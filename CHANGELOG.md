@@ -4,6 +4,14 @@ All notable changes to `@pipelex/mthds-form` are documented here. The format fol
 
 A `## [vX.Y.Z]` heading means that version was published to npm. Work in progress accumulates under `## [Unreleased]` and is renamed when the release actually ships.
 
+## [v0.2.0] - 2026-08-21
+
+### Added
+
+- **A presentation seam on the controls — `FieldPresentationProvider`.** A form has two audiences and they want opposite label chrome. In a builder-facing surface the field's name IS the identifier written in the `.mthds` file, so it is shown verbatim in mono beside its concept pill; in a published method app that name and that concept are implementation detail the person filling the form has never seen. `presentation="app"` humanises the label (`full_name` → `Full name`), drops the pill, and outlines a field in error instead of only captioning it — the caption alone is easy to miss on a tall form, and on controls whose `aria-invalid` sits on an element the user cannot see (the file dropzone's hidden input, most of all) it was the only signal at all. `studio` is the default, so nothing changes for a host that says nothing.
+
+  It is a context rather than a prop, deliberately: only `FieldShell` and `ObjectField` read it, and a prop would have meant editing every control and both recursive containers to carry a value they never use. `humanizeFieldName` is exported too, for hosts that label something outside a control.
+
 ## [v0.1.0] - 2026-08-21
 
 The initial contents of the package.

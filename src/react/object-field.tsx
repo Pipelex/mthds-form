@@ -5,6 +5,7 @@ import { cn } from './utils';
 import { isFilled, type ObjectRunField } from '../core';
 import { ConceptPill } from './concept-pill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
+import { humanizeFieldName, useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 
@@ -25,6 +26,8 @@ interface ObjectFieldProps {
 export function ObjectField({ field, value, onChange, id, error, env }: ObjectFieldProps) {
   const s = useFieldStrings();
   const [showOptional, setShowOptional] = useState(false);
+  // A grouped concept reads as a section heading in an app, not as a typed field.
+  const isApp = useFieldPresentation() === 'app';
   const data = value ?? {};
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
@@ -37,10 +40,15 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="font-mono text-[13px] font-medium leading-none text-foreground">
-          {field.title ?? field.name}
+        <span
+          className={cn(
+            'text-[13px] font-medium leading-none text-foreground',
+            isApp ? 'text-[13.5px]' : 'font-mono',
+          )}
+        >
+          {isApp ? humanizeFieldName(field.title ?? field.name) : (field.title ?? field.name)}
         </span>
-        <ConceptPill conceptRef={field.conceptRef} category="structured" />
+        {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
         {!field.required && (
           <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
             {s.optionalBadge}
