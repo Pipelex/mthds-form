@@ -1,0 +1,65 @@
+# @pipelex/mthds-form
+
+The input form for MTHDS methods, as a library: a headless kernel that turns a method's declared input contract into a renderable descriptor and gates what may be run, plus a themeable React control set that renders that descriptor.
+
+It exists because "the form" is one problem that keeps being solved separately. A method declares its inputs; something has to decide what widget each input deserves, whether the Run button may light up, what shape the values take on the wire, and what a validation failure says to a person. That logic belongs in one place with tests around it, not copied into each surface that happens to need a form.
+
+## Two entry points
+
+```ts
+import { buildRunFields, computeReadiness } from '@pipelex/mthds-form'; // headless
+import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
+```
+
+`.` is the kernel: no React, no design system, no framework. Its only runtime dependency is `ajv`, which the gate validates through. It runs in a browser, in Node, in a worker.
+
+`./react` is the control set — one control per field kind behind a single dispatch point, styled with Tailwind classes over standard shadcn/ui tokens. `react` and `react-dom` are optional peer dependencies, so a consumer that only wants the kernel never installs them.
+
+## The shape of a form
+
+```tsx
+import { buildRunFields, computeReadiness, getPipeIOContract } from '@pipelex/mthds-form';
+import { FieldRenderer } from '@pipelex/mthds-form/react';
+
+const contract = getPipeIOContract(method.pipe_io_contracts, pipeCode, method.domain);
+const fields = buildRunFields(contract.inputs);
+const { canRun } = computeReadiness(fields, values);
+
+return fields.map((field) => (
+  <FieldRenderer
+    key={field.name}
+    field={field}
+    id={field.name}
+    value={values[field.name]}
+    onChange={(next) => setValue(field.name, next)}
+  />
+));
+```
+
+`buildRunFields` is the only function that reads JSON Schema. Everything downstream — rendering, readiness, validation messaging — reads the `RunField` descriptor it returns. That is the load-bearing rule of the package, and [docs/architecture.md](docs/architecture.md) explains what it buys.
+
+Submitting goes through the gate: `buildRunInputsSchema` → `prepareRunInputs` → `validateRunInputs` → `apiInputsFromSchemaData`. The verdict is structured (`RunInputError[]`), and `describeValidationError` renders it for a person.
+
+## Theming
+
+The controls carry Tailwind classes over the standard shadcn/ui semantic tokens (`--background`, `--input`, `--border`, `--primary`, …). A host that already defines those tokens gets controls that match its product with no configuration. A host with no Tailwind build loads the prebuilt `@pipelex/mthds-form/styles.css`. Both paths, and the exact token list, are in [docs/theming.md](docs/theming.md).
+
+## Documentation
+
+| | |
+| --- | --- |
+| [docs/architecture.md](docs/architecture.md) | the descriptor currency, the one-function seam, the module map |
+| [docs/dependency-budget.md](docs/dependency-budget.md) | what each layer may depend on, and how that is enforced |
+| [docs/theming.md](docs/theming.md) | the token contract and host setup |
+| [docs/derivation-swap.md](docs/derivation-swap.md) | how the descriptor moves server-side without touching consumers |
+
+## Development
+
+```bash
+make install
+make check   # lint + format + typecheck
+make test
+make build   # both entry points, plus the prebuilt stylesheet
+```
+
+MIT licensed.

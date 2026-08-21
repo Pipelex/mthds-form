@@ -1,0 +1,136 @@
+import {
+  inputMustBeFilled,
+  buildRunFields,
+  computeReadiness,
+  conceptCategory,
+  mustBeFilled,
+  type ObjectRunField,
+} from '..';
+import { describe, expect, it } from 'vitest';
+import type { PipeInputContract } from '..';
+
+describe('buildRunFields date mapping', () => {
+  it('maps a `date-time` string property to a date field that stores a timestamp', () => {
+    // A `type = "date"` structure field compiles to `format: date-time`.
+    const inputs: Record<string, PipeInputContract> = {
+      quote_date: {
+        concept_ref: 'atlas.QuoteDate',
+        json_schema: {
+          type: 'object',
+          properties: { date: { type: 'string', format: 'date-time', title: 'Date' } },
+          required: ['date'],
+        },
+      },
+    };
+
+    const quote = buildRunFields(inputs)[0] as ObjectRunField;
+    expect(quote.kind).toBe('object');
+    const date = quote.fields.find((f) => f.name === 'date')!;
+    expect(date.kind).toBe('date');
+    expect(date.kind === 'date' && date.datetime).toBe(true);
+  });
+
+  it('maps a bare `date` format to a date field that stores a plain day', () => {
+    const inputs: Record<string, PipeInputContract> = {
+      day: {
+        concept_ref: 'atlas.Day',
+        json_schema: { type: 'string', format: 'date' },
+      },
+    };
+
+    const field = buildRunFields(inputs)[0]!;
+    expect(field.kind).toBe('date');
+    expect(field.kind === 'date' && field.datetime).toBe(false);
+    expect(conceptCategory(field)).toBe('date');
+  });
+
+  it('leaves a plain string field as text (not date)', () => {
+    const inputs: Record<string, PipeInputContract> = {
+      label: { concept_ref: 'atlas.Label', json_schema: { type: 'string' } },
+    };
+    expect(buildRunFields(inputs)[0]!.kind).not.toBe('date');
+  });
+});
+
+// ─── What the Run bar is allowed to demand ───────────────────────────────────
+
+describe('required / readiness over optional and plural inputs', () => {
+  const INPUTS: Record<string, PipeInputContract> = {
+    supplier_quote: { concept_ref: 'native.Document', json_schema: { type: 'object' } },
+    comments: {
+      concept_ref: 'native.Text',
+      json_schema: { type: 'object', properties: { text: { type: 'string' } } },
+      optional: true,
+    },
+    illustrations: {
+      concept_ref: 'native.Image',
+      json_schema: { type: 'array', items: { type: 'object' } },
+    },
+  };
+
+  it('marks an optional (`?`) input not-required so it can collapse', () => {
+    const [quote, comments, illustrations] = buildRunFields(INPUTS);
+    expect(quote?.required).toBe(true);
+    expect(comments?.required).toBe(false);
+    // A plural input is still a first-class input: it keeps its place in the form.
+    expect(illustrations?.required).toBe(true);
+    expect(illustrations?.kind).toBe('list');
+  });
+
+  it('gates only on the required, non-plural inputs', () => {
+    const fields = buildRunFields(INPUTS);
+    expect(mustBeFilled(fields[0]!)).toBe(true);
+    expect(mustBeFilled(fields[1]!)).toBe(false);
+    expect(mustBeFilled(fields[2]!)).toBe(false);
+  });
+
+  // The run page and the method viewer must answer "does Run wait for this?"
+  // identically - they used to hold two rules, and this is the input that told
+  // them apart: a plural conceptRef whose json_schema is NOT an array. The
+  // viewer's contract predicate is the single source now, so both say the same.
+  it('agrees with the method viewer on a plural input carrying a non-array schema', () => {
+    const input = {
+      concept_ref: 'native.Text[]',
+      // Deliberately not `type: 'array'` - the shape heuristic would call this a
+      // list from the conceptRef alone and stop gating on it.
+      json_schema: { type: 'string' },
+    };
+    const [field] = buildRunFields({ tags: input });
+
+    expect(mustBeFilled(field!)).toBe(inputMustBeFilled(input));
+    // And concretely: the contract never declared it optional or plural-by-schema,
+    // so it still gates - the mapped `kind` is irrelevant to the question.
+    expect(mustBeFilled(field!)).toBe(true);
+  });
+
+  it('falls back to the shape heuristic for a hand-authored field (no contract)', () => {
+    // Story fixtures and unit tests build `RunField`s directly; they carry no
+    // `gating` because there is no contract behind them.
+    const handAuthored = {
+      kind: 'list' as const,
+      name: 'tags',
+      conceptRef: 'native.Text[]',
+      required: true,
+      item: { kind: 'text' as const, name: 'tag', required: true },
+    };
+    expect(handAuthored).not.toHaveProperty('gating');
+    expect(mustBeFilled(handAuthored)).toBe(false);
+  });
+
+  it('counts an empty form as one input short, not three', () => {
+    const readiness = computeReadiness(buildRunFields(INPUTS), {});
+    expect(readiness).toEqual({ total: 1, ready: 0, missing: ['supplier_quote'] });
+  });
+
+  it('is ready once the one required input is filled', () => {
+    const readiness = computeReadiness(buildRunFields(INPUTS), {
+      supplier_quote: { url: 'quote.pdf' },
+    });
+    expect(readiness).toEqual({ total: 1, ready: 1, missing: [] });
+  });
+
+  it('still gates a required input when other inputs are filled', () => {
+    const readiness = computeReadiness(buildRunFields(INPUTS), { comments: 'offrir la gravure' });
+    expect(readiness.missing).toEqual(['supplier_quote']);
+  });
+});

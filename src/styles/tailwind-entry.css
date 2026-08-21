@@ -1,0 +1,12 @@
+/*
+ * Source for `dist/styles.css` - the prebuilt stylesheet for hosts that do NOT
+ * run Tailwind themselves. It carries Tailwind's preflight, so a host that has
+ * its own Tailwind build must NOT load it (see `docs/theming.md`): add the
+ * package to that build's content globs instead.
+ *
+ * Token VALUES are not baked in here - they come from `theme.css` (or from the
+ * host's own definitions), which is what makes the controls themeable.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

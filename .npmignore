@@ -1,0 +1,16 @@
+# Tests
+src/**/__tests__/
+coverage/
+
+# CI/CD and tooling config
+.claude/
+.github/
+docs/
+wip/
+vitest.config.mts
+tsup.config.ts
+tailwind.config.cjs
+eslint.config.mjs
+.prettierrc
+Makefile
+CLAUDE.md
