@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { cn } from './utils';
 import { type ListRunField, type RunField } from '../core';
 import { ConceptPill } from './concept-pill';
+import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
 
@@ -24,6 +25,10 @@ interface ListFieldProps {
  */
 export function ListField({ field, value, onChange, id, error, env }: ListFieldProps) {
   const s = useFieldStrings();
+  // Same label chrome switch as `FieldShell` - this control owns its own label
+  // because the items-count badge sits beside it. See `field-presentation.tsx`.
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
   const items = value ?? [];
 
   const setItem = (index: number, itemValue: unknown) => {
@@ -37,10 +42,15 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="font-mono text-[13px] font-medium leading-none text-foreground">
-          {field.title ?? field.name}
+        <span
+          className={cn(
+            'text-[13px] font-medium leading-none text-foreground',
+            isApp ? 'text-[13.5px]' : 'font-mono',
+          )}
+        >
+          {fieldLabel(field.title, field.name, presentation)}
         </span>
-        <ConceptPill conceptRef={field.conceptRef} category="list" />
+        {!isApp && <ConceptPill conceptRef={field.conceptRef} category="list" />}
         <span className="font-mono text-[10.5px] text-muted-foreground">
           {s.itemsCount(items.length)}
         </span>

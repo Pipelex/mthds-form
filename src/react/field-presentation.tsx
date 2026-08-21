@@ -12,9 +12,10 @@ import { createContext, use, type ReactNode } from 'react';
  *   a method app, `full_name` and `native.Text` are implementation detail; the
  *   person filling the form has never seen the method's source.
  *
- * Deliberately a context rather than a prop or a `FieldEnv` flag: `FieldShell`
- * and `ObjectField` are the ONLY components that need it, and threading a prop
- * would have meant editing every field control and both recursive containers.
+ * Deliberately a context rather than a prop or a `FieldEnv` flag: only the
+ * components that own label chrome read it - `FieldShell`, `ObjectField`,
+ * `BooleanField` and `ListField` - and threading a prop would have meant
+ * editing every field control and both recursive containers.
  */
 export type FieldPresentation = 'studio' | 'app';
 
@@ -37,11 +38,27 @@ export function useFieldPresentation(): FieldPresentation {
 /**
  * `full_name` → `Full name`. Only the first word is capitalised: these are
  * labels, not titles, and Title Case on every word reads as a form from 2009.
- * An already-humanised name (a `title` from the schema) passes through
- * unchanged because it contains no underscores.
+ * Takes IDENTIFIERS only - snake_case or kebab-case names, where a separator
+ * is structure. An authored `title` never goes through here: it is already
+ * human-facing, and its hyphens are spelling (`E-mail address`), not structure.
  */
 export function humanizeFieldName(name: string): string {
   const words = name.replace(/[_-]+/g, ' ').trim();
   if (words === '') return name;
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * The one label expression every chrome-owning component uses: an authored
+ * `title` is authoritative and shown verbatim in both presentations; only the
+ * identifier fallback is humanised in app mode. An empty title stays empty -
+ * that is how a list row suppresses its per-row label.
+ */
+export function fieldLabel(
+  title: string | undefined,
+  name: string,
+  presentation: FieldPresentation,
+): string {
+  if (title !== undefined) return title;
+  return presentation === 'app' ? humanizeFieldName(name) : name;
 }

@@ -5,7 +5,7 @@ import { cn } from './utils';
 import type { ConceptCategory } from '../core';
 import { ConceptPill } from './concept-pill';
 import { useFieldStrings } from './field-strings';
-import { humanizeFieldName, useFieldPresentation } from './field-presentation';
+import { fieldLabel, useFieldPresentation } from './field-presentation';
 
 interface FieldShellProps {
   name: string;
@@ -43,12 +43,12 @@ export function FieldShell({
   // Inside a method app the label is a question, not an identifier: sans,
   // humanised, and with no concept pill. Everywhere else it stays the exact
   // mono name a builder wrote. See `field-presentation.tsx`.
-  const isApp = useFieldPresentation() === 'app';
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
   const Label = htmlFor ? 'label' : 'div';
   // A list item passes title="" - the row index already labels it, so we drop
   // the name and keep only the type pill to avoid a redundant header per row.
-  const rawLabel = title !== undefined ? title : name;
-  const labelText = isApp ? humanizeFieldName(rawLabel) : rawLabel;
+  const labelText = fieldLabel(title, name, presentation);
   const showLabel = labelText.trim() !== '';
   return (
     <div className={cn('space-y-2', className)}>
