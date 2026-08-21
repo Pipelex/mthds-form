@@ -25,3 +25,10 @@ export { fieldControlClass } from './field-styles';
 
 export type { FieldStrings } from './field-strings';
 export { DEFAULT_FIELD_STRINGS, FieldStringsProvider, useFieldStrings } from './field-strings';
+
+export type { FieldPresentation } from './field-presentation';
+export {
+  FieldPresentationProvider,
+  humanizeFieldName,
+  useFieldPresentation,
+} from './field-presentation';

@@ -3,6 +3,7 @@
 import { cn } from './utils';
 import type { BooleanRunField } from '../core';
 import { ConceptPill } from './concept-pill';
+import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { Switch } from './ui/switch';
 
 interface BooleanFieldProps {
@@ -19,6 +20,10 @@ interface BooleanFieldProps {
  * a labelled box.
  */
 export function BooleanField({ field, value, onChange, id, disabled }: BooleanFieldProps) {
+  // Same label chrome switch as `FieldShell` - this control owns its own label
+  // because it sits inline with the switch. See `field-presentation.tsx`.
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
   return (
     <div
       className={cn(
@@ -30,11 +35,14 @@ export function BooleanField({ field, value, onChange, id, disabled }: BooleanFi
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <label
             htmlFor={id}
-            className="font-mono text-[13px] font-medium leading-none text-foreground"
+            className={cn(
+              'text-[13px] font-medium leading-none text-foreground',
+              isApp ? 'text-[13.5px]' : 'font-mono',
+            )}
           >
-            {field.title ?? field.name}
+            {fieldLabel(field.title, field.name, presentation)}
           </label>
-          <ConceptPill conceptRef={field.conceptRef} category="boolean" />
+          {!isApp && <ConceptPill conceptRef={field.conceptRef} category="boolean" />}
         </div>
         {field.description && (
           <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>

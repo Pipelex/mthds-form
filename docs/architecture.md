@@ -38,10 +38,11 @@ Everything heuristic is module-private behind that function: the native-concept 
 
 `FieldRenderer` is the single dispatch point: a `RunField` in, the matching control out. Object and list fields recurse back through it, so a form of any depth is one data-driven tree with no per-type branching anywhere else. `FieldEnv` threads the ambient concerns a nested field may need — disabled state, and the upload trio (`onDropFile`, `uploadingIds`, `resolveUrl`) that keeps file handling injected rather than built in. The package never uploads anything itself.
 
-Two seams keep the controls host-agnostic:
+Three seams keep the controls host-agnostic:
 
 - **Copy.** `FieldStringsProvider` supplies every user-visible string, with complete English defaults baked in. A host wraps its form once to inject translations; nothing is required for English.
 - **Upload.** Injected through `FieldEnv`, as above.
+- **Presentation.** `FieldPresentationProvider` picks how a field's label chrome reads. `studio` (the default) shows the field's name verbatim in mono with its concept pill, because in a builder-facing surface the name IS the identifier written in the `.mthds` file. `app` shows it humanised in sans with no pill, and outlines a field in error rather than only captioning it, because the person filling a published form has never seen the method's source. An authored `title` is authoritative and shown verbatim in both presentations; only the identifier fallback is humanised. It is a context rather than a prop deliberately: only the components that own label chrome read it — `FieldShell`, `ObjectField`, `BooleanField` and `ListField` — and threading a prop would have meant editing every control and both recursive containers to carry something they do not use.
 
 The vendored `ui/` primitives (`switch`, `select`, `toggle`, `toggle-group`) and the `cn` helper are copies rather than imports, which is how shadcn/ui is meant to be consumed. They are internal: only what `src/react/index.ts` exports is public API.
 
