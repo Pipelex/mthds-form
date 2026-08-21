@@ -61,7 +61,7 @@ The release branch is `release/vX.Y.Z`, where X.Y.Z is the **new** version, and 
 A `## [vX.Y.Z]` heading in this changelog is a receipt for a published npm version, so it is written exactly once, at the moment the release is cut.
 
 1. Rename the existing `## [Unreleased]` heading to `## [vX.Y.Z] - YYYY-MM-DD`, keeping everything under it. Do not leave an empty `[Unreleased]` behind — the next piece of work re-creates it.
-2. If there is no `[Unreleased]` section, insert the new heading **above the first `## [v` heading**, not directly under the `# Changelog` title: the file opens with a preamble explaining the format and what a version heading means, and that preamble stays at the top.
+2. If there is no `[Unreleased]` section, insert the new heading **immediately above the first `## [v` heading**. Today that is directly under the `# Changelog` title, since the file carries no introductory prose; anchoring on the first version heading rather than on the title is what keeps this correct if a preamble is ever added back.
 3. If the user passed changelog content when invoking the skill, **merge** it with whatever is under `[Unreleased]` — never discard either source. Sort the combined content under the usual headings (`### Added`, `### Changed`, `### Fixed`), inferring them from the content.
 4. Changes to files under `wip/` are working notes, not release-facing — leave them out.
 5. If the release has no content at all, neither from `[Unreleased]` nor from the invocation, ask the user what to include before proceeding.
@@ -100,6 +100,8 @@ Stage the release changes — at minimum `package.json`, `CHANGELOG.md` and `pac
 ```
 bump version to X.Y.Z
 ```
+
+**On the already-bumped path from step 1 there is no bump to describe, so that message would be false.** The commit then carries only whatever the user chose to include, and its message should say what that actually is — a plain `chore:` or `docs:` line naming the work, with a body noting that the version and the changelog entry landed earlier and giving the commit they landed in. If nothing was included, there is nothing to commit at all: the branch is its parent, and the release is the PR alone.
 
 Push with `-u` to set up tracking.
 
