@@ -43,7 +43,7 @@ export interface Readiness {
  * a plural slot is never "absent" in MTHDS, its empty form IS the empty list,
  * and no method can declare "at least one item".
  *
- * **For a field the app built, the answer comes from `inputMustBeFilled`**
+ * **For a field this package built, the answer comes from `inputMustBeFilled`**
  * (`contracts.ts`) - the SAME predicate the method viewer's Run button, its ajv
  * `required` list and its missing-inputs toast all read. `buildRunFields`
  * stamps it onto `gating`. This used to be re-derived here as
@@ -55,8 +55,8 @@ export interface Readiness {
  *
  * The shape heuristic survives only as the fallback for a **hand-authored**
  * `RunField` - story fixtures and unit tests, which have no contract to consult
- * and therefore nothing to disagree with. Every field the app renders comes from
- * `buildRunFields` and carries `gating`, so the app is on the contract's answer
+ * and therefore nothing to disagree with. Every field a host renders comes from
+ * `buildRunFields` and carries `gating`, so a host is on the contract's answer
  * alone.
  */
 export function mustBeFilled(field: RunField): boolean {

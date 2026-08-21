@@ -103,6 +103,6 @@ export {
   schemaTypeOf,
 } from './schema-utils';
 
-// RJSF-shaped schema preparation (consumed by the app's leftover RJSF panel
-// and by the gate).
+// RJSF-shaped schema preparation (consumed by the gate, and by hosts still
+// rendering an RJSF panel).
 export { normalizeSchemaForRjsf, prepareSchemaForRjsf } from './normalize-schema';

@@ -1,8 +1,8 @@
 /**
  * CHARACTERIZATION - the three drifted native-concept taxonomies, pinned BEFORE
- * they were consolidated during this package's extraction. Module names below
- * are the app-side originals; docs/derivation-swap.md explains why the drift
- * is preserved rather than fixed.
+ * they were consolidated. Module names below are the pre-consolidation
+ * originals; docs/derivation-swap.md explains why the drift is preserved rather
+ * than fixed.
  *
  * Three modules hardcode their own list of native concepts, and they disagree:
  *   - `field-model.ts` folds `Date`/`HTML` into TEXT and `Page` into DOCUMENT;

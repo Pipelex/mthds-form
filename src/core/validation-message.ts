@@ -29,7 +29,7 @@ import type { RunInputError } from './gate-validator';
 const MAX_SHOWN_VALUE_CHARS = 120;
 
 /** The message keys this module renders, relative to the caller's namespace
- *  (the app passes its `method.editor` translator). */
+ *  (a host passes its own translator for that namespace). */
 export type ValidationMessageKey =
   | 'inputPanel.aDateField'
   | 'inputPanel.pickValidDate'

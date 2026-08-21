@@ -24,8 +24,5 @@
 - **Files are kebab-case**; one control per file.
 - **Tests** are the core's unit suites under `src/core/__tests__/`, node environment, no DOM. The control set's stories and interaction tests live in the consuming app for now and move here with Storybook.
 - **Docs live in `docs/`, one topic per file, updated in the same change as the code.** A change to a documented contract that does not touch `docs/` is incomplete.
+- **This repo is open source — never name a closed-source repo in it,** in source comments, docs, changelogs, config or tests. Say "a host" or "a consumer" instead; a reader outside the company cannot follow a name they have no access to, and it leaks internal structure into a published package.
 - **Versioning:** a `## [vX.Y.Z]` changelog heading is a receipt for a published npm release, never a commit counter. Work accumulates under `## [Unreleased]`; cut and rename it when you actually publish, keeping `package.json` in agreement.
-
-## Consumers
-
-`pipelex-app` is the first, and the package was extracted from its run form. `@pipelex/mthds-ui` takes it as a dependency for its side panel — the dependency runs one way only, and this package must never import `mthds-ui`. The two speak different theming regimes on purpose (this one Tailwind, that one plain CSS over custom properties); a consumer of both configures each once and they do not interact.
