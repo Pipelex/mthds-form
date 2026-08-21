@@ -8,8 +8,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 /**
  * The dependency budget, enforced as lint rather than left to review.
  *
- * The package carved out of `pipelex-app` under an equivalent rule set there;
- * keeping it here is what stops the budget from eroding one convenient import
+ * Enforcing it here is what stops the budget from eroding one convenient import
  * at a time. See `docs/dependency-budget.md`.
  */
 const BUDGET_PATTERNS = [

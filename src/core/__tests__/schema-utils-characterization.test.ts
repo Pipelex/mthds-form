@@ -1,8 +1,8 @@
 /**
- * CHARACTERIZATION - the divergent behaviors of the duplicated schema helpers
- * this package was carved out of, pinned BEFORE they were consolidated into
- * one `schema-utils` module. Module names below are the app-side originals;
- * docs/derivation-swap.md explains why the divergence is preserved.
+ * CHARACTERIZATION - the divergent behaviors of the duplicated schema helpers,
+ * pinned BEFORE they were consolidated into one `schema-utils` module. Module
+ * names below are the pre-consolidation originals; docs/derivation-swap.md
+ * explains why the divergence is preserved.
  *
  * Two `anyOf` collapses exist and their semantics differ in load-bearing ways:
  *   - `field-model.ts` `collapseNullable` (private, observed via `buildRunFields`)

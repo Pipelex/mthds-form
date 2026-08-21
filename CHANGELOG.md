@@ -6,7 +6,7 @@ A `## [vX.Y.Z]` heading means that version was published to npm. Work in progres
 
 ## [Unreleased]
 
-The initial contents of the package, extracted from `pipelex-app`'s run form with behaviour frozen — the app's suites and stories stayed green throughout, and pass unchanged against the package.
+The initial contents of the package.
 
 ### Added
 

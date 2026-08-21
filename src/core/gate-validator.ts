@@ -8,7 +8,7 @@
  * configured for byte-identical output:
  *
  * - the ajv OPTIONS are `@rjsf/validator-ajv8`'s `AJV_CONFIG` plus the same
- *   `coerceTypes: true` override the app has always run with (pydantic runs in
+ *   `coerceTypes: true` override this gate has always run with (pydantic runs in
  *   lax mode - `"20"` is a number, `"5"` an int - and rejecting client-side what
  *   the runner accepts blocks valid work; see `rjsf-validator.ts`);
  * - the `date` / `date-time` formats are the pydantic-parity predicates from
@@ -27,10 +27,10 @@ import addFormats from 'ajv-formats';
 import { isAcceptableDate, isAcceptableDateTime } from './date-format';
 
 /**
- * One validation error, in the shape the app reads (`property`, `message`,
+ * One validation error, in the shape hosts read (`property`, `message`,
  * `name`, `stack`, `params.format`). Structurally a superset-compatible twin of
- * RJSF's `RJSFValidationError`, so surfaces still holding RJSF form errors (the
- * method editor's Inputs panel) can hand them to the same message renderer.
+ * RJSF's `RJSFValidationError`, so a host surface still holding RJSF form errors
+ * (an RJSF-based inputs panel) can hand them to the same message renderer.
  */
 export interface RunInputError {
   /** The ajv keyword that failed (`required`, `format`, `type`, …). */

@@ -4,13 +4,13 @@
  * The controls' i18n seam. The field controls are kernel code - they cannot
  * import `next-intl` - so every user-visible string they render comes through
  * this typed contract, with English defaults baked in. A host app injects its
- * own values (the webapp bridges next-intl in `field-strings-intl.tsx`) by
- * mounting `FieldStringsProvider` above the form; stories and tests run on the
- * defaults, which match the app's `en.json` word for word.
+ * own values (a next-intl host bridges them in its own `field-strings-intl.tsx`)
+ * by mounting `FieldStringsProvider` above the form; stories and tests run on
+ * the defaults.
  *
  * Count-bearing messages are FUNCTIONS, not templates: the default English
  * pluralization lives here, and an injecting host applies its own locale's
- * rules (next-intl's ICU plurals in the app).
+ * rules (ICU plurals under next-intl, for instance).
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 

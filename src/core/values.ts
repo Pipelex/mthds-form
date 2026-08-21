@@ -1,5 +1,5 @@
 /**
- * Bridges the `MethodRunner`'s field values to the rest of the app.
+ * Bridges the `MethodRunner`'s field values to the rest of the host.
  *
  * The method-store keeps inputs in the *simplified* format and runs send the
  * *full* RJSF form shape - both already handled by `inflate/deflateAllInputs`.
@@ -221,7 +221,7 @@ export interface OutputEntry {
 
 /**
  * The slice of a serialized pipe output this module actually reads. Structural
- * on purpose: the SDK's `DictPipeOutput` is the app's wire type, and the kernel
+ * on purpose: the SDK's `DictPipeOutput` is the host's wire type, and the kernel
  * must not depend on `@pipelex/sdk` - the guard below verifies the shape at
  * runtime anyway.
  */
