@@ -4,7 +4,7 @@ All notable changes to `@pipelex/mthds-form` are documented here. The format fol
 
 A `## [vX.Y.Z]` heading means that version was published to npm. Work in progress accumulates under `## [Unreleased]` and is renamed when the release actually ships.
 
-## [Unreleased]
+## [v0.1.0] - 2026-08-21
 
 The initial contents of the package.
 
