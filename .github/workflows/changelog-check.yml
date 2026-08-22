@@ -1,0 +1,59 @@
+# On a release PR (release/vX.Y.Z -> main), require that CHANGELOG.md already
+# carries the matching `## [vX.Y.Z]` heading, and that package.json agrees with
+# the branch name. Merging that PR is what publishes, so this is the last point
+# at which a missing heading is still cheap to fix: afterwards `npm publish` has
+# run, and npm never gives a version number back.
+#
+# Non-release PRs are skipped. The branch ref is read into env: and never
+# interpolated into the shell.
+name: Changelog Version Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check-changelog:
+    name: Changelog Version Check
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'release/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the changelog has an entry for the release version
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ ! "$HEAD_REF" =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Branch name '$HEAD_REF' does not match the expected format 'release/vX.Y.Z'."
+            exit 1
+          fi
+          BRANCH_VERSION="${BASH_REMATCH[1]}"
+
+          # The version that gets published is the one in package.json, not the
+          # one in the branch name, so that is the one whose heading must exist.
+          # They are required to agree, otherwise this gate would happily vouch
+          # for a version the release is not actually shipping.
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$BRANCH_VERSION" ]; then
+            echo "::error::package.json is at $VERSION but the branch is release/v$BRANCH_VERSION. They must match."
+            exit 1
+          fi
+
+          # Anchored, with the dots escaped, and the date suffix optional - the
+          # same shape release.yml's extraction step looks for, so a heading can
+          # never pass this gate and then be missed by the release notes.
+          if ! grep -qE "^## \[v${VERSION//./\\.}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [v$VERSION]' heading. Rename '## [Unreleased]' to '## [v$VERSION] - YYYY-MM-DD' before merging this release."
+            echo "Versions currently in the changelog:"
+            grep -E "^## \[v[0-9]+\.[0-9]+\.[0-9]+\]" CHANGELOG.md || true
+            exit 1
+          fi
+
+          echo "Changelog entry found for v$VERSION."

@@ -50,6 +50,23 @@ jobs:
             echo "already_published=false" >> $GITHUB_OUTPUT
           fi
 
+      # The same gate `changelog-check.yml` runs on the release PR, repeated at
+      # the last moment before the irreversible step. That gate only sees PRs
+      # from a `release/v*` branch, so a version bump reaching `main` any other
+      # way would otherwise publish with no entry - and npm never gives a
+      # version number back. Gated on already_published so that a push which
+      # does not move the version stays the deliberate no-op described above.
+      - name: Assert the changelog has an entry for this version
+        if: steps.check_published.outputs.already_published == 'false'
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if ! grep -qE "^## \[v${VERSION//./\\.}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [v$VERSION]' heading - refusing to publish $VERSION. Rename '## [Unreleased]' and push again."
+            exit 1
+          fi
+          echo "Changelog entry found for v$VERSION."
+
       - name: Install dependencies
         if: steps.check_published.outputs.already_published == 'false'
         # --ignore-scripts skips the `prepare` hook (= npm run build), so we
@@ -149,6 +166,11 @@ jobs:
 
           START_LINE=$(grep -n "^## \[v$VERSION\]" CHANGELOG.md | head -1 | cut -d: -f1)
 
+          # Deliberately a warning here, where the publish job hard-fails: this
+          # job also runs on the recovery path, backfilling a release for a
+          # version npm already has. Failing it would leave that version
+          # permanently without a GitHub release, which is the opposite of what
+          # the gate is for. The heading is enforced before publishing instead.
           if [ -z "$START_LINE" ]; then
             echo "Warning: No changelog entry found for version v$VERSION"
             echo "CHANGELOG_NOTES=" >> $GITHUB_ENV

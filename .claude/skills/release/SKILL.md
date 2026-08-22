@@ -50,7 +50,7 @@ If anything fails, stop and report the errors. Help the user fix them rather tha
 
 ### 4. Ensure we're on the right branch
 
-The release branch is `release/vX.Y.Z`, where X.Y.Z is the **new** version, and it is the one branch in this workspace that targets `main` instead of `dev`. All release edits happen on it.
+The release branch is `release/vX.Y.Z`, where X.Y.Z is the **new** version, and it is the one branch in this workspace that targets `main` instead of `dev`. All release edits happen on it. The name is not cosmetic: `.github/workflows/changelog-check.yml` parses it on the PR and fails the release if it is malformed or disagrees with `package.json`.
 
 - If already on `release/vX.Y.Z` matching the new version, stay on it.
 - If on `dev` (the usual case), `main`, or any other branch, create and switch to `release/vX.Y.Z` from the current HEAD.
@@ -59,6 +59,8 @@ The release branch is `release/vX.Y.Z`, where X.Y.Z is the **new** version, and 
 ### 5. Finalize the changelog
 
 A `## [vX.Y.Z]` heading in this changelog is a receipt for a published npm version, so it is written exactly once, at the moment the release is cut.
+
+Two CI gates hold that discipline rather than trusting it, so a heading forgotten here stops the release rather than shipping without one: the release PR fails if `CHANGELOG.md` carries no `## [vX.Y.Z]` heading for the version in `package.json`, and the publish job re-checks before `npm publish` and refuses to ship a version that has none. The date suffix is optional to both; write it anyway.
 
 1. Rename the existing `## [Unreleased]` heading to `## [vX.Y.Z] - YYYY-MM-DD`, keeping everything under it. Do not leave an empty `[Unreleased]` behind — the next piece of work re-creates it.
 2. If there is no `[Unreleased]` section, insert the new heading **immediately above the first `## [v` heading**. Today that is directly under the `# Changelog` title, since the file carries no introductory prose; anchoring on the first version heading rather than on the title is what keeps this correct if a preamble is ever added back.
