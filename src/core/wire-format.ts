@@ -79,8 +79,8 @@ function deflateListItem(value: unknown, concept: string): unknown {
   // Custom structured concept → { concept, content }.
   //
   // IDEMPOTENT ON PURPOSE - see `unwrapAllWrappers`. Wrapping unconditionally
-  // corrupted persisted inputs: `input-config-panel` seeds the form with the
-  // RAW stored value when the input schemas aren't loaded yet (no dry run yet),
+  // corrupted persisted inputs: a host panel seeds the form with the RAW
+  // stored value when the input schemas aren't loaded yet (no dry run yet),
   // so the form could hold an ALREADY-wrapped value; the next change deflated
   // it again and saved `{ concept, content: { concept, content: {...} } }`.
   // Wrapping exactly once, whatever we're handed, makes that unreachable.
@@ -111,8 +111,8 @@ function deflateSingleValue(value: unknown, concept: string): unknown {
   // Custom structured concept → { concept, content }.
   //
   // IDEMPOTENT ON PURPOSE - see `unwrapAllWrappers`. Wrapping unconditionally
-  // corrupted persisted inputs: `input-config-panel` seeds the form with the
-  // RAW stored value when the input schemas aren't loaded yet (no dry run yet),
+  // corrupted persisted inputs: a host panel seeds the form with the RAW
+  // stored value when the input schemas aren't loaded yet (no dry run yet),
   // so the form could hold an ALREADY-wrapped value; the next change deflated
   // it again and saved `{ concept, content: { concept, content: {...} } }`.
   // Wrapping exactly once, whatever we're handed, makes that unreachable.

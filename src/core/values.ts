@@ -150,9 +150,9 @@ export function runValuesFromStore(
 }
 
 /**
- * The runner's form values in **schema shape** - the same shape the MethodViewer's
- * RJSF form holds, and therefore the shape `gate.ts` validates
- * against the per-input JSON Schemas.
+ * The runner's form values in **schema shape** - the same shape an RJSF panel
+ * holds, and therefore the shape `gate.ts` validates against the per-input
+ * JSON Schemas.
  *
  * Deliberately stops short of `deflateAllInputs`: deflation is the STORE's
  * compact form, and ajv validates the full one.

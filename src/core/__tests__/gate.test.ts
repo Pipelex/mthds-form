@@ -1,7 +1,7 @@
 /**
  * The shared run gate - the chain BOTH run surfaces put a run through.
  *
- * The MethodViewer's Inputs panel (RJSF) and the standalone run page (bespoke
+ * A schema-driven inputs panel (RJSF) and a standalone run page (a bespoke
  * field renderer) differ only in how they DISPLAY inputs. Everything between
  * "Run pressed" and "payload on the wire" is this module, so these tests are the
  * contract for both.
