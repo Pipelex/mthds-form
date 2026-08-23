@@ -14,19 +14,29 @@ buildRunFields(inputs: Record<string, PipeInputContract>) -> RunField[]
 
 Everything heuristic is module-private behind that function: the native-concept taxonomy, the url-bearing-object test, the depth rule that decides prose versus a single-line input, the `accept` strings, list splitting. None of it is exported, which is what makes the seam real rather than aspirational — see [derivation-swap.md](derivation-swap.md).
 
+### What a scalar's value actually looks like on the wire
+
+A native scalar reads as a plain value in the form and travels as an object on the wire. `native.Number` declares `NumberContent {number}`, `native.YesNo` declares `YesNoContent {yes_no}`, `native.Text` declares `TextContent {text}` — so the control holds `2` while the payload must carry `{number: 2}`, and the gate validates against the declared content model.
+
+The descriptor is what reconciles those. `buildRunFields` reads the contract, finds the single property the content model declares, and stamps its **name** on the field as `contentKey`. The value bridge in `values` then wraps on the way out and unwraps on the way back in, by name — it holds no list of which concepts wrap, and it never looks at a schema.
+
+That indirection is not decoration. The wrapper used to be a second hand-written list of concept names living next to the render taxonomy, the two disagreed about `native.Number`, and the result was a form that looked correct, satisfied readiness, enabled Run, and then failed its own gate with `'…' must be object`. Deriving the name from the contract covers concepts nobody remembered to add.
+
+A field with no `contentKey` keeps its value plain, and that is equally deliberate: a structured concept, a file, or a child property of a structure IS its value, and wrapping one double-nests it into a payload no schema accepts.
+
 ## Module map
 
 ### `.` — the headless core (`src/core/`)
 
 | Module | Role |
 | --- | --- |
-| `descriptor` | the `RunField` union, `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
+| `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the one derivation function; every heuristic lives behind it |
 | `contracts` | the typed `PipeIOContract` mirror plus `getPipeIOContract` / `buildPipeRef` and the gating predicates |
 | `gate` | `buildRunInputsSchema` → `prepareRunInputs` → `validateRunInputs` → `apiInputsFromSchemaData` |
 | `gate-validator` | the kernel's own ajv instance and the `RunInputError` type its verdict speaks |
 | `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on |
-| `values` | store/wire value conversions, `setValueAtPath`, `outputsFromPipeOutput` |
+| `values` | store/wire value conversions (wrapping scalars by `contentKey`), `setValueAtPath`, `outputsFromPipeOutput` |
 | `wire-format` | deflate/inflate and the exactly-one-wrapper invariant |
 | `schema-utils` | the one nullable-`anyOf` collapse and the one `$defs` walker |
 | `native-concepts` | the native-concept taxonomy, stated once (not exported from the entry) |

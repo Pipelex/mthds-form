@@ -21,11 +21,19 @@ No consumer changes. No renderer changes. The control set switches on `field.kin
 
 If a change to this package ever makes a heuristic visible to a consumer — exports a concept set, adds a `json_schema` passthrough to `RunField`, lets a control sniff a shape — the seam is gone and the swap becomes a breaking release. That is the thing to defend in review.
 
+A *derived fact* on the descriptor is the opposite of that, and `RunField.contentKey` is the example to reason from. It is the name of the property a native scalar's value sits inside on the wire (`{number}` for `NumberContent`, `{yes_no}` for `YesNoContent`), read off the contract by `buildRunFields` and carried as a plain string. No consumer learns anything about JSON Schema from it, and the value bridge that consumes it stopped keeping a taxonomy of its own — which is one fewer copy for the swap to reconcile, not one more.
+
+The rule that separates the two: does the field let something downstream re-derive a decision this package is supposed to own? A schema would. A name the engine will state for itself does not.
+
 ## The recorded drift
 
 The taxonomy this package states once was consolidated from copies that had drifted, and the drift is *preserved*, not silently fixed, because some of it is visible on the wire. `src/core/native-concepts.ts` carries the table in its header; `__tests__/concept-taxonomy-characterization.test.ts` pins every cell of it.
 
-The consequential entry: a `native.Date` input renders as prose rather than a date picker, wraps as `{text}`, and deflates to `{concept, content: {text}}` — consistent end to end, but not `DateContent`. `native.HTML` is the same class of case. Correcting either changes what goes over the wire, so both belong to the swap and not to a patch release before it.
+The consequential entry: a `native.Date` input renders as prose rather than a date picker, wraps as `{text}`, and deflates to `{concept, content: {text}}` — consistent end to end, but not `DateContent`. Correcting it changes what goes over the wire, so it belongs to the swap and not to a patch release before it.
+
+`native.Html` is a related case that turned out to work by accident. The concept set spells the code `HTML`; the language spells it `Html`, so the set matches nothing a real contract carries and `native.Html` falls through to the generic object dispatch — a nested card over `HtmlContent {inner_html, css_class}`, which round-trips correctly. **Correcting the spelling on its own would break inputs that work today**, by routing them into the prose-plus-`{text}` drift above. It goes with the `Date` fix, not before it.
+
+A third entry was a genuine bug rather than a drift, and it is fixed: `native.Number` rendered as a number control and then travelled bare into a schema declaring `NumberContent {number}`, so the kernel's own gate rejected every run carrying one. There was no working behaviour to preserve, which is what separated it from the two above. The wrapper property is now derived from the contract (see `contentKey`, above) instead of being kept in a second hand-written list — the generalization the fix chose over a fourth special case, precisely so the next unlisted concept is covered without anyone noticing the gap. `native.YesNo` was in that same blind spot and came back with it: the render taxonomy looked for a concept named `Boolean`, which MTHDS does not have, so a yes/no input arrived as an object card wrapping a lone switch. It renders as a switch now, and the wire shape is unchanged either way.
 
 The url-bearing-object test is a second recorded case. It reduces to `Boolean(schema.properties?.url)`, and the code says exactly that rather than implying a narrower check it does not perform. A narrower predicate — requiring the description to match — is a real behaviour change (arbitrary url-bearing objects would stop rendering as documents) and is queued with the swap.
 
@@ -34,6 +42,7 @@ The url-bearing-object test is a second recorded case. It reduces to `Boolean(sc
 The characterization suites are the contract, and they were written before the extraction precisely so this could be checked rather than argued:
 
 - `concept-taxonomy-characterization` — every native concept's behaviour on all three paths (render, wire, value bridge).
+- `native-scalars` — the content wrapper each native scalar declares, end to end from the contract through the value bridge to the gate's verdict.
 - `schema-utils-characterization` — the nullable-`anyOf` collapse and `$defs` walking, including the primitive-union case where the two historical implementations genuinely differed.
 - `gate` and `values` — the four-step gate contract and the store/wire conversions.
 
