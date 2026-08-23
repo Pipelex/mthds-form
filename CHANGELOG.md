@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A `native.Number` input is runnable again — it wraps into the content envelope its concept declares.** The form offered a proper number control, readiness was satisfied, Run lit up, and the gate then rejected the payload with `'<input>' must be object`: the value bridge sent the number bare while the contract declared `NumberContent {number}`. The two halves of the kernel disagreed about the same input, no host could correct it from outside, and any method taking a number was unrunnable through the package. A number now travels as `{number: 2}`, and the plural and optional cases behave the way they read — an untouched optional number stays absent rather than becoming an empty envelope that would fail the content model's own `required`.
+
+  This is visible on the wire, and it is a fix rather than a wire change: the shape it replaces was rejected by the kernel's own gate, so there was no working behaviour to preserve. The recorded drift on `native.Date` is a different case and is untouched — see [docs/derivation-swap.md](docs/derivation-swap.md).
+
+- **A `native.YesNo` input renders as a switch.** The taxonomy looked for a concept named `Boolean`, which MTHDS does not have, so `kind: 'boolean'` was unreachable from a real method and a yes/no input arrived as a nested card wrapping a lone switch. The wire shape is `{yes_no: …}` before and after; only the rendering changes.
+
+- **A number's `minimum` / `maximum` reach the control.** They are declared on the wrapped property, never on the wrapper object, so reading the outer schema always found nothing and the stepper ignored a method's declared range.
+
+### Changed
+
+- **The scalar content wrapper is derived from the contract, not from a hand-kept list.** `buildRunFields` — still the only reader of JSON Schema — finds the single property a scalar concept's content model declares and stamps its name on the descriptor as `RunField.contentKey`; the value bridge wraps and unwraps by that name and no longer keeps a taxonomy of its own. That is what made the bug above possible: the render taxonomy knew `native.Number` and the wrapper taxonomy did not. Deriving the name covers a concept nobody remembered to add, instead of adding a fourth special case that would leave the next one uncovered.
+
+- **The native-concept sets spell the codes the language actually defines.** `Integer` and `Float` were dead entries for concepts MTHDS has no such thing as, and `Boolean` was the miss above. `HTML_CONCEPTS` is the deliberate exception and stays misspelled: the language spells it `Html`, the set matches nothing a real contract carries, and `native.Html` therefore falls through to a nested card over `HtmlContent {inner_html, css_class}` that round-trips correctly. Correcting the spelling alone would break inputs that work today by routing them into the recorded `Date` drift, so it goes with that fix at the derivation swap.
+
 ## [v0.2.0] - 2026-08-21
 
 ### Added
