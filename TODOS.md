@@ -215,10 +215,43 @@ What reading the siblings does establish, and running them would not have establ
 
 ## Phase 7 — ajv out of the client bundle (issue 11)
 
-- [ ] Restructure the build so the React entry no longer imports the chunk carrying the gate/ajv machinery. Preferred: move `isFilled`, `toStoredDateValue`, `toDateInputValue` into a leaf chunk both entries share, leaving ajv reachable only from the core's validation exports. Fallbacks per the filing: a `./validate` subpath (breaking) or dynamic-importing ajv inside `validateRunInputs`.
-- [ ] Extend the CI bundle assertions: alongside the existing React-in-core grep, assert the React entry's chunk graph is ajv-free so this cannot regress silently.
-- [ ] Changelog + a note in [docs/dependency-budget.md](docs/dependency-budget.md) if the chunking strategy is now load-bearing.
-- [ ] Verify in `pipelex-starter-js` with the filing's recipe: clean `next build`, then `grep -rl "missingProperty" .next/static/chunks/` finds nothing, and the route's First Load JS drops back toward the pre-adoption figure.
+- [x] The filing's preferred fix, taken: the controls take **types** from the `../core` barrel (erased before bundling, free) and **values** from the specific module (`../core/readiness`, `../core/date-format`), which are leaves. The chunk the two entries share went from 38.53 KB opening `import Ajv from 'ajv'` to 3.94 KB importing nothing at all. Neither fallback was needed — no subpath, no dynamic import, no API change.
+- [x] **A second cause, found by measuring rather than by reading — the reported fix alone moved nothing.** Recorded below.
+- [x] Build restructured so `dist/core/index.js` is a **pure re-export barrel**: `tsup.config.ts` names every core module as an entry, so each becomes its own chunk and a consumer's bundler can drop the ones behind exports the host never uses. The per-module `dist/core/*.js` files are build artifacts — `exports` lists only `.` and `./react`, so no deep path became reachable.
+- [x] Bundle assertions extended and consolidated into [scripts/assert-bundle.mjs](scripts/assert-bundle.mjs) (`make assert-bundle`, in `make all` and both workflows), replacing the two inline greps in CI. Three invariants now: each entry's **transitively walked** graph is free of its banned packages (React out of `.`, ajv out of `./react`), the `.` barrel carries no inline code, and the React entry keeps `'use client'`. Each was re-verified as a real tripwire by reverting the thing it guards.
+- [x] Second guard, one step earlier and cheaper: lint bans **value** imports of the `../core` barrel from `src/react/`, with `allowTypeImports` keeping the type imports that cost nothing. Verified as a tripwire in both directions.
+- [x] Changelog + [docs/dependency-budget.md](docs/dependency-budget.md) § "The chunk graph is part of the budget" (the chunking is now load-bearing and says so), plus the `dist/core/` note in `docs/architecture.md` § "Public API and internal code", `CLAUDE.md` rule 2, and the release skill.
+- [x] Verified in `pipelex-starter-js` with the filing's recipe. `grep -rl "missingProperty" .next/static/chunks/` finds **nothing** where it found a chunk before; client chunks went **1,037 KB raw / 308 KB gzip → 806 KB / 242 KB**. Restored afterwards — the sibling carries no change from this phase (384 tests green, clean tree, back on the registry copy).
+
+### What Phase 7 settled
+
+**Landed 2026-08-24.** `make check`, `make test` (425 tests), `make build` and `make assert-bundle` all green.
+
+#### Fixing what was filed moved the number by zero
+
+The filing reported the React entry dragging ajv through the shared chunk, and that reproduced exactly. But a starter rebuilt against the fix still shipped ajv, and its client bundle moved by +1.7 KB — noise. The reported cause was real and was only half of it.
+
+The other half is that a host imports core **values** from client components as a matter of course — `isFilled` to decide whether an optional section starts folded, `setValueAtPath` to write an upload back — and `dist/core/index.js` was a single bundled module carrying real code beside a top-level `import Ajv from 'ajv'`. Bundlers keep or drop whole modules, so those two things could not be separated by any consumer. This is why the filing's own note that host-side import discipline measured at **exactly zero effect** was the important sentence in it: it is not a remark about that host's diligence, it is the statement that the package had made the choice on the consumer's behalf.
+
+Naming every core module as a tsup entry is what dissolves it: each becomes its own chunk, the barrel comes out pure re-export, and the bundler gets back the granularity it needs. Two properties are load-bearing and silent if broken, so both are written down in the budget doc — `sideEffects` must stay CSS-only, and the entry glob must not be narrowed.
+
+#### The assertion that matters most is the one for the thing that is invisible
+
+Of the three invariants, the pure-barrel check is the one worth having: narrowing the entry glob back to `src/core/index.ts` leaves **both** graph checks green — the barrel legitimately reaches ajv either way — while every consumer silently re-ships the validator. It was verified against exactly that edit, and reports 928 lines of inline code with the fix to make.
+
+The existing React-in-core assertion also had a latent flaw that the rewrite closes: it globbed `dist/chunk-*.js`, which is every chunk rather than the ones the `.` entry reaches, so a React-bearing chunk belonging only to `./react` would have failed it. That was correct only for as long as there happened to be exactly one shared chunk. The script walks each entry's real graph instead.
+
+#### Adoption note for `pipelex-starter-js`
+
+Nothing is required — the win arrives with the version bump, no host edit. Its `PdfForm.tsx` and `RunInputsForm.tsx` may keep importing `isFilled` and `setValueAtPath` from `@pipelex/mthds-form` in client components; that is the ordinary usage this phase made cheap, not something to work around.
+
+### Checkpoint 4 — the campaign is closed
+
+**Reached 2026-08-24.** Every issue triaged into this plan (1–12) is fixed, documented and verified; 13 and 14 remain deliberately deferred below. The package is releasable: `make all` is green and the changelog's `## [Unreleased]` carries the whole campaign. Cutting the version is `/release`, and it is a **minor** at minimum — the contract reshape in Phase 1 is breaking on the wire.
+
+The one thing the release note has to carry beyond the changelog is the sequencing already recorded at Checkpoint 1: a form on the new contract mirror talks correctly only to a runtime that has taken the `pipe_io_contracts` reshape. Until that hosted deploy lands, a form against an older runtime reads every `?` input as `plain` and gates it — fail-closed, never a wrong payload, but visible.
+
+Both siblings still owe their own bump commits, and those notes are collected per phase above (Phases 1–3 fixture reshape and the gate swap, Phase 4's stale comments, Phase 6's retired workarounds). None of them is this repo's to land.
 
 ## Deferred — tracked, deliberately not in this campaign
 

@@ -96,6 +96,8 @@ The gate validates through the package's own ajv instance, configured for pydant
 
 `src/core/index.ts` and `src/react/index.ts` are the two entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation, the taxonomy, and the vendored primitives change without a breaking release.
 
+`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only `.` and `./react`, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
+
 ## Local development against a consumer
 
 The package builds to `dist/` with `make build`. To develop it against a consumer before publishing:

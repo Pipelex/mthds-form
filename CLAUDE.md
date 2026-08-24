@@ -6,7 +6,7 @@
 
 **1. The descriptor is the currency, and `buildRunFields` is the only thing that reads JSON Schema.** Every heuristic — the native-concept sets, the url-bearing-object test, the depth rule — is private to `src/core/derive.ts` and `src/core/native-concepts.ts`, and neither is re-exported. If a change makes a heuristic visible to a consumer (exporting a concept set, adding a schema passthrough to `RunField`, letting a control sniff a shape), it destroys the seam the whole package is built around. [docs/derivation-swap.md](docs/derivation-swap.md) explains what that seam is for.
 
-**2. The dependency budget is a hard list, not a preference.** [docs/dependency-budget.md](docs/dependency-budget.md) has it. Lint enforces it across `src/` and additionally bans React from `src/core/`; CI greps the built `.` bundle for React, which catches the violations that arrive through a shared chunk rather than a source import. Adding a dependency means updating that table in the same change.
+**2. The dependency budget is a hard list, not a preference.** [docs/dependency-budget.md](docs/dependency-budget.md) has it. Lint enforces it across `src/`, bans React from `src/core/`, and bans *value* imports of the `../core` barrel from `src/react/` (type imports are erased, so they stay allowed). `make assert-bundle` then walks each built entry's chunk graph — React must not reach `.`, ajv must not reach `./react` — which catches the violations that arrive through a shared chunk rather than a source import, and asserts that `dist/core/index.js` stays a pure re-export barrel, which is what lets a consumer tree-shake ajv out of the core entry. Adding a dependency means updating that table in the same change.
 
 **3. The public API is the two index files.** `src/core/index.ts` and `src/react/index.ts`. Deep paths are not exported and not stable — that is what lets the derivation, the taxonomy, and the vendored primitives change without a breaking release.
 
@@ -20,7 +20,7 @@
 ## Conventions
 
 - **Package manager: npm.** Matching `mthds-ui`, the sibling package this repo's toolchain was copied from.
-- **Gates:** `make check` (lint + format + typecheck) and `make test`. `make all` adds the build. Run both before calling a change done.
+- **Gates:** `make check` (lint + format + typecheck) and `make test`. `make all` adds the build and `make assert-bundle`, which reads `dist/` and so only means anything after one. Run both before calling a change done.
 - **Files are kebab-case**; one control per file.
 - **Tests** are two suites, and `vitest.config.ts` keeps them apart on purpose. The core's unit suites (`src/core/__tests__/`) run in **node**, so a stray `document` reference in headless code fails there instead of passing quietly under a global jsdom. The control suites (`src/react/__tests__/`) run in **jsdom** with `@testing-library/react`, because what gets filed against a control is a DOM fact — an input with no accessible name, a button still live during an upload — and nothing short of rendering asserts it. A control test opens with `// @vitest-environment jsdom`. The DOM stack is devDependencies and ships in nothing. Stories still live in the consuming app and move here with Storybook.
 - **Docs live in `docs/`, one topic per file, updated in the same change as the code.** A change to a documented contract that does not touch `docs/` is incomplete.

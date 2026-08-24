@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { cn } from './utils';
-import { isFilled, type ObjectRunField } from '../core';
+import type { ObjectRunField } from '../core';
+import { isFilled } from '../core/readiness';
 import { ConceptPill } from './concept-pill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';

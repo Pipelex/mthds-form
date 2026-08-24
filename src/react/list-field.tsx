@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from './utils';
-import { type ListRunField, type RunField } from '../core';
+import type { ListRunField, RunField } from '../core';
 import { ConceptPill } from './concept-pill';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
