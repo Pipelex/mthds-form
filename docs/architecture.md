@@ -67,6 +67,20 @@ Validation is a four-step contract, and the order matters:
 
 The verdict is the contract; its rendering is not. `describeValidationError` is one presentation of a `RunInputError` and a host is free to write another. A consumer branches on the structured error, never on message text.
 
+A message that names a field names the field's **identifier** — the one written in the method — never the schema `title` a pydantic contract carries alongside it. That is the one deliberate divergence from RJSF's error transform, which substitutes the title because in an RJSF form the title *is* the rendered label. Here the controls label a field by its identifier, so quoting `'Audience'` at someone whose bundle says `audience` sends them looking for a field that does not exist.
+
+### What absence looks like
+
+An input the user never touched is **absent**. Not an empty shell, not `{}`, not `{child: ""}` — absent. Every step has to agree about that, because when they disagree the form offers a run its own gate then refuses.
+
+`isFilled` is the one predicate, and three places read it. The value bridge omits a structure nothing was put into rather than materializing children for it. `prepareRunInputs` drops an optional property that pruned down to `{}` — which is what the shell collapses to on the surface that renders through RJSF, where the bridge is not involved. `apiInputsFromSchemaData` omits an unfilled optional input from the payload. Readiness already ignores optional inputs, so all four answers line up.
+
+Materializing the shell instead is what made an optional input with a required child unrunnable: readiness ignored the input (correctly — the method said it may be omitted), Run lit up, and ajv then judged an object the kernel itself had invented against the concept's full schema. A structure the user *did* open keeps its shell, empty children and all: opening it is what makes the concept's required fields fall due.
+
+An empty **list** is deliberately not absent, at either step: a plural slot is never missing in MTHDS — its empty form IS the empty list — so dropping it would invent an absence the method cannot express.
+
+Neither is an **item** in a list. Absence is what a *singular* slot expresses; an item is in the array only because the user added it, so adding is itself the touch. Letting an item collapse the way an untouched input does leaves `undefined` in the array, and ajv answers `must be object` — which blocks an empty item the item schema allowed, and replaces a required-child complaint with a type error that names nothing the user can act on. So the value bridge collapses an empty structure in a singular slot and never in a list item; that is the one distinction `collapseEmpty` draws in `toRjsf`.
+
 The gate validates through the package's own ajv instance, configured for pydantic parity (type coercion, and `date` / `date-time` formats matching what the runtime accepts). It does not depend on RJSF: a host that renders an RJSF panel elsewhere builds its own `ValidatorType` over the package's exported date predicates, so the leniency rules keep one definition and two presentations.
 
 ## Public API and internal code
