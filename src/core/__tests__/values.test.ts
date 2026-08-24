@@ -403,7 +403,7 @@ describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
   });
 
   it('keeps the whole structure - empty children and all - once anything is filled', () => {
-    // The required child must still be demanded of a section the user opened.
+    // The required child must still be demanded of a section the user filled in.
     const data = rjsfDataFromRunValues({ brief: 'hello', focus: { notes: 'terse' } }, FIELDS);
     expect(data['focus']).toEqual({ audience: undefined, notes: 'terse' });
   });

@@ -199,8 +199,12 @@ function toRjsf(field: RunField, value: unknown, collapseEmpty = true): unknown 
       //
       // Emptiness is `isFilled`, the SAME predicate readiness and the wire
       // payload use, so the three cannot disagree about whether this input is
-      // there. A structure the user did open keeps its shell, empty children
-      // and all: its required child must still fail, and loudly.
+      // there. Which also says what the touch is NOT: opening the optional
+      // disclosure is local view state the value never sees, so a section
+      // opened and left blank collapses exactly like one never opened. What
+      // keeps a structure is a VALUE in it - and then the whole shell survives,
+      // empty children and all, so a required child left blank still fails, and
+      // loudly.
       return collapseEmpty && !isFilled(out) ? undefined : out;
     }
     case 'list': {
