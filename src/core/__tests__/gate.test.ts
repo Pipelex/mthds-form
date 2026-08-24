@@ -9,8 +9,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   apiInputsFromSchemaData,
+  buildRunFields,
   buildRunInputsSchema,
+  computeReadiness,
   prepareRunInputs,
+  rjsfDataFromRunValues,
   validateRunInputs,
 } from '..';
 import type { PipeInputContract } from '..';
@@ -155,5 +158,121 @@ describe('apiInputsFromSchemaData', () => {
     expect(apiInputsFromSchemaData(prepared, inputs)).toEqual({
       quote_date: { concept: 'native.Date', content: { date: '2026-07-06' } },
     });
+  });
+});
+
+// ─── Readiness and the gate must agree about an optional STRUCTURED input ────
+
+/**
+ * `ExtractionFocus {audience (required), notes (optional)}`, declared
+ * `focus = "demo.ExtractionFocus?"` - an optional input whose concept has a
+ * required child. The whole chain, exactly as a host runs it: descriptors →
+ * form values → schema data → prepare → validate → payload.
+ */
+const FOCUS_INPUT: PipeInputContract = {
+  concept_ref: 'demo.ExtractionFocus',
+  optional: true,
+  json_schema: {
+    title: 'ExtractionFocus',
+    type: 'object',
+    properties: {
+      audience: { title: 'Audience', type: 'string', enum: ['engineer', 'executive'] },
+      notes: { title: 'Notes', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+    },
+    required: ['audience'],
+  },
+};
+
+describe('an optional structured input whose concept has a required child', () => {
+  const INPUTS = { text: TEXT_INPUT, focus: FOCUS_INPUT };
+  const FIELDS = buildRunFields(INPUTS);
+  const SCHEMA = buildRunInputsSchema(INPUTS);
+
+  /** What a host does between "Run pressed" and the payload. */
+  const gate = (values: Record<string, unknown>) => {
+    const prepared = prepareRunInputs(rjsfDataFromRunValues(values, FIELDS), SCHEMA);
+    return { prepared, verdict: validateRunInputs(prepared, INPUTS, SCHEMA) };
+  };
+
+  it('is not materialized when untouched, so the run the button offered is the run the gate allows', () => {
+    // The bug: the bridge invented `focus: { notes: "" }` for a section nobody
+    // opened, ajv judged that shell against the concept's full schema, and the
+    // run was rejected for a required child of an input the method said may be
+    // omitted. Readiness (which correctly ignores an optional input) and the
+    // gate disagreed, and no host could fix it from outside.
+    const values = { text: 'Apple in Cupertino.' };
+
+    expect(computeReadiness(FIELDS, values).missing).toEqual([]);
+    expect(rjsfDataFromRunValues(values, FIELDS)['focus']).toBeUndefined();
+
+    const { prepared, verdict } = gate(values);
+    expect(prepared).not.toHaveProperty('focus');
+    expect(verdict.isValid).toBe(true);
+    expect(apiInputsFromSchemaData(prepared, INPUTS)).toEqual({
+      text: { concept: 'native.Text', content: { text: 'Apple in Cupertino.' } },
+    });
+  });
+
+  it('drops the same shell when an RJSF panel is what materialized it', () => {
+    // The other run surface never goes through the value bridge: RJSF fills an
+    // untouched object's children itself. The prune is the shared repair, so
+    // both surfaces reach the validator with the input genuinely absent.
+    const prepared = prepareRunInputs({ text: { text: 'hi' }, focus: { notes: '' } }, SCHEMA);
+
+    expect(prepared).not.toHaveProperty('focus');
+    expect(validateRunInputs(prepared, INPUTS, SCHEMA).isValid).toBe(true);
+  });
+
+  it('travels whole once the user fills it', () => {
+    const { prepared, verdict } = gate({
+      text: 'Apple in Cupertino.',
+      focus: { audience: 'engineer' },
+    });
+
+    expect(verdict.isValid).toBe(true);
+    expect(apiInputsFromSchemaData(prepared, INPUTS)['focus']).toEqual({
+      concept: 'demo.ExtractionFocus',
+      content: { audience: 'engineer' },
+    });
+  });
+
+  it('still fails on the required child once the user HAS opened it', () => {
+    // Dropping an untouched structure must not become "an optional structure
+    // never has to be complete": a section the user put something in owes its
+    // concept every field the concept demands.
+    const { verdict } = gate({ text: 'Apple in Cupertino.', focus: { notes: 'skip the pricing' } });
+
+    expect(verdict.isValid).toBe(false);
+    // The scan names inputs the method DEMANDS; this one is optional, so the
+    // caller falls back to the validator's own complaint rather than a dead end.
+    expect(verdict.missingInputs).toEqual([]);
+    expect(verdict.errors[0]?.property).toBe('.focus.audience');
+  });
+
+  it('reports a missing REQUIRED structured input by its variable name', () => {
+    const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, optional: false } };
+    const requiredFields = buildRunFields(REQUIRED_INPUTS);
+    const schema = buildRunInputsSchema(REQUIRED_INPUTS);
+    const prepared = prepareRunInputs(
+      rjsfDataFromRunValues({ text: 'Apple in Cupertino.' }, requiredFields),
+      schema,
+    );
+    const verdict = validateRunInputs(prepared, REQUIRED_INPUTS, schema);
+
+    expect(computeReadiness(requiredFields, { text: 'Apple in Cupertino.' }).missing).toEqual([
+      'focus',
+    ]);
+    expect(verdict.isValid).toBe(false);
+    expect(verdict.missingInputs).toEqual(['focus']);
+  });
+
+  it('names the PROPERTY in a required-child complaint, not the schema title', () => {
+    // pydantic titles `audience` as `Audience`. Quoting the title (what RJSF
+    // does, because there the title IS the label) sent the user hunting for a
+    // field their bundle does not contain - this package labels a field by its
+    // identifier.
+    const { verdict } = gate({ text: 'Apple in Cupertino.', focus: { notes: 'skip the pricing' } });
+
+    expect(verdict.errors[0]?.stack).toBe("must have required property 'audience'");
   });
 });

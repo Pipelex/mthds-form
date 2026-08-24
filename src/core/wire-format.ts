@@ -352,6 +352,24 @@ export function healStringWrappers(
   return value;
 }
 
+/** Nothing left worth sending, once this value has itself been pruned. */
+function isEmptyAfterPruning(value: unknown): boolean {
+  if (value === '' || value === null || value === undefined) return true;
+  // An object whose every property was itself pruned away carries nothing, and
+  // that is what an untouched OPTIONAL STRUCTURED input looks like by the time
+  // it reaches here - a shell of empty children, emptied out. Keeping the `{}`
+  // handed it to ajv against the concept's full schema, which rejected the run
+  // for a required child of an input the method said may be omitted. Dropping
+  // it is the same judgement the wire payload already makes one step later
+  // (`apiInputsFromSchemaData` omits it as unfilled); making the prune agree is
+  // what stops the gate from failing a run it was about to omit anyway.
+  //
+  // An empty ARRAY is deliberately NOT empty: a plural slot is never absent in
+  // MTHDS - its empty form IS the empty list - so dropping it would invent an
+  // absence the method cannot express.
+  return typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
+}
+
 /**
  * Drop optional properties the user never filled, so an untouched field cannot
  * fail validation or reach the API as an empty string.
@@ -368,6 +386,9 @@ export function healStringWrappers(
  * the runner just as it fails ajv here. Only properties absent from their
  * parent's `required` are dropped - an empty REQUIRED field must still fail, so
  * the user is told about it.
+ *
+ * What counts as empty is `isEmptyAfterPruning`, and it includes an optional
+ * STRUCTURE the user never opened, on exactly the same grounds.
  */
 export function pruneEmptyOptionals(
   value: unknown,
@@ -397,8 +418,7 @@ export function pruneEmptyOptionals(
       continue;
     }
     const pruned = pruneEmptyOptionals(raw, propSchema, allDefs);
-    const isEmpty = pruned === '' || pruned === null || pruned === undefined;
-    if (isEmpty && !required.has(key)) continue;
+    if (isEmptyAfterPruning(pruned) && !required.has(key)) continue;
     out[key] = pruned;
   }
   return out;

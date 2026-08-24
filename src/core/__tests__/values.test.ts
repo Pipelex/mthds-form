@@ -5,6 +5,7 @@ import {
   fieldsForContract,
   inputDataFromWorkingMemory,
   outputsFromPipeOutput,
+  rjsfDataFromRunValues,
   runValuesFromStore,
   setValueAtPath,
   storeInputDataFromRunValues,
@@ -360,5 +361,55 @@ describe('runValuesFromStore over corrupted text values', () => {
   it('leaves an empty value empty', () => {
     expect(read(undefined)).toBe('');
     expect(read('')).toBe('');
+  });
+});
+
+// ─── An untouched structure is ABSENT, not an invented shell ─────────────────
+
+describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
+  const CONTRACT: Record<string, PipeInputContract> = {
+    brief: {
+      concept_ref: 'native.Text',
+      json_schema: { type: 'object', properties: { text: { type: 'string' } } },
+    },
+    focus: {
+      concept_ref: 'demo.ExtractionFocus',
+      optional: true,
+      json_schema: {
+        type: 'object',
+        properties: {
+          audience: { type: 'string', enum: ['engineer', 'executive'] },
+          notes: { anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+        },
+        required: ['audience'],
+      },
+    },
+  };
+  const FIELDS = buildRunFields(CONTRACT);
+
+  it('emits nothing for it, rather than a shell of empty children', () => {
+    // `{ notes: "" }` was an object that existed only because the bridge built
+    // it, and the gate then judged it against the concept's full schema.
+    expect(rjsfDataFromRunValues({ brief: 'hello' }, FIELDS)['focus']).toBeUndefined();
+  });
+
+  it('emits nothing for a value holding only empty children either', () => {
+    // What the form state looks like after a section is opened and closed.
+    const data = rjsfDataFromRunValues(
+      { brief: 'hello', focus: { audience: undefined, notes: '' } },
+      FIELDS,
+    );
+    expect(data['focus']).toBeUndefined();
+  });
+
+  it('keeps the whole structure - empty children and all - once anything is filled', () => {
+    // The required child must still be demanded of a section the user opened.
+    const data = rjsfDataFromRunValues({ brief: 'hello', focus: { notes: 'terse' } }, FIELDS);
+    expect(data['focus']).toEqual({ audience: undefined, notes: 'terse' });
+  });
+
+  it('omits it from the run payload, so the method sees a real absence', () => {
+    const payload = apiInputsFromRunValues({ brief: 'hello' }, FIELDS, CONTRACT);
+    expect(payload).not.toHaveProperty('focus');
   });
 });

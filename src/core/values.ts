@@ -181,7 +181,20 @@ function toRjsf(field: RunField, value: unknown): unknown {
       const obj = (value && typeof value === 'object' ? value : {}) as Dict;
       const out: Dict = {};
       for (const child of field.fields) out[child.name] = toRjsf(child, obj[child.name]);
-      return out;
+      // A structure nobody put anything into stays ABSENT, exactly as an
+      // untouched number does above - it does NOT become a shell of empty
+      // children. Materializing that shell made an OPTIONAL structured input
+      // unrunnable whenever its concept declared a required child: readiness
+      // ignored the input (correctly - the method said it may be omitted), Run
+      // lit up, and the gate then judged an object the kernel had invented
+      // against the concept's full schema and rejected the run for a child the
+      // user was never asked to fill.
+      //
+      // Emptiness is `isFilled`, the SAME predicate readiness and the wire
+      // payload use, so the three cannot disagree about whether this input is
+      // there. A structure the user did open keeps its shell, empty children
+      // and all: its required child must still fail, and loudly.
+      return isFilled(out) ? out : undefined;
     }
     case 'list': {
       const arr = Array.isArray(value) ? value : [];

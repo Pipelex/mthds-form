@@ -5,7 +5,7 @@
  * `@rjsf/validator-ajv8` (`rjsf-validator.ts`), which is an RJSF `ValidatorType`
  * wrapper around exactly this: an ajv instance plus an error-shape transform.
  * The kernel must not depend on RJSF, so this module owns both halves directly,
- * configured for byte-identical output:
+ * configured to reproduce its output but for one deliberate divergence:
  *
  * - the ajv OPTIONS are `@rjsf/validator-ajv8`'s `AJV_CONFIG` plus the same
  *   `coerceTypes: true` override this gate has always run with (pydantic runs in
@@ -15,12 +15,14 @@
  *   `date-format.ts`, same as before;
  * - `toRunInputError` reproduces RJSF's `transformRJSFValidationErrors` for the
  *   no-uiSchema case the gate is: `property` is the dotted instance path (plus
- *   the missing property name for `required` errors), `stack` quotes the parent
- *   schema's `title` when one names the field.
+ *   the missing property name for `required` errors), and `stack` quotes the
+ *   parent schema's `title` when the error does not itself name a property.
  *
- * Parity is proven, not assumed: `validator-error-baseline.test.ts` records the
- * RJSF validator's output on the gate fixtures, and
- * `gate-validator-parity.test.ts` diffs this module against that recording.
+ * It diverges from RJSF in exactly one place, and deliberately: an error that
+ * NAMES a property keeps the property's own name rather than swapping in that
+ * property's schema `title`. RJSF substitutes because the title is the label its
+ * forms render; this package labels a field by its identifier instead, so the
+ * substitution named something the user could not find. See `toRunInputError`.
  */
 import Ajv, { type ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
@@ -94,25 +96,25 @@ export function validateRunInputsSchema(data: unknown, schema: object): RunInput
 function toRunInputError(e: ErrorObject): RunInputError {
   const { instancePath, keyword, schemaPath, parentSchema } = e;
   const params = e.params as Record<string, unknown>;
-  let message = e.message ?? '';
+  const message = e.message ?? '';
   let property = instancePath.replace(/\//g, '.');
   let stack = `${property} ${message}`.trim();
 
-  const rawPropertyNames = [
+  const namesAProperty = [
     ...(typeof params.deps === 'string' ? params.deps.split(', ') : []),
     params.missingProperty,
     params.property,
-  ].filter((item): item is string => typeof item === 'string' && item.length > 0);
+  ].some((item) => typeof item === 'string' && item.length > 0);
 
-  if (rawPropertyNames.length > 0) {
-    for (const currentProperty of rawPropertyNames) {
-      const title = (
-        parentSchema as { properties?: Record<string, { title?: unknown }> } | undefined
-      )?.properties?.[currentProperty]?.title;
-      if (typeof title === 'string' && title) {
-        message = message.replace(`'${currentProperty}'`, `'${title}'`);
-      }
-    }
+  if (namesAProperty) {
+    // ajv already quotes the property NAME, and that is the name kept - the ONE
+    // deliberate divergence from RJSF, which substitutes the parent schema's
+    // `properties[name].title` here. That substitution is right in an RJSF form,
+    // where the title IS the rendered label; it is wrong for this package, whose
+    // controls label a field by its identifier on purpose (see `mapSchema`). A
+    // pydantic contract titles `audience` as `Audience`, so the blocked run read
+    // `must have required property 'Audience'` and sent the user hunting for a
+    // field their bundle does not contain.
     stack = message;
   } else {
     const parentTitle = (parentSchema as { title?: unknown } | undefined)?.title;
