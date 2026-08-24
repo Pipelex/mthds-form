@@ -29,6 +29,8 @@ Three layers, because review alone does not hold a boundary:
 - **The build.** CI greps the built `.` bundle for React and fails if it appears. This catches what lint cannot see: a violation arriving through a shared chunk rather than a source import.
 - **The manifest.** Nothing outside the table above is in `dependencies`.
 
+`devDependencies` are a different question and are not on the table: they ship in nothing, so a consumer never installs them. The DOM test stack (`jsdom`, `@testing-library/*`) is there for the control suites and is invisible to anyone consuming the package — which is the only property this budget is defending.
+
 ## Adding a dependency
 
 Adding one is a design decision, not a convenience. Ask: does a consumer of the *other* entry point have to install this? If yes, it does not belong in `dependencies` — vendor it, inject it, or state the shape structurally. If a genuinely new dependency is warranted, update the table above in the same change, so this document stays the answer rather than a snapshot of one.

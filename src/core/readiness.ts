@@ -4,18 +4,74 @@
  */
 
 import type { RunField } from './descriptor';
+import { hasOwnProp, ownProp } from './own-property';
+
+/**
+ * How deep `isFilled` walks a value before it stops looking, and the answer it
+ * gives when it does.
+ *
+ * The walk is over CALLER-SUPPLIED data - a request body on a public run
+ * endpoint, or a form's state - so its depth is whatever the caller sent, and
+ * the schema is no bound on it: `pruneEmptyOptionals` copies a property the
+ * schema does not declare straight through, so a key ajv never walks reaches
+ * this function unwalked. Unbounded, a value a few thousand levels deep threw
+ * `RangeError` out of the middle of a host's server gate - a gate whose whole
+ * contract is that it returns a verdict instead of throwing.
+ *
+ * **The cap answers `false`, and that direction is the deliberate half.** Past
+ * the cap this function cannot tell whether there is anything down there, and
+ * the kernel's rule throughout is that an unanswerable absence fails closed.
+ * The cost of the other choice is a run the method cannot use, started (and
+ * billed) on a payload no schema validated. The cost of this one is nearly
+ * nothing: `isFilled` combines branches with `some`, so a refused over-deep
+ * branch only loses its own vote - a real value anywhere beside it still reads
+ * filled - and no concept structure declares nesting anywhere near this deep,
+ * so a value that reaches the cap is not one the method had a slot for.
+ */
+const MAX_FILLED_DEPTH = 64;
 
 /** True when a value is meaningfully filled (not empty / blank / empty container). */
 export function isFilled(value: unknown): boolean {
-  if (value == null || value === '') return false;
-  if (Array.isArray(value)) return value.length > 0 && value.some(isFilled);
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    // A file value is { url } - filled when the url is set.
-    if ('url' in obj) return isFilled(obj.url);
-    return Object.values(obj).some(isFilled);
-  }
-  return true;
+  return walkFilled(value, 0, undefined);
+}
+
+/**
+ * `isFilled`'s walk, carrying the depth and the objects already judged.
+ *
+ * `seen` is a cycle guard first - a value that references itself would
+ * otherwise recurse to the cap on every branch - and a memo second. Both uses
+ * are the same fact: an object reached twice within ONE call answered `false`
+ * the first time, because a `true` short-circuits every `some` above it and the
+ * walk never gets back down here. So the set can only ever hold empty
+ * subtrees, which is also what makes it safe to keep entries after unwinding -
+ * without that, a value shaped like a diamond chain costs exponential time.
+ */
+function walkFilled(value: unknown, depth: number, seen: Set<object> | undefined): boolean {
+  if (value == null) return false;
+  // Whitespace is not a value. The Run button lit up over a required text input
+  // holding three spaces, ajv passed it (a content model carries no
+  // `minLength`), and the run reached the runtime with nothing in it. The same
+  // test is what makes a blank OPTIONAL input a real absence on the wire rather
+  // than a supplied empty string - see `apiInputsFromSchemaData`.
+  if (typeof value === 'string') return value.trim() !== '';
+  // No concept in the taxonomy holds a function, so one here arrived by a route
+  // that is already wrong - most plausibly an inherited `Object.prototype`
+  // member read off a plain object by a colliding input name. `ownProp` closes
+  // that route at every lookup; this branch is the backstop for the ones that
+  // arrive by another.
+  if (typeof value === 'function') return false;
+  if (typeof value !== 'object') return true;
+
+  if (depth >= MAX_FILLED_DEPTH) return false;
+  const visited = seen ?? new Set<object>();
+  if (visited.has(value)) return false;
+  visited.add(value);
+
+  if (Array.isArray(value)) return value.some((item) => walkFilled(item, depth + 1, visited));
+  const obj = value as Record<string, unknown>;
+  // A file value is { url } - filled when the url is set.
+  if (hasOwnProp(obj, 'url')) return walkFilled(obj.url, depth + 1, visited);
+  return Object.values(obj).some((child) => walkFilled(child, depth + 1, visited));
 }
 
 /**
@@ -38,12 +94,17 @@ export function isFilled(value: unknown): boolean {
  * expresses, so a required one has to be touched - the button stays dark until
  * the user puts a value somewhere inside, and then the whole shell travels,
  * empty children and all, so a required child left blank still fails loudly.
+ *
+ * Its own recursion follows the DESCRIPTOR, not the value, so it needs no depth
+ * cap of its own: a `RunField` tree only exists because `buildRunFields`
+ * finished walking a contract's schema, which bounds it. `isFilled` is where
+ * the caller's data is walked, and where the cap lives.
  */
 export function fieldFilled(field: RunField, value: unknown): boolean {
   if (field.kind === 'object') {
     if (!isFilled(value)) return false;
     const obj = (value ?? {}) as Record<string, unknown>;
-    return field.fields.every((f) => !f.required || fieldFilled(f, obj[f.name]));
+    return field.fields.every((f) => !f.required || fieldFilled(f, ownProp(obj, f.name)));
   }
   // A list the method gave a count to (`Concept[N]`) is satisfied only by that
   // many items, each of them filled. Answering it by `isFilled` alone - "is
@@ -115,9 +176,9 @@ export function mustBeFilled(field: RunField): boolean {
  * things stand between me and Run", which is the number a host is displaying.
  */
 export function computeReadiness(fields: RunField[], values: Record<string, unknown>): Readiness {
-  const gating = fields.filter((f) => mustBeFilled(f) || isFilled(values[f.name]));
+  const gating = fields.filter((f) => mustBeFilled(f) || isFilled(ownProp(values, f.name)));
   const missing = gating
-    .filter((f) => !fieldFilled(f, values[f.name]))
+    .filter((f) => !fieldFilled(f, ownProp(values, f.name)))
     .map((f) => f.title ?? f.name);
   return { total: gating.length, ready: gating.length - missing.length, missing };
 }

@@ -17,6 +17,7 @@
  */
 import type { RunField } from './descriptor';
 import { buildRunFields } from './derive';
+import { ownProp } from './own-property';
 import { isFilled } from './readiness';
 import { isOptionalInput, isPluralInput } from './contracts';
 import { deflateAllInputs, inflateAllInputs } from './wire-format';
@@ -55,7 +56,7 @@ function unwrapContent(field: RunField, value: unknown): unknown {
   const key = field.contentKey;
   if (key === undefined || !value || typeof value !== 'object' || Array.isArray(value))
     return value;
-  return (value as Record<string, unknown>)[key];
+  return ownProp(value as Record<string, unknown>, key);
 }
 
 /** How deep a nested `{ text: … }` / `{ content: … }` chain we bother unwrapping. */
@@ -138,7 +139,7 @@ function fromRjsf(field: RunField, value: unknown): unknown {
     case 'object': {
       const obj = (value && typeof value === 'object' ? value : {}) as Dict;
       const out: Dict = {};
-      for (const child of field.fields) out[child.name] = fromRjsf(child, obj[child.name]);
+      for (const child of field.fields) out[child.name] = fromRjsf(child, ownProp(obj, child.name));
       return out;
     }
     case 'list': {
@@ -187,7 +188,7 @@ function toRjsf(field: RunField, value: unknown, collapseEmpty = true): unknown 
     case 'object': {
       const obj = (value && typeof value === 'object' ? value : {}) as Dict;
       const out: Dict = {};
-      for (const child of field.fields) out[child.name] = toRjsf(child, obj[child.name]);
+      for (const child of field.fields) out[child.name] = toRjsf(child, ownProp(obj, child.name));
       // A structure nobody put anything into stays ABSENT, exactly as an
       // untouched number does above - it does NOT become a shell of empty
       // children. Materializing that shell made an OPTIONAL structured input
@@ -232,7 +233,7 @@ export function runValuesFromStore(
 ): Dict {
   const full = inflateAllInputs(inputData ?? {}, inputSchemas);
   const out: Dict = {};
-  for (const field of fields) out[field.name] = fromRjsf(field, full[field.name]);
+  for (const field of fields) out[field.name] = fromRjsf(field, ownProp(full, field.name));
   return out;
 }
 
@@ -246,7 +247,7 @@ export function runValuesFromStore(
  */
 export function rjsfDataFromRunValues(values: Dict, fields: RunField[]): Dict {
   const full: Dict = {};
-  for (const field of fields) full[field.name] = toRjsf(field, values[field.name]);
+  for (const field of fields) full[field.name] = toRjsf(field, ownProp(values, field.name));
   return full;
 }
 
@@ -284,14 +285,15 @@ export function apiInputsFromRunValues(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const field of fields) {
-    const schema = inputSchemas[field.name];
+    const schema = ownProp(inputSchemas, field.name);
     if (!schema) continue;
-    if (isOptionalInput(schema) && !isFilled(values[field.name])) continue;
-    if (isPluralInput(schema) && !isFilled(values[field.name])) {
+    const value = ownProp(values, field.name);
+    if (isOptionalInput(schema) && !isFilled(value)) continue;
+    if (isPluralInput(schema) && !isFilled(value)) {
       out[field.name] = [];
       continue;
     }
-    out[field.name] = { concept: schema.concept_ref, content: toRjsf(field, values[field.name]) };
+    out[field.name] = { concept: schema.concept_ref, content: toRjsf(field, value) };
   }
   return out;
 }
@@ -395,7 +397,7 @@ export function inputDataFromWorkingMemory(
   const full: Dict = {};
   let found = false;
   for (const key of Object.keys(inputSchemas)) {
-    const entry = root[key];
+    const entry = ownProp(root, key);
     if (entry && typeof entry === 'object' && 'content' in entry) {
       full[key] = (entry as { content: unknown }).content;
       found = true;

@@ -33,6 +33,7 @@ import { fieldFilled, isFilled, mustBeFilled } from './readiness';
 import { validateRunInputsSchema, type RunInputError } from './gate-validator';
 import { healStringWrappers, pruneEmptyOptionals } from './wire-format';
 import { prepareSchemaForRjsf } from './normalize-schema';
+import { ownProp } from './own-property';
 import type { PipeIOContract, PipeInputContract } from './contracts';
 
 type Dict = Record<string, unknown>;
@@ -114,7 +115,7 @@ export function validateRunInputs(
   const missingInputs: string[] = [];
   for (const [varName, input] of Object.entries(inputs)) {
     if (!inputMustBeFilled(input)) continue;
-    const varData = preparedData[varName];
+    const varData = ownProp(preparedData, varName);
     // A demanded input that is not there at all is missing whatever its concept
     // declares inside. The check has to come BEFORE the required-children one:
     // a struct whose concept demands no child used to fall out of the scan
@@ -132,7 +133,12 @@ export function validateRunInputs(
       continue;
     }
     const record = varData as Dict;
-    if (requiredFields.some((f) => record[f] === undefined || record[f] === '')) {
+    if (
+      requiredFields.some((f) => {
+        const child = ownProp(record, f);
+        return child === undefined || child === '';
+      })
+    ) {
       missingInputs.push(varName);
     }
   }
@@ -169,7 +175,7 @@ export function apiInputsFromSchemaData(
 ): Dict {
   const out: Dict = {};
   for (const [varName, input] of Object.entries(inputs)) {
-    const raw = preparedData[varName];
+    const raw = ownProp(preparedData, varName);
     if (isOptionalInput(input) && !isFilled(raw)) continue;
     if (isPluralInput(input) && !isFilled(raw)) {
       out[varName] = [];
@@ -278,7 +284,7 @@ export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInput
 
   const missingInputs = buildRunFields(contract.inputs)
     .filter(mustBeFilled)
-    .filter((field) => !fieldFilled(field, preparedData[field.name]))
+    .filter((field) => !fieldFilled(field, ownProp(preparedData, field.name)))
     .map((field) => field.name);
   if (missingInputs.length) return { ok: false, missingInputs, errors: [], preparedData };
 

@@ -10,6 +10,8 @@
  * codes the UI tracks.
  */
 
+import { ownProp } from './own-property';
+
 /**
  * The authored presence marker on an input slot, verbatim.
  *
@@ -90,6 +92,12 @@ export function buildPipeRef(domain: string, pipeCode: string): string {
  * pipe_ref re-keying also carry bare-code keys. Try the namespaced ref first
  * (when the caller supplies a domain), then fall back to the bare code.
  * Returns `undefined` (never crashes) when neither matches.
+ *
+ * Both lookups read OWN properties only. A bare index returned the inherited
+ * `Object` constructor for a pipe code named `constructor` (or `toString`, …) -
+ * a truthy non-contract that sailed straight through the `if (!contract)` guard
+ * hosts are shown writing, so a pipe that does not exist rendered as one taking
+ * no inputs instead of reaching the host's not-found path. See `ownProp`.
  */
 export function getPipeIOContract(
   pipeIoContracts: PipeIOContracts | null | undefined,
@@ -98,10 +106,10 @@ export function getPipeIOContract(
 ): PipeIOContract | undefined {
   if (!pipeIoContracts || !pipeCode) return undefined;
   if (domain) {
-    const byRef = pipeIoContracts[buildPipeRef(domain, pipeCode)];
+    const byRef = ownProp(pipeIoContracts, buildPipeRef(domain, pipeCode));
     if (byRef) return byRef;
   }
-  return pipeIoContracts[pipeCode];
+  return ownProp(pipeIoContracts, pipeCode);
 }
 
 /**
@@ -157,11 +165,11 @@ export function isFixedCountInput(input: PipeInputContract): boolean {
  * (`[N]`), which is a list whose empty form the method has explicitly ruled out.
  * This is the derivation the input-form descriptor spec states for `gating`.
  *
- * Emptiness is all this predicate answers for. A fixed-count list that holds
- * fewer items than it declares passes here and is then rejected by the gate's
- * ajv pass on the schema's `minItems` - fail-closed, but the two halves do not
- * yet phrase it the same way. Closing that is the readiness/gate invariant
- * work, which needs the count on the descriptor.
+ * Emptiness is all this predicate answers for - WHETHER a slot gates, never how
+ * much it needs. A fixed-count list that holds fewer items than it declares
+ * gates here and is refused by `fieldFilled`, which reads the declared count off
+ * the descriptor's `itemCount`, and by the gate's ajv pass on the schema's
+ * `minItems`. All three read the one number the method stated.
  */
 export function inputMustBeFilled(input: PipeInputContract): boolean {
   if (isOptionalInput(input)) return false;

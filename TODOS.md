@@ -114,36 +114,104 @@ An OVER-full fixed list (four items in a `[3]` slot) is still live on the button
 
 One pass through `readiness.ts` and the `contracts.ts` lookup; three filings, one review surface.
 
-- [ ] Depth cap + cycle guard in `isFilled` (issue 4). Decide which way the cap answers — fail open (a deep-but-real value stays submittable) or fail closed — and state it in the doc comment. Sweep `fieldFilled` / `mustBeFilled` for the same unbounded shape.
-- [ ] Whitespace-only strings count as unfilled (issue 5): `typeof value === 'string' → value.trim() !== ''`. Check the knock-on in `apiInputsFromSchemaData`'s optional-omission branch (a blank optional becomes a real absence, which the surrounding comment already wants) and fix any fixture asserting the opposite.
-- [ ] Own-property reads (issue 6): an `Object.hasOwn` helper at `readiness.ts:70`, `:27`, and `getPipeIOContract`'s bare fallback lookup (`contracts.ts:67`). Add the function branch to `isFilled` (`typeof value === 'function' → false`) as defence in depth.
-- [ ] Core tests for all three: deep and cyclic values through the gate, blank strings on required and optional inputs, prototype-named inputs and pipe codes.
-- [ ] Changelog + doc comment updates.
-- [ ] Verify in siblings: the starter's gate docstring drops its recorded recursion gap; `mthds-ui`'s prototype-key repro (`computeReadiness` with an input named `constructor`) now reports missing.
+- [x] Depth cap + cycle guard in `isFilled` (issue 4). **The cap answers `false`** — reasoning recorded below. The walk is now a private `walkFilled(value, depth, seen)` behind the unchanged public signature; `seen` is a cycle guard and a memo at once. `fieldFilled` was swept and needs no cap of its own: its recursion follows the DESCRIPTOR, which only exists because `buildRunFields` finished walking a contract's schema. `mustBeFilled` does not recurse.
+- [x] Whitespace-only strings count as unfilled (issue 5). The knock-on in `apiInputsFromSchemaData` is the one the surrounding comment already wanted — a blank optional is omitted as a real absence. No fixture asserted the opposite, here or in either sibling.
+- [x] Own-property reads (issue 6), taken as a sweep rather than at the three named sites — see below for why. New private `src/core/own-property.ts` (`ownProp` / `hasOwnProp`), applied everywhere a method-author-chosen name indexes a host-built record: `readiness.ts`, `contracts.ts`, `gate.ts`, `values.ts`, `wire-format.ts`. The `typeof value === 'function' → false` branch is in as the backstop.
+- [x] Core tests: new [src/core/__tests__/hostile-values.test.ts](src/core/__tests__/hostile-values.test.ts) — depth, cycles and repeated sharing, blank strings on required and optional inputs, prototype-named inputs, children and pipe codes. Each fix was re-verified as a real tripwire by reverting it in turn (the cap: 4 rows; the trim: 6; the own-reads plus the function branch: 7; `getPipeIOContract`: 1).
+- [x] Changelog (three `### Fixed` entries) + docs: `docs/architecture.md` § "What absence looks like" gained the hostile-value half and the module table gained `own-property`; `docs/run-gate.md` gained § "What arrives that nobody designed for". The stale residual paragraph in `inputMustBeFilled`'s doc comment — Phase 3 closed it — was corrected in the same pass.
+- [x] Verified against the BUILT artifact rather than in the siblings, and the reason is worth stating: each filing's evidence block is a few lines of `isFilled` / `computeReadiness` / `gateRunInputs` / `getPipeIOContract` calls, so re-running those against `dist/` answers them directly, while a sibling suite cannot be run green against this tree at all until it takes the Phase 1 fixture reshape. Every reported line now answers the fixed way (below). Neither sibling carries a change from this phase.
+
+### What Phase 4 settled
+
+**Landed 2026-08-24.** `make check`, `make test` and `make build` all green. Phase 1 landed as `07cb281`, Phases 2–3 as `bcfe849`.
+
+#### Why the depth cap fails closed
+
+The filing left the direction to us: `true` at the cap keeps a deep-but-real value submittable, `false` refuses it. `false`, for three reasons that point the same way.
+
+- Past the cap the walk genuinely cannot tell whether there is anything down there, and every other unanswerable absence in this package fails closed. A `true` there would start a run — a paid one — on a payload no schema validated, since the branch that reaches the cap is precisely the one `pruneEmptyOptionals` copied through undeclared and ajv never walked.
+- It costs almost nothing, because `isFilled` combines branches with `some`: a refused over-deep branch loses only its own vote, and a real value anywhere beside it still reads filled. The answer changes only when the over-deep junk is the *whole* of what the input holds.
+- No concept structure declares nesting anywhere near 64 levels, so a value that reaches the cap is not one the method had a slot for.
+
+#### The cycle guard is also what stops an exponential walk
+
+A depth cap alone terminates a cycle, but it does not make it cheap: a self-referencing object with a few keys walks to the cap on every branch. The `seen` set is kept across the unwind rather than scoped to the current path, and that is safe for a reason worth writing down — an object reached twice inside ONE call must have answered `false` the first time, because a `true` short-circuits every `some` above it and the walk never gets back down. So the set can only ever hold empty subtrees. Without it a value shaped like a diamond chain (each node holding the same next node twice) costs `2^n`; the test pins forty levels, which is 2^40 visits unmemoised.
+
+#### Why the own-read became a sweep
+
+The filing named three sites and warned, in its own words, that "a reader who fixes only `readiness.ts` will believe the class is closed" — it had already found a second call site cold. Fixing the named three would have left `apiInputsFromRunValues` reading `values[field.name]` bare while readiness read own-only, which is this campaign's whole failure family in miniature: two halves phrasing one rule differently. So the read is spelled one way everywhere, in one tiny module nothing re-exports.
+
+Two things the sweep turned up:
+
+- **ajv cannot close this and should not be asked to.** Its `required` compiles to `data.constructor === undefined`, which the inherited function satisfies — so the schema pass reads a prototype-named input as *supplied*, then fails its TYPE check and tells the caller a value they never sent is of the wrong type. The run was refused either way; what was broken was readiness, where nothing refused it at all and the Run button was live. That is why the fix belongs in the kernel and why the filing's "low" severity is right.
+- **The WRITE twin is deliberately left open, and recorded rather than hidden.** `out[name] = value` on a plain object invokes the inherited `__proto__` setter for that one name, so an input actually called `__proto__` is dropped from a payload rather than added to it. That fails loudly — the runtime refuses a run whose input is missing — where the read bug failed open, and `__proto__` is not a name an author writes. Closing it would mean `Object.defineProperty` at every accumulator in `gate.ts`, `values.ts` and `wire-format.ts`, trading a legible line for an illegible one at a dozen sites. Stated in `own-property.ts`'s doc comment and in [docs/run-gate.md](docs/run-gate.md) so nobody reads a fixed read as a fixed class.
+
+#### What the built-artifact verification showed
+
+Every line of evidence the three filings quoted, re-run against `dist/core/index.js`:
+
+- The starter's repro at 1000 / 5000 / 20000 levels returns `ok=true` instead of throwing `RangeError` at 5000 and 20000. A self-referencing value answers `false` instead of hanging.
+- A required text input holding `'   '` reads `{total: 1, ready: 0, missing: ['text']}` and the gate refuses it by name; a blank *optional* one is omitted from the payload entirely.
+- `mthds-ui`'s table inverts exactly: `isFilled(values['constructor'])` and its three siblings are all `false` (were all `true`), and a required input named `constructor` reports `missing: ['constructor']` where it reported `ready: 1, missing: []`. `getPipeIOContract(contracts, 'demo', 'constructor')` is `undefined` where it returned the `Object` constructor.
+
+**Adoption notes for the siblings' own bump commits.**
+
+- `pipelex-starter-js`: `src/lib/runInputs.ts`'s gate docstring carries a recorded paragraph about the uncapped recursion — it goes away with the Phase 3 swap to the kernel's `gateRunInputs`, which deletes the function that comment sits on. Separately, `src/hooks/useRunInputs.ts:40-41` claims readiness makes a per-form `!text.trim()` unnecessary; that claim was aspirational and is now literally true.
+- `mthds-ui`: `RunPanel.tsx:296` uses `isFilled(values[field.name])` to decide whether an optional field starts folded, so a field holding only spaces now folds. That is the intended reading of the predicate, not a regression, but it is visible.
 
 ## Phase 5 — List row identity (issue 7)
 
-- [ ] Decide the approach: (1) stable generated row identity — React key and field-id basis, write-backs resolved through it (the real fix; touches the id surface, so design it deliberately); or (2) the mitigation — disable remove/add while any row in the list uploads (via `env.uploadingIds`). The filing prefers (1); (2) can land first as a stopgap if (1) needs design time. Record the choice here.
-- [ ] Implement in `src/react/list-field.tsx` (and the id derivation, if (1)).
-- [ ] While in that file: stop offering **Add** past a fixed list's `ListRunField.itemCount` (added in Phase 3). An over-full `[3]` slot is the one fixed-count state where the button is still live and ajv refuses on `maxItems`; readiness cannot phrase "too many" without calling it missing, so the control is the honest place to close it.
-- [ ] Interaction coverage: remove-during-upload no longer misroutes the resolved file; under (1), row DOM state survives a sibling removal.
-- [ ] Changelog + docs (the file seam / `FieldEnv` topic).
-- [ ] Verify in `mthds-ui`: the `RunPanel` drop-then-remove repro from the filing (the file lands in the right row); confirm `mthds-ui/wip/adopt-form/deferred-review-residues.md` can strike the residue.
+- [x] **Approach decided: both halves of (1) that cost nothing, plus (2) — and the reason (1) as sketched was not taken is below.** The row's field ID stays a POSITIONAL PATH; the row gains a generated React key; removal is blocked while a file is arriving anywhere in the list.
+- [x] Implemented in `src/react/list-field.tsx`. `useRowKeys` mints an identity when a row appears and `removeItem` drops that identity with its row; the length reconciliation is the fallback for a value replaced from outside the control, where there is nothing to match rows by. `listIsBusy` reads `env.uploadingIds` by ID PREFIX, so an upload *inside* a row (`cvs.1.resume`) counts as well as a row that is one (`cvs.1`), and the dot keeps it off a sibling input called `cvs_extra`.
+- [x] **Add** stops at a fixed list's `itemCount`, and the items badge states the count it is working towards (`2 of 3 items`) through a new `itemsCountOf` key on `FieldStrings`.
+- [x] Interaction coverage: new [src/react/__tests__/list-field.test.tsx](src/react/__tests__/list-field.test.tsx). This is the repo's first rendering suite — see the note on the test harness below. Both halves re-verified as tripwires by reverting each (the busy rule and the fixed count: 3 rows; the row key: 1).
+- [x] Changelog + new [docs/upload-seam.md](docs/upload-seam.md), linked from `docs/architecture.md` § "./react".
+- [x] Verified against `mthds-ui`'s host wiring by reading it rather than by installing a tarball, for the reason recorded below. `RunPanel.tsx:316` feeds the union of its in-flight IDs into `env.uploadingIds` and `:245` writes an upload back with `setValueAtPath(valuesRef.current, id.split("."), …)` — so the ID-is-a-path contract this phase preserved is the one that host depends on, and the drop-then-remove repro is now unperformable: the remove button is disabled for as long as `cvs.*` is in that set.
+
+### Why (1) was not taken as the filing sketched it
+
+The filing's preferred fix is a generated row identity used **as the basis of the field ID**, with write-backs resolved through it. Two things make that the wrong trade here.
+
+**The ID is a path, and that is load-bearing.** A host writes an upload back with `setValueAtPath(values, id.split('.'), value)`, and `setValueAtPath` is a pure function of the value tree. Resolving an opaque token to a position at write-back time means the kernel keeping a live token-to-position registry for that function to consult — hidden, mutable, per-mount state in a core whose whole claim is that it has none. It would also have to be designed twice, because M1 moves the descriptor to the server.
+
+**And it would not buy what it looks like it buys.** A generated key lives in the control's state, not in the value, so a host that replaces `values` wholesale — the filing's own example of "anything else that reorders a list" — reconciles by length exactly as positions do. What a stable identity covers over a position is precisely the reorderings the KERNEL performs, and the kernel performs one: removal. Blocking removal while the list is busy closes that set completely, which makes (2) the fix rather than the mitigation it is described as.
+
+The half of (1) that is genuinely free is the React key, and it is in: it fixes the remount-on-remove the filing names as a bonus, and it is what makes the guarantee legible — a row is a thing, not a slot. **Add** was deliberately left enabled during an upload: appending moves no existing row, and freezing it would make filling a list of files needlessly serial.
 
 ## Phase 6 — FileField pass (issues 8, 9, 10)
 
-One pass through `file-field.tsx`; three filings, one review surface.
-
-- [ ] `uploading` reaches the URL affordances (issue 8): `disabled={disabled || uploading}` at the toggle (`:198`) and the URL input (`:210`). Design call taken alongside: whether `uploading` also reads visually so the control looks busy as a unit.
-- [ ] Accessible name (issue 9): `htmlFor={id}` on the `FieldShell` call (`:130-138`). Second design call decided rather than deferred: whether the dropzone root becomes a named `role="button"` target instead of `role="presentation"`, since that is the element keyboard and voice users actually land on.
-- [ ] Preview fixes (issue 10), in the filing's order: (3) sniff filename and URL separately instead of the concatenated `ref` (`:102`); (2) treat `data:` URLs as directly displayable — exclude them from `storageUri` so a resolver-less host gets a preview, not a spinner; (1) key `localPreview` to the `value.url` it was created for and drop it when they diverge.
-- [ ] Rendering tests for the control — the accessible-name filing noted there are none today; cover the name, the busy states, and the three preview behaviours.
-- [ ] Changelog + docs (`FieldEnv` guarantee wording: the busy seam now covers every door into the value).
-- [ ] Verify in `pipelex-starter-js`: `PdfForm.test.tsx` goes back to `getByLabelText(/pdf document/i)`; drop `encodingIds` from its form-wide `busy` workaround and pass run state alone (the comment in `PdfForm.tsx` names this moment); the pasted-storage-URL preview test stays green. Update `pipelex-starter-js/docs/input-form.md`'s upstream-gap notes.
+- [x] `uploading` reaches the URL affordances (issue 8): both now read a single `busy = disabled || uploading`. **Design call taken:** it reads visually through the `disabled:opacity-50` both affordances already carry, plus the dropzone's own `opacity-60` — the control dims as a unit with no new spinner, because a second busy indicator on a control that already has one is noise.
+- [x] Accessible name (issue 9): `htmlFor={id}` on the `FieldShell` call. **Second design call taken, and it is not the one the filing floated:** rather than giving the presentational div a `role="button"`, the TAB STOP moves to the `<input type="file">` itself (`noKeyboard` on the dropzone, `tabIndex: 0` and `disabled` on the input), with the focus ring drawn on the root through `focus-within`. A file input already has exactly the right role and only ever lacked a name; a named `role="button"` beside it would put a second control in the accessibility tree for one value.
+- [x] Preview fixes (issue 10), in the filing's order: filename and URL sniffed separately (and a `data:` URL's declared MIME type read, since it is the only type such a URL carries); `data:` and `blob:` join `http(s):` as directly viewable, so a resolver-less host gets a preview instead of a spinner; and the object URL is BOUND to the value it belongs to — it adopts the first URL to appear once the upload is no longer in flight and retires itself when the value moves on.
+- [x] Rendering tests: new [src/react/__tests__/file-field.test.tsx](src/react/__tests__/file-field.test.tsx) — the accessible name, the tab stop, the busy states, and all three preview behaviours. Every one of the six fixes was re-verified as a tripwire by reverting it in turn.
+- [x] Changelog + [docs/upload-seam.md](docs/upload-seam.md), which states the `FieldEnv` guarantee in the wording this phase earned: an uploading ID means every door into that value is shut.
+- [x] Verified against `pipelex-starter-js`'s host code by reading it. Every workaround the filings describe is present and is now retired — see the adoption note.
 
 ### Checkpoint 3 — controls are clean
 
-Natural handoff: everything user-facing is fixed; what remains is packaging. Update the statuses above and note any design calls that were deferred instead of decided.
+**Reached 2026-08-24.** `make check`, `make test` and `make build` all green. Everything user-facing in the campaign is fixed; what remains is Phase 7, which is packaging.
+
+#### The repo grew a rendering test harness, and that was the phase's real cost
+
+Issues 9 and 10 both noted that `src/react/__tests__/` held one pure-function suite and that **no rendering test existed that could have caught them** — which is why three DOM bugs shipped in one control. Landing more DOM behaviour into that control with no way to assert it would have repeated the mistake, so the harness went in first:
+
+- `vitest.config.ts` now defines two projects. The core suites stay in **node**, deliberately: a stray `document` reference in headless code has to fail there rather than pass quietly under a global jsdom. The control suites run in **jsdom** with `@testing-library/react`, and each opens with `// @vitest-environment jsdom`.
+- `vitest.setup.react.ts` does the per-test `cleanup` (Testing Library only auto-cleans when vitest's globals are on, and they are deliberately off) and loads `@testing-library/jest-dom`.
+- `jsdom` and the `@testing-library/*` packages are **devDependencies**, so they ship in nothing. `docs/dependency-budget.md` now says so explicitly, because the budget's property is what a consumer installs and a reader should not have to infer that dev tooling is out of scope. `CLAUDE.md`'s testing convention was rewritten to match — it said "node environment, no DOM", which is no longer the whole truth.
+
+#### Why the sibling verification was reading rather than running
+
+Phases 1–3 verified by installing a tarball into each sibling and running its suite. That is no longer the informative move, for two reasons that both point the same way: the siblings cannot run green against this tree at all until they take the Phase 1 fixture reshape, so a failure would be about Phase 1; and these fixes are DOM facts that this repo now has its own rendering suites for, which is the durable form of that evidence rather than a one-off run in someone else's checkout.
+
+What reading the siblings does establish, and running them would not have established better, is that the HOST-side contract is the one these fixes preserve:
+
+- `mthds-ui/src/form/react/RunPanel.tsx:245` writes an upload back with `setValueAtPath(valuesRef.current, id.split("."), …)` — the positional path this phase deliberately kept — and `:316` supplies `env.uploadingIds` as the union of its own in-flight IDs with the host's, which is exactly the set `ListField` now reads.
+- `pipelex-starter-js/src/components/PdfForm.tsx:99-108` carries the workaround issue 8 describes, in a comment that states the bug: "the kernel threads `uploadingIds` to the *dropzone* alone: its 'paste a URL instead'…", with a form-wide `busy = running || encodingIds.size > 0` to compensate. `PdfForm.test.tsx:53` reaches the control with `document.querySelector('input[type="file"]')` because it had no accessible name, and `:205` records the resolver-less spinner.
+
+**Adoption notes for the siblings' own bump commits.**
+
+- `pipelex-starter-js`: `PdfForm.test.tsx` goes back to `getByLabelText`; `PdfForm.tsx` drops `encodingIds` from its form-wide `busy` and passes run state alone (the comment at `:99-108` names this moment); the `resolveUrl` workaround stays useful for real storage URIs but is no longer needed for `data:` URLs. Its upstream-gap notes in `docs/input-form.md` lose the preview and accessible-name entries.
+- `mthds-ui`: `wip/adopt-form/deferred-review-residues.md` can strike the list-row residue — the drop-then-remove sequence is unperformable now that removal is blocked while the list is busy.
 
 ## Phase 7 — ajv out of the client bundle (issue 11)
 

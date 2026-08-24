@@ -28,6 +28,8 @@ export interface FieldStrings {
   addItem: string;
   removeItemAria: (index: number) => string;
   itemsCount: (count: number) => string;
+  /** The same badge for a list the method gave an exact count (`Concept[N]`). */
+  itemsCountOf: (count: number, total: number) => string;
   uploading: string;
   dropToUpload: string;
   dropOrBrowse: string;
@@ -56,6 +58,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   addItem: 'Add item',
   removeItemAria: (index) => `Remove item ${index}`,
   itemsCount: (count) => (count === 1 ? '1 item' : `${count} items`),
+  itemsCountOf: (count, total) => `${count} of ${total} items`,
   uploading: 'Uploading…',
   dropToUpload: 'Drop to upload',
   dropOrBrowse: 'Drop a file or click to browse',
