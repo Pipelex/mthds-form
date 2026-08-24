@@ -18,7 +18,7 @@
 import type { RunField } from './descriptor';
 import { buildRunFields } from './derive';
 import { isFilled } from './readiness';
-import { isPluralInput } from './contracts';
+import { isOptionalInput, isPluralInput } from './contracts';
 import { deflateAllInputs, inflateAllInputs } from './wire-format';
 import type { PipeIOContract, PipeInputContract } from './contracts';
 
@@ -286,7 +286,7 @@ export function apiInputsFromRunValues(
   for (const field of fields) {
     const schema = inputSchemas[field.name];
     if (!schema) continue;
-    if (schema.optional === true && !isFilled(values[field.name])) continue;
+    if (isOptionalInput(schema) && !isFilled(values[field.name])) continue;
     if (isPluralInput(schema) && !isFilled(values[field.name])) {
       out[field.name] = [];
       continue;

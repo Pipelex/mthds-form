@@ -2,23 +2,48 @@
 
 Implementation plan for the issues triaged in [wip/issues.md](wip/issues.md) (the 2026-08-24 sweep of the workspace inbox). Issue numbers below refer to that document. Work accumulates in the changelog under `## [Unreleased]`; releases are cut with `/release` when we decide to publish, not per phase.
 
-**Verification setup:** `pipelex-starter-js`, `mthds-ui` and the consuming app host resolve `@pipelex/mthds-form` from this checkout as a local dependency. Every phase ends by exercising the fix in the sibling repos — fan out fresh-context sub-agents per repo where useful; each inbox filing carries its own repro. Run `make check` and `make test` here before calling any phase done.
+**Verification setup:** the siblings resolve `@pipelex/mthds-form` from the npm registry, not from this checkout — so exercising a fix in `pipelex-starter-js`, `mthds-ui` or the consuming app host means `npm pack` here and `npm install <tarball> --no-save` there, then restoring (`rm -rf node_modules/@pipelex/mthds-form && npm install`) and `git checkout` on anything the run touched. Verify without leaving a change behind: a sibling adopting the new kernel is that repo's own commit, on its own bump. Each inbox filing carries its own repro. Run `make check` and `make test` here before calling any phase done.
 
 ## Phase 1 — Contract reshape (issue 1) + README fix (issue 12)
 
 The reshape gates fixture regeneration in every consumer and the pipelex release cascade; the README fix rides along because it is free and touches the same module's docs.
 
-- [ ] Mirror the reshape in `src/core/contracts.ts`: `presence: 'plain' | 'optional' | 'force'` replaces `optional?: boolean` on inputs; `multiplicity` gains the `fixed` arm; `item_count: number | null` (always on the wire, non-null exactly on `fixed`). No backward compatibility — the retired `optional` key goes away. Check the output side against what pipelex actually emits before assuming it reshaped the same way.
-- [ ] Gate on the new shape: `inputMustBeFilled` reads `presence !== 'optional'` (a `force` input gates like `plain`), replacing `input.optional !== true` at `contracts.ts:92`.
-- [ ] Sweep the rest of the core for readers of the retired shape (`derive.ts`, `gate.ts`, fixtures, tests) and move them to `presence` / the new multiplicity arms. Decide what, if anything, the kernel does with `fixed` + `item_count` (render as list like `variable`? enforce the count?) and record it.
-- [ ] Align with the spec (`docs/specs/pipelex-mthds-protocol.md` → "Optional IO contracts and liftable pipes") and the conformance shape (`conformance/tests/pipelex_api/test_validate_optionals.py`) — the types must match what the wire actually carries.
-- [ ] Fix `README.md:24`: `getPipeIOContract(method.pipe_io_contracts, method.domain, pipeCode)`, plus the one-line "argument order: contracts, domain, pipe code" note beside the example.
-- [ ] Update `docs/` where the contract mirror is described, and add the `## [Unreleased]` changelog entry (breaking).
-- [ ] Verify in siblings: `mthds-ui` regenerates its contract fixtures on the new shape (`make fixtures-contracts`) with suites green — that closes `mthds-ui/wip/adopt-form/contracts-fixture-reshape-obligation.md`; starter and app-host suites green against reshaped contracts (the starter's known-bug test for issue 2 is expected to still fail — it is the tripwire for Phase 2, not this one).
+- [x] Mirror the reshape in `src/core/contracts.ts`: `presence: 'plain' | 'optional' | 'force'` replaces `optional?: boolean` on inputs; `multiplicity` gains the `fixed` arm; `item_count: number | null`. The retired `optional` key is gone from the input. **The output did NOT reshape the same way** — it keeps a boolean `optional` (verified against pipelex's model: `!` is rejected on outputs, so output presence is genuinely two-valued) and gains the same `multiplicity`/`item_count` pair.
+- [x] Gate on the new shape: `inputMustBeFilled` reads `presence !== 'optional'` through the new `isOptionalInput`, so a `force` input gates like `plain`.
+- [x] Sweep the rest of the core for readers of the retired shape — `derive.ts:237`, `gate.ts:143`, `values.ts:289`, and the fixtures in seven test files, all now on `isOptionalInput`. The `fixed` decision is recorded at the checkpoint below.
+- [x] Align with the spec and with what pipelex actually serializes — checked by dumping the real models rather than by reading them (see the checkpoint).
+- [x] Fix the README quick-start: argument order corrected, order stated in prose beside the example, plus the `canRun` the readiness verdict never had.
+- [x] Update `docs/` — new [docs/contract-mirror.md](docs/contract-mirror.md) is the topic; `docs/architecture.md` links it and takes the fixed-count nuance. `## [Unreleased]` changelog entry added (breaking).
+- [x] Verify in siblings: done by installing this working tree into each and restoring both afterwards — neither sibling repo carries a change from this phase. `mthds-ui`: contracts regenerated from the local pipelex, typecheck clean, **135 files / 1968 tests green**. `pipelex-starter-js`: **31 files / 384 tests green** on reshaped fixtures, typecheck clean; the issue-2 tripwire still holds as a known-bug assertion, which is Phase 2's to flip.
 
 ### Checkpoint 1 — the cascade unblocks here
 
-Natural handoff: once this lands, the wire shape is settled, consumers can regenerate fixtures, and everything after is internal to the kernel. Before moving on, update this file with the decisions taken (especially the `fixed`/`item_count` handling and the output-side finding) and anything surprising the sweep turned up.
+Natural handoff: once this lands, the wire shape is settled, consumers can regenerate fixtures, and everything after is internal to the kernel.
+
+**Reached 2026-08-24.** `make check` and `make test` green here (335 tests), build green. Nothing is committed; the work sits in the working tree on this branch.
+
+#### What `fixed` + `item_count` does in the kernel
+
+A fixed-count list **renders exactly like a variable one** and **gates like a plain input**. Both halves follow from what pipelex emits, which is worth stating because neither was a free choice:
+
+- pipelex wraps a plural slot's schema in an array and, for `Concept[N]`, adds `minItems`/`maxItems` set to the count (`pipelex/core/concepts/concept.py:222-231`). So the list control needs nothing new, and the count is enforced by ajv from the schema the contract already carries — the kernel never restates the number.
+- `Concept[1]` is `single`, never `fixed`, so a fixed count is always greater than one.
+- Gating changed: a plural slot used to be exempt on the grounds that its empty form IS the empty list. That is right for `[]` and wrong for `[N]` — and left ungated the failure is not strictness but silence, because an absent property is one ajv never validates, so the run would go out with the input missing altogether. This matches the derivation the input-form descriptor spec already states for `gating` (`docs/specs/mthds-input-form-descriptor.md:94`).
+
+**One residual, recorded rather than hidden.** Readiness answers emptiness only, so a `[3]` slot holding two items reads ready and is then refused by the gate on `minItems`. Fail-closed — no wrong payload leaves — but the two halves phrase the rule differently, which is the family of bug this campaign is about. Closing it needs the count on the descriptor (`ListRunField` has no `item_count`; the descriptor spec assigns that growth to M1), so it belongs with the Phase 3 invariant work and is listed there. A characterization test pins the current answer so the fix shows up as a deliberate diff.
+
+#### What the sweep turned up
+
+- **`presence` is not the only new field: inputs now carry `multiplicity` too.** The kernel deliberately keeps `isPluralInput` a *schema* test rather than moving it to the new field. The schema is what `buildRunFields` maps and therefore what the user is shown; a gate predicate reading the other field could disagree with the rendered control, which is precisely the failure `mustBeFilled` exists to prevent. `multiplicity` is read for the one question the schema cannot answer as directly — whether a list declares an exact count.
+- **The mirror was verified against real serialization, not against the Python source.** `PipeInputContract.model_dump(mode="json")` emits `{concept_ref, presence, multiplicity, item_count, json_schema}` with `item_count: null`, and the output emits `{concept_ref, multiplicity, item_count, optional}`. Required typing is correct for all of them: `pipe_io_contracts` rides the validate **valid** arm, which `pipelex-api/api/routes/pipelex/validate.py:214` dumps *without* `exclude_none`.
+- **The hosted plane speaks this shape as of `pipelex` 0.52.0.** The reshape (`4bb97ec1f`) shipped there, and `pipelex-server` has moved every one of its pin sites onto it (root `constraint-dependencies`, the three plugin libs, the Daytona snapshot) and consumes `pipelex-api` `v0.17.0`, which pins the same core. The window is now the deploy rather than the release: until that hosted deploy goes out, a form talking to the older runtime reads every `?` input as `plain` and gates it — fail-closed, never a wrong payload, but a visible difference in what a form does. That is the release-cascade window, and it is called out in the changelog entry.
+- **Required typing turned a silent semantic break into a loud one.** In `pipelex-starter-js` the reshape surfaced as a type error at every construction site (its `src/generated/*/contracts.ts` are codegen output and will carry the new shape once regenerated against a reshaped runtime) instead of as `?` inputs quietly becoming required. That is the argument for typing the always-on-the-wire fields as required rather than optional.
+- **`mthds-ui`'s fixture dumper strips `item_count`** — `exclude_none=True` at `scripts/dump_pipe_io_contracts.py:70`, so the fixtures lose a field the wire carries, invisibly, because the generated modules cast through `unknown`. Their suites pass either way. Filed as `../wip/inbox/2026-08-24-mthds-ui-contract-dump-strips-item-count.md`.
+- **The regeneration carries a second, unrelated S2 change**: schema `title` now reads the concept ref (`DocumentContent` → `native.Document`, `document_batch__PageSummary` → `document_batch.PageSummary`). Nothing in the kernel keys on `title`, and `mthds-ui`'s suites were green across it, but a host that renders `title` as a label will see it change.
+
+#### Also fixed along the way
+
+The README's `computeReadiness` example destructured a `canRun` the verdict has never had. Same example as the filed argument-order bug, so it rode along.
 
 ## Phase 2 — Required-struct agreement (issue 2)
 
@@ -32,6 +57,7 @@ Natural handoff: once this lands, the wire shape is settled, consumers can regen
 
 - [ ] Design the surface: `gateRunInputs(contract, data)` in the headless core returning a discriminated result — the validated `{concept, content}` inputs, or the missing-input names plus `RunInputError[]`. Reference implementation: `pipelex-starter-js/src/lib/runInputs.ts` at `9a52551` (the error-rendering seam — `describeValidationError` + injected `Translate` — stays host-side).
 - [ ] Implement it as the composition of the existing pieces, with the emptiness rule taken from the same predicates `computeReadiness` uses (`mustBeFilled` + `fieldFilled`), so browser and server verdicts are one invariant.
+- [ ] Close the fixed-count residual from Phase 1: a `Concept[N]` list holding fewer than `item_count` items reads ready and is refused by the gate. Needs the count on `ListRunField` (`derive.ts` can read it off the array schema's `minItems`/`maxItems`, which is where pipelex states it) so `fieldFilled` can answer the same question ajv does. A characterization test in `gate.test.ts` pins the current answer — read its diff.
 - [ ] Test `computeReadiness` and `gateRunInputs` against each other inside the package over one table of inputs — including structured-concept fixtures, the kind hosts never have at adoption time. The Phase 2 shape belongs in this table.
 - [ ] Decide and document the `*Filled` export set: keep `isFilled` (legitimate standalone use — deciding whether an optional field starts folded), document it as the leaf predicate, and point everything gate-shaped at `gateRunInputs`.
 - [ ] Export from `src/core/index.ts`, changelog, and a docs topic for the gate.

@@ -11,15 +11,18 @@ import {
   storeInputDataFromRunValues,
 } from '..';
 import type { PipeInputContract } from '..';
+import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE } from './contract-fixtures';
 
 // Realistic contract: a Text concept (TextContent {text}), a Document
 // (DocumentContent {url}), and a custom structured concept.
 const INPUTS: Record<string, PipeInputContract> = {
   brief: {
+    ...PLAIN_SINGLE,
     concept_ref: 'native.Text',
     json_schema: { type: 'object', properties: { text: { type: 'string' } } },
   },
   invoice: {
+    ...PLAIN_SINGLE,
     concept_ref: 'native.Document',
     json_schema: {
       type: 'object',
@@ -27,6 +30,7 @@ const INPUTS: Record<string, PipeInputContract> = {
     },
   },
   applicant: {
+    ...PLAIN_SINGLE,
     concept_ref: 'demo.Applicant',
     json_schema: {
       type: 'object',
@@ -102,6 +106,7 @@ describe('custom concept refining native.Text (wrapper schema, e.g. poem_html.Po
   // concept_ref - so they map to an object field with a child `text` string.
   const POEM_INPUTS: Record<string, PipeInputContract> = {
     poem: {
+      ...PLAIN_SINGLE,
       concept_ref: 'poem_html.Poem',
       json_schema: {
         type: 'object',
@@ -243,13 +248,18 @@ describe('fieldsForContract', () => {
 
 describe('apiInputsFromRunValues over optional and plural inputs', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
-    supplier_quote: { concept_ref: 'native.Document', json_schema: { type: 'object' } },
+    supplier_quote: {
+      ...PLAIN_SINGLE,
+      concept_ref: 'native.Document',
+      json_schema: { type: 'object' },
+    },
     comments: {
+      ...OPTIONAL_SINGLE,
       concept_ref: 'native.Text',
       json_schema: { type: 'object', properties: { text: { type: 'string' } } },
-      optional: true,
     },
     illustrations: {
+      ...PLAIN_VARIABLE,
       concept_ref: 'native.Image',
       json_schema: { type: 'array', items: { type: 'object' } },
     },
@@ -313,6 +323,7 @@ describe('apiInputsFromRunValues over optional and plural inputs', () => {
 describe('runValuesFromStore over corrupted text values', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
     customer_name: {
+      ...PLAIN_SINGLE,
       concept_ref: 'native.Text',
       json_schema: { type: 'object', properties: { text: { type: 'string' } } },
     },
@@ -369,12 +380,13 @@ describe('runValuesFromStore over corrupted text values', () => {
 describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
     brief: {
+      ...PLAIN_SINGLE,
       concept_ref: 'native.Text',
       json_schema: { type: 'object', properties: { text: { type: 'string' } } },
     },
     focus: {
+      ...OPTIONAL_SINGLE,
       concept_ref: 'demo.ExtractionFocus',
-      optional: true,
       json_schema: {
         type: 'object',
         properties: {
@@ -419,10 +431,12 @@ describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
 describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
     brief: {
+      ...PLAIN_SINGLE,
       concept_ref: 'native.Text',
       json_schema: { type: 'object', properties: { text: { type: 'string' } } },
     },
     findings: {
+      ...PLAIN_VARIABLE,
       concept_ref: 'demo.Finding[]',
       json_schema: {
         type: 'array',
@@ -452,8 +466,8 @@ describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
     const withOptional: Record<string, PipeInputContract> = {
       brief: CONTRACT['brief'] as PipeInputContract,
       focus: {
+        ...OPTIONAL_SINGLE,
         concept_ref: 'demo.ExtractionFocus',
-        optional: true,
         json_schema: {
           type: 'object',
           properties: { audience: { type: 'string' }, notes: { type: 'string' } },

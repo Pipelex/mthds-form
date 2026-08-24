@@ -32,7 +32,7 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 | --- | --- |
 | `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the one derivation function; every heuristic lives behind it |
-| `contracts` | the typed `PipeIOContract` mirror plus `getPipeIOContract` / `buildPipeRef` and the gating predicates |
+| `contracts` | the typed `PipeIOContract` mirror plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
 | `gate` | `buildRunInputsSchema` → `prepareRunInputs` → `validateRunInputs` → `apiInputsFromSchemaData` |
 | `gate-validator` | the kernel's own ajv instance and the `RunInputError` type its verdict speaks |
 | `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on |
@@ -77,7 +77,7 @@ An input the user never touched is **absent**. Not an empty shell, not `{}`, not
 
 Materializing the shell instead is what made an optional input with a required child unrunnable: readiness ignored the input (correctly — the method said it may be omitted), Run lit up, and ajv then judged an object the kernel itself had invented against the concept's full schema. The touch that keeps a structure is a **value** in it, not a disclosure: opening the optional section is local view state the value never sees, so a section opened and left blank is absent exactly as one never opened is. Put anything in it and the whole shell survives, empty children and all — which is what makes the concept's required fields fall due, and they fail loudly.
 
-An empty **list** is deliberately not absent, at either step: a plural slot is never missing in MTHDS — its empty form IS the empty list — so dropping it would invent an absence the method cannot express.
+An empty **list** is deliberately not absent, at either step: a plural slot is never missing in MTHDS — its empty form IS the empty list — so dropping it would invent an absence the method cannot express. A *fixed-count* list (`Concept[N]`) is the exception the contract states, and it is an exception to gating rather than to absence: the empty list is still what an empty one of those is, it is simply a value the method has ruled out, so Run waits for it. See [contract-mirror.md](contract-mirror.md).
 
 Neither is an **item** in a list. Absence is what a *singular* slot expresses; an item is in the array only because the user added it, so adding is itself the touch. Letting an item collapse the way an untouched input does leaves `undefined` in the array, and ajv answers `must be object` — which blocks an empty item the item schema allowed, and replaces a required-child complaint with a type error that names nothing the user can act on. So the value bridge collapses an empty structure in a singular slot and never in a list item; that is the one distinction `collapseEmpty` draws in `toRjsf`.
 

@@ -8,7 +8,8 @@
  * those surfaces cannot drift:
  *
  *   1. `buildRunInputsSchema` - the combined JSON Schema, whose `required` list
- *      is `inputMustBeFilled` (optional `?` and plural `[]` never block).
+ *      is `inputMustBeFilled` (optional `?` and variable-plural `[]` never
+ *      block; a fixed-count `[N]` list does).
  *   2. `prepareRunInputs` - heal legacy wrappers, then prune empty optionals.
  *   3. `validateRunInputs` - ajv, plus the missing-input scan that names the
  *      VARIABLE at fault.
@@ -18,7 +19,7 @@
  * This module is pure: no React, no toasts, no i18n. Each caller renders the
  * verdict in its own idiom.
  */
-import { inputMustBeFilled, isPluralInput } from './contracts';
+import { inputMustBeFilled, isOptionalInput, isPluralInput } from './contracts';
 import { isFilled } from './readiness';
 import { validateRunInputsSchema, type RunInputError } from './gate-validator';
 import { healStringWrappers, pruneEmptyOptionals } from './wire-format';
@@ -32,8 +33,13 @@ type Dict = Record<string, unknown>;
  *
  * Each input variable becomes a property, titled with the variable name and
  * described with the concept code. Only the inputs the method actually demands
- * land in `required` - an optional (`?`) or plural (`[]`) input must not block
- * the form (see `inputMustBeFilled`).
+ * land in `required` - an optional (`?`) or variable-plural (`[]`) input must
+ * not block the form (see `inputMustBeFilled`).
+ *
+ * The per-input schema travels verbatim, which is how a fixed-count (`[N]`)
+ * list's declared count reaches ajv: pipelex states it as `minItems`/`maxItems`
+ * on the array wrapper, so the count is enforced here without the kernel
+ * restating it.
  */
 export function buildRunInputsSchema(inputs: Record<string, PipeInputContract>): Dict {
   const properties: Dict = {};
@@ -132,6 +138,12 @@ export function validateRunInputs(
  *   empty list in content". The bare form keeps the shaper, which reads the
  *   DECLARED concept and builds the empty list correctly. (pipelex/#1096 makes
  *   the envelope agree; the bare form runs today and stays correct after.)
+ *
+ * A fixed-count (`[N]`) list takes that same empty-list path, and an empty one
+ * is not a payload the method can accept. It is unreachable through the gate,
+ * which demands the input and rejects a short list on `minItems`; building the
+ * payload straight from unvalidated data is what would reach it, and inventing
+ * a different absence here would only hide that.
  */
 export function apiInputsFromSchemaData(
   preparedData: Dict,
@@ -140,7 +152,7 @@ export function apiInputsFromSchemaData(
   const out: Dict = {};
   for (const [varName, input] of Object.entries(inputs)) {
     const raw = preparedData[varName];
-    if (input.optional === true && !isFilled(raw)) continue;
+    if (isOptionalInput(input) && !isFilled(raw)) continue;
     if (isPluralInput(input) && !isFilled(raw)) {
       out[varName] = [];
       continue;

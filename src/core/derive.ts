@@ -8,7 +8,7 @@
  * descriptor (server-derived) without touching consumers.
  */
 
-import { inputMustBeFilled, type PipeInputContract } from './contracts';
+import { inputMustBeFilled, isOptionalInput, type PipeInputContract } from './contracts';
 import type { RunField, RunFieldCommon } from './descriptor';
 import {
   FIELD_DOCUMENT_CONCEPTS,
@@ -234,7 +234,7 @@ export function buildRunFields(inputs: Record<string, PipeInputContract>): RunFi
     const defs: Record<string, JsonSchema> = {};
     collectSchemaDefs(input.json_schema, defs, { traverseArrays: true });
     // A top-level input is required unless the method declared it optional (`?`).
-    const field = mapSchema(name, input.concept_ref, input.json_schema, input.optional !== true, {
+    const field = mapSchema(name, input.concept_ref, input.json_schema, !isOptionalInput(input), {
       defs,
       depth: 0,
     });

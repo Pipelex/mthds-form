@@ -38,10 +38,12 @@ export interface Readiness {
  * True when the user must put a value in this field before the run can start.
  *
  * Distinct from `required`, which also drives layout (a required field always
- * shows; an optional one may collapse). A **plural** field stays required - it
- * is a first-class input and keeps its place in the form - but it never gates:
- * a plural slot is never "absent" in MTHDS, its empty form IS the empty list,
- * and no method can declare "at least one item".
+ * shows; an optional one may collapse). A **variable-plural** field stays
+ * required - it is a first-class input and keeps its place in the form - but it
+ * never gates: a plural slot is never "absent" in MTHDS, its empty form IS the
+ * empty list, and no method can declare "at least one item". A **fixed-count**
+ * list (`[N]`) is the exception the wire now states, and it gates like any other
+ * slot - there the method HAS ruled the empty form out.
  *
  * **For a field this package built, the answer comes from `inputMustBeFilled`**
  * (`contracts.ts`) - the SAME predicate the method viewer's Run button, its ajv
@@ -57,7 +59,8 @@ export interface Readiness {
  * `RunField` - story fixtures and unit tests, which have no contract to consult
  * and therefore nothing to disagree with. Every field a host renders comes from
  * `buildRunFields` and carries `gating`, so a host is on the contract's answer
- * alone.
+ * alone. (The fallback cannot see a fixed count either - one more thing only the
+ * contract knows.)
  */
 export function mustBeFilled(field: RunField): boolean {
   return field.gating ?? (field.required && field.kind !== 'list');

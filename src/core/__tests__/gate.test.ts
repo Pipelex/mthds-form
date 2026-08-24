@@ -17,8 +17,10 @@ import {
   validateRunInputs,
 } from '..';
 import type { PipeInputContract } from '..';
+import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE, plainFixed } from './contract-fixtures';
 
 const TEXT_INPUT: PipeInputContract = {
+  ...PLAIN_SINGLE,
   concept_ref: 'native.Text',
   json_schema: {
     title: 'TextContent',
@@ -31,6 +33,7 @@ const TEXT_INPUT: PipeInputContract = {
 /** `DateContent`: `date` required, `time` optional AND format-constrained - the
  *  shape that made an untouched optional field block a run. */
 const DATE_INPUT: PipeInputContract = {
+  ...PLAIN_SINGLE,
   concept_ref: 'native.Date',
   json_schema: {
     title: 'DateContent',
@@ -43,8 +46,9 @@ const DATE_INPUT: PipeInputContract = {
   },
 };
 
-const OPTIONAL_INPUT: PipeInputContract = { ...TEXT_INPUT, optional: true };
+const OPTIONAL_INPUT: PipeInputContract = { ...TEXT_INPUT, ...OPTIONAL_SINGLE };
 const PLURAL_INPUT: PipeInputContract = {
+  ...PLAIN_VARIABLE,
   concept_ref: 'native.Image[]',
   json_schema: {
     type: 'array',
@@ -105,6 +109,7 @@ describe('validateRunInputs', () => {
     // is too short. This is the class of failure that used to reach the runner.
     const inputs = {
       quote: {
+        ...PLAIN_SINGLE,
         concept_ref: 'native.Text',
         json_schema: {
           type: 'object',
@@ -170,8 +175,8 @@ describe('apiInputsFromSchemaData', () => {
  * form values → schema data → prepare → validate → payload.
  */
 const FOCUS_INPUT: PipeInputContract = {
+  ...OPTIONAL_SINGLE,
   concept_ref: 'demo.ExtractionFocus',
-  optional: true,
   json_schema: {
     title: 'ExtractionFocus',
     type: 'object',
@@ -250,7 +255,7 @@ describe('an optional structured input whose concept has a required child', () =
   });
 
   it('reports a missing REQUIRED structured input by its variable name', () => {
-    const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, optional: false } };
+    const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, ...PLAIN_SINGLE } };
     const requiredFields = buildRunFields(REQUIRED_INPUTS);
     const schema = buildRunInputsSchema(REQUIRED_INPUTS);
     const prepared = prepareRunInputs(
@@ -286,6 +291,7 @@ describe('an optional structured input whose concept has a required child', () =
  * `must be object`: a run the form offered and its own gate then refused.
  */
 const FINDINGS_INPUT: PipeInputContract = {
+  ...PLAIN_VARIABLE,
   concept_ref: 'demo.Finding[]',
   json_schema: {
     type: 'array',
@@ -299,6 +305,7 @@ const FINDINGS_INPUT: PipeInputContract = {
 
 /** The same list, but the item concept DEMANDS a child. */
 const RATED_INPUT: PipeInputContract = {
+  ...PLAIN_VARIABLE,
   concept_ref: 'demo.Rated[]',
   json_schema: {
     type: 'array',
@@ -354,5 +361,66 @@ describe('a freshly added empty item in a list of structures', () => {
 
     expect(verdict.isValid).toBe(false);
     expect(verdict.errors[0]?.stack).toBe("must have required property 'audience'");
+  });
+});
+
+// ─── A fixed-count list (`Concept[N]`) is the one plural that gates ──────────
+
+/**
+ * `Image[3]`: pipelex states the count twice, and the two halves of the gate
+ * read one each - `item_count` on the contract tells `inputMustBeFilled` the
+ * empty form is ruled out, `minItems`/`maxItems` on the array wrapper tell ajv
+ * how many. A variable `[]` list carries neither.
+ */
+const FIXED_INPUT: PipeInputContract = {
+  ...plainFixed(3),
+  concept_ref: 'native.Image',
+  json_schema: {
+    type: 'array',
+    items: { type: 'object', properties: { url: { type: 'string' } } },
+    minItems: 3,
+    maxItems: 3,
+  },
+};
+
+describe('a fixed-count plural input', () => {
+  const INPUTS = { text: TEXT_INPUT, shots: FIXED_INPUT };
+  const FIELDS = buildRunFields(INPUTS);
+  const SCHEMA = buildRunInputsSchema(INPUTS);
+  const gate = (values: Record<string, unknown>) => {
+    const prepared = prepareRunInputs(rjsfDataFromRunValues(values, FIELDS), SCHEMA);
+    return { prepared, verdict: validateRunInputs(prepared, INPUTS, SCHEMA) };
+  };
+
+  it('lands in the schema’s `required` list, unlike a variable-length one', () => {
+    expect(SCHEMA['required']).toEqual(['text', 'shots']);
+    expect(buildRunInputsSchema({ illustrations: PLURAL_INPUT })['required']).toEqual([]);
+  });
+
+  it('blocks the Run button while it is empty', () => {
+    // The whole reason it gates: left ungated and empty, the property is simply
+    // absent, ajv never looks at it, and the run goes out without the input.
+    expect(computeReadiness(FIELDS, { text: 'Apple in Cupertino.' }).missing).toEqual(['shots']);
+  });
+
+  it('runs once the declared number of items is there', () => {
+    const { verdict } = gate({
+      text: 'Apple in Cupertino.',
+      shots: [{ url: 'a.png' }, { url: 'b.png' }, { url: 'c.png' }],
+    });
+    expect(verdict.isValid).toBe(true);
+  });
+
+  it('refuses a short list on the count the method declared', () => {
+    // Recorded as it stands: readiness answers emptiness only, so the button is
+    // live at two of three and the gate is what refuses. Fail-closed, but the
+    // two halves are not phrasing the same rule - closing that needs the count
+    // on the descriptor, which is the readiness/gate invariant work.
+    const values = { text: 'Apple in Cupertino.', shots: [{ url: 'a.png' }, { url: 'b.png' }] };
+    expect(computeReadiness(FIELDS, values).missing).toEqual([]);
+
+    const { verdict } = gate(values);
+    expect(verdict.isValid).toBe(false);
+    expect(verdict.errors[0]?.stack).toBe("'shots' must NOT have fewer than 3 items");
   });
 });

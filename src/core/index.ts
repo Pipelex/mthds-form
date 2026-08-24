@@ -35,12 +35,21 @@ export { computeReadiness, fieldFilled, isFilled, mustBeFilled } from './readine
 
 // The typed pipe_io_contracts mirror and its gating predicates.
 export type {
+  InputPresence,
+  IOMultiplicity,
   PipeIOContract,
   PipeIOContracts,
   PipeInputContract,
   PipeOutputContract,
 } from './contracts';
-export { buildPipeRef, getPipeIOContract, inputMustBeFilled, isPluralInput } from './contracts';
+export {
+  buildPipeRef,
+  getPipeIOContract,
+  inputMustBeFilled,
+  isFixedCountInput,
+  isOptionalInput,
+  isPluralInput,
+} from './contracts';
 
 // The run gate - schema build, prepare, validate, API payload.
 export type { RunInputsVerdict } from './gate';

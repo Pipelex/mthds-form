@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking: the input contract mirror follows the wire's reshaped `pipe_io_contracts`.** An input no longer carries a boolean `optional`; it carries the authored marker verbatim as `presence: 'plain' | 'optional' | 'force'`, alongside the `multiplicity: 'single' | 'variable' | 'fixed'` and `item_count: number | null` pair the wire now states. The output contract gained the same multiplicity pair and deliberately kept its boolean `optional` — output presence is genuinely two-valued, because `!` is rejected on an output.
+
+  There is no compatibility branch, so a contract in the retired shape now reads as `plain` and every `?` input in it gates. That fails in the safe direction — a run is blocked, never mis-sent — but a host whose runtime has not yet moved will see optional inputs demanded until it does. `isOptionalInput` is the one predicate that answers "may this be absent?" for the whole package, so a host reading `input.optional` itself should call it instead of matching on the marker.
+
+- **A fixed-count list (`Concept[N]`) gates like any other input.** A plural slot never blocked Run, on the grounds that its empty form IS the empty list and no method can declare "at least one" — which is exactly right for `Concept[]` and exactly wrong for `Concept[N]`, where the method has declared the count. Left ungated the failure was not strictness but silence: an absent property is one ajv never validates, so the run went out with the input missing altogether. The declared count itself is enforced by the schema the contract already carries (`minItems`/`maxItems`), not restated in the kernel.
+
+### Added
+
+- **`isOptionalInput`, `isFixedCountInput`, and the `InputPresence` / `IOMultiplicity` types are exported.** The predicates are what the retired `input.optional` read becomes; exporting them keeps a host from re-deriving a gating rule the kernel already answers — the re-derivation being what this package exists to remove.
+
+### Fixed
+
+- **The README quick-start called `getPipeIOContract` with its arguments swapped**, and destructured a `canRun` the readiness verdict does not have. The lookup takes contracts, domain, pipe code — and because the last two are both strings, a swap typechecks and then resolves anyway against a bare-code-keyed map, failing only against a namespaced one, far from the call. Both are corrected, with a note beside the example stating the order and what `computeReadiness` actually returns.
+
 ## [v0.3.0] - 2026-08-24
 
 ### Fixed

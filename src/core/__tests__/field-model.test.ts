@@ -8,12 +8,14 @@ import {
 } from '..';
 import { describe, expect, it } from 'vitest';
 import type { PipeInputContract } from '..';
+import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE } from './contract-fixtures';
 
 describe('buildRunFields date mapping', () => {
   it('maps a `date-time` string property to a date field that stores a timestamp', () => {
     // A `type = "date"` structure field compiles to `format: date-time`.
     const inputs: Record<string, PipeInputContract> = {
       quote_date: {
+        ...PLAIN_SINGLE,
         concept_ref: 'atlas.QuoteDate',
         json_schema: {
           type: 'object',
@@ -33,6 +35,7 @@ describe('buildRunFields date mapping', () => {
   it('maps a bare `date` format to a date field that stores a plain day', () => {
     const inputs: Record<string, PipeInputContract> = {
       day: {
+        ...PLAIN_SINGLE,
         concept_ref: 'atlas.Day',
         json_schema: { type: 'string', format: 'date' },
       },
@@ -46,7 +49,7 @@ describe('buildRunFields date mapping', () => {
 
   it('leaves a plain string field as text (not date)', () => {
     const inputs: Record<string, PipeInputContract> = {
-      label: { concept_ref: 'atlas.Label', json_schema: { type: 'string' } },
+      label: { ...PLAIN_SINGLE, concept_ref: 'atlas.Label', json_schema: { type: 'string' } },
     };
     expect(buildRunFields(inputs)[0]!.kind).not.toBe('date');
   });
@@ -56,13 +59,18 @@ describe('buildRunFields date mapping', () => {
 
 describe('required / readiness over optional and plural inputs', () => {
   const INPUTS: Record<string, PipeInputContract> = {
-    supplier_quote: { concept_ref: 'native.Document', json_schema: { type: 'object' } },
+    supplier_quote: {
+      ...PLAIN_SINGLE,
+      concept_ref: 'native.Document',
+      json_schema: { type: 'object' },
+    },
     comments: {
+      ...OPTIONAL_SINGLE,
       concept_ref: 'native.Text',
       json_schema: { type: 'object', properties: { text: { type: 'string' } } },
-      optional: true,
     },
     illustrations: {
+      ...PLAIN_VARIABLE,
       concept_ref: 'native.Image',
       json_schema: { type: 'array', items: { type: 'object' } },
     },
@@ -89,7 +97,8 @@ describe('required / readiness over optional and plural inputs', () => {
   // them apart: a plural conceptRef whose json_schema is NOT an array. The
   // viewer's contract predicate is the single source now, so both say the same.
   it('agrees with the method viewer on a plural input carrying a non-array schema', () => {
-    const input = {
+    const input: PipeInputContract = {
+      ...PLAIN_SINGLE,
       concept_ref: 'native.Text[]',
       // Deliberately not `type: 'array'` - the shape heuristic would call this a
       // list from the conceptRef alone and stop gating on it.

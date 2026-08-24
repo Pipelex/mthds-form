@@ -21,9 +21,10 @@ import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
 import { buildRunFields, computeReadiness, getPipeIOContract } from '@pipelex/mthds-form';
 import { FieldRenderer } from '@pipelex/mthds-form/react';
 
-const contract = getPipeIOContract(method.pipe_io_contracts, pipeCode, method.domain);
+const contract = getPipeIOContract(method.pipe_io_contracts, method.domain, pipeCode);
 const fields = buildRunFields(contract.inputs);
-const { canRun } = computeReadiness(fields, values);
+const { missing } = computeReadiness(fields, values);
+const canRun = missing.length === 0;
 
 return fields.map((field) => (
   <FieldRenderer
@@ -35,6 +36,10 @@ return fields.map((field) => (
   />
 ));
 ```
+
+The lookup takes its arguments in wire order — **contracts, domain, pipe code** — and both of the last two are strings, so swapping them typechecks. It resolves anyway against a map keyed by bare pipe code, and fails only against one keyed by namespaced `pipe_ref`, a long way from the call.
+
+`computeReadiness` reports `{ total, ready, missing }` — `missing` names the inputs still to fill, so it is both the Run gate and what a form tells the user is left.
 
 `buildRunFields` is the only function that reads JSON Schema. Everything downstream — rendering, readiness, validation messaging — reads the `RunField` descriptor it returns. That is the load-bearing rule of the package, and [docs/architecture.md](docs/architecture.md) explains what it buys.
 
