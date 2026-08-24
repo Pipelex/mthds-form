@@ -79,6 +79,8 @@ Materializing the shell instead is what made an optional input with a required c
 
 An empty **list** is deliberately not absent, at either step: a plural slot is never missing in MTHDS — its empty form IS the empty list — so dropping it would invent an absence the method cannot express.
 
+Neither is an **item** in a list. Absence is what a *singular* slot expresses; an item is in the array only because the user added it, so adding is itself the touch. Letting an item collapse the way an untouched input does leaves `undefined` in the array, and ajv answers `must be object` — which blocks an empty item the item schema allowed, and replaces a required-child complaint with a type error that names nothing the user can act on. So the value bridge collapses an empty structure in a singular slot and never in a list item; that is the one distinction `collapseEmpty` draws in `toRjsf`.
+
 The gate validates through the package's own ajv instance, configured for pydantic parity (type coercion, and `date` / `date-time` formats matching what the runtime accepts). It does not depend on RJSF: a host that renders an RJSF panel elsewhere builds its own `ValidatorType` over the package's exported date predicates, so the leniency rules keep one definition and two presentations.
 
 ## Public API and internal code

@@ -150,8 +150,15 @@ function fromRjsf(field: RunField, value: unknown): unknown {
   }
 }
 
-/** The runner's field value → RJSF full form value (what runs/store expect). */
-function toRjsf(field: RunField, value: unknown): unknown {
+/**
+ * The runner's field value → RJSF full form value (what runs/store expect).
+ *
+ * `collapseEmpty` is what a SINGULAR slot does and a LIST ITEM must not: an
+ * untouched structure in a singular slot is absent, but an item exists only
+ * because the user added it, so adding IS the touch. Only the structure case
+ * reads the flag.
+ */
+function toRjsf(field: RunField, value: unknown, collapseEmpty = true): unknown {
   switch (field.kind) {
     case 'text':
     case 'prose':
@@ -194,11 +201,17 @@ function toRjsf(field: RunField, value: unknown): unknown {
       // payload use, so the three cannot disagree about whether this input is
       // there. A structure the user did open keeps its shell, empty children
       // and all: its required child must still fail, and loudly.
-      return isFilled(out) ? out : undefined;
+      return collapseEmpty && !isFilled(out) ? undefined : out;
     }
     case 'list': {
       const arr = Array.isArray(value) ? value : [];
-      return arr.map((item) => toRjsf(field.item, item));
+      // An item is NEVER absent: it is in the array because the user added it,
+      // and `ListField`'s "Add" seeds an object item with `{}`. Letting it
+      // collapse the way an untouched singular slot does put `undefined` in the
+      // array, which ajv rejects as `must be object` - blocking an empty item
+      // the item schema allowed, and turning a required-child complaint into a
+      // type error that names nothing the user can act on.
+      return arr.map((item) => toRjsf(field.item, item, false));
     }
     default:
       return value;

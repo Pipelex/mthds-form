@@ -413,3 +413,56 @@ describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
     expect(payload).not.toHaveProperty('focus');
   });
 });
+
+// ─── An item in a LIST is never absent - adding it IS the touch ──────────────
+
+describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
+  const CONTRACT: Record<string, PipeInputContract> = {
+    brief: {
+      concept_ref: 'native.Text',
+      json_schema: { type: 'object', properties: { text: { type: 'string' } } },
+    },
+    findings: {
+      concept_ref: 'demo.Finding[]',
+      json_schema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { label: { type: 'string' }, note: { type: 'string' } },
+        },
+      },
+    },
+  };
+  const FIELDS = buildRunFields(CONTRACT);
+
+  it('keeps the item as a shell rather than collapsing it to an absence', () => {
+    // `ListField`'s "Add" seeds an object item with `{}` (`emptyValue`). A
+    // structure nobody put anything into is absent when it sits in a SINGULAR
+    // slot - but an item exists only because the user added it, so adding IS
+    // the touch. Collapsing it left `[undefined]` in the array, which ajv
+    // rejects as `must be object`.
+    const data = rjsfDataFromRunValues({ brief: 'hello', findings: [{}] }, FIELDS);
+
+    expect(data['findings']).toEqual([{ label: '', note: '' }]);
+  });
+
+  it('still omits an untouched optional STRUCTURED input - the invariant holds', () => {
+    // The singular slot and the list item answer differently on purpose; this
+    // pins that the list repair did not undo the absence rule.
+    const withOptional: Record<string, PipeInputContract> = {
+      brief: CONTRACT['brief'] as PipeInputContract,
+      focus: {
+        concept_ref: 'demo.ExtractionFocus',
+        optional: true,
+        json_schema: {
+          type: 'object',
+          properties: { audience: { type: 'string' }, notes: { type: 'string' } },
+          required: ['audience'],
+        },
+      },
+    };
+    const data = rjsfDataFromRunValues({ brief: 'hello' }, buildRunFields(withOptional));
+
+    expect(data['focus']).toBeUndefined();
+  });
+});

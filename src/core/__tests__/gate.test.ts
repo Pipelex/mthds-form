@@ -276,3 +276,83 @@ describe('an optional structured input whose concept has a required child', () =
     expect(verdict.errors[0]?.stack).toBe("must have required property 'audience'");
   });
 });
+
+// ─── An empty item in a LIST of structures must reach ajv as an object ───────
+
+/**
+ * `Finding {label, note}` - every child optional, so `{}` is a VALID item. The
+ * list control seeds a freshly added object item with `{}`, and collapsing that
+ * to an absence put `[undefined]` on the wire, which ajv rejects as
+ * `must be object`: a run the form offered and its own gate then refused.
+ */
+const FINDINGS_INPUT: PipeInputContract = {
+  concept_ref: 'demo.Finding[]',
+  json_schema: {
+    type: 'array',
+    items: {
+      type: 'object',
+      title: 'Finding',
+      properties: { label: { type: 'string' }, note: { type: 'string' } },
+    },
+  },
+};
+
+/** The same list, but the item concept DEMANDS a child. */
+const RATED_INPUT: PipeInputContract = {
+  concept_ref: 'demo.Rated[]',
+  json_schema: {
+    type: 'array',
+    items: {
+      type: 'object',
+      title: 'Rated',
+      properties: {
+        audience: { type: 'string', title: 'Audience', enum: ['engineer', 'executive'] },
+        note: { type: 'string' },
+      },
+      required: ['audience'],
+    },
+  },
+};
+
+describe('a freshly added empty item in a list of structures', () => {
+  /** What a host does between "Run pressed" and the payload. */
+  const gate = (values: Record<string, unknown>, inputs: Record<string, PipeInputContract>) => {
+    const fields = buildRunFields(inputs);
+    const schema = buildRunInputsSchema(inputs);
+    const prepared = prepareRunInputs(rjsfDataFromRunValues(values, fields), schema);
+    return { prepared, verdict: validateRunInputs(prepared, inputs, schema) };
+  };
+
+  it('is runnable when the item concept demands nothing', () => {
+    const INPUTS = { text: TEXT_INPUT, findings: FINDINGS_INPUT };
+    const { prepared, verdict } = gate({ text: 'Apple in Cupertino.', findings: [{}] }, INPUTS);
+
+    // Every child pruned away, so the item is the empty object the schema
+    // allows - not an absence, and not a type error.
+    expect(prepared['findings']).toEqual([{}]);
+    expect(verdict.isValid).toBe(true);
+    // The empty row then deflates away on the wire, because `isFilled` finds
+    // nothing in it - the same predicate that omits an unfilled optional input.
+    // A plural slot's empty form IS the empty list, so this is a real value.
+    expect(apiInputsFromSchemaData(prepared, INPUTS)['findings']).toEqual([]);
+  });
+
+  it('fails on the item concept’s required child, by NAME, not as a type error', () => {
+    // Collapsing the item turned this into `'Rated' must be object` - which
+    // names neither the field at fault nor anything the user can act on, and
+    // threw away the identifier-quoting this gate does on purpose. The child is
+    // an enum on purpose: a required plain STRING is filled with `''` by the
+    // shell and `''` is a valid string, so only a child the shell leaves unset
+    // reaches the `required` keyword at all.
+    const { verdict } = gate(
+      { text: 'Apple in Cupertino.', rated: [{}] },
+      {
+        text: TEXT_INPUT,
+        rated: RATED_INPUT,
+      },
+    );
+
+    expect(verdict.isValid).toBe(false);
+    expect(verdict.errors[0]?.stack).toBe("must have required property 'audience'");
+  });
+});
