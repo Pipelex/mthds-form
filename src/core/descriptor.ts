@@ -43,6 +43,20 @@ export interface RunFieldCommon {
    * they are gated through their parent's `fieldFilled`.
    */
   gating?: boolean;
+  /**
+   * The single property this field's value sits inside on the wire, when its
+   * concept declares a scalar content model: `native.Text` is `TextContent
+   * {text}`, `native.Number` is `NumberContent {number}`, `native.YesNo` is
+   * `YesNoContent {yes_no}`. The control still holds the plain scalar; the
+   * value bridge wraps into this property on the way out and unwraps on the way
+   * back in.
+   *
+   * A property NAME, never a schema - the descriptor stays the only currency
+   * and `buildRunFields` stays the only reader of JSON Schema. Absent whenever
+   * the value is already the whole content (a structured concept, a file, a
+   * child property of a structure): wrapping those would double-nest them.
+   */
+  contentKey?: string;
 }
 
 export interface TextRunField extends RunFieldCommon {

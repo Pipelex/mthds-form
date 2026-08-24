@@ -1,11 +1,11 @@
 /**
  * The gate every run passes through, whichever surface starts it.
  *
- * Two pages let a user run a method - the MethodViewer's Inputs panel
- * (`components/method/input-config-panel.tsx`, an RJSF form) and the standalone
- * run page (`components/method-run/*`, a bespoke field renderer). **Only the
- * rendering of inputs differs.** Everything between "the user pressed Run" and
- * "the payload goes on the wire" lives here, so the two cannot drift:
+ * A host may offer more than one place to run a method - a schema-driven
+ * inputs panel (an RJSF form) and a standalone run page (a bespoke field
+ * renderer), say. **Only the rendering of inputs differs.** Everything between
+ * "the user pressed Run" and "the payload goes on the wire" lives here, so
+ * those surfaces cannot drift:
  *
  *   1. `buildRunInputsSchema` - the combined JSON Schema, whose `required` list
  *      is `inputMustBeFilled` (optional `?` and plural `[]` never block).

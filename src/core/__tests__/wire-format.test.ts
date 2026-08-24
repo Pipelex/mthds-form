@@ -935,6 +935,17 @@ const DATE_CONTENT_SCHEMA = {
   required: ['date'],
 };
 
+/** A custom concept with a required child - `ExtractionFocus {audience, notes}`. */
+const FOCUS_SCHEMA = {
+  type: 'object',
+  title: 'ExtractionFocus',
+  properties: {
+    audience: { type: 'string', title: 'Audience' },
+    notes: { type: 'string', title: 'Notes' },
+  },
+  required: ['audience'],
+};
+
 describe('pruneEmptyOptionals', () => {
   it('drops the empty optional `time` RJSF fills in on mount', () => {
     // This is the bug: `""` is not a valid `format: "time"`, so ajv rejected a
@@ -1003,6 +1014,35 @@ describe('pruneEmptyOptionals', () => {
     expect(pruneEmptyOptionals({ quote_date: { date: '2026-08-06', time: '' } }, schema)).toEqual({
       quote_date: { date: '2026-08-06' },
     });
+  });
+
+  it('drops an optional STRUCTURE whose every child was pruned away', () => {
+    // An untouched optional structured input arrives as a shell of empty
+    // children. Emptied out it is `{}`, which carries nothing - but ajv still
+    // judged it against the concept's full schema and rejected the run for a
+    // required child of an input the method said may be omitted.
+    const schema = {
+      type: 'object',
+      properties: { focus: FOCUS_SCHEMA },
+      required: [],
+    };
+    expect(pruneEmptyOptionals({ focus: { notes: '' } }, schema)).toEqual({});
+  });
+
+  it('KEEPS an emptied-out REQUIRED structure so it still fails validation', () => {
+    const schema = { type: 'object', properties: { focus: FOCUS_SCHEMA }, required: ['focus'] };
+    expect(pruneEmptyOptionals({ focus: { notes: '' } }, schema)).toEqual({ focus: {} });
+  });
+
+  it('keeps an optional EMPTY LIST - a plural slot is never absent', () => {
+    // Its empty form IS the empty list, so dropping it would invent an absence
+    // MTHDS cannot express.
+    const schema = {
+      type: 'object',
+      properties: { illustrations: { type: 'array', items: { type: 'string' } } },
+      required: [],
+    };
+    expect(pruneEmptyOptionals({ illustrations: [] }, schema)).toEqual({ illustrations: [] });
   });
 
   it('leaves a property the schema does not describe untouched', () => {

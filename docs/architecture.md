@@ -14,19 +14,29 @@ buildRunFields(inputs: Record<string, PipeInputContract>) -> RunField[]
 
 Everything heuristic is module-private behind that function: the native-concept taxonomy, the url-bearing-object test, the depth rule that decides prose versus a single-line input, the `accept` strings, list splitting. None of it is exported, which is what makes the seam real rather than aspirational — see [derivation-swap.md](derivation-swap.md).
 
+### What a scalar's value actually looks like on the wire
+
+A native scalar reads as a plain value in the form and travels as an object on the wire. `native.Number` declares `NumberContent {number}`, `native.YesNo` declares `YesNoContent {yes_no}`, `native.Text` declares `TextContent {text}` — so the control holds `2` while the payload must carry `{number: 2}`, and the gate validates against the declared content model.
+
+The descriptor is what reconciles those. `buildRunFields` reads the contract, finds the single property the content model declares, and stamps its **name** on the field as `contentKey`. The value bridge in `values` then wraps on the way out and unwraps on the way back in, by name — it holds no list of which concepts wrap, and it never looks at a schema.
+
+That indirection is not decoration. The wrapper used to be a second hand-written list of concept names living next to the render taxonomy, the two disagreed about `native.Number`, and the result was a form that looked correct, satisfied readiness, enabled Run, and then failed its own gate with `'…' must be object`. Deriving the name from the contract covers concepts nobody remembered to add.
+
+A field with no `contentKey` keeps its value plain, and that is equally deliberate: a structured concept, a file, or a child property of a structure IS its value, and wrapping one double-nests it into a payload no schema accepts.
+
 ## Module map
 
 ### `.` — the headless core (`src/core/`)
 
 | Module | Role |
 | --- | --- |
-| `descriptor` | the `RunField` union, `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
+| `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the one derivation function; every heuristic lives behind it |
 | `contracts` | the typed `PipeIOContract` mirror plus `getPipeIOContract` / `buildPipeRef` and the gating predicates |
 | `gate` | `buildRunInputsSchema` → `prepareRunInputs` → `validateRunInputs` → `apiInputsFromSchemaData` |
 | `gate-validator` | the kernel's own ajv instance and the `RunInputError` type its verdict speaks |
 | `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on |
-| `values` | store/wire value conversions, `setValueAtPath`, `outputsFromPipeOutput` |
+| `values` | store/wire value conversions (wrapping scalars by `contentKey`), `setValueAtPath`, `outputsFromPipeOutput` |
 | `wire-format` | deflate/inflate and the exactly-one-wrapper invariant |
 | `schema-utils` | the one nullable-`anyOf` collapse and the one `$defs` walker |
 | `native-concepts` | the native-concept taxonomy, stated once (not exported from the entry) |
@@ -56,6 +66,20 @@ Validation is a four-step contract, and the order matters:
 4. `apiInputsFromSchemaData` produces the wire payload.
 
 The verdict is the contract; its rendering is not. `describeValidationError` is one presentation of a `RunInputError` and a host is free to write another. A consumer branches on the structured error, never on message text.
+
+A message that names a field names the field's **identifier** — the one written in the method — never the schema `title` a pydantic contract carries alongside it. That is the one deliberate divergence from RJSF's error transform, which substitutes the title because in an RJSF form the title *is* the rendered label. Here the controls label a field by its identifier, so quoting `'Audience'` at someone whose bundle says `audience` sends them looking for a field that does not exist.
+
+### What absence looks like
+
+An input the user never touched is **absent**. Not an empty shell, not `{}`, not `{child: ""}` — absent. Every step has to agree about that, because when they disagree the form offers a run its own gate then refuses.
+
+`isFilled` is the one predicate, and three places read it. The value bridge omits a structure nothing was put into rather than materializing children for it. `prepareRunInputs` drops an optional property that pruned down to `{}` — which is what the shell collapses to on the surface that renders through RJSF, where the bridge is not involved. `apiInputsFromSchemaData` omits an unfilled optional input from the payload. Readiness already ignores optional inputs, so all four answers line up.
+
+Materializing the shell instead is what made an optional input with a required child unrunnable: readiness ignored the input (correctly — the method said it may be omitted), Run lit up, and ajv then judged an object the kernel itself had invented against the concept's full schema. The touch that keeps a structure is a **value** in it, not a disclosure: opening the optional section is local view state the value never sees, so a section opened and left blank is absent exactly as one never opened is. Put anything in it and the whole shell survives, empty children and all — which is what makes the concept's required fields fall due, and they fail loudly.
+
+An empty **list** is deliberately not absent, at either step: a plural slot is never missing in MTHDS — its empty form IS the empty list — so dropping it would invent an absence the method cannot express.
+
+Neither is an **item** in a list. Absence is what a *singular* slot expresses; an item is in the array only because the user added it, so adding is itself the touch. Letting an item collapse the way an untouched input does leaves `undefined` in the array, and ajv answers `must be object` — which blocks an empty item the item schema allowed, and replaces a required-child complaint with a type error that names nothing the user can act on. So the value bridge collapses an empty structure in a singular slot and never in a list item; that is the one distinction `collapseEmpty` draws in `toRjsf`.
 
 The gate validates through the package's own ajv instance, configured for pydantic parity (type coercion, and `date` / `date-time` formats matching what the runtime accepts). It does not depend on RJSF: a host that renders an RJSF panel elsewhere builds its own `ValidatorType` over the package's exported date predicates, so the leniency rules keep one definition and two presentations.
 

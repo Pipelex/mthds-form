@@ -11,14 +11,14 @@
 import { inputMustBeFilled, type PipeInputContract } from './contracts';
 import type { RunField, RunFieldCommon } from './descriptor';
 import {
-  BOOLEAN_CONCEPTS,
   FIELD_DOCUMENT_CONCEPTS,
   FIELD_TEXT_CONCEPTS,
   HTML_CONCEPTS,
   IMAGE_CONCEPTS,
-  INTEGER_CONCEPTS,
   NUMBER_CONCEPTS,
   splitListConcept,
+  TEXT_WRAPPER_CONCEPTS,
+  YES_NO_CONCEPTS,
 } from './native-concepts';
 import {
   collapseNullable,
@@ -51,6 +51,35 @@ function isDocumentObject(schema: JsonSchema): boolean {
 interface MapCtx {
   defs: Record<string, JsonSchema>;
   depth: number;
+}
+
+/**
+ * The single property a pydantic scalar content model holds its value in -
+ * `TextContent {text}`, `NumberContent {number}`, `YesNoContent {yes_no}`.
+ *
+ * A native scalar's value does NOT sit at the top of its declared schema, and
+ * this is where that is discovered: from the CONTRACT, not from a hand-kept
+ * list of which concepts wrap. Keeping such a list is what broke `native.Number`
+ * - the render taxonomy knew the concept, the wrapper taxonomy did not, so a
+ * number reached the gate bare and failed against `NumberContent`. Reading the
+ * declared shape covers a concept nobody remembered to add.
+ *
+ * A wrapper is a schema declaring EXACTLY ONE property. A multi-property content
+ * model (`DateContent {date, time}`, `HtmlContent {inner_html, css_class}`) is
+ * not one and deliberately answers `undefined`; so does a contract that declares
+ * no properties at all. The returned `schema` is the WRAPPED property's, which
+ * is where its constraints live.
+ */
+function scalarWrapper(
+  schema: JsonSchema,
+  ctx: MapCtx,
+): { key: string; schema: JsonSchema } | undefined {
+  const props = schema.properties as Record<string, JsonSchema> | undefined;
+  const entries = props ? Object.entries(props) : [];
+  const only = entries.length === 1 ? entries[0] : undefined;
+  if (!only) return undefined;
+  const [key, propSchema] = only;
+  return { key, schema: collapseNullable(derefSchema(propSchema ?? {}, ctx.defs)) };
 }
 
 /** Build the recursive RunField for a single resolved schema node. */
@@ -94,25 +123,36 @@ function mapSchema(
     if (FIELD_DOCUMENT_CONCEPTS.has(base))
       return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
     if (IMAGE_CONCEPTS.has(base)) return { ...common, kind: 'image', accept: 'PNG, JPG, WEBP' };
-    if (FIELD_TEXT_CONCEPTS.has(base) || HTML_CONCEPTS.has(base))
-      return ctx.depth === 0 ? { ...common, kind: 'prose' } : { ...common, kind: 'text' };
-    if (INTEGER_CONCEPTS.has(base))
-      return {
-        ...common,
-        kind: 'number',
-        integer: true,
-        min: numOrUndef(schema.minimum),
-        max: numOrUndef(schema.maximum),
-      };
+
+    // The three native scalars render as a bare control but travel inside the
+    // content model their concept declares. `contentKey` carries that property
+    // name to the value bridge, which is how the control can hold `2` while the
+    // wire carries `{number: 2}`.
+    const wrapper = scalarWrapper(schema, ctx);
+
+    if (FIELD_TEXT_CONCEPTS.has(base) || HTML_CONCEPTS.has(base)) {
+      // `Date` declares two properties, so no wrapper is found for it and the
+      // `{text}` fallback answers instead - the recorded drift, kept until the
+      // derivation swap (see `native-concepts.ts`).
+      const contentKey = wrapper?.key ?? (TEXT_WRAPPER_CONCEPTS.has(base) ? 'text' : undefined);
+      return ctx.depth === 0
+        ? { ...common, contentKey, kind: 'prose' }
+        : { ...common, contentKey, kind: 'text' };
+    }
     if (NUMBER_CONCEPTS.has(base))
       return {
         ...common,
+        contentKey: wrapper?.key,
         kind: 'number',
+        // `NumberContent.number` is `int | float`, an unresolvable union, so the
+        // control stays a float input. Constraints are read off the WRAPPED
+        // property - the wrapper object never carries them, which is why the
+        // outer schema always answered `undefined`.
         integer: false,
-        min: numOrUndef(schema.minimum),
-        max: numOrUndef(schema.maximum),
+        min: numOrUndef(wrapper?.schema.minimum ?? schema.minimum),
+        max: numOrUndef(wrapper?.schema.maximum ?? schema.maximum),
       };
-    if (BOOLEAN_CONCEPTS.has(base)) return { ...common, kind: 'boolean' };
+    if (YES_NO_CONCEPTS.has(base)) return { ...common, contentKey: wrapper?.key, kind: 'boolean' };
   }
 
   // A custom concept whose schema looks like DocumentContent (refines Document).

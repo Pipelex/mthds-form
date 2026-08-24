@@ -5,6 +5,7 @@ import {
   fieldsForContract,
   inputDataFromWorkingMemory,
   outputsFromPipeOutput,
+  rjsfDataFromRunValues,
   runValuesFromStore,
   setValueAtPath,
   storeInputDataFromRunValues,
@@ -360,5 +361,108 @@ describe('runValuesFromStore over corrupted text values', () => {
   it('leaves an empty value empty', () => {
     expect(read(undefined)).toBe('');
     expect(read('')).toBe('');
+  });
+});
+
+// ─── An untouched structure is ABSENT, not an invented shell ─────────────────
+
+describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
+  const CONTRACT: Record<string, PipeInputContract> = {
+    brief: {
+      concept_ref: 'native.Text',
+      json_schema: { type: 'object', properties: { text: { type: 'string' } } },
+    },
+    focus: {
+      concept_ref: 'demo.ExtractionFocus',
+      optional: true,
+      json_schema: {
+        type: 'object',
+        properties: {
+          audience: { type: 'string', enum: ['engineer', 'executive'] },
+          notes: { anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+        },
+        required: ['audience'],
+      },
+    },
+  };
+  const FIELDS = buildRunFields(CONTRACT);
+
+  it('emits nothing for it, rather than a shell of empty children', () => {
+    // `{ notes: "" }` was an object that existed only because the bridge built
+    // it, and the gate then judged it against the concept's full schema.
+    expect(rjsfDataFromRunValues({ brief: 'hello' }, FIELDS)['focus']).toBeUndefined();
+  });
+
+  it('emits nothing for a value holding only empty children either', () => {
+    // What the form state looks like after a section is opened and closed.
+    const data = rjsfDataFromRunValues(
+      { brief: 'hello', focus: { audience: undefined, notes: '' } },
+      FIELDS,
+    );
+    expect(data['focus']).toBeUndefined();
+  });
+
+  it('keeps the whole structure - empty children and all - once anything is filled', () => {
+    // The required child must still be demanded of a section the user filled in.
+    const data = rjsfDataFromRunValues({ brief: 'hello', focus: { notes: 'terse' } }, FIELDS);
+    expect(data['focus']).toEqual({ audience: undefined, notes: 'terse' });
+  });
+
+  it('omits it from the run payload, so the method sees a real absence', () => {
+    const payload = apiInputsFromRunValues({ brief: 'hello' }, FIELDS, CONTRACT);
+    expect(payload).not.toHaveProperty('focus');
+  });
+});
+
+// ─── An item in a LIST is never absent - adding it IS the touch ──────────────
+
+describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
+  const CONTRACT: Record<string, PipeInputContract> = {
+    brief: {
+      concept_ref: 'native.Text',
+      json_schema: { type: 'object', properties: { text: { type: 'string' } } },
+    },
+    findings: {
+      concept_ref: 'demo.Finding[]',
+      json_schema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { label: { type: 'string' }, note: { type: 'string' } },
+        },
+      },
+    },
+  };
+  const FIELDS = buildRunFields(CONTRACT);
+
+  it('keeps the item as a shell rather than collapsing it to an absence', () => {
+    // `ListField`'s "Add" seeds an object item with `{}` (`emptyValue`). A
+    // structure nobody put anything into is absent when it sits in a SINGULAR
+    // slot - but an item exists only because the user added it, so adding IS
+    // the touch. Collapsing it left `[undefined]` in the array, which ajv
+    // rejects as `must be object`.
+    const data = rjsfDataFromRunValues({ brief: 'hello', findings: [{}] }, FIELDS);
+
+    expect(data['findings']).toEqual([{ label: '', note: '' }]);
+  });
+
+  it('still omits an untouched optional STRUCTURED input - the invariant holds', () => {
+    // The singular slot and the list item answer differently on purpose; this
+    // pins that the list repair did not undo the absence rule.
+    const withOptional: Record<string, PipeInputContract> = {
+      brief: CONTRACT['brief'] as PipeInputContract,
+      focus: {
+        concept_ref: 'demo.ExtractionFocus',
+        optional: true,
+        json_schema: {
+          type: 'object',
+          properties: { audience: { type: 'string' }, notes: { type: 'string' } },
+          required: ['audience'],
+        },
+      },
+    };
+    const data = rjsfDataFromRunValues({ brief: 'hello' }, buildRunFields(withOptional));
+
+    expect(data['focus']).toBeUndefined();
   });
 });
