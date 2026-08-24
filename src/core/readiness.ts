@@ -18,12 +18,44 @@ export function isFilled(value: unknown): boolean {
   return true;
 }
 
-/** True when every required field has a value. */
+/**
+ * True when a slot holds something AND every required field inside it has a
+ * value.
+ *
+ * The two halves are both load-bearing, and the first one is the one that is
+ * easy to leave out. A structure is satisfied only if there is something in it:
+ * a struct whose concept declares no required child used to be *vacuously*
+ * satisfied by an absent value - every child passed the `!f.required` test, so
+ * `every` returned true over a value that was not there. Readiness reported
+ * nothing missing and the Run button lit up, while the value bridge omitted the
+ * untouched structure and the gate then rejected the run on the combined
+ * schema's `required` list, naming an input the form had just declared ready.
+ *
+ * `isFilled` is the SAME predicate `toRjsf` uses to decide whether a structure
+ * collapses to an absence (`values.ts`), which is what makes the two halves
+ * agree by construction rather than by parallel edits: readiness calls an input
+ * present exactly when the bridge keeps it. Absence is what a singular slot
+ * expresses, so a required one has to be touched - the button stays dark until
+ * the user puts a value somewhere inside, and then the whole shell travels,
+ * empty children and all, so a required child left blank still fails loudly.
+ */
 export function fieldFilled(field: RunField, value: unknown): boolean {
   if (field.kind === 'object') {
-    if (!value || typeof value !== 'object') return field.fields.every((f) => !f.required);
-    const obj = value as Record<string, unknown>;
+    if (!isFilled(value)) return false;
+    const obj = (value ?? {}) as Record<string, unknown>;
     return field.fields.every((f) => !f.required || fieldFilled(f, obj[f.name]));
+  }
+  // A list the method gave a count to (`Concept[N]`) is satisfied only by that
+  // many items, each of them filled. Answering it by `isFilled` alone - "is
+  // there anything in the array?" - left the button live on a `[3]` slot
+  // holding two, and the gate then refused it on the very count the method
+  // declared. `itemCount` comes off the same `minItems` ajv reads, so the two
+  // halves phrase one rule. A VARIABLE list keeps the emptiness answer and
+  // never gates anyway (see `mustBeFilled`), which is why the count, not the
+  // kind, is what this branch turns on.
+  if (field.kind === 'list' && field.itemCount !== undefined) {
+    if (!Array.isArray(value) || value.length < field.itemCount) return false;
+    return value.every((item) => fieldFilled(field.item, item));
   }
   return isFilled(value);
 }
@@ -66,9 +98,24 @@ export function mustBeFilled(field: RunField): boolean {
   return field.gating ?? (field.required && field.kind !== 'list');
 }
 
-/** How many gating top-level inputs are satisfied by the current values. */
+/**
+ * How many top-level inputs stand between the current values and a run.
+ *
+ * Two kinds count, and the second is easy to miss. An input the method DEMANDS
+ * counts always (`mustBeFilled`). An input the method left optional counts once
+ * the user has put something in it - because a structure that has been touched
+ * owes its concept every field the concept declares, and the gate enforces
+ * exactly that. Left out, an optional struct opened and half-filled was ignored
+ * here and refused there: the button stayed live and the run came back rejected
+ * on a required child, which is the same disagreement the demanded case had.
+ *
+ * So an optional input moves INTO the denominator the moment it is touched, and
+ * out of `missing` as soon as it is complete: 3 of 3 while it is untouched, 3
+ * of 4 once it is started, 4 of 4 once it is done. `total` answers "how many
+ * things stand between me and Run", which is the number a host is displaying.
+ */
 export function computeReadiness(fields: RunField[], values: Record<string, unknown>): Readiness {
-  const gating = fields.filter(mustBeFilled);
+  const gating = fields.filter((f) => mustBeFilled(f) || isFilled(values[f.name]));
   const missing = gating
     .filter((f) => !fieldFilled(f, values[f.name]))
     .map((f) => f.title ?? f.name);

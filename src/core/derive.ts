@@ -110,7 +110,10 @@ function mapSchema(
   if (isList || schemaTypeOf(schema) === 'array') {
     const itemsSchema = (schema.items as JsonSchema) ?? {};
     const item = mapSchema(name, base, itemsSchema, true, { ...ctx, depth: ctx.depth + 1 });
-    return { ...common, kind: 'list', item };
+    // A declared count (`Concept[N]`) reaches the descriptor from the schema
+    // keyword ajv itself reads - see `ListRunField.itemCount`.
+    const itemCount = numOrUndef(schema.minItems);
+    return { ...common, kind: 'list', item, ...(itemCount === undefined ? {} : { itemCount }) };
   }
 
   // Enum (a custom concept may refine a native with a fixed value set).

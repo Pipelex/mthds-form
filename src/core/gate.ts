@@ -16,15 +16,24 @@
  *   4. `apiInputsFromSchemaData` - the `{concept, content}` payload, built from
  *      the PREPARED data so the pruning reaches the wire too.
  *
+ * **`gateRunInputs` is that whole chain as one call**, and it is what a server
+ * should use. The four steps stay exported because a host that renders its own
+ * panel needs the schema and the verdict separately, but assembling them is not
+ * a host's job: the step between validation and the payload is an emptiness
+ * check with four look-alike predicates to choose from, only two of which are
+ * the ones the Run button reads, and choosing the near-miss pair produces a
+ * server that is more permissive than the button in front of it.
+ *
  * This module is pure: no React, no toasts, no i18n. Each caller renders the
  * verdict in its own idiom.
  */
 import { inputMustBeFilled, isOptionalInput, isPluralInput } from './contracts';
-import { isFilled } from './readiness';
+import { buildRunFields } from './derive';
+import { fieldFilled, isFilled, mustBeFilled } from './readiness';
 import { validateRunInputsSchema, type RunInputError } from './gate-validator';
 import { healStringWrappers, pruneEmptyOptionals } from './wire-format';
 import { prepareSchemaForRjsf } from './normalize-schema';
-import type { PipeInputContract } from './contracts';
+import type { PipeIOContract, PipeInputContract } from './contracts';
 
 type Dict = Record<string, unknown>;
 
@@ -106,10 +115,19 @@ export function validateRunInputs(
   for (const [varName, input] of Object.entries(inputs)) {
     if (!inputMustBeFilled(input)) continue;
     const varData = preparedData[varName];
+    // A demanded input that is not there at all is missing whatever its concept
+    // declares inside. The check has to come BEFORE the required-children one:
+    // a struct whose concept demands no child used to fall out of the scan
+    // here, so the run was refused by the combined schema's `required` list
+    // while the scan named nothing and the caller could only quote ajv.
+    if (varData == null) {
+      missingInputs.push(varName);
+      continue;
+    }
     const inputSchema = input.json_schema as Dict;
     const requiredFields = (inputSchema.required as string[]) || [];
     if (requiredFields.length === 0) continue;
-    if (!varData || typeof varData !== 'object') {
+    if (typeof varData !== 'object') {
       missingInputs.push(varName);
       continue;
     }
@@ -161,4 +179,108 @@ export function apiInputsFromSchemaData(
     out[varName] = { concept: input.concept_ref, content };
   }
   return out;
+}
+
+// ─── The whole chain, as one call ────────────────────────────────────────────
+
+/** The gate's verdict: the payload to send, or why the run may not start. */
+export type RunInputsGateResult =
+  | { ok: true; inputs: Dict }
+  | {
+      ok: false;
+      /** Variable names the caller left empty or short. */
+      missingInputs: string[];
+      /** Raw ajv errors, for when the scan cannot name anything. */
+      errors: RunInputError[];
+      /** The repaired data the verdict was reached on - what
+       *  `describeValidationError` needs to quote the value it received. */
+      preparedData: Dict;
+    };
+
+/**
+ * One schema object per contract, for the lifetime of the process.
+ *
+ * `buildRunInputsSchema` is a pure function of the contract, so rebuilding it is
+ * *semantically* free - but validation runs through a module-level ajv whose
+ * compiled-schema cache is keyed on **schema object identity** and is never
+ * evicted. A fresh object per call therefore misses every time and retains
+ * another compiled validator. On a publicly callable server endpoint that is
+ * unbounded growth driven by the cheapest request there is: an empty body,
+ * rejected in a fraction of a millisecond, costing nothing to send.
+ *
+ * Weakly keyed so the map never pins a contract that goes out of scope. The
+ * schema a run has been gated against is pinned for the process lifetime anyway
+ * by ajv's own cache; the point is that the NUMBER of them is bounded by the
+ * number of distinct contracts rather than by traffic.
+ */
+const SCHEMA_CACHE = new WeakMap<PipeIOContract, Dict>();
+
+function schemaForContract(contract: PipeIOContract): Dict {
+  const cached = SCHEMA_CACHE.get(contract);
+  if (cached) return cached;
+  const schema = buildRunInputsSchema(contract.inputs);
+  SCHEMA_CACHE.set(contract, schema);
+  return schema;
+}
+
+/**
+ * Gate a run: repair the caller's data, validate it against the contract,
+ * refuse anything the Run button would have refused, and build the payload.
+ *
+ * Returns a verdict rather than throwing. A server endpoint must not throw
+ * across the boundary to its client - frameworks routinely strip the message to
+ * an opaque digest in a production build - and a rejection here is an ordinary
+ * outcome, not an exceptional one.
+ *
+ * **`data` is `unknown` because that is what it is.** A run endpoint is public
+ * and no framework enforces a declared parameter type, so the argument is
+ * whatever the caller put in the body. Normalizing it is the gate's first step
+ * rather than a wrapper around the gate: the chain indexes the payload by
+ * variable name without first checking it is indexable, so a `null` body would
+ * throw *after* ajv had already reported `must be object` and before any
+ * verdict came back. An empty object walks the normal path instead and names
+ * every input the caller left out.
+ *
+ * **The schema alone is not the rule.** ajv's `required` asserts only that a
+ * key is PRESENT, and a content model carries no `minLength` - so a required
+ * input that arrived empty (`{document: {url: ""}}`, `{text: {text: ""}}`)
+ * satisfies the schema. That is the natural payload, not a contrived one:
+ * `rjsfDataFromRunValues({}, fields)` emits exactly that when nothing is
+ * selected. So the gate re-applies the emptiness rule using
+ * `computeReadiness`'s OWN two functions over the same derived fields, which is
+ * the only way to be sure the two sides cannot disagree.
+ *
+ * Picking a pair that merely looks equivalent is not enough, and this is the
+ * whole reason the assembly lives here rather than in each host: the obvious
+ * choice, `inputMustBeFilled` + `isFilled`, agrees on every leaf kind and
+ * diverges on a structured concept in BOTH directions - `isFilled` on an object
+ * is `some(child filled)` where `fieldFilled` is `every(required child
+ * filled)`. That accepts a half-filled struct the browser refuses (a paid run
+ * past a disabled button) and rejects a filled all-optional struct the browser
+ * accepts. A host whose methods happen to use only native concepts has no test
+ * that can catch either.
+ */
+export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInputsGateResult {
+  const payload =
+    typeof data === 'object' && data !== null && !Array.isArray(data) ? (data as Dict) : {};
+  const schema = schemaForContract(contract);
+  const preparedData = prepareRunInputs(payload, schema);
+
+  const verdict = validateRunInputs(preparedData, contract.inputs, schema);
+  if (!verdict.isValid) {
+    return {
+      ok: false,
+      missingInputs: verdict.missingInputs,
+      errors: verdict.errors,
+      preparedData,
+    };
+  }
+
+  const missingInputs = buildRunFields(contract.inputs)
+    .filter(mustBeFilled)
+    .filter((field) => !fieldFilled(field, preparedData[field.name]))
+    .map((field) => field.name);
+  if (missingInputs.length) return { ok: false, missingInputs, errors: [], preparedData };
+
+  return { ok: true, inputs: apiInputsFromSchemaData(preparedData, contract.inputs) };
 }

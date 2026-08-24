@@ -111,6 +111,20 @@ export interface ListRunField extends RunFieldCommon {
   kind: 'list';
   /** The element descriptor (its `name` is unused; the index labels items). */
   item: RunField;
+  /**
+   * How many items the slot demands, when the method declared a count
+   * (`Concept[N]`). Absent for a variable `Concept[]` list, which demands none.
+   *
+   * Read off the array schema's `minItems` rather than off the contract's
+   * `item_count`, which states the same number: this exists so `fieldFilled` can
+   * answer the question **ajv** answers, and `minItems` is the keyword ajv
+   * reads. pipelex emits `minItems`/`maxItems` = N for a `[N]` slot and neither
+   * for `[]`, so the two sources agree by construction on every real contract -
+   * and where a schema stated only a lower bound, gating on that bound is the
+   * same rule, which is the direction that cannot leave readiness more
+   * permissive than the gate.
+   */
+  itemCount?: number;
 }
 
 export interface UnknownRunField extends RunFieldCommon {

@@ -142,4 +142,19 @@ describe('required / readiness over optional and plural inputs', () => {
     const readiness = computeReadiness(buildRunFields(INPUTS), { comments: 'offrir la gravure' });
     expect(readiness.missing).toEqual(['supplier_quote']);
   });
+
+  it('counts a TOUCHED optional input, because the gate then demands it whole', () => {
+    // An optional input is out of the denominator until the user puts something
+    // in it, and in it afterwards - a touched structure owes its concept every
+    // field the concept declares, which is what the server gate enforces. The
+    // count a host displays follows: 1 of 1 untouched, 1 of 2 once started.
+    const fields = buildRunFields(INPUTS);
+
+    expect(computeReadiness(fields, {}).total).toBe(1);
+    expect(computeReadiness(fields, { comments: 'offrir la gravure' })).toEqual({
+      total: 2,
+      ready: 1,
+      missing: ['supplier_quote'],
+    });
+  });
 });

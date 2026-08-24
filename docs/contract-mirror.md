@@ -43,7 +43,7 @@ The fixed-count row is the one the reshape added, and leaving it ungated would n
 
 The declared **count** is enforced separately, and by the schema rather than by the kernel: `minItems`/`maxItems` travel verbatim into the combined schema `buildRunInputsSchema` produces, so the gate's ajv pass rejects a short list without the kernel restating a number the wire already carries.
 
-One residual is recorded rather than hidden, in `contracts.ts` and in a characterization test: readiness answers emptiness only, so a `[3]` slot holding two items reads ready and is refused by the gate. That is fail-closed — the wrong payload never leaves — but the two halves are not yet phrasing the same rule, and closing it needs the count on the descriptor, which is the readiness/gate invariant work.
+The count reaches the descriptor too, as `ListRunField.itemCount`, so readiness phrases the same rule the gate does: a `[3]` slot holding two items reads missing rather than ready. It is read off the array schema's `minItems` rather than off `item_count` — the two state the same number, but this one exists so `fieldFilled` can answer the question **ajv** answers, and `minItems` is the keyword ajv reads. (Earlier this was a recorded residual: readiness answered emptiness only, the button was live at two of three, and the gate alone refused. Fail-closed, but the two halves were not phrasing one rule.) See [run-gate.md](run-gate.md).
 
 ## The output side did not reshape the same way
 

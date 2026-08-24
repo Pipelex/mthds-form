@@ -33,9 +33,9 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 | `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the one derivation function; every heuristic lives behind it |
 | `contracts` | the typed `PipeIOContract` mirror plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
-| `gate` | `buildRunInputsSchema` → `prepareRunInputs` → `validateRunInputs` → `apiInputsFromSchemaData` |
+| `gate` | `gateRunInputs`, the whole chain as one call, over the four steps it composes — [docs/run-gate.md](run-gate.md) |
 | `gate-validator` | the kernel's own ajv instance and the `RunInputError` type its verdict speaks |
-| `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on |
+| `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on, and what the server gate re-applies |
 | `values` | store/wire value conversions (wrapping scalars by `contentKey`), `setValueAtPath`, `outputsFromPipeOutput` |
 | `wire-format` | deflate/inflate and the exactly-one-wrapper invariant |
 | `schema-utils` | the one nullable-`anyOf` collapse and the one `$defs` walker |
@@ -58,12 +58,14 @@ The vendored `ui/` primitives (`switch`, `select`, `toggle`, `toggle-group`) and
 
 ## The gate
 
-Validation is a four-step contract, and the order matters:
+**`gateRunInputs(contract, data)` is the whole gate as one call, and it is what a server should use.** Underneath, validation is a four-step contract, and the order matters:
 
 1. `buildRunInputsSchema` composes the per-input schemas into one object schema.
 2. `prepareRunInputs` normalizes the values against it (`$ref` resolution, nullable collapse, empty-optional pruning).
 3. `validateRunInputs` returns a structured verdict — `RunInputError[]`, never a thrown exception, never a rendered string.
 4. `apiInputsFromSchemaData` produces the wire payload.
+
+The four stay exported for a host that renders its own panel, but assembling them is not a host's job: the step between validation and the payload re-applies the Run button's own emptiness rule, and there are four look-alike predicates to pick it from. [run-gate.md](run-gate.md) is the topic — why the browser and server verdicts are one invariant, which `*Filled` to reach for, and why the schema is cached.
 
 The verdict is the contract; its rendering is not. `describeValidationError` is one presentation of a `RunInputError` and a host is free to write another. A consumer branches on the structured error, never on message text.
 
@@ -73,9 +75,11 @@ A message that names a field names the field's **identifier** — the one writte
 
 An input the user never touched is **absent**. Not an empty shell, not `{}`, not `{child: ""}` — absent. Every step has to agree about that, because when they disagree the form offers a run its own gate then refuses.
 
-`isFilled` is the one predicate, and three places read it. The value bridge omits a structure nothing was put into rather than materializing children for it. `prepareRunInputs` drops an optional property that pruned down to `{}` — which is what the shell collapses to on the surface that renders through RJSF, where the bridge is not involved. `apiInputsFromSchemaData` omits an unfilled optional input from the payload. Readiness already ignores optional inputs, so all four answers line up.
+`isFilled` is the one predicate, and four places read it. The value bridge omits a structure nothing was put into rather than materializing children for it. `prepareRunInputs` drops an optional property that pruned down to `{}` — which is what the shell collapses to on the surface that renders through RJSF, where the bridge is not involved. `apiInputsFromSchemaData` omits an unfilled optional input from the payload. And `fieldFilled` asks it before descending into a structure, so readiness calls an input present exactly when the bridge keeps it.
 
-Materializing the shell instead is what made an optional input with a required child unrunnable: readiness ignored the input (correctly — the method said it may be omitted), Run lit up, and ajv then judged an object the kernel itself had invented against the concept's full schema. The touch that keeps a structure is a **value** in it, not a disclosure: opening the optional section is local view state the value never sees, so a section opened and left blank is absent exactly as one never opened is. Put anything in it and the whole shell survives, empty children and all — which is what makes the concept's required fields fall due, and they fail loudly.
+That last reader is the one that was missing, and its absence left a live edge of the same family. `fieldFilled` used to answer a structure by checking its required children alone, which is *vacuously true* over a value that is not there when the concept demands no child: a **required** struct whose properties are all optional reported ready while untouched, the bridge omitted it like any other untouched structure, and the combined schema's `required` list then refused the run. Reading `isFilled` first states the rule once — a slot holds something, and then everything it demands inside is filled — and both halves refuse together. The consequence is that a required structure must be *touched*: the button stays dark until a value goes somewhere inside it, exactly as it does for an untouched required number. A concept with no properties at all is therefore ungateable through a required slot — it was already unrunnable, since the bridge omits it and ajv demands it; the change is only that the form now says so before Run rather than after.
+
+Materializing the shell instead is the other way the two halves came apart, and it is what made an optional input with a required child unrunnable: readiness ignored the input (correctly — the method said it may be omitted), Run lit up, and ajv then judged an object the kernel itself had invented against the concept's full schema. The touch that keeps a structure is a **value** in it, not a disclosure: opening the optional section is local view state the value never sees, so a section opened and left blank is absent exactly as one never opened is. Put anything in it and the whole shell survives, empty children and all — which is what makes the concept's required fields fall due, and they fail loudly.
 
 An empty **list** is deliberately not absent, at either step: a plural slot is never missing in MTHDS — its empty form IS the empty list — so dropping it would invent an absence the method cannot express. A *fixed-count* list (`Concept[N]`) is the exception the contract states, and it is an exception to gating rather than to absence: the empty list is still what an empty one of those is, it is simply a value the method has ruled out, so Run waits for it. See [contract-mirror.md](contract-mirror.md).
 

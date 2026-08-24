@@ -30,6 +30,20 @@ export { conceptCategory } from './descriptor';
 export { buildRunFields } from './derive';
 
 // Readiness - what the Run button gates on.
+//
+// `computeReadiness` is the answer for a form; `gateRunInputs` (below) is the
+// answer for a server, and it is built from these same predicates so the two
+// cannot disagree. The three underneath it are exported for the cases that are
+// genuinely neither:
+//   - `isFilled` is the LEAF predicate - "is there anything here?" - and the one
+//     to reach for outside gating entirely, such as deciding whether an optional
+//     section starts folded.
+//   - `fieldFilled` applies it to one descriptor, honouring what that field's
+//     concept demands inside it (required children, a declared item count).
+//   - `mustBeFilled` answers whether a field gates at all.
+// Do not assemble a server gate out of them by hand: `gateRunInputs` exists
+// because the near-miss pair is easy to pick and impossible to test for without
+// a structured concept.
 export type { Readiness } from './readiness';
 export { computeReadiness, fieldFilled, isFilled, mustBeFilled } from './readiness';
 
@@ -51,11 +65,16 @@ export {
   isPluralInput,
 } from './contracts';
 
-// The run gate - schema build, prepare, validate, API payload.
-export type { RunInputsVerdict } from './gate';
+// The run gate. `gateRunInputs` is the whole chain as one call and is what a
+// SERVER should use - it re-applies the Run button's own emptiness rule, which
+// is the step hosts got wrong when they assembled the four themselves. The four
+// stay exported for a host that renders its own panel and needs the schema or
+// the verdict on its own.
+export type { RunInputsGateResult, RunInputsVerdict } from './gate';
 export {
   apiInputsFromSchemaData,
   buildRunInputsSchema,
+  gateRunInputs,
   prepareRunInputs,
   validateRunInputs,
 } from './gate';

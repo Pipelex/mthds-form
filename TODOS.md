@@ -47,25 +47,68 @@ The README's `computeReadiness` example destructured a `canRun` the verdict has 
 
 ## Phase 2 — Required-struct agreement (issue 2)
 
-- [ ] Decide the direction before coding: (a) readiness demands a touch — a required struct with no required children counts as missing until something in it is filled; or (b) the wire keeps/materializes the empty shell for required structs only, restoring the 0.2.0 outcome for this shape. The filing and 0.3.0's own framing ("absence is what a singular slot expresses") lean (a). Record the decision and the reason here.
-- [ ] Implement so the invariant "emptiness is `isFilled` throughout" covers this case — readiness, the prune and the wire payload must agree by construction, not by parallel edits.
-- [ ] Add the shape to the core suites: required struct with no required children, untouched / half-filled / filled, through `computeReadiness`, the value bridge and the gate in one table.
-- [ ] Changelog + touch `docs/` where the emptiness rule is described.
-- [ ] Verify in `pipelex-starter-js`: its known-bug test ("still disagrees on a required struct input with no required children (upstream bug)", `src/lib/runInputs.test.ts`) must now fail as written — flip it into the agreement table and confirm the whole suite is green. Update `pipelex-starter-js/docs/input-form.md` § "Two input shapes that used to render but not run" to drop the shape-to-avoid.
+- [x] **Direction (a) — readiness demands a touch.** Recorded below with the reason (b) was rejected.
+- [x] Implement so the invariant "emptiness is `isFilled` throughout" covers this case: `fieldFilled` asks `isFilled` before descending, which makes it the fourth reader of the one predicate — the same one `toRjsf` uses to decide whether a structure collapses. Readiness now calls an input present exactly when the bridge keeps it, by construction rather than by parallel edits.
+- [x] Second half, taken alongside because it is the other place the two halves phrased the rule differently: the gate's missing-input scan now NAMES a demanded input that is absent altogether. It checked required *children* first and skipped any input whose concept lists none, so this shape was refused with nothing named and the caller could only quote ajv.
+- [x] The shape is a table in `gate.test.ts` — untouched / opened-but-blank / all-children-blank / filled / the optional twin / nested — each row asserting `computeReadiness`, the value bridge and the gate together. Both halves of the fix were re-verified as real tripwires by reverting each in turn (readiness alone: four rows fail; the scan alone: two).
+- [x] Changelog (two `### Fixed` entries) + `docs/architecture.md` § "What absence looks like" rewritten: three readers of `isFilled` became four, with the vacuous-satisfaction failure and the touch consequence stated.
+- [x] Verify in `pipelex-starter-js`: done by installing this working tree and restoring afterwards — **the sibling carries no change from this phase**. See the adoption note below for what its own bump commit owes.
+
+### What Phase 2 settled
+
+**Landed 2026-08-24.** `make check` and `make test` green here (342 tests). The working tree carries Phase 2; Phase 1 is committed as `07cb281`.
+
+#### Why (a), and why not (b)
+
+(a) is one predicate reading another predicate that was already the emptiness rule; (b) would have to materialize a shell *only* for a required struct with no required descendants — a conditional the kernel would compute in the bridge and restate in the prune, and precisely the invented-value shape v0.3.0 removed when a materialized shell made an optional struct with a required child unrunnable. (a) also fails closed and matches the filing's lean and 0.3.0's own framing that absence is what a singular slot expresses.
+
+**The consequence, stated rather than hidden:** a required structure must now be *touched* — the button stays dark until a value goes somewhere inside it, exactly as for an untouched required number. A concept with no properties at all is therefore ungateable in a required slot. It was already unrunnable (the bridge omits it, ajv demands it); the change is only that the form says so before Run instead of after.
+
+#### What the starter verification showed
+
+Installed as a tarball, its suite reproduced the filing exactly — `computeReadiness(fields, {}).missing` moved `[] → ['opts']`, so the known-bug pin failed as written. Folding it back into the agreement table (plus a row for the filled case) and completing the Phase 1 fixture reshape took the whole suite to green, typecheck clean. Everything was then reverted and the registry copy reinstalled; the starter is back on published 0.3.0, 384 tests green, clean tree.
+
+**Adoption note for `pipelex-starter-js`'s own bump commit** (not ours to land — its generated contracts are codegen output signed by `sources.json`, so a hand edit would fail `npm run codegen:check`):
+
+- Regenerate `src/generated/*/contracts.ts` against a reshaped runtime — inputs take `presence`/`multiplicity`/`item_count`, outputs gain `item_count`. Until then `ComplexForm.test.tsx` fails on the *Phase 1* reshape, not on this phase: a `?` input reads `plain`, so it renders unfolded and gates Run.
+- Reshape the hand-written fixtures in `src/lib/runInputs.test.ts` the same way.
+- Rename the pin "still disagrees on a required struct input with no required children (upstream bug)" to an agreement row asserting `missing` is `['opts']`, and update its detail assertion: the gate now says `Missing required input: opts` where it used to quote ajv's `must have required property 'opts'`.
+- Drop the shape from `pipelex-starter-js/docs/input-form.md` § "Two input shapes that used to render but not run".
 
 ## Phase 3 — Assembled server gate export (issue 3)
 
-- [ ] Design the surface: `gateRunInputs(contract, data)` in the headless core returning a discriminated result — the validated `{concept, content}` inputs, or the missing-input names plus `RunInputError[]`. Reference implementation: `pipelex-starter-js/src/lib/runInputs.ts` at `9a52551` (the error-rendering seam — `describeValidationError` + injected `Translate` — stays host-side).
-- [ ] Implement it as the composition of the existing pieces, with the emptiness rule taken from the same predicates `computeReadiness` uses (`mustBeFilled` + `fieldFilled`), so browser and server verdicts are one invariant.
-- [ ] Close the fixed-count residual from Phase 1: a `Concept[N]` list holding fewer than `item_count` items reads ready and is refused by the gate. Needs the count on `ListRunField` (`derive.ts` can read it off the array schema's `minItems`/`maxItems`, which is where pipelex states it) so `fieldFilled` can answer the same question ajv does. A characterization test in `gate.test.ts` pins the current answer — read its diff.
-- [ ] Test `computeReadiness` and `gateRunInputs` against each other inside the package over one table of inputs — including structured-concept fixtures, the kind hosts never have at adoption time. The Phase 2 shape belongs in this table.
-- [ ] Decide and document the `*Filled` export set: keep `isFilled` (legitimate standalone use — deciding whether an optional field starts folded), document it as the leaf predicate, and point everything gate-shaped at `gateRunInputs`.
-- [ ] Export from `src/core/index.ts`, changelog, and a docs topic for the gate.
-- [ ] Verify in `pipelex-starter-js`: replace its hand-rolled gate with the kernel's, delete the local near-miss trap from the file adopters copy, suite green. Check `mthds-ui`'s server-side usage for the same replacement.
+- [x] `gateRunInputs(contract, data)` in `gate.ts`, returning `{ok: true, inputs}` or `{ok: false, missingInputs, errors, preparedData}`. `preparedData` rides the rejection because `describeValidationError` needs it to quote the value it received; the rendering seam itself stays host-side. `data` is `unknown` and is normalized as the gate's FIRST step — the chain indexes by variable name without checking the payload is indexable, so a `null` body used to throw after ajv had already judged it.
+- [x] Implemented as the composition, with the emptiness re-check running `computeReadiness`'s own `mustBeFilled` + `fieldFilled` over the same derived fields.
+- [x] Schema caching moved into the kernel (a `WeakMap` keyed on the contract). Not an optimization: ajv keys its compiled-schema cache on schema object identity and never evicts, so a host rebuilding per call retains a validator per request on a public endpoint. Leaving it to hosts would have handed every adopter that leak along with the assembly.
+- [x] Fixed-count residual closed. `ListRunField.itemCount` is read off the array schema's `minItems` — deliberately the keyword **ajv** reads, not the contract's `item_count`, since the field exists so `fieldFilled` can answer ajv's own question. The Phase 1 characterization test fired on the change and was flipped into an agreement assertion.
+- [x] Cross-half invariant table: new `src/core/__tests__/gate-agreement.test.ts` runs `computeReadiness` and `gateRunInputs` over one table of well-formed values — leaves, both struct shapes in both presences, the nested case, and all four fixed-list states — asserting each side against the row's expected answer.
+- [x] `*Filled` export set decided: all four stay, documented by role in `src/core/index.ts` and in the new docs topic. `isFilled` is the leaf predicate with a legitimate standalone use; nothing gate-shaped should be assembled from them by hand.
+- [x] Exported from `src/core/index.ts`; changelog entries; new [docs/run-gate.md](docs/run-gate.md), linked from `docs/architecture.md` (module table + the gate section) and `docs/contract-mirror.md`.
+- [x] Verified in both siblings by tarball install, then restored — **neither carries a change from this phase.**
 
 ### Checkpoint 2 — the kernel invariant exists
 
-Natural handoff: after this, browser readiness and the server gate cannot disagree by construction, and the remaining phases are independent of each other. Good session boundary; on resume, re-read `wip/issues.md` sections C–D.
+**Reached 2026-08-24.** `make check`, `make test` (380 tests) and `make build` green. Phase 1 is committed as `07cb281`; Phases 2 and 3 sit in the working tree on this branch.
+
+Browser readiness and the server gate now answer together by construction, and the remaining phases are independent of each other. On resume, re-read `wip/issues.md` sections C–D.
+
+#### What the invariant table found
+
+Writing the table was the point of the phase, and it turned up a **third** disagreement in the same family that no filing had reported: readiness skipped an optional input entirely, so a structured one the user had opened and half-filled kept the Run button live while the gate rejected the run on a required child. `computeReadiness` now counts an optional input from the moment something is filled in it. That is visible in the count a host displays — 3 of 3 while untouched, 3 of 4 once started, 4 of 4 once complete — and is pinned in `field-model.test.ts`.
+
+The fixed-count fix also covers a case the filing did not name: three rows one of which was added and left blank is a payload `minItems` accepts and the method cannot use. `fieldFilled` demands `itemCount` **filled** items, so both halves refuse it.
+
+#### One thing deliberately left to Phase 5
+
+An OVER-full fixed list (four items in a `[3]` slot) is still live on the button and refused by ajv on `maxItems`. Readiness has no vocabulary for "too many" and calling it *missing* would be a lie, so the honest fix is in the control: now that `ListRunField.itemCount` exists, `list-field.tsx` can stop offering **Add** past the count. Added to Phase 5, which already opens that file.
+
+#### What the sibling verification showed
+
+- **`pipelex-starter-js`:** its hand-rolled gate was replaced by a thin rendering shim over `gateRunInputs` — 224 lines to 144, with the local schema cache and the whole emptiness step deleted, so the near-miss trap is gone from the file adopters copy. Suite green (383, one fewer: its `schemaFor` identity test is now the kernel's), typecheck and lint clean.
+- **`mthds-ui`:** `runSubmitGate` assembled the same four steps and **omitted the emptiness check altogether** — its own test said so in its name, "does not, on its own, catch a required text input left blank". So that panel's submit gate was more permissive than the button in front of it: an untouched file input emits `{url: ""}`, which the schema accepts. Replacing it with `gateRunInputs` flipped that test into "catches a required text input left blank, by name". All 1968 tests green including the Storybook interaction runs, typecheck and lint clean.
+- Both were then reverted and the registry copy reinstalled: `mthds-ui` 1968 green, the starter 384 green, both trees clean.
+
+**Adoption note for the siblings' own bump commits.** Both need the Phase 1 fixture reshape first (`mthds-ui` is holding its fixtures on the pre-S2 shape on purpose). Then: the starter swaps `src/lib/runInputs.ts` to the shim and drops its `schemaFor` export and test; `mthds-ui` swaps `runSubmitGate`'s body and flips the test named above. `mthds-ui`'s fixture dumper still strips `item_count` (filed as `../wip/inbox/2026-08-24-mthds-ui-contract-dump-strips-item-count.md`) — worth fixing before it regenerates.
 
 ## Phase 4 — Readiness/`isFilled` hardening (issues 4, 5, 6)
 
@@ -82,6 +125,7 @@ One pass through `readiness.ts` and the `contracts.ts` lookup; three filings, on
 
 - [ ] Decide the approach: (1) stable generated row identity — React key and field-id basis, write-backs resolved through it (the real fix; touches the id surface, so design it deliberately); or (2) the mitigation — disable remove/add while any row in the list uploads (via `env.uploadingIds`). The filing prefers (1); (2) can land first as a stopgap if (1) needs design time. Record the choice here.
 - [ ] Implement in `src/react/list-field.tsx` (and the id derivation, if (1)).
+- [ ] While in that file: stop offering **Add** past a fixed list's `ListRunField.itemCount` (added in Phase 3). An over-full `[3]` slot is the one fixed-count state where the button is still live and ajv refuses on `maxItems`; readiness cannot phrase "too many" without calling it missing, so the control is the honest place to close it.
 - [ ] Interaction coverage: remove-during-upload no longer misroutes the resolved file; under (1), row DOM state survives a sibling removal.
 - [ ] Changelog + docs (the file seam / `FieldEnv` topic).
 - [ ] Verify in `mthds-ui`: the `RunPanel` drop-then-remove repro from the filing (the file lands in the right row); confirm `mthds-ui/wip/adopt-form/deferred-review-residues.md` can strike the residue.
