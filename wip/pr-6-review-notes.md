@@ -52,7 +52,7 @@ While an upload is in flight the local preview is deliberately *unbound*: the co
 
 It is recorded rather than fixed because it is the same unsolvable shape as the row-identity item above, and the control's own comment already states the half that matters: the fallback for a host that does not report `uploading` is "the first URL to appear". Telling "the host wrote the URL for *my* upload" apart from "the host wrote some other file" needs an identity the value does not carry — `FileValue` is `{url, filename}` and neither is known to the control before the upload resolves. Every remedy therefore invents a correlation token and a pending record to hold it, which is the hidden control state this kernel's design does not have, and would have to be reconciled against the host's write anyway.
 
-Two facts bound it. The user cannot cause it: every door into the value is shut while `uploading` (that is the `busy` rule this branch added), so it takes a host writing to the same path from elsewhere. And it is a *presentation* divergence with a bounded life — the value on the wire is the host's throughout, and the next settled write re-binds the preview correctly.
+Two facts bound it. The user cannot cause it: every door into the value is shut while `uploading` (that is the `busy` rule this branch added), so it takes a host writing to the same path from elsewhere. And it is a *presentation* divergence, not a data one — the value on the wire is the host's throughout. Its life is **not** bounded, though, and the first draft of this note was wrong to say so: once the pending preview binds to the replacement's URL it is `localIsCurrent` by that URL, so it stands until the value changes again. A host that writes B and leaves B there shows A's preview under B's name indefinitely.
 
 The right time to answer it is with the pending-removal question above and the touch-record questions in [`pr-4-review-notes.md`](pr-4-review-notes.md) and [`pr-5-review-notes.md`](pr-5-review-notes.md). All four are one question: whether a control may hold a fact about what the user did that the value does not carry.
 
@@ -63,3 +63,34 @@ Reporter: second-round review, `wip/issues.md:3`. **Not a defect** — recorded 
 The finding reads the repo rule in `CLAUDE.md` ("never name a closed-source repo in it") as violated by the repository names in this document. Every repository it names is public: `pipelex`, `mthds-form`, `mthds-ui` and `pipelex-starter-js` are all public on GitHub and all published. The one consumer that is closed source is referred to throughout as "the consuming app host", which is exactly what the rule asks for.
 
 The rule is about *reachability* — a reader outside the company cannot follow a name they have no access to — so a public sibling's name is information, not a leak. Replacing those names with "a consumer" would delete the only detail that makes the verification notes actionable: which checkout to run which suite in.
+
+
+## An untouched row travels when it shares a list with a filled one
+
+Reporter: second-round review, `src/core/readiness.ts` — the variable-list branch. Found while the round's own probe checked a claim this document made, and the claim was wrong.
+
+The second round added the rule that a **started** list row owes its item concept every required child. It deliberately skips a row that is empty, on the grounds that an untouched row is an absence rather than an incomplete value. That half is right, and it is also where the two halves stop agreeing with the wire:
+
+- `{briefs: [{}]}` — no filled row anywhere, so the list reads unfilled, and the payload builder emits `briefs: []`. The empty row is gone. This is the case the rule was written against and it behaves as described.
+- `{briefs: [{name: 'x'}, {}]}` — one filled row, so the list reads filled and the gate passes it. The payload is `[{name: 'x'}, {name: ''}]`. **The untouched row travels**, carrying the blank required child the rule exists to refuse one row over.
+
+So the rule is asked per row for *gating* and not at all for *serialization*, and the difference only shows in a mixed list. Nothing here is a regression — before the rule existed the whole list was judged by `some` alone and the same payload went out — but the round-2 documentation claimed the untouched row "deflates back out of the payload", which is true only for the all-empty list. Those sentences are corrected in `docs/run-gate.md` and the changelog; this is the underlying question.
+
+It is recorded rather than fixed because every fix is a change to what goes on the wire, and the choice is not obvious:
+
+- **Drop empty rows in the payload builder.** Then `[{name:'x'}, {}]` sends one item, and a method counting items sees a different length than the form showed. It also silently changes index alignment, which is the exact class of bug the row-identity work above exists to prevent.
+- **Refuse the mixed list in `fieldFilled`.** Then adding a row and not filling it disables Run, with the missing-input line naming the whole list and nothing pointing at the row. That is the strictness the "a plural slot's empty form IS the empty list" rule was written to avoid.
+- **Leave it.** An empty shell reaches the runtime, which is what a required child ajv cannot see always meant.
+
+The right answer probably depends on whether a list row is addressable in a missing-input verdict at all, which is the same question the row-identity item above raises from the control side. They should be answered together.
+
+
+## Reported and declined: the barrel guard should accept only `export ... from`
+
+Reporter: second-round review, `scripts/assert-bundle.mjs`. **Applied, measured, reverted** — recorded so it is not tried a third time.
+
+The finding is that allowing a bare `import '...'` in `dist/core/index.js` weakens the pure-barrel guard, since a side-effect import is something a bundler must keep. That reasoning is correct in general and the change was made and run. It fails the build on the package's own correct output: naming every core module as a tsup entry means the entries whose exports the barrel does not re-export are held in the graph by exactly such an import, and there are two of them (`own-property`, `native-concepts`).
+
+Those two chunks are leaves — no imports of their own, no external package, about two kilobytes together — so what the finding warns about cannot happen through them silently. And it could not happen unnoticed in general either, because the guard immediately above walks those same specifiers transitively: a chunk that started pulling ajv or React would fail the graph check whether it arrived by a re-export or a side-effect import. The barrel check owns the narrower claim the graph walk cannot make — that the barrel holds no code — and that claim is unaffected.
+
+The comment at the check now says this, so the next reader derives it instead of re-running the experiment.

@@ -170,6 +170,17 @@ const coreBarrel = readFileSync(`${DIST}/core/index.js`, 'utf8');
 // Every statement must be a re-export or a bare import - `export ... from '...'`
 // or `import '...'`. `export const`, `export function` and anything unprefixed
 // are all real code, and real code in the barrel is what makes it unshakeable.
+//
+// The bare import is allowed deliberately, and it was worth re-deriving rather
+// than inheriting: naming every core module as an entry means tsup emits
+// `import './chunk-X.js'` for the entries whose exports the barrel does not
+// re-export (`own-property`, `native-concepts`), and a side-effect import IS
+// something a bundler must keep. Banning it fails this package's own correct
+// output. What makes it harmless is the check above, not this one - the graph
+// walk follows those same specifiers, so a chunk that ever began dragging ajv
+// or React in would fail there. This check owns one narrower claim: that the
+// barrel holds no CODE, which is what a narrowed entry glob breaks and what
+// the graph walk cannot see.
 const inlineCode = statementsOf(coreBarrel).filter(
   (statement) =>
     !/^export\b[^]*\bfrom\s*['"][^'"]+['"]$/.test(statement) &&
