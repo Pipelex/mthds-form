@@ -44,8 +44,12 @@ const REACT_PATTERNS = [
  */
 const CORE_BARREL_PATTERN = {
   // Anchored: the BARREL only. `../core/readiness` is the fix, not the breach,
-  // and a gitignore-style glob would match it as a path under `../core`.
-  regex: '^\\.\\./(\\.\\./)?core$',
+  // and a gitignore-style glob would match it as a path under `../core`. Both
+  // spellings of the barrel count and both arrive at the same ajv-bearing
+  // module, so `/index` is matched explicitly and the `../` prefix repeats -
+  // a rule that read only `../core` let `../core/index` and any deeper nesting
+  // walk straight past it.
+  regex: '^(?:\\.\\./)+core(?:/index)?$',
   allowTypeImports: true,
   message:
     'Import the core module directly (e.g. ../core/readiness) - a value import of the barrel drags ajv into the client bundle. See docs/dependency-budget.md.',

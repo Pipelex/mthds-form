@@ -58,7 +58,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   addItem: 'Add item',
   removeItemAria: (index) => `Remove item ${index}`,
   itemsCount: (count) => (count === 1 ? '1 item' : `${count} items`),
-  itemsCountOf: (count, total) => `${count} of ${total} items`,
+  itemsCountOf: (count, total) => `${count} of ${total} ${total === 1 ? 'item' : 'items'}`,
   uploading: 'Uploading…',
   dropToUpload: 'Drop to upload',
   dropOrBrowse: 'Drop a file or click to browse',

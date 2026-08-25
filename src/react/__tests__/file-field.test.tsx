@@ -262,6 +262,36 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     await waitFor(() => expect(previewSrc(container)).toBe('https://signed/b.pdf#view=FitH'));
   });
 
+  it('leaves the spinner when the resolver answers with nothing at all', async () => {
+    // The twin of the rejection below, and the one that survived it: a resolver
+    // that RESOLVES with `null` is saying it has no URL, and skipping the state
+    // write on an empty answer left the previous one standing. Nothing here
+    // even moves URI - reopening the SAME file after its signed URL expired
+    // kept painting the dead URL under a resolver that had just declined it.
+    const user = userEvent.setup();
+    let call = 0;
+    const resolveUrl = vi.fn(() =>
+      Promise.resolve(call++ === 0 ? 'https://signed/a.pdf?expires=soon' : null),
+    );
+
+    const { container } = render(
+      <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
+    );
+
+    await user.click(previewButton() as HTMLElement);
+    await waitFor(() =>
+      expect(previewSrc(container)).toBe('https://signed/a.pdf?expires=soon#view=FitH'),
+    );
+
+    // Close and reopen: same file, same URI, and the URL behind it has expired.
+    await user.click(previewButton() as HTMLElement);
+    await user.click(previewButton() as HTMLElement);
+
+    await waitFor(() => expect(spinner(container)).not.toBeNull());
+    expect(previewSrc(container)).toBeUndefined();
+    expect(resolveUrl).toHaveBeenCalledTimes(2);
+  });
+
   it('leaves the spinner, not the wrong file, when a resolution fails', async () => {
     // A rejecting resolver is ordinary - it is a network call. Without a
     // `.catch` the rejection also escaped as an unhandled promise rejection

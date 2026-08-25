@@ -200,7 +200,13 @@ function FileField({
     let cancelled = false;
     void resolveUrl(storageUri)
       .then((src) => {
-        if (!cancelled && src) setResolved({ uri: storageUri, src });
+        // A resolver that ANSWERS with nothing is the same outcome as one that
+        // rejects, and it has to be recorded as one. Skipping `setResolved` on
+        // an empty answer left the previous resolution standing, and it was not
+        // even stale by URI - reopening the SAME file after its signed URL
+        // expired kept painting the dead URL under a resolver that had just
+        // said it had none.
+        if (!cancelled) setResolved(src ? { uri: storageUri, src } : null);
       })
       .catch(() => {
         // A resolution that failed must leave the spinner, not the file before

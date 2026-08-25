@@ -103,19 +103,30 @@ export interface RunInputsVerdict {
  * The scan can come up empty even on an invalid form (a wrong value shape, a
  * nested mismatch); `errors` is what the caller falls back to then, so a failure
  * is never undiagnosable.
+ *
+ * `preparedData` is `unknown` for the same reason `gateRunInputs`' `data` is: on
+ * a public endpoint the body is whatever was sent, and ajv must be shown that
+ * rather than a repair of it, or `must be object` is a verdict no caller can
+ * ever receive. The name-the-variable scan below needs something indexable, so
+ * a body that is not a record scans against nothing and names every input the
+ * method demands - which is the honest answer for a body that carried none.
  */
 export function validateRunInputs(
-  preparedData: Dict,
+  preparedData: unknown,
   inputs: Record<string, PipeInputContract>,
   schema: Dict,
 ): RunInputsVerdict {
   const errors = validateRunInputsSchema(preparedData, schema);
   if (errors.length === 0) return { isValid: true, missingInputs: [], errors: [] };
 
+  const record0 =
+    typeof preparedData === 'object' && preparedData !== null && !Array.isArray(preparedData)
+      ? (preparedData as Dict)
+      : undefined;
   const missingInputs: string[] = [];
   for (const [varName, input] of Object.entries(inputs)) {
     if (!inputMustBeFilled(input)) continue;
-    const varData = ownProp(preparedData, varName);
+    const varData = ownProp(record0, varName);
     // A demanded input that is not there at all is missing whatever its concept
     // declares inside. The check has to come BEFORE the required-children one:
     // a struct whose concept demands no child used to fall out of the scan
@@ -240,12 +251,20 @@ function schemaForContract(contract: PipeIOContract): Dict {
  *
  * **`data` is `unknown` because that is what it is.** A run endpoint is public
  * and no framework enforces a declared parameter type, so the argument is
- * whatever the caller put in the body. Normalizing it is the gate's first step
- * rather than a wrapper around the gate: the chain indexes the payload by
+ * whatever the caller put in the body. The chain indexes the payload by
  * variable name without first checking it is indexable, so a `null` body would
  * throw *after* ajv had already reported `must be object` and before any
- * verdict came back. An empty object walks the normal path instead and names
- * every input the caller left out.
+ * verdict came back.
+ *
+ * So the two uses are separated rather than collapsed into one repair. **ajv
+ * judges the value the caller actually sent**, which is what makes `must be
+ * object` the verdict for a body that is not one; the indexing that follows
+ * uses a safe `{}` stand-in, which is what keeps the gate from throwing. Repair
+ * FIRST - coercing a non-object to `{}` before validating - is the shape that
+ * looks equivalent and is not: a contract whose inputs are all optional has an
+ * empty `required` list, so `{}` validates, and `gateRunInputs("garbage", …)`
+ * came back `ok: true` on a body the caller never meant as a run. Fail-closed
+ * costs a malformed caller an error it earned; the other direction bills a run.
  *
  * **The schema alone is not the rule.** ajv's `required` asserts only that a
  * key is PRESENT, and a content model carries no `minLength` - so a required
@@ -267,12 +286,13 @@ function schemaForContract(contract: PipeIOContract): Dict {
  * that can catch either.
  */
 export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInputsGateResult {
-  const payload =
-    typeof data === 'object' && data !== null && !Array.isArray(data) ? (data as Dict) : {};
+  const isRecord = typeof data === 'object' && data !== null && !Array.isArray(data);
+  const payload = isRecord ? (data as Dict) : {};
   const schema = schemaForContract(contract);
   const preparedData = prepareRunInputs(payload, schema);
 
-  const verdict = validateRunInputs(preparedData, contract.inputs, schema);
+  // The value ajv is shown is the caller's, not the stand-in - see above.
+  const verdict = validateRunInputs(isRecord ? preparedData : data, contract.inputs, schema);
   if (!verdict.isValid) {
     return {
       ok: false,

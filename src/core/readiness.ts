@@ -40,13 +40,26 @@ export function isFilled(value: unknown): boolean {
  *
  * `seen` is a cycle guard first - a value that references itself would
  * otherwise recurse to the cap on every branch - and a memo second. Both uses
- * are the same fact: an object reached twice within ONE call answered `false`
- * the first time, because a `true` short-circuits every `some` above it and the
- * walk never gets back down here. So the set can only ever hold empty
- * subtrees, which is also what makes it safe to keep entries after unwinding -
+ * rest on the same fact: an object reached twice within ONE call answered
+ * `false` the first time, because a `true` short-circuits every `some` above it
+ * and the walk never gets back down here. So the map can only ever hold empty
+ * subtrees, which is what makes it safe to keep entries after unwinding -
  * without that, a value shaped like a diamond chain costs exponential time.
+ *
+ * **It records the DEPTH each object was judged at, and that is not a detail.**
+ * A `false` here has two causes - nothing was down there, or the cap stopped
+ * the walk - and only the first travels. An object whose children sit one level
+ * past the cap answers `false` at depth 63 and is perfectly filled at depth 5;
+ * memoizing identity alone then reported a genuinely filled input as missing
+ * the moment a shallower path reached the same object second. So a recorded
+ * answer is reused only for a revisit at the SAME depth or deeper, where the
+ * walk could see no more than the first one did, and a strictly shallower
+ * arrival walks again. That keeps the cycle guard exact (depth rises along
+ * every path, so a cycle always revisits deeper) and keeps the memo bounded:
+ * an object's recorded depth strictly falls each time it is re-walked, over a
+ * range the cap fixes, so the diamond stays linear in all but a constant.
  */
-function walkFilled(value: unknown, depth: number, seen: Set<object> | undefined): boolean {
+function walkFilled(value: unknown, depth: number, seen: Map<object, number> | undefined): boolean {
   if (value == null) return false;
   // Whitespace is not a value. The Run button lit up over a required text input
   // holding three spaces, ajv passed it (a content model carries no
@@ -63,9 +76,10 @@ function walkFilled(value: unknown, depth: number, seen: Set<object> | undefined
   if (typeof value !== 'object') return true;
 
   if (depth >= MAX_FILLED_DEPTH) return false;
-  const visited = seen ?? new Set<object>();
-  if (visited.has(value)) return false;
-  visited.add(value);
+  const visited = seen ?? new Map<object, number>();
+  const judgedAt = visited.get(value);
+  if (judgedAt !== undefined && judgedAt <= depth) return false;
+  visited.set(value, depth);
 
   if (Array.isArray(value)) return value.some((item) => walkFilled(item, depth + 1, visited));
   const obj = value as Record<string, unknown>;
@@ -106,25 +120,44 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
     const obj = (value ?? {}) as Record<string, unknown>;
     return field.fields.every((f) => !f.required || fieldFilled(f, ownProp(obj, f.name)));
   }
-  // A list the method gave a count to (`Concept[N]`) is satisfied only by that
-  // many items, each of them filled. Answering it by `isFilled` alone - "is
-  // there anything in the array?" - left the button live on a `[3]` slot
-  // holding two, and the gate then refused it on the very count the method
-  // declared. `itemCount` comes off the same `minItems` ajv reads, so the two
-  // halves phrase one rule. A VARIABLE list keeps the emptiness answer and
-  // never gates anyway (see `mustBeFilled`), which is why the count, not the
-  // kind, is what this branch turns on.
-  if (field.kind === 'list' && field.itemCount !== undefined) {
-    if (!Array.isArray(value) || value.length < field.itemCount) return false;
-    // And too many is not filled either. `ListField` will not add past the
-    // bound, so this answers the list that arrived from somewhere else - a
-    // restored draft, a host seeding values, a bespoke surface calling these
-    // predicates over data it did not render. Left out, the button was live on
-    // a four-item `[3]` slot and only ajv refused it: fail-closed, but the two
-    // halves were not phrasing one rule. Naming it in `missing` is a small
-    // stretch of that word, and the alternative is the disagreement.
-    if (field.maxItemCount !== undefined && value.length > field.maxItemCount) return false;
-    return value.every((item) => fieldFilled(field.item, item));
+  if (field.kind === 'list') {
+    // Too many items is not filled, and this is asked of EVERY list, not only
+    // one carrying a lower bound. `ListField` will not add past the bound, so
+    // it answers the list that arrived from somewhere else - a restored draft,
+    // a host seeding values, a bespoke surface calling these predicates over
+    // data it did not render. Asking it only inside the `itemCount` branch
+    // meant a model stating `maxItems` alone published its ceiling on the
+    // descriptor and enforced it nowhere: the button stayed live on a list ajv
+    // was about to refuse. Naming it in `missing` is a small stretch of that
+    // word, and the alternative is the disagreement.
+    if (
+      field.maxItemCount !== undefined &&
+      Array.isArray(value) &&
+      value.length > field.maxItemCount
+    )
+      return false;
+    // A list the method gave a count to (`Concept[N]`) is satisfied only by that
+    // many items, each of them filled. Answering it by `isFilled` alone - "is
+    // there anything in the array?" - left the button live on a `[3]` slot
+    // holding two, and the gate then refused it on the very count the method
+    // declared. `itemCount` comes off the same `minItems` ajv reads, so the two
+    // halves phrase one rule.
+    if (field.itemCount !== undefined) {
+      if (!Array.isArray(value) || value.length < field.itemCount) return false;
+      return value.every((item) => fieldFilled(field.item, item));
+    }
+    // A VARIABLE list never gates on being empty (see `mustBeFilled`) - a plural
+    // slot's empty form IS the empty list. But a row the user STARTED owes its
+    // concept every field the concept declares, which is the same rule a touched
+    // optional input follows one level up, and `isFilled` alone does not say it:
+    // a row holding `{name: 'x', other: ''}` reads filled by `some`, satisfies
+    // ajv's `required` (a present empty string is present), and went out as an
+    // item the runtime cannot use. An untouched row stays an absence and still
+    // blocks nothing.
+    if (Array.isArray(value))
+      return (
+        value.every((item) => !isFilled(item) || fieldFilled(field.item, item)) && isFilled(value)
+      );
   }
   return isFilled(value);
 }

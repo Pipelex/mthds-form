@@ -18,12 +18,20 @@ const DIST = resolve('dist');
  *
  * Anchored to a statement boundary (line start or a preceding `;`) so a
  * `from '...'` sitting inside a string literal cannot be read as an import.
+ *
+ * `import(...)` is read too, and it is not decoration. A dynamic import is a
+ * real edge of the chunk graph - a bundler splits at it rather than dropping it
+ * - so a walk that followed only static edges would stop at the chunk boundary
+ * and report a clean graph for an entry that loads ajv one `import()` away. The
+ * expression form (`import(someVariable)`) is unreadable from here by
+ * construction; only a literal specifier is matched, which is what tsup emits.
  */
 function specifiersOf(code) {
   const found = [];
   const fromClause = /(?:^|[\n;])\s*(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/g;
   const sideEffect = /(?:^|[\n;])\s*import\s*['"]([^'"]+)['"]/g;
-  for (const re of [fromClause, sideEffect]) {
+  const dynamic = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  for (const re of [fromClause, sideEffect, dynamic]) {
     let match;
     while ((match = re.exec(code)) !== null) found.push(match[1]);
   }
@@ -87,18 +95,93 @@ for (const { entry, packages, why } of BANNED) {
 // the moment `tsup.config.ts` stops naming every core module as an entry, and
 // nothing else here would notice: the graph checks above still pass, because
 // the barrel legitimately reaches ajv either way.
+/**
+ * Split bundled JS into top-level statements.
+ *
+ * Reading the barrel LINE by line answered the wrong question in both
+ * directions. A re-export esbuild wrapped across several lines put its
+ * continuation lines (`  someExport,`) in front of a rule that recognises only
+ * a line STARTING with `import`/`export`, so a perfectly pure barrel failed the
+ * build; and `export const x = …` starts with `export`, so the one shape the
+ * check exists to catch - real code sitting in the barrel - walked through it.
+ * Statements are the unit the rule is actually about.
+ *
+ * Bundled output has no ASI surprises - esbuild terminates every statement - so
+ * splitting on a `;` outside a string or a comment is enough, and far less
+ * machinery than a parser for a check this narrow. Comments have to be skipped
+ * rather than assumed away: esbuild appends a `//# sourceMappingURL=` footer to
+ * every chunk, which is a line the old check dropped by accident and this one
+ * has to drop on purpose.
+ */
+function statementsOf(code) {
+  const statements = [];
+  let current = '';
+  let quote = null;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (quote) {
+      if (quote !== '/*' && quote !== '//' && ch === '\\') {
+        current += ch + (code[i + 1] ?? '');
+        i++;
+        continue;
+      }
+      if (quote === '//') {
+        if (ch === '\n') quote = null;
+        continue;
+      }
+      if (quote === '/*') {
+        if (ch === '*' && code[i + 1] === '/') {
+          quote = null;
+          i++;
+        }
+        continue;
+      }
+      if (ch === quote) quote = null;
+      current += ch;
+      continue;
+    }
+    if (ch === '/' && code[i + 1] === '/') {
+      quote = '//';
+      i++;
+      continue;
+    }
+    if (ch === '/' && code[i + 1] === '*') {
+      quote = '/*';
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === ';') {
+      statements.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  statements.push(current.trim());
+  return statements.filter((statement) => statement !== '');
+}
+
 const coreBarrel = readFileSync(`${DIST}/core/index.js`, 'utf8');
-const inlineCode = coreBarrel
-  .split('\n')
-  .filter((line) => line.trim() !== '')
-  .filter((line) => !/^\s*(import|export)\b/.test(line))
-  .filter((line) => !/^\s*\/\//.test(line));
+// Every statement must be a re-export or a bare import - `export ... from '...'`
+// or `import '...'`. `export const`, `export function` and anything unprefixed
+// are all real code, and real code in the barrel is what makes it unshakeable.
+const inlineCode = statementsOf(coreBarrel).filter(
+  (statement) =>
+    !/^export\b[^]*\bfrom\s*['"][^'"]+['"]$/.test(statement) &&
+    !/^import\s*['"][^'"]+['"]$/.test(statement) &&
+    !/^import\b[^]*\bfrom\s*['"][^'"]+['"]$/.test(statement),
+);
 
 if (inlineCode.length === 0) {
   console.log('ok  core/index.js is a pure re-export barrel');
 } else {
   failures.push(
-    `core/index.js carries ${inlineCode.length} line(s) of inline code, so it is no longer tree-shakeable - a consumer importing any core value will ship ajv. Check the entry glob in tsup.config.ts.\n    first: ${inlineCode[0].trim().slice(0, 80)}`,
+    `core/index.js carries ${inlineCode.length} statement(s) that are not re-exports, so it is no longer tree-shakeable - a consumer importing any core value will ship ajv. Check the entry glob in tsup.config.ts.\n    first: ${inlineCode[0].replace(/\s+/g, ' ').slice(0, 80)}`,
   );
 }
 

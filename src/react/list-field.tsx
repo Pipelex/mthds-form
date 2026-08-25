@@ -97,9 +97,15 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="list" />}
         <span className="font-mono text-[10.5px] text-muted-foreground">
-          {field.itemCount === undefined
-            ? s.itemsCount(items.length)
-            : s.itemsCountOf(items.length, field.itemCount)}
+          {/* "of N" is a claim about an EXACT count, so it needs both bounds and
+              needs them equal. Read off `itemCount` alone - the LOWER bound - a
+              model saying "at least two" was announced as a list of exactly two
+              and then read `3 of 2 items` the moment a third row arrived. Every
+              other list is a plain count, which is the honest thing to say
+              about a slot with room to grow. */}
+          {field.itemCount !== undefined && field.maxItemCount === field.itemCount
+            ? s.itemsCountOf(items.length, field.itemCount)
+            : s.itemsCount(items.length)}
         </span>
         {!field.required && (
           <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">

@@ -202,4 +202,40 @@ describe('a list bound the wire did not put there', () => {
     // And it does NOT become a ceiling: three tags satisfy "at least two".
     expect(computeReadiness(fields, { applicant: { tags: ['a', 'b', 'c'] } }).missing).toEqual([]);
   });
+
+  describe('stated as an upper bound alone', () => {
+    const CAPPED: PipeInputContract = {
+      ...PLAIN_SINGLE,
+      concept_ref: 'demo.Applicant',
+      json_schema: {
+        type: 'object',
+        title: 'Applicant',
+        properties: {
+          tags: { type: 'array', items: { type: 'string' }, maxItems: 2 },
+        },
+        required: ['tags'],
+      },
+    };
+
+    it('carries an upper bound alone as an upper bound alone', () => {
+      const [applicant] = buildRunFields({ applicant: CAPPED });
+      const tags = (applicant as ObjectRunField).fields[0];
+
+      expect(tags?.kind === 'list' && tags.maxItemCount).toBe(2);
+      expect(tags?.kind === 'list' && tags.itemCount).toBeUndefined();
+    });
+
+    it('gates on it, so a ceiling the descriptor publishes is a ceiling readiness keeps', () => {
+      // The bound used to be enforced only inside the `itemCount` branch, so a
+      // model stating `maxItems` alone put its ceiling on the descriptor and
+      // nowhere else: the button stayed live over a list ajv was about to
+      // refuse, which is the disagreement both halves exist to prevent.
+      const fields = buildRunFields({ applicant: CAPPED });
+
+      expect(computeReadiness(fields, { applicant: { tags: ['a', 'b'] } }).missing).toEqual([]);
+      expect(computeReadiness(fields, { applicant: { tags: ['a', 'b', 'c'] } }).missing).toEqual([
+        'applicant',
+      ]);
+    });
+  });
 });

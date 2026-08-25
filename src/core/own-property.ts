@@ -25,6 +25,14 @@
  * fail-open, and `__proto__` is not a name an author writes, so the writes are
  * left plain and legible.
  *
+ * Spelled with `Object.prototype.hasOwnProperty.call` rather than `Object.hasOwn`
+ * deliberately. `hasOwn` is an ES2022 runtime API and `tsconfig.json` compiles
+ * to **ES2020**, so a browser inside the declared target has no such function
+ * and every read here would throw before a form could render a single field -
+ * a whole-package failure in service of a shorter spelling. TypeScript cannot
+ * catch that: `lib` is what types a runtime API, `target` is what states the
+ * baseline, and the two are allowed to disagree.
+ *
  * Deliberately module-private: this is a spelling of `record[key]`, not a
  * concept a consumer needs. Reachability is low - only a method author picks
  * these names - but the cost of being wrong is a form that says a field is
@@ -36,10 +44,10 @@ export function ownProp<T>(
   key: string,
 ): T | undefined {
   if (record == null) return undefined;
-  return Object.hasOwn(record, key) ? record[key] : undefined;
+  return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
 }
 
 /** `key in record` with the prototype chain left out. */
 export function hasOwnProp(record: object | null | undefined, key: string): boolean {
-  return record != null && Object.hasOwn(record, key);
+  return record != null && Object.prototype.hasOwnProperty.call(record, key);
 }

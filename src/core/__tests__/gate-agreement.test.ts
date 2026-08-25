@@ -170,6 +170,13 @@ const SHOTS: PipeInputContract = {
 /** The same slot the method left omittable: `Image[3]?`. */
 const OPTIONAL_SHOTS: PipeInputContract = { ...SHOTS, presence: 'optional' };
 
+/** `Brief[]` - a variable list whose ITEM owes its concept a required child. */
+const BRIEFS: PipeInputContract = {
+  ...PLAIN_VARIABLE,
+  concept_ref: 'demo.Brief',
+  json_schema: { type: 'array', items: briefSchema },
+};
+
 interface Row {
   label: string;
   inputs: Record<string, PipeInputContract>;
@@ -406,10 +413,70 @@ describe('gateRunInputs is a public endpoint, so it takes whatever arrives', () 
     if (!gate.ok) expect(gate.missingInputs).toEqual(['text']);
   });
 
-  it('reuses one schema object per contract, so ajv’s cache is bounded by contracts', () => {
-    // ajv keys its compiled-schema cache on schema object IDENTITY and never
-    // evicts. Rebuilding per call would retain a validator per REQUEST - on a
-    // public endpoint, unbounded growth driven by the cheapest possible body.
+  it('holds a STARTED list row to its concept, and leaves an untouched one alone', () => {
+    // One level down from the rule the top-level struct already follows. A row
+    // the user began owes its concept every required child; ajv cannot say so
+    // (a required plain string arrives as `''`, which is present), and
+    // `isFilled` on the array is `some`, which a half-filled row satisfies. So
+    // the row went out incomplete on a run the button had declared ready.
+    const contract: PipeIOContract = { inputs: { briefs: BRIEFS }, output: OUTPUT };
+    const fields = buildRunFields(contract.inputs);
+    // Both halves over one value, exactly as the table above does it: readiness
+    // reads the runner's values, the gate reads what the bridge sends.
+    const both = (values: Record<string, unknown>) => ({
+      button: computeReadiness(fields, values).missing.length === 0,
+      gate: gateRunInputs(contract, rjsfDataFromRunValues(values, fields)),
+    });
+
+    // A row with something in it but its required `name` blank. `''` is a
+    // present string, so ajv passes it; only the kernel's rule refuses it.
+    const started = both({ briefs: [{ name: '', notes: 'a thought' }] });
+    expect(started.button).toBe(false);
+    expect(started.gate.ok).toBe(false);
+    if (!started.gate.ok) expect(started.gate.missingInputs).toEqual(['briefs']);
+
+    // The same row completed.
+    const done = both({ briefs: [{ name: 'Q3 launch', notes: 'a thought' }] });
+    expect(done.button).toBe(true);
+    expect(done.gate.ok).toBe(true);
+
+    // An empty list blocks nothing - a plural slot's empty form IS the empty
+    // list - and neither does a row the user added and never touched, which
+    // deflates back out of the payload rather than travelling half-built.
+    for (const untouched of [{ briefs: [] }, { briefs: [{}] }]) {
+      const verdict = both(untouched);
+      expect(verdict.button).toBe(true);
+      expect(verdict.gate.ok).toBe(true);
+      if (verdict.gate.ok) expect(verdict.gate.inputs['briefs']).toEqual([]);
+    }
+  });
+
+  it('refuses a malformed body even when the method demands no input', () => {
+    // The nastier half of the same defect, and the one a required input hides.
+    // Repairing a non-object to `{}` BEFORE validating it means ajv is shown a
+    // body the caller never sent; with an empty `required` list, `{}` validates
+    // and `ok: true` came back on a string. Nothing downstream could tell: the
+    // payload is built from the repair, so the run started, and was billed, on
+    // a request that carried no inputs at all.
+    const optional: PipeIOContract = { inputs: { text: OPTIONAL_TEXT }, output: OUTPUT };
+
+    expect(gateRunInputs(optional, {}).ok).toBe(true);
+    for (const body of ['text=hi', 7, true, [{ text: 'hi' }]]) {
+      const gate = gateRunInputs(optional, body);
+      expect(gate.ok).toBe(false);
+      // And it says why, rather than naming an input the caller did send.
+      if (!gate.ok) expect(gate.errors[0]?.stack).toBe('must be object');
+    }
+  });
+
+  it('gives the same verdict however many times one contract is gated', () => {
+    // The schema is cached per contract, and a cache is a place a verdict can
+    // start drifting from the value in front of it. This says only that it does
+    // not: repeated gating of one contract answers identically, and a later
+    // filled body still passes. That the cache EXISTS - that ajv is handed one
+    // schema object rather than a fresh one per request - is a claim about
+    // object identity that no sequence of verdicts can make, and it is asserted
+    // where it is observable, in `gate-schema-cache.test.ts`.
     for (let i = 0; i < 50; i++) expect(gateRunInputs(contract, {}).ok).toBe(false);
     expect(gateRunInputs(contract, { text: { text: 'hi' } }).ok).toBe(true);
   });

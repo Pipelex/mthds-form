@@ -35,7 +35,7 @@ Three layers, because review alone does not hold a boundary:
 
 ## The chunk graph is part of the budget
 
-The budget's real subject is **what a consumer installs and ships**, and for a bundled package that is decided by the chunk graph, not by the import list. The granularity is the **module**, not the export: a bundler keeps or drops whole modules, so one value import of a module pulls that module and everything it statically imports. Both rules below follow from that single fact, and neither is visible in a diff.
+The budget's real subject is **what a consumer ships to its users**, and for a bundled package that is decided by the chunk graph, not by the import list. What a consumer *installs* is a separate question the package manifest answers, and the chunk graph cannot: `ajv` is a top-level dependency, so a host that renders controls and never touches the gate still has it in `node_modules`. That is the right trade - the alternative is an optional dependency a server-side consumer has to know to add - and it is why every rule here is phrased about shipped bytes. The granularity is the **module**, not the export: a bundler keeps or drops whole modules, so one value import of a module pulls that module and everything it statically imports. Both rules below follow from that single fact, and neither is visible in a diff.
 
 ### The controls take values from the module, types from the barrel
 
@@ -52,7 +52,7 @@ Fixing the controls is not enough on its own, and the reason is worth keeping: a
 Two things make it work and would switch it off silently if changed:
 
 - **`sideEffects` in `package.json` must stay CSS-only.** It is what lets a bundler drop a re-exported module it decided is unused. Widening it to `true`, or dropping the field, re-ships everything.
-- **The per-module `dist/core/*.js` files are build artifacts, not API.** The `exports` map lists only `.` and `./react`, so a consumer cannot import a deep path — which is what keeps this a packaging detail rather than a surface (see the third rule in `CLAUDE.md`).
+- **The per-module `dist/core/*.js` files are build artifacts, not API.** The `exports` map lists `.` and `./react` as JavaScript entries, plus the two stylesheets `./styles.css` and `./theme.css`; no core deep path is reachable — which is what keeps this a packaging detail rather than a surface (see the third rule in `CLAUDE.md`).
 
 ### Guarding it
 

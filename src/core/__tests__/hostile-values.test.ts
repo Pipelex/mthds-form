@@ -130,6 +130,26 @@ describe('a value that references itself', () => {
     for (let i = 0; i < 40; i += 1) node = { left: node, right: node };
     expect(isFilled(node)).toBe(false);
   });
+
+  it('does not carry a CAPPED answer back to a shallower path', () => {
+    // The memo's whole justification is that a `false` means "nothing down
+    // there". Past the cap it means "could not look", and the two are not
+    // interchangeable: this shared node answers `false` at the bottom of the
+    // deep branch because its own child sits one level past the cap, and it is
+    // plainly filled from the shallow one. Keyed on identity alone, whichever
+    // branch ran first decided for both and a filled input read as empty.
+    // 62 wrappers puts `shared` at depth 63 - inside the cap, so it is judged
+    // and recorded - while its own content lands at 64 and is refused. That is
+    // the only window where a recorded `false` is a lie about the value.
+    const shared: Record<string, unknown> = { deeper: { text: 'hi' } };
+    let chain: Record<string, unknown> = shared;
+    for (let i = 0; i < 62; i += 1) chain = { next: chain };
+
+    expect(isFilled({ deep: chain, shallow: shared })).toBe(true);
+    // Order must not decide it either.
+    expect(isFilled({ shallow: shared, deep: chain })).toBe(true);
+    expect(isFilled(shared)).toBe(true);
+  });
 });
 
 describe('a string of nothing but whitespace', () => {

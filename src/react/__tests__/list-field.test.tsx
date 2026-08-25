@@ -144,6 +144,21 @@ describe('a declared item count is the end of the list', () => {
     render(<Harness field={listOf(docItem, { itemCount: 2 })} initial={[1, 2, 3]} />);
     expect(addButton()).not.toBeDisabled();
   });
+
+  it('does not announce a lower bound as an exact count', () => {
+    // The same one-field-two-meanings mistake, read out loud. `of N` claims the
+    // slot holds exactly N, so it needs both bounds AND needs them equal; off
+    // `itemCount` alone a list told "at least two" was announced as a list of
+    // exactly two, and then read `3 of 2 items` the moment a third row arrived.
+    render(<Harness field={listOf(docItem, { itemCount: 2 })} initial={[1, 2, 3]} />);
+    expect(screen.getByText('3 items')).toBeInTheDocument();
+    expect(screen.queryByText('3 of 2 items')).not.toBeInTheDocument();
+  });
+
+  it('counts a one-item slot in the singular, like every other count in the set', () => {
+    render(<Harness field={fixedOf(docItem, 1)} initial={[1]} />);
+    expect(screen.getByText('1 of 1 item')).toBeInTheDocument();
+  });
 });
 
 describe('a row keeps its own DOM when a sibling is removed', () => {

@@ -1,5 +1,10 @@
 /**
- * The wire slot facts every `pipe_io_contracts` entry carries, as fixtures.
+ * The wire slot facts every `pipe_io_contracts` INPUT entry carries, as fixtures.
+ *
+ * Inputs and outputs do not state presence the same way, and the fixtures below
+ * are the input side. An input carries the authored marker verbatim as
+ * `presence`; an output carries a boolean `optional`, because `!` is rejected on
+ * an output and its presence is genuinely two-valued (see `SINGLE_OUTPUT`).
  *
  * `presence`, `multiplicity` and `item_count` are always on the wire, so the
  * mirror types them as required - which would otherwise put three lines of

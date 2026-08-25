@@ -1,6 +1,12 @@
 # PR #6 review follow-ups
 
-Deferred items from the agent-review triage of [PR #6](https://github.com/Pipelex/mthds-form/pull/6). Four of the reported items were confirmed and fixed on the branch — the gate's selection of touched optional inputs, the control set's prototype-named reads, the list's two bounds, and the resolved preview's provenance. The two below are what is left: one reported item that is real but whose only implementable fix is a state machine, and one disagreement that no reviewer reported and that the triage's own test table turned up.
+Deferred items from the agent-review triage of [PR #6](https://github.com/Pipelex/mthds-form/pull/6). Two review rounds have run against this branch.
+
+The **first round** (two reviewers) confirmed and fixed four items — the gate's selection of touched optional inputs, the control set's prototype-named reads, the list's two bounds, and the resolved preview's provenance.
+
+The **second round** (one reviewer, twenty-one findings) fixed eighteen: the gate accepting a malformed non-object body, a started list row not held to its item concept, a list bound stated alone going unenforced, the depth-keyed memo in `isFilled`, the resolver's empty answer leaving a dead preview, the two item-count badge defects, `Object.hasOwn` against an ES2020 target, and the rest across the lint rule, the bundle assertions, the vitest coverage config and the docs.
+
+What is left is below: two reported items whose only implementable fix is a state machine the kernel's design does not have, one reported item that is not a defect, and one disagreement that no reviewer reported and that the first triage's own test table turned up.
 
 ## A row's identity shifts when a host refuses the removal it was told about
 
@@ -36,3 +42,24 @@ This is the mirror image of the disagreements this PR fixed — the gate is *str
 The fix is a design call, which is why it is here rather than on the branch. An untouched optional plural slot has two defensible answers and they are not the same for the two multiplicities: a *variable* `[]?` should keep its key and send `[]`, which is what the payload builder already does deliberately and documents at length; a *fixed* `[N]?` cannot send `[]`, because the method ruled the empty list out — so the only coherent answer for it is to omit the input entirely, as an optional absence. That means the prune (or the bridge) needs to distinguish the two, and today `pruneEmptyOptionals` sees only the schema and knows nothing about `presence`. Deciding where that knowledge belongs is the work.
 
 Until then the row is deliberately absent from `gate-agreement.test.ts`, so nothing in the suite claims this case is answered.
+
+
+## A local file preview outlives a value the host replaces mid-upload
+
+Reporter: second-round review, `src/react/file-field.tsx` — the binding effect (`:157`).
+
+While an upload is in flight the local preview is deliberately *unbound*: the control has made an object URL for the file the user dropped and does not yet know which URL the host will write for it. `uploading` is the signal that the write has not happened, so the effect waits. If the host writes a **different** file's value during that window, the preview stays marked current and is then bound to the replacement's URL when the upload finishes — the chip names one file over a preview of another, which is the defect this control already fixed for the settled case.
+
+It is recorded rather than fixed because it is the same unsolvable shape as the row-identity item above, and the control's own comment already states the half that matters: the fallback for a host that does not report `uploading` is "the first URL to appear". Telling "the host wrote the URL for *my* upload" apart from "the host wrote some other file" needs an identity the value does not carry — `FileValue` is `{url, filename}` and neither is known to the control before the upload resolves. Every remedy therefore invents a correlation token and a pending record to hold it, which is the hidden control state this kernel's design does not have, and would have to be reconciled against the host's write anyway.
+
+Two facts bound it. The user cannot cause it: every door into the value is shut while `uploading` (that is the `busy` rule this branch added), so it takes a host writing to the same path from elsewhere. And it is a *presentation* divergence with a bounded life — the value on the wire is the host's throughout, and the next settled write re-binds the preview correctly.
+
+The right time to answer it is with the pending-removal question above and the touch-record questions in [`pr-4-review-notes.md`](pr-4-review-notes.md) and [`pr-5-review-notes.md`](pr-5-review-notes.md). All four are one question: whether a control may hold a fact about what the user did that the value does not carry.
+
+## Reported and declined: `wip/issues.md` naming closed-source repositories
+
+Reporter: second-round review, `wip/issues.md:3`. **Not a defect** — recorded so a later sweep does not re-open it.
+
+The finding reads the repo rule in `CLAUDE.md` ("never name a closed-source repo in it") as violated by the repository names in this document. Every repository it names is public: `pipelex`, `mthds-form`, `mthds-ui` and `pipelex-starter-js` are all public on GitHub and all published. The one consumer that is closed source is referred to throughout as "the consuming app host", which is exactly what the rule asks for.
+
+The rule is about *reachability* — a reader outside the company cannot follow a name they have no access to — so a public sibling's name is information, not a leak. Replacing those names with "a consumer" would delete the only detail that makes the verification notes actionable: which checkout to run which suite in.
