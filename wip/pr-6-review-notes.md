@@ -4,6 +4,8 @@ Deferred items from the agent-review triage of [PR #6](https://github.com/Pipele
 
 The **first round** (two reviewers) confirmed and fixed four items — the gate's selection of touched optional inputs, the control set's prototype-named reads, the list's two bounds, and the resolved preview's provenance.
 
+The **third round** (seven findings) is deferred in full — the branch was wrapped up at that point and nothing reported rose to blocking. Every item is recorded below under "Third round", with what was verified about each, so none of it is lost.
+
 The **second round** (one reviewer, twenty-one findings) fixed eighteen: the gate accepting a malformed non-object body, a started list row not held to its item concept, a list bound stated alone going unenforced, the depth-keyed memo in `isFilled`, the resolver's empty answer leaving a dead preview, the two item-count badge defects, `Object.hasOwn` against an ES2020 target, and the rest across the lint rule, the bundle assertions, the vitest coverage config and the docs.
 
 What is left is below: two reported items whose only implementable fix is a state machine the kernel's design does not have, one reported item that is not a defect, and one disagreement that no reviewer reported and that the first triage's own test table turned up.
@@ -94,3 +96,22 @@ The finding is that allowing a bare `import '...'` in `dist/core/index.js` weake
 Those two chunks are leaves — no imports of their own, no external package, about two kilobytes together — so what the finding warns about cannot happen through them silently. And it could not happen unnoticed in general either, because the guard immediately above walks those same specifiers transitively: a chunk that started pulling ajv or React would fail the graph check whether it arrived by a re-export or a side-effect import. The barrel check owns the narrower claim the graph walk cannot make — that the barrel holds no code — and that claim is unaffected.
 
 The comment at the check now says this, so the next reader derives it instead of re-running the experiment.
+
+
+## Third round: reported, verified, deferred
+
+The branch was closed to further change at this point, so none of these were acted on. Each was checked rather than waved through, and the checkable ones hold — they are recorded here at the precision the next person needs, not as a list of links.
+
+**`specifiersOf` reads an `import()` inside a string or a comment as a real chunk edge** (`scripts/assert-bundle.mjs`). Verified: both `const msg = "call import('./ghost.js') here"` and `// see import('./ghost.js')` yield `./ghost.js`. The graph walk then calls `existsSync` on a file that is not there and throws *Bundle graph names a file that does not exist*, so the failure is a false build break rather than a missed dependency — it fails loud and in the safe direction. The `from`-clause regexes beside it are anchored to a statement boundary and are not affected. The fix is to strip comments and strings before matching, which `statementsOf` already does for the barrel check further down; the two should share one lexer rather than growing a second.
+
+**`docs/run-gate.md` says the absence rule is "one predicate, `isFilled`, read in four places".** Verified false for one of the four: the prune uses `isEmptyAfterPruning` (`wire-format.ts:357`), which is schema-aware and differs on whitespace and on arrays. The value bridge, the payload builder and `fieldFilled` do call `isFilled`. The sentence should say the four are coordinated, and name the one that is a different function — the current wording invites a reader to change `isFilled` and expect the prune to follow.
+
+**The quick-start in `docs/run-gate.md` does not narrow the lookup.** `getPipeIOContract` can return `undefined`, and the example passes the result straight to `gateRunInputs`, so the sample as written does not typecheck. It needs the not-found branch a real endpoint has anyway.
+
+**The changelog's migration note overstates the compatibility break.** A retired-shape contract makes legacy *singular* `?` inputs demanded, but a variable-plural `[]?` still does not gate, because an empty list stays a valid value. Reported in the second round as well and deferred both times; it is a note about a shape no current runtime emits.
+
+**The changelog says ajv "is now shown the caller's own value".** True for a body that is not a record, which is the hole that was closed — and not true for a record body, where ajv is shown `preparedData` so that healing and pruning are what it validates. That distinction is exactly the one the second round declined to collapse (see the reply on `gate.ts`), so the code is deliberate and the sentence is the thing that is loose.
+
+**`docs/run-gate.md` states the browser/server invariant without its known exception.** An untouched `Concept[N]?` is refused by the gate and allowed by the button — the item already recorded above under its own heading. The invariant paragraph should carry a pointer to it, since a reader meeting the strong claim first has no reason to look for the exception.
+
+**The mid-upload correlation note is imprecise about filenames.** `FileField` does hold the dropped `File` and therefore `file.name`; what it cannot rely on is the eventual `FileValue.filename` matching it, since a host may normalize it and two files may share one. That does not change the conclusion — a filename is not an identity — but the note should say *unreliable* rather than *unavailable*.
