@@ -33,6 +33,48 @@ interface FileFieldProps {
 
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)(\?|$)/i;
 const PDF_EXT_RE = /\.pdf(\?|$)/i;
+const DATA_URL_MIME_RE = /^data:([^;,]+)/i;
+
+/**
+ * True when the browser can render this URL as-is.
+ *
+ * `data:` is the one that used to be missing, and its absence cost a preview
+ * rather than a fetch: any URL that is not `http` was treated as a stored URI
+ * needing `resolveUrl`, so a host with no resolver got a spinner that never
+ * stopped over a value the browser could have rendered immediately.
+ */
+function isDirectlyViewable(url: string | undefined): url is string {
+  return !!url && (/^https?:/i.test(url) || /^data:/i.test(url) || /^blob:/i.test(url));
+}
+
+/** The MIME type a `data:` URL declares, which is the only type it carries. */
+function dataUrlMime(url: string): string | undefined {
+  return DATA_URL_MIME_RE.exec(url)?.[1]?.toLowerCase();
+}
+
+/**
+ * A preview of the file this control's own dropzone just took, held until the
+ * host writes the uploaded value back.
+ *
+ * The object URL is the only way to show a file the moment it is dropped: the
+ * value the host writes is a `pipelex-storage://` URI the browser cannot
+ * render. What it must NOT do is outlive the value it belongs to, and that is
+ * what `boundUrl` is for - it used to win over `value` unconditionally and was
+ * cleared only by this control's own clear button, so a host writing a
+ * different file at the same path got a chip naming B over a preview showing A.
+ */
+interface LocalPreview {
+  objectUrl: string;
+  type: string;
+  /**
+   * The `value.url` this preview is the preview OF, or `undefined` while the
+   * upload it came from has not landed yet. The control cannot know the URL at
+   * drop time - the host assigns it - so the first value that appears after the
+   * upload stops being in flight is adopted as this preview's own, and any
+   * later change to a different one retires it.
+   */
+  boundUrl?: string;
+}
 
 /** Document variant: a file shown as a PDF preview (or chip for other docs). */
 export function DocumentField(props: FileFieldProps) {
@@ -60,31 +102,41 @@ function FileField({
   const [showUrl, setShowUrl] = useState(false);
   // The preview is collapsed by default - opened on demand via a "Preview" button.
   const [previewOpen, setPreviewOpen] = useState(false);
-  // A browser-viewable URL for the just-dropped file (the stored value is a
-  // `pipelex-storage://` URI that the browser can't render), so the user sees a
-  // real preview the moment they add a file. Revoked when replaced/unmounted.
-  const [localPreview, setLocalPreview] = useState<{ url: string; type: string } | null>(null);
+  const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
+  // Resolved lazily, only when the user opens the preview, so a closed field
+  // never fetches a presigned URL. Keyed by the URI it was resolved FROM, the
+  // way `LocalPreview` is bound to the value it is the preview OF - a cached
+  // source with no record of its provenance is painted under whatever name the
+  // value carries next.
+  const [resolved, setResolved] = useState<{ uri: string; src: string } | null>(null);
   const localUrlRef = useRef<string | null>(null);
 
-  const setLocal = useCallback((next: { url: string; type: string } | null) => {
+  const setLocal = useCallback((next: LocalPreview | null) => {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
-    localUrlRef.current = next?.url ?? null;
+    localUrlRef.current = next?.objectUrl ?? null;
     setLocalPreview(next);
   }, []);
   useEffect(() => () => setLocal(null), [setLocal]);
 
   const handleFile = useCallback(
     (file: File) => {
-      setLocal({ url: URL.createObjectURL(file), type: file.type });
+      setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
       onDropFile(file);
     },
     [setLocal, onDropFile],
   );
 
+  const busy = disabled || uploading;
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     maxFiles: 1,
     multiple: false,
-    disabled: disabled || uploading,
+    disabled: busy,
+    // The tab stop belongs on the INPUT, not on this div - see the root element
+    // below. Without this, react-dropzone puts `tabIndex: 0` and its own key
+    // handlers on a `role="presentation"` div, and the element a keyboard or
+    // voice-control user lands on is a generic with no role and no name.
+    noKeyboard: true,
     onDrop: (files) => {
       const file = files[0];
       if (file) handleFile(file);
@@ -93,38 +145,90 @@ function FileField({
 
   const clear = useCallback(() => {
     setLocal(null);
-    setResolvedSrc(null);
+    setResolved(null);
     setPreviewOpen(false);
     onChange(undefined);
   }, [setLocal, onChange]);
 
+  // Whether the local preview still describes the value on screen. Computed in
+  // render rather than left to the effect below, so the frame in which the host
+  // writes a different file does not show the old one.
+  const localIsCurrent =
+    !!localPreview && (localPreview.boundUrl === undefined || localPreview.boundUrl === value?.url);
+
+  useEffect(() => {
+    if (!localPreview) return;
+    if (localPreview.boundUrl === undefined) {
+      // Still waiting for the host's write. `uploading` is the honest signal
+      // that it has not happened yet; a host that does not report it falls back
+      // to "the first URL to appear", which for the ordinary case - an empty
+      // field the user drops into - is the same moment.
+      if (uploading || !value?.url) return;
+      setLocalPreview({ ...localPreview, boundUrl: value.url });
+      return;
+    }
+    if (value?.url !== localPreview.boundUrl) setLocal(null);
+  }, [localPreview, value?.url, uploading, setLocal]);
+
   const hasFile = !!value?.url;
-  const ref = `${value?.filename ?? ''} ${value?.url ?? ''}`;
+  const localType = localIsCurrent ? localPreview?.type : undefined;
+  // Sniffed SEPARATELY, because they used to be concatenated into one string
+  // and tested with `/\.pdf(\?|$)/i` - so a filename's extension was always
+  // followed by a space and could never match. Only a URL that carried its own
+  // extension was ever previewable; a `data:` URL or an opaque storage id with
+  // a perfectly good filename beside it was not offered a preview at all.
+  const filename = value?.filename ?? '';
+  const url = value?.url ?? '';
+  const urlMime = dataUrlMime(url);
 
   const isImage =
-    category === 'image' || localPreview?.type.startsWith('image/') || IMAGE_EXT_RE.test(ref);
-  const isPdf = localPreview?.type === 'application/pdf' || PDF_EXT_RE.test(ref);
+    category === 'image' ||
+    localType?.startsWith('image/') === true ||
+    urlMime?.startsWith('image/') === true ||
+    IMAGE_EXT_RE.test(filename) ||
+    IMAGE_EXT_RE.test(url);
+  const isPdf =
+    localType === 'application/pdf' ||
+    urlMime === 'application/pdf' ||
+    PDF_EXT_RE.test(filename) ||
+    PDF_EXT_RE.test(url);
   const canPreview = isImage || isPdf;
 
-  // Resolve a stored `pipelex-storage://` URI to a presigned URL - lazily, only
-  // when the user opens the preview, so a closed field never fetches one.
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
-  const storageUri = value?.url && !value.url.startsWith('http') ? value.url : null;
+  const storageUri = value?.url && !isDirectlyViewable(value.url) ? value.url : null;
   useEffect(() => {
-    if (!previewOpen || !storageUri || localPreview || !resolveUrl) return;
+    if (!previewOpen || !storageUri || localIsCurrent || !resolveUrl) return;
     let cancelled = false;
-    void resolveUrl(storageUri).then((url) => {
-      if (!cancelled) setResolvedSrc(url);
-    });
+    void resolveUrl(storageUri)
+      .then((src) => {
+        // A resolver that ANSWERS with nothing is the same outcome as one that
+        // rejects, and it has to be recorded as one. Skipping `setResolved` on
+        // an empty answer left the previous resolution standing, and it was not
+        // even stale by URI - reopening the SAME file after its signed URL
+        // expired kept painting the dead URL under a resolver that had just
+        // said it had none.
+        if (!cancelled) setResolved(src ? { uri: storageUri, src } : null);
+      })
+      .catch(() => {
+        // A resolution that failed must leave the spinner, not the file before
+        // it - and must not escape as an unhandled rejection into the host's
+        // app. `resolveUrl` is a network call; rejecting is ordinary.
+        if (!cancelled) setResolved(null);
+      });
     return () => {
       cancelled = true;
     };
-  }, [previewOpen, storageUri, localPreview, resolveUrl]);
+  }, [previewOpen, storageUri, localIsCurrent, resolveUrl]);
 
-  // A browser-viewable source: the local object URL, an http(s) URL, or a
-  // resolved presigned URL for a stored file.
+  // A browser-viewable source: the local object URL, a directly-viewable URL, or
+  // a resolved presigned URL for a stored file. The resolution counts only while
+  // it still belongs to the value on screen, which is what makes staleness
+  // impossible rather than merely brief: clearing it from an effect would still
+  // paint one frame of the old file, exactly as `localIsCurrent` above is
+  // computed in render for the same reason.
+  const resolvedSrc = resolved && resolved.uri === storageUri ? resolved.src : undefined;
   const previewSrc =
-    localPreview?.url ?? (value?.url?.startsWith('http') ? value.url : (resolvedSrc ?? undefined));
+    (localIsCurrent ? localPreview?.objectUrl : undefined) ??
+    (isDirectlyViewable(value?.url) ? value.url : resolvedSrc);
 
   return (
     <FieldShell
@@ -135,6 +239,10 @@ function FileField({
       description={field.description}
       required={field.required}
       error={error}
+      // Names the file input, the way every other control in the set names its
+      // own. Without it `FieldShell` renders the title as a `<div>` bound to
+      // nothing and the input's accessible name computes to the empty string.
+      htmlFor={id}
     >
       {hasFile && !uploading ? (
         <div className="space-y-2">
@@ -158,18 +266,30 @@ function FileField({
             ))}
         </div>
       ) : (
+        // `role="presentation"` and no tab stop: this div is the drop TARGET and
+        // the visual affordance, and the control inside it is a real
+        // `<input type="file">`, which already has the right role and now has a
+        // name. Giving the div a `role="button"` of its own would put a second
+        // named control in the accessibility tree for one value. The focus ring
+        // is `focus-within` because the element that takes focus is clip-hidden.
         <div
           {...getRootProps()}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center',
             'cursor-pointer select-none transition-colors',
+            'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
             isDragActive
               ? 'border-primary/60 bg-primary/5'
               : 'border-border bg-input hover:border-border hover:bg-muted',
-            (disabled || uploading) && 'cursor-not-allowed opacity-60',
+            busy && 'cursor-not-allowed opacity-60',
           )}
         >
-          <input {...getInputProps()} id={id} aria-invalid={!!error} />
+          <input
+            {...getInputProps({ tabIndex: 0 })}
+            id={id}
+            disabled={busy}
+            aria-invalid={!!error}
+          />
           {uploading ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -191,11 +311,17 @@ function FileField({
         </div>
       )}
 
-      {/* URL escape hatch - collapsed by default to keep the happy path clean. */}
+      {/* URL escape hatch - collapsed by default to keep the happy path clean.
+          It reads `busy`, not `disabled`: an upload is a door into this value
+          like any other, and leaving these two live while the dropzone was shut
+          let a user paste a URL over a file that was still arriving - or, on the
+          host side, abandon a started and billed run client-side. The seam
+          promises the control is disabled while its id is uploading, and that
+          has to mean every way in. */}
       {!showUrl ? (
         <button
           type="button"
-          disabled={disabled}
+          disabled={busy}
           onClick={() => setShowUrl(true)}
           className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
         >
@@ -207,7 +333,7 @@ function FileField({
           type="text"
           autoFocus
           value={value?.url ?? ''}
-          disabled={disabled}
+          disabled={busy}
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
             setLocal(null);

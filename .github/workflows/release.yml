@@ -87,26 +87,12 @@ jobs:
         if: steps.check_published.outputs.already_published == 'false'
         run: make build
 
-      # The two assertions the PR gate runs, repeated here because the artifact
-      # this job publishes is built by THIS job - a green PR proves nothing
-      # about the tarball that actually reaches npm.
-
-      # The `.` entry must stay headless: a React import reaching it is a
-      # dependency-budget breach that lint alone cannot see, because it would
-      # arrive through a shared chunk rather than through a source import.
-      - name: Assert the core bundle is React-free
+      # The same bundle invariants the PR gate runs, repeated here because the
+      # artifact this job publishes is built by THIS job - a green PR proves
+      # nothing about the tarball that actually reaches npm.
+      - name: Assert the bundle invariants
         if: steps.check_published.outputs.already_published == 'false'
-        run: |
-          if grep -rq "from 'react" dist/core/ dist/chunk-*.js; then
-            echo "::error::React reached the headless core bundle - see docs/dependency-budget.md"
-            exit 1
-          fi
-
-      # esbuild drops directive prologues when it bundles, so this is re-asserted
-      # by the build and has to be verified, not assumed.
-      - name: Assert the react entry keeps its 'use client' directive
-        if: steps.check_published.outputs.already_published == 'false'
-        run: head -n 1 dist/react/index.js | grep -q 'use client'
+        run: make assert-bundle
 
       - name: Publish to npm
         if: steps.check_published.outputs.already_published == 'false'

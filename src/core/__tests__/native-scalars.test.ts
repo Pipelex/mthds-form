@@ -26,6 +26,7 @@ import {
   validateRunInputs,
 } from '..';
 import type { PipeInputContract } from '..';
+import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE } from './contract-fixtures';
 
 /** `NumberContent`, exactly as pydantic emits it (`number: int | float`). */
 const NUMBER_CONTENT_SCHEMA = {
@@ -56,7 +57,11 @@ const TEXT_CONTENT_SCHEMA = {
 describe('buildRunFields reads the wrapper property off the contract', () => {
   it('gives a native.Number field the `number` content key', () => {
     const [field] = buildRunFields({
-      max_per_category: { concept_ref: 'native.Number', json_schema: NUMBER_CONTENT_SCHEMA },
+      max_per_category: {
+        ...PLAIN_SINGLE,
+        concept_ref: 'native.Number',
+        json_schema: NUMBER_CONTENT_SCHEMA,
+      },
     });
     expect(field).toMatchObject({ kind: 'number', contentKey: 'number', integer: false });
   });
@@ -66,14 +71,18 @@ describe('buildRunFields reads the wrapper property off the contract', () => {
     // does not have - so `kind: 'boolean'` was unreachable from a real method
     // and a yes/no input arrived as an object card wrapping a lone switch.
     const [field] = buildRunFields({
-      is_urgent: { concept_ref: 'native.YesNo', json_schema: YES_NO_CONTENT_SCHEMA },
+      is_urgent: {
+        ...PLAIN_SINGLE,
+        concept_ref: 'native.YesNo',
+        json_schema: YES_NO_CONTENT_SCHEMA,
+      },
     });
     expect(field).toMatchObject({ kind: 'boolean', contentKey: 'yes_no' });
   });
 
   it('gives a native.Text field the `text` content key, as it always wrapped', () => {
     const [field] = buildRunFields({
-      brief: { concept_ref: 'native.Text', json_schema: TEXT_CONTENT_SCHEMA },
+      brief: { ...PLAIN_SINGLE, concept_ref: 'native.Text', json_schema: TEXT_CONTENT_SCHEMA },
     });
     expect(field).toMatchObject({ contentKey: 'text' });
   });
@@ -81,6 +90,7 @@ describe('buildRunFields reads the wrapper property off the contract', () => {
   it('leaves a structured concept unwrapped - its value IS the whole content', () => {
     const [field] = buildRunFields({
       applicant: {
+        ...PLAIN_SINGLE,
         concept_ref: 'demo.Applicant',
         json_schema: { type: 'object', properties: { name: { type: 'string' } } },
       },
@@ -92,6 +102,7 @@ describe('buildRunFields reads the wrapper property off the contract', () => {
   it('reads min/max off the WRAPPED property, where a constraint actually lives', () => {
     const [field] = buildRunFields({
       score: {
+        ...PLAIN_SINGLE,
         concept_ref: 'native.Number',
         json_schema: {
           type: 'object',
@@ -108,11 +119,11 @@ describe('buildRunFields reads the wrapper property off the contract', () => {
 
 describe('a filled `Number?` input passes the gate it used to fail', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
-    text: { concept_ref: 'native.Text', json_schema: TEXT_CONTENT_SCHEMA },
+    text: { ...PLAIN_SINGLE, concept_ref: 'native.Text', json_schema: TEXT_CONTENT_SCHEMA },
     max_per_category: {
+      ...OPTIONAL_SINGLE,
       concept_ref: 'native.Number',
       json_schema: NUMBER_CONTENT_SCHEMA,
-      optional: true,
     },
   };
   const FIELDS = buildRunFields(CONTRACT);
@@ -164,7 +175,11 @@ describe('a filled `Number?` input passes the gate it used to fail', () => {
 
   it('reports a REQUIRED number left blank by variable name', () => {
     const REQUIRED: Record<string, PipeInputContract> = {
-      max_per_category: { concept_ref: 'native.Number', json_schema: NUMBER_CONTENT_SCHEMA },
+      max_per_category: {
+        ...PLAIN_SINGLE,
+        concept_ref: 'native.Number',
+        json_schema: NUMBER_CONTENT_SCHEMA,
+      },
     };
     const fields = buildRunFields(REQUIRED);
     const schema = buildRunInputsSchema(REQUIRED);
@@ -182,8 +197,16 @@ describe('a filled `Number?` input passes the gate it used to fail', () => {
 
 describe('store ↔ values round trip over the scalar wrappers', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
-    max_per_category: { concept_ref: 'native.Number', json_schema: NUMBER_CONTENT_SCHEMA },
-    is_urgent: { concept_ref: 'native.YesNo', json_schema: YES_NO_CONTENT_SCHEMA },
+    max_per_category: {
+      ...PLAIN_SINGLE,
+      concept_ref: 'native.Number',
+      json_schema: NUMBER_CONTENT_SCHEMA,
+    },
+    is_urgent: {
+      ...PLAIN_SINGLE,
+      concept_ref: 'native.YesNo',
+      json_schema: YES_NO_CONTENT_SCHEMA,
+    },
   };
   const FIELDS = buildRunFields(CONTRACT);
 
@@ -235,6 +258,7 @@ describe('store ↔ values round trip over the scalar wrappers', () => {
 describe('a plural number input', () => {
   const CONTRACT: Record<string, PipeInputContract> = {
     scores: {
+      ...PLAIN_VARIABLE,
       concept_ref: 'native.Number',
       json_schema: { type: 'array', items: NUMBER_CONTENT_SCHEMA },
     },

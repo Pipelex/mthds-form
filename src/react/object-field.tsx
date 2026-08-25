@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { cn } from './utils';
-import { isFilled, type ObjectRunField } from '../core';
+import type { ObjectRunField } from '../core';
+import { ownProp } from '../core/own-property';
+import { isFilled } from '../core/readiness';
 import { ConceptPill } from './concept-pill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
@@ -33,10 +35,15 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
-  const optionalEmpty = field.fields.filter((f) => !f.required && !isFilled(data[f.name]));
+  // `ownProp`, not `data[f.name]`: the name is the method author's, the record
+  // is a plain object a host built, and a child named `constructor` or
+  // `toString` reads as the inherited function from a bare index. The kernel
+  // spells this read one way at every one of its sites; the control set is the
+  // other half of "every".
+  const optionalEmpty = field.fields.filter((f) => !f.required && !isFilled(ownProp(data, f.name)));
   const visible = showOptional
     ? field.fields
-    : field.fields.filter((f) => f.required || isFilled(data[f.name]));
+    : field.fields.filter((f) => f.required || isFilled(ownProp(data, f.name)));
 
   return (
     <div className="space-y-2">
@@ -70,7 +77,7 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           <FieldRenderer
             key={child.name}
             field={child}
-            value={data[child.name]}
+            value={ownProp(data, child.name)}
             onChange={(v) => setChild(child.name, v)}
             id={`${id}.${child.name}`}
             env={env}

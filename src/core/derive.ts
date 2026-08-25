@@ -8,7 +8,7 @@
  * descriptor (server-derived) without touching consumers.
  */
 
-import { inputMustBeFilled, type PipeInputContract } from './contracts';
+import { inputMustBeFilled, isOptionalInput, type PipeInputContract } from './contracts';
 import type { RunField, RunFieldCommon } from './descriptor';
 import {
   FIELD_DOCUMENT_CONCEPTS,
@@ -110,7 +110,21 @@ function mapSchema(
   if (isList || schemaTypeOf(schema) === 'array') {
     const itemsSchema = (schema.items as JsonSchema) ?? {};
     const item = mapSchema(name, base, itemsSchema, true, { ...ctx, depth: ctx.depth + 1 });
-    return { ...common, kind: 'list', item };
+    // A declared count (`Concept[N]`) reaches the descriptor from the schema
+    // keywords ajv itself reads - see `ListRunField.itemCount`. BOTH bounds
+    // travel, because they are two facts: a `[N]` slot states them equal, but
+    // this mapper also walks nested arrays, whose model may have stated only
+    // one. Carrying a single number forced readiness and the control to read it
+    // as a minimum and a maximum respectively.
+    const itemCount = numOrUndef(schema.minItems);
+    const maxItemCount = numOrUndef(schema.maxItems);
+    return {
+      ...common,
+      kind: 'list',
+      item,
+      ...(itemCount === undefined ? {} : { itemCount }),
+      ...(maxItemCount === undefined ? {} : { maxItemCount }),
+    };
   }
 
   // Enum (a custom concept may refine a native with a fixed value set).
@@ -234,7 +248,7 @@ export function buildRunFields(inputs: Record<string, PipeInputContract>): RunFi
     const defs: Record<string, JsonSchema> = {};
     collectSchemaDefs(input.json_schema, defs, { traverseArrays: true });
     // A top-level input is required unless the method declared it optional (`?`).
-    const field = mapSchema(name, input.concept_ref, input.json_schema, input.optional !== true, {
+    const field = mapSchema(name, input.concept_ref, input.json_schema, !isOptionalInput(input), {
       defs,
       depth: 0,
     });
