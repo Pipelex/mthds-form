@@ -55,7 +55,7 @@ The gate is four exported steps — `buildRunInputsSchema` → `prepareRunInputs
 
 The rule is one predicate, `isFilled`, read in four places — the value bridge, the prune, the payload builder, and `fieldFilled`. [architecture.md](architecture.md) § "What absence looks like" states it in full. Three consequences are worth having in front of you when reading a verdict:
 
-- **A structure must be touched.** An input the method demands is missing until a value goes somewhere inside it, even when its concept declares no required child. Opening the section is view state the value never sees.
+- **A structure must be touched.** An input the method demands is missing until a value goes somewhere inside it, even when its concept declares no required child. Opening the section is view state the value never sees. That shape draws an advisory `input_presence_vacuous` warning from pipelex's validate surfaces, so a form mostly meets it from a method authored despite the lint — and both halves of the kernel still answer it the same way when one arrives.
 - **A touched *optional* input is held to its concept.** It is out of the reckoning while untouched and in it the moment something is filled, because the gate then validates it whole. So the readiness count moves from 3 of 3 to 3 of 4 when the user starts filling an optional structure, and to 4 of 4 when they finish.
 - **A declared item count gates.** A `Concept[N]` list is satisfied only by `N` filled items; a variable `Concept[]` list never gates, because its empty form is the legitimate value `[]`. The count reaches the descriptor as `ListRunField.itemCount`, read off the same `minItems` ajv reads.
 
