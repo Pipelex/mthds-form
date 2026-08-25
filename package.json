@@ -1,6 +1,6 @@
 {
   "name": "@pipelex/mthds-form",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Headless form kernel and control set for MTHDS method inputs",
   "license": "MIT",
   "repository": {
@@ -74,11 +74,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.0",
     "eslint": "^9.39.4",
+    "jsdom": "^30.0.1",
     "prettier": "^3.8.1",
     "react": "^19",
     "react-dom": "^19",

@@ -28,10 +28,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildRunFields, healStringWrappers, hoistDefsToRoot, normalizeSchemaForRjsf } from '..';
 import type { PipeInputContract } from '..';
+import { PLAIN_SINGLE } from './contract-fixtures';
 
 /** A non-native concept, so `buildRunFields` dispatches on the SCHEMA alone. */
 function customInput(json_schema: Record<string, unknown>): Record<string, PipeInputContract> {
-  return { value: { concept_ref: 'demo.Custom', json_schema } };
+  return { value: { ...PLAIN_SINGLE, concept_ref: 'demo.Custom', json_schema } };
 }
 
 describe('anyOf collapse divergence: primitive unions', () => {

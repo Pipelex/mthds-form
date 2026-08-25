@@ -1,0 +1,61 @@
+/**
+ * The wire slot facts every `pipe_io_contracts` INPUT entry carries, as fixtures.
+ *
+ * Inputs and outputs do not state presence the same way, and the fixtures below
+ * are the input side. An input carries the authored marker verbatim as
+ * `presence`; an output carries a boolean `optional`, because `!` is rejected on
+ * an output and its presence is genuinely two-valued (see `SINGLE_OUTPUT`).
+ *
+ * `presence`, `multiplicity` and `item_count` are always on the wire, so the
+ * mirror types them as required - which would otherwise put three lines of
+ * boilerplate on every fixture in the suite, in tests that are about deflation
+ * or field mapping and have no opinion about presence at all. Spreading one of
+ * these says which slot the fixture means and keeps the rest of it readable:
+ *
+ *     const brief: PipeInputContract = { ...PLAIN_SINGLE, concept_ref, json_schema };
+ *
+ * Not a test file (vitest collects `*.test.ts` only).
+ */
+
+/** A plain, single-item input: `Concept`. The shape most fixtures mean. */
+export const PLAIN_SINGLE = {
+  presence: 'plain',
+  multiplicity: 'single',
+  item_count: null,
+} as const;
+
+/** An optional single input: `Concept?` - the caller may omit it. */
+export const OPTIONAL_SINGLE = {
+  presence: 'optional',
+  multiplicity: 'single',
+  item_count: null,
+} as const;
+
+/** A force-marked single input: `Concept!` - gates exactly like a plain one. */
+export const FORCE_SINGLE = {
+  presence: 'force',
+  multiplicity: 'single',
+  item_count: null,
+} as const;
+
+/** A variable-length plural input: `Concept[]` - the empty list is a value. */
+export const PLAIN_VARIABLE = {
+  presence: 'plain',
+  multiplicity: 'variable',
+  item_count: null,
+} as const;
+
+/** An optional variable-length plural input: `Concept[]?`. */
+export const OPTIONAL_VARIABLE = {
+  presence: 'optional',
+  multiplicity: 'variable',
+  item_count: null,
+} as const;
+
+/** A fixed-count plural input: `Concept[N]` - exactly `count` items. */
+export function plainFixed(count: number) {
+  return { presence: 'plain', multiplicity: 'fixed', item_count: count } as const;
+}
+
+/** A plain, single, non-optional output - what a fixture's `output` usually is. */
+export const SINGLE_OUTPUT = { multiplicity: 'single', item_count: null, optional: false } as const;

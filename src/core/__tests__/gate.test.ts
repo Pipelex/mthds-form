@@ -12,13 +12,16 @@ import {
   buildRunFields,
   buildRunInputsSchema,
   computeReadiness,
+  gateRunInputs,
   prepareRunInputs,
   rjsfDataFromRunValues,
   validateRunInputs,
 } from '..';
-import type { PipeInputContract } from '..';
+import type { PipeInputContract, PipeOutputContract } from '..';
+import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE, plainFixed } from './contract-fixtures';
 
 const TEXT_INPUT: PipeInputContract = {
+  ...PLAIN_SINGLE,
   concept_ref: 'native.Text',
   json_schema: {
     title: 'TextContent',
@@ -31,6 +34,7 @@ const TEXT_INPUT: PipeInputContract = {
 /** `DateContent`: `date` required, `time` optional AND format-constrained - the
  *  shape that made an untouched optional field block a run. */
 const DATE_INPUT: PipeInputContract = {
+  ...PLAIN_SINGLE,
   concept_ref: 'native.Date',
   json_schema: {
     title: 'DateContent',
@@ -43,8 +47,17 @@ const DATE_INPUT: PipeInputContract = {
   },
 };
 
-const OPTIONAL_INPUT: PipeInputContract = { ...TEXT_INPUT, optional: true };
+/** Every contract needs one; nothing in the gate reads it. */
+const TEXT_OUTPUT: PipeOutputContract = {
+  concept_ref: 'native.Text',
+  multiplicity: 'single',
+  item_count: null,
+  optional: false,
+};
+
+const OPTIONAL_INPUT: PipeInputContract = { ...TEXT_INPUT, ...OPTIONAL_SINGLE };
 const PLURAL_INPUT: PipeInputContract = {
+  ...PLAIN_VARIABLE,
   concept_ref: 'native.Image[]',
   json_schema: {
     type: 'array',
@@ -105,6 +118,7 @@ describe('validateRunInputs', () => {
     // is too short. This is the class of failure that used to reach the runner.
     const inputs = {
       quote: {
+        ...PLAIN_SINGLE,
         concept_ref: 'native.Text',
         json_schema: {
           type: 'object',
@@ -170,8 +184,8 @@ describe('apiInputsFromSchemaData', () => {
  * form values → schema data → prepare → validate → payload.
  */
 const FOCUS_INPUT: PipeInputContract = {
+  ...OPTIONAL_SINGLE,
   concept_ref: 'demo.ExtractionFocus',
-  optional: true,
   json_schema: {
     title: 'ExtractionFocus',
     type: 'object',
@@ -249,8 +263,57 @@ describe('an optional structured input whose concept has a required child', () =
     expect(verdict.errors[0]?.property).toBe('.focus.audience');
   });
 
+  it('is refused by the WHOLE gate even when ajv has nothing to say about it', () => {
+    // The enum child above is why the case survived: the shell leaves an
+    // unset enum out, so ajv's `required` catches it. A required plain STRING
+    // is filled with `''` instead, which is a valid string - so nothing in the
+    // schema notices, and the assembled gate is on its own.
+    //
+    // It used to select only the inputs the method DEMANDS before re-applying
+    // the emptiness rule, so this input was skipped entirely: the button was
+    // dark and `gateRunInputs` answered `ok: true`. `apiInputsFromSchemaData`
+    // would then have SENT it - a paid run past a disabled button, over a
+    // required field holding nothing.
+    const briefInput: PipeInputContract = {
+      ...OPTIONAL_SINGLE,
+      concept_ref: 'demo.Brief',
+      json_schema: {
+        title: 'Brief',
+        type: 'object',
+        properties: {
+          name: { title: 'Name', type: 'string' },
+          notes: { title: 'Notes', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+        },
+        required: ['name'],
+      },
+    };
+    const inputs = { text: TEXT_INPUT, brief: briefInput };
+    const fields = buildRunFields(inputs);
+    const values = { text: 'Apple in Cupertino.', brief: { notes: 'skip the pricing' } };
+
+    // The shape really is one the value bridge produces, not a contrived body:
+    // a touched structure travels whole, empty children and all.
+    expect(rjsfDataFromRunValues(values, fields)['brief']).toEqual({
+      name: '',
+      notes: 'skip the pricing',
+    });
+    expect(computeReadiness(fields, values).missing).toEqual(['brief']);
+
+    const result = gateRunInputs(
+      { inputs, output: TEXT_OUTPUT },
+      rjsfDataFromRunValues(values, fields),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.missingInputs).toEqual(['brief']);
+      // ajv passed it, so the refusal is the kernel's alone.
+      expect(result.errors).toEqual([]);
+    }
+  });
+
   it('reports a missing REQUIRED structured input by its variable name', () => {
-    const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, optional: false } };
+    const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, ...PLAIN_SINGLE } };
     const requiredFields = buildRunFields(REQUIRED_INPUTS);
     const schema = buildRunInputsSchema(REQUIRED_INPUTS);
     const prepared = prepareRunInputs(
@@ -276,6 +339,144 @@ describe('an optional structured input whose concept has a required child', () =
     expect(verdict.errors[0]?.stack).toBe("must have required property 'audience'");
   });
 });
+// ─── A REQUIRED structured input whose concept demands no child ──────────────
+
+/**
+ * `RunOptions {tone, notes}` - every child optional - declared
+ * `opts = "demo.RunOptions"`, with no `?`. The surviving edge of the family
+ * above: readiness used to be *vacuously* satisfied here (every child passed
+ * `!f.required` over a value that was not there), the bridge omitted the
+ * untouched structure like any other, and the combined schema's `required`
+ * list then refused the run the button had just offered.
+ *
+ * One table, all three halves per row, because the point of the fix is that
+ * they answer together.
+ */
+const OPTS_INPUT: PipeInputContract = {
+  ...PLAIN_SINGLE,
+  concept_ref: 'demo.RunOptions',
+  json_schema: {
+    title: 'RunOptions',
+    type: 'object',
+    properties: {
+      tone: { title: 'Tone', type: 'string', enum: ['formal', 'casual'] },
+      notes: { title: 'Notes', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+    },
+  },
+};
+
+describe('a required structured input whose concept demands no child', () => {
+  const INPUTS = { text: TEXT_INPUT, opts: OPTS_INPUT };
+  const FIELDS = buildRunFields(INPUTS);
+  const SCHEMA = buildRunInputsSchema(INPUTS);
+
+  /** What a host does between "Run pressed" and the payload. */
+  const gate = (values: Record<string, unknown>) => {
+    const prepared = prepareRunInputs(rjsfDataFromRunValues(values, FIELDS), SCHEMA);
+    return { prepared, verdict: validateRunInputs(prepared, INPUTS, SCHEMA) };
+  };
+
+  const TEXT = 'Apple in Cupertino.';
+
+  it('is demanded by the schema like any other singular input', () => {
+    expect(SCHEMA['required']).toEqual(['text', 'opts']);
+  });
+
+  it('reads MISSING while untouched, and the gate refuses it by name', () => {
+    // The bug: `every(f => !f.required)` was true over an absent value, so the
+    // button lit up and the gate then rejected `must have required property
+    // "opts"` - the two halves disagreeing about whether the input is there.
+    const values = { text: TEXT };
+
+    expect(computeReadiness(FIELDS, values).missing).toEqual(['opts']);
+    expect(rjsfDataFromRunValues(values, FIELDS)['opts']).toBeUndefined();
+
+    const { prepared, verdict } = gate(values);
+    expect(prepared['opts']).toBeUndefined();
+    expect(verdict.isValid).toBe(false);
+    // Named, not just refused: the scan used to skip an input whose concept
+    // lists no required child, leaving the caller with ajv's own wording.
+    expect(verdict.missingInputs).toEqual(['opts']);
+  });
+
+  it('still reads missing when the section was opened but left blank', () => {
+    // Opening the disclosure is view state the value never sees, and an empty
+    // shell is what the bridge collapses - so `{}` has to answer like an
+    // absence on BOTH halves, or the disagreement just moves.
+    const values = { text: TEXT, opts: {} };
+
+    expect(computeReadiness(FIELDS, values).missing).toEqual(['opts']);
+    expect(rjsfDataFromRunValues(values, FIELDS)['opts']).toBeUndefined();
+    expect(gate(values).verdict.missingInputs).toEqual(['opts']);
+  });
+
+  it('reads missing when every child is there but blank', () => {
+    // `isFilled` is the emptiness rule throughout: a child holding `''` is not
+    // a touch, on either side of the gate.
+    const values = { text: TEXT, opts: { tone: '', notes: '' } };
+
+    expect(computeReadiness(FIELDS, values).missing).toEqual(['opts']);
+    expect(gate(values).verdict.isValid).toBe(false);
+  });
+
+  it('runs the moment one child holds a value, and travels whole', () => {
+    const values = { text: TEXT, opts: { notes: 'skip the pricing' } };
+
+    expect(computeReadiness(FIELDS, values).missing).toEqual([]);
+
+    const { prepared, verdict } = gate(values);
+    expect(verdict.isValid).toBe(true);
+    expect(apiInputsFromSchemaData(prepared, INPUTS)['opts']).toEqual({
+      concept: 'demo.RunOptions',
+      content: { notes: 'skip the pricing' },
+    });
+  });
+
+  it('leaves the OPTIONAL twin alone - it never gated and still does not', () => {
+    // The fix is about a slot the method DEMANDS. An optional structure with no
+    // required child stays omittable, and an untouched one is still a run.
+    const optionalInputs = { text: TEXT_INPUT, opts: { ...OPTS_INPUT, ...OPTIONAL_SINGLE } };
+    const optionalFields = buildRunFields(optionalInputs);
+    const optionalSchema = buildRunInputsSchema(optionalInputs);
+    const prepared = prepareRunInputs(
+      rjsfDataFromRunValues({ text: TEXT }, optionalFields),
+      optionalSchema,
+    );
+
+    expect(computeReadiness(optionalFields, { text: TEXT }).missing).toEqual([]);
+    expect(validateRunInputs(prepared, optionalInputs, optionalSchema).isValid).toBe(true);
+    expect(apiInputsFromSchemaData(prepared, optionalInputs)).not.toHaveProperty('opts');
+  });
+
+  it('gates a NESTED required struct that demands no child the same way', () => {
+    // The vacuous answer was recursive: `fieldFilled` descends into required
+    // children, so a required all-optional struct nested inside another one
+    // read satisfied too, while the parent's own `required` list refused it.
+    const nestedInputs = {
+      wrapper: {
+        ...PLAIN_SINGLE,
+        concept_ref: 'demo.Wrapper',
+        json_schema: {
+          title: 'Wrapper',
+          type: 'object',
+          properties: {
+            label: { title: 'Label', type: 'string' },
+            opts: OPTS_INPUT.json_schema,
+          },
+          required: ['label', 'opts'],
+        },
+      } as PipeInputContract,
+    };
+    const nestedFields = buildRunFields(nestedInputs);
+    const nestedSchema = buildRunInputsSchema(nestedInputs);
+    const values = { wrapper: { label: 'run 4' } };
+
+    expect(computeReadiness(nestedFields, values).missing).toEqual(['wrapper']);
+
+    const prepared = prepareRunInputs(rjsfDataFromRunValues(values, nestedFields), nestedSchema);
+    expect(validateRunInputs(prepared, nestedInputs, nestedSchema).isValid).toBe(false);
+  });
+});
 
 // ─── An empty item in a LIST of structures must reach ajv as an object ───────
 
@@ -286,6 +487,7 @@ describe('an optional structured input whose concept has a required child', () =
  * `must be object`: a run the form offered and its own gate then refused.
  */
 const FINDINGS_INPUT: PipeInputContract = {
+  ...PLAIN_VARIABLE,
   concept_ref: 'demo.Finding[]',
   json_schema: {
     type: 'array',
@@ -299,6 +501,7 @@ const FINDINGS_INPUT: PipeInputContract = {
 
 /** The same list, but the item concept DEMANDS a child. */
 const RATED_INPUT: PipeInputContract = {
+  ...PLAIN_VARIABLE,
   concept_ref: 'demo.Rated[]',
   json_schema: {
     type: 'array',
@@ -354,5 +557,101 @@ describe('a freshly added empty item in a list of structures', () => {
 
     expect(verdict.isValid).toBe(false);
     expect(verdict.errors[0]?.stack).toBe("must have required property 'audience'");
+  });
+});
+
+// ─── A fixed-count list (`Concept[N]`) is the one plural that gates ──────────
+
+/**
+ * `Image[3]`: pipelex states the count twice, and the two halves of the gate
+ * read one each - `item_count` on the contract tells `inputMustBeFilled` the
+ * empty form is ruled out, `minItems`/`maxItems` on the array wrapper tell ajv
+ * how many. A variable `[]` list carries neither.
+ */
+const FIXED_INPUT: PipeInputContract = {
+  ...plainFixed(3),
+  concept_ref: 'native.Image',
+  json_schema: {
+    type: 'array',
+    items: { type: 'object', properties: { url: { type: 'string' } } },
+    minItems: 3,
+    maxItems: 3,
+  },
+};
+
+describe('a fixed-count plural input', () => {
+  const INPUTS = { text: TEXT_INPUT, shots: FIXED_INPUT };
+  const CONTRACT = { inputs: INPUTS, output: TEXT_OUTPUT };
+  const FIELDS = buildRunFields(INPUTS);
+  const SCHEMA = buildRunInputsSchema(INPUTS);
+  const gate = (values: Record<string, unknown>) => {
+    const prepared = prepareRunInputs(rjsfDataFromRunValues(values, FIELDS), SCHEMA);
+    return { prepared, verdict: validateRunInputs(prepared, INPUTS, SCHEMA) };
+  };
+
+  it('lands in the schema’s `required` list, unlike a variable-length one', () => {
+    expect(SCHEMA['required']).toEqual(['text', 'shots']);
+    expect(buildRunInputsSchema({ illustrations: PLURAL_INPUT })['required']).toEqual([]);
+  });
+
+  it('blocks the Run button while it is empty', () => {
+    // The whole reason it gates: left ungated and empty, the property is simply
+    // absent, ajv never looks at it, and the run goes out without the input.
+    expect(computeReadiness(FIELDS, { text: 'Apple in Cupertino.' }).missing).toEqual(['shots']);
+  });
+
+  it('runs once the declared number of items is there', () => {
+    const { verdict } = gate({
+      text: 'Apple in Cupertino.',
+      shots: [{ url: 'a.png' }, { url: 'b.png' }, { url: 'c.png' }],
+    });
+    expect(verdict.isValid).toBe(true);
+  });
+
+  it('refuses a short list on the count the method declared, and so does the button', () => {
+    // This used to be the recorded residual: readiness answered emptiness only,
+    // so the button was live at two of three and the gate alone refused -
+    // fail-closed, but the two halves were not phrasing the same rule. The
+    // count now reaches the descriptor off the same `minItems` ajv reads.
+    const values = { text: 'Apple in Cupertino.', shots: [{ url: 'a.png' }, { url: 'b.png' }] };
+    expect(computeReadiness(FIELDS, values).missing).toEqual(['shots']);
+
+    const { verdict } = gate(values);
+    expect(verdict.isValid).toBe(false);
+    expect(verdict.errors[0]?.stack).toBe("'shots' must NOT have fewer than 3 items");
+  });
+
+  it('carries the declared count on the descriptor, and only for a fixed list', () => {
+    // BOTH bounds, because they are two facts. A `[N]` slot states them equal,
+    // which is what lets the control stop offering Add at the same number
+    // readiness waits for - without either of them reading the other's field.
+    const shots = FIELDS.find((f) => f.name === 'shots');
+    expect(shots?.kind === 'list' && shots.itemCount).toBe(3);
+    expect(shots?.kind === 'list' && shots.maxItemCount).toBe(3);
+
+    const variable = buildRunFields({ illustrations: PLURAL_INPUT })[0];
+    expect(variable?.kind === 'list' && variable.itemCount).toBeUndefined();
+    expect(variable?.kind === 'list' && variable.maxItemCount).toBeUndefined();
+  });
+
+  it('refuses a full-length list holding a blank row', () => {
+    // The count is not the whole rule: three rows one of which was added and
+    // left blank is a payload ajv's `minItems` accepts and the method cannot
+    // use. Readiness and the assembled gate both refuse it, together.
+    const values = {
+      text: 'Apple in Cupertino.',
+      shots: [{ url: 'a.png' }, { url: '' }, { url: 'c.png' }],
+    };
+    expect(computeReadiness(FIELDS, values).missing).toEqual(['shots']);
+    expect(gateRunInputs(CONTRACT, rjsfDataFromRunValues(values, FIELDS)).ok).toBe(false);
+  });
+
+  it('is a run once all three are there', () => {
+    const values = {
+      text: 'Apple in Cupertino.',
+      shots: [{ url: 'a.png' }, { url: 'b.png' }, { url: 'c.png' }],
+    };
+    expect(computeReadiness(FIELDS, values).missing).toEqual([]);
+    expect(gateRunInputs(CONTRACT, rjsfDataFromRunValues(values, FIELDS)).ok).toBe(true);
   });
 });

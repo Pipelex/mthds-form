@@ -1,0 +1,117 @@
+# PR #6 review follow-ups
+
+Deferred items from the agent-review triage of [PR #6](https://github.com/Pipelex/mthds-form/pull/6). Two review rounds have run against this branch.
+
+The **first round** (two reviewers) confirmed and fixed four items — the gate's selection of touched optional inputs, the control set's prototype-named reads, the list's two bounds, and the resolved preview's provenance.
+
+The **third round** (seven findings) is deferred in full — the branch was wrapped up at that point and nothing reported rose to blocking. Every item is recorded below under "Third round", with what was verified about each, so none of it is lost.
+
+The **second round** (one reviewer, twenty-one findings) fixed eighteen: the gate accepting a malformed non-object body, a started list row not held to its item concept, a list bound stated alone going unenforced, the depth-keyed memo in `isFilled`, the resolver's empty answer leaving a dead preview, the two item-count badge defects, `Object.hasOwn` against an ES2020 target, and the rest across the lint rule, the bundle assertions, the vitest coverage config and the docs.
+
+What is left is below: two reported items whose only implementable fix is a state machine the kernel's design does not have, one reported item that is not a defect, and one disagreement that no reviewer reported and that the first triage's own test table turned up.
+
+## A row's identity shifts when a host refuses the removal it was told about
+
+Reporter: supplied with the triage (no PR thread). Location: `src/react/list-field.tsx` — `removeItem` (`:60`) and `useRowKeys` (`:205`).
+
+`removeItem` drops the row's key from local state and then calls `onChange` with the shortened array. If the host does not accept that removal — a `minItems` guard, a debounced or async commit, a normalizing reducer — the next render arrives with the array still at its original length while the key list is one shorter. `useRowKeys`'s render-phase reconciliation then takes the **grow** branch and appends a fresh key at the *end*, so every row's identity shifts up by one and the last row remounts. That is precisely the renumbering the generated keys were added to prevent, arrived at from the other direction.
+
+Two facts bound the damage, and they are why this is recorded rather than fixed.
+
+**Values are never wrong.** Every control in a row is controlled from `items`, so what the user sees in each row is still the host's value. What transfers is *uncontrolled* row-local state: a caret or selection, a scroll offset, `FileField`'s local preview and its URL toggle, `ObjectField`'s optional-disclosure state, a nested list's own keys.
+
+**The mode that would corrupt data is already closed.** An upload write-back resolving against a moved position is the serious failure in this family, and removal is blocked outright while any ID under the list is uploading (`:79`, `:139`). That guard does not care whether the host accepts the removal, so it holds here too.
+
+The remedy the report suggests — "update row identity from the accepted controlled value" — cannot be built. It needs something in the value to match rows by, and there is nothing: items are arbitrary, routinely duplicated, and routinely `undefined` (the suite's own fixture is three `undefined`s). The control's doc comment already states this and [`docs/upload-seam.md`](../docs/upload-seam.md) § "A row is a thing, not a slot" publishes it: the keys live in this control's state and not in the value, so a host that replaces `values` wholesale reconciles by length exactly as positions do. Length reconciliation for externally-driven change is a **declared design position**, not an oversight.
+
+Nor is there a cheap half-measure. Minting fresh keys in the grow branch instead of appending would remount every row on every `addItem`, since adding a row is the same signal. Telling "the host appended" apart from "the host refused my removal" *requires* the pending record: a ref holding the index and the length it expected, a render-phase commit-or-restore, and a policy for the ambiguous outcomes — the host removed a different index, replaced the array, or removed one and appended one. That is hidden state in a control whose documented design is that the kernel keeps none.
+
+So the open question is not how to fix it but whether the control should own a pending-removal record at all. It is worth answering together with the touch-record question already blocking items in [`pr-4-review-notes.md`](pr-4-review-notes.md) and [`pr-5-review-notes.md`](pr-5-review-notes.md) — all three are the same shape, a control holding a fact about what the user did that the value does not carry.
+
+## An untouched `Concept[N]?` is refused by the gate and allowed by the button
+
+Found while writing the invariant table rows for this triage, not reported by any reviewer. Pre-existing — it is not a regression from anything in this PR. Location: `src/core/wire-format.ts` (`pruneEmptyOptionals`) against `src/core/gate.ts`.
+
+An input that is optional **and** fixed-count (`presence: 'optional'`, `multiplicity: 'fixed'`) is a shape the contract mirror can express, and the two halves answer it differently when it is untouched:
+
+- `inputMustBeFilled` is false because the input is optional, so readiness never counts it and the Run button is live. Correct — the method said the input may be omitted.
+- The value bridge deflates an untouched list to `[]`, because a plural slot's empty form *is* the empty list. The prune does not drop it. ajv then rejects it on the `minItems: 3` the fixed count put in the schema, and `gateRunInputs` returns `ok: false` with `missingInputs` **empty** — so the caller can only quote ajv about an input the user was never asked to fill.
+
+Reproduced directly: with `shots: Image[3]?` and no values, the bridge emits `{"shots":[]}`, the prepared data is unchanged, and the verdict is `must NOT have fewer than 3 items`.
+
+This is the mirror image of the disagreements this PR fixed — the gate is *stricter* than the button rather than more permissive — so it fails closed and no wrong run is billed. The cost is that an `Image[3]?` slot is unrunnable while untouched, which is exactly the state the `?` was supposed to allow.
+
+The fix is a design call, which is why it is here rather than on the branch. An untouched optional plural slot has two defensible answers and they are not the same for the two multiplicities: a *variable* `[]?` should keep its key and send `[]`, which is what the payload builder already does deliberately and documents at length; a *fixed* `[N]?` cannot send `[]`, because the method ruled the empty list out — so the only coherent answer for it is to omit the input entirely, as an optional absence. That means the prune (or the bridge) needs to distinguish the two, and today `pruneEmptyOptionals` sees only the schema and knows nothing about `presence`. Deciding where that knowledge belongs is the work.
+
+Until then the row is deliberately absent from `gate-agreement.test.ts`, so nothing in the suite claims this case is answered.
+
+
+## A local file preview outlives a value the host replaces mid-upload
+
+Reporter: second-round review, `src/react/file-field.tsx` — the binding effect (`:157`).
+
+While an upload is in flight the local preview is deliberately *unbound*: the control has made an object URL for the file the user dropped and does not yet know which URL the host will write for it. `uploading` is the signal that the write has not happened, so the effect waits. If the host writes a **different** file's value during that window, the preview stays marked current and is then bound to the replacement's URL when the upload finishes — the chip names one file over a preview of another, which is the defect this control already fixed for the settled case.
+
+It is recorded rather than fixed because it is the same unsolvable shape as the row-identity item above, and the control's own comment already states the half that matters: the fallback for a host that does not report `uploading` is "the first URL to appear". Telling "the host wrote the URL for *my* upload" apart from "the host wrote some other file" needs an identity the value does not carry — `FileValue` is `{url, filename}` and neither is known to the control before the upload resolves. Every remedy therefore invents a correlation token and a pending record to hold it, which is the hidden control state this kernel's design does not have, and would have to be reconciled against the host's write anyway.
+
+Two facts bound it. The user cannot cause it: every door into the value is shut while `uploading` (that is the `busy` rule this branch added), so it takes a host writing to the same path from elsewhere. And it is a *presentation* divergence, not a data one — the value on the wire is the host's throughout. Its life is **not** bounded, though, and the first draft of this note was wrong to say so: once the pending preview binds to the replacement's URL it is `localIsCurrent` by that URL, so it stands until the value changes again. A host that writes B and leaves B there shows A's preview under B's name indefinitely.
+
+The right time to answer it is with the pending-removal question above and the touch-record questions in [`pr-4-review-notes.md`](pr-4-review-notes.md) and [`pr-5-review-notes.md`](pr-5-review-notes.md). All four are one question: whether a control may hold a fact about what the user did that the value does not carry.
+
+## Reported and declined: `wip/issues.md` naming closed-source repositories
+
+Reporter: second-round review, `wip/issues.md:3`. **Not a defect** — recorded so a later sweep does not re-open it.
+
+The finding reads the repo rule in `CLAUDE.md` ("never name a closed-source repo in it") as violated by the repository names in this document. Every repository it names is public: `pipelex`, `mthds-form`, `mthds-ui` and `pipelex-starter-js` are all public on GitHub and all published. The one consumer that is closed source is referred to throughout as "the consuming app host", which is exactly what the rule asks for.
+
+The rule is about *reachability* — a reader outside the company cannot follow a name they have no access to — so a public sibling's name is information, not a leak. Replacing those names with "a consumer" would delete the only detail that makes the verification notes actionable: which checkout to run which suite in.
+
+
+## An untouched row travels when it shares a list with a filled one
+
+Reporter: second-round review, `src/core/readiness.ts` — the variable-list branch. Found while the round's own probe checked a claim this document made, and the claim was wrong.
+
+The second round added the rule that a **started** list row owes its item concept every required child. It deliberately skips a row that is empty, on the grounds that an untouched row is an absence rather than an incomplete value. That half is right, and it is also where the two halves stop agreeing with the wire:
+
+- `{briefs: [{}]}` — no filled row anywhere, so the list reads unfilled, and the payload builder emits `briefs: []`. The empty row is gone. This is the case the rule was written against and it behaves as described.
+- `{briefs: [{name: 'x'}, {}]}` — one filled row, so the list reads filled and the gate passes it. The payload is `[{name: 'x'}, {name: ''}]`. **The untouched row travels**, carrying the blank required child the rule exists to refuse one row over.
+
+So the rule is asked per row for *gating* and not at all for *serialization*, and the difference only shows in a mixed list. Nothing here is a regression — before the rule existed the whole list was judged by `some` alone and the same payload went out — but the round-2 documentation claimed the untouched row "deflates back out of the payload", which is true only for the all-empty list. Those sentences are corrected in `docs/run-gate.md` and the changelog; this is the underlying question.
+
+It is recorded rather than fixed because every fix is a change to what goes on the wire, and the choice is not obvious:
+
+- **Drop empty rows in the payload builder.** Then `[{name:'x'}, {}]` sends one item, and a method counting items sees a different length than the form showed. It also silently changes index alignment, which is the exact class of bug the row-identity work above exists to prevent.
+- **Refuse the mixed list in `fieldFilled`.** Then adding a row and not filling it disables Run, with the missing-input line naming the whole list and nothing pointing at the row. That is the strictness the "a plural slot's empty form IS the empty list" rule was written to avoid.
+- **Leave it.** An empty shell reaches the runtime, which is what a required child ajv cannot see always meant.
+
+The right answer probably depends on whether a list row is addressable in a missing-input verdict at all, which is the same question the row-identity item above raises from the control side. They should be answered together.
+
+
+## Reported and declined: the barrel guard should accept only `export ... from`
+
+Reporter: second-round review, `scripts/assert-bundle.mjs`. **Applied, measured, reverted** — recorded so it is not tried a third time.
+
+The finding is that allowing a bare `import '...'` in `dist/core/index.js` weakens the pure-barrel guard, since a side-effect import is something a bundler must keep. That reasoning is correct in general and the change was made and run. It fails the build on the package's own correct output: naming every core module as a tsup entry means the entries whose exports the barrel does not re-export are held in the graph by exactly such an import, and there are two of them (`own-property`, `native-concepts`).
+
+Those two chunks are leaves — no imports of their own, no external package, about two kilobytes together — so what the finding warns about cannot happen through them silently. And it could not happen unnoticed in general either, because the guard immediately above walks those same specifiers transitively: a chunk that started pulling ajv or React would fail the graph check whether it arrived by a re-export or a side-effect import. The barrel check owns the narrower claim the graph walk cannot make — that the barrel holds no code — and that claim is unaffected.
+
+The comment at the check now says this, so the next reader derives it instead of re-running the experiment.
+
+
+## Third round: reported, verified, deferred
+
+The branch was closed to further change at this point, so none of these were acted on. Each was checked rather than waved through, and the checkable ones hold — they are recorded here at the precision the next person needs, not as a list of links.
+
+**`specifiersOf` reads an `import()` inside a string or a comment as a real chunk edge** (`scripts/assert-bundle.mjs`). Verified: both `const msg = "call import('./ghost.js') here"` and `// see import('./ghost.js')` yield `./ghost.js`. The graph walk then calls `existsSync` on a file that is not there and throws *Bundle graph names a file that does not exist*, so the failure is a false build break rather than a missed dependency — it fails loud and in the safe direction. The `from`-clause regexes beside it are anchored to a statement boundary and are not affected. The fix is to strip comments and strings before matching, which `statementsOf` already does for the barrel check further down; the two should share one lexer rather than growing a second.
+
+**`docs/run-gate.md` says the absence rule is "one predicate, `isFilled`, read in four places".** Verified false for one of the four: the prune uses `isEmptyAfterPruning` (`wire-format.ts:357`), which is schema-aware and differs on whitespace and on arrays. The value bridge, the payload builder and `fieldFilled` do call `isFilled`. The sentence should say the four are coordinated, and name the one that is a different function — the current wording invites a reader to change `isFilled` and expect the prune to follow.
+
+**The quick-start in `docs/run-gate.md` does not narrow the lookup.** `getPipeIOContract` can return `undefined`, and the example passes the result straight to `gateRunInputs`, so the sample as written does not typecheck. It needs the not-found branch a real endpoint has anyway.
+
+**The changelog's migration note overstates the compatibility break.** A retired-shape contract makes legacy *singular* `?` inputs demanded, but a variable-plural `[]?` still does not gate, because an empty list stays a valid value. Reported in the second round as well and deferred both times; it is a note about a shape no current runtime emits.
+
+**The changelog says ajv "is now shown the caller's own value".** True for a body that is not a record, which is the hole that was closed — and not true for a record body, where ajv is shown `preparedData` so that healing and pruning are what it validates. That distinction is exactly the one the second round declined to collapse (see the reply on `gate.ts`), so the code is deliberate and the sentence is the thing that is loose.
+
+**`docs/run-gate.md` states the browser/server invariant without its known exception.** An untouched `Concept[N]?` is refused by the gate and allowed by the button — the item already recorded above under its own heading. The invariant paragraph should carry a pointer to it, since a reader meeting the strong claim first has no reason to look for the exception.
+
+**The mid-upload correlation note is imprecise about filenames.** `FileField` does hold the dropped `File` and therefore `file.name`; what it cannot rely on is the eventual `FileValue.filename` matching it, since a host may normalize it and two files may share one. That does not change the conclusion — a filename is not an identity — but the note should say *unreliable* rather than *unavailable*.

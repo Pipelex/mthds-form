@@ -25,6 +25,7 @@ import {
   storeInputDataFromRunValues,
 } from '..';
 import type { PipeInputContract } from '..';
+import { PLAIN_SINGLE } from './contract-fixtures';
 
 const DATE_CONTENT_SCHEMA = {
   title: 'DateContent',
@@ -37,7 +38,7 @@ const DATE_CONTENT_SCHEMA = {
 };
 
 function input(concept_ref: string, json_schema: Record<string, unknown>): PipeInputContract {
-  return { concept_ref, json_schema };
+  return { ...PLAIN_SINGLE, concept_ref, json_schema };
 }
 
 describe('field-model taxonomy: Date and HTML fold into TEXT, Page into DOCUMENT', () => {

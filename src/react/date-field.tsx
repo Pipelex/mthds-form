@@ -2,7 +2,7 @@
 
 import { cn } from './utils';
 import type { DateRunField } from '../core';
-import { toDateInputValue, toStoredDateValue } from '../core';
+import { toDateInputValue, toStoredDateValue } from '../core/date-format';
 import { FieldShell } from './field-shell';
 import { fieldControlClass } from './field-styles';
 

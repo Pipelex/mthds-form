@@ -1,14 +1,14 @@
 ---
 name: release
 description: >
-  Automates the mthds-form release workflow: bumps the version in package.json, renames the CHANGELOG.md `[Unreleased]` section into a version heading, runs the full gate (checks, tests, build, and the two bundle assertions), creates a `release/vX.Y.Z` branch, commits, pushes, and opens a PR to `main` — merging that PR is what publishes `@pipelex/mthds-form` to npm. Use whenever the user says "release", "cut a release", "bump the version", "prepare a release", "make a release", "ship it", "publish to npm", "create a release branch", or any variation of shipping a new version of this package, even if they do not name the package. The user can pass changelog content inline (e.g. "/release added a presentation seam on the controls"), which becomes the entry for this version.
+  Automates the mthds-form release workflow: bumps the version in package.json, renames the CHANGELOG.md `[Unreleased]` section into a version heading, runs the full gate (checks, tests, build, and the bundle assertions), creates a `release/vX.Y.Z` branch, commits, pushes, and opens a PR to `main` — merging that PR is what publishes `@pipelex/mthds-form` to npm. Use whenever the user says "release", "cut a release", "bump the version", "prepare a release", "make a release", "ship it", "publish to npm", "create a release branch", or any variation of shipping a new version of this package, even if they do not name the package. The user can pass changelog content inline (e.g. "/release added a presentation seam on the controls"), which becomes the entry for this version.
 ---
 
 # mthds-form Release Workflow
 
 This skill handles the full release cycle for the `@pipelex/mthds-form` npm package.
 
-**Merging the release PR into `main` is what publishes.** `.github/workflows/release.yml` runs on every push to `main`: it re-runs the gate, rebuilds, re-asserts the two bundle invariants, publishes to npm with provenance, creates the `vX.Y.Z` git tag and opens the GitHub release. That job is idempotent — a push to `main` that does not move the version is a deliberate no-op — so nothing here needs to publish anything. This skill's job ends when the PR is open.
+**Merging the release PR into `main` is what publishes.** `.github/workflows/release.yml` runs on every push to `main`: it re-runs the gate, rebuilds, re-asserts the bundle invariants, publishes to npm with provenance, creates the `vX.Y.Z` git tag and opens the GitHub release. That job is idempotent — a push to `main` that does not move the version is a deliberate no-op — so nothing here needs to publish anything. This skill's job ends when the PR is open.
 
 ## Files touched
 
@@ -35,16 +35,9 @@ Ask the user which kind of bump they want — **patch**, **minor** or **major** 
 
 ### 3. Run the gate
 
-Run `make all`. That is check (lint, format, typecheck), then tests, then the build — note that `make check` here does **not** include tests, which is why the target to run is `make all` rather than the pair.
+Run `make all`. That is check (lint, format, typecheck), then tests, then the build, then `make assert-bundle` — the same bundle invariants the publish job runs, against the `dist/` the build just produced. Note that `make check` here does **not** include tests, which is why the target to run is `make all` rather than the pair.
 
-Then re-run the two assertions the publish job runs, against the `dist/` that `make all` just produced:
-
-```bash
-if grep -rq "from 'react" dist/core/ dist/chunk-*.js; then echo "FAIL: React reached the headless core bundle"; fi
-head -n 1 dist/react/index.js | grep -q 'use client' && echo "ok: 'use client' survived the bundle"
-```
-
-These two are worth a local minute because they cannot fail in a way source review would catch: React reaches the headless `.` entry through a shared chunk rather than through an import, and esbuild drops the `'use client'` prologue that `tsup.config.ts` then re-asserts. Both are re-checked on `main` by the publish job, but discovering them there means a broken release commit is already merged.
+Those invariants are worth the local minute because none of them can fail in a way source review would catch. The first two walk each entry's built chunk graph, which is where a banned dependency actually arrives: React into the headless `.` entry, ajv into `./react`, both through a shared chunk rather than through any import statement in that entry's sources. The third checks that `dist/core/index.js` is still a pure re-export barrel, which is what lets a consumer tree-shake ajv out of the core entry and is the one a narrowed entry glob breaks silently. The fourth checks the `'use client'` prologue esbuild drops and `tsup.config.ts` then re-asserts. All of them are re-checked on `main` by the publish job, but discovering them there means a broken release commit is already merged.
 
 If anything fails, stop and report the errors. Help the user fix them rather than skipping the gate.
 

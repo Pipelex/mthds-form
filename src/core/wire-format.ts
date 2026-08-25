@@ -18,6 +18,7 @@
 
 import { asCalendarDate } from './date-format';
 import { isWireDocumentLikeConcept, isWireTextConcept, splitListConcept } from './native-concepts';
+import { hasOwnProp, ownProp } from './own-property';
 import { collectSchemaDefs, resolveSchemaIndirection, schemaTypeOf } from './schema-utils';
 
 /** The wire-format view of the native-concept taxonomy (which concept codes use
@@ -279,7 +280,7 @@ export function deflateAllInputs(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [stuffName, schema] of Object.entries(inputSchemas)) {
-    result[stuffName] = deflateInput(formData[stuffName], resolveConceptCode(schema));
+    result[stuffName] = deflateInput(ownProp(formData, stuffName), resolveConceptCode(schema));
   }
   return result;
 }
@@ -341,7 +342,7 @@ export function healStringWrappers(
     if (!props) return value;
     const out = { ...(value as Record<string, unknown>) };
     for (const [key, propSchema] of Object.entries(props)) {
-      if (key in out) out[key] = healStringWrappers(out[key], propSchema, allDefs);
+      if (hasOwnProp(out, key)) out[key] = healStringWrappers(out[key], propSchema, allDefs);
     }
     return out;
   }
@@ -412,7 +413,7 @@ export function pruneEmptyOptionals(
   const required = new Set(Array.isArray(schema.required) ? (schema.required as string[]) : []);
   const out: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-    const propSchema = props[key];
+    const propSchema = ownProp(props, key);
     if (!propSchema) {
       out[key] = raw;
       continue;
@@ -434,7 +435,7 @@ export function inflateAllInputs(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [stuffName, value] of Object.entries(simplifiedData)) {
-    const schema = inputSchemas[stuffName];
+    const schema = ownProp(inputSchemas, stuffName);
     if (schema) {
       result[stuffName] = healStringWrappers(
         inflateInput(value, resolveConceptCode(schema)),
