@@ -1,0 +1,19 @@
+wip/pr-7-review-notes.md
+  s_83c8596de1646c::t_a890656954f6e5 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5dd182d63a0f028314ac74e8ded77191de63bb25",
+  "prompts": {},
+  "sessions": {
+    "s_83c8596de1646c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "316cb296-c478-41a5-9d3c-765b47f3f9b6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}
