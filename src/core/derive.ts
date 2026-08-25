@@ -111,9 +111,20 @@ function mapSchema(
     const itemsSchema = (schema.items as JsonSchema) ?? {};
     const item = mapSchema(name, base, itemsSchema, true, { ...ctx, depth: ctx.depth + 1 });
     // A declared count (`Concept[N]`) reaches the descriptor from the schema
-    // keyword ajv itself reads - see `ListRunField.itemCount`.
+    // keywords ajv itself reads - see `ListRunField.itemCount`. BOTH bounds
+    // travel, because they are two facts: a `[N]` slot states them equal, but
+    // this mapper also walks nested arrays, whose model may have stated only
+    // one. Carrying a single number forced readiness and the control to read it
+    // as a minimum and a maximum respectively.
     const itemCount = numOrUndef(schema.minItems);
-    return { ...common, kind: 'list', item, ...(itemCount === undefined ? {} : { itemCount }) };
+    const maxItemCount = numOrUndef(schema.maxItems);
+    return {
+      ...common,
+      kind: 'list',
+      item,
+      ...(itemCount === undefined ? {} : { itemCount }),
+      ...(maxItemCount === undefined ? {} : { maxItemCount }),
+    };
   }
 
   // Enum (a custom concept may refine a native with a fixed value set).

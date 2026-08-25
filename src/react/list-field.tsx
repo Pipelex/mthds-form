@@ -77,11 +77,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // it was, so an in-flight write-back is unaffected, and freezing it would make
   // filling a list of files needlessly serial.
   const busy = listIsBusy(id, env?.uploadingIds);
-  // A `Concept[N]` slot is full at N. The count is the method's, read off the
-  // same `minItems` ajv enforces, so offering an (N+1)th row would offer one the
-  // gate then refuses on `maxItems` - the one fixed-count state readiness has no
-  // vocabulary for, since "too many" is not "missing".
-  const isFull = field.itemCount !== undefined && items.length >= field.itemCount;
+  // A `Concept[N]` slot is full at N. The bound is the method's, read off the
+  // same `maxItems` ajv enforces, so offering one more row would offer one the
+  // gate then refuses. It is deliberately NOT `itemCount`, which is the LOWER
+  // bound: a schema stating "at least two" would otherwise be presented as a
+  // list of exactly two, with Add dead over a list the method lets you grow.
+  const isFull = field.maxItemCount !== undefined && items.length >= field.maxItemCount;
 
   return (
     <div className="space-y-2">

@@ -111,6 +111,33 @@ const OPTS: PipeInputContract = {
 };
 const OPTIONAL_OPTS: PipeInputContract = { ...OPTS, ...OPTIONAL_SINGLE };
 
+/**
+ * A required child ajv cannot catch: a plain string, which `''` satisfies.
+ *
+ * Every other structured fixture in this file gives its required child an
+ * `enum`, and `gate.test.ts` says why - the shell fills a required plain string
+ * with `''`, so only a child the shell leaves UNSET ever reaches ajv's
+ * `required` at all. That makes the enum shape the one where a schema error
+ * covers for the kernel, and this one the shape where the two halves are on
+ * their own. A table meant to catch them drifting apart needs the second.
+ */
+const briefSchema = {
+  title: 'Brief',
+  type: 'object',
+  properties: {
+    name: { title: 'Name', type: 'string' },
+    notes: { title: 'Notes', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+  },
+  required: ['name'],
+};
+
+const BRIEF: PipeInputContract = {
+  ...PLAIN_SINGLE,
+  concept_ref: 'demo.Brief',
+  json_schema: briefSchema,
+};
+const OPTIONAL_BRIEF: PipeInputContract = { ...BRIEF, ...OPTIONAL_SINGLE };
+
 /** A required struct holding a required struct that demands nothing. */
 const NESTED: PipeInputContract = {
   ...PLAIN_SINGLE,
@@ -139,6 +166,9 @@ const SHOTS: PipeInputContract = {
     maxItems: 3,
   },
 };
+
+/** The same slot the method left omittable: `Image[3]?`. */
+const OPTIONAL_SHOTS: PipeInputContract = { ...SHOTS, presence: 'optional' };
 
 interface Row {
   label: string;
@@ -249,6 +279,24 @@ const ROWS: Row[] = [
     runnable: true,
   },
   {
+    label: 'an OPTIONAL struct whose required child is a plain string, untouched',
+    inputs: { text: TEXT, brief: OPTIONAL_BRIEF },
+    values: { text: 'hi' },
+    runnable: true,
+  },
+  {
+    label: 'an OPTIONAL struct whose required child is a plain string, half filled',
+    inputs: { text: TEXT, brief: OPTIONAL_BRIEF },
+    values: { text: 'hi', brief: { notes: 'skip pricing' } },
+    runnable: false,
+  },
+  {
+    label: 'an OPTIONAL struct whose required child is a plain string, filled',
+    inputs: { text: TEXT, brief: OPTIONAL_BRIEF },
+    values: { text: 'hi', brief: { name: 'Q3' } },
+    runnable: true,
+  },
+  {
     label: 'a required struct nesting a required struct that demands no child, outer only',
     inputs: { w: NESTED },
     values: { w: { label: 'run 4' } },
@@ -287,6 +335,18 @@ const ROWS: Row[] = [
     inputs: { shots: SHOTS },
     values: { shots: [shot('a.png'), shot('b.png'), shot('c.png')] },
     runnable: true,
+  },
+  {
+    label: 'a fixed list of three, holding four',
+    inputs: { shots: SHOTS },
+    values: { shots: [shot('a.png'), shot('b.png'), shot('c.png'), shot('d.png')] },
+    runnable: false,
+  },
+  {
+    label: 'an OPTIONAL fixed list of three, holding three one of which is blank',
+    inputs: { text: TEXT, shots: OPTIONAL_SHOTS },
+    values: { text: 'hi', shots: [shot('a.png'), shot(''), shot('c.png')] },
+    runnable: false,
   },
 ];
 

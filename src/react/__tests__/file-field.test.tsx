@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField } from '../../core';
 import { DocumentField, type FileValue } from '../file-field';
@@ -191,5 +191,96 @@ describe('the local preview belongs to the value it was made for', () => {
     // file. The chip used to say B over a preview showing A.
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
     expect(container.querySelector('object')?.getAttribute('data')).toBe(`${DATA_B}#view=FitH`);
+  });
+});
+
+/** A host that owns the value and resolves storage URIs on demand. */
+function ResolvingField({
+  initial,
+  resolveUrl,
+}: {
+  initial: FileValue;
+  resolveUrl: (uri: string) => Promise<string | null>;
+}) {
+  const [value, setValue] = useState<FileValue>(initial);
+  return (
+    <>
+      <DocumentField
+        field={field}
+        value={value}
+        onDropFile={noop}
+        onChange={(v) => setValue(v as FileValue)}
+        id="cv"
+        resolveUrl={resolveUrl}
+      />
+      <button type="button" onClick={() => setValue({ filename: 'b.pdf', url: URI_B })}>
+        host writes B
+      </button>
+    </>
+  );
+}
+
+const URI_A = 'pipelex-storage://bucket/a';
+const URI_B = 'pipelex-storage://bucket/b';
+
+describe('the resolved preview belongs to the URI it was resolved from', () => {
+  const spinner = (container: HTMLElement) => container.querySelector('.animate-spin');
+  const previewSrc = (container: HTMLElement) =>
+    container.querySelector('object')?.getAttribute('data');
+
+  it('stops showing the previous file the moment the value moves on', async () => {
+    // `resolvedSrc` was a bare string with no record of which URI produced it,
+    // and it is the last fallback the preview reaches for - so between the
+    // host's write and the next resolution, the chip named B over a preview
+    // still painting A. The local preview carries `boundUrl` for exactly this
+    // reason; the resolved one was never given the same binding.
+    const user = userEvent.setup();
+    let releaseB: (src: string) => void = noop;
+    const resolveUrl = vi.fn((uri: string) =>
+      uri === URI_A
+        ? Promise.resolve('https://signed/a.pdf')
+        : new Promise<string>((resolve) => {
+            releaseB = resolve;
+          }),
+    );
+
+    const { container } = render(
+      <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
+    );
+
+    await user.click(previewButton() as HTMLElement);
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+
+    await user.click(screen.getByRole('button', { name: 'host writes B' }));
+
+    // B has not resolved yet, so there is nothing to show - and what there is
+    // to show must not be A.
+    expect(previewSrc(container)).toBeUndefined();
+    expect(spinner(container)).not.toBeNull();
+
+    releaseB('https://signed/b.pdf');
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/b.pdf#view=FitH'));
+  });
+
+  it('leaves the spinner, not the wrong file, when a resolution fails', async () => {
+    // A rejecting resolver is ordinary - it is a network call. Without a
+    // `.catch` the rejection also escaped as an unhandled promise rejection
+    // into the host's app, which is what this test fails on if one is missing.
+    const user = userEvent.setup();
+    const resolveUrl = vi.fn((uri: string) =>
+      uri === URI_A ? Promise.resolve('https://signed/a.pdf') : Promise.reject(new Error('gone')),
+    );
+
+    const { container } = render(
+      <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
+    );
+
+    await user.click(previewButton() as HTMLElement);
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+
+    await user.click(screen.getByRole('button', { name: 'host writes B' }));
+
+    await waitFor(() => expect(spinner(container)).not.toBeNull());
+    expect(previewSrc(container)).toBeUndefined();
   });
 });

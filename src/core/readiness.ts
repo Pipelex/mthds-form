@@ -116,6 +116,14 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
   // kind, is what this branch turns on.
   if (field.kind === 'list' && field.itemCount !== undefined) {
     if (!Array.isArray(value) || value.length < field.itemCount) return false;
+    // And too many is not filled either. `ListField` will not add past the
+    // bound, so this answers the list that arrived from somewhere else - a
+    // restored draft, a host seeding values, a bespoke surface calling these
+    // predicates over data it did not render. Left out, the button was live on
+    // a four-item `[3]` slot and only ajv refused it: fail-closed, but the two
+    // halves were not phrasing one rule. Naming it in `missing` is a small
+    // stretch of that word, and the alternative is the disagreement.
+    if (field.maxItemCount !== undefined && value.length > field.maxItemCount) return false;
     return value.every((item) => fieldFilled(field.item, item));
   }
   return isFilled(value);

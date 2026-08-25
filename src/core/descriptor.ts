@@ -112,19 +112,32 @@ export interface ListRunField extends RunFieldCommon {
   /** The element descriptor (its `name` is unused; the index labels items). */
   item: RunField;
   /**
-   * How many items the slot demands, when the method declared a count
-   * (`Concept[N]`). Absent for a variable `Concept[]` list, which demands none.
+   * The FEWEST items the slot accepts, when the schema states a lower bound.
+   * Absent for a variable `Concept[]` list, which demands none.
    *
    * Read off the array schema's `minItems` rather than off the contract's
    * `item_count`, which states the same number: this exists so `fieldFilled` can
    * answer the question **ajv** answers, and `minItems` is the keyword ajv
    * reads. pipelex emits `minItems`/`maxItems` = N for a `[N]` slot and neither
-   * for `[]`, so the two sources agree by construction on every real contract -
-   * and where a schema stated only a lower bound, gating on that bound is the
-   * same rule, which is the direction that cannot leave readiness more
+   * for `[]`, so on a top-level slot the two sources agree by construction.
+   *
+   * A schema may still state a lower bound alone - `mapSchema` recurses, so a
+   * nested array inside a structured concept reaches here with whatever its
+   * model declared and no MTHDS multiplicity behind it. Gating on that bound is
+   * the same rule, and it is the direction that cannot leave readiness more
    * permissive than the gate.
    */
   itemCount?: number;
+  /**
+   * The MOST items the slot accepts, off the schema's `maxItems`.
+   *
+   * A separate field because it is a separate fact, and conflating them is a
+   * bug that hides: `itemCount` was read as a minimum by readiness and as a
+   * maximum by the control that stops offering `Add`, which agree only while
+   * a contract states both bounds equal. A list told "at least two" was then
+   * presented as a list of exactly two.
+   */
+  maxItemCount?: number;
 }
 
 export interface UnknownRunField extends RunFieldCommon {

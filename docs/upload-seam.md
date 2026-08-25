@@ -51,6 +51,10 @@ A stored value is a `pipelex-storage://` URI the browser cannot render, so a pre
 
 It is not needed for a URL the browser can already render — `http(s):`, `data:` and `blob:` are used directly. `data:` used to fall through to the resolver path, so a host that passed no `resolveUrl` got a spinner that never stopped over a value the browser could have painted immediately.
 
+The result is **bound to the URI it was resolved from**, the same way the local preview below is bound to the value it is the preview of — one rule, applied to both sources a preview can come from. A cached source with no record of its provenance is painted under whatever name the value carries next: when an open preview moved between two storage URIs, the chip named the new file over a preview still showing the old one, and it stayed there until the next resolution landed. Keeping the URI beside the source makes that impossible by construction rather than briefly wrong — clearing it from an effect would still paint one frame of the old file, which is why the check is computed in render.
+
+A resolution that **fails** leaves the spinner rather than the file before it, and is caught rather than left to escape as an unhandled rejection into the host's app. `resolveUrl` is a network call, so rejecting is ordinary; the viewer shows the same thing it shows for a resolver that answers `null`.
+
 ## What the control decides it can preview
 
 A file is previewable when the **filename** or the **URL** says so, tested separately. They used to be concatenated into one string and matched with an end-anchored extension test, which made the filename half dead code — a filename's extension was always followed by a space — so a value with a good filename and an extension-less URL (an opaque storage id, a `data:` URL) was offered no preview at all. A `data:` URL's declared MIME type is read too, since it is the only type such a URL carries.

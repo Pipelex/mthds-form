@@ -104,8 +104,11 @@ function FileField({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
   // Resolved lazily, only when the user opens the preview, so a closed field
-  // never fetches a presigned URL.
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
+  // never fetches a presigned URL. Keyed by the URI it was resolved FROM, the
+  // way `LocalPreview` is bound to the value it is the preview OF - a cached
+  // source with no record of its provenance is painted under whatever name the
+  // value carries next.
+  const [resolved, setResolved] = useState<{ uri: string; src: string } | null>(null);
   const localUrlRef = useRef<string | null>(null);
 
   const setLocal = useCallback((next: LocalPreview | null) => {
@@ -142,7 +145,7 @@ function FileField({
 
   const clear = useCallback(() => {
     setLocal(null);
-    setResolvedSrc(null);
+    setResolved(null);
     setPreviewOpen(false);
     onChange(undefined);
   }, [setLocal, onChange]);
@@ -195,19 +198,31 @@ function FileField({
   useEffect(() => {
     if (!previewOpen || !storageUri || localIsCurrent || !resolveUrl) return;
     let cancelled = false;
-    void resolveUrl(storageUri).then((resolved) => {
-      if (!cancelled) setResolvedSrc(resolved);
-    });
+    void resolveUrl(storageUri)
+      .then((src) => {
+        if (!cancelled && src) setResolved({ uri: storageUri, src });
+      })
+      .catch(() => {
+        // A resolution that failed must leave the spinner, not the file before
+        // it - and must not escape as an unhandled rejection into the host's
+        // app. `resolveUrl` is a network call; rejecting is ordinary.
+        if (!cancelled) setResolved(null);
+      });
     return () => {
       cancelled = true;
     };
   }, [previewOpen, storageUri, localIsCurrent, resolveUrl]);
 
   // A browser-viewable source: the local object URL, a directly-viewable URL, or
-  // a resolved presigned URL for a stored file.
+  // a resolved presigned URL for a stored file. The resolution counts only while
+  // it still belongs to the value on screen, which is what makes staleness
+  // impossible rather than merely brief: clearing it from an effect would still
+  // paint one frame of the old file, exactly as `localIsCurrent` above is
+  // computed in render for the same reason.
+  const resolvedSrc = resolved && resolved.uri === storageUri ? resolved.src : undefined;
   const previewSrc =
     (localIsCurrent ? localPreview?.objectUrl : undefined) ??
-    (isDirectlyViewable(value?.url) ? value.url : (resolvedSrc ?? undefined));
+    (isDirectlyViewable(value?.url) ? value.url : resolvedSrc);
 
   return (
     <FieldShell

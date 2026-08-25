@@ -158,3 +158,48 @@ describe('required / readiness over optional and plural inputs', () => {
     });
   });
 });
+
+describe('a list bound the wire did not put there', () => {
+  /**
+   * `buildRunFields` maps a top-level slot AND recurses into a structured
+   * concept's own schema, where an array property is a pydantic model's, not an
+   * MTHDS multiplicity marker. Such a property can state one bound alone, and
+   * the two bounds then mean different things - which is why the descriptor
+   * carries them separately instead of one `itemCount` read as both.
+   */
+  const INPUT: PipeInputContract = {
+    ...PLAIN_SINGLE,
+    concept_ref: 'demo.Applicant',
+    json_schema: {
+      type: 'object',
+      title: 'Applicant',
+      properties: {
+        tags: { type: 'array', items: { type: 'string' }, minItems: 2 },
+      },
+      required: ['tags'],
+    },
+  };
+
+  const tagsField = () => {
+    const [applicant] = buildRunFields({ applicant: INPUT });
+    const tags = (applicant as ObjectRunField).fields[0];
+    return tags?.kind === 'list' ? tags : undefined;
+  };
+
+  it('carries a lower bound alone as a lower bound alone', () => {
+    expect(tagsField()?.itemCount).toBe(2);
+    expect(tagsField()?.maxItemCount).toBeUndefined();
+  });
+
+  it('still gates on that bound, so readiness cannot outrun ajv', () => {
+    // The direction that matters: a nested array holding one item where the
+    // schema demands two must not read ready, or the button offers a run the
+    // validator refuses.
+    const fields = buildRunFields({ applicant: INPUT });
+
+    expect(computeReadiness(fields, { applicant: { tags: ['a'] } }).missing).toEqual(['applicant']);
+    expect(computeReadiness(fields, { applicant: { tags: ['a', 'b'] } }).missing).toEqual([]);
+    // And it does NOT become a ceiling: three tags satisfy "at least two".
+    expect(computeReadiness(fields, { applicant: { tags: ['a', 'b', 'c'] } }).missing).toEqual([]);
+  });
+});

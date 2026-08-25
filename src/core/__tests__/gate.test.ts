@@ -263,6 +263,55 @@ describe('an optional structured input whose concept has a required child', () =
     expect(verdict.errors[0]?.property).toBe('.focus.audience');
   });
 
+  it('is refused by the WHOLE gate even when ajv has nothing to say about it', () => {
+    // The enum child above is why the case survived: the shell leaves an
+    // unset enum out, so ajv's `required` catches it. A required plain STRING
+    // is filled with `''` instead, which is a valid string - so nothing in the
+    // schema notices, and the assembled gate is on its own.
+    //
+    // It used to select only the inputs the method DEMANDS before re-applying
+    // the emptiness rule, so this input was skipped entirely: the button was
+    // dark and `gateRunInputs` answered `ok: true`. `apiInputsFromSchemaData`
+    // would then have SENT it - a paid run past a disabled button, over a
+    // required field holding nothing.
+    const briefInput: PipeInputContract = {
+      ...OPTIONAL_SINGLE,
+      concept_ref: 'demo.Brief',
+      json_schema: {
+        title: 'Brief',
+        type: 'object',
+        properties: {
+          name: { title: 'Name', type: 'string' },
+          notes: { title: 'Notes', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+        },
+        required: ['name'],
+      },
+    };
+    const inputs = { text: TEXT_INPUT, brief: briefInput };
+    const fields = buildRunFields(inputs);
+    const values = { text: 'Apple in Cupertino.', brief: { notes: 'skip the pricing' } };
+
+    // The shape really is one the value bridge produces, not a contrived body:
+    // a touched structure travels whole, empty children and all.
+    expect(rjsfDataFromRunValues(values, fields)['brief']).toEqual({
+      name: '',
+      notes: 'skip the pricing',
+    });
+    expect(computeReadiness(fields, values).missing).toEqual(['brief']);
+
+    const result = gateRunInputs(
+      { inputs, output: TEXT_OUTPUT },
+      rjsfDataFromRunValues(values, fields),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.missingInputs).toEqual(['brief']);
+      // ajv passed it, so the refusal is the kernel's alone.
+      expect(result.errors).toEqual([]);
+    }
+  });
+
   it('reports a missing REQUIRED structured input by its variable name', () => {
     const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, ...PLAIN_SINGLE } };
     const requiredFields = buildRunFields(REQUIRED_INPUTS);
@@ -573,11 +622,16 @@ describe('a fixed-count plural input', () => {
   });
 
   it('carries the declared count on the descriptor, and only for a fixed list', () => {
+    // BOTH bounds, because they are two facts. A `[N]` slot states them equal,
+    // which is what lets the control stop offering Add at the same number
+    // readiness waits for - without either of them reading the other's field.
     const shots = FIELDS.find((f) => f.name === 'shots');
     expect(shots?.kind === 'list' && shots.itemCount).toBe(3);
+    expect(shots?.kind === 'list' && shots.maxItemCount).toBe(3);
 
     const variable = buildRunFields({ illustrations: PLURAL_INPUT })[0];
     expect(variable?.kind === 'list' && variable.itemCount).toBeUndefined();
+    expect(variable?.kind === 'list' && variable.maxItemCount).toBeUndefined();
   });
 
   it('refuses a full-length list holding a blank row', () => {

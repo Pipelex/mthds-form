@@ -38,6 +38,10 @@ const listOf = (item: ListRunField['item'], extra: Partial<ListRunField> = {}): 
   ...extra,
 });
 
+/** A `Concept[N]` slot: the wire states BOTH bounds, equal, for a fixed count. */
+const fixedOf = (item: ListRunField['item'], count: number): ListRunField =>
+  listOf(item, { itemCount: count, maxItemCount: count });
+
 /** The control is controlled; a host holds the array. */
 function Harness({
   field,
@@ -114,13 +118,13 @@ describe('removal is blocked while a file is arriving in the list', () => {
 
 describe('a declared item count is the end of the list', () => {
   it('stops offering Add once the slot is full', () => {
-    render(<Harness field={listOf(docItem, { itemCount: 3 })} initial={[1, 2, 3]} />);
+    render(<Harness field={fixedOf(docItem, 3)} initial={[1, 2, 3]} />);
     expect(addButton()).toBeDisabled();
     expect(screen.getByText('3 of 3 items')).toBeInTheDocument();
   });
 
   it('offers it again while the slot is short', () => {
-    render(<Harness field={listOf(docItem, { itemCount: 3 })} initial={[1, 2]} />);
+    render(<Harness field={fixedOf(docItem, 3)} initial={[1, 2]} />);
     expect(addButton()).not.toBeDisabled();
     expect(screen.getByText('2 of 3 items')).toBeInTheDocument();
   });
@@ -129,6 +133,16 @@ describe('a declared item count is the end of the list', () => {
     render(<Harness field={listOf(docItem)} initial={[1, 2, 3]} />);
     expect(addButton()).not.toBeDisabled();
     expect(screen.getByText('3 items')).toBeInTheDocument();
+  });
+
+  it('keeps offering Add when the schema stated only a lower bound', () => {
+    // `itemCount` is the MINIMUM - the descriptor says so, and readiness reads
+    // it that way. Reading the same number as a maximum here made one field
+    // mean two things, and they only agreed because a `[N]` slot happens to
+    // state both bounds. A schema carrying `minItems` alone - a nested array
+    // inside a structured concept - is a list the method lets you grow.
+    render(<Harness field={listOf(docItem, { itemCount: 2 })} initial={[1, 2, 3]} />);
+    expect(addButton()).not.toBeDisabled();
   });
 });
 

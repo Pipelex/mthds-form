@@ -282,8 +282,20 @@ export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInput
     };
   }
 
+  // The SELECTION is half the rule, and leaving it out is what made the two
+  // halves disagree. `computeReadiness` reckons with an input the method
+  // demands AND one it left optional that the user has touched - because a
+  // structure with something in it owes its concept every field the concept
+  // declares. Filtering on `mustBeFilled` alone dropped the second kind, so a
+  // half-filled optional struct was refused by the button and accepted here.
+  //
+  // ajv cannot cover for it: a required child that is a plain string arrives as
+  // `''`, which satisfies `required`. And the payload builder below then SENDS
+  // that input, because `isFilled` is exactly what it tests. Which is the rule
+  // stated properly: the gate holds to its concept precisely the inputs it is
+  // about to put on the wire, and nothing it will omit.
   const missingInputs = buildRunFields(contract.inputs)
-    .filter(mustBeFilled)
+    .filter((field) => mustBeFilled(field) || isFilled(ownProp(preparedData, field.name)))
     .filter((field) => !fieldFilled(field, ownProp(preparedData, field.name)))
     .map((field) => field.name);
   if (missingInputs.length) return { ok: false, missingInputs, errors: [], preparedData };
