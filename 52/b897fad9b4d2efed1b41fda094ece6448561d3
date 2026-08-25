@@ -1,0 +1,21 @@
+CHANGELOG.md
+  s_491feb8c1cb459::t_661d21e15c17e7 3,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61
+package.json
+  s_491feb8c1cb459::t_c0da17fc21f42c 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "52b897fad9b4d2efed1b41fda094ece6448561d3",
+  "prompts": {},
+  "sessions": {
+    "s_491feb8c1cb459": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bb36516-18cf-4ea0-a6c7-72483e9b1f82",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}
