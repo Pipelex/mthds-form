@@ -61,7 +61,7 @@
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
-    "mthds": "^0.23.0",
+    "mthds": "^0.24.0",
     "react": "^19",
     "react-dom": "^19"
   },
@@ -84,7 +84,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "eslint": "^9.39.4",
     "jsdom": "^30.0.1",
-    "mthds": "^0.23.0",
+    "mthds": "^0.24.0",
     "prettier": "^3.8.1",
     "react": "^19",
     "react-dom": "^19",
