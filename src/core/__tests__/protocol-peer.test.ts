@@ -10,13 +10,12 @@
  * satisfy that and is exactly the drift being ruled out) is what makes the
  * re-export a fact instead of an intention.
  *
- * **The descriptor types resolve from inside the kernel.** Nothing in `src/`
- * reads the input-form descriptor yet - the derivation still guesses from
- * contracts and schemas (docs/derivation-swap.md). The swap's first line is an
- * annotation naming `PipeInputFormDescriptor`, so the peer has to reach the
- * kernel before that line can be written. This file writes it early: if the
- * peer, the `exports` map, or the module resolution ever stops working, it
- * fails here rather than at the top of the change that needed it.
+ * **The descriptor types resolve from inside the kernel.** Since the
+ * derivation swap, `buildRunFields` maps `PipeInputFormDescriptor` directly
+ * (docs/derivation-swap.md), so this resolution is load-bearing in `src/`
+ * itself. The suite keeps asserting it anyway: if the peer, the `exports` map,
+ * or the module resolution ever stops working, it fails HERE, by name, rather
+ * than as a type error in the middle of `derive.ts`.
  *
  * Types only, throughout - `import type`, which lint requires and
  * `scripts/assert-bundle.mjs` verifies on the built graph. A test file ships in

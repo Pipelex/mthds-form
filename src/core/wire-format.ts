@@ -53,8 +53,7 @@ function isDocumentLikeConcept(concept: string): boolean {
 
 /** A concept ref like `native.Document[]` → base `native.Document`, isList true. */
 function isListConcept(conceptCode: string): { isList: boolean; baseConcept: string } {
-  if (conceptCode.endsWith('[]'))
-    return { isList: true, baseConcept: conceptCode.slice(0, -2) };
+  if (conceptCode.endsWith('[]')) return { isList: true, baseConcept: conceptCode.slice(0, -2) };
   return { isList: false, baseConcept: conceptCode };
 }
 

@@ -216,59 +216,140 @@ const BRIEF_FIELDS: InputFormField[] = [
 
 const WIRE = new Map<PipeInputContract, (name: string) => InputFormTopLevelField>([
   [TEXT, (name) => ({ ...WIRE_PLAIN, kind: 'prose', name, concept_ref: 'native.Text' })],
-  [OPTIONAL_TEXT, (name) => ({ ...WIRE_OPTIONAL, kind: 'prose', name, concept_ref: 'native.Text' })],
-  [NUMBER, (name) => ({ ...WIRE_PLAIN, kind: 'number', name, concept_ref: 'native.Number', integer: false })],
+  [
+    OPTIONAL_TEXT,
+    (name) => ({ ...WIRE_OPTIONAL, kind: 'prose', name, concept_ref: 'native.Text' }),
+  ],
+  [
+    NUMBER,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'number',
+      name,
+      concept_ref: 'native.Number',
+      integer: false,
+    }),
+  ],
   [YES_NO, (name) => ({ ...WIRE_PLAIN, kind: 'boolean', name, concept_ref: 'native.YesNo' })],
   [IMAGE, (name) => ({ ...WIRE_PLAIN, kind: 'image', name, concept_ref: 'native.Image' })],
-  [FOCUS, (name) => ({ ...WIRE_PLAIN, kind: 'object', name, concept_ref: 'demo.ExtractionFocus', fields: FOCUS_FIELDS })],
-  [OPTIONAL_FOCUS, (name) => ({ ...WIRE_OPTIONAL, kind: 'object', name, concept_ref: 'demo.ExtractionFocus', fields: FOCUS_FIELDS })],
-  [OPTS, (name) => ({ ...WIRE_PLAIN, kind: 'object', name, concept_ref: 'demo.RunOptions', fields: OPTS_FIELDS })],
-  [OPTIONAL_OPTS, (name) => ({ ...WIRE_OPTIONAL, kind: 'object', name, concept_ref: 'demo.RunOptions', fields: OPTS_FIELDS })],
-  [BRIEF, (name) => ({ ...WIRE_PLAIN, kind: 'object', name, concept_ref: 'demo.Brief', fields: BRIEF_FIELDS })],
-  [OPTIONAL_BRIEF, (name) => ({ ...WIRE_OPTIONAL, kind: 'object', name, concept_ref: 'demo.Brief', fields: BRIEF_FIELDS })],
-  [NESTED, (name) => ({
-    ...WIRE_PLAIN,
-    kind: 'object',
-    name,
-    concept_ref: 'demo.Wrapper',
-    fields: [
-      { kind: 'text', name: 'label', required: true },
-      { kind: 'object', name: 'opts', required: true, fields: OPTS_FIELDS },
-    ],
-  })],
-  [PAGES, (name) => ({
-    ...WIRE_VARIABLE,
-    kind: 'list',
-    name,
-    concept_ref: 'native.Text',
-    item: { kind: 'prose', required: true, concept_ref: 'native.Text' },
-  })],
-  [SHOTS, (name) => ({
-    ...WIRE_PLAIN,
-    kind: 'list',
-    name,
-    concept_ref: 'native.Image',
-    item: { kind: 'image', required: true, concept_ref: 'native.Image' },
-    item_count: 3,
-  })],
+  [
+    FOCUS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.ExtractionFocus',
+      fields: FOCUS_FIELDS,
+    }),
+  ],
+  [
+    OPTIONAL_FOCUS,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.ExtractionFocus',
+      fields: FOCUS_FIELDS,
+    }),
+  ],
+  [
+    OPTS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RunOptions',
+      fields: OPTS_FIELDS,
+    }),
+  ],
+  [
+    OPTIONAL_OPTS,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RunOptions',
+      fields: OPTS_FIELDS,
+    }),
+  ],
+  [
+    BRIEF,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Brief',
+      fields: BRIEF_FIELDS,
+    }),
+  ],
+  [
+    OPTIONAL_BRIEF,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Brief',
+      fields: BRIEF_FIELDS,
+    }),
+  ],
+  [
+    NESTED,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Wrapper',
+      fields: [
+        { kind: 'text', name: 'label', required: true },
+        { kind: 'object', name: 'opts', required: true, fields: OPTS_FIELDS },
+      ],
+    }),
+  ],
+  [
+    PAGES,
+    (name) => ({
+      ...WIRE_VARIABLE,
+      kind: 'list',
+      name,
+      concept_ref: 'native.Text',
+      item: { kind: 'prose', required: true, concept_ref: 'native.Text' },
+    }),
+  ],
+  [
+    SHOTS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'list',
+      name,
+      concept_ref: 'native.Image',
+      item: { kind: 'image', required: true, concept_ref: 'native.Image' },
+      item_count: 3,
+    }),
+  ],
   // The optional-plural combination is invalid MTHDS (see OPTIONAL_SHOTS); the
   // optional arm of the top-level union happens to admit a list node, so the
   // wire side of the same violating producer needs no cast.
-  [OPTIONAL_SHOTS, (name) => ({
-    ...WIRE_OPTIONAL,
-    kind: 'list',
-    name,
-    concept_ref: 'native.Image',
-    item: { kind: 'image', required: true, concept_ref: 'native.Image' },
-    item_count: 3,
-  })],
-  [BRIEFS, (name) => ({
-    ...WIRE_VARIABLE,
-    kind: 'list',
-    name,
-    concept_ref: 'demo.Brief',
-    item: { kind: 'object', required: true, concept_ref: 'demo.Brief', fields: BRIEF_FIELDS },
-  })],
+  [
+    OPTIONAL_SHOTS,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'list',
+      name,
+      concept_ref: 'native.Image',
+      item: { kind: 'image', required: true, concept_ref: 'native.Image' },
+      item_count: 3,
+    }),
+  ],
+  [
+    BRIEFS,
+    (name) => ({
+      ...WIRE_VARIABLE,
+      kind: 'list',
+      name,
+      concept_ref: 'demo.Brief',
+      item: { kind: 'object', required: true, concept_ref: 'demo.Brief', fields: BRIEF_FIELDS },
+    }),
+  ],
 ]);
 
 /** The render tree for a row's inputs: the wire descriptor mapped over them. */

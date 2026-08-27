@@ -5,6 +5,12 @@
  * field renderer) differ only in how they DISPLAY inputs. Everything between
  * "Run pressed" and "payload on the wire" is this module, so these tests are the
  * contract for both.
+ *
+ * Since the derivation swap the render tree is mapped from the pipe's wire
+ * descriptor, so each contract fixture that reaches `buildRunFields` carries
+ * its hand-authored wire node - authored per the standard's kind assignment,
+ * never derived from the schema by the test (that derivation is exactly what
+ * the swap deleted).
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -17,8 +23,22 @@ import {
   rjsfDataFromRunValues,
   validateRunInputs,
 } from '..';
+import type {
+  InputFormField,
+  InputFormTopLevelField,
+  PipeInputFormDescriptor,
+} from 'mthds/protocol';
 import type { PipeInputContract, PipeOutputContract } from '..';
-import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE, plainFixed } from './contract-fixtures';
+import {
+  descriptorOf,
+  OPTIONAL_SINGLE,
+  PLAIN_SINGLE,
+  PLAIN_VARIABLE,
+  plainFixed,
+  WIRE_OPTIONAL,
+  WIRE_PLAIN,
+  WIRE_VARIABLE,
+} from './contract-fixtures';
 
 const TEXT_INPUT: PipeInputContract = {
   ...PLAIN_SINGLE,
@@ -29,6 +49,13 @@ const TEXT_INPUT: PipeInputContract = {
     properties: { text: { type: 'string' } },
     required: ['text'],
   },
+};
+
+const TEXT_NODE: InputFormTopLevelField = {
+  ...WIRE_PLAIN,
+  kind: 'prose',
+  name: 'text',
+  concept_ref: 'native.Text',
 };
 
 /** `DateContent`: `date` required, `time` optional AND format-constrained - the
@@ -63,6 +90,14 @@ const PLURAL_INPUT: PipeInputContract = {
     type: 'array',
     items: { type: 'object', properties: { url: { type: 'string' } } },
   },
+};
+
+const ILLUSTRATIONS_NODE: InputFormTopLevelField = {
+  ...WIRE_VARIABLE,
+  kind: 'list',
+  name: 'illustrations',
+  concept_ref: 'native.Image',
+  item: { kind: 'image', required: true, concept_ref: 'native.Image' },
 };
 
 describe('buildRunInputsSchema', () => {
@@ -197,9 +232,31 @@ const FOCUS_INPUT: PipeInputContract = {
   },
 };
 
+const FOCUS_FIELDS: InputFormField[] = [
+  { kind: 'enum', name: 'audience', choices: ['engineer', 'executive'], required: true },
+  { kind: 'text', name: 'notes', required: false },
+];
+
+const OPTIONAL_FOCUS_NODE: InputFormTopLevelField = {
+  ...WIRE_OPTIONAL,
+  kind: 'object',
+  name: 'focus',
+  concept_ref: 'demo.ExtractionFocus',
+  fields: FOCUS_FIELDS,
+};
+
+/** The same slot the method demands: `focus = "demo.ExtractionFocus"`. */
+const FOCUS_NODE: InputFormTopLevelField = {
+  ...WIRE_PLAIN,
+  kind: 'object',
+  name: 'focus',
+  concept_ref: 'demo.ExtractionFocus',
+  fields: FOCUS_FIELDS,
+};
+
 describe('an optional structured input whose concept has a required child', () => {
   const INPUTS = { text: TEXT_INPUT, focus: FOCUS_INPUT };
-  const FIELDS = buildRunFields(INPUTS);
+  const FIELDS = buildRunFields(descriptorOf(TEXT_NODE, OPTIONAL_FOCUS_NODE), INPUTS);
   const SCHEMA = buildRunInputsSchema(INPUTS);
 
   /** What a host does between "Run pressed" and the payload. */
@@ -287,8 +344,18 @@ describe('an optional structured input whose concept has a required child', () =
         required: ['name'],
       },
     };
+    const briefNode: InputFormTopLevelField = {
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name: 'brief',
+      concept_ref: 'demo.Brief',
+      fields: [
+        { kind: 'text', name: 'name', required: true },
+        { kind: 'text', name: 'notes', required: false },
+      ],
+    };
     const inputs = { text: TEXT_INPUT, brief: briefInput };
-    const fields = buildRunFields(inputs);
+    const fields = buildRunFields(descriptorOf(TEXT_NODE, briefNode), inputs);
     const values = { text: 'Apple in Cupertino.', brief: { notes: 'skip the pricing' } };
 
     // The shape really is one the value bridge produces, not a contrived body:
@@ -314,7 +381,7 @@ describe('an optional structured input whose concept has a required child', () =
 
   it('reports a missing REQUIRED structured input by its variable name', () => {
     const REQUIRED_INPUTS = { text: TEXT_INPUT, focus: { ...FOCUS_INPUT, ...PLAIN_SINGLE } };
-    const requiredFields = buildRunFields(REQUIRED_INPUTS);
+    const requiredFields = buildRunFields(descriptorOf(TEXT_NODE, FOCUS_NODE), REQUIRED_INPUTS);
     const schema = buildRunInputsSchema(REQUIRED_INPUTS);
     const prepared = prepareRunInputs(
       rjsfDataFromRunValues({ text: 'Apple in Cupertino.' }, requiredFields),
@@ -365,9 +432,30 @@ const OPTS_INPUT: PipeInputContract = {
   },
 };
 
+const OPTS_FIELDS: InputFormField[] = [
+  { kind: 'enum', name: 'tone', choices: ['formal', 'casual'], required: false },
+  { kind: 'text', name: 'notes', required: false },
+];
+
+const OPTS_NODE: InputFormTopLevelField = {
+  ...WIRE_PLAIN,
+  kind: 'object',
+  name: 'opts',
+  concept_ref: 'demo.RunOptions',
+  fields: OPTS_FIELDS,
+};
+
+const OPTIONAL_OPTS_NODE: InputFormTopLevelField = {
+  ...WIRE_OPTIONAL,
+  kind: 'object',
+  name: 'opts',
+  concept_ref: 'demo.RunOptions',
+  fields: OPTS_FIELDS,
+};
+
 describe('a required structured input whose concept demands no child', () => {
   const INPUTS = { text: TEXT_INPUT, opts: OPTS_INPUT };
-  const FIELDS = buildRunFields(INPUTS);
+  const FIELDS = buildRunFields(descriptorOf(TEXT_NODE, OPTS_NODE), INPUTS);
   const SCHEMA = buildRunInputsSchema(INPUTS);
 
   /** What a host does between "Run pressed" and the payload. */
@@ -436,7 +524,10 @@ describe('a required structured input whose concept demands no child', () => {
     // The fix is about a slot the method DEMANDS. An optional structure with no
     // required child stays omittable, and an untouched one is still a run.
     const optionalInputs = { text: TEXT_INPUT, opts: { ...OPTS_INPUT, ...OPTIONAL_SINGLE } };
-    const optionalFields = buildRunFields(optionalInputs);
+    const optionalFields = buildRunFields(
+      descriptorOf(TEXT_NODE, OPTIONAL_OPTS_NODE),
+      optionalInputs,
+    );
     const optionalSchema = buildRunInputsSchema(optionalInputs);
     const prepared = prepareRunInputs(
       rjsfDataFromRunValues({ text: TEXT }, optionalFields),
@@ -467,7 +558,17 @@ describe('a required structured input whose concept demands no child', () => {
         },
       } as PipeInputContract,
     };
-    const nestedFields = buildRunFields(nestedInputs);
+    const nestedNode: InputFormTopLevelField = {
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name: 'wrapper',
+      concept_ref: 'demo.Wrapper',
+      fields: [
+        { kind: 'text', name: 'label', required: true },
+        { kind: 'object', name: 'opts', required: true, fields: OPTS_FIELDS },
+      ],
+    };
+    const nestedFields = buildRunFields(descriptorOf(nestedNode), nestedInputs);
     const nestedSchema = buildRunInputsSchema(nestedInputs);
     const values = { wrapper: { label: 'run 4' } };
 
@@ -499,6 +600,22 @@ const FINDINGS_INPUT: PipeInputContract = {
   },
 };
 
+const FINDINGS_NODE: InputFormTopLevelField = {
+  ...WIRE_VARIABLE,
+  kind: 'list',
+  name: 'findings',
+  concept_ref: 'demo.Finding',
+  item: {
+    kind: 'object',
+    required: true,
+    concept_ref: 'demo.Finding',
+    fields: [
+      { kind: 'text', name: 'label', required: false },
+      { kind: 'text', name: 'note', required: false },
+    ],
+  },
+};
+
 /** The same list, but the item concept DEMANDS a child. */
 const RATED_INPUT: PipeInputContract = {
   ...PLAIN_VARIABLE,
@@ -517,10 +634,30 @@ const RATED_INPUT: PipeInputContract = {
   },
 };
 
+const RATED_NODE: InputFormTopLevelField = {
+  ...WIRE_VARIABLE,
+  kind: 'list',
+  name: 'rated',
+  concept_ref: 'demo.Rated',
+  item: {
+    kind: 'object',
+    required: true,
+    concept_ref: 'demo.Rated',
+    fields: [
+      { kind: 'enum', name: 'audience', choices: ['engineer', 'executive'], required: true },
+      { kind: 'text', name: 'note', required: false },
+    ],
+  },
+};
+
 describe('a freshly added empty item in a list of structures', () => {
   /** What a host does between "Run pressed" and the payload. */
-  const gate = (values: Record<string, unknown>, inputs: Record<string, PipeInputContract>) => {
-    const fields = buildRunFields(inputs);
+  const gate = (
+    values: Record<string, unknown>,
+    inputs: Record<string, PipeInputContract>,
+    descriptor: PipeInputFormDescriptor,
+  ) => {
+    const fields = buildRunFields(descriptor, inputs);
     const schema = buildRunInputsSchema(inputs);
     const prepared = prepareRunInputs(rjsfDataFromRunValues(values, fields), schema);
     return { prepared, verdict: validateRunInputs(prepared, inputs, schema) };
@@ -528,7 +665,11 @@ describe('a freshly added empty item in a list of structures', () => {
 
   it('is runnable when the item concept demands nothing', () => {
     const INPUTS = { text: TEXT_INPUT, findings: FINDINGS_INPUT };
-    const { prepared, verdict } = gate({ text: 'Apple in Cupertino.', findings: [{}] }, INPUTS);
+    const { prepared, verdict } = gate(
+      { text: 'Apple in Cupertino.', findings: [{}] },
+      INPUTS,
+      descriptorOf(TEXT_NODE, FINDINGS_NODE),
+    );
 
     // Every child pruned away, so the item is the empty object the schema
     // allows - not an absence, and not a type error.
@@ -549,10 +690,8 @@ describe('a freshly added empty item in a list of structures', () => {
     // reaches the `required` keyword at all.
     const { verdict } = gate(
       { text: 'Apple in Cupertino.', rated: [{}] },
-      {
-        text: TEXT_INPUT,
-        rated: RATED_INPUT,
-      },
+      { text: TEXT_INPUT, rated: RATED_INPUT },
+      descriptorOf(TEXT_NODE, RATED_NODE),
     );
 
     expect(verdict.isValid).toBe(false);
@@ -563,10 +702,11 @@ describe('a freshly added empty item in a list of structures', () => {
 // ─── A fixed-count list (`Concept[N]`) is the one plural that gates ──────────
 
 /**
- * `Image[3]`: pipelex states the count twice, and the two halves of the gate
- * read one each - `item_count` on the contract tells `inputMustBeFilled` the
- * empty form is ruled out, `minItems`/`maxItems` on the array wrapper tell ajv
- * how many. A variable `[]` list carries neither.
+ * `Image[3]`: pipelex states the count on every artifact, and each reader takes
+ * its own - `item_count` on the contract tells `inputMustBeFilled` the empty
+ * form is ruled out, `minItems`/`maxItems` on the array wrapper tell ajv how
+ * many, and `item_count` on the wire node carries it to the descriptor. A
+ * variable `[]` list carries none of them.
  */
 const FIXED_INPUT: PipeInputContract = {
   ...plainFixed(3),
@@ -579,10 +719,19 @@ const FIXED_INPUT: PipeInputContract = {
   },
 };
 
+const SHOTS_NODE: InputFormTopLevelField = {
+  ...WIRE_PLAIN,
+  kind: 'list',
+  name: 'shots',
+  concept_ref: 'native.Image',
+  item: { kind: 'image', required: true, concept_ref: 'native.Image' },
+  item_count: 3,
+};
+
 describe('a fixed-count plural input', () => {
   const INPUTS = { text: TEXT_INPUT, shots: FIXED_INPUT };
   const CONTRACT = { inputs: INPUTS, output: TEXT_OUTPUT };
-  const FIELDS = buildRunFields(INPUTS);
+  const FIELDS = buildRunFields(descriptorOf(TEXT_NODE, SHOTS_NODE), INPUTS);
   const SCHEMA = buildRunInputsSchema(INPUTS);
   const gate = (values: Record<string, unknown>) => {
     const prepared = prepareRunInputs(rjsfDataFromRunValues(values, FIELDS), SCHEMA);
@@ -612,7 +761,8 @@ describe('a fixed-count plural input', () => {
     // This used to be the recorded residual: readiness answered emptiness only,
     // so the button was live at two of three and the gate alone refused -
     // fail-closed, but the two halves were not phrasing the same rule. The
-    // count now reaches the descriptor off the same `minItems` ajv reads.
+    // count now reaches the descriptor as the wire node's `item_count`, the
+    // same declaration `minItems` restates to ajv.
     const values = { text: 'Apple in Cupertino.', shots: [{ url: 'a.png' }, { url: 'b.png' }] };
     expect(computeReadiness(FIELDS, values).missing).toEqual(['shots']);
 
@@ -629,7 +779,9 @@ describe('a fixed-count plural input', () => {
     expect(shots?.kind === 'list' && shots.itemCount).toBe(3);
     expect(shots?.kind === 'list' && shots.maxItemCount).toBe(3);
 
-    const variable = buildRunFields({ illustrations: PLURAL_INPUT })[0];
+    const variable = buildRunFields(descriptorOf(ILLUSTRATIONS_NODE), {
+      illustrations: PLURAL_INPUT,
+    })[0];
     expect(variable?.kind === 'list' && variable.itemCount).toBeUndefined();
     expect(variable?.kind === 'list' && variable.maxItemCount).toBeUndefined();
   });

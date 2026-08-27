@@ -72,7 +72,6 @@ export const SINGLE_OUTPUT = { multiplicity: 'single', item_count: null, optiona
 // union discriminated on `required`, so an incoherent fixture (an optional
 // slot that gates, a `required` contradicting its marker) does not typecheck.
 
-
 /** The pipe-slot facts of a plain required slot that gates - most fixtures. */
 export const WIRE_PLAIN = { required: true, presence: 'plain', gating: true } as const;
 

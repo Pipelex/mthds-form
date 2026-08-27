@@ -35,12 +35,7 @@ import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
 import { buildPipeRef, type PipeInputContract } from './contracts';
 import type { RunField, RunFieldCommon } from './descriptor';
 import { ownProp } from './own-property';
-import {
-  collapseNullable,
-  collectSchemaDefs,
-  derefSchema,
-  type JsonSchema,
-} from './schema-utils';
+import { collapseNullable, collectSchemaDefs, derefSchema, type JsonSchema } from './schema-utils';
 
 /**
  * Look up a pipe's input-form descriptor by pipe code, tolerant of both key
