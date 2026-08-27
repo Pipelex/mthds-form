@@ -23,13 +23,20 @@ import { createContext, use, useId, type ReactNode } from 'react';
  * and only the DOM write is namespaced.
  *
  * **No host change is required.** With no provider above it, each control mints
- * its own prefix from `useId`, which is already unique per instance and
- * hydration-stable - so mounting the same method twice is correct by default.
+ * its own prefix from `useId`, which is unique per instance within a React
+ * root and hydration-stable - so mounting the same method twice in one app is
+ * correct by default. `useId` cannot see across roots, though: separate roots
+ * left on React's default `identifierPrefix` may emit the same sequences, so a
+ * host mounting forms in separate roots (islands, microfrontends) gives each
+ * root its own `identifierPrefix` - or each root's provider a distinct prefix.
  * `FieldDomIdProvider` is for hosts that want the ids to be PREDICTABLE rather
  * than merely unique: a deterministic prefix makes `getElementById` and
- * deep-link focus work. Passing `prefix=""` restores path-as-id exactly, which
- * is the escape hatch for a host that addressed the old ids and has not moved
- * yet - and it reintroduces the collision, so it is only safe for one form.
+ * deep-link focus work. Predictability moves the uniqueness obligation to the
+ * host - a provider scopes ONE form, since everything under it shares its one
+ * prefix, and an explicit prefix must be unique in the document. Passing
+ * `prefix=""` restores path-as-id exactly, which is the escape hatch for a
+ * host that addressed the old ids and has not moved yet - and it reintroduces
+ * the collision, so it is only safe for one form.
  */
 const FieldDomIdContext = createContext<string | null>(null);
 
@@ -37,7 +44,10 @@ export function FieldDomIdProvider({
   prefix,
   children,
 }: {
-  /** Omit to mint one from `useId`; `''` writes the path unprefixed. */
+  /**
+   * Omit to mint one from `useId`; `''` writes the path unprefixed. An explicit
+   * prefix must be unique in the document - one provider, one form.
+   */
   prefix?: string;
   children: ReactNode;
 }) {
