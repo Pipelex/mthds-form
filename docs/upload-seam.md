@@ -25,6 +25,8 @@ Keeping the ID a path is a deliberate choice, because the alternative is worse. 
 
 The cost of that choice is that a path can go stale, and the package pays it where the staleness is created rather than asking the host to.
 
+**The DOM id is derived from the path, not equal to it.** The two used to be the same string, which is a collision waiting to happen: a path is unique within one form and an `id` attribute must be unique within the whole _document_, so two forms whose methods both declare an input named `text` emitted two `id="text"`. Per HTML a `<label for>` binds the first matching element in tree order, so the second form's label bound to the first form's control and its own input was left with no label at all — a screen reader announcing the placeholder in place of the field's name. Making the path unique instead was not available: it is the write-back address, and prefixing it would land uploads at the wrong place in the value tree and stop `uploadingIds` matching. So the path stays exactly what this page describes, and only the DOM write is namespaced, by `useFieldDomId` inside each control. A host keeps passing `id={field.name}` and keeps writing back with `id.split('.')`; nothing on this page changes for it.
+
 ## While a file is arriving, nothing else may touch that value
 
 `uploadingIds` is not a spinner hint. It is the statement that **an ID in that set is mid-flight, and the control for it is shut** — which is what lets a host drop the staleness tokens it would otherwise need.

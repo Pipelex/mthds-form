@@ -6,6 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import type { EnumRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
+import { useFieldDomId } from './field-dom-id';
 
 interface EnumFieldProps {
   field: EnumRunField;
@@ -32,6 +33,7 @@ const CLEAR_VALUE = '__none__';
 export function EnumField({ field, value, onChange, id, error, disabled }: EnumFieldProps) {
   const s = useFieldStrings();
   const isSegmented = field.options.length <= 4 && field.options.every((o) => o.length <= 16);
+  const domId = useFieldDomId(id);
 
   return (
     <FieldShell
@@ -42,7 +44,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
       description={field.description}
       required={field.required}
       error={error}
-      htmlFor={isSegmented ? undefined : id}
+      htmlFor={isSegmented ? undefined : domId}
     >
       {isSegmented ? (
         // `type="single"` gives the roving tabindex and arrow-key navigation a
@@ -76,7 +78,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
           disabled={disabled}
           onValueChange={(next) => onChange(next === CLEAR_VALUE ? undefined : next)}
         >
-          <SelectTrigger id={id} aria-invalid={!!error} className="h-11">
+          <SelectTrigger id={domId} aria-invalid={!!error} className="h-11">
             <SelectValue placeholder={s.selectPlaceholder} />
           </SelectTrigger>
           <SelectContent>
