@@ -15,6 +15,8 @@ import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
 
 `./react` is the control set — one control per field kind behind a single dispatch point, styled with Tailwind classes over standard shadcn/ui tokens. `react` and `react-dom` are optional peer dependencies, so a consumer that only wants the kernel never installs them.
 
+`mthds` is a peer dependency too, and a required one, but it is **types only**: the wire types of `pipe_io_contracts` belong to the MTHDS standard, so this package re-exports the standard's declarations instead of restating them. Every import of it is an `import type` and is erased at build, so it costs an install entry and no shipped bytes. See [docs/dependency-budget.md](docs/dependency-budget.md).
+
 ## The shape of a form
 
 ```tsx

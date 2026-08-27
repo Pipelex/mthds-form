@@ -167,8 +167,15 @@ const SHOTS: PipeInputContract = {
   },
 };
 
-/** The same slot the method left omittable: `Image[3]?`. */
-const OPTIONAL_SHOTS: PipeInputContract = { ...SHOTS, presence: 'optional' };
+/**
+ * The same slot the method left omittable: `Image[3]?` - which is invalid
+ * MTHDS, because a presence marker may not be combined with a multiplicity
+ * suffix, and which the standard's types reject. The cast is deliberate and the
+ * row is kept: the kernel does not parse-check the contract an API hands it, so
+ * a producer emitting the combination reaches both halves, and the one thing
+ * they must never do is disagree about it.
+ */
+const OPTIONAL_SHOTS = { ...SHOTS, presence: 'optional' } as unknown as PipeInputContract;
 
 /** `Brief[]` - a variable list whose ITEM owes its concept a required child. */
 const BRIEFS: PipeInputContract = {

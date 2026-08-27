@@ -24,6 +24,20 @@ const BUDGET_PATTERNS = [
     group: ['zustand', 'zustand/*', '@pipelex/sdk', '@pipelex/sdk/*'],
     message: 'Outside the dependency budget (docs/dependency-budget.md).',
   },
+  {
+    // The standard's TypeScript client is a TYPES-ONLY peer. `import type` is
+    // erased before bundling, so the wire types cost a consumer nothing at run
+    // time; a value import would put the standard's CLI - commander, ora,
+    // posthog and the rest of its closure - into whichever chunk reached it.
+    // `FIELD_KINDS` is the one runtime value `mthds/protocol` exports and is
+    // therefore the one tempting breach: restate the vocabulary, or ask the
+    // question at the type level. `scripts/assert-bundle.mjs` walks the built
+    // graph, which is the backstop this rule cannot be.
+    group: ['mthds', 'mthds/*'],
+    allowTypeImports: true,
+    message:
+      'The standard client is a types-only peer - `import type` only. See docs/dependency-budget.md.',
+  },
 ];
 
 const REACT_PATTERNS = [
@@ -78,21 +92,27 @@ export default tseslint.config(
         },
       ],
       'no-console': 'error',
-      'no-restricted-imports': ['error', { patterns: BUDGET_PATTERNS }],
+      // `allowTypeImports` is understood by the typescript-eslint extension and
+      // not by the base rule, so the base rule is off EVERYWHERE and every
+      // block below restricts imports through the extension. A block that
+      // reached for the base rule would quietly drop the type-import allowance
+      // the budget's types-only peer line is built on.
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: BUDGET_PATTERNS }],
     },
   },
   {
     files: ['src/core/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS] }],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS] },
+      ],
     },
   },
   {
     files: ['src/react/**/*.ts', 'src/react/**/*.tsx'],
     rules: {
-      // The typescript-eslint extension is what understands `allowTypeImports`;
-      // the base rule has to be off for it to take effect.
-      'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
         { patterns: [...BUDGET_PATTERNS, CORE_BARREL_PATTERN] },
