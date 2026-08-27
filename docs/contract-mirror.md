@@ -1,30 +1,44 @@
-# The wire contract mirror
+# The wire contract
 
-A method's inputs reach the kernel as `pipe_io_contracts` — the artifact the MTHDS Protocol's `validate` operation reports, keyed by namespaced `pipe_ref` (`<domain>.<pipe_code>`). `src/core/contracts.ts` is the TypeScript mirror of that shape, and the only place in the package that states it. The SDK deliberately keeps `pipe_io_contracts` opaque, so this file is the canonical TS home for it until the protocol specs a generated one.
+A method's inputs reach the kernel as `pipe_io_contracts` — the artifact the MTHDS Protocol's `validate` operation reports, keyed by namespaced `pipe_ref` (`<domain>.<pipe_code>`).
 
-Mirroring means mirroring: the fields are named as the wire names them (`concept_ref`, `item_count` — snake_case, not the kernel's camelCase), and a field the wire always carries is typed as required here, so a contract that is missing one is a type error at the boundary rather than an `undefined` three modules deep.
+**The standard owns that shape, and this package no longer states it.** `pipe_io_contracts` is specified by the MTHDS page [Pipe I/O Contracts](https://mthds.ai/latest/spec/pipe-io-contracts/), and the standard's TypeScript client declares it as types in `mthds/protocol`. `src/core/contracts.ts` imports those declarations and re-exports them under the names this package has always exported, so `PipeIOContracts`, `PipeIOContract`, `PipeInputContract`, `PipeOutputContract` and `IOMultiplicity` are the standard's own types reaching a consumer through this package's entry, not a copy of them. `InputPresence` is the one renamed alias: the standard spells it `PresenceMarker`, and the old name is kept because consumers import it. This file used to say it was "the canonical TS home for this shape until the protocol specs a generated one" — the protocol specs one, so it is not any more.
+
+What remains genuinely the kernel's, and what the rest of this document is about, is the reading: which predicate answers which question, why plurality is read off the schema rather than off the declared multiplicity, and what gates.
+
+## How the types arrive
+
+`mthds` is a **types-only peer dependency**. Every import of it in `src/` is an `import type`, erased before the bundle exists, so nothing named `mthds` survives into `dist/` — see [dependency-budget.md](dependency-budget.md) for the reason and for the two guards that hold it (lint on the source, `make assert-bundle` on the built chunk graph).
+
+The consequence for a consumer is a `node_modules` entry, not a shipped byte. A host that installs this package installs the standard's client alongside it, and TypeScript resolves the re-exported names through it. A host that would rather read the standard's own spelling can import from `mthds/protocol` directly — it has the package.
 
 ## What an input contract says
 
 ```ts
-interface PipeInputContract {
-  concept_ref: string;
-  presence: 'plain' | 'optional' | 'force';
-  multiplicity: 'single' | 'variable' | 'fixed';
-  item_count: number | null;
-  json_schema: Record<string, unknown>;
-}
+type PipeInputContract =
+  | { concept_ref: string; json_schema: …; presence: PresenceMarker; multiplicity: 'single';   item_count: null }
+  | { concept_ref: string; json_schema: …; presence: 'plain';        multiplicity: 'variable'; item_count: null }
+  | { concept_ref: string; json_schema: …; presence: 'plain';        multiplicity: 'fixed';    item_count: number };
 ```
+
+It is a **union discriminated on `multiplicity`**, which is the standard's way of making the page's pairing rules the type rather than prose beside it. Two rules ride in that shape, and both used to be comments here:
+
+- `item_count` is non-`null` exactly on the `fixed` arm, and is always on the wire (`null` off it);
+- a presence marker may not be combined with a multiplicity suffix, so a plural slot always reports `presence: 'plain'`.
+
+That second rule is worth stating loudly, because it retires a shape this package's fixtures used to carry: **`Concept[]?` and `Concept[N]?` are invalid MTHDS**, not merely unusual. The language rejects them ("markers MUST NOT be combined with multiplicity" — [MTHDS format](https://mthds.ai/latest/spec/mthds-format/)) on the grounds that a plural slot already expresses "nothing to supply" as the empty list. The kernel's predicates are still total over the combination — a producer that emitted one anyway comes out non-gating, which is what both halves of the declaration say on their own — but no fixture states it as a legal slot, and the two tests that exercise it now cast, with the cast saying why.
+
+The one pairing a type cannot state is that a fixed count is always greater than one: `Concept[1]` is a way of writing `Concept` and reports `single`. That half stays a producer obligation.
 
 **`presence`** is the authored marker, verbatim. `optional` (`?`) is the one that means the caller may omit the input and the pipe handles the absence itself. `plain` (no marker) and `force` (`!`) both mean it must be supplied — the difference between them is an authored assertion that lint and graph surfaces read, and that a form has no use for. It is three-valued on the wire precisely so `!` is not flattened away before those surfaces see it; the kernel is one of the consumers that flattens it, and it does so in exactly one place.
 
 `isOptionalInput` is that place. Everything asking "may this be absent?" — the descriptor's `required`, the gate's `required` list, the two payload builders that omit an unfilled input — reads it, so a marker the wire adds later cannot come to mean one thing on one surface and something else on another.
 
-**`multiplicity`** and **`item_count`** are a pair: `item_count` is non-null exactly when `multiplicity` is `fixed`, and the slot is on the wire either way (`null` off that arm). `Concept[1]` is `single` — one item, no list framing — so a fixed count is always greater than one.
+**`json_schema`** is the schema the slot's *content* must satisfy, not the slot's envelope. A plural slot's schema is an array wrapper, and on the fixed arm only it also carries `minItems` / `maxItems` equal to `item_count`.
 
 ## Two readings of plurality, and why they are not the same field
 
-The wire states plurality twice: as `multiplicity`, and as the shape of `json_schema`, which pipelex wraps in an array (adding `minItems`/`maxItems` for a fixed count) exactly when the slot is plural. They agree by construction upstream.
+The wire states plurality twice: as `multiplicity`, and as the shape of `json_schema`, which the engine wraps in an array (adding `minItems`/`maxItems` for a fixed count) exactly when the slot is plural. They agree by construction upstream.
 
 The kernel still reads only one of them for rendering-adjacent questions. `isPluralInput` is a **schema** test, because the schema is what `buildRunFields` maps and therefore what the user is actually shown. A predicate that read the other field could disagree with the rendered control — a form offering a single text box for a slot the gate treats as a list — and that class of disagreement is the one this package exists to make impossible. `multiplicity` is read for the one question the schema cannot answer as directly: whether a list declares an exact count.
 
@@ -50,18 +64,26 @@ The count reaches the descriptor too, as `ListRunField.itemCount` and `ListRunFi
 ## The output side did not reshape the same way
 
 ```ts
-interface PipeOutputContract {
-  concept_ref: string;
-  multiplicity: 'single' | 'variable' | 'fixed';
-  item_count: number | null;
-  optional: boolean;
-}
+type PipeOutputContract =
+  | { concept_ref: string; multiplicity: 'single';   item_count: null;   optional: boolean }
+  | { concept_ref: string; multiplicity: 'variable'; item_count: null;   optional: false }
+  | { concept_ref: string; multiplicity: 'fixed';    item_count: number; optional: false };
 ```
 
-An output gained the same `multiplicity`/`item_count` pair, and kept a **boolean** `optional`. That asymmetry is the wire's, not a lag in the mirror: output presence is genuinely two-valued because `!` is rejected on an output, so there is no third state to carry. `optional: true` there means the pipe may resolve the output as a *recorded absence* instead of a value — a successful run that produced nothing.
+An output gained the same `multiplicity`/`item_count` pair, and kept a **boolean** `optional`. That asymmetry is the wire's: output presence is genuinely two-valued because `!` is rejected on an output, so there is no third state to carry. `optional: true` there means the pipe may resolve the output as a *recorded absence* instead of a value — a successful run that produced nothing, not a run that failed. The same no-markers-with-multiplicity rule applies, which is why a plural output is never optional.
 
-The kernel does not read the output contract at all today; it is mirrored because a consumer holding a `PipeIOContract` holds both halves.
+The kernel does not read the output contract at all today; it is re-exported because a consumer holding a `PipeIOContract` holds both halves.
+
+## The sibling artifact this package does not read yet
+
+`pipe_io_contracts` has a sibling: the **input-form descriptor**, specified at [Input-Form Descriptor](https://mthds.ai/latest/spec/input-form-descriptor/) and declared in the same `mthds/protocol` module set (`PipeInputFormDescriptor`, `InputFormTopLevelField`, `InputFormField`). It is the per-pipe, **ordered** presentation view of a method's inputs — one recursive node per slot, discriminated on `kind`, stating the facts a renderer needs so that no schema heuristics are required.
+
+Nothing in `src/` reads it. `buildRunFields` still derives its `RunField[]` from the contract and the schema, guessing where the language did not used to state an answer — which is what [derivation-swap.md](derivation-swap.md) is about. The peer is what puts the descriptor's type within the kernel's reach, so the swap is an ordinary change to one function's body rather than a change that first has to invent a type; `src/core/__tests__/protocol-peer.test.ts` writes that import today so the resolution is proven rather than assumed.
+
+Two details of the descriptor's shape are worth carrying into that work, because they are easy to miss. Its `item_count` is **absent** when it does not apply, the deliberate opposite of the contract's always-on-the-wire `null` — each artifact states its own rule. And `PipeInputFormDescriptor.fields` holds `InputFormTopLevelField`, which requires `presence` and `gating`; the shared `InputFormField` node does not require them, because that same type is the nested named-field shape, where presence is not a fact at all.
 
 ## Which runtime speaks this
 
-This shape is what pipelex emits after the input-semantics reshape. A runtime older than that emits the retired shape instead — a boolean `optional` on the input, no `presence`, no `item_count`, no `fixed` arm — and against one of those every `?` input reads as plain and therefore gates. That is the direction to fail in (a run is blocked, never mis-sent), but it is a real difference in what a form does, so a host on an older runtime sees optional inputs demanded until its runtime moves. There is no compatibility branch: the package reads the current contract.
+This shape is what the engine emits after the input-semantics reshape. A runtime older than that emits the retired shape instead — a boolean `optional` on the input, no `presence`, no `item_count`, no `fixed` arm — and against one of those every `?` input reads as plain and therefore gates. That is the direction to fail in (a run is blocked, never mis-sent), but it is a real difference in what a form does, so a host on an older runtime sees optional inputs demanded until its runtime moves. There is no compatibility branch: the package reads the current contract.
+
+The kernel does not parse-check what an API hands it, either. The standard rules these artifacts **closed shapes** — a producer must not emit a member the standard does not define, and a consumer may reject one — but this package validates a method's *inputs*, not the contract describing them. A malformed contract therefore reaches the predicates, and the invariant that matters is that the two halves of the gate keep agreeing about it rather than one lighting the Run button the other refuses.

@@ -1,19 +1,46 @@
 /**
- * The typed `pipe_io_contracts` mirror and its gating predicates.
+ * The `pipe_io_contracts` types and the kernel's gating predicates over them.
  *
- * Mirrors pipelex's `PipeIOContract` (pipelex/pipeline/pipe_io_contracts.py).
- * The SDK deliberately keeps `pipe_io_contracts` opaque, so the kernel is the
- * canonical TS home for this shape until the D-track specs it.
+ * The types are the STANDARD'S, imported from `mthds/protocol` and re-exported
+ * under the names this package has always exported. `pipe_io_contracts` is an
+ * MTHDS artifact - the standard specifies it (the "Pipe I/O Contracts" page)
+ * and its TypeScript client declares it - so this module states no shape of its
+ * own any more. What it keeps is the half that is genuinely the kernel's: the
+ * predicates that turn a declared slot into a gating answer, and the lookup
+ * that tolerates both key conventions a real payload arrives with.
+ *
+ * `mthds` is a TYPES-ONLY peer dependency: every import here is `import type`,
+ * so nothing survives into `dist/` and no consumer ships the standard's CLI.
+ * `scripts/assert-bundle.mjs` holds that on the built graph and lint holds it
+ * on the source. See docs/dependency-budget.md.
  *
  * The map itself is keyed by namespaced pipe ref (`<domain>.<pipe_code>`),
  * NOT bare pipe code - use `getPipeIOContract` to look entries up by the bare
  * codes the UI tracks.
  */
 
+import type {
+  IOMultiplicity,
+  PipeInputContract,
+  PipeIOContract,
+  PipeIOContracts,
+  PipeOutputContract,
+  PresenceMarker,
+} from 'mthds/protocol';
+
 import { ownProp } from './own-property';
 
+export type {
+  IOMultiplicity,
+  PipeInputContract,
+  PipeIOContract,
+  PipeIOContracts,
+  PipeOutputContract,
+};
+
 /**
- * The authored presence marker on an input slot, verbatim.
+ * The authored presence marker on an input slot, verbatim - the standard's
+ * `PresenceMarker` under the name this package exports.
  *
  * - `plain` - no marker: the caller must supply the input.
  * - `optional` (`?`) - the caller may omit it and the pipe handles the absence
@@ -21,61 +48,13 @@ import { ownProp } from './own-property';
  * - `force` (`!`) - a use-site assertion that the value IS present. It must be
  *   supplied, exactly like `plain`; the distinction is the authored assertion,
  *   which lint and graph surfaces read and a form does not.
- */
-export type InputPresence = 'plain' | 'optional' | 'force';
-
-/**
- * How many items a slot carries.
  *
- * - `single` - one item. `Concept[1]` is single too: no list framing.
- * - `variable` (`Concept[]`) - a list of any length, the empty list included.
- * - `fixed` (`Concept[N]`, N > 1) - a list of exactly `item_count` items.
+ * Kept as an alias rather than renamed because a consumer imports it by this
+ * name; a host that would rather read the standard's spelling has `mthds`
+ * installed through this package's peer and can import `PresenceMarker`
+ * straight from `mthds/protocol`.
  */
-export type IOMultiplicity = 'single' | 'variable' | 'fixed';
-
-export interface PipeInputContract {
-  concept_ref: string;
-  /** The declared presence marker - see `InputPresence`. */
-  presence: InputPresence;
-  /** The declared multiplicity - see `IOMultiplicity`. */
-  multiplicity: IOMultiplicity;
-  /**
-   * The exact item count, non-null exactly when `multiplicity` is `fixed`. The
-   * slot is always on the wire, `null` off the fixed arm.
-   */
-  item_count: number | null;
-  /**
-   * The input's JSON Schema. A plural slot (`variable` or `fixed`) is an array
-   * wrapper around the item schema, and a `fixed` one additionally carries
-   * `minItems` / `maxItems` set to `item_count` - which is what makes the gate's
-   * ajv pass enforce the declared count without the kernel restating it.
-   */
-  json_schema: Record<string, unknown>;
-}
-
-export interface PipeOutputContract {
-  concept_ref: string;
-  multiplicity: IOMultiplicity;
-  /** As on the input: non-null exactly on the `fixed` arm, always on the wire. */
-  item_count: number | null;
-  /**
-   * `true` when the output is declared optional (`?`) - the pipe may resolve it
-   * as a recorded absence instead of a value.
-   *
-   * Deliberately still a boolean while the INPUT side carries three-valued
-   * `presence`: output presence is genuinely two-valued, because `!` is
-   * rejected on an output. The asymmetry is the wire's, not ours.
-   */
-  optional: boolean;
-}
-
-export interface PipeIOContract {
-  inputs: Record<string, PipeInputContract>;
-  output: PipeOutputContract;
-}
-
-/** The `pipe_io_contracts` map: namespaced `pipe_ref` → IO contract. */
-export type PipeIOContracts = Record<string, PipeIOContract>;
+export type InputPresence = PresenceMarker;
 
 /** Namespaced pipe ref (`<domain>.<pipe_code>`) - the identity convention the
  *  validate artifacts key on. */
@@ -134,8 +113,8 @@ export function isOptionalInput(input: PipeInputContract): boolean {
  * maps and therefore what the user is shown; a predicate reading the other
  * field could disagree with the rendered control, which is the exact failure
  * mode `mustBeFilled` (readiness.ts) exists to prevent. The two agree by
- * construction upstream - pipelex wraps the schema in an array exactly when it
- * reports `variable` or `fixed`.
+ * construction upstream - the engine wraps the schema in an array exactly when
+ * it reports `variable` or `fixed`.
  */
 export function isPluralInput(input: PipeInputContract): boolean {
   return (input.json_schema as { type?: unknown } | undefined)?.type === 'array';

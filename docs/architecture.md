@@ -32,7 +32,7 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 | --- | --- |
 | `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the one derivation function; every heuristic lives behind it |
-| `contracts` | the typed `PipeIOContract` mirror plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
+| `contracts` | the standard's `pipe_io_contracts` types, re-exported from `mthds/protocol`, plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
 | `gate` | `gateRunInputs`, the whole chain as one call, over the four steps it composes — [docs/run-gate.md](run-gate.md) |
 | `gate-validator` | the kernel's own ajv instance and the `RunInputError` type its verdict speaks |
 | `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on, and what the server gate re-applies |

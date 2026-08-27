@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking — API: the `pipe_io_contracts` types are the standard's own, imported from `mthds/protocol` rather than declared here.** `pipe_io_contracts` is an MTHDS artifact: the standard specifies it ([Pipe I/O Contracts](https://mthds.ai/latest/spec/pipe-io-contracts/)) and its TypeScript client declares it. `src/core/contracts.ts` keeps the gating predicates and the `pipe_ref` lookup — the part that is genuinely the kernel's — and re-exports the shapes instead of restating them. Every exported name is unchanged (`PipeIOContracts`, `PipeIOContract`, `PipeInputContract`, `PipeOutputContract`, `IOMultiplicity`, and `InputPresence`, which aliases the standard's `PresenceMarker`), so no consumer renames an import. What a consumer does gain is the standard's stricter declaration: an input contract is a **union discriminated on `multiplicity`**, which makes two rules that were prose into the type — `item_count` is non-`null` exactly on the `fixed` arm, and a presence marker may not ride a plural slot. That second rule retires a shape hand-built fixtures used to carry: `Concept[]?` and `Concept[N]?` are invalid MTHDS, and the type now says so. The predicates stay total over the combination anyway, since the package does not parse-check a contract an API hands it.
+
+- **Breaking — Packaging: `mthds` is a required peer dependency, types only.** It is imported exclusively with `import type` and erased at build, so a consumer ships none of it and gains a `node_modules` entry rather than bytes. The peer is required (unlike the optional React pair) because a consumer of the headless entry still resolves the re-exported contract types through it. Enforced on both sides: lint restricts `mthds` to type imports across `src/`, and `make assert-bundle` bans it from both entries' built chunk graphs — the check that catches a value import arriving through a shared chunk, where no source diff would show it. Required rather than optional for a reason worth knowing: under `skipLibCheck: true`, an absent peer does not error — the re-exported names silently become `any` — so an automatic install is what keeps the types real. New reasoning, including what would justify revisiting the choice, in [docs/dependency-budget.md](docs/dependency-budget.md).
+
+### Added
+
+- **Testing: the types-only peer is asserted rather than assumed.** A suite holds every re-exported contract name to type *identity* with `mthds/protocol` — not assignability, which a drifting subset would satisfy — and writes the input-form descriptor import (`PipeInputFormDescriptor`, `InputFormTopLevelField`) that the derivation swap will open with, so the peer's resolution is proven before the change that depends on it.
+
+### Docs
+
+- **[docs/contract-mirror.md](docs/contract-mirror.md) is rewritten around who owns the shape.** It was the canonical TypeScript home for `pipe_io_contracts` "until the protocol specs a generated one"; the protocol specs one, so the document now points at the standard's pages and keeps what it was always better at than any code comment — what each slot means, why plurality is read off the schema rather than off the declared multiplicity, and what gates. It gains the discriminated-union rules, and a section on the sibling artifact the kernel does not read yet.
+
 ## [v0.4.0] - 2026-08-25
 
 ### Added

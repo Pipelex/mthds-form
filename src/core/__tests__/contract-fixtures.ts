@@ -14,6 +14,13 @@
  *
  *     const brief: PipeInputContract = { ...PLAIN_SINGLE, concept_ref, json_schema };
  *
+ * Every fixture here is a slot the language can actually declare. A presence
+ * marker may not be combined with a multiplicity suffix - `Concept[]?` and
+ * `Concept[N]!` are invalid MTHDS - so there is no optional-plural fixture, and
+ * the standard's types reject the combination outright. A test that wants one
+ * anyway (to assert the kernel does not fall over on a producer that emitted
+ * one) builds it inline with a cast, where the cast says so.
+ *
  * Not a test file (vitest collects `*.test.ts` only).
  */
 
@@ -41,13 +48,6 @@ export const FORCE_SINGLE = {
 /** A variable-length plural input: `Concept[]` - the empty list is a value. */
 export const PLAIN_VARIABLE = {
   presence: 'plain',
-  multiplicity: 'variable',
-  item_count: null,
-} as const;
-
-/** An optional variable-length plural input: `Concept[]?`. */
-export const OPTIONAL_VARIABLE = {
-  presence: 'optional',
   multiplicity: 'variable',
   item_count: null,
 } as const;
