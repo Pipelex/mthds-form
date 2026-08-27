@@ -13,6 +13,14 @@ The wire artifact is the standard's per-pipe **input-form descriptor** ([Input-F
 
 The seam held, which was the whole point of building it: consumers receive `RunField[]` and never saw how it was produced, so the swap changed one function's signature and no renderer, no control, no readiness rule. The control set still switches on `field.kind` and cannot tell where the kind came from.
 
+## The mapping is total, including over version drift
+
+`kind` is the discriminant of the whole artifact, and the vocabulary it draws from is versioned with the standard — the peer this package compiles against pins the set it knows (`FIELD_KINDS` in `mthds/protocol`). A server can be ahead of that peer, and no type rules it out: `mapNode`'s switch is exhaustive over the *pinned* union, which `tsc` proves, and proving it says nothing about a `kind` the wire invents after this build shipped.
+
+So the mapper answers drift with the standard's own escape hatch. An unrecognized node becomes `kind: 'unknown'` — the raw-JSON entry a renderer falls back to against the contract's `json_schema`, which is exactly what `unknown` exists for ("a producer that cannot map a node honestly MUST report it rather than guess a kind"; a consumer meeting a member it does not know is in the same position). The field keeps its `name`, its `required` and its `concept_ref`, which is the part that matters: a field with no name is unaddressable by the value bridge and unnameable by readiness, so its input silently never reaches the payload while the Run button waits on a blank entry.
+
+The compile-time half is kept by a `satisfies never` after the switch: when the **peer** grows a kind, the build fails and someone maps it deliberately. The runtime return is only ever reached when a **server** is ahead of the peer.
+
 ## What the schema still answers, and why
 
 The contract's `json_schema` is co-walked for exactly **two facts** the wire deliberately does not carry — both structural reads of keywords ajv itself enforces, never judgements:

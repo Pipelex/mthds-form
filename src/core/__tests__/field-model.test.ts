@@ -388,3 +388,49 @@ describe('a list bound the wire did not put there', () => {
     });
   });
 });
+
+// ─── Version drift: a wire kind this build's peer does not define ────────────
+
+describe('buildRunFields over a kind newer than the pinned peer', () => {
+  // The descriptor is a CLOSED shape the standard versions, and the peer pins
+  // the vocabulary this build compiled against - so `mapNode`'s switch is
+  // exhaustive at the type level and tsc proves it. A server ahead of the peer
+  // is the runtime case that type cannot cover, and the standard answers it
+  // with its own escape hatch: an unrecognized node falls back to raw entry
+  // against the contract's `json_schema`, which is `kind: 'unknown'` here.
+  //
+  // The cast is the point of the test - it stages exactly what a newer server
+  // sends and no fixture could otherwise state.
+  const DRIFTED = {
+    ...WIRE_PLAIN,
+    kind: 'signature',
+    name: 'consent',
+    concept_ref: 'legal.Consent',
+  } as unknown as InputFormTopLevelField;
+
+  const INPUT: PipeInputContract = {
+    ...PLAIN_SINGLE,
+    concept_ref: 'legal.Consent',
+    json_schema: { type: 'object', properties: { signed_by: { type: 'string' } } },
+  };
+
+  it('degrades the node to the escape hatch instead of dropping the field', () => {
+    const [consent] = buildRunFields(descriptorOf(DRIFTED), { consent: INPUT });
+
+    expect(consent?.kind).toBe('unknown');
+  });
+
+  it('keeps the field ADDRESSABLE, which is what a nameless field costs', () => {
+    // Without the fallback `mapNode` returned `undefined` and `buildRunFields`
+    // spread it, so the field arrived with no `name`: the value bridge wrote
+    // the input under the key `"undefined"` (the real input never reached the
+    // payload) and readiness reported a blank entry the user could not act on.
+    const [consent] = buildRunFields(descriptorOf(DRIFTED), { consent: INPUT });
+
+    expect(consent?.name).toBe('consent');
+    expect(consent?.required).toBe(true);
+    expect(consent?.conceptRef).toBe('legal.Consent');
+    expect(computeReadiness([consent!], { consent: 'signed' }).missing).toEqual([]);
+    expect(computeReadiness([consent!], {}).missing).toEqual(['consent']);
+  });
+});

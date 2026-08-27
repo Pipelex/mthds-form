@@ -182,6 +182,17 @@ function mapNode(
     case 'unknown':
       return { ...common, kind: 'unknown' };
   }
+  // Version drift: the wire states a kind this build's pinned peer does not
+  // define. The switch above is exhaustive over `InputFormItem`, so
+  // `satisfies never` keeps the build LOUD when the PEER grows a kind - and
+  // this return keeps the mapper TOTAL when a SERVER is ahead of the peer,
+  // which no type can rule out. The standard's own escape hatch is the honest
+  // answer (`unknown` exists so a derivation can be total truthfully): the
+  // field keeps its name and falls back to raw entry against the contract's
+  // `json_schema`. Returning nothing produced a field with no `name` at all -
+  // unaddressable by the value bridge and unnameable by readiness.
+  node satisfies never;
+  return { ...common, kind: 'unknown' };
 }
 
 /**
