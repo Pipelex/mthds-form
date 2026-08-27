@@ -77,6 +77,12 @@ const MAX_UNWRAP_DEPTH = 8;
  *
  * Genuine primitives still stringify - a number or a boolean in a text slot is
  * a value, not a wrapper.
+ *
+ * The envelope names here are the HISTORICAL corruptions, not the wrapper key:
+ * the declared wrapper is stripped by `unwrapContent` first, off the field's
+ * `contentKey`, exactly as the number and boolean paths do. A text wrapper
+ * whose property is not literally `text` would otherwise read back empty - and
+ * one save later, BE empty.
  */
 function textFromStored(value: unknown, depth = 0): string | undefined {
   if (value == null) return undefined;
@@ -94,7 +100,7 @@ function fromRjsf(field: RunField, value: unknown): unknown {
   switch (field.kind) {
     case 'text':
     case 'prose':
-      return textFromStored(value);
+      return textFromStored(unwrapContent(field, value));
     case 'number': {
       // The control holds `number | undefined`. A numeric STRING is tolerated
       // because that is what a hand-written inputs.json tends to carry; anything

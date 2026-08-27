@@ -213,6 +213,97 @@ describe('a value that references itself', () => {
   });
 });
 
+describe('a schema that references itself', () => {
+  // The values above reference themselves; this contract's SCHEMA does. The
+  // gate's tree walk follows `$ref`, and unlike the value walks its recursion
+  // is driven by the schema - without a cycle guard it has no floor. ajv is
+  // untouched by the same schema: it resolves recursion natively, data-bounded.
+
+  /** `TreeNode {label, children: TreeNode[]}` - pydantic's emission for a
+   *  self-referencing model: one `$defs` entry, referenced from the root and
+   *  from inside itself. */
+  const TREE: PipeInputContract = {
+    ...PLAIN_SINGLE,
+    concept_ref: 'demo.Tree',
+    json_schema: {
+      $defs: {
+        TreeNode: {
+          title: 'TreeNode',
+          type: 'object',
+          properties: {
+            label: { title: 'Label', type: 'string' },
+            children: { type: 'array', items: { $ref: '#/$defs/TreeNode' } },
+          },
+          required: ['label'],
+        },
+      },
+      $ref: '#/$defs/TreeNode',
+    },
+  };
+
+  /** Two siblings referencing the SAME def - repetition, not recursion. */
+  const TWINS: PipeInputContract = {
+    ...PLAIN_SINGLE,
+    concept_ref: 'demo.Twins',
+    json_schema: {
+      title: 'Twins',
+      type: 'object',
+      $defs: {
+        Part: {
+          title: 'Part',
+          type: 'object',
+          properties: {
+            name: { title: 'Name', type: 'string' },
+            note: { title: 'Note', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+          },
+          required: ['name'],
+        },
+      },
+      properties: { first: { $ref: '#/$defs/Part' }, second: { $ref: '#/$defs/Part' } },
+      required: ['first', 'second'],
+    },
+  };
+
+  it('gets a verdict from the gate, not a RangeError', () => {
+    // The filled payload is the one that reaches the walk: ajv passes it, so
+    // nothing between the request and the tree build stands in the way.
+    const gate = gateRunInputs(contractOf({ tree: TREE }), {
+      tree: { label: 'root', children: [{ label: 'kid', children: [] }] },
+    });
+    expect(gate.ok).toBe(true);
+  });
+
+  it('still refuses the payload that holds nothing', () => {
+    const gate = gateRunInputs(contractOf({ tree: TREE }), {});
+    expect(gate.ok).toBe(false);
+    if (!gate.ok) expect(gate.missingInputs).toEqual(['tree']);
+  });
+
+  it('leaves depth enforcement to ajv, which resolves recursion natively', () => {
+    const gate = gateRunInputs(contractOf({ tree: TREE }), {
+      tree: { label: 'root', children: [{ children: [] }] },
+    });
+    expect(gate.ok).toBe(false);
+  });
+
+  it('does not mistake a repeated reference for a cycle', () => {
+    // Two siblings referencing one def is ordinary composition. A guard keyed
+    // on "seen this ref before" - rather than "this ref is on my own path" -
+    // truncates the second expansion into an opaque leaf, and then a required
+    // child ajv cannot catch ('' satisfies a plain string) slips the emptiness
+    // walk.
+    const half = gateRunInputs(contractOf({ twins: TWINS }), {
+      twins: { first: { name: 'a', note: '' }, second: { name: '', note: 'x' } },
+    });
+    expect(half.ok).toBe(false);
+
+    const full = gateRunInputs(contractOf({ twins: TWINS }), {
+      twins: { first: { name: 'a' }, second: { name: 'b' } },
+    });
+    expect(full.ok).toBe(true);
+  });
+});
+
 describe('a string of nothing but whitespace', () => {
   it.each([
     ['spaces', '   '],

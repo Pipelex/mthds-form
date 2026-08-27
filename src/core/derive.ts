@@ -35,7 +35,7 @@ import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
 import { buildPipeRef, type PipeInputContract } from './contracts';
 import type { RunField, RunFieldCommon } from './descriptor';
 import { ownProp } from './own-property';
-import { collapseNullable, collectSchemaDefs, derefSchema, type JsonSchema } from './schema-utils';
+import { collectSchemaDefs, resolveSchemaNode, type JsonSchema } from './schema-utils';
 
 /**
  * Look up a pipe's input-form descriptor by pipe code, tolerant of both key
@@ -77,12 +77,14 @@ function numOrUndef(v: unknown): number | undefined {
   return typeof v === 'number' ? v : undefined;
 }
 
-/** Resolve one schema node the same way the gate's validator will see it. */
+/** Resolve one schema node the same way the gate's validator will see it -
+ *  to the FIXPOINT, so a nullable `$ref` (pydantic's Optional concept-typed
+ *  field) yields its definition rather than an unresolved reference. */
 function resolveSchema(
   schema: JsonSchema | undefined,
   defs: Record<string, JsonSchema>,
 ): JsonSchema | undefined {
-  return schema ? collapseNullable(derefSchema(schema, defs)) : undefined;
+  return schema ? resolveSchemaNode(schema, defs) : undefined;
 }
 
 /** The slots every wire node carries, mapped onto the descriptor's names. */

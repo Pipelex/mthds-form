@@ -43,12 +43,35 @@ function gatingNode(
   rawSchema: JsonSchema,
   required: boolean,
   defs: Record<string, JsonSchema>,
+  active: ReadonlySet<string>,
 ): RunField {
-  const schema = collapseNullable(derefSchema(rawSchema, defs));
+  // Resolve `$ref` / nullable-`anyOf` layers to a fixpoint - one pass of
+  // either helper cannot see through pydantic's Optional concept-typed shape,
+  // `anyOf: [{$ref}, {type:'null'}]` - keeping the set of references OPEN ON
+  // THIS PATH. A reference met again while still open is a self-referencing
+  // model: expanding it has no floor, so the node degrades to the opaque leaf
+  // instead of overflowing the stack - the gate returns a verdict, never a
+  // throw. Open on this path, not seen anywhere: two siblings referencing one
+  // definition are ordinary composition and both expand in full. Degrading
+  // OPEN is safe because ajv - which resolves recursion natively, bounded by
+  // the data - has already enforced required children at every depth by the
+  // time this tree is walked.
+  let schema = rawSchema;
+  let path = active;
+  for (;;) {
+    const ref = schema.$ref;
+    if (typeof ref === 'string') {
+      if (path.has(ref)) return { name, required, kind: 'unknown' };
+      path = new Set(path).add(ref);
+    }
+    const next = collapseNullable(derefSchema(schema, defs));
+    if (next === schema) break;
+    schema = next;
+  }
   const type = schemaTypeOf(schema);
 
   if (type === 'array') {
-    const item = gatingNode(name, (schema.items as JsonSchema) ?? {}, true, defs);
+    const item = gatingNode(name, (schema.items as JsonSchema) ?? {}, true, defs, path);
     const itemCount = numOrUndef(schema.minItems);
     const maxItemCount = numOrUndef(schema.maxItems);
     return {
@@ -68,7 +91,7 @@ function gatingNode(
       required,
       kind: 'object',
       fields: Object.entries(props).map(([childName, childSchema]) =>
-        gatingNode(childName, childSchema ?? {}, req.has(childName), defs),
+        gatingNode(childName, childSchema ?? {}, req.has(childName), defs, path),
       ),
     };
   }
@@ -92,6 +115,7 @@ export function gatingFieldsFromInputs(inputs: Record<string, PipeInputContract>
       (input.json_schema as JsonSchema) ?? {},
       !isOptionalInput(input),
       defs,
+      new Set(),
     );
     return { ...node, gating: inputMustBeFilled(input) };
   });

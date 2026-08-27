@@ -194,6 +194,30 @@ const BRIEFS: PipeInputContract = {
 };
 
 /**
+ * Children that arrive BY REFERENCE. Pydantic emits `$defs` + `$ref` for a
+ * concept-typed field, wraps the ref in `anyOf: [.., {type:'null'}]` when the
+ * field is Optional, and states required-AND-nullable (`Sub | None` with no
+ * default) as a nullable ref that `required` still names. The inlined fixtures
+ * above cannot see a resolution bug - both halves must agree about a child
+ * neither can read without resolving the indirection first.
+ */
+const REFS: PipeInputContract = {
+  ...PLAIN_SINGLE,
+  concept_ref: 'demo.RefWrapper',
+  json_schema: {
+    title: 'RefWrapper',
+    type: 'object',
+    $defs: { Brief: briefSchema },
+    properties: {
+      main: { $ref: '#/$defs/Brief' },
+      audit: { anyOf: [{ $ref: '#/$defs/Brief' }, { type: 'null' }] },
+      extra: { anyOf: [{ $ref: '#/$defs/Brief' }, { type: 'null' }], default: null },
+    },
+    required: ['main', 'audit'],
+  },
+};
+
+/**
  * The wire descriptor node each contract fixture arrives with - hand-authored
  * per the standard's kind assignment, keyed by fixture IDENTITY so the table's
  * rows stay exactly what they were. Since the swap, readiness runs over the
@@ -350,6 +374,38 @@ const WIRE = new Map<PipeInputContract, (name: string) => InputFormTopLevelField
       item: { kind: 'object', required: true, concept_ref: 'demo.Brief', fields: BRIEF_FIELDS },
     }),
   ],
+  [
+    REFS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RefWrapper',
+      fields: [
+        {
+          kind: 'object',
+          name: 'main',
+          required: true,
+          concept_ref: 'demo.Brief',
+          fields: BRIEF_FIELDS,
+        },
+        {
+          kind: 'object',
+          name: 'audit',
+          required: true,
+          concept_ref: 'demo.Brief',
+          fields: BRIEF_FIELDS,
+        },
+        {
+          kind: 'object',
+          name: 'extra',
+          required: false,
+          concept_ref: 'demo.Brief',
+          fields: BRIEF_FIELDS,
+        },
+      ],
+    }),
+  ],
 ]);
 
 /** The render tree for a row's inputs: the wire descriptor mapped over them. */
@@ -497,6 +553,26 @@ const ROWS: Row[] = [
     inputs: { w: NESTED },
     values: { w: { label: 'run 4', opts: { tone: 'casual' } } },
     runnable: true,
+  },
+
+  // ─── children by reference ────────────────────────────────────────────────
+  {
+    label: 'a struct whose ref children are filled',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' } } },
+    runnable: true,
+  },
+  {
+    label: 'a struct whose plain-$ref child is half filled',
+    inputs: { w: REFS },
+    values: { w: { main: { notes: 'skip pricing' }, audit: { name: 'A1' } } },
+    runnable: false,
+  },
+  {
+    label: 'a struct whose required NULLABLE ref child is half filled',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { notes: 'later' } } },
+    runnable: false,
   },
 
   // ─── plurals ──────────────────────────────────────────────────────────────

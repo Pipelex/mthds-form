@@ -16,7 +16,7 @@ The contract's `json_schema` is co-walked for exactly two facts the wire deliber
 
 A native scalar reads as a plain value in the form and travels as an object on the wire. `native.Number` declares `NumberContent {number}`, `native.YesNo` declares `YesNoContent {yes_no}`, `native.Text` declares `TextContent {text}` — so the control holds `2` while the payload must carry `{number: 2}`, and the gate validates against the declared content model.
 
-The descriptor is what reconciles those. `buildRunFields`' schema co-walk finds the single property a scalar-kind node's content model declares and stamps its **name** on the field as `contentKey`. The value bridge in `values` then wraps on the way out and unwraps on the way back in, by name — it holds no list of which concepts wrap, and it never looks at a schema.
+The descriptor is what reconciles those. `buildRunFields`' schema co-walk finds the single property a scalar-kind node's content model declares and stamps its **name** on the field as `contentKey` — resolving `$ref` and nullable-`anyOf` indirection to a fixpoint first, so an optional concept-typed child (pydantic's `anyOf: [{$ref}, {type: 'null'}]`) reads like any other. The value bridge in `values` then wraps on the way out and unwraps on the way back in, by name — it holds no list of which concepts wrap, and it never looks at a schema.
 
 That indirection is not decoration. The wrapper used to be a second hand-written list of concept names living next to the render taxonomy, the two disagreed about `native.Number`, and the result was a form that looked correct, satisfied readiness, enabled Run, and then failed its own gate with `'…' must be object`. Deriving the name from the contract covers concepts nobody remembered to add.
 

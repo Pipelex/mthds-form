@@ -166,6 +166,64 @@ describe('buildRunFields reads the wrapper property off the contract', () => {
   });
 });
 
+// ─── The wrapper behind a nullable reference ─────────────────────────────────
+
+describe('a concept-typed optional child behind a nullable $ref', () => {
+  // Pydantic emits `anyOf: [{$ref: '#/$defs/…'}, {type: 'null'}]` for an
+  // Optional concept-typed field, so the reference does not sit at the top of
+  // the property's schema - resolving it takes more than one pass. Losing it
+  // silently loses the child's wrapper key, and the form then offers a bare
+  // scalar the contract rejects.
+  const REPORT_SCHEMA = {
+    title: 'Report',
+    type: 'object',
+    $defs: {
+      Poem: {
+        title: 'Poem',
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text'],
+      },
+    },
+    properties: {
+      headline: { title: 'Headline', type: 'string' },
+      poem: { anyOf: [{ $ref: '#/$defs/Poem' }, { type: 'null' }], default: null },
+    },
+    required: ['headline'],
+  };
+  const CONTRACT: Record<string, PipeInputContract> = {
+    report: { ...PLAIN_SINGLE, concept_ref: 'demo.Report', json_schema: REPORT_SCHEMA },
+  };
+  const FIELDS = buildRunFields(
+    descriptorOf({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name: 'report',
+      concept_ref: 'demo.Report',
+      fields: [
+        { kind: 'text', name: 'headline', required: true },
+        { kind: 'prose', name: 'poem', required: false, concept_ref: 'demo.Poem' },
+      ],
+    }),
+    CONTRACT,
+  );
+
+  it('carries the wrapper key through the reference', () => {
+    expect(FIELDS[0]).toMatchObject({
+      kind: 'object',
+      fields: [{ kind: 'text' }, { kind: 'prose', contentKey: 'text' }],
+    });
+  });
+
+  it('wraps the child so the contract accepts the filled form', () => {
+    const data = rjsfDataFromRunValues({ report: { headline: 'H', poem: 'Whispers' } }, FIELDS);
+    expect(data).toEqual({ report: { headline: 'H', poem: { text: 'Whispers' } } });
+    const schema = buildRunInputsSchema(CONTRACT);
+    const verdict = validateRunInputs(prepareRunInputs(data, schema), CONTRACT, schema);
+    expect(verdict).toMatchObject({ isValid: true, missingInputs: [] });
+  });
+});
+
 // ─── The reported failure, run end to end ───────────────────────────────────
 
 describe('a filled `Number?` input passes the gate it used to fail', () => {
@@ -334,6 +392,37 @@ describe('store ↔ values round trip over the scalar wrappers', () => {
   it('refuses to coerce "yes" into a boolean - YesNoContent is strict', () => {
     const values = runValuesFromStore({ is_urgent: 'yes' }, FIELDS, CONTRACT);
     expect(values['is_urgent']).toBeUndefined();
+  });
+
+  it('reads back a text wrapper whose property is not `text`', () => {
+    // The wrapper key comes from the DESCRIPTOR: the read path must not keep a
+    // private list of blessed property names - that is the defect shape this
+    // suite's header records, in the other direction. A text-kind node over
+    // `TimeContent {time}` writes by its contentKey and must read back by it.
+    const TIME_CONTRACT: Record<string, PipeInputContract> = {
+      at: {
+        ...PLAIN_SINGLE,
+        concept_ref: 'native.Time',
+        json_schema: {
+          title: 'TimeContent',
+          type: 'object',
+          properties: { time: { type: 'string' } },
+          required: ['time'],
+        },
+      },
+    };
+    const TIME_FIELDS = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'text',
+        name: 'at',
+        concept_ref: 'native.Time',
+        format: 'time',
+      }),
+      TIME_CONTRACT,
+    );
+    const stored = storeInputDataFromRunValues({ at: '15:40' }, TIME_FIELDS, TIME_CONTRACT);
+    expect(runValuesFromStore(stored, TIME_FIELDS, TIME_CONTRACT)).toEqual({ at: '15:40' });
   });
 });
 
