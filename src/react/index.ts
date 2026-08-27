@@ -26,6 +26,8 @@ export { fieldControlClass } from './field-styles';
 export type { FieldStrings } from './field-strings';
 export { DEFAULT_FIELD_STRINGS, FieldStringsProvider, useFieldStrings } from './field-strings';
 
+export { FieldDomIdProvider, useFieldDomId } from './field-dom-id';
+
 export type { FieldPresentation } from './field-presentation';
 export {
   FieldPresentationProvider,

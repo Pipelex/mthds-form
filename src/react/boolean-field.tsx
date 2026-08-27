@@ -5,6 +5,7 @@ import type { BooleanRunField } from '../core';
 import { ConceptPill } from './concept-pill';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { Switch } from './ui/switch';
+import { useFieldDomId } from './field-dom-id';
 
 interface BooleanFieldProps {
   field: BooleanRunField;
@@ -24,6 +25,7 @@ export function BooleanField({ field, value, onChange, id, disabled }: BooleanFi
   // because it sits inline with the switch. See `field-presentation.tsx`.
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
+  const domId = useFieldDomId(id);
   return (
     <div
       className={cn(
@@ -34,7 +36,7 @@ export function BooleanField({ field, value, onChange, id, disabled }: BooleanFi
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <label
-            htmlFor={id}
+            htmlFor={domId}
             className={cn(
               'text-[13px] font-medium leading-none text-foreground',
               isApp ? 'text-[13.5px]' : 'font-mono',
@@ -49,7 +51,7 @@ export function BooleanField({ field, value, onChange, id, disabled }: BooleanFi
         )}
       </div>
       <Switch
-        id={id}
+        id={domId}
         checked={value ?? false}
         onCheckedChange={onChange}
         disabled={disabled}

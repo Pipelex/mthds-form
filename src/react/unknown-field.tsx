@@ -5,6 +5,7 @@ import type { UnknownRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
+import { useFieldDomId } from './field-dom-id';
 
 interface UnknownFieldProps {
   field: UnknownRunField;
@@ -22,6 +23,7 @@ interface UnknownFieldProps {
  */
 export function UnknownField({ field, value, onChange, id, error, disabled }: UnknownFieldProps) {
   const s = useFieldStrings();
+  const domId = useFieldDomId(id);
   return (
     <FieldShell
       name={field.name}
@@ -31,10 +33,10 @@ export function UnknownField({ field, value, onChange, id, error, disabled }: Un
       description={field.description ?? s.jsonHint}
       required={field.required}
       error={error}
-      htmlFor={id}
+      htmlFor={domId}
     >
       <textarea
-        id={id}
+        id={domId}
         value={value ?? ''}
         disabled={disabled}
         aria-invalid={!!error}
