@@ -3,9 +3,12 @@
  *
  * `native.Number`, `native.YesNo` and `native.Text` render as bare controls but
  * travel inside the content model their concept declares - `NumberContent
- * {number}`, `YesNoContent {yes_no}`, `TextContent {text}`. The wrapper property
- * is derived from the contract in `buildRunFields` and carried on the descriptor
- * as `contentKey`, so the value bridge and the gate cannot disagree about it.
+ * {number}`, `YesNoContent {yes_no}`, `TextContent {text}`. The KIND comes from
+ * the wire descriptor; the wrapper property is the one fact the wire does not
+ * state, so `buildRunFields` still reads it off the contract's `json_schema`
+ * (the artifact whose job the payload shape is) and carries it on the
+ * descriptor as `contentKey`, so the value bridge and the gate cannot disagree
+ * about it.
  *
  * They used to. `native.Number` was in the render taxonomy and absent from the
  * wrapper taxonomy: the form offered a number control, readiness was satisfied,
@@ -26,7 +29,15 @@ import {
   validateRunInputs,
 } from '..';
 import type { PipeInputContract } from '..';
-import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE } from './contract-fixtures';
+import {
+  descriptorOf,
+  OPTIONAL_SINGLE,
+  PLAIN_SINGLE,
+  PLAIN_VARIABLE,
+  WIRE_OPTIONAL,
+  WIRE_PLAIN,
+  WIRE_VARIABLE,
+} from './contract-fixtures';
 
 /** `NumberContent`, exactly as pydantic emits it (`number: int | float`). */
 const NUMBER_CONTENT_SCHEMA = {
@@ -56,62 +67,102 @@ const TEXT_CONTENT_SCHEMA = {
 
 describe('buildRunFields reads the wrapper property off the contract', () => {
   it('gives a native.Number field the `number` content key', () => {
-    const [field] = buildRunFields({
-      max_per_category: {
-        ...PLAIN_SINGLE,
+    const [field] = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'number',
+        name: 'max_per_category',
         concept_ref: 'native.Number',
-        json_schema: NUMBER_CONTENT_SCHEMA,
+        integer: false,
+      }),
+      {
+        max_per_category: {
+          ...PLAIN_SINGLE,
+          concept_ref: 'native.Number',
+          json_schema: NUMBER_CONTENT_SCHEMA,
+        },
       },
-    });
+    );
     expect(field).toMatchObject({ kind: 'number', contentKey: 'number', integer: false });
   });
 
-  it('renders a native.YesNo input as a switch, not a nested card', () => {
-    // `BOOLEAN_CONCEPTS` used to look for a concept named `Boolean`, which MTHDS
-    // does not have - so `kind: 'boolean'` was unreachable from a real method
-    // and a yes/no input arrived as an object card wrapping a lone switch.
-    const [field] = buildRunFields({
-      is_urgent: {
-        ...PLAIN_SINGLE,
+  it('gives a native.YesNo switch the `yes_no` content key', () => {
+    const [field] = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'boolean',
+        name: 'is_urgent',
         concept_ref: 'native.YesNo',
-        json_schema: YES_NO_CONTENT_SCHEMA,
+      }),
+      {
+        is_urgent: {
+          ...PLAIN_SINGLE,
+          concept_ref: 'native.YesNo',
+          json_schema: YES_NO_CONTENT_SCHEMA,
+        },
       },
-    });
+    );
     expect(field).toMatchObject({ kind: 'boolean', contentKey: 'yes_no' });
   });
 
   it('gives a native.Text field the `text` content key, as it always wrapped', () => {
-    const [field] = buildRunFields({
-      brief: { ...PLAIN_SINGLE, concept_ref: 'native.Text', json_schema: TEXT_CONTENT_SCHEMA },
-    });
+    const [field] = buildRunFields(
+      descriptorOf({ ...WIRE_PLAIN, kind: 'prose', name: 'brief', concept_ref: 'native.Text' }),
+      {
+        brief: { ...PLAIN_SINGLE, concept_ref: 'native.Text', json_schema: TEXT_CONTENT_SCHEMA },
+      },
+    );
     expect(field).toMatchObject({ contentKey: 'text' });
   });
 
   it('leaves a structured concept unwrapped - its value IS the whole content', () => {
-    const [field] = buildRunFields({
-      applicant: {
-        ...PLAIN_SINGLE,
+    const [field] = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'object',
+        name: 'applicant',
         concept_ref: 'demo.Applicant',
-        json_schema: { type: 'object', properties: { name: { type: 'string' } } },
+        fields: [{ kind: 'text', name: 'name', required: false }],
+      }),
+      {
+        applicant: {
+          ...PLAIN_SINGLE,
+          concept_ref: 'demo.Applicant',
+          json_schema: { type: 'object', properties: { name: { type: 'string' } } },
+        },
       },
-    });
+    );
     expect(field!.contentKey).toBeUndefined();
     expect(field!.kind).toBe('object');
   });
 
-  it('reads min/max off the WRAPPED property, where a constraint actually lives', () => {
-    const [field] = buildRunFields({
-      score: {
-        ...PLAIN_SINGLE,
+  it('takes number bounds from the WIRE node, where the engine states them', () => {
+    // Before the swap the bounds were dug out of the wrapped property's schema;
+    // the wire now states `minimum`/`maximum` on the number node itself, read
+    // off the same model - the schema is consulted for the wrapper name alone.
+    const [field] = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'number',
+        name: 'score',
         concept_ref: 'native.Number',
-        json_schema: {
-          type: 'object',
-          properties: { number: { type: 'number', minimum: 0, maximum: 10 } },
-          required: ['number'],
+        integer: false,
+        minimum: 0,
+        maximum: 10,
+      }),
+      {
+        score: {
+          ...PLAIN_SINGLE,
+          concept_ref: 'native.Number',
+          json_schema: {
+            type: 'object',
+            properties: { number: { type: 'number', minimum: 0, maximum: 10 } },
+            required: ['number'],
+          },
         },
       },
-    });
-    expect(field).toMatchObject({ kind: 'number', min: 0, max: 10 });
+    );
+    expect(field).toMatchObject({ kind: 'number', contentKey: 'number', min: 0, max: 10 });
   });
 });
 
@@ -126,7 +177,17 @@ describe('a filled `Number?` input passes the gate it used to fail', () => {
       json_schema: NUMBER_CONTENT_SCHEMA,
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const DESCRIPTOR = descriptorOf(
+    { ...WIRE_PLAIN, kind: 'prose', name: 'text', concept_ref: 'native.Text' },
+    {
+      ...WIRE_OPTIONAL,
+      kind: 'number',
+      name: 'max_per_category',
+      concept_ref: 'native.Number',
+      integer: false,
+    },
+  );
+  const FIELDS = buildRunFields(DESCRIPTOR, CONTRACT);
   const SCHEMA = buildRunInputsSchema(CONTRACT);
 
   const verdictFor = (values: Record<string, unknown>) =>
@@ -181,7 +242,16 @@ describe('a filled `Number?` input passes the gate it used to fail', () => {
         json_schema: NUMBER_CONTENT_SCHEMA,
       },
     };
-    const fields = buildRunFields(REQUIRED);
+    const fields = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'number',
+        name: 'max_per_category',
+        concept_ref: 'native.Number',
+        integer: false,
+      }),
+      REQUIRED,
+    );
     const schema = buildRunInputsSchema(REQUIRED);
     const verdict = validateRunInputs(
       prepareRunInputs(rjsfDataFromRunValues({}, fields), schema),
@@ -208,7 +278,19 @@ describe('store ↔ values round trip over the scalar wrappers', () => {
       json_schema: YES_NO_CONTENT_SCHEMA,
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const FIELDS = buildRunFields(
+    descriptorOf(
+      {
+        ...WIRE_PLAIN,
+        kind: 'number',
+        name: 'max_per_category',
+        concept_ref: 'native.Number',
+        integer: false,
+      },
+      { ...WIRE_PLAIN, kind: 'boolean', name: 'is_urgent', concept_ref: 'native.YesNo' },
+    ),
+    CONTRACT,
+  );
 
   it('writes the wrapper into the store and reads the bare scalar back', () => {
     const stored = storeInputDataFromRunValues(
@@ -263,9 +345,20 @@ describe('a plural number input', () => {
       json_schema: { type: 'array', items: NUMBER_CONTENT_SCHEMA },
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const FIELDS = buildRunFields(
+    descriptorOf({
+      ...WIRE_VARIABLE,
+      kind: 'list',
+      name: 'scores',
+      concept_ref: 'native.Number',
+      item: { kind: 'number', required: true, concept_ref: 'native.Number', integer: false },
+    }),
+    CONTRACT,
+  );
 
   it('wraps every item, the same way a single value is wrapped', () => {
+    // The item's `contentKey` comes off the ITEMS schema - the co-walk descends
+    // arrays exactly as it descends object properties.
     expect(rjsfDataFromRunValues({ scores: [1, 2] }, FIELDS)).toEqual({
       scores: [{ number: 1 }, { number: 2 }],
     });

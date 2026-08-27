@@ -15,6 +15,8 @@
  *
  * Pure module - no React, unit-tested.
  */
+import type { PipeInputFormDescriptor } from 'mthds/protocol';
+
 import type { RunField } from './descriptor';
 import { buildRunFields } from './derive';
 import { ownProp } from './own-property';
@@ -407,9 +409,18 @@ export function inputDataFromWorkingMemory(
   return deflateAllInputs(full, inputSchemas);
 }
 
-/** Field descriptors for a method's main pipe. */
-export function fieldsForContract(contract: PipeIOContract | undefined): RunField[] {
-  return contract?.inputs ? buildRunFields(contract.inputs) : [];
+/**
+ * Field descriptors for a method's main pipe - the wire descriptor mapped over
+ * the contract, or `[]` while either artifact has not arrived yet. The
+ * descriptor comes back from `validate` beside `pipe_io_contracts` when the
+ * request opts in with `views: ["input_form"]`; `getPipeInputForm` is the
+ * lookup that matches `getPipeIOContract`.
+ */
+export function fieldsForContract(
+  contract: PipeIOContract | undefined,
+  descriptor: PipeInputFormDescriptor | undefined,
+): RunField[] {
+  return contract?.inputs && descriptor ? buildRunFields(descriptor, contract.inputs) : [];
 }
 
 /**

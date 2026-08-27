@@ -28,7 +28,7 @@
  * verdict in its own idiom.
  */
 import { inputMustBeFilled, isOptionalInput, isPluralInput } from './contracts';
-import { buildRunFields } from './derive';
+import { gatingFieldsFromInputs } from './gating-fields';
 import { fieldFilled, isFilled, mustBeFilled } from './readiness';
 import { validateRunInputsSchema, type RunInputError } from './gate-validator';
 import { healStringWrappers, pruneEmptyOptionals } from './wire-format';
@@ -314,7 +314,12 @@ export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInput
   // that input, because `isFilled` is exactly what it tests. Which is the rule
   // stated properly: the gate holds to its concept precisely the inputs it is
   // about to put on the wire, and nothing it will omit.
-  const missingInputs = buildRunFields(contract.inputs)
+  //
+  // The tree the predicates run over is the gate's own, walked structurally
+  // from the same `json_schema` ajv just validated - NOT the render tree, which
+  // is built from the input-form descriptor. A server validating a payload must
+  // never need that presentation artifact; see `gating-fields.ts`.
+  const missingInputs = gatingFieldsFromInputs(contract.inputs)
     .filter((field) => mustBeFilled(field) || isFilled(ownProp(preparedData, field.name)))
     .filter((field) => !fieldFilled(field, ownProp(preparedData, field.name)))
     .map((field) => field.name);

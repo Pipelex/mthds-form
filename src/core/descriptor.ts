@@ -1,16 +1,18 @@
 /**
  * The `RunField` descriptor - the consumer-facing currency of the form kernel.
  *
- * A method's inputs arrive from the API as a map of variable name →
- * `PipeInputContract` ({ concept_ref, json_schema }). That JSON Schema is rich
- * (Pydantic-generated) and not pleasant to render directly. `buildRunFields`
- * (in `derive.ts`) normalizes it once into a flat, recursive `RunField[]`
- * descriptor that the presentational field components consume - so the
- * components never touch raw JSON Schema, and stories can describe any input
- * shape declaratively.
+ * A method's inputs arrive from the API as two sibling artifacts: the wire
+ * input-form descriptor (`input_form`, the ordered presentation view the MTHDS
+ * standard specifies) and the `pipe_io_contracts` entry whose `json_schema`
+ * stays the validation contract. `buildRunFields` (in `derive.ts`) maps the
+ * wire descriptor structurally onto this `RunField[]` shape - so the
+ * presentational field components never touch either wire artifact directly,
+ * and stories can describe any input shape declaratively.
  *
  * Pure module: no React, no API calls. Trivially unit-testable.
  */
+
+import type { InputPresence } from './contracts';
 
 export type RunFieldKind =
   | 'text' // short single-line string
@@ -32,10 +34,38 @@ export interface RunFieldCommon {
   title?: string;
   /** The concept this input carries, e.g. `native.Document`, `demo.Invoice`. */
   conceptRef?: string;
+  /**
+   * The concept's refinement chain, immediate parent first, walked to its end
+   * (`['legal.BaseClause', 'native.Text']`). Straight off the wire descriptor;
+   * absent when the concept refines nothing. "Does this refine `native.X`?" is
+   * a membership test on this list, never shape sniffing.
+   */
+  refines?: string[];
   /** One-line helper text shown under the label. */
   description?: string;
   /** Required inputs always show; optional ones can collapse. */
   required: boolean;
+  /**
+   * The authored presence marker of the pipe's input slot, verbatim - set on
+   * TOP-LEVEL fields only, like `gating`. `required` is its two-valued
+   * projection (`presence !== 'optional'`); the marker itself is carried so a
+   * renderer can distinguish the authored `!` assertion from a plain slot.
+   */
+  presence?: InputPresence;
+  /**
+   * The value applied when the caller omits the field - present only when a
+   * default was AUTHORED, never the `null` a schema projection attaches to an
+   * optional field. A defaulted field always arrives `required: false`.
+   */
+  defaultValue?: unknown;
+  /** Example values for the field, when the wire carries any. */
+  examples?: unknown[];
+  /**
+   * The node's effective intent hints - the flat `string → string` merge the
+   * language defines, carried verbatim. Non-normative: a renderer that ignores
+   * them stays correct, and nothing in the kernel's gating reads them.
+   */
+  hints?: Record<string, string>;
   /**
    * Whether Run waits for this input - set on TOP-LEVEL fields only, straight
    * from `inputMustBeFilled` (see `mustBeFilled` in `readiness.ts` for why this
@@ -59,12 +89,25 @@ export interface RunFieldCommon {
   contentKey?: string;
 }
 
-export interface TextRunField extends RunFieldCommon {
+/**
+ * The constraint slots the two text kinds share, mapped from the wire's
+ * `min_length` / `max_length` / `pattern` / `format`. `format` is the open
+ * string set carrying schema formats the `date` kind does not absorb
+ * (`'time'`, `'uri'`, …); a renderer may hint on it and ignore it safely.
+ */
+export interface TextConstraints {
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: string;
+}
+
+export interface TextRunField extends RunFieldCommon, TextConstraints {
   kind: 'text';
   placeholder?: string;
 }
 
-export interface ProseRunField extends RunFieldCommon {
+export interface ProseRunField extends RunFieldCommon, TextConstraints {
   kind: 'prose';
   placeholder?: string;
 }
@@ -72,10 +115,11 @@ export interface ProseRunField extends RunFieldCommon {
 export interface DateRunField extends RunFieldCommon {
   kind: 'date';
   /**
-   * True when the backing schema is `format: date-time`: the stored value is a
-   * full RFC 3339 timestamp (`2026-07-06T00:00:00Z`) so it passes the API's
+   * The wire's `datetime` flag - true when the value carries a time of day
+   * (the backing schema is `format: date-time`): the stored value is a full
+   * RFC 3339 timestamp (`2026-07-06T00:00:00Z`) so it passes the API's
    * `date-time` validation, even though the control only asks for a day. False
-   * for a bare `format: date`, where the value stays `YYYY-MM-DD`.
+   * for a bare calendar date, where the value stays `YYYY-MM-DD`.
    */
   datetime: boolean;
 }
@@ -112,24 +156,23 @@ export interface ListRunField extends RunFieldCommon {
   /** The element descriptor (its `name` is unused; the index labels items). */
   item: RunField;
   /**
-   * The FEWEST items the slot accepts, when the schema states a lower bound.
-   * Absent for a variable `Concept[]` list, which demands none.
+   * The FEWEST items the slot accepts. Absent for a variable `Concept[]` list,
+   * which demands none.
    *
-   * Read off the array schema's `minItems` rather than off the contract's
-   * `item_count`, which states the same number: this exists so `fieldFilled` can
-   * answer the question **ajv** answers, and `minItems` is the keyword ajv
-   * reads. pipelex emits `minItems`/`maxItems` = N for a `[N]` slot and neither
-   * for `[]`, so on a top-level slot the two sources agree by construction.
+   * On a top-level slot this is the wire descriptor's `item_count` (present
+   * exactly on a fixed `[N]` slot); an engine emits `minItems`/`maxItems` = N
+   * on the same slot's schema, so the number `fieldFilled` gates on and the
+   * keyword ajv reads agree by construction.
    *
-   * A schema may still state a lower bound alone - `mapSchema` recurses, so a
-   * nested array inside a structured concept reaches here with whatever its
-   * model declared and no MTHDS multiplicity behind it. Gating on that bound is
-   * the same rule, and it is the direction that cannot leave readiness more
-   * permissive than the gate.
+   * The wire never puts `item_count` on a NESTED list, but the model behind a
+   * structured concept may state `minItems` on an array property of its own -
+   * so on nested nodes this is read off the schema, which is the direction
+   * that cannot leave readiness more permissive than the gate.
    */
   itemCount?: number;
   /**
-   * The MOST items the slot accepts, off the schema's `maxItems`.
+   * The MOST items the slot accepts, off the schema's `maxItems` (which a
+   * fixed `[N]` slot also states as N).
    *
    * A separate field because it is a separate fact, and conflating them is a
    * bug that hides: `itemCount` was read as a minimum by readiness and as a

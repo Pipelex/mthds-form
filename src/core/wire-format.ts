@@ -17,20 +17,46 @@
  */
 
 import { asCalendarDate } from './date-format';
-import { isWireDocumentLikeConcept, isWireTextConcept, splitListConcept } from './native-concepts';
 import { hasOwnProp, ownProp } from './own-property';
 import { collectSchemaDefs, resolveSchemaIndirection, schemaTypeOf } from './schema-utils';
 
-/** The wire-format view of the native-concept taxonomy (which concept codes use
- *  simplified formats) lives in `native-concepts.ts` - including the record of
- *  where it drifts from the field mapper's view. */
-function isListConcept(conceptCode: string): { isList: boolean; baseConcept: string } {
-  const { base, isList } = splitListConcept(conceptCode);
-  return { isList, baseConcept: base ?? '' };
+// ─── The wire taxonomy ──────────────────────────────────────────────────────
+//
+// Which native concepts use a SIMPLIFIED wire form is a fact about the
+// runtime's input parser, not about rendering - so this module states it for
+// itself, and it is the one native-concept knowledge left in the package now
+// that the render taxonomy is gone (the field mapper reads the wire descriptor;
+// see docs/derivation-swap.md). `native.Date` and `native.Html` are absent on
+// purpose: both travel through the structured `{ concept, content }` branch,
+// which since the derivation swap carries their REAL content models
+// (`DateContent {date, time}`, `HtmlContent {inner_html, css_class}`) rather
+// than the historical `{text}` drift.
+
+/** Both spellings a concept ref uses: bare (`Text`) and namespaced (`native.Text`). */
+function nativeSet(...names: string[]): ReadonlySet<string> {
+  return new Set(names.flatMap((n) => [n, `native.${n}`]));
 }
 
-const isTextConcept = isWireTextConcept;
-const isDocumentLikeConcept = isWireDocumentLikeConcept;
+/** Concepts whose simplified wire form is a bare string (`{text} ↔ "..."`). */
+const WIRE_TEXT_CONCEPTS = nativeSet('Text');
+
+/** Concepts whose simplified wire form is a bare URL string. */
+const WIRE_DOCUMENT_LIKE_CONCEPTS = nativeSet('Document', 'Image', 'Page');
+
+function isTextConcept(concept: string): boolean {
+  return WIRE_TEXT_CONCEPTS.has(concept);
+}
+
+function isDocumentLikeConcept(concept: string): boolean {
+  return WIRE_DOCUMENT_LIKE_CONCEPTS.has(concept);
+}
+
+/** A concept ref like `native.Document[]` → base `native.Document`, isList true. */
+function isListConcept(conceptCode: string): { isList: boolean; baseConcept: string } {
+  if (conceptCode.endsWith('[]'))
+    return { isList: true, baseConcept: conceptCode.slice(0, -2) };
+  return { isList: false, baseConcept: conceptCode };
+}
 
 // ─── Deflate: form (full) → inputs.json (simplified) ──────────────────────
 
