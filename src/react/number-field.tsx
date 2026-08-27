@@ -6,6 +6,7 @@ import type { NumberRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
+import { useFieldDomId } from './field-dom-id';
 
 interface NumberFieldProps {
   field: NumberRunField;
@@ -19,6 +20,7 @@ interface NumberFieldProps {
 /** Numeric input with steppers and min/max clamping. */
 export function NumberField({ field, value, onChange, id, error, disabled }: NumberFieldProps) {
   const s = useFieldStrings();
+  const domId = useFieldDomId(id);
   const step = field.integer ? 1 : 0.1;
 
   const clamp = (n: number) => {
@@ -44,11 +46,11 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
       description={field.description ?? rangeHint}
       required={field.required}
       error={error}
-      htmlFor={id}
+      htmlFor={domId}
     >
       <div className="flex items-stretch gap-1.5">
         <input
-          id={id}
+          id={domId}
           type="number"
           inputMode={field.integer ? 'numeric' : 'decimal'}
           value={value ?? ''}

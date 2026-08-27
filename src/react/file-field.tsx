@@ -8,6 +8,7 @@ import type { FileRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
+import { useFieldDomId } from './field-dom-id';
 
 /** The serializable value of a file field. URL is what the runner sends. */
 export interface FileValue {
@@ -99,6 +100,7 @@ function FileField({
   category,
 }: FileFieldProps & { category: 'document' | 'image' }) {
   const s = useFieldStrings();
+  const domId = useFieldDomId(id);
   const [showUrl, setShowUrl] = useState(false);
   // The preview is collapsed by default - opened on demand via a "Preview" button.
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -242,7 +244,7 @@ function FileField({
       // Names the file input, the way every other control in the set names its
       // own. Without it `FieldShell` renders the title as a `<div>` bound to
       // nothing and the input's accessible name computes to the empty string.
-      htmlFor={id}
+      htmlFor={domId}
     >
       {hasFile && !uploading ? (
         <div className="space-y-2">
@@ -286,7 +288,7 @@ function FileField({
         >
           <input
             {...getInputProps({ tabIndex: 0 })}
-            id={id}
+            id={domId}
             disabled={busy}
             aria-invalid={!!error}
           />

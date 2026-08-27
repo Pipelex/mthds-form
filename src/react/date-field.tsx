@@ -5,6 +5,7 @@ import type { DateRunField } from '../core';
 import { toDateInputValue, toStoredDateValue } from '../core/date-format';
 import { FieldShell } from './field-shell';
 import { fieldControlClass } from './field-styles';
+import { useFieldDomId } from './field-dom-id';
 
 interface DateFieldProps {
   field: DateRunField;
@@ -21,6 +22,7 @@ interface DateFieldProps {
  * still satisfies the API's `date-time` format.
  */
 export function DateField({ field, value, onChange, id, error, disabled }: DateFieldProps) {
+  const domId = useFieldDomId(id);
   return (
     <FieldShell
       name={field.name}
@@ -30,10 +32,10 @@ export function DateField({ field, value, onChange, id, error, disabled }: DateF
       description={field.description}
       required={field.required}
       error={error}
-      htmlFor={id}
+      htmlFor={domId}
     >
       <input
-        id={id}
+        id={domId}
         type="date"
         value={toDateInputValue(value)}
         disabled={disabled}
