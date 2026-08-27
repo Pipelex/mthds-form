@@ -2,23 +2,21 @@
 
 ## The one rule: the descriptor is the currency
 
-A method's inputs arrive as a `pipe_io_contracts` map — a concept reference and a JSON Schema per input. JSON Schema is a poor thing to render from directly: it is recursive, it expresses the same shape several ways (`anyOf` nullables, `$ref` indirection, `$defs` hoisting), and the interesting question for a form ("is this a document upload or a paragraph of prose?") is not a schema question at all, it is a *concept* question that the schema only hints at.
-
-So exactly one function answers it:
+A method's inputs arrive as two sibling wire artifacts, both derived by the engine from the same resolved library: `pipe_io_contracts` (a concept reference and a JSON Schema per input — the validation contract) and the per-pipe **input-form descriptor** (the ordered presentation view the standard specifies). Exactly one function turns them into what the rest of the package consumes:
 
 ```
-buildRunFields(inputs: Record<string, PipeInputContract>) -> RunField[]
+buildRunFields(descriptor: PipeInputFormDescriptor, inputs: Record<string, PipeInputContract>) -> RunField[]
 ```
 
-`RunField` is a discriminated union over `kind` — `text`, `prose`, `date`, `document`, `image`, `number`, `boolean`, `choice`, `structured`, `list`, `unknown` — carrying everything a control needs and nothing a control would have to re-derive. **Nothing else in the package, and nothing in any consumer, reads JSON Schema to decide how to render.** The renderer switches on `field.kind`. Readiness reads `field.gating`. Validation messaging reads the field's name and label.
+`RunField` is a discriminated union over `kind` — `text`, `prose`, `date`, `number`, `boolean`, `enum`, `document`, `image`, `object`, `list`, `unknown` — carrying everything a control needs and nothing a control would have to re-derive. **What a field IS comes from the wire descriptor, verbatim**: the kind, the constraints, the refinement chain, whether Run gates on it. `buildRunFields` maps that tree structurally and decides nothing — the heuristics that used to guess here are deleted, and [derivation-swap.md](derivation-swap.md) is the record. The name-for-name wire ↔ kernel mapping is [wire-correspondence.md](wire-correspondence.md).
 
-Everything heuristic is module-private behind that function: the native-concept taxonomy, the url-bearing-object test, the depth rule that decides prose versus a single-line input, the `accept` strings, list splitting. None of it is exported, which is what makes the seam real rather than aspirational — see [derivation-swap.md](derivation-swap.md).
+The contract's `json_schema` is co-walked for exactly two facts the wire deliberately omits — `contentKey` (below) and a nested array's `minItems`/`maxItems` — both structural reads of keywords ajv itself enforces, never judgements. Beyond that walk, **nothing else in the package, and nothing in any consumer, reads JSON Schema to decide how to render.** The renderer switches on `field.kind`. Readiness reads `field.gating`. Validation messaging reads the field's name and label. The one other schema reader in the kernel is the gate's own private walk (`gating-fields`, below), which exists precisely so a server never needs the presentation artifact to refuse a run.
 
 ### What a scalar's value actually looks like on the wire
 
 A native scalar reads as a plain value in the form and travels as an object on the wire. `native.Number` declares `NumberContent {number}`, `native.YesNo` declares `YesNoContent {yes_no}`, `native.Text` declares `TextContent {text}` — so the control holds `2` while the payload must carry `{number: 2}`, and the gate validates against the declared content model.
 
-The descriptor is what reconciles those. `buildRunFields` reads the contract, finds the single property the content model declares, and stamps its **name** on the field as `contentKey`. The value bridge in `values` then wraps on the way out and unwraps on the way back in, by name — it holds no list of which concepts wrap, and it never looks at a schema.
+The descriptor is what reconciles those. `buildRunFields`' schema co-walk finds the single property a scalar-kind node's content model declares and stamps its **name** on the field as `contentKey` — resolving `$ref` and nullable-`anyOf` indirection to a fixpoint first, so an optional concept-typed child (pydantic's `anyOf: [{$ref}, {type: 'null'}]`) reads like any other. The value bridge in `values` then wraps on the way out and unwraps on the way back in, by name — it holds no list of which concepts wrap, and it never looks at a schema.
 
 That indirection is not decoration. The wrapper used to be a second hand-written list of concept names living next to the render taxonomy, the two disagreed about `native.Number`, and the result was a form that looked correct, satisfied readiness, enabled Run, and then failed its own gate with `'…' must be object`. Deriving the name from the contract covers concepts nobody remembered to add.
 
@@ -31,15 +29,15 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 | Module | Role |
 | --- | --- |
 | `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
-| `derive` | `buildRunFields`, the one derivation function; every heuristic lives behind it |
+| `derive` | `buildRunFields`, the structural wire-descriptor → `RunField` mapping, and `getPipeInputForm`, the descriptor lookup; the schema co-walk for `contentKey` and nested list bounds lives behind it |
 | `contracts` | the standard's `pipe_io_contracts` types, re-exported from `mthds/protocol`, plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
 | `gate` | `gateRunInputs`, the whole chain as one call, over the four steps it composes — [docs/run-gate.md](run-gate.md) |
+| `gating-fields` | the gate's own private field tree, walked structurally from the contract's `json_schema` — a server must never need the presentation artifact to validate (not exported) |
 | `gate-validator` | the kernel's own ajv instance and the `RunInputError` type its verdict speaks |
 | `readiness` | `isFilled`, `fieldFilled`, `mustBeFilled`, `computeReadiness` — what the Run button gates on, and what the server gate re-applies |
 | `values` | store/wire value conversions (wrapping scalars by `contentKey`), `setValueAtPath`, `outputsFromPipeOutput` |
-| `wire-format` | deflate/inflate and the exactly-one-wrapper invariant |
+| `wire-format` | deflate/inflate and the exactly-one-wrapper invariant; states the wire-simplification taxonomy for itself — the one native-concept knowledge left in the package |
 | `schema-utils` | the one nullable-`anyOf` collapse and the one `$defs` walker |
-| `native-concepts` | the native-concept taxonomy, stated once (not exported from the entry) |
 | `date-format` | pydantic-parity date leniency, shared by the validator and the date control |
 | `validation-message` | turns a `RunInputError` into something a person can act on |
 | `normalize-schema` | RJSF-shaped schema preparation, consumed by the gate and by hosts that still drive an RJSF panel |
@@ -95,7 +93,7 @@ The gate validates through the package's own ajv instance, configured for pydant
 
 ## Public API and internal code
 
-`src/core/index.ts` and `src/react/index.ts` are the two entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation, the taxonomy, and the vendored primitives change without a breaking release.
+`src/core/index.ts` and `src/react/index.ts` are the two entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
 
 `dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only `.` and `./react`, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
 

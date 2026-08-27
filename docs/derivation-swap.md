@@ -1,49 +1,55 @@
 # The derivation swap
 
-The package ships one honest compromise, and this document is what makes it survivable: **`buildRunFields` guesses.**
+This package used to guess. `buildRunFields` looked at a concept reference and a JSON Schema and decided — with hardcoded native-concept sets, a url-bearing-object test, and a depth rule — whether an input was a paragraph of prose, a document upload, a date, or a nested structure. This document was the survival plan for that compromise; it is now the **record of the swap**: the MTHDS standard grew a wire artifact that states those answers, the engine derives it, and the guessing has been deleted rather than bypassed.
 
-It looks at a concept reference and a JSON Schema and decides whether an input is a paragraph of prose, a document upload, a date, or a nested structure. It does this with hardcoded native-concept sets, a url-bearing-object test, and a depth rule. These are heuristics. They are correct for the methods that exist today and they are not derivable from first principles, because the information a form actually wants — *this input is a long free-text field*, *this one is an uploaded file* — is not something the language currently states.
-
-The plan is that the language will state it: a specced input-form descriptor, derived by the engine and carried on the wire. When that lands, the guessing gets deleted rather than bypassed.
-
-## Why the seam is shaped the way it is
-
-Everything heuristic is private to `src/core/derive.ts` and `src/core/native-concepts.ts`. Neither module is re-exported from the package entry. Consumers receive `RunField[]` and never see how it was produced.
-
-That is the whole design. The swap is then a change to one function's body and to nothing else:
+## What swapped
 
 ```
-today:     PipeInputContract map --(local heuristics)--> RunField[]
-after:     wire descriptor       --(structural mapping)--> RunField[]
+before:  contracts map                --(local heuristics)-->    RunField[]
+after:   wire descriptor + contracts  --(structural mapping)-->  RunField[]
 ```
 
-No consumer changes. No renderer changes. The control set switches on `field.kind` and cannot tell where the kind came from. The gate, readiness, and validation messaging all read the descriptor, never the schema.
+The wire artifact is the standard's per-pipe **input-form descriptor** ([Input-Form Descriptor](https://mthds.ai/latest/spec/input-form-descriptor/)): one ordered node per input slot, discriminated on `kind`, carrying the constraints, the refinement chain, the presence marker and the producer-derived `gating` answer. `buildRunFields(descriptor, inputs)` maps that tree structurally onto `RunField` and decides nothing: kinds, bounds, `required`/`presence`/`gating`, `refines`, `default_value`, `examples`, `hints` all cross verbatim — the exact name-for-name mapping is [wire-correspondence.md](wire-correspondence.md). `getPipeInputForm` is the lookup beside it, `getPipeIOContract`'s twin.
 
-If a change to this package ever makes a heuristic visible to a consumer — exports a concept set, adds a `json_schema` passthrough to `RunField`, lets a control sniff a shape — the seam is gone and the swap becomes a breaking release. That is the thing to defend in review.
+The seam held, which was the whole point of building it: consumers receive `RunField[]` and never saw how it was produced, so the swap changed one function's signature and no renderer, no control, no readiness rule. The control set still switches on `field.kind` and cannot tell where the kind came from.
 
-A *derived fact* on the descriptor is the opposite of that, and `RunField.contentKey` is the example to reason from. It is the name of the property a native scalar's value sits inside on the wire (`{number}` for `NumberContent`, `{yes_no}` for `YesNoContent`), read off the contract by `buildRunFields` and carried as a plain string. No consumer learns anything about JSON Schema from it, and the value bridge that consumes it stopped keeping a taxonomy of its own — which is one fewer copy for the swap to reconcile, not one more.
+## The mapping is total, including over version drift
 
-The rule that separates the two: does the field let something downstream re-derive a decision this package is supposed to own? A schema would. A name the engine will state for itself does not.
+`kind` is the discriminant of the whole artifact, and the vocabulary it draws from is versioned with the standard — the peer this package compiles against pins the set it knows (`FIELD_KINDS` in `mthds/protocol`). A server can be ahead of that peer, and no type rules it out: `mapNode`'s switch is exhaustive over the *pinned* union, which `tsc` proves, and proving it says nothing about a `kind` the wire invents after this build shipped.
 
-## The recorded drift
+So the mapper answers drift with the standard's own escape hatch. An unrecognized node becomes `kind: 'unknown'` — the raw-JSON entry a renderer falls back to against the contract's `json_schema`, which is exactly what `unknown` exists for ("a producer that cannot map a node honestly MUST report it rather than guess a kind"; a consumer meeting a member it does not know is in the same position). The field keeps its `name`, its `required` and its `concept_ref`, which is the part that matters: a field with no name is unaddressable by the value bridge and unnameable by readiness, so its input silently never reaches the payload while the Run button waits on a blank entry.
 
-The taxonomy this package states once was consolidated from copies that had drifted, and the drift is *preserved*, not silently fixed, because some of it is visible on the wire. `src/core/native-concepts.ts` carries the table in its header; `__tests__/concept-taxonomy-characterization.test.ts` pins every cell of it.
+The compile-time half is kept by a `satisfies never` after the switch: when the **peer** grows a kind, the build fails and someone maps it deliberately. The runtime return is only ever reached when a **server** is ahead of the peer.
 
-The consequential entry: a `native.Date` input renders as prose rather than a date picker, wraps as `{text}`, and deflates to `{concept, content: {text}}` — consistent end to end, but not `DateContent`. Correcting it changes what goes over the wire, so it belongs to the swap and not to a patch release before it.
+## What the schema still answers, and why
 
-`native.Html` is a related case that turned out to work by accident. The concept set spells the code `HTML`; the language spells it `Html`, so the set matches nothing a real contract carries and `native.Html` falls through to the generic object dispatch — a nested card over `HtmlContent {inner_html, css_class}`, which round-trips correctly. **Correcting the spelling on its own would break inputs that work today**, by routing them into the prose-plus-`{text}` drift above. It goes with the `Date` fix, not before it.
+The contract's `json_schema` is co-walked for exactly **two facts** the wire deliberately does not carry — both structural reads of keywords ajv itself enforces, never judgements:
 
-A third entry was a genuine bug rather than a drift, and it is fixed: `native.Number` rendered as a number control and then travelled bare into a schema declaring `NumberContent {number}`, so the kernel's own gate rejected every run carrying one. There was no working behaviour to preserve, which is what separated it from the two above. The wrapper property is now derived from the contract (see `contentKey`, above) instead of being kept in a second hand-written list — the generalization the fix chose over a fourth special case, precisely so the next unlisted concept is covered without anyone noticing the gap. `native.YesNo` was in that same blind spot and came back with it: the render taxonomy looked for a concept named `Boolean`, which MTHDS does not have, so a yes/no input arrived as an object card wrapping a lone switch. It renders as a switch now, and the wire shape is unchanged either way.
+- **`contentKey`** — the single property a native scalar's value sits inside on the wire (`TextContent {text}`, `NumberContent {number}`, `YesNoContent {yes_no}`). A scalar-kind node (text, prose, number, boolean) whose aligned schema declares exactly one property gets that property's name; anything else gets none. The alignment resolves `$ref` and nullable-`anyOf` indirection to a fixpoint, not in one pass — pydantic states an Optional concept-typed field as `anyOf: [{$ref}, {type: 'null'}]`, where collapsing the nullable is what surfaces the reference. It is a fact about the **payload** shape, which is the schema's job — the descriptor describes the form, never the payload.
+- **Nested list bounds** — the wire puts `item_count` only on a top-level fixed `[N]` slot, but the model behind a structured concept may state `minItems`/`maxItems` on an array property of its own, and ajv enforces them. A list's `itemCount` prefers the wire's `item_count` (falling back to `minItems`); `maxItemCount` prefers the schema's `maxItems` (falling back to `item_count`).
 
-The url-bearing-object test is a second recorded case. It reduces to `Boolean(schema.properties?.url)`, and the code says exactly that rather than implying a narrower check it does not perform. A narrower predicate — requiring the description to match — is a real behaviour change (arbitrary url-bearing objects would stop rendering as documents) and is queued with the swap.
+## The gate walks the schema for itself
 
-## What the swap has to preserve
+`gateRunInputs(contract, data)` kept its signature, and that is doctrine rather than accident: the descriptor is a presentation view, and a machine consumer must never need it to validate a payload — `json_schema` keeps that job. A server holds contracts; it may never have asked for the view.
 
-The characterization suites are the contract, and they were written before the extraction precisely so this could be checked rather than argued:
+So the gate's emptiness re-check runs over its own private tree, `src/core/gating-fields.ts`: a minimal structural walk of the contract's schema (`object` nodes with their required children, `list` nodes with their bounds, opaque leaves), with `gating` stamped from `inputMustBeFilled`. It reads exactly the keywords ajv enforces and never reaches a renderer. Agreement with the browser's readiness — which runs over the wire-mapped render tree — holds by construction, because both artifacts derive from one resolved library, and is asserted in `gate-agreement.test.ts`, which runs both halves over one table.
 
-- `concept-taxonomy-characterization` — every native concept's behaviour on all three paths (render, wire, value bridge).
-- `native-scalars` — the content wrapper each native scalar declares, end to end from the contract through the value bridge to the gate's verdict.
-- `schema-utils-characterization` — the nullable-`anyOf` collapse and `$defs` walking, including the primitive-union case where the two historical implementations genuinely differed.
-- `gate` and `values` — the four-step gate contract and the store/wire conversions.
+## What survived, and where it lives now
 
-A wire-derived descriptor that reproduces these is a drop-in. One that does not is a behaviour change, and the diff in those tests is exactly the list of what changed — which is the point of having recorded them.
+The deflate/inflate taxonomy — which native concepts use a *simplified wire form* (`native.Text` as a bare string; `native.Document`/`Image`/`Page` as a bare URL) — is a fact about the runtime's input parser, not about rendering, so it did not swap. It moved into `wire-format.ts` as private code, and it is the one piece of native-concept knowledge left in the package. Everything render-flavoured — the text/document/number/yes-no/date render sets, the text-wrapper fallback, the url-bearing-object test, the depth rule, the prose-length rule, the schema-`enum` dispatch — is gone with `native-concepts.ts`.
+
+## The reviewed differences
+
+The characterization suites were written before the swap precisely so the swap could be checked rather than argued. Every difference below was reviewed against that diff and is intentional; the suites now pin the resolved behaviour.
+
+1. **`native.Date` is its structure.** It rendered as prose, wrapped as `{text}`, and deflated to `{concept, content: {text}}` — consistent only with itself. The wire states it as an `object` node over `DateContent {date, time}`, so the store and the run payload now carry the shape the schema declares. **Wire-visible**, and the reason the drift waited for the swap instead of a patch. (A composite date-picker control over that object node is an allowed presentation call, not taken — the object card renders a date child and a time child today.)
+2. **`native.Html` works on purpose.** It rendered as an object card before, but only because the deleted set spelled the code `HTML` while the language spells it `Html` — the concept matched nothing and fell through to the generic object dispatch. The wire now states the same answer deliberately, as an `object` node over `HtmlContent`.
+3. **A concept refining `native.Text` is prose.** A refining concept carrying the `TextContent` wrapper schema (a Poem, say) used to render as a nested object card with a lone `text` child. The wire states it as `prose` with `refines: ["native.Text"]`, and the co-walk finds the wrapper's single property — so the run value is the bare string and the field carries `contentKey: "text"`. The **stored** shape is unchanged (`{concept, content: {text}}`).
+4. **The text-wrapper fallback is gone.** `native.Text` beside a degenerate contract (a bare `{type: "object"}` with no properties, or a `{type: "string"}`) no longer gets an assumed `{text}` wrapper: `contentKey` is purely structural now, and a schema that declares no single property yields none.
+5. **The heuristics have no successors.** The depth rule, the url-bearing-object test, the prose-length rule and the schema-`enum` dispatch are deleted — the wire states kinds. Number bounds are no longer read from the schema at all: `min`/`max` come from the wire node (`minimum ?? exclusive_minimum`, `maximum ?? exclusive_maximum` — the kernel collapses the exclusive bounds; ajv still enforces the exact keyword).
+6. **Field order is the authored order.** The descriptor's `fields` list follows the method's authored input order — the fact the contract's `inputs` map deliberately never carried.
+7. **`title` is mapped.** The kernel used to suppress the contract's title (the engine could report a model name there); the wire's `title` is an authored or engine-derived fact and crosses verbatim.
+
+## What "a derived fact on the descriptor" still means
+
+`contentKey` remains the example to reason from. It is read off the contract and carried as a plain string; no consumer learns anything about JSON Schema from it, and the value bridge that consumes it keeps no taxonomy of its own. The rule that separates a fact from a leak is unchanged: does the field let something downstream re-derive a decision this package is supposed to own? A schema passthrough would. A name the engine states — or a name structurally read from the schema the engine also derived — does not.

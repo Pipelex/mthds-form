@@ -162,6 +162,35 @@ export function resolveSchemaIndirection(
   }
 }
 
+/** How many indirection layers `resolveSchemaNode` unwraps before concluding
+ *  the chain is cyclic and returning what it has. Pydantic stacks at most a
+ *  handful (`$ref` inside a nullable `anyOf`); real chains end long before. */
+const MAX_INDIRECTION_HOPS = 16;
+
+/**
+ * Resolve one schema node to its fixpoint under `derefSchema` +
+ * `collapseNullable`, so a nullable REFERENCE - pydantic's `anyOf: [{$ref},
+ * {type:'null'}]` for an Optional concept-typed field - resolves the same way
+ * a bare `$ref` or an inline nullable does. One pass of either helper cannot:
+ * collapsing the nullable surfaces a `$ref` that was inside a branch, and
+ * dereferencing can surface a nullable the definition holds. Sibling keys
+ * still merge over the definition (`derefSchema`'s semantics - unlike
+ * `resolveSchemaIndirection`, which replaces). Identity is the fixpoint test:
+ * both helpers return the schema unchanged when they have nothing to do.
+ */
+export function resolveSchemaNode(
+  schema: JsonSchema,
+  defs: Record<string, JsonSchema>,
+): JsonSchema {
+  let current = schema;
+  for (let hop = 0; hop < MAX_INDIRECTION_HOPS; hop++) {
+    const next = collapseNullable(derefSchema(current, defs));
+    if (next === current) return current;
+    current = next;
+  }
+  return current;
+}
+
 // ─── $defs collection ────────────────────────────────────────────────────────
 
 export interface CollectDefsOptions {

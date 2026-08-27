@@ -21,13 +21,19 @@ export type {
   RunField,
   RunFieldCommon,
   RunFieldKind,
+  TextConstraints,
   TextRunField,
   UnknownRunField,
 } from './descriptor';
 export { conceptCategory } from './descriptor';
 
-// The ONE derivation function - contracts in, descriptors out.
-export { buildRunFields } from './derive';
+// The ONE derivation function - the wire input-form descriptor mapped
+// structurally onto RunField, with the contract beside it for the two
+// schema-derived facts (contentKey, nested list bounds). The wire types are
+// the standard's, re-exported so a host can type the artifacts it passes in;
+// `getPipeInputForm` is `getPipeIOContract`'s twin for the sibling artifact.
+export type { InputForm, PipeInputFormDescriptor } from 'mthds/protocol';
+export { buildRunFields, getPipeInputForm } from './derive';
 
 // Readiness - what the Run button gates on.
 //

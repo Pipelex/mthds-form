@@ -12,6 +12,11 @@
  * Every case is asserted through BOTH halves wherever both can see it. A
  * hostile value that makes the two disagree is the same defect class as a
  * well-formed one that does - it just arrives from a different direction.
+ *
+ * The render tree is mapped from each fixture's hand-authored wire node
+ * (`fieldsOf`, the same identity-keyed idiom as `gate-agreement.test.ts`);
+ * several inputs here are named dynamically, so the node factories take the
+ * name.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -22,8 +27,15 @@ import {
   isFilled,
   rjsfDataFromRunValues,
 } from '..';
-import type { PipeIOContract, PipeIOContracts, PipeInputContract } from '..';
-import { OPTIONAL_SINGLE, PLAIN_SINGLE, SINGLE_OUTPUT } from './contract-fixtures';
+import type { InputFormTopLevelField } from 'mthds/protocol';
+import type { PipeIOContract, PipeIOContracts, PipeInputContract, RunField } from '..';
+import {
+  OPTIONAL_SINGLE,
+  PLAIN_SINGLE,
+  SINGLE_OUTPUT,
+  WIRE_OPTIONAL,
+  WIRE_PLAIN,
+} from './contract-fixtures';
 
 const textSchema = {
   title: 'TextContent',
@@ -50,6 +62,55 @@ const OPTS: PipeInputContract = {
     properties: { tone: { title: 'Tone', type: 'string' } },
   },
 };
+
+/** A concept whose required CHILD collides with `Object.prototype`. */
+const NAMED: PipeInputContract = {
+  ...PLAIN_SINGLE,
+  concept_ref: 'demo.Named',
+  json_schema: {
+    title: 'Named',
+    type: 'object',
+    properties: { constructor: { title: 'Constructor', type: 'string' } },
+    required: ['constructor'],
+  },
+};
+
+/** The wire node each contract fixture arrives with, keyed by fixture identity. */
+const WIRE = new Map<PipeInputContract, (name: string) => InputFormTopLevelField>([
+  [TEXT, (name) => ({ ...WIRE_PLAIN, kind: 'prose', name, concept_ref: 'native.Text' })],
+  [
+    OPTIONAL_TEXT,
+    (name) => ({ ...WIRE_OPTIONAL, kind: 'prose', name, concept_ref: 'native.Text' }),
+  ],
+  [
+    OPTS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RunOptions',
+      fields: [{ kind: 'text', name: 'tone', required: false }],
+    }),
+  ],
+  [
+    NAMED,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Named',
+      fields: [{ kind: 'text', name: 'constructor', required: true }],
+    }),
+  ],
+]);
+
+/** The render tree for a case's inputs: the wire descriptor mapped over them. */
+function fieldsOf(inputs: Record<string, PipeInputContract>): RunField[] {
+  return buildRunFields(
+    { fields: Object.entries(inputs).map(([name, input]) => WIRE.get(input)!(name)) },
+    inputs,
+  );
+}
 
 const contractOf = (inputs: Record<string, PipeInputContract>): PipeIOContract => ({
   inputs,
@@ -86,7 +147,7 @@ describe('a value deeper than any structure the method could declare', () => {
     const inputs = { opts: OPTS };
     const values = { opts: { junk: deepValue(5000) } };
 
-    expect(computeReadiness(buildRunFields(inputs), values).missing).toEqual(['opts']);
+    expect(computeReadiness(fieldsOf(inputs), values).missing).toEqual(['opts']);
 
     const gate = gateRunInputs(contractOf(inputs), values);
     expect(gate.ok).toBe(false);
@@ -152,6 +213,97 @@ describe('a value that references itself', () => {
   });
 });
 
+describe('a schema that references itself', () => {
+  // The values above reference themselves; this contract's SCHEMA does. The
+  // gate's tree walk follows `$ref`, and unlike the value walks its recursion
+  // is driven by the schema - without a cycle guard it has no floor. ajv is
+  // untouched by the same schema: it resolves recursion natively, data-bounded.
+
+  /** `TreeNode {label, children: TreeNode[]}` - pydantic's emission for a
+   *  self-referencing model: one `$defs` entry, referenced from the root and
+   *  from inside itself. */
+  const TREE: PipeInputContract = {
+    ...PLAIN_SINGLE,
+    concept_ref: 'demo.Tree',
+    json_schema: {
+      $defs: {
+        TreeNode: {
+          title: 'TreeNode',
+          type: 'object',
+          properties: {
+            label: { title: 'Label', type: 'string' },
+            children: { type: 'array', items: { $ref: '#/$defs/TreeNode' } },
+          },
+          required: ['label'],
+        },
+      },
+      $ref: '#/$defs/TreeNode',
+    },
+  };
+
+  /** Two siblings referencing the SAME def - repetition, not recursion. */
+  const TWINS: PipeInputContract = {
+    ...PLAIN_SINGLE,
+    concept_ref: 'demo.Twins',
+    json_schema: {
+      title: 'Twins',
+      type: 'object',
+      $defs: {
+        Part: {
+          title: 'Part',
+          type: 'object',
+          properties: {
+            name: { title: 'Name', type: 'string' },
+            note: { title: 'Note', anyOf: [{ type: 'string' }, { type: 'null' }], default: null },
+          },
+          required: ['name'],
+        },
+      },
+      properties: { first: { $ref: '#/$defs/Part' }, second: { $ref: '#/$defs/Part' } },
+      required: ['first', 'second'],
+    },
+  };
+
+  it('gets a verdict from the gate, not a RangeError', () => {
+    // The filled payload is the one that reaches the walk: ajv passes it, so
+    // nothing between the request and the tree build stands in the way.
+    const gate = gateRunInputs(contractOf({ tree: TREE }), {
+      tree: { label: 'root', children: [{ label: 'kid', children: [] }] },
+    });
+    expect(gate.ok).toBe(true);
+  });
+
+  it('still refuses the payload that holds nothing', () => {
+    const gate = gateRunInputs(contractOf({ tree: TREE }), {});
+    expect(gate.ok).toBe(false);
+    if (!gate.ok) expect(gate.missingInputs).toEqual(['tree']);
+  });
+
+  it('leaves depth enforcement to ajv, which resolves recursion natively', () => {
+    const gate = gateRunInputs(contractOf({ tree: TREE }), {
+      tree: { label: 'root', children: [{ children: [] }] },
+    });
+    expect(gate.ok).toBe(false);
+  });
+
+  it('does not mistake a repeated reference for a cycle', () => {
+    // Two siblings referencing one def is ordinary composition. A guard keyed
+    // on "seen this ref before" - rather than "this ref is on my own path" -
+    // truncates the second expansion into an opaque leaf, and then a required
+    // child ajv cannot catch ('' satisfies a plain string) slips the emptiness
+    // walk.
+    const half = gateRunInputs(contractOf({ twins: TWINS }), {
+      twins: { first: { name: 'a', note: '' }, second: { name: '', note: 'x' } },
+    });
+    expect(half.ok).toBe(false);
+
+    const full = gateRunInputs(contractOf({ twins: TWINS }), {
+      twins: { first: { name: 'a' }, second: { name: 'b' } },
+    });
+    expect(full.ok).toBe(true);
+  });
+});
+
 describe('a string of nothing but whitespace', () => {
   it.each([
     ['spaces', '   '],
@@ -170,7 +322,7 @@ describe('a string of nothing but whitespace', () => {
     // A content model carries no `minLength`, so ajv passes this and the
     // emptiness rule is what refuses it - on both sides, by name.
     const inputs = { text: TEXT };
-    const fields = buildRunFields(inputs);
+    const fields = fieldsOf(inputs);
     const values = { text: '   ' };
 
     expect(computeReadiness(fields, values).missing).toEqual(['text']);
@@ -184,7 +336,7 @@ describe('a string of nothing but whitespace', () => {
     // Not a validation dodge: omitting it is what lets the method branch on the
     // absence, where `{text: "   "}` would look like a supplied value.
     const inputs = { text: TEXT, note: OPTIONAL_TEXT };
-    const fields = buildRunFields(inputs);
+    const fields = fieldsOf(inputs);
     const values = { text: 'hi', note: '   ' };
 
     expect(computeReadiness(fields, values)).toEqual({ total: 1, ready: 1, missing: [] });
@@ -202,7 +354,7 @@ describe('a name that collides with Object.prototype', () => {
     // `isFilled` had no branch for and therefore called filled: a live Run
     // button over an input holding nothing.
     const inputs = { constructor: TEXT };
-    expect(computeReadiness(buildRunFields(inputs), {}).missing).toEqual(['constructor']);
+    expect(computeReadiness(fieldsOf(inputs), {}).missing).toEqual(['constructor']);
   });
 
   it('is named as MISSING by the gate, not reported as a type error', () => {
@@ -225,24 +377,13 @@ describe('a name that collides with Object.prototype', () => {
   it.each(['constructor', 'toString', 'valueOf', 'hasOwnProperty'])(
     'reads an empty input named %s as empty',
     (name) => {
-      expect(computeReadiness(buildRunFields({ [name]: TEXT }), {}).missing).toEqual([name]);
+      expect(computeReadiness(fieldsOf({ [name]: TEXT }), {}).missing).toEqual([name]);
     },
   );
 
   it('does not read a required CHILD as filled either', () => {
-    const inputs = {
-      opts: {
-        ...PLAIN_SINGLE,
-        concept_ref: 'demo.Named',
-        json_schema: {
-          title: 'Named',
-          type: 'object',
-          properties: { constructor: { title: 'Constructor', type: 'string' } },
-          required: ['constructor'],
-        },
-      } satisfies PipeInputContract,
-    };
-    const fields = buildRunFields(inputs);
+    const inputs = { opts: NAMED };
+    const fields = fieldsOf(inputs);
 
     expect(computeReadiness(fields, { opts: { tone: 'formal' } }).missing).toEqual(['opts']);
     expect(computeReadiness(fields, { opts: { constructor: 'x' } }).missing).toEqual([]);

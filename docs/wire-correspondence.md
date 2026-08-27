@@ -1,0 +1,15 @@
+# Wire ↔ `RunField` correspondence
+
+The MTHDS standard defines the wire input-form descriptor ([Input-Form Descriptor](https://mthds.ai/latest/spec/input-form-descriptor/)); this package's `RunField` (`src/core/descriptor.ts`) is its consumer-side mapping, produced by `buildRunFields`. The `kind` union maps one to one (`text`, `prose`, `date`, `number`, `boolean`, `enum`, `document`, `image`, `object`, `list`, `unknown` — no kind is renamed), and most slots cross verbatim. The two surfaces deliberately differ in places, and this table is the record of where and why. It is kernel-owned on purpose: a standard page must not reference one consumer's camelCase surface, so the mapping lives here, beside the code that performs it.
+
+| Wire | Kernel | Why they differ |
+|---|---|---|
+| snake_case (`concept_ref`, `default_value`, `item_count`, …) | camelCase (`conceptRef`, `defaultValue`, `itemCount`, …) | Protocol convention on the wire; the kernel keeps its TypeScript surface. |
+| `choices` (`unknown[]`) | `options` (`string[]`) | The wire matches the authoring key (`choices = [...]` in `.mthds`) and carries the authored values verbatim; the kernel's name is its own, and its controls render and store strings. |
+| `minimum` / `maximum` / `exclusive_minimum` / `exclusive_maximum` | `min` / `max` | The wire keeps JSON Schema's vocabulary. The kernel collapses the exclusive bounds (`min = minimum ?? exclusive_minimum`, `max` likewise): a number control clamps, it does not express open intervals, and ajv still enforces the exact keyword off the schema. |
+| `min_length` / `max_length` / `pattern` / `format` | `minLength` / `maxLength` / `pattern` / `format` | Name convention only — the text constraints cross verbatim. |
+| `required`, `presence`, `gating` | `required`, `presence`, `gating` | Same slots, same meaning, taken from the wire verbatim on the render tree. The gate's own private tree stamps `gating` from the contract with `inputMustBeFilled` instead, because a server may never have asked for the descriptor — see [derivation-swap.md](derivation-swap.md). |
+| `refines`, `default_value`, `examples`, `hints`, `title`, `description` | `refines`, `defaultValue`, `examples`, `hints`, `title`, `description` | Cross verbatim; the derivation swap grew `RunField` to carry them. |
+| `item_count` (absent when inapplicable) | `itemCount` + `maxItemCount` | One wire fact, two kernel bounds: `itemCount = item_count ?? schema.minItems`, `maxItemCount = schema.maxItems ?? item_count`. Two fields because a *nested* array's model may state either bound alone — see [contract-mirror.md](contract-mirror.md) § "What gates". |
+| — | `contentKey` | Kernel-derived from the contract's `json_schema` (a scalar-kind node whose aligned schema declares exactly one property). A payload fact, not a form fact — the descriptor never describes the payload. |
+| — | `placeholder`, `accept` | Renderer-side affordances, never on the wire: what a field *is* rides `kind`, `concept_ref` and `refines`. `accept` is stamped by the mapper as a presentation default keyed on the wire kind; `placeholder` is a host's to set. |

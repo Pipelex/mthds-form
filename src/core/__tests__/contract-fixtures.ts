@@ -24,6 +24,8 @@
  * Not a test file (vitest collects `*.test.ts` only).
  */
 
+import type { InputFormTopLevelField, PipeInputFormDescriptor } from 'mthds/protocol';
+
 /** A plain, single-item input: `Concept`. The shape most fixtures mean. */
 export const PLAIN_SINGLE = {
   presence: 'plain',
@@ -59,3 +61,30 @@ export function plainFixed(count: number) {
 
 /** A plain, single, non-optional output - what a fixture's `output` usually is. */
 export const SINGLE_OUTPUT = { multiplicity: 'single', item_count: null, optional: false } as const;
+
+// ─── Wire input-form descriptor fixtures ─────────────────────────────────────
+//
+// Since the derivation swap, `buildRunFields` maps the WIRE descriptor; a test
+// therefore states, beside each contract fixture, the descriptor node the
+// engine emits for it - hand-authored per the standard's kind-assignment
+// tables, never derived by the test from the schema (that derivation is
+// exactly what the swap deleted). The standard's `InputFormTopLevelField` is a
+// union discriminated on `required`, so an incoherent fixture (an optional
+// slot that gates, a `required` contradicting its marker) does not typecheck.
+
+/** The pipe-slot facts of a plain required slot that gates - most fixtures. */
+export const WIRE_PLAIN = { required: true, presence: 'plain', gating: true } as const;
+
+/** A force-marked (`!`) slot: gates exactly like a plain one. */
+export const WIRE_FORCE = { required: true, presence: 'force', gating: true } as const;
+
+/** A required variable-plural (`[]`) slot: keeps its place, never gates. */
+export const WIRE_VARIABLE = { required: true, presence: 'plain', gating: false } as const;
+
+/** An optional (`?`) slot: never gates, may collapse. */
+export const WIRE_OPTIONAL = { required: false, presence: 'optional', gating: false } as const;
+
+/** The wire artifact over the given ordered top-level fields. */
+export function descriptorOf(...fields: InputFormTopLevelField[]): PipeInputFormDescriptor {
+  return { fields };
+}
