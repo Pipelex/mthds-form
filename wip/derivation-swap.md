@@ -23,11 +23,12 @@ Ledger item: `L-260826-13fedd` (closes `L-260821-2e3730` with it). Branch: `feat
 
 ## State
 
-- Core `src/` fully swapped and compiling (`npx tsc --noEmit` clean of non-test errors).
-- Rewritten and PASSING: `field-model`, `native-scalars`, `concept-taxonomy-characterization` (now the resolution record), `schema-utils-characterization` (re-anchored on direct `collapseNullable`/`collectSchemaDefs`/`derefSchema` calls), `gate-agreement`.
-- React suites untouched on purpose (hand-authored RunFields; all additions optional).
+- Core `src/` fully swapped; ALL suites rewritten and green; full gates pass (`make check`, `make test`, `make all` incl. `assert-bundle`).
+- The rewritten suites: `field-model`, `native-scalars`, `concept-taxonomy-characterization` (now the resolution record), `schema-utils-characterization`, `gate-agreement` (cross-tree proof), `gate`, `hostile-values`, `values` (poem assertions flipped per difference 3), `protocol-peer` (header updated). React suites untouched on purpose (hand-authored RunFields; all additions optional).
+- Docs pass done: `docs/derivation-swap.md` rewritten as the record; NEW `docs/wire-correspondence.md` (the D-6 table, updated); `docs/architecture.md`, `docs/contract-mirror.md`, `docs/run-gate.md`, `README.md`, repo `CLAUDE.md` rule 1 + trap all updated. (Also fixed en passant: architecture.md's stale kind list `choice`/`structured` → the real `enum`/`object` union.)
+- CHANGELOG entries under `## [Unreleased]` (breaking signatures, the swap, wire-visible drift resolution, gate walk, new exports); the two pre-existing Unreleased entries that spoke of the swap as future were re-tensed for release-time coherence. No version cut (D-7).
 
-## Remaining
+## Remaining (items 1-7 of the original list are done - see State)
 
 1. **Rewrite `gate.test.ts`** — descriptor fixtures for each `buildRunFields` site (`{text, focus}`, `{text, brief}`, REQUIRED_INPUTS, `{text, opts}`, optional/nested variants, `{text, findings}`/`{text, rated}` lists, fixed `{text, shots}`, variable). Wire nodes: text→prose w/ `concept_ref native.Text`; focus/opts/brief→object nodes (children: enum w/ choices, text) mirroring gate-agreement's `FOCUS_FIELDS`/`OPTS_FIELDS`/`BRIEF_FIELDS`; findings/rated→`WIRE_VARIABLE` lists of object items; shots→`WIRE_PLAIN` list `item_count: 3`.
 2. **Rewrite `hostile-values.test.ts`** — same idiom; note dynamic input names (`{[name]: TEXT}`, `constructor`) — a `fieldsOf`-style helper keyed by fixture identity works (copy from gate-agreement).

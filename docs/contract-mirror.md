@@ -40,11 +40,11 @@ The one pairing a type cannot state is that a fixed count is always greater than
 
 The wire states plurality twice: as `multiplicity`, and as the shape of `json_schema`, which the engine wraps in an array (adding `minItems`/`maxItems` for a fixed count) exactly when the slot is plural. They agree by construction upstream.
 
-The kernel still reads only one of them for rendering-adjacent questions. `isPluralInput` is a **schema** test, because the schema is what `buildRunFields` maps and therefore what the user is actually shown. A predicate that read the other field could disagree with the rendered control — a form offering a single text box for a slot the gate treats as a list — and that class of disagreement is the one this package exists to make impossible. `multiplicity` is read for the one question the schema cannot answer as directly: whether a list declares an exact count.
+The kernel still reads only one of them per question. `isPluralInput` is a **schema** test, and its consumers are the gate-side builders — the combined schema, the payload builders, the gate's own tree — because the schema is what ajv judges. The render tree, since the derivation swap, takes `kind: "list"` from the wire descriptor instead; the two cannot disagree, because both artifacts derive from one resolved library. `multiplicity` is read for the one question the schema cannot answer as directly: whether a list declares an exact count.
 
 ## What gates
 
-`inputMustBeFilled` is the single answer to "must the user put something in before Run may fire", and `buildRunFields` stamps it onto each top-level descriptor as `gating`:
+`inputMustBeFilled` is the single answer to "must the user put something in before Run may fire". The wire descriptor carries the same answer, producer-derived, as `gating` on each top-level node — `buildRunFields` copies it verbatim onto the render tree — and the gate's own private tree stamps it from the contract with this predicate, so a server that never asked for the descriptor still gates identically (`gate-agreement.test.ts` runs both halves over one table):
 
 | Slot | Gates? | Why |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ The fixed-count row is the one the reshape added, and leaving it ungated would n
 
 The declared **count** is enforced separately, and by the schema rather than by the kernel: `minItems`/`maxItems` travel verbatim into the combined schema `buildRunInputsSchema` produces, so the gate's ajv pass rejects a short list without the kernel restating a number the wire already carries.
 
-The count reaches the descriptor too, as `ListRunField.itemCount` and `ListRunField.maxItemCount`, so readiness phrases the same rule the gate does: a `[3]` slot holding two items reads missing rather than ready, and one holding four does too. They are read off the array schema's `minItems`/`maxItems` rather than off `item_count` — all of them state the same number for a `[N]` slot, but these exist so `fieldFilled` can answer the question **ajv** answers, and those are the keywords ajv reads. (Earlier this was a recorded residual: readiness answered emptiness only, the button was live at two of three, and the gate alone refused. Fail-closed, but the two halves were not phrasing one rule.)
+The count reaches the descriptor too, as `ListRunField.itemCount` and `ListRunField.maxItemCount`, so readiness phrases the same rule the gate does: a `[3]` slot holding two items reads missing rather than ready, and one holding four does too. On the render tree `itemCount` is the wire node's `item_count` (falling back to the schema's `minItems`) and `maxItemCount` is the schema's `maxItems` (falling back to `item_count`); on the gate's own tree both come off the schema — either way they exist so `fieldFilled` can answer the question **ajv** answers, and `minItems`/`maxItems` are the keywords ajv reads. (Earlier this was a recorded residual: readiness answered emptiness only, the button was live at two of three, and the gate alone refused. Fail-closed, but the two halves were not phrasing one rule.)
 
 **Two bounds, not one number**, and that is worth stating because a `[N]` slot makes them look interchangeable. `buildRunFields` also recurses into a structured concept's own schema, where an array property is a model's and carries whatever bounds that model declared — possibly only one. A single `itemCount` was therefore read as a minimum by readiness and as a maximum by the control that stops offering **Add**, which agree only while both bounds are equal: a nested array told "at least two" was presented as a list of exactly two. See [run-gate.md](run-gate.md).
 
@@ -74,11 +74,11 @@ An output gained the same `multiplicity`/`item_count` pair, and kept a **boolean
 
 The kernel does not read the output contract at all today; it is re-exported because a consumer holding a `PipeIOContract` holds both halves.
 
-## The sibling artifact this package does not read yet
+## The sibling artifact, now the mapper's input
 
 `pipe_io_contracts` has a sibling: the **input-form descriptor**, specified at [Input-Form Descriptor](https://mthds.ai/latest/spec/input-form-descriptor/) and declared in the same `mthds/protocol` module set (`PipeInputFormDescriptor`, `InputFormTopLevelField`, `InputFormField`). It is the per-pipe, **ordered** presentation view of a method's inputs — one recursive node per slot, discriminated on `kind`, stating the facts a renderer needs so that no schema heuristics are required.
 
-Nothing in `src/` reads it. `buildRunFields` still derives its `RunField[]` from the contract and the schema, guessing where the language did not used to state an answer — which is what [derivation-swap.md](derivation-swap.md) is about. The peer is what puts the descriptor's type within the kernel's reach, so the swap is an ordinary change to one function's body rather than a change that first has to invent a type; `src/core/__tests__/protocol-peer.test.ts` writes that import today so the resolution is proven rather than assumed.
+Since the derivation swap it is `buildRunFields`' first argument: the mapper takes the descriptor and the contracts together and maps the tree structurally, consulting the schema only for `contentKey` and nested list bounds — [derivation-swap.md](derivation-swap.md) is the record, and [wire-correspondence.md](wire-correspondence.md) the name-for-name mapping. `getPipeInputForm` resolves a pipe's descriptor out of the response-level `input_form` map, tolerant of the same two key conventions as `getPipeIOContract`. The gate deliberately does NOT take it: a machine consumer must never need the presentation artifact to validate a payload, so `gateRunInputs` keeps walking `json_schema` for itself.
 
 Two details of the descriptor's shape are worth carrying into that work, because they are easy to miss. Its `item_count` is **absent** when it does not apply, the deliberate opposite of the contract's always-on-the-wire `null` — each artifact states its own rule. And `PipeInputFormDescriptor.fields` holds `InputFormTopLevelField`, which carries `presence` and `gating` where the shared `InputFormField` node does not, because that same node type is also the nested named-field shape, where presence is not a fact at all.
 
