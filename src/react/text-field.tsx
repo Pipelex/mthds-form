@@ -5,6 +5,7 @@ import type { ProseRunField, TextRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
+import { useFieldDomId } from './field-dom-id';
 
 interface TextFieldProps {
   field: TextRunField;
@@ -18,6 +19,7 @@ interface TextFieldProps {
 /** Single-line string input (short native.Text or a plain string property). */
 export function TextField({ field, value, onChange, id, error, disabled }: TextFieldProps) {
   const s = useFieldStrings();
+  const domId = useFieldDomId(id);
   return (
     <FieldShell
       name={field.name}
@@ -27,10 +29,10 @@ export function TextField({ field, value, onChange, id, error, disabled }: TextF
       description={field.description}
       required={field.required}
       error={error}
-      htmlFor={id}
+      htmlFor={domId}
     >
       <input
-        id={id}
+        id={domId}
         type="text"
         value={value ?? ''}
         disabled={disabled}
@@ -59,6 +61,7 @@ interface ProseFieldProps {
  */
 export function ProseField({ field, value, onChange, id, error, disabled }: ProseFieldProps) {
   const s = useFieldStrings();
+  const domId = useFieldDomId(id);
   return (
     <FieldShell
       name={field.name}
@@ -68,10 +71,10 @@ export function ProseField({ field, value, onChange, id, error, disabled }: Pros
       description={field.description}
       required={field.required}
       error={error}
-      htmlFor={id}
+      htmlFor={domId}
     >
       <textarea
-        id={id}
+        id={domId}
         value={value ?? ''}
         disabled={disabled}
         aria-invalid={!!error}

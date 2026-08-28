@@ -10,11 +10,23 @@ import {
   setValueAtPath,
   storeInputDataFromRunValues,
 } from '..';
+import type { InputFormTopLevelField } from 'mthds/protocol';
 import type { PipeInputContract } from '..';
-import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE } from './contract-fixtures';
+import {
+  descriptorOf,
+  OPTIONAL_SINGLE,
+  PLAIN_SINGLE,
+  PLAIN_VARIABLE,
+  SINGLE_OUTPUT,
+  WIRE_OPTIONAL,
+  WIRE_PLAIN,
+  WIRE_VARIABLE,
+} from './contract-fixtures';
 
 // Realistic contract: a Text concept (TextContent {text}), a Document
-// (DocumentContent {url}), and a custom structured concept.
+// (DocumentContent {url}), and a custom structured concept. Beside it, the wire
+// descriptor the engine emits for the same pipe - hand-authored, as everywhere
+// in these suites.
 const INPUTS: Record<string, PipeInputContract> = {
   brief: {
     ...PLAIN_SINGLE,
@@ -40,15 +52,36 @@ const INPUTS: Record<string, PipeInputContract> = {
   },
 };
 
-const fields = buildRunFields(INPUTS);
+const BRIEF_NODE: InputFormTopLevelField = {
+  ...WIRE_PLAIN,
+  kind: 'prose',
+  name: 'brief',
+  concept_ref: 'native.Text',
+};
 
-describe('buildRunFields native mapping', () => {
-  it('maps native.Text (TextContent object) to a text/prose field, not an object', () => {
-    const brief = fields.find((f) => f.name === 'brief')!;
-    expect(brief.kind === 'prose' || brief.kind === 'text').toBe(true);
+const INPUTS_DESCRIPTOR = descriptorOf(
+  BRIEF_NODE,
+  { ...WIRE_PLAIN, kind: 'document', name: 'invoice', concept_ref: 'native.Document' },
+  {
+    ...WIRE_PLAIN,
+    kind: 'object',
+    name: 'applicant',
+    concept_ref: 'demo.Applicant',
+    fields: [
+      { kind: 'text', name: 'name', required: true },
+      { kind: 'number', name: 'age', integer: true, required: false },
+    ],
+  },
+);
+
+const fields = buildRunFields(INPUTS_DESCRIPTOR, INPUTS);
+
+describe('buildRunFields wire mapping', () => {
+  it('maps a native.Text slot to the prose field the wire states', () => {
+    expect(fields.find((f) => f.name === 'brief')!.kind).toBe('prose');
   });
 
-  it('maps native.Document (DocumentContent object) to a document field', () => {
+  it('maps a native.Document slot to a document field', () => {
     expect(fields.find((f) => f.name === 'invoice')!.kind).toBe('document');
   });
 
@@ -102,8 +135,11 @@ describe('store ↔ run values round-trip', () => {
 });
 
 describe('custom concept refining native.Text (wrapper schema, e.g. poem_html.Poem)', () => {
-  // Refining concepts arrive with the TextContent wrapper schema but a custom
-  // concept_ref - so they map to an object field with a child `text` string.
+  // The wire states a refining concept as PROSE - the engine knows it IS a
+  // text - and the co-walk finds the TextContent wrapper's single `text`
+  // property, so the field carries `contentKey` and the runner value is the
+  // bare string. (Before the derivation swap this mapped to an object card
+  // with a `text` child; the STORED shape below is unchanged.)
   const POEM_INPUTS: Record<string, PipeInputContract> = {
     poem: {
       ...PLAIN_SINGLE,
@@ -114,11 +150,20 @@ describe('custom concept refining native.Text (wrapper schema, e.g. poem_html.Po
       },
     },
   };
-  const poemFields = buildRunFields(POEM_INPUTS);
+  const poemFields = buildRunFields(
+    descriptorOf({
+      ...WIRE_PLAIN,
+      kind: 'prose',
+      name: 'poem',
+      concept_ref: 'poem_html.Poem',
+      refines: ['native.Text'],
+    }),
+    POEM_INPUTS,
+  );
 
   it('stores the wrapper shape once - never double-wrapped { text: { text } }', () => {
     const stored = storeInputDataFromRunValues(
-      { poem: { text: 'Whispers of the Morning Tide' } },
+      { poem: 'Whispers of the Morning Tide' },
       poemFields,
       POEM_INPUTS,
     );
@@ -129,13 +174,9 @@ describe('custom concept refining native.Text (wrapper schema, e.g. poem_html.Po
   });
 
   it('round-trips store → values → store byte-identically', () => {
-    const stored = storeInputDataFromRunValues(
-      { poem: { text: 'Whispers' } },
-      poemFields,
-      POEM_INPUTS,
-    );
+    const stored = storeInputDataFromRunValues({ poem: 'Whispers' }, poemFields, POEM_INPUTS);
     const values = runValuesFromStore(stored, poemFields, POEM_INPUTS);
-    expect(values.poem).toEqual({ text: 'Whispers' });
+    expect(values.poem).toBe('Whispers');
     expect(storeInputDataFromRunValues(values, poemFields, POEM_INPUTS)).toEqual(stored);
   });
 
@@ -145,7 +186,7 @@ describe('custom concept refining native.Text (wrapper schema, e.g. poem_html.Po
       poem: { concept: 'poem_html.Poem', content: { text: { text: 'Whispers' } } },
     };
     const values = runValuesFromStore(legacy, poemFields, POEM_INPUTS);
-    expect(values.poem).toEqual({ text: 'Whispers' });
+    expect(values.poem).toBe('Whispers');
   });
 });
 
@@ -191,7 +232,7 @@ describe('outputsFromPipeOutput', () => {
 
 describe('inputDataFromWorkingMemory', () => {
   // A run's working memory: inputs + outputs, keyed by variable name, each a
-  // stuff with `{ concept, content }` (the shape platform's working_memory.json
+  // stuff with `{ concept, content }` (the shape a host's working-memory JSON
   // relays).
   const workingMemory = {
     root: {
@@ -239,8 +280,19 @@ describe('setValueAtPath', () => {
 });
 
 describe('fieldsForContract', () => {
-  it('returns [] for an undefined contract', () => {
-    expect(fieldsForContract(undefined)).toEqual([]);
+  it('returns [] unless BOTH the contract and the descriptor are present', () => {
+    // The two artifacts arrive from one response but are still two fields; a
+    // host that has only one of them so far renders an empty form, not a crash.
+    const contract = { inputs: INPUTS, output: { concept_ref: 'native.Text', ...SINGLE_OUTPUT } };
+    expect(fieldsForContract(undefined, undefined)).toEqual([]);
+    expect(fieldsForContract(contract, undefined)).toEqual([]);
+    expect(fieldsForContract(undefined, INPUTS_DESCRIPTOR)).toEqual([]);
+  });
+
+  it('maps the pair once both are there', () => {
+    const contract = { inputs: INPUTS, output: { concept_ref: 'native.Text', ...SINGLE_OUTPUT } };
+    const mapped = fieldsForContract(contract, INPUTS_DESCRIPTOR);
+    expect(mapped.map((f) => f.name)).toEqual(['brief', 'invoice', 'applicant']);
   });
 });
 
@@ -264,7 +316,20 @@ describe('apiInputsFromRunValues over optional and plural inputs', () => {
       json_schema: { type: 'array', items: { type: 'object' } },
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const FIELDS = buildRunFields(
+    descriptorOf(
+      { ...WIRE_PLAIN, kind: 'document', name: 'supplier_quote', concept_ref: 'native.Document' },
+      { ...WIRE_OPTIONAL, kind: 'prose', name: 'comments', concept_ref: 'native.Text' },
+      {
+        ...WIRE_VARIABLE,
+        kind: 'list',
+        name: 'illustrations',
+        concept_ref: 'native.Image',
+        item: { kind: 'image', required: true, concept_ref: 'native.Image' },
+      },
+    ),
+    CONTRACT,
+  );
 
   it('omits a blank optional (`?`) input so the method sees a real absence', () => {
     const payload = apiInputsFromRunValues({ supplier_quote: { url: 'q.pdf' } }, FIELDS, CONTRACT);
@@ -328,7 +393,15 @@ describe('runValuesFromStore over corrupted text values', () => {
       json_schema: { type: 'object', properties: { text: { type: 'string' } } },
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const FIELDS = buildRunFields(
+    descriptorOf({
+      ...WIRE_PLAIN,
+      kind: 'prose',
+      name: 'customer_name',
+      concept_ref: 'native.Text',
+    }),
+    CONTRACT,
+  );
   const read = (stored: unknown) =>
     runValuesFromStore({ customer_name: stored }, FIELDS, CONTRACT)['customer_name'];
 
@@ -397,7 +470,19 @@ describe('rjsfDataFromRunValues over a structured input nobody opened', () => {
       },
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const FIELDS = buildRunFields(
+    descriptorOf(BRIEF_NODE, {
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name: 'focus',
+      concept_ref: 'demo.ExtractionFocus',
+      fields: [
+        { kind: 'enum', name: 'audience', choices: ['engineer', 'executive'], required: true },
+        { kind: 'text', name: 'notes', required: false },
+      ],
+    }),
+    CONTRACT,
+  );
 
   it('emits nothing for it, rather than a shell of empty children', () => {
     // `{ notes: "" }` was an object that existed only because the bridge built
@@ -447,7 +532,24 @@ describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
       },
     },
   };
-  const FIELDS = buildRunFields(CONTRACT);
+  const FIELDS = buildRunFields(
+    descriptorOf(BRIEF_NODE, {
+      ...WIRE_VARIABLE,
+      kind: 'list',
+      name: 'findings',
+      concept_ref: 'demo.Finding',
+      item: {
+        kind: 'object',
+        required: true,
+        concept_ref: 'demo.Finding',
+        fields: [
+          { kind: 'text', name: 'label', required: false },
+          { kind: 'text', name: 'note', required: false },
+        ],
+      },
+    }),
+    CONTRACT,
+  );
 
   it('keeps the item as a shell rather than collapsing it to an absence', () => {
     // `ListField`'s "Add" seeds an object item with `{}` (`emptyValue`). A
@@ -475,7 +577,22 @@ describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
         },
       },
     };
-    const data = rjsfDataFromRunValues({ brief: 'hello' }, buildRunFields(withOptional));
+    const data = rjsfDataFromRunValues(
+      { brief: 'hello' },
+      buildRunFields(
+        descriptorOf(BRIEF_NODE, {
+          ...WIRE_OPTIONAL,
+          kind: 'object',
+          name: 'focus',
+          concept_ref: 'demo.ExtractionFocus',
+          fields: [
+            { kind: 'text', name: 'audience', required: true },
+            { kind: 'text', name: 'notes', required: false },
+          ],
+        }),
+        withOptional,
+      ),
+    );
 
     expect(data['focus']).toBeUndefined();
   });

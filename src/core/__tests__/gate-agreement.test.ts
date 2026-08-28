@@ -20,8 +20,17 @@
  */
 import { describe, expect, it } from 'vitest';
 import { buildRunFields, computeReadiness, gateRunInputs, rjsfDataFromRunValues } from '..';
-import type { PipeIOContract, PipeInputContract, PipeOutputContract } from '..';
-import { OPTIONAL_SINGLE, PLAIN_SINGLE, PLAIN_VARIABLE, plainFixed } from './contract-fixtures';
+import type { InputFormField, InputFormTopLevelField } from 'mthds/protocol';
+import type { PipeIOContract, PipeInputContract, PipeOutputContract, RunField } from '..';
+import {
+  OPTIONAL_SINGLE,
+  PLAIN_SINGLE,
+  PLAIN_VARIABLE,
+  plainFixed,
+  WIRE_OPTIONAL,
+  WIRE_PLAIN,
+  WIRE_VARIABLE,
+} from './contract-fixtures';
 
 const OUTPUT: PipeOutputContract = {
   concept_ref: 'native.Text',
@@ -167,8 +176,15 @@ const SHOTS: PipeInputContract = {
   },
 };
 
-/** The same slot the method left omittable: `Image[3]?`. */
-const OPTIONAL_SHOTS: PipeInputContract = { ...SHOTS, presence: 'optional' };
+/**
+ * The same slot the method left omittable: `Image[3]?` - which is invalid
+ * MTHDS, because a presence marker may not be combined with a multiplicity
+ * suffix, and which the standard's types reject. The cast is deliberate and the
+ * row is kept: the kernel does not parse-check the contract an API hands it, so
+ * a producer emitting the combination reaches both halves, and the one thing
+ * they must never do is disagree about it.
+ */
+const OPTIONAL_SHOTS = { ...SHOTS, presence: 'optional' } as unknown as PipeInputContract;
 
 /** `Brief[]` - a variable list whose ITEM owes its concept a required child. */
 const BRIEFS: PipeInputContract = {
@@ -176,6 +192,229 @@ const BRIEFS: PipeInputContract = {
   concept_ref: 'demo.Brief',
   json_schema: { type: 'array', items: briefSchema },
 };
+
+/**
+ * Children that arrive BY REFERENCE. Pydantic emits `$defs` + `$ref` for a
+ * concept-typed field, wraps the ref in `anyOf: [.., {type:'null'}]` when the
+ * field is Optional, and states required-AND-nullable (`Sub | None` with no
+ * default) as a nullable ref that `required` still names. The inlined fixtures
+ * above cannot see a resolution bug - both halves must agree about a child
+ * neither can read without resolving the indirection first.
+ */
+const REFS: PipeInputContract = {
+  ...PLAIN_SINGLE,
+  concept_ref: 'demo.RefWrapper',
+  json_schema: {
+    title: 'RefWrapper',
+    type: 'object',
+    $defs: { Brief: briefSchema },
+    properties: {
+      main: { $ref: '#/$defs/Brief' },
+      audit: { anyOf: [{ $ref: '#/$defs/Brief' }, { type: 'null' }] },
+      extra: { anyOf: [{ $ref: '#/$defs/Brief' }, { type: 'null' }], default: null },
+    },
+    required: ['main', 'audit'],
+  },
+};
+
+/**
+ * The wire descriptor node each contract fixture arrives with - hand-authored
+ * per the standard's kind assignment, keyed by fixture IDENTITY so the table's
+ * rows stay exactly what they were. Since the swap, readiness runs over the
+ * WIRE-mapped tree while the gate walks the contract's schema for itself; this
+ * suite is therefore the agreement proof ACROSS the two trees, which is the
+ * stronger form of the claim it always made.
+ */
+const FOCUS_FIELDS: InputFormField[] = [
+  { kind: 'enum', name: 'audience', choices: ['engineer', 'executive'], required: true },
+  { kind: 'text', name: 'notes', required: false },
+];
+const OPTS_FIELDS: InputFormField[] = [
+  { kind: 'enum', name: 'tone', choices: ['formal', 'casual'], required: false },
+  { kind: 'text', name: 'notes', required: false },
+];
+const BRIEF_FIELDS: InputFormField[] = [
+  { kind: 'text', name: 'name', required: true },
+  { kind: 'text', name: 'notes', required: false },
+];
+
+const WIRE = new Map<PipeInputContract, (name: string) => InputFormTopLevelField>([
+  [TEXT, (name) => ({ ...WIRE_PLAIN, kind: 'prose', name, concept_ref: 'native.Text' })],
+  [
+    OPTIONAL_TEXT,
+    (name) => ({ ...WIRE_OPTIONAL, kind: 'prose', name, concept_ref: 'native.Text' }),
+  ],
+  [
+    NUMBER,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'number',
+      name,
+      concept_ref: 'native.Number',
+      integer: false,
+    }),
+  ],
+  [YES_NO, (name) => ({ ...WIRE_PLAIN, kind: 'boolean', name, concept_ref: 'native.YesNo' })],
+  [IMAGE, (name) => ({ ...WIRE_PLAIN, kind: 'image', name, concept_ref: 'native.Image' })],
+  [
+    FOCUS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.ExtractionFocus',
+      fields: FOCUS_FIELDS,
+    }),
+  ],
+  [
+    OPTIONAL_FOCUS,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.ExtractionFocus',
+      fields: FOCUS_FIELDS,
+    }),
+  ],
+  [
+    OPTS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RunOptions',
+      fields: OPTS_FIELDS,
+    }),
+  ],
+  [
+    OPTIONAL_OPTS,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RunOptions',
+      fields: OPTS_FIELDS,
+    }),
+  ],
+  [
+    BRIEF,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Brief',
+      fields: BRIEF_FIELDS,
+    }),
+  ],
+  [
+    OPTIONAL_BRIEF,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Brief',
+      fields: BRIEF_FIELDS,
+    }),
+  ],
+  [
+    NESTED,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Wrapper',
+      fields: [
+        { kind: 'text', name: 'label', required: true },
+        { kind: 'object', name: 'opts', required: true, fields: OPTS_FIELDS },
+      ],
+    }),
+  ],
+  [
+    PAGES,
+    (name) => ({
+      ...WIRE_VARIABLE,
+      kind: 'list',
+      name,
+      concept_ref: 'native.Text',
+      item: { kind: 'prose', required: true, concept_ref: 'native.Text' },
+    }),
+  ],
+  [
+    SHOTS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'list',
+      name,
+      concept_ref: 'native.Image',
+      item: { kind: 'image', required: true, concept_ref: 'native.Image' },
+      item_count: 3,
+    }),
+  ],
+  // The optional-plural combination is invalid MTHDS (see OPTIONAL_SHOTS); the
+  // optional arm of the top-level union happens to admit a list node, so the
+  // wire side of the same violating producer needs no cast.
+  [
+    OPTIONAL_SHOTS,
+    (name) => ({
+      ...WIRE_OPTIONAL,
+      kind: 'list',
+      name,
+      concept_ref: 'native.Image',
+      item: { kind: 'image', required: true, concept_ref: 'native.Image' },
+      item_count: 3,
+    }),
+  ],
+  [
+    BRIEFS,
+    (name) => ({
+      ...WIRE_VARIABLE,
+      kind: 'list',
+      name,
+      concept_ref: 'demo.Brief',
+      item: { kind: 'object', required: true, concept_ref: 'demo.Brief', fields: BRIEF_FIELDS },
+    }),
+  ],
+  [
+    REFS,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.RefWrapper',
+      fields: [
+        {
+          kind: 'object',
+          name: 'main',
+          required: true,
+          concept_ref: 'demo.Brief',
+          fields: BRIEF_FIELDS,
+        },
+        {
+          kind: 'object',
+          name: 'audit',
+          required: true,
+          concept_ref: 'demo.Brief',
+          fields: BRIEF_FIELDS,
+        },
+        {
+          kind: 'object',
+          name: 'extra',
+          required: false,
+          concept_ref: 'demo.Brief',
+          fields: BRIEF_FIELDS,
+        },
+      ],
+    }),
+  ],
+]);
+
+/** The render tree for a row's inputs: the wire descriptor mapped over them. */
+function fieldsOf(inputs: Record<string, PipeInputContract>): RunField[] {
+  return buildRunFields(
+    { fields: Object.entries(inputs).map(([name, input]) => WIRE.get(input)!(name)) },
+    inputs,
+  );
+}
 
 interface Row {
   label: string;
@@ -316,6 +555,26 @@ const ROWS: Row[] = [
     runnable: true,
   },
 
+  // ─── children by reference ────────────────────────────────────────────────
+  {
+    label: 'a struct whose ref children are filled',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' } } },
+    runnable: true,
+  },
+  {
+    label: 'a struct whose plain-$ref child is half filled',
+    inputs: { w: REFS },
+    values: { w: { main: { notes: 'skip pricing' }, audit: { name: 'A1' } } },
+    runnable: false,
+  },
+  {
+    label: 'a struct whose required NULLABLE ref child is half filled',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { notes: 'later' } } },
+    runnable: false,
+  },
+
   // ─── plurals ──────────────────────────────────────────────────────────────
   { label: 'a variable list, empty', inputs: { pages: PAGES }, values: {}, runnable: true },
   {
@@ -360,7 +619,7 @@ const ROWS: Row[] = [
 describe('the Run button and the server gate answer together', () => {
   it.each(ROWS)('$label', ({ inputs, values, runnable }) => {
     const contract: PipeIOContract = { inputs, output: OUTPUT };
-    const fields = buildRunFields(inputs);
+    const fields = fieldsOf(inputs);
 
     const buttonLive = computeReadiness(fields, values).missing.length === 0;
     // Exactly what a form sends: the runner's values through the value bridge.
@@ -383,7 +642,7 @@ describe('the Run button and the server gate answer together', () => {
 
   it('builds the wire payload only on the ok arm', () => {
     const contract: PipeIOContract = { inputs: { text: TEXT, pages: PAGES }, output: OUTPUT };
-    const fields = buildRunFields(contract.inputs);
+    const fields = fieldsOf(contract.inputs);
     const gate = gateRunInputs(contract, rjsfDataFromRunValues({ text: 'hi' }, fields));
 
     expect(gate).toEqual({
@@ -420,7 +679,7 @@ describe('gateRunInputs is a public endpoint, so it takes whatever arrives', () 
     // `isFilled` on the array is `some`, which a half-filled row satisfies. So
     // the row went out incomplete on a run the button had declared ready.
     const contract: PipeIOContract = { inputs: { briefs: BRIEFS }, output: OUTPUT };
-    const fields = buildRunFields(contract.inputs);
+    const fields = fieldsOf(contract.inputs);
     // Both halves over one value, exactly as the table above does it: readiness
     // reads the runner's values, the gate reads what the bridge sends.
     const both = (values: Record<string, unknown>) => ({

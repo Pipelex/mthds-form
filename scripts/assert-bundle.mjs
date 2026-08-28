@@ -61,30 +61,54 @@ function graphOf(entry) {
   return { files, externals };
 }
 
+/**
+ * What must not appear in an entry's chunk graph, and why.
+ *
+ * Each ban carries its OWN reason rather than one reason per entry, because the
+ * bans on a single entry are about different things: `./react` must not drag
+ * the validator into a client bundle, and neither entry may drag the standard's
+ * CLI anywhere. A failure names the reason for the package it actually found.
+ */
 const BANNED = [
   {
     entry: `${DIST}/core/index.js`,
-    packages: [/^react($|\/)/, /^react-dom($|\/)/],
+    match: /^react($|\/)|^react-dom($|\/)/,
     why: 'The `.` entry is headless and must stay importable from a server component.',
   },
   {
     entry: `${DIST}/react/index.js`,
-    packages: [/^ajv($|-|\/)/],
+    match: /^ajv($|-|\/)/,
     why: 'The `./react` entry must not drag the run gate\'s validator into a client bundle.',
   },
+  // The standard's TypeScript client is a TYPES-ONLY peer, banned from BOTH
+  // entries. The wire types it declares are erased at build, so a `mthds`
+  // specifier surviving into either graph means a value import slipped in -
+  // `FIELD_KINDS` is the one runtime value `mthds/protocol` exports, and it is
+  // the one that would do it. The cost is not the specifier: it is the
+  // standard's CLI closure (commander, ora, posthog, zod, …) arriving in a
+  // consumer's bundle for types that were supposed to disappear. Lint holds the
+  // same line on source imports; this holds it on the built graph, which is
+  // where a shared chunk would deliver it silently.
+  ...['core', 'react'].map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
+    match: /^mthds($|\/)/,
+    why: 'The standard client is a types-only peer - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
+  })),
 ];
 
 const failures = [];
 
-for (const { entry, packages, why } of BANNED) {
+for (const { entry, match, why } of BANNED) {
   const { files, externals } = graphOf(entry);
-  const reached = [...externals].filter((specifier) => packages.some((re) => re.test(specifier)));
+  const reached = [...externals].filter((specifier) => match.test(specifier));
   const graph = [...files].map((f) => relative(DIST, f)).sort().join(', ');
 
   if (reached.length > 0) {
     failures.push(`${relative(DIST, entry)} reaches ${reached.join(', ')} - ${why}\n    graph: ${graph}`);
   } else {
-    console.log(`ok  ${relative(DIST, entry)} graph is clean (${files.size} modules)`);
+    console.log(
+      `ok  ${relative(DIST, entry)} (${files.size} modules) reaches nothing matching ${match.source}`,
+    );
   }
 }
 

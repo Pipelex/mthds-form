@@ -1,259 +1,251 @@
 /**
- * The ONE derivation function: `PipeInputContract` map → `RunField[]`.
+ * The ONE derivation function: wire input-form descriptor → `RunField[]`.
  *
- * Everything heuristic stays module-private behind `buildRunFields`: the
- * native-concept taxonomy, `isDocumentObject`, the depth-based prose/label
- * rule, the `accept` strings, list splitting. Nothing here is exported except
- * the function itself - so the M1 milestone can swap the source of the
- * descriptor (server-derived) without touching consumers.
+ * `buildRunFields` maps the standard's per-pipe descriptor STRUCTURALLY onto
+ * the kernel's `RunField` shape. It decides nothing: what a field IS - its
+ * kind, its constraints, its refinement chain, whether Run gates on it - is
+ * stated by the wire, derived by the engine from the resolved library. The
+ * heuristics that used to live here (native-concept sets, the url-bearing
+ * object test, the depth-based prose/label rule) are deleted, not bypassed;
+ * docs/derivation-swap.md is the record of that swap and of every behaviour
+ * that moved with it.
+ *
+ * The contract is still consulted, for exactly two facts the wire deliberately
+ * does not carry:
+ *
+ * - **`contentKey`** - the single property a native scalar's value sits inside
+ *   on the wire (`TextContent {text}`, `NumberContent {number}`). A renderer
+ *   holds the bare scalar; the value bridge wraps by this name. It is read off
+ *   the contract's `json_schema` because it is a fact about the PAYLOAD shape,
+ *   which is the schema's job - the descriptor describes the form, never the
+ *   payload.
+ * - **Nested list bounds** - the wire puts `item_count` only on a top-level
+ *   fixed `[N]` slot, but the model behind a structured concept may state
+ *   `minItems`/`maxItems` on an array property of its own, and ajv enforces
+ *   them. Reading them off the schema is what keeps readiness from being more
+ *   permissive than the gate.
+ *
+ * Both are structural reads (a property count, two keywords ajv itself
+ * enforces), not judgements - the mapper stays honest about owning no taxonomy.
  */
 
-import { inputMustBeFilled, isOptionalInput, type PipeInputContract } from './contracts';
+import type { PipeInputFormDescriptor } from 'mthds/protocol';
+import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
+
+import { buildPipeRef, type PipeInputContract } from './contracts';
 import type { RunField, RunFieldCommon } from './descriptor';
-import {
-  FIELD_DOCUMENT_CONCEPTS,
-  FIELD_TEXT_CONCEPTS,
-  HTML_CONCEPTS,
-  IMAGE_CONCEPTS,
-  NUMBER_CONCEPTS,
-  splitListConcept,
-  TEXT_WRAPPER_CONCEPTS,
-  YES_NO_CONCEPTS,
-} from './native-concepts';
-import {
-  collapseNullable,
-  collectSchemaDefs,
-  derefSchema,
-  schemaTypeOf,
-  type JsonSchema,
-} from './schema-utils';
-
-// Native concepts arrive as their pydantic wrapper schema (e.g. native.Text is
-// `TextContent {text}`, native.Document is `DocumentContent {url,…}`), NOT a bare
-// primitive - so we map them by concept_ref, before the generic schema-type
-// dispatch, or they'd all render as nested objects. The taxonomy lives in
-// `native-concepts.ts`, which also records where this mapper's view drifts from
-// the wire format's.
+import { ownProp } from './own-property';
+import { collectSchemaDefs, resolveSchemaNode, type JsonSchema } from './schema-utils';
 
 /**
- * A url-bearing object renders as a document field. This is `Boolean(
- * schema.properties?.url)` and nothing more: the historical description check
- * ("storage url" / "document url") was followed by `|| 'url' in props`, which
- * made it unreachable. Stated honestly as the heuristic it is - M1 replaces it
- * with the server-derived descriptor; narrowing it to the description match is
- * a recorded M1 option, not a K1 change.
+ * Look up a pipe's input-form descriptor by pipe code, tolerant of both key
+ * conventions - the exact mirror of `getPipeIOContract`, because the standard
+ * keys `input_form` by the same `pipe_ref` set as `pipe_io_contracts` and a
+ * host tracks the same bare codes either way.
  */
-function isDocumentObject(schema: JsonSchema): boolean {
-  const props = schema.properties as Record<string, JsonSchema> | undefined;
-  return Boolean(props?.url);
-}
-
-interface MapCtx {
-  defs: Record<string, JsonSchema>;
-  depth: number;
+export function getPipeInputForm(
+  inputForm: InputForm | null | undefined,
+  domain: string | null | undefined,
+  pipeCode: string | null | undefined,
+): PipeInputFormDescriptor | undefined {
+  if (!inputForm || !pipeCode) return undefined;
+  if (domain) {
+    const byRef = ownProp(inputForm, buildPipeRef(domain, pipeCode));
+    if (byRef) return byRef;
+  }
+  return ownProp(inputForm, pipeCode);
 }
 
 /**
- * The single property a pydantic scalar content model holds its value in -
- * `TextContent {text}`, `NumberContent {number}`, `YesNoContent {yes_no}`.
+ * The single property a scalar content model holds its value in - `TextContent
+ * {text}`, `NumberContent {number}`, `YesNoContent {yes_no}`.
  *
- * A native scalar's value does NOT sit at the top of its declared schema, and
- * this is where that is discovered: from the CONTRACT, not from a hand-kept
- * list of which concepts wrap. Keeping such a list is what broke `native.Number`
- * - the render taxonomy knew the concept, the wrapper taxonomy did not, so a
- * number reached the gate bare and failed against `NumberContent`. Reading the
- * declared shape covers a concept nobody remembered to add.
- *
- * A wrapper is a schema declaring EXACTLY ONE property. A multi-property content
- * model (`DateContent {date, time}`, `HtmlContent {inner_html, css_class}`) is
- * not one and deliberately answers `undefined`; so does a contract that declares
- * no properties at all. The returned `schema` is the WRAPPED property's, which
- * is where its constraints live.
+ * A wrapper is a schema declaring EXACTLY ONE property. A multi-property
+ * content model (`DateContent {date, time}`, `HtmlContent {inner_html,
+ * css_class}`) is not one and deliberately answers `undefined` - those travel
+ * as the structures they are, which the wire now also says by giving them
+ * `kind: "object"`. Reading the declared shape rather than keeping a list of
+ * wrapping concepts is what covers a concept nobody remembered to add.
  */
-function scalarWrapper(
-  schema: JsonSchema,
-  ctx: MapCtx,
-): { key: string; schema: JsonSchema } | undefined {
-  const props = schema.properties as Record<string, JsonSchema> | undefined;
-  const entries = props ? Object.entries(props) : [];
-  const only = entries.length === 1 ? entries[0] : undefined;
-  if (!only) return undefined;
-  const [key, propSchema] = only;
-  return { key, schema: collapseNullable(derefSchema(propSchema ?? {}, ctx.defs)) };
-}
-
-/** Build the recursive RunField for a single resolved schema node. */
-function mapSchema(
-  name: string,
-  conceptRef: string | undefined,
-  rawSchema: JsonSchema,
-  required: boolean,
-  ctx: MapCtx,
-): RunField {
-  const schema = collapseNullable(derefSchema(rawSchema, ctx.defs));
-  // The LABEL is always the stuff name (the variable key) - that's what
-  // identifies the input in the method. We deliberately do NOT use
-  // `schema.title`, which is the pydantic model name (TextContent, ImageContent,
-  // DocumentContent…) and would mask the stuff name. The concept pill carries
-  // the type instead. `title` stays undefined here so FieldShell falls back to
-  // `name`; list items still pass `title: ''` to suppress the per-row label.
-  const common: RunFieldCommon = {
-    name,
-    conceptRef,
-    description: typeof schema.description === 'string' ? schema.description : undefined,
-    required,
-  };
-
-  const { base, isList } = splitListConcept(conceptRef);
-
-  // List concepts (native.Text[], demo.Invoice[]) and array schemas.
-  if (isList || schemaTypeOf(schema) === 'array') {
-    const itemsSchema = (schema.items as JsonSchema) ?? {};
-    const item = mapSchema(name, base, itemsSchema, true, { ...ctx, depth: ctx.depth + 1 });
-    // A declared count (`Concept[N]`) reaches the descriptor from the schema
-    // keywords ajv itself reads - see `ListRunField.itemCount`. BOTH bounds
-    // travel, because they are two facts: a `[N]` slot states them equal, but
-    // this mapper also walks nested arrays, whose model may have stated only
-    // one. Carrying a single number forced readiness and the control to read it
-    // as a minimum and a maximum respectively.
-    const itemCount = numOrUndef(schema.minItems);
-    const maxItemCount = numOrUndef(schema.maxItems);
-    return {
-      ...common,
-      kind: 'list',
-      item,
-      ...(itemCount === undefined ? {} : { itemCount }),
-      ...(maxItemCount === undefined ? {} : { maxItemCount }),
-    };
-  }
-
-  // Enum (a custom concept may refine a native with a fixed value set).
-  if (Array.isArray(schema.enum)) {
-    return { ...common, kind: 'enum', options: schema.enum.map(String) };
-  }
-
-  // Native concepts: map by concept_ref regardless of the wrapper schema shape.
-  if (base) {
-    if (FIELD_DOCUMENT_CONCEPTS.has(base))
-      return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
-    if (IMAGE_CONCEPTS.has(base)) return { ...common, kind: 'image', accept: 'PNG, JPG, WEBP' };
-
-    // The three native scalars render as a bare control but travel inside the
-    // content model their concept declares. `contentKey` carries that property
-    // name to the value bridge, which is how the control can hold `2` while the
-    // wire carries `{number: 2}`.
-    const wrapper = scalarWrapper(schema, ctx);
-
-    if (FIELD_TEXT_CONCEPTS.has(base) || HTML_CONCEPTS.has(base)) {
-      // `Date` declares two properties, so no wrapper is found for it and the
-      // `{text}` fallback answers instead - the recorded drift, kept until the
-      // derivation swap (see `native-concepts.ts`).
-      const contentKey = wrapper?.key ?? (TEXT_WRAPPER_CONCEPTS.has(base) ? 'text' : undefined);
-      return ctx.depth === 0
-        ? { ...common, contentKey, kind: 'prose' }
-        : { ...common, contentKey, kind: 'text' };
-    }
-    if (NUMBER_CONCEPTS.has(base))
-      return {
-        ...common,
-        contentKey: wrapper?.key,
-        kind: 'number',
-        // `NumberContent.number` is `int | float`, an unresolvable union, so the
-        // control stays a float input. Constraints are read off the WRAPPED
-        // property - the wrapper object never carries them, which is why the
-        // outer schema always answered `undefined`.
-        integer: false,
-        min: numOrUndef(wrapper?.schema.minimum ?? schema.minimum),
-        max: numOrUndef(wrapper?.schema.maximum ?? schema.maximum),
-      };
-    if (YES_NO_CONCEPTS.has(base)) return { ...common, contentKey: wrapper?.key, kind: 'boolean' };
-  }
-
-  // A custom concept whose schema looks like DocumentContent (refines Document).
-  if (isDocumentObject(schema)) {
-    return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
-  }
-
-  const type = schemaTypeOf(schema);
-  switch (type) {
-    case 'string': {
-      if (base && (FIELD_DOCUMENT_CONCEPTS.has(base) || base === 'native.Document'))
-        return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
-      // A `date` structure field compiles to a `format: date`/`date-time`
-      // string. Render it as a real date picker so the user picks a day - no
-      // hand-typed timestamps - and stores a value the API accepts.
-      if (schema.format === 'date' || schema.format === 'date-time')
-        return { ...common, kind: 'date', datetime: schema.format === 'date-time' };
-      // A top-level Text input is usually the main prompt (roomy textarea); the
-      // same concept nested in a concept/list is usually a short attribute
-      // (name, label) and reads better as a single line.
-      const long =
-        base && FIELD_TEXT_CONCEPTS.has(base)
-          ? ctx.depth === 0
-          : typeof schema.maxLength === 'number'
-            ? schema.maxLength > 120
-            : false;
-      return long
-        ? { ...common, kind: 'prose' }
-        : { ...common, kind: 'text', placeholder: undefined };
-    }
-    case 'integer':
-      return {
-        ...common,
-        kind: 'number',
-        integer: true,
-        min: numOrUndef(schema.minimum),
-        max: numOrUndef(schema.maximum),
-      };
-    case 'number':
-      return {
-        ...common,
-        kind: 'number',
-        integer: false,
-        min: numOrUndef(schema.minimum),
-        max: numOrUndef(schema.maximum),
-      };
-    case 'boolean':
-      return { ...common, kind: 'boolean' };
-    case 'object': {
-      const props = (schema.properties as Record<string, JsonSchema>) ?? {};
-      const req = new Set(Array.isArray(schema.required) ? (schema.required as string[]) : []);
-      const fields = Object.entries(props).map(([fieldName, fieldSchema]) =>
-        mapSchema(fieldName, undefined, fieldSchema, req.has(fieldName), {
-          ...ctx,
-          depth: ctx.depth + 1,
-        }),
-      );
-      return { ...common, kind: 'object', fields };
-    }
-    default:
-      // A bare `native.Text` concept may arrive as `{type:'string'}` (handled
-      // above) but a custom concept with no resolvable shape lands here.
-      if (base && FIELD_TEXT_CONCEPTS.has(base))
-        return ctx.depth === 0 ? { ...common, kind: 'prose' } : { ...common, kind: 'text' };
-      return { ...common, kind: 'unknown' };
-  }
+function scalarWrapperKey(schema: JsonSchema | undefined): string | undefined {
+  const props = schema?.properties as Record<string, JsonSchema> | undefined;
+  const keys = props ? Object.keys(props) : [];
+  return keys.length === 1 ? keys[0] : undefined;
 }
 
 function numOrUndef(v: unknown): number | undefined {
   return typeof v === 'number' ? v : undefined;
 }
 
+/** The inclusive bound a control can express for a wire-stated exclusive one.
+ *  On an integer the open interval has a nearest neighbour and the conversion
+ *  is exact (`> 0` IS `>= 1`), so `toNearest` steps off the endpoint onto it.
+ *  It rounds rather than adding one, because the endpoint need not be integral
+ *  - JSON Schema allows `> 0.5` on an integer node, whose nearest neighbour is
+ *  `1`, not `1.5`. On a float the interval has no nearest neighbour, and the
+ *  answer is to publish no bound at all: a control that only clamps cannot
+ *  express an open interval, and naming the excluded endpoint would advertise
+ *  the one value the gate is about to refuse. */
+function inclusiveFrom(
+  bound: number | undefined,
+  integer: boolean | undefined,
+  toNearest: (endpoint: number) => number,
+): number | undefined {
+  return typeof bound === 'number' && integer === true ? toNearest(bound) : undefined;
+}
+
+/** Resolve one schema node the same way the gate's validator will see it -
+ *  to the FIXPOINT, so a nullable `$ref` (pydantic's Optional concept-typed
+ *  field) yields its definition rather than an unresolved reference. */
+function resolveSchema(
+  schema: JsonSchema | undefined,
+  defs: Record<string, JsonSchema>,
+): JsonSchema | undefined {
+  return schema ? resolveSchemaNode(schema, defs) : undefined;
+}
+
+/** The slots every wire node carries, mapped onto the descriptor's names. */
+function commonOf(node: InputFormItem, name: string): RunFieldCommon {
+  return {
+    name,
+    title: node.title,
+    conceptRef: node.concept_ref,
+    refines: node.refines,
+    description: node.description,
+    required: node.required,
+    defaultValue: node.default_value,
+    examples: node.examples,
+    hints: node.hints,
+  };
+}
+
 /**
- * Convert the API's per-input contracts into the runner's field descriptors.
- * The map's insertion order is preserved (required-first is the caller's job).
+ * Map one wire node onto a `RunField`, walking the aligned `json_schema` node
+ * beside it. The schema walk supplies only `contentKey` and list bounds (see
+ * the module header); a missing or misaligned schema degrades to their absence,
+ * never to a different field.
  */
-export function buildRunFields(inputs: Record<string, PipeInputContract>): RunField[] {
-  return Object.entries(inputs).map(([name, input]) => {
+function mapNode(
+  node: InputFormItem,
+  name: string,
+  rawSchema: JsonSchema | undefined,
+  defs: Record<string, JsonSchema>,
+): RunField {
+  const schema = resolveSchema(rawSchema, defs);
+  const common = commonOf(node, name);
+
+  switch (node.kind) {
+    case 'text':
+    case 'prose':
+      return {
+        ...common,
+        contentKey: scalarWrapperKey(schema),
+        kind: node.kind,
+        minLength: node.min_length,
+        maxLength: node.max_length,
+        pattern: node.pattern,
+        format: node.format,
+      };
+    case 'date':
+      return { ...common, kind: 'date', datetime: node.datetime };
+    case 'number':
+      return {
+        ...common,
+        contentKey: scalarWrapperKey(schema),
+        kind: 'number',
+        integer: node.integer,
+        // A number control clamps; it does not express open intervals. So an
+        // exclusive bound becomes the nearest inclusive one where that is
+        // exact (integers) and is dropped where it is not (floats) - never
+        // the excluded endpoint itself, which the control would clamp onto
+        // and the gate would then refuse. ajv enforces the exact keyword off
+        // the schema either way, so the bound is a hint, never the rule.
+        min:
+          node.minimum ??
+          inclusiveFrom(
+            node.exclusive_minimum,
+            node.integer,
+            (endpoint) => Math.floor(endpoint) + 1,
+          ),
+        max:
+          node.maximum ??
+          inclusiveFrom(
+            node.exclusive_maximum,
+            node.integer,
+            (endpoint) => Math.ceil(endpoint) - 1,
+          ),
+      };
+    case 'boolean':
+      return { ...common, contentKey: scalarWrapperKey(schema), kind: 'boolean' };
+    case 'enum':
+      // The wire carries the authored `choices` verbatim (`unknown[]`); the
+      // control set renders and stores strings, as it always has.
+      return { ...common, kind: 'enum', options: node.choices.map(String) };
+    case 'document':
+      // `accept` is a renderer-side affordance the wire deliberately does not
+      // state - a presentation default keyed on the WIRE's kind, not a guess.
+      return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
+    case 'image':
+      return { ...common, kind: 'image', accept: 'PNG, JPG, WEBP' };
+    case 'object': {
+      const props = schema?.properties as Record<string, JsonSchema> | undefined;
+      return {
+        ...common,
+        kind: 'object',
+        fields: node.fields.map((child: InputFormField) =>
+          mapNode(child, child.name, props ? ownProp(props, child.name) : undefined, defs),
+        ),
+      };
+    }
+    case 'list': {
+      // The item keeps the parent's name (unused for labels - the index labels
+      // items), exactly as the wire's `item` carries no `name` of its own.
+      const item = mapNode(node.item, name, schema?.items as JsonSchema | undefined, defs);
+      const itemCount = node.item_count ?? numOrUndef(schema?.minItems);
+      const maxItemCount = numOrUndef(schema?.maxItems) ?? node.item_count;
+      return {
+        ...common,
+        kind: 'list',
+        item,
+        ...(itemCount === undefined ? {} : { itemCount }),
+        ...(maxItemCount === undefined ? {} : { maxItemCount }),
+      };
+    }
+    case 'unknown':
+      return { ...common, kind: 'unknown' };
+  }
+  // Version drift: the wire states a kind this build's pinned peer does not
+  // define. The switch above is exhaustive over `InputFormItem`, so
+  // `satisfies never` keeps the build LOUD when the PEER grows a kind - and
+  // this return keeps the mapper TOTAL when a SERVER is ahead of the peer,
+  // which no type can rule out. The standard's own escape hatch is the honest
+  // answer (`unknown` exists so a derivation can be total truthfully): the
+  // field keeps its name and falls back to raw entry against the contract's
+  // `json_schema`. Returning nothing produced a field with no `name` at all -
+  // unaddressable by the value bridge and unnameable by readiness.
+  node satisfies never;
+  return { ...common, kind: 'unknown' };
+}
+
+/**
+ * Map a pipe's wire input-form descriptor onto the kernel's field descriptors,
+ * with the pipe's input contracts beside it for the two schema-derived facts.
+ *
+ * The order is the DESCRIPTOR's - authored input order, the fact the contract's
+ * `inputs` map deliberately does not carry. `required`, `presence` and `gating`
+ * are taken from the wire verbatim: the standard's top-level type ties
+ * `required` to the presence marker, and `gating` is the producer-derived
+ * answer `mustBeFilled` reads - the kernel re-derives none of them.
+ */
+export function buildRunFields(
+  descriptor: PipeInputFormDescriptor,
+  inputs: Record<string, PipeInputContract>,
+): RunField[] {
+  return descriptor.fields.map((node) => {
+    const input = ownProp(inputs, node.name);
     const defs: Record<string, JsonSchema> = {};
-    collectSchemaDefs(input.json_schema, defs, { traverseArrays: true });
-    // A top-level input is required unless the method declared it optional (`?`).
-    const field = mapSchema(name, input.concept_ref, input.json_schema, !isOptionalInput(input), {
-      defs,
-      depth: 0,
-    });
-    // Whether Run gates on it is a SEPARATE question, and it is answered by the
-    // contract, not by the shape we mapped it to - see `mustBeFilled`.
-    return { ...field, gating: inputMustBeFilled(input) };
+    if (input) collectSchemaDefs(input.json_schema, defs, { traverseArrays: true });
+    const field = mapNode(node, node.name, input?.json_schema as JsonSchema | undefined, defs);
+    return { ...field, presence: node.presence, gating: node.gating };
   });
 }

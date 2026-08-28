@@ -11,7 +11,6 @@ import type { PipeIOContract, PipeInputContract } from '..';
 import {
   FORCE_SINGLE,
   OPTIONAL_SINGLE,
-  OPTIONAL_VARIABLE,
   PLAIN_SINGLE,
   PLAIN_VARIABLE,
   SINGLE_OUTPUT,
@@ -162,8 +161,15 @@ describe('inputMustBeFilled', () => {
     expect(inputMustBeFilled(fixedPlural)).toBe(true);
   });
 
-  it('never demands an optional plural, whichever way the two are combined', () => {
-    expect(inputMustBeFilled({ ...plural, ...OPTIONAL_VARIABLE })).toBe(false);
+  it('never demands an optional plural, even though no method can declare one', () => {
+    // `Concept[]?` is invalid MTHDS - a presence marker may not be combined
+    // with a multiplicity suffix - and the standard's types reject it, which is
+    // what the cast is admitting. The row stays because the kernel does not
+    // parse-check what an API hands it: a producer that emitted the combination
+    // anyway must not come out gating, since either half of the declaration
+    // says on its own that it does not.
+    const optionalPlural = { ...plural, presence: 'optional' } as unknown as PipeInputContract;
+    expect(inputMustBeFilled(optionalPlural)).toBe(false);
   });
 
   it('treats an unstated presence as required, not optional', () => {
