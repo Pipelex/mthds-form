@@ -79,16 +79,19 @@ function numOrUndef(v: unknown): number | undefined {
 
 /** The inclusive bound a control can express for a wire-stated exclusive one.
  *  On an integer the open interval has a nearest neighbour and the conversion
- *  is exact (`> 0` IS `>= 1`), so `step` walks one off the endpoint. On a
- *  float it has none, and the answer is to publish no bound at all: a control
- *  that only clamps cannot express an open interval, and naming the excluded
- *  endpoint would advertise the one value the gate is about to refuse. */
+ *  is exact (`> 0` IS `>= 1`), so `toNearest` steps off the endpoint onto it.
+ *  It rounds rather than adding one, because the endpoint need not be integral
+ *  - JSON Schema allows `> 0.5` on an integer node, whose nearest neighbour is
+ *  `1`, not `1.5`. On a float the interval has no nearest neighbour, and the
+ *  answer is to publish no bound at all: a control that only clamps cannot
+ *  express an open interval, and naming the excluded endpoint would advertise
+ *  the one value the gate is about to refuse. */
 function inclusiveFrom(
   bound: number | undefined,
   integer: boolean | undefined,
-  step: 1 | -1,
+  toNearest: (endpoint: number) => number,
 ): number | undefined {
-  return typeof bound === 'number' && integer === true ? bound + step : undefined;
+  return typeof bound === 'number' && integer === true ? toNearest(bound) : undefined;
 }
 
 /** Resolve one schema node the same way the gate's validator will see it -
@@ -157,8 +160,20 @@ function mapNode(
         // the excluded endpoint itself, which the control would clamp onto
         // and the gate would then refuse. ajv enforces the exact keyword off
         // the schema either way, so the bound is a hint, never the rule.
-        min: node.minimum ?? inclusiveFrom(node.exclusive_minimum, node.integer, 1),
-        max: node.maximum ?? inclusiveFrom(node.exclusive_maximum, node.integer, -1),
+        min:
+          node.minimum ??
+          inclusiveFrom(
+            node.exclusive_minimum,
+            node.integer,
+            (endpoint) => Math.floor(endpoint) + 1,
+          ),
+        max:
+          node.maximum ??
+          inclusiveFrom(
+            node.exclusive_maximum,
+            node.integer,
+            (endpoint) => Math.ceil(endpoint) - 1,
+          ),
       };
     case 'boolean':
       return { ...common, contentKey: scalarWrapperKey(schema), kind: 'boolean' };

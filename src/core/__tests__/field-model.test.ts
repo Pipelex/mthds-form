@@ -150,6 +150,27 @@ describe('the wire-stated facts land on the descriptor verbatim', () => {
     expect(field).toMatchObject({ kind: 'number', integer: true, min: 1, max: 9 });
   });
 
+  it('rounds a fractional exclusive integer bound to the nearest valid integer', () => {
+    // JSON Schema permits a fractional exclusive bound on an integer node, and
+    // the wire's `integer` flag is independent of the bounds beside it. Adding
+    // one to `0.5` publishes `1.5` - a fractional bound on a field declared
+    // `integer`, which no integer control can mean, and which walks the stepper
+    // past the valid value `1` onto `2`. The nearest valid integer is the floor
+    // of the open endpoint plus one, and its ceiling minus one.
+    const [field] = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'number',
+        name: 'score',
+        integer: true,
+        exclusive_minimum: 0.5,
+        exclusive_maximum: 10.5,
+      }),
+      { score: { ...PLAIN_SINGLE, concept_ref: 'demo.Score', json_schema: { type: 'integer' } } },
+    );
+    expect(field).toMatchObject({ kind: 'number', integer: true, min: 1, max: 10 });
+  });
+
   it('publishes no bound for an exclusive float bound', () => {
     // A float open interval has no nearest inclusive neighbour, and the control
     // only clamps. Saying nothing is honest; naming the excluded endpoint is
