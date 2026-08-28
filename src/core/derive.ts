@@ -77,6 +77,20 @@ function numOrUndef(v: unknown): number | undefined {
   return typeof v === 'number' ? v : undefined;
 }
 
+/** The inclusive bound a control can express for a wire-stated exclusive one.
+ *  On an integer the open interval has a nearest neighbour and the conversion
+ *  is exact (`> 0` IS `>= 1`), so `step` walks one off the endpoint. On a
+ *  float it has none, and the answer is to publish no bound at all: a control
+ *  that only clamps cannot express an open interval, and naming the excluded
+ *  endpoint would advertise the one value the gate is about to refuse. */
+function inclusiveFrom(
+  bound: number | undefined,
+  integer: boolean | undefined,
+  step: 1 | -1,
+): number | undefined {
+  return typeof bound === 'number' && integer === true ? bound + step : undefined;
+}
+
 /** Resolve one schema node the same way the gate's validator will see it -
  *  to the FIXPOINT, so a nullable `$ref` (pydantic's Optional concept-typed
  *  field) yields its definition rather than an unresolved reference. */
@@ -137,11 +151,14 @@ function mapNode(
         contentKey: scalarWrapperKey(schema),
         kind: 'number',
         integer: node.integer,
-        // The kernel collapses the exclusive bounds: a number control clamps,
-        // it does not express open intervals. ajv still enforces the exact
-        // keyword off the schema, so nothing is lost - only unrendered.
-        min: node.minimum ?? node.exclusive_minimum,
-        max: node.maximum ?? node.exclusive_maximum,
+        // A number control clamps; it does not express open intervals. So an
+        // exclusive bound becomes the nearest inclusive one where that is
+        // exact (integers) and is dropped where it is not (floats) - never
+        // the excluded endpoint itself, which the control would clamp onto
+        // and the gate would then refuse. ajv enforces the exact keyword off
+        // the schema either way, so the bound is a hint, never the rule.
+        min: node.minimum ?? inclusiveFrom(node.exclusive_minimum, node.integer, 1),
+        max: node.maximum ?? inclusiveFrom(node.exclusive_maximum, node.integer, -1),
       };
     case 'boolean':
       return { ...common, contentKey: scalarWrapperKey(schema), kind: 'boolean' };

@@ -132,7 +132,10 @@ describe('the wire-stated facts land on the descriptor verbatim', () => {
     });
   });
 
-  it('collapses the wire’s exclusive number bounds into min/max', () => {
+  it('converts an exclusive integer bound to the nearest inclusive one', () => {
+    // `> 0` on an integer is exactly `>= 1`, and the wire states `integer`, so
+    // the conversion guesses nothing. Publishing the excluded endpoint instead
+    // would let the control clamp onto the one value the gate then refuses.
     const [field] = buildRunFields(
       descriptorOf({
         ...WIRE_PLAIN,
@@ -140,11 +143,30 @@ describe('the wire-stated facts land on the descriptor verbatim', () => {
         name: 'score',
         integer: true,
         exclusive_minimum: 0,
-        maximum: 10,
+        exclusive_maximum: 10,
       }),
       { score: { ...PLAIN_SINGLE, concept_ref: 'demo.Score', json_schema: { type: 'integer' } } },
     );
-    expect(field).toMatchObject({ kind: 'number', integer: true, min: 0, max: 10 });
+    expect(field).toMatchObject({ kind: 'number', integer: true, min: 1, max: 9 });
+  });
+
+  it('publishes no bound for an exclusive float bound', () => {
+    // A float open interval has no nearest inclusive neighbour, and the control
+    // only clamps. Saying nothing is honest; naming the excluded endpoint is
+    // not. ajv still enforces `exclusiveMinimum` off the schema either way.
+    const [field] = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'number',
+        name: 'ratio',
+        integer: false,
+        exclusive_minimum: 0,
+        maximum: 1,
+      }),
+      { ratio: { ...PLAIN_SINGLE, concept_ref: 'demo.Ratio', json_schema: { type: 'number' } } },
+    );
+    expect(field).toMatchObject({ kind: 'number', max: 1 });
+    expect((field as { min?: number }).min).toBeUndefined();
   });
 });
 
