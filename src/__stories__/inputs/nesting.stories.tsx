@@ -13,7 +13,7 @@ import { CONTRACTS as FILE_CONTRACTS, INPUT_FORM as FILE_INPUT_FORM } from '../_
  */
 
 const meta = {
-  title: 'Complex/Nesting',
+  title: 'Inputs/Nesting',
   component: CaseForm,
   args: { contracts: CONTRACTS, inputForm: INPUT_FORM, domain: 'structured' },
 } satisfies Meta<typeof CaseForm>;

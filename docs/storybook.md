@@ -8,24 +8,34 @@ The `src/react/__tests__/` suites already assert the DOM facts: an input has an 
 
 What nothing else in this repo can answer is whether a control **renders correctly, in both themes, across every input shape the standard can produce**. That is the question the stories exist for. Read a failing story as "this looks wrong", and a failing unit test as "this behaves wrong"; when the two disagree, the unit test is the contract.
 
-## The folders
+## The sections
 
-Sidebar order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical — alphabetical opens on `Complex`, which is the last thing to meet first.
+Three, mirroring what the package is:
 
-| Folder | Question it answers |
+| Section | What is in it |
 | --- | --- |
-| **Field Kinds** | What is every input type, in isolation, with nothing else on screen? One story file per kind. |
-| **States** | The state axis, once, on a representative concept — defaults, presence markers, filled, invalid, disabled. Its own section because a state is not a kind. |
-| **Concepts** | What does a realistic single structure look like — mixed scalars, an enum, an optional beside a required, a nested concept, a list of concepts? |
-| **Complex** | Does it survive composition — a list of objects containing lists, four levels deep, files inside a list, the whole tree disabled? |
-| **Gallery** | Do all of these read as one system? The question no per-kind story can answer. |
-| **Toolchain** | The pieces that need no descriptor, currently the concept pill across all nine categories. |
+| **Inputs** | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
+| **Outputs** | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one. |
+| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories. |
+
+Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
 
 **A story isolates one comparison, and its doc comment names what varies.** A canvas with three near-identical dropzones and no statement of the difference is not a comparison, it is a coincidence — that is what the first `Files/Image` story was, and it is the failure mode a fixture-driven catalog invites, because putting more slots on a pipe is free. Prefer several small carrier pipes over one that shows everything.
 
 **A state story shows one slot.** `Uploading` on a three-slot form puts two idle dropzones beside the control the story is about, and a reader cannot tell which part of the canvas is the subject. So state stories render a single-slot carrier — `one_document`, `one_image` — and the multi-slot form stays for the stories whose subject *is* the form. When a state needs isolating, add a single-slot pipe to the case's `.slots.json` rather than filtering fields in the story: the fixture stays the thing that decides what renders.
 
-The state axis is factored **out** of the per-kind catalog rather than multiplied into it: `Field States` walks one representative concept through defaults, the three presence markers, filled, invalid and disabled, and each kind's own file carries only the states where that kind behaves differently. Crossing every kind with every state produces a folder nobody can scan, which is the one thing the catalog exists not to be.
+The state axis is factored **out** of the per-kind stories rather than multiplied into them: `Field States` walks one representative concept through defaults, the three presence markers, filled, invalid and disabled, and each kind's own file carries only the states where that kind behaves differently. Crossing every kind with every state produces a folder nobody can scan, which is the one thing the catalog exists not to be.
+
+## Outputs
+
+An output is a concept ref exactly like an input is, so its stories are driven by the same `RunField` — mapped by `buildResultField`, which delegates to the mapper `buildRunFields` uses and differs only in not stamping slot facts.
+
+What differs is presentation: a result is **read, not edited**, so `ResultField` renders values with labels rather than controls with values. Rendering a result as a disabled form would say "you may not change this" where the truth is "this is what came back".
+
+Two halves, sourced differently:
+
+- **The descriptor** is generated, like every input fixture — but from an artifact the standard does not have yet. See `src/core/output-form.ts` for what `pipe_io_contracts` carries for an output today (identity and plurality, no schema) and what this simulates.
+- **The payloads** are copied verbatim from real runs, in `src/__stories__/payloads/`. A payload is what a run produced; there is no other way to get one. That is not ceremony: two shapes in them are invisible from the descriptor — a `date` arrives as kajson's typed `{date, __class__, __module__}`, and a plural payload is `{ items: [...] }` rather than a bare array. A payload written by hand from the descriptor would have been a bare string and a bare array, and the renderer would have been built to a shape that never occurs.
 
 ## What a file slot accepts
 

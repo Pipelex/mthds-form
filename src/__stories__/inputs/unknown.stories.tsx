@@ -27,7 +27,7 @@ const DRIFTED: InputForm = JSON.parse(
 );
 
 const meta = {
-  title: 'Field Kinds/Unknown',
+  title: 'Inputs/Unknown',
   component: CaseForm,
   args: { contracts: CONTRACTS, inputForm: DRIFTED, domain: 'scalars' },
 } satisfies Meta<typeof CaseForm>;

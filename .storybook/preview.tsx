@@ -14,15 +14,14 @@ const preview: Preview = {
   parameters: {
     layout: 'fullscreen',
     /**
-     * Reading order, not alphabetical order. Left to sort itself the sidebar
-     * opens on `Complex`, which is the last thing anyone wants to meet first:
-     * the catalog is what someone comes here to see, then a realistic concept,
-     * then what happens under composition. `Gallery` sits after those because
-     * it is a summary of them, and `Toolchain` last because it is scaffolding.
+     * Three sections, in reading order, mirroring what the package actually is:
+     * the inputs a method declares, the results it resolves to, and the
+     * scaffolding underneath. Alphabetical order would open the sidebar on
+     * whatever happened to sort first.
      */
     options: {
       storySort: {
-        order: ['Field Kinds', 'States', 'Concepts', 'Complex', 'Outputs', 'Gallery', 'Toolchain'],
+        order: ['Inputs', 'Outputs', 'Toolchain'],
       },
     },
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
