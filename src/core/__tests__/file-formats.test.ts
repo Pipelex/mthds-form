@@ -8,28 +8,54 @@ import {
 } from '../file-formats';
 
 /**
- * The format table is a MIRROR of the runtime's `DocumentFormat` and
- * `ImageFormat` enums, so these tests pin the two things a mirror can get
- * wrong: the membership itself, and the fallbacks that decide whether a real
- * file matches it.
+ * The format table mirrors a runtime fact that was MEASURED - see the header of
+ * `../file-formats` for the runs and the model-deck derivation behind it.
+ *
+ * The membership assertions are deliberately literal. Their job is to fail
+ * loudly if someone widens the table from a plausible-looking source, which is
+ * exactly how DOCX and PPTX got in: off an enum the runtime never reads.
  */
 
 describe('the accepted formats', () => {
-  it('mirrors DocumentFormat: PDF, DOCX, PPTX - and not TXT', () => {
-    expect(DOCUMENT_FORMATS.map((f) => f.label)).toEqual(['PDF', 'DOCX', 'PPTX']);
-    expect(acceptLabelForKind('document')).toBe('PDF, DOCX, PPTX');
+  it('is PDF, JPG, PNG for a document - the extract model reads an image as one page', () => {
+    expect(DOCUMENT_FORMATS.map((f) => f.label)).toEqual(['PDF', 'JPG', 'PNG']);
+    expect(acceptLabelForKind('document')).toBe('PDF, JPG, PNG');
   });
 
-  it('mirrors ImageFormat: PNG, JPEG, WEBP', () => {
+  it('excludes DOCX and PPTX, which every path refuses', () => {
+    // Both were in this table once. A run proves the refusal: the LLM path
+    // answers "does not support docx documents", and the extract gateway
+    // answers with its own list.
+    const mimes = DOCUMENT_FORMATS.map((f) => f.mimeType);
+    expect(mimes).not.toContain(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+    expect(mimes).not.toContain(
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    );
+  });
+
+  it('is PNG, JPG, WEBP for an image', () => {
     expect(IMAGE_FORMATS.map((f) => f.label)).toEqual(['PNG', 'JPG', 'WEBP']);
     expect(acceptLabelForKind('image')).toBe('PNG, JPG, WEBP');
   });
 
-  it('carries the runtime MIME types verbatim', () => {
+  it('excludes GIF, BMP and TIFF, which the vision path refuses', () => {
+    const mimes = IMAGE_FORMATS.map((f) => f.mimeType);
+    // GIF is the interesting exclusion: it IS in the provider's image enum, but
+    // it arrives there as a document block and fails. Listing it would
+    // advertise an upload that cannot work today.
+    expect(mimes).not.toContain('image/gif');
+    expect(mimes).not.toContain('image/bmp');
+    expect(mimes).not.toContain('image/tiff');
+  });
+
+  it('carries the MIME types the gateway named in its own refusal', () => {
+    // "Supported formats: application/pdf, image/jpeg, image/png"
     expect(DOCUMENT_FORMATS.map((f) => f.mimeType)).toEqual([
       'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'image/jpeg',
+      'image/png',
     ]);
     expect(IMAGE_FORMATS.map((f) => f.mimeType)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
   });
@@ -42,21 +68,41 @@ describe('isAcceptedFile', () => {
   });
 
   it('refuses a file whose MIME type is not', () => {
-    expect(isAcceptedFile('document', { name: 'archive.zip', type: 'application/zip' })).toBe(
-      false,
-    );
+    expect(isAcceptedFile('document', { name: 'a.zip', type: 'application/zip' })).toBe(false);
     expect(isAcceptedFile('image', { name: 'clip.mp4', type: 'video/mp4' })).toBe(false);
   });
 
-  it('refuses a document on an image slot, and the reverse', () => {
+  it('refuses the office formats a run proves fail', () => {
+    expect(
+      isAcceptedFile('document', {
+        name: 'report.docx',
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }),
+    ).toBe(false);
+    // A PPTX is detected as a zip upstream, so both spellings must be refused.
+    expect(isAcceptedFile('document', { name: 'deck.pptx', type: 'application/zip' })).toBe(false);
+    expect(isAcceptedFile('document', { name: 'deck.pptx', type: '' })).toBe(false);
+  });
+
+  it('refuses a PDF on an image slot', () => {
     expect(isAcceptedFile('image', { name: 'report.pdf', type: 'application/pdf' })).toBe(false);
-    expect(isAcceptedFile('document', { name: 'shot.png', type: 'image/png' })).toBe(false);
+  });
+
+  it('accepts a PNG in a DOCUMENT slot - the extract model reads it as one page', () => {
+    expect(isAcceptedFile('document', { name: 'scan.png', type: 'image/png' })).toBe(true);
+    expect(isAcceptedFile('document', { name: 'scan.jpg', type: 'image/jpeg' })).toBe(true);
+  });
+
+  it('refuses a WEBP in a document slot, though an image slot takes it', () => {
+    // The asymmetry is real: the extract gateway names only PDF, JPEG and PNG.
+    expect(isAcceptedFile('document', { name: 'scan.webp', type: 'image/webp' })).toBe(false);
+    expect(isAcceptedFile('image', { name: 'scan.webp', type: 'image/webp' })).toBe(true);
   });
 
   it('falls back to the extension when the browser reports no MIME type', () => {
-    // An OS with no handler registered for .docx reports ''. Refusing that file
-    // would be refusing a valid one over a fact about the user's machine.
-    expect(isAcceptedFile('document', { name: 'contract.docx', type: '' })).toBe(true);
+    // A browser reports '' often enough to matter, and refusing then would be
+    // refusing a valid file over a fact about the user's machine.
+    expect(isAcceptedFile('document', { name: 'report.pdf', type: '' })).toBe(true);
     expect(isAcceptedFile('document', { name: 'notes.txt', type: '' })).toBe(false);
   });
 
@@ -88,6 +134,11 @@ describe('acceptMapForKind', () => {
       'image/png': ['.png'],
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/webp': ['.webp'],
+    });
+    expect(acceptMapForKind('document')).toEqual({
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
     });
   });
 

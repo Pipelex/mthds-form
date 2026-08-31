@@ -1,30 +1,54 @@
 /**
  * What a `document` or an `image` slot actually accepts.
  *
- * **This is a mirror of the runtime's format enums, and it is a mirror on
- * purpose.** The wire says a slot's kind is `document` or `image` and stops
- * there — the input-form descriptor carries no accept list, because which bytes
- * a runtime can decode is a property of that runtime, not of the method. So the
- * list has to live somewhere on this side, and the only honest place is one
- * module that says out loud what it mirrors.
+ * **This is a client-side mirror of a runtime fact, and the fact was measured
+ * rather than read off a list.** The wire says a slot's kind is `document` or
+ * `image` and stops there — which bytes a runtime can decode is a property of
+ * that runtime, not of the method — so the list has to live on this side, and
+ * the only honest place is one module that says where it came from.
  *
- * The source is `pipelex`:
+ * There is no single enum to copy. In `pipelex`, what a slot accepts is derived
+ * per model:
  *
- * | Here | There |
- * | --- | --- |
- * | `DOCUMENT_FORMATS` | `DocumentFormat` in `pipelex/tools/misc/document_utils.py` |
- * | `IMAGE_FORMATS` | `ImageFormat` in `pipelex/tools/misc/image_utils.py` |
+ *   ModelSpec.supported_document_types = {"pdf","docx","pptx"} & set(inputs)
+ *   ModelSpec.is_vision_supported      = "images" in inputs
  *
- * Both enums expose `get_supported_mime_types()`, and both are closed. If a
- * runtime grows a format, this table is the thing that has to move with it —
- * and a stale entry here is worse than none, because it rejects a file the
- * runtime would have taken.
+ * so the effective set is that vocabulary intersected with the **model deck's**
+ * declared `inputs`. No model in the shipped deck declares `docx` or `pptx`;
+ * every LLM entry is `["text", "images", "pdf"]`, and the default extract model
+ * (`azure-document-intelligence`) is `["image", "pdf"]`.
  *
- * The previous arrangement was a hard-coded display string in `derive.ts`, and
- * it was wrong in both directions: it advertised `TXT`, which no
- * `DocumentFormat` member covers, and omitted `PPTX`, which is one. Nothing
- * caught that, because the string was never compared to anything and the
- * dropzone never enforced it.
+ * Confirmed by running each format end to end:
+ *
+ * | Format | PipeExtract | PipeLLM |
+ * | --- | --- | --- |
+ * | PDF  | yes | yes |
+ * | PNG  | yes | n/a |
+ * | JPEG | yes | n/a |
+ * | WEBP | no  | no  |
+ * | DOCX | no  | no — `does not support docx documents` |
+ * | PPTX | no  | no — detected as `zip`, so it never even reaches the check |
+ *
+ * The gateway states its own list in the failure: *"Supported formats:
+ * application/pdf, image/jpeg, image/png as base64 data URLs."*
+ *
+ * Images were measured the same way: PNG, JPEG and WEBP pass; BMP and TIFF fail
+ * on the provider's image enum; GIF fails too, though it is *in* that enum — it
+ * arrives at the provider as a document block rather than an image one, which
+ * looks like a routing bug upstream rather than an unsupported format.
+ *
+ * **A document slot's PNG and JPEG only work in an extract pipe.** The
+ * descriptor never says which operator consumes the slot, so this table cannot
+ * distinguish them; it matches the extract model's declared inputs, because
+ * extraction is the operator that actually reads a document's bytes.
+ *
+ * What was here before was built on `DocumentFormat` (PDF/DOCX/PPTX), an enum
+ * that is referenced nowhere in the runtime outside commented-out code and is
+ * being deleted. A dead enum is the worst kind of source: it reads exactly like
+ * a live one.
+ *
+ * A stale entry here is worse than no list at all, because it refuses a file the
+ * runtime would have taken. If the deck grows a format, this table moves with it.
  *
  * Pure data. No React, no ajv, nothing imported.
  */
@@ -38,27 +62,23 @@ export interface FileFormat {
   label: string;
 }
 
-/** Mirrors `DocumentFormat`: PDF, DOCX, PPTX. */
+/**
+ * What a `document` slot takes: PDF, plus the two image formats the extract
+ * model reads as a single-page document.
+ */
 export const DOCUMENT_FORMATS: readonly FileFormat[] = [
   { mimeType: 'application/pdf', extensions: ['.pdf'], label: 'PDF' },
-  {
-    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    extensions: ['.docx'],
-    label: 'DOCX',
-  },
-  {
-    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    extensions: ['.pptx'],
-    label: 'PPTX',
-  },
+  { mimeType: 'image/jpeg', extensions: ['.jpg', '.jpeg'], label: 'JPG' },
+  { mimeType: 'image/png', extensions: ['.png'], label: 'PNG' },
 ];
 
 /**
- * Mirrors `ImageFormat`: PNG, JPEG, WEBP.
+ * What an `image` slot takes: PNG, JPEG, WEBP — all three measured through the
+ * vision path.
  *
- * `.jpg` and `.jpeg` both ride `image/jpeg` — the runtime's `as_file_extension`
- * returns `jpg`, so that is the label, but a file named `.jpeg` is the same
- * bytes and must not be refused over its spelling.
+ * `.jpg` and `.jpeg` both ride `image/jpeg`. `JPG` is the label because that is
+ * the spelling the runtime uses, but a file named `.jpeg` is the same bytes and
+ * must not be refused over its spelling.
  */
 export const IMAGE_FORMATS: readonly FileFormat[] = [
   { mimeType: 'image/png', extensions: ['.png'], label: 'PNG' },

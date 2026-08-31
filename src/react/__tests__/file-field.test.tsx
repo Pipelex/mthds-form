@@ -392,7 +392,10 @@ describe('a file the slot cannot accept never reaches the host', () => {
     // The attribute is the affordance; `isAcceptedFile` is the enforcement.
     // Both have to be right, and only this one is visible in the DOM.
     expect(fileInput().accept).toContain('application/pdf');
-    expect(fileInput().accept).toContain('.pptx');
+    expect(fileInput().accept).toContain('image/png');
     expect(fileInput().accept).not.toContain('text/plain');
+    // The two that a run proves fail, and that this table used to advertise.
+    expect(fileInput().accept).not.toContain('wordprocessingml');
+    expect(fileInput().accept).not.toContain('presentationml');
   });
 });

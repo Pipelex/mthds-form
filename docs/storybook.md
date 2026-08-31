@@ -29,7 +29,16 @@ The state axis is factored **out** of the per-kind catalog rather than multiplie
 
 ## What a file slot accepts
 
-Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` therefore mirrors the runtime's own enums — `DocumentFormat` (PDF, DOCX, PPTX) and `ImageFormat` (PNG, JPEG, WEBP) — and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree. A stale entry there is worse than none: it refuses a file the runtime would have taken. See [dependency-budget.md](dependency-budget.md) for why this lives in core rather than in the control.
+Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree.
+
+| Slot | Accepts |
+| --- | --- |
+| `document` | PDF, JPG, PNG — the extract model reads an image as a single page |
+| `image` | PNG, JPG, WEBP |
+
+The asymmetry is real rather than an oversight: WEBP passes as an image and is refused as a document, which is what the extract gateway answers.
+
+**The list was measured, not read off an enum**, and that distinction is the whole lesson of how it got wrong twice. There is no single list in the runtime to copy: what a slot accepts is `{"pdf","docx","pptx"} & set(model.inputs)` per model, and no shipped model declares `docx` or `pptx`. The header of `file-formats.ts` records the runs. A stale entry there is worse than none — it refuses a file the runtime would have taken.
 
 ## What the corpus cannot reach
 

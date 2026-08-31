@@ -101,14 +101,20 @@ export const Uploading: Story = {
  *
  * The accepted formats are not a wire fact: the descriptor says the kind is
  * `document` or `image` and stops there, because which bytes a runtime can
- * decode is a property of the runtime. So the kernel mirrors the runtime's own
- * enums in `core/file-formats.ts` — `DocumentFormat` is PDF, DOCX, PPTX;
- * `ImageFormat` is PNG, JPEG, WEBP — and both the label under the dropzone and
- * the filter it enforces are read from that one table.
+ * decode is a property of the runtime. `core/file-formats.ts` holds the answer,
+ * and both the label under the dropzone and the filter it enforces read that
+ * one table.
  *
- * They used to disagree with everything: the label was a hard-coded
- * `PDF, DOCX, TXT` (TXT is not a supported format; PPTX, which is, was missing)
- * and the dropzone carried no filter at all, so any file was accepted in
+ * A **document** takes PDF, JPG and PNG — the extract model reads an image as a
+ * single page. An **image** takes PNG, JPG and WEBP. Note the asymmetry: WEBP is
+ * fine as an image and refused as a document, which is not an oversight but what
+ * the extract gateway answers.
+ *
+ * Both lists were measured by running each format end to end, after two earlier
+ * versions of this table were wrong in opposite directions — first a hard-coded
+ * `PDF, DOCX, TXT`, then `PDF, DOCX, PPTX` taken off an enum the runtime never
+ * reads. DOCX and PPTX fail on every path. And until recently the label was only
+ * a label: the dropzone carried no filter at all, so any file was accepted in
  * silence and failed much later, mid-run.
  *
  * Drop a `.zip` on this to see the refusal. It is not reproducible as a static
