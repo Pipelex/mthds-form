@@ -51,8 +51,8 @@ const GALLERY: RunField[] = [
   ]),
   ...pick(SCALAR_CONTRACTS, SCALAR_INPUT_FORM, 'scalars', 'enum_kind', ['priority']),
   ...pick(SCALAR_CONTRACTS, SCALAR_INPUT_FORM, 'scalars', 'multiplicity_axis', ['many']),
-  ...pick(FILE_CONTRACTS, FILE_INPUT_FORM, 'files', 'document_kind', ['attachment']),
-  ...pick(FILE_CONTRACTS, FILE_INPUT_FORM, 'files', 'image_kind', ['picture']),
+  ...pick(FILE_CONTRACTS, FILE_INPUT_FORM, 'files', 'one_document', ['attachment']),
+  ...pick(FILE_CONTRACTS, FILE_INPUT_FORM, 'files', 'one_image', ['picture']),
   ...pick(STRUCT_CONTRACTS, STRUCT_INPUT_FORM, 'structured', 'flat_object', ['address']),
 ];
 

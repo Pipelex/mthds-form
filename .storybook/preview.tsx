@@ -21,7 +21,9 @@ const preview: Preview = {
      * it is a summary of them, and `Toolchain` last because it is scaffolding.
      */
     options: {
-      storySort: { order: ['Field Kinds', 'Concepts', 'Complex', 'Gallery', 'Toolchain'] },
+      storySort: {
+        order: ['Field Kinds', 'States', 'Concepts', 'Complex', 'Gallery', 'Toolchain'],
+      },
     },
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
     /**

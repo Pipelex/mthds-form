@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **`refines` is on the wire and nothing renders it.** A slot typed to a concept that refines `native.Image` shows its own pill and description, so a reader can see the slot wants a `files.Headshot` but not that a `files.Headshot` *is* an image — except by recognising the icon. The descriptor has carried the full refinement chain since `0.5.0`. Not changed here, because what to do with it is a design decision; `Field Kinds/Files/Native Vs Refined Image` now puts it in front of a reader instead of leaving it in a type definition.
+
 - **The optional badge met only 2.73:1 contrast in the light theme.** `field-shell.tsx`, `object-field.tsx` and `list-field.tsx` rendered it as `text-muted-foreground/70`, and dimming an already-muted token with an opacity is what did it — the token alone measures 4.83:1, the dimmed blend 2.73:1, against an AA threshold of 4.5:1. All three now use the token at full opacity. Found by the a11y gate on the first stories that rendered real controls. A second, narrower finding remains open and is deliberately not fixed here: the **default** palette's `--muted-foreground` measures 4.39:1 against `--muted`, which is the pairing a description line inside a card uses. Changing that changes the default colours of every host that has not defined its own tokens, so it is tracked separately rather than ridden along.
 
 ### Added

@@ -14,11 +14,14 @@ Sidebar order is set explicitly in `.storybook/preview.tsx` (`options.storySort`
 
 | Folder | Question it answers |
 | --- | --- |
-| **Field Kinds** | What is every input type, in isolation, with nothing else on screen? One story file per kind, plus `Field States` for the state axis. |
+| **Field Kinds** | What is every input type, in isolation, with nothing else on screen? One story file per kind. |
+| **States** | The state axis, once, on a representative concept — defaults, presence markers, filled, invalid, disabled. Its own section because a state is not a kind. |
 | **Concepts** | What does a realistic single structure look like — mixed scalars, an enum, an optional beside a required, a nested concept, a list of concepts? |
 | **Complex** | Does it survive composition — a list of objects containing lists, four levels deep, files inside a list, the whole tree disabled? |
 | **Gallery** | Do all of these read as one system? The question no per-kind story can answer. |
 | **Toolchain** | The pieces that need no descriptor, currently the concept pill across all nine categories. |
+
+**A story isolates one comparison, and its doc comment names what varies.** A canvas with three near-identical dropzones and no statement of the difference is not a comparison, it is a coincidence — that is what the first `Files/Image` story was, and it is the failure mode a fixture-driven catalog invites, because putting more slots on a pipe is free. Prefer several small carrier pipes over one that shows everything.
 
 **A state story shows one slot.** `Uploading` on a three-slot form puts two idle dropzones beside the control the story is about, and a reader cannot tell which part of the canvas is the subject. So state stories render a single-slot carrier — `one_document`, `one_image` — and the multi-slot form stays for the stories whose subject *is* the form. When a state needs isolating, add a single-slot pipe to the case's `.slots.json` rather than filtering fields in the story: the fixture stays the thing that decides what renders.
 

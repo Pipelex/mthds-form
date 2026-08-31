@@ -1,73 +1,40 @@
 {
-  "description": "Document and image slots: native, refined, optional, and plural.",
+  "description": "Document and image slots. Each pipe isolates ONE comparison, so a story can name what varies.",
   "pipes": [
     {
       "code": "one_document",
-      "slots": [
-        {
-          "name": "attachment",
-          "concept": "Document"
-        }
-      ]
+      "slots": [{ "name": "attachment", "concept": "Document" }]
     },
     {
       "code": "one_image",
+      "slots": [{ "name": "picture", "concept": "Image" }]
+    },
+    {
+      "code": "native_vs_refined_document",
       "slots": [
-        {
-          "name": "picture",
-          "concept": "Image"
-        }
+        { "name": "attachment", "concept": "Document" },
+        { "name": "contract", "concept": "SignedContract" }
       ]
     },
     {
-      "code": "document_kind",
+      "code": "native_vs_refined_image",
       "slots": [
-        {
-          "name": "attachment",
-          "concept": "Document"
-        },
-        {
-          "name": "contract",
-          "concept": "SignedContract"
-        },
-        {
-          "name": "cover_letter",
-          "concept": "Document",
-          "presence": "optional"
-        }
+        { "name": "picture", "concept": "Image" },
+        { "name": "headshot", "concept": "Headshot" }
       ]
     },
     {
-      "code": "image_kind",
+      "code": "required_vs_optional",
       "slots": [
-        {
-          "name": "picture",
-          "concept": "Image"
-        },
-        {
-          "name": "headshot",
-          "concept": "Headshot"
-        },
-        {
-          "name": "logo",
-          "concept": "Image",
-          "presence": "optional"
-        }
+        { "name": "attachment", "concept": "Document" },
+        { "name": "cover_letter", "concept": "Document", "presence": "optional" }
       ]
     },
     {
       "code": "many_files",
       "slots": [
-        {
-          "name": "attachments",
-          "concept": "Document",
-          "multiplicity": "variable"
-        },
-        {
-          "name": "gallery",
-          "concept": "Image",
-          "multiplicity": "variable"
-        }
+        { "name": "attachments", "concept": "Document", "multiplicity": "variable" },
+        { "name": "gallery", "concept": "Image", "multiplicity": "variable" }
       ]
     }
   ]
