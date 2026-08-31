@@ -18,6 +18,9 @@ export { ObjectField } from './object-field';
 export { ProseField, TextField } from './text-field';
 export { UnknownField } from './unknown-field';
 
+export type { ResultFieldProps } from './result-field';
+export { ResultField } from './result-field';
+
 export { FieldShell } from './field-shell';
 export { ConceptPill } from './concept-pill';
 export { OptionalToggle } from './optional-toggle';

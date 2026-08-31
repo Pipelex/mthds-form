@@ -39,6 +39,10 @@ export interface FieldStrings {
   preview: string;
   removeFileAria: string;
   previewUnavailablePdf: string;
+  /** A result slot the run resolved as an absence, or a value it left empty. */
+  resultAbsent: string;
+  yes: string;
+  no: string;
   /**
    * Shown when a picked file is not a format this slot accepts. Takes the
    * accept label so the message names what WOULD have worked - "not accepted"
@@ -74,6 +78,9 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
+  resultAbsent: 'not provided',
+  yes: 'Yes',
+  no: 'No',
   unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
   hideOptionalFields: 'Hide optional fields',
   hideOptionalInputs: 'Hide optional inputs',
