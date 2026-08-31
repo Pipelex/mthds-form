@@ -10,6 +10,8 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 ## The folders
 
+Sidebar order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical — alphabetical opens on `Complex`, which is the last thing to meet first.
+
 | Folder | Question it answers |
 | --- | --- |
 | **Field Kinds** | What is every input type, in isolation, with nothing else on screen? One story file per kind, plus `Field States` for the state axis. |
@@ -17,6 +19,8 @@ What nothing else in this repo can answer is whether a control **renders correct
 | **Complex** | Does it survive composition — a list of objects containing lists, four levels deep, files inside a list, the whole tree disabled? |
 | **Gallery** | Do all of these read as one system? The question no per-kind story can answer. |
 | **Toolchain** | The pieces that need no descriptor, currently the concept pill across all nine categories. |
+
+**A state story shows one slot.** `Uploading` on a three-slot form puts two idle dropzones beside the control the story is about, and a reader cannot tell which part of the canvas is the subject. So state stories render a single-slot carrier — `one_document`, `one_image` — and the multi-slot form stays for the stories whose subject *is* the form. When a state needs isolating, add a single-slot pipe to the case's `.slots.json` rather than filtering fields in the story: the fixture stays the thing that decides what renders.
 
 The state axis is factored **out** of the per-kind catalog rather than multiplied into it: `Field States` walks one representative concept through defaults, the three presence markers, filled, invalid and disabled, and each kind's own file carries only the states where that kind behaves differently. Crossing every kind with every state produces a folder nobody can scan, which is the one thing the catalog exists not to be.
 

@@ -27,23 +27,32 @@ export const Image: Story = { args: { pipeCode: 'image_kind' } };
 export const ManyFiles: Story = { args: { pipeCode: 'many_files' } };
 
 /**
- * A stored file, as a host hands one back after upload. The value is the wire
- * shape a `pipelex-storage://` reference deflates to, not a browser `File`.
+ * One slot holding a stored file. The value is the wire shape a
+ * `pipelex-storage://` reference deflates to, not a browser `File`.
+ *
+ * A STATE story renders a single-slot carrier on purpose. Showing a state
+ * inside the three-slot form puts idle dropzones beside the one the story is
+ * about, and a reader cannot tell which part of the canvas is the subject - the
+ * empty state is already covered by `Document` above.
  */
 export const Filled: Story = {
   args: {
-    pipeCode: 'document_kind',
+    pipeCode: 'one_document',
     initialValues: {
       attachment: {
         url: 'https://example.invalid/quarterly-report.pdf',
         filename: 'quarterly-report.pdf',
       },
-      contract: { url: 'https://example.invalid/msa-signed.pdf', filename: 'msa-signed.pdf' },
     },
   },
 };
 
 /** Mid-upload: the control is busy and a host holds Run until it settles. */
 export const Uploading: Story = {
-  args: { pipeCode: 'document_kind', uploadingIds: ['document_kind-attachment'] },
+  args: { pipeCode: 'one_document', uploadingIds: ['one_document-attachment'] },
+};
+
+/** The same busy state on an image slot, where the preview area is what waits. */
+export const UploadingImage: Story = {
+  args: { pipeCode: 'one_image', uploadingIds: ['one_image-picture'] },
 };

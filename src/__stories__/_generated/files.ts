@@ -9,7 +9,13 @@
 import type { InputForm, PipeIOContracts } from 'mthds/protocol';
 
 /** Every pipe_ref this case projects, in sorted order. */
-export const PIPE_REFS = ['files.document_kind', 'files.image_kind', 'files.many_files'] as const;
+export const PIPE_REFS = [
+  'files.document_kind',
+  'files.image_kind',
+  'files.many_files',
+  'files.one_document',
+  'files.one_image',
+] as const;
 
 export const CONTRACTS: PipeIOContracts = {
   'files.document_kind': {
@@ -885,6 +891,235 @@ export const CONTRACTS: PipeIOContracts = {
       optional: false,
     },
   },
+  'files.one_document': {
+    inputs: {
+      attachment: {
+        concept_ref: 'native.Document',
+        item_count: null,
+        json_schema: {
+          description: 'A document',
+          properties: {
+            filename: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The original filename of the document',
+              title: 'Filename',
+            },
+            mime_type: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The MIME type of the document',
+              title: 'Mime Type',
+            },
+            public_url: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The public HTTPS URL of the document',
+              title: 'Public Url',
+            },
+            snippet: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'A text snippet or excerpt from the document',
+              title: 'Snippet',
+            },
+            title: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The title of the document or source',
+              title: 'Title',
+            },
+            url: {
+              description: 'The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+              title: 'Url',
+              type: 'string',
+            },
+          },
+          required: ['url'],
+          title: 'native.Document',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'native.Text',
+      item_count: null,
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
+  'files.one_image': {
+    inputs: {
+      picture: {
+        concept_ref: 'native.Image',
+        item_count: null,
+        json_schema: {
+          description: 'An image',
+          properties: {
+            caption: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The caption of the image',
+              title: 'Caption',
+            },
+            filename: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The original filename of the image',
+              title: 'Filename',
+            },
+            height: {
+              anyOf: [
+                {
+                  exclusiveMinimum: 0,
+                  type: 'integer',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The height of the image, in pixels',
+              title: 'Height',
+            },
+            mime_type: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The MIME type of the image',
+              title: 'Mime Type',
+            },
+            public_url: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The public URL of the image',
+              title: 'Public Url',
+            },
+            source_negative_prompt: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The source negative prompt of the image',
+              title: 'Source Negative Prompt',
+            },
+            source_prompt: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The source prompt of the image',
+              title: 'Source Prompt',
+            },
+            url: {
+              description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+              title: 'Url',
+              type: 'string',
+            },
+            width: {
+              anyOf: [
+                {
+                  exclusiveMinimum: 0,
+                  type: 'integer',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The width of the image, in pixels',
+              title: 'Width',
+            },
+          },
+          required: ['url'],
+          title: 'native.Image',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'native.Text',
+      item_count: null,
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
 };
 
 export const INPUT_FORM: InputForm = {
@@ -981,6 +1216,32 @@ export const INPUT_FORM: InputForm = {
         },
         kind: 'list',
         name: 'gallery',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
+  'files.one_document': {
+    fields: [
+      {
+        concept_ref: 'native.Document',
+        description: 'A document',
+        gating: true,
+        kind: 'document',
+        name: 'attachment',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
+  'files.one_image': {
+    fields: [
+      {
+        concept_ref: 'native.Image',
+        description: 'An image',
+        gating: true,
+        kind: 'image',
+        name: 'picture',
         presence: 'plain',
         required: true,
       },
