@@ -57,8 +57,9 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.pipeline.input_form import build_input_form, qualify_current_library_crate
+from pipelex.pipeline.input_form import InputFormDeriver, build_input_form, qualify_current_library_crate
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
+from pipelex.runtime_hub import get_class_registry
 
 
 async def views_for(bundle: Path) -> dict[str, object]:
@@ -96,13 +97,86 @@ async def views_for(bundle: Path) -> dict[str, object]:
             pipe_ref: contract.model_dump(mode="json")
             for pipe_ref, contract in build_pipe_io_contracts(pipes).items()
         }
+        qualified_crate = qualify_current_library_crate()
         input_form = {
             pipe_ref: descriptor.model_dump(mode="json")
             for pipe_ref, descriptor in build_input_form(
-                pipes, qualified_crate=qualify_current_library_crate()
+                pipes, qualified_crate=qualified_crate
             ).items()
         }
-        return {"pipe_io_contracts": contracts, "input_form": input_form}
+        # ---- The output half, which the standard does not carry yet ------------
+        #
+        # `pipe_io_contracts`'s output member states identity and plurality and
+        # stops: `concept_ref`, `multiplicity`, `item_count`, `optional`, and no
+        # schema. There is no `output_form` at all. So a renderer has nothing to
+        # render an output FROM, even though an output is a concept ref exactly
+        # like an input is.
+        #
+        # Nothing here invents a descriptor. `InputFormDeriver.derive_concept` is
+        # a PUBLIC method the input derivation already calls for every nested
+        # concept field - when `Invoice` appears inside an input, this is the code
+        # that describes it. Pointing it at the output concept is the projection
+        # nobody has made, not a new derivation, which is why these fixtures are
+        # as generated as the input ones.
+        #
+        # `presence` and `gating` are absent from these nodes, and correctly:
+        # both are slot facts, both are optional on the protocol type, and
+        # `derive_concept` is the entry point that leaves them unset.
+        #
+        # This is a SIMULATION of a standard change under discussion. If the
+        # standard grows `output_form`, delete this block and read the wire.
+        deriver = InputFormDeriver(concepts=qualified_crate.concepts)
+        output_form = {}
+        for pipe in pipes:
+            node = deriver.derive_concept(
+                name="output", concept_ref=pipe.output.concept.concept_ref
+            ).model_dump(mode="json", exclude_none=True)
+
+            # Plurality is NOT on the concept: `concept_ref` is the element with
+            # the multiplicity suffix stripped, on both sides of the contract. The
+            # input side handles this in `derive_slot`, which knows the slot's
+            # multiplicity; `derive_concept` describes a concept alone and cannot.
+            # So a plural output is wrapped here, exactly as an input's list node
+            # is shaped: a `list` whose `item` is the element node minus its name.
+            #
+            # This is the one place the simulation does real work rather than
+            # delegating, and it is worth flagging in the standard discussion: an
+            # `output_form` producer has to make the same wrap, or a `Concept[]`
+            # output would describe a single item and every renderer would show
+            # one where there are many.
+            output_contract = contracts[pipe.pipe_ref]["output"]
+            multiplicity = output_contract["multiplicity"]
+            if multiplicity != "single":
+                item = {k: v for k, v in node.items() if k != "name"}
+                node = {
+                    "name": "output",
+                    "kind": "list",
+                    "concept_ref": node.get("concept_ref"),
+                    "description": node.get("description"),
+                    "required": node.get("required", True),
+                    "item": item,
+                }
+                if output_contract.get("item_count") is not None:
+                    node["item_count"] = output_contract["item_count"]
+                node = {k: v for k, v in node.items() if v is not None}
+
+            output_form[pipe.pipe_ref] = {"field": node}
+        # The schema half, off the structure class the runtime already built. The
+        # input side carries this on the contract; there is nowhere on the output
+        # contract to put it, so it rides separately here.
+        class_registry = get_class_registry()
+        output_json_schema: dict[str, object] = {}
+        for pipe in pipes:
+            structure_class = class_registry.get_class(pipe.output.concept.structure_class_name)
+            if structure_class is not None and hasattr(structure_class, "model_json_schema"):
+                output_json_schema[pipe.pipe_ref] = structure_class.model_json_schema()
+
+        return {
+            "pipe_io_contracts": contracts,
+            "input_form": input_form,
+            "output_form": output_form,
+            "output_json_schema": output_json_schema,
+        }
     finally:
         if previous_library_id is not None:
             set_current_library(library_id=previous_library_id)

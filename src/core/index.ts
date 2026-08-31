@@ -33,7 +33,12 @@ export { conceptCategory } from './descriptor';
 // the standard's, re-exported so a host can type the artifacts it passes in;
 // `getPipeInputForm` is `getPipeIOContract`'s twin for the sibling artifact.
 export type { InputForm, PipeInputFormDescriptor } from 'mthds/protocol';
-export { buildRunFields, getPipeInputForm } from './derive';
+export { buildResultField, buildRunFields, getPipeInputForm } from './derive';
+
+// The output half. NOT a standard artifact yet - see ./output-form for what the
+// standard carries today and what this simulates.
+export type { OutputForm, PipeOutputFormDescriptor } from './output-form';
+export { getPipeOutputForm } from './output-form';
 
 // What a `document` or `image` slot accepts - a mirror of the runtime's format
 // enums, exported because a host that uploads files needs the same answer the

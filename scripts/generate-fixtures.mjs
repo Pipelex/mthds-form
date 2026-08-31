@@ -151,6 +151,10 @@ function slotTypeExpression(slot) {
  * no story reads it. See the three rules in this file's header.
  */
 function synthesizeCarrier(pipe) {
+  // A carrier's OUTPUT is `Text` unless the case names one. It matters now that
+  // the fixtures describe outputs too: a corpus whose every pipe resolves to
+  // `Text` can only ever produce one output descriptor, which describes nothing.
+  const output = pipe.output ?? 'Text';
   const inputs = pipe.slots
     .map((slot) => `${slot.name} = "${slotTypeExpression(slot)}"`)
     .join(', ');
@@ -162,7 +166,7 @@ function synthesizeCarrier(pipe) {
     `type        = "PipeLLM"`,
     `description = "Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored."`,
     `inputs      = { ${inputs} }`,
-    `output      = "Text"`,
+    `output      = "${output}"`,
     `prompt      = """`,
     references,
     `"""`,
@@ -271,6 +275,7 @@ function emitModule(entry, views) {
   const body = [
     header,
     "import type { InputForm, PipeIOContracts } from 'mthds/protocol';",
+    "import type { OutputForm } from '../../core/output-form';",
     '',
     `/** Every pipe_ref this case projects, in sorted order. */`,
     `export const PIPE_REFS = ${JSON.stringify(pipeRefs)} as const;`,
@@ -278,6 +283,22 @@ function emitModule(entry, views) {
     `export const CONTRACTS: PipeIOContracts = ${JSON.stringify(views.pipe_io_contracts, null, 2)};`,
     '',
     `export const INPUT_FORM: InputForm = ${JSON.stringify(views.input_form, null, 2)};`,
+    '',
+    '/**',
+    ' * The output half. NOT a standard artifact yet - see the note in',
+    ' * `scripts/dump-validate-views.py`. Derived by pipelex\'s own',
+    ' * `InputFormDeriver.derive_concept`, the method the input derivation already',
+    ' * calls for every nested concept field, so it is as generated as the rest.',
+    ' */',
+    `export const OUTPUT_FORM: OutputForm = ${JSON.stringify(views.output_form, null, 2)};`,
+    '',
+    '/**',
+    ' * The output schemas, keyed the same way. The input side carries these on the',
+    ' * contract; the output side has nowhere to put them, so they ride separately',
+    ' * rather than being smuggled onto `PipeIOContracts` - whose type would',
+    ' * rightly reject the extra member.',
+    ' */',
+    `export const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = ${JSON.stringify(views.output_json_schema, null, 2)};`,
     '',
   ].join('\n');
 

@@ -242,6 +242,35 @@ function mapNode(
  * `required` to the presence marker, and `gating` is the producer-derived
  * answer `mustBeFilled` reads - the kernel re-derives none of them.
  */
+/**
+ * The same mapping, for a single node that belongs to no slot — a pipe's OUTPUT.
+ *
+ * `buildRunFields` maps a descriptor's fields and then stamps each with the slot
+ * facts (`presence`, `gating`) the wire states per input. An output has no slot,
+ * so this stamps nothing: the node arrives without them and leaves without them,
+ * which is exactly what the standard's optional members are for.
+ *
+ * Everything else is shared, deliberately. An output is a concept ref like an
+ * input is, so its kinds, its nesting, its list bounds and its `contentKey` are
+ * the same questions with the same answers — and a second mapper would be a
+ * second place for them to drift.
+ *
+ * `schema` is optional because the standard currently gives an output nowhere to
+ * carry one. Without it a scalar output has no `contentKey`, so a renderer
+ * cannot know that `native.Text`'s payload sits under `text` — which is the
+ * output-side twin of the input bug that omission causes, and the reason to pass
+ * it whenever it can be had.
+ */
+export function buildResultField(
+  descriptor: { field: InputFormField },
+  schema?: Record<string, unknown>,
+): RunField {
+  const node = descriptor.field;
+  const defs: Record<string, JsonSchema> = {};
+  if (schema) collectSchemaDefs(schema as JsonSchema, defs, { traverseArrays: true });
+  return mapNode(node, node.name, schema as JsonSchema | undefined, defs);
+}
+
 export function buildRunFields(
   descriptor: PipeInputFormDescriptor,
   inputs: Record<string, PipeInputContract>,

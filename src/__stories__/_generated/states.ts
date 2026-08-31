@@ -7,6 +7,7 @@
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
  */
 import type { InputForm, PipeIOContracts } from 'mthds/protocol';
+import type { OutputForm } from '../../core/output-form';
 
 /** Every pipe_ref this case projects, in sorted order. */
 export const PIPE_REFS = ['states.defaults', 'states.presence'] as const;
@@ -514,5 +515,67 @@ export const INPUT_FORM: InputForm = {
         required: false,
       },
     ],
+  },
+};
+
+/**
+ * The output half. NOT a standard artifact yet - see the note in
+ * `scripts/dump-validate-views.py`. Derived by pipelex's own
+ * `InputFormDeriver.derive_concept`, the method the input derivation already
+ * calls for every nested concept field, so it is as generated as the rest.
+ */
+export const OUTPUT_FORM: OutputForm = {
+  'states.defaults': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+  'states.presence': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+};
+
+/**
+ * The output schemas, keyed the same way. The input side carries these on the
+ * contract; the output side has nowhere to put them, so they ride separately
+ * rather than being smuggled onto `PipeIOContracts` - whose type would
+ * rightly reject the extra member.
+ */
+export const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
+  'states.defaults': {
+    description: 'A text',
+    properties: {
+      text: {
+        description: 'The text',
+        title: 'Text',
+        type: 'string',
+      },
+    },
+    required: ['text'],
+    title: 'TextContent',
+    type: 'object',
+  },
+  'states.presence': {
+    description: 'A text',
+    properties: {
+      text: {
+        description: 'The text',
+        title: 'Text',
+        type: 'string',
+      },
+    },
+    required: ['text'],
+    title: 'TextContent',
+    type: 'object',
   },
 };

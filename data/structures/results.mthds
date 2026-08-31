@@ -1,0 +1,32 @@
+domain      = "results"
+description = "Concepts used as pipe OUTPUTS, so the fixtures can describe results as well as inputs."
+
+[concept.Sentiment]
+description = "How positive a piece of writing is"
+
+[concept.Sentiment.structure]
+label      = { type = "text", description = "The overall verdict", required = true, choices = [
+  "positive",
+  "neutral",
+  "negative",
+] }
+confidence = { type = "number", description = "How sure the model is, from 0 to 1", required = true }
+rationale  = { type = "text", description = "Why it landed there", required = false }
+
+[concept.LineItem]
+description = "One billable line of an invoice"
+
+[concept.LineItem.structure]
+label      = { type = "text", description = "What was sold", required = true }
+quantity   = { type = "integer", description = "How many units", required = true }
+unit_price = { type = "number", description = "Price of one unit", required = true }
+
+[concept.Invoice]
+description = "A commercial invoice"
+
+[concept.Invoice.structure]
+reference = { type = "text", description = "The invoice reference", required = true }
+issued_on = { type = "date", description = "The date it was issued", required = true }
+total     = { type = "number", description = "Total amount due", required = true }
+paid      = { type = "boolean", description = "Whether it has been settled", required = false }
+lines     = { type = "list", item_type = "concept", item_concept_ref = "LineItem", description = "The billable lines", required = true }

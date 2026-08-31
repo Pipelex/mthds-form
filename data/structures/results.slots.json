@@ -1,0 +1,45 @@
+{
+  "description": "Pipes whose OUTPUT is the interesting half: a scalar, a flat structure, a nested one, and a plural result. A Page[] output is deliberately absent - the carrier is a PipeLLM, and the language forbids a PipeLLM resolving to a concept that contains images.",
+  "pipes": [
+    {
+      "code": "plain_text_result",
+      "output": "Text",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ]
+    },
+    {
+      "code": "flat_result",
+      "output": "Sentiment",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ]
+    },
+    {
+      "code": "nested_result",
+      "output": "Invoice",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ]
+    },
+    {
+      "code": "plural_result",
+      "output": "LineItem[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ]
+    }
+  ]
+}
