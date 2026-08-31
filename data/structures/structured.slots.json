@@ -1,0 +1,18 @@
+{
+  "description": "A realistic domain object: mixed scalars, an enum, a nested concept, and a list of concepts.",
+  "pipes": [
+    { "code": "one_invoice", "slots": [{ "name": "invoice", "concept": "Invoice" }] },
+    {
+      "code": "many_invoices",
+      "slots": [{ "name": "invoices", "concept": "Invoice", "multiplicity": "variable" }]
+    },
+    {
+      "code": "flat_object",
+      "slots": [{ "name": "address", "concept": "Address" }]
+    },
+    {
+      "code": "list_of_objects",
+      "slots": [{ "name": "lines", "concept": "LineItem", "multiplicity": "variable" }]
+    }
+  ]
+}

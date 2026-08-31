@@ -1,0 +1,43 @@
+domain      = "structured"
+description = "One concept whose structure declares many properties of mixed kinds."
+
+[concept.Address]
+description = "A postal address"
+
+[concept.Address.structure]
+street  = { type = "text", description = "Street and number", required = true }
+city    = { type = "text", description = "City", required = true }
+country = { type = "text", description = "Country", required = false, choices = [
+  "France",
+  "Germany",
+  "Spain",
+  "United Kingdom",
+] }
+
+[concept.LineItem]
+description = "One billable line of an invoice"
+
+[concept.LineItem.structure]
+label      = { type = "text", description = "What was sold", required = true }
+quantity   = { type = "integer", description = "How many units", required = true }
+unit_price = { type = "number", description = "Price of one unit", required = true }
+taxable    = { type = "boolean", description = "Whether VAT applies", required = false }
+
+[concept.Invoice]
+description = "A commercial invoice"
+
+[concept.Invoice.structure]
+reference   = { type = "text", description = "The invoice reference", required = true }
+issued_on   = { type = "date", description = "The date it was issued", required = true }
+settled_at  = { type = "datetime", description = "When payment cleared", required = false }
+total       = { type = "number", description = "Total amount due", required = true }
+paid        = { type = "boolean", description = "Whether it has been settled", required = false }
+status      = { type = "text", description = "Where the invoice stands", required = true, choices = [
+  "draft",
+  "sent",
+  "paid",
+  "void",
+] }
+billed_to   = { type = "concept", concept_ref = "Address", description = "Who it is billed to", required = true }
+lines       = { type = "list", item_type = "concept", item_concept_ref = "LineItem", description = "The billable lines", required = true }
+notes       = { type = "text", description = "Free-form notes", required = false }

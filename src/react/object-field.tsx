@@ -58,7 +58,7 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
         {!field.required && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             {s.optionalBadge}
           </span>
         )}

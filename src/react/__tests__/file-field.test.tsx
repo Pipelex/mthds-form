@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField } from '../../core';
 import { DocumentField, type FileValue } from '../file-field';
@@ -312,5 +312,90 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
 
     await waitFor(() => expect(spinner(container)).not.toBeNull());
     expect(previewSrc(container)).toBeUndefined();
+  });
+});
+
+describe('a file the slot cannot accept never reaches the host', () => {
+  /**
+   * The point is the ORDER, not the message. A host's `onDropFile` is a network
+   * call and usually a billed one, so a file the runtime cannot decode has to be
+   * refused before it is handed over - not uploaded and then complained about,
+   * and not (as it was) accepted in silence under a label reading PDF, DOCX, TXT.
+   *
+   * These go through a DROP rather than the file input, and that is forced
+   * rather than stylistic: the input now carries an `accept` attribute, so a
+   * wrong file never becomes a pick at all - in jsdom exactly as in a real OS
+   * picker. Drag-and-drop is the door that stays open, which is why the control
+   * cannot rely on the attribute alone.
+   */
+  // `items` is deliberately absent. react-dropzone reads the drop through
+  // `file-selector`, which PREFERS `dataTransfer.items` when the key exists -
+  // so passing an empty array is a drop of zero files, and the control is right
+  // to do nothing with it.
+  const drop = (file: File) => {
+    const root = document.querySelector('[role="presentation"]');
+    if (!root) throw new Error('no dropzone root');
+    fireEvent.drop(root, { dataTransfer: { files: [file], types: ['Files'] } });
+  };
+
+  const zip = () => new File(['zip'], 'archive.zip', { type: 'application/zip' });
+  const pdf = () => new File(['pdf'], 'report.pdf', { type: 'application/pdf' });
+
+  it('does not call onDropFile for a wrong file type', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    drop(zip());
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(onDropFile).not.toHaveBeenCalled();
+  });
+
+  it('says which file was refused, and what would have worked', async () => {
+    renderField();
+    drop(zip());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('archive.zip');
+    expect(alert).toHaveTextContent('PDF');
+  });
+
+  /**
+   * The case that needs BOTH layers. react-dropzone matches on the MIME type OR
+   * the extension, so a file named `.pdf` carrying `text/plain` passes its
+   * matcher and arrives at `onDrop`. `isAcceptedFile` treats a present-but-wrong
+   * MIME type as the stronger signal and refuses it there.
+   */
+  it('refuses a file whose extension lies about its type', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    drop(new File(['text'], 'notes.pdf', { type: 'text/plain' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(onDropFile).not.toHaveBeenCalled();
+  });
+
+  it('still calls onDropFile for an accepted file, and says nothing', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    drop(pdf());
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('clears the refusal once an accepted file arrives', async () => {
+    renderField();
+    drop(zip());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    drop(pdf());
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('offers the accepted types to the OS picker', () => {
+    renderField();
+    // The attribute is the affordance; `isAcceptedFile` is the enforcement.
+    // Both have to be right, and only this one is visible in the DOM.
+    expect(fileInput().accept).toContain('application/pdf');
+    expect(fileInput().accept).toContain('image/png');
+    expect(fileInput().accept).not.toContain('text/plain');
+    // The two that a run proves fail, and that this table used to advertise.
+    expect(fileInput().accept).not.toContain('wordprocessingml');
+    expect(fileInput().accept).not.toContain('presentationml');
   });
 });

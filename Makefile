@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures assert-bundle clean pack
 
 install:
 	npm install
@@ -10,13 +10,13 @@ build-css:
 	npm run build:css
 
 lint:
-	npx eslint src/
+	npx eslint src/ .storybook/
 
 format:
-	npx prettier --write "src/**/*.{ts,tsx,css}"
+	npm run format
 
 format-check:
-	npx prettier --check "src/**/*.{ts,tsx,css}"
+	npm run format:check
 
 typecheck:
 	npx tsc --noEmit
@@ -36,6 +36,22 @@ check: lint format-check typecheck
 	@echo "All checks passed."
 
 c: check
+
+# The stories, in a browser. `make test` runs them too (they are a vitest
+# project); this is the one you open to LOOK at them.
+storybook:
+	npm run storybook
+
+st: storybook
+
+build-storybook:
+	npm run build-storybook
+
+# Regenerate the story fixtures from data/structures/. Needs the sibling
+# ../pipelex checkout's venv (PIPELEX_PYTHON) - dev-only, since the emitted .ts
+# files are committed and the stories read those. ONLY=<case> narrows it.
+fixtures:
+	node scripts/generate-fixtures.mjs $(if $(ONLY),--only $(ONLY))
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

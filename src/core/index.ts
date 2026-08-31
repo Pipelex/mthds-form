@@ -35,6 +35,19 @@ export { conceptCategory } from './descriptor';
 export type { InputForm, PipeInputFormDescriptor } from 'mthds/protocol';
 export { buildRunFields, getPipeInputForm } from './derive';
 
+// What a `document` or `image` slot accepts - a mirror of the runtime's format
+// enums, exported because a host that uploads files needs the same answer the
+// control uses. See ./file-formats.
+export type { FileFormat } from './file-formats';
+export {
+  DOCUMENT_FORMATS,
+  IMAGE_FORMATS,
+  acceptLabelForKind,
+  acceptMapForKind,
+  formatsForKind,
+  isAcceptedFile,
+} from './file-formats';
+
 // Readiness - what the Run button gates on.
 //
 // `computeReadiness` is the answer for a form; `gateRunInputs` (below) is the

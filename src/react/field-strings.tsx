@@ -39,6 +39,12 @@ export interface FieldStrings {
   preview: string;
   removeFileAria: string;
   previewUnavailablePdf: string;
+  /**
+   * Shown when a picked file is not a format this slot accepts. Takes the
+   * accept label so the message names what WOULD have worked - "not accepted"
+   * on its own leaves the user guessing at the list they just failed.
+   */
+  unsupportedFileType: (accept: string) => string;
   /** The optional-entries disclosure ("field" inside a concept, "input" at top level). */
   hideOptionalFields: string;
   hideOptionalInputs: string;
@@ -68,6 +74,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
+  unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
   hideOptionalFields: 'Hide optional fields',
   hideOptionalInputs: 'Hide optional inputs',
   optionalFieldsCount: (count) => (count === 1 ? '1 optional field' : `${count} optional fields`),
