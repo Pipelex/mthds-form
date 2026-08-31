@@ -27,6 +27,10 @@ Sidebar order is set explicitly in `.storybook/preview.tsx` (`options.storySort`
 
 The state axis is factored **out** of the per-kind catalog rather than multiplied into it: `Field States` walks one representative concept through defaults, the three presence markers, filled, invalid and disabled, and each kind's own file carries only the states where that kind behaves differently. Crossing every kind with every state produces a folder nobody can scan, which is the one thing the catalog exists not to be.
 
+## What a file slot accepts
+
+Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` therefore mirrors the runtime's own enums — `DocumentFormat` (PDF, DOCX, PPTX) and `ImageFormat` (PNG, JPEG, WEBP) — and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree. A stale entry there is worse than none: it refuses a file the runtime would have taken. See [dependency-budget.md](dependency-budget.md) for why this lives in core rather than in the control.
+
 ## What the corpus cannot reach
 
 Two gaps, both structural rather than oversights, and both better stated than quietly missing.

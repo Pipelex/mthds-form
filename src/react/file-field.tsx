@@ -5,6 +5,9 @@ import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
 import { cn } from './utils';
 import type { FileRunField } from '../core';
+// Value imports come from the specific module, never the `../core` barrel - the
+// barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
+import { acceptMapForKind, isAcceptedFile } from '../core/file-formats';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
@@ -120,12 +123,30 @@ function FileField({
   }, []);
   useEffect(() => () => setLocal(null), [setLocal]);
 
+  /**
+   * A file the slot does not accept, held locally until the next pick.
+   *
+   * Local rather than raised to the host, and that is the distinction to keep:
+   * the host's `error` prop carries the GATE's verdict about a value, while this
+   * is the control refusing to produce a value at all. Nothing is uploaded, so
+   * there is nothing for a host to be told about yet.
+   */
+  const [rejected, setRejected] = useState<string | null>(null);
+
   const handleFile = useCallback(
     (file: File) => {
+      if (!isAcceptedFile(field.kind, file)) {
+        // Refuse BEFORE the object URL and before `onDropFile`: a host's
+        // uploader is a network call and often a billed one, and a file the
+        // runtime cannot decode has no business reaching it.
+        setRejected(file.name);
+        return;
+      }
+      setRejected(null);
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
       onDropFile(file);
     },
-    [setLocal, onDropFile],
+    [field.kind, setLocal, onDropFile],
   );
 
   const busy = disabled || uploading;
@@ -134,6 +155,12 @@ function FileField({
     maxFiles: 1,
     multiple: false,
     disabled: busy,
+    // Filters the OS picker so a wrong file is hard to choose in the first
+    // place. It is NOT the enforcement: a drag-and-drop bypasses the picker
+    // entirely, and a browser reporting an empty `File.type` slips through
+    // react-dropzone's own matcher. `handleFile` is where the answer is
+    // decided; this is the affordance in front of it.
+    accept: acceptMapForKind(field.kind),
     // The tab stop belongs on the INPUT, not on this div - see the root element
     // below. Without this, react-dropzone puts `tabIndex: 0` and its own key
     // handlers on a `role="presentation"` div, and the element a keyboard or
@@ -143,12 +170,21 @@ function FileField({
       const file = files[0];
       if (file) handleFile(file);
     },
+    // react-dropzone rejects a file its own matcher refuses without ever calling
+    // `onDrop`, so without this a wrong drop is silently swallowed - the control
+    // simply does nothing, which reads as a broken dropzone rather than a
+    // refused file.
+    onDropRejected: (rejections) => {
+      const name = rejections[0]?.file.name;
+      if (name) setRejected(name);
+    },
   });
 
   const clear = useCallback(() => {
     setLocal(null);
     setResolved(null);
     setPreviewOpen(false);
+    setRejected(null);
     onChange(undefined);
   }, [setLocal, onChange]);
 
@@ -311,6 +347,18 @@ function FileField({
             </>
           )}
         </div>
+      )}
+
+      {/* The refusal. `role="alert"` because it appears in response to something
+          the user just did and is the only feedback that the action had no
+          effect - a screen-reader user who drops a .zip otherwise gets silence.
+          It names the file so the message is about the thing they picked, not a
+          generic complaint. */}
+      {rejected && !busy && (
+        <p role="alert" className="text-[12px] text-destructive">
+          <span className="font-mono">{rejected}</span> —{' '}
+          {s.unsupportedFileType(field.accept ?? '')}
+        </p>
       )}
 
       {/* URL escape hatch - collapsed by default to keep the happy path clean.

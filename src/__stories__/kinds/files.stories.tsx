@@ -96,6 +96,27 @@ export const Uploading: Story = {
   args: { pipeCode: 'one_document', uploadingIds: ['one_document-attachment'] },
 };
 
+/**
+ * **What a slot actually accepts, and what happens when it does not.**
+ *
+ * The accepted formats are not a wire fact: the descriptor says the kind is
+ * `document` or `image` and stops there, because which bytes a runtime can
+ * decode is a property of the runtime. So the kernel mirrors the runtime's own
+ * enums in `core/file-formats.ts` — `DocumentFormat` is PDF, DOCX, PPTX;
+ * `ImageFormat` is PNG, JPEG, WEBP — and both the label under the dropzone and
+ * the filter it enforces are read from that one table.
+ *
+ * They used to disagree with everything: the label was a hard-coded
+ * `PDF, DOCX, TXT` (TXT is not a supported format; PPTX, which is, was missing)
+ * and the dropzone carried no filter at all, so any file was accepted in
+ * silence and failed much later, mid-run.
+ *
+ * Drop a `.zip` on this to see the refusal. It is not reproducible as a static
+ * story - a rejection is a response to an action - so this one is here to be
+ * used by hand; the automated coverage is `src/react/__tests__/file-field.test.tsx`.
+ */
+export const TryAWrongFileType: Story = { args: { pipeCode: 'one_document' } };
+
 /** The same busy state on an image slot, where the preview area is what waits. */
 export const UploadingImage: Story = {
   args: { pipeCode: 'one_image', uploadingIds: ['one_image-picture'] },

@@ -105,7 +105,12 @@ describe('the render path follows the wire: Date and Html are their structures',
       }),
       { page: input('native.Page', { type: 'object', properties: { url: { type: 'string' } } }) },
     );
-    expect(field).toMatchObject({ kind: 'document', accept: 'PDF, DOCX, TXT' });
+    // `accept` moved from a hard-coded literal to `acceptLabelForKind`, which
+    // mirrors the runtime's `DocumentFormat` enum: TXT is not a member and PPTX
+    // is. Updating this expectation is right where updating a WIRE expectation
+    // would not be - `accept` is a renderer affordance the descriptor never
+    // states, so this pins a presentation default, not the standard.
+    expect(field).toMatchObject({ kind: 'document', accept: 'PDF, DOCX, PPTX' });
   });
 });
 

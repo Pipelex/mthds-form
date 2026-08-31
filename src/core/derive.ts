@@ -33,6 +33,7 @@ import type { PipeInputFormDescriptor } from 'mthds/protocol';
 import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
 
 import { buildPipeRef, type PipeInputContract } from './contracts';
+import { acceptLabelForKind } from './file-formats';
 import type { RunField, RunFieldCommon } from './descriptor';
 import { ownProp } from './own-property';
 import { collectSchemaDefs, resolveSchemaNode, type JsonSchema } from './schema-utils';
@@ -182,11 +183,15 @@ function mapNode(
       // control set renders and stores strings, as it always has.
       return { ...common, kind: 'enum', options: node.choices.map(String) };
     case 'document':
-      // `accept` is a renderer-side affordance the wire deliberately does not
-      // state - a presentation default keyed on the WIRE's kind, not a guess.
-      return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
     case 'image':
-      return { ...common, kind: 'image', accept: 'PNG, JPG, WEBP' };
+      // `accept` is a renderer-side affordance the wire deliberately does not
+      // state - which bytes a runtime can decode is a property of the runtime,
+      // not of the method. The list is therefore ours, and it is one table
+      // (`./file-formats`) rather than a literal here, so the label a user reads
+      // and the filter the dropzone enforces cannot disagree. They used to: this
+      // line advertised `TXT`, which no DocumentFormat covers, and omitted PPTX,
+      // which is one.
+      return { ...common, kind: node.kind, accept: acceptLabelForKind(node.kind) };
     case 'object': {
       const props = schema?.properties as Record<string, JsonSchema> | undefined;
       return {
