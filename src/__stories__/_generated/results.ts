@@ -1,7 +1,7 @@
 /**
  * Generated from data/structures/results.mthds - DO NOT EDIT.
  *
- * Pipes whose OUTPUT is the interesting half: a scalar, a flat structure, a nested one, and a plural result. A Page[] output is deliberately absent - the carrier is a PipeLLM, and the language forbids a PipeLLM resolving to a concept that contains images.
+ * Pipes whose OUTPUT is the interesting half: a scalar, a flat structure, a nested one, a plural result, and a generated image. Each carries a 'run' block (or states its own prompt), so `make fixtures-runs` can produce the real payload beside the descriptor. A Page[] output is deliberately absent - a PipeLLM carrier may not resolve to a concept that contains images, which is also why the image case swaps the carrier for a PipeImgGen.
  *
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
@@ -12,6 +12,7 @@ import type { OutputForm } from '../../core/output-form';
 /** Every pipe_ref this case projects, in sorted order. */
 export const PIPE_REFS = [
   'results.flat_result',
+  'results.image_result',
   'results.nested_result',
   'results.plain_text_result',
   'results.plural_result',
@@ -42,6 +43,15 @@ export const CONTRACTS: PipeIOContracts = {
     },
     output: {
       concept_ref: 'results.Sentiment',
+      item_count: null,
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
+  'results.image_result': {
+    inputs: {},
+    output: {
+      concept_ref: 'native.Image',
       item_count: null,
       multiplicity: 'single',
       optional: false,
@@ -150,6 +160,9 @@ export const INPUT_FORM: InputForm = {
       },
     ],
   },
+  'results.image_result': {
+    fields: [],
+  },
   'results.nested_result': {
     fields: [
       {
@@ -225,6 +238,15 @@ export const OUTPUT_FORM: OutputForm = {
         },
       ],
       kind: 'object',
+      name: 'output',
+      required: true,
+    },
+  },
+  'results.image_result': {
+    field: {
+      concept_ref: 'native.Image',
+      description: 'An image',
+      kind: 'image',
       name: 'output',
       required: true,
     },
@@ -388,6 +410,125 @@ export const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
     title: 'results__Sentiment',
     type: 'object',
   },
+  'results.image_result': {
+    description: 'An image',
+    properties: {
+      caption: {
+        anyOf: [
+          {
+            type: 'string',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The caption of the image',
+        title: 'Caption',
+      },
+      filename: {
+        anyOf: [
+          {
+            type: 'string',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The original filename of the image',
+        title: 'Filename',
+      },
+      height: {
+        anyOf: [
+          {
+            exclusiveMinimum: 0,
+            type: 'integer',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The height of the image, in pixels',
+        title: 'Height',
+      },
+      mime_type: {
+        anyOf: [
+          {
+            type: 'string',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The MIME type of the image',
+        title: 'Mime Type',
+      },
+      public_url: {
+        anyOf: [
+          {
+            type: 'string',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The public URL of the image',
+        title: 'Public Url',
+      },
+      source_negative_prompt: {
+        anyOf: [
+          {
+            type: 'string',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The source negative prompt of the image',
+        title: 'Source Negative Prompt',
+      },
+      source_prompt: {
+        anyOf: [
+          {
+            type: 'string',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The source prompt of the image',
+        title: 'Source Prompt',
+      },
+      url: {
+        description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+        title: 'Url',
+        type: 'string',
+      },
+      width: {
+        anyOf: [
+          {
+            exclusiveMinimum: 0,
+            type: 'integer',
+          },
+          {
+            type: 'null',
+          },
+        ],
+        default: null,
+        description: 'The width of the image, in pixels',
+        title: 'Width',
+      },
+    },
+    required: ['url'],
+    title: 'ImageContent',
+    type: 'object',
+  },
   'results.nested_result': {
     $defs: {
       results__LineItem: {
@@ -472,26 +613,42 @@ export const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
     type: 'object',
   },
   'results.plural_result': {
-    description: 'One billable line of an invoice',
-    properties: {
-      label: {
-        description: 'What was sold',
-        title: 'Label',
-        type: 'string',
-      },
-      quantity: {
-        description: 'How many units',
-        title: 'Quantity',
-        type: 'integer',
-      },
-      unit_price: {
-        description: 'Price of one unit',
-        title: 'Unit Price',
-        type: 'number',
+    $defs: {
+      results__LineItem: {
+        description: 'One billable line of an invoice',
+        properties: {
+          label: {
+            description: 'What was sold',
+            title: 'Label',
+            type: 'string',
+          },
+          quantity: {
+            description: 'How many units',
+            title: 'Quantity',
+            type: 'integer',
+          },
+          unit_price: {
+            description: 'Price of one unit',
+            title: 'Unit Price',
+            type: 'number',
+          },
+        },
+        required: ['label', 'quantity', 'unit_price'],
+        title: 'results__LineItem',
+        type: 'object',
       },
     },
-    required: ['label', 'quantity', 'unit_price'],
-    title: 'results__LineItem',
+    properties: {
+      items: {
+        items: {
+          $ref: '#/$defs/results__LineItem',
+        },
+        title: 'Items',
+        type: 'array',
+      },
+    },
+    required: ['items'],
+    title: 'ListContent[results__LineItem]',
     type: 'object',
   },
 };

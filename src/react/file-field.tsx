@@ -8,6 +8,7 @@ import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { acceptMapForKind, isAcceptedFile } from '../core/file-formats';
+import { isViewableUrl } from '../core/native-content';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
@@ -40,16 +41,19 @@ const PDF_EXT_RE = /\.pdf(\?|$)/i;
 const DATA_URL_MIME_RE = /^data:([^;,]+)/i;
 
 /**
- * True when the browser can render this URL as-is.
+ * True when the browser can render this URL as-is - `isViewableUrl`, under the
+ * name this file has always called it.
  *
- * `data:` is the one that used to be missing, and its absence cost a preview
- * rather than a fetch: any URL that is not `http` was treated as a stored URI
- * needing `resolveUrl`, so a host with no resolver got a spinner that never
- * stopped over a value the browser could have rendered immediately.
+ * The predicate itself moved to core when the result side needed the same
+ * answer: an input control deciding whether to fetch a preview and a result view
+ * deciding whether to paint an `<img>` are the same question, and answering it
+ * twice is how the two drift. `data:` is the arm that used to be missing here,
+ * and its absence cost a preview rather than a fetch: any URL that is not `http`
+ * was treated as a stored URI needing `resolveUrl`, so a host with no resolver
+ * got a spinner that never stopped over a value the browser could have rendered
+ * immediately.
  */
-function isDirectlyViewable(url: string | undefined): url is string {
-  return !!url && (/^https?:/i.test(url) || /^data:/i.test(url) || /^blob:/i.test(url));
-}
+const isDirectlyViewable = isViewableUrl;
 
 /** The MIME type a `data:` URL declares, which is the only type it carries. */
 function dataUrlMime(url: string): string | undefined {

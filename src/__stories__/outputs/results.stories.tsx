@@ -4,15 +4,17 @@ import * as React from 'react';
 import { buildResultField, getPipeOutputForm } from '../../core';
 import { ResultField } from '../../react';
 import { OUTPUT_FORM, OUTPUT_SCHEMAS } from '../_generated/results';
-import { FLAT_RESULT, NESTED_RESULT, PLAIN_TEXT_RESULT, PLURAL_RESULT } from '../payloads/results';
+import { PAYLOADS } from '../_generated/results.payloads';
 
 /**
  * A pipe's RESULT, rendered from its output descriptor.
  *
- * Everything here is real. The descriptors are generated from
- * `data/structures/results.mthds` by pipelex's own `InputFormDeriver`, and the
- * payloads are copied verbatim from real runs of the matching pipes — which is
- * the only way to get a payload, since a payload is what a run produced.
+ * **Everything on this page came out of a real run.** The descriptors are
+ * generated from `data/structures/results.mthds` by pipelex's own
+ * `InputFormDeriver` (`make fixtures`), and the payloads beside them are the
+ * `main_stuff.json` the real `pipelex run bundle` CLI wrote when each pipe was
+ * actually executed (`make fixtures-runs`). Nothing here is hand-written, and
+ * the payloads could not be: what a run returns is knowable only by running it.
  *
  * What these stories are really demonstrating is that **an output is a concept
  * ref exactly like an input**: the same descriptor vocabulary, mapped by the
@@ -22,17 +24,42 @@ import { FLAT_RESULT, NESTED_RESULT, PLAIN_TEXT_RESULT, PLURAL_RESULT } from '..
  * The descriptor half is a SIMULATION of a standard change under discussion:
  * `pipe_io_contracts` carries no schema for an output and there is no
  * `output_form` artifact. See `src/core/output-form.ts`.
+ *
+ * ## Why the assertions read the fixture instead of naming values
+ *
+ * A live model does not answer the same way twice — this corpus has been swept
+ * twice and the sentiment came back `neutral` once and `positive` the next time,
+ * both defensible. A play function that hard-codes `'neutral'` is asserting the
+ * model's mood rather than the renderer, and it fails on the next sweep for a
+ * reason nobody should have to investigate. So each assertion below reads the
+ * value out of the payload it is rendering and checks it reached the DOM, which
+ * is the fact the renderer is actually responsible for.
  */
 
-function Result({ pipeCode, value }: { pipeCode: string; value: unknown }) {
-  const field = React.useMemo(() => {
-    const descriptor = getPipeOutputForm(OUTPUT_FORM, 'results', pipeCode);
-    if (!descriptor) throw new Error(`No output descriptor for results.${pipeCode}`);
-    return buildResultField(descriptor, OUTPUT_SCHEMAS[`results.${pipeCode}`]);
-  }, [pipeCode]);
+function payloadFor(pipeCode: string): Record<string, unknown> {
+  return PAYLOADS[`results.${pipeCode}`] as Record<string, unknown>;
+}
+
+function resultFieldFor(pipeCode: string) {
+  const descriptor = getPipeOutputForm(OUTPUT_FORM, 'results', pipeCode);
+  if (!descriptor) throw new Error(`No output descriptor for results.${pipeCode}`);
+  const schema = OUTPUT_SCHEMAS[`results.${pipeCode}`];
+  if (!schema) throw new Error(`No output schema for results.${pipeCode}`);
+  return buildResultField(descriptor, schema);
+}
+
+/**
+ * One result, rendered.
+ *
+ * `absent` renders the same descriptor with no value, which is a state a
+ * SUCCESSFUL run can leave behind - not an error - and so belongs on the same
+ * component rather than in a second one.
+ */
+function Result({ pipeCode, absent = false }: { pipeCode: string; absent?: boolean }) {
+  const field = React.useMemo(() => resultFieldFor(pipeCode), [pipeCode]);
   return (
     <div style={{ maxWidth: 560 }}>
-      <ResultField field={field} value={value} />
+      <ResultField field={field} value={absent ? undefined : payloadFor(pipeCode)} />
     </div>
   );
 }
@@ -45,40 +72,54 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Every story renders twice - the `ThemePair` decorator shows both themes. */
+const BOTH_THEMES = 2;
+
 /**
  * A `Text` output. Its content model wraps the value under `text`, so the
- * renderer unwraps before displaying — the read direction of the same bridge the
- * input side uses to wrap on the way out.
+ * renderer unwraps by that property NAME — read off the payload schema, never
+ * worked out by counting the value's properties.
  */
 export const PlainText: Story = {
-  args: { pipeCode: 'plain_text_result', value: PLAIN_TEXT_RESULT },
+  args: { pipeCode: 'plain_text_result' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const text = payloadFor('plain_text_result').text as string;
+    // The opening words are enough to prove the unwrap happened: the whole
+    // record, unwrapped, would have rendered as `[object Object]`.
+    const opening = text.slice(0, 24);
+    await expect(canvas.getAllByText(new RegExp(escapeRegExp(opening)))).toHaveLength(BOTH_THEMES);
+  },
 };
 
 /** A flat structure: an enum, a number and an optional text, all from one run. */
 export const FlatStructure: Story = {
-  args: { pipeCode: 'flat_result', value: FLAT_RESULT },
+  args: { pipeCode: 'flat_result' },
   play: async ({ canvasElement }) => {
-    // Two panes: the ThemePair decorator renders every story twice.
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText('neutral')).toHaveLength(2);
-    await expect(canvas.getAllByText('0.7')).toHaveLength(2);
+    const payload = payloadFor('flat_result');
+    await expect(canvas.getAllByText(String(payload.label))).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByText(String(payload.confidence))).toHaveLength(BOTH_THEMES);
   },
 };
 
 /**
  * A nested structure carrying a date and a list of concepts.
  *
- * The date is the story: it arrives as kajson's typed form,
+ * The date is the story: it arrives in the serializer's typed envelope,
  * `{date, __class__, __module__}`, not as a bare ISO string. Nothing in the
- * descriptor says so — only a real payload does.
+ * descriptor says so — only a real payload does — and the `date` arm reads it
+ * through `readDateContent`, keyed by the kind the descriptor states, rather
+ * than by filtering the `__`-prefixed keys as the renderer used to.
  */
 export const NestedStructure: Story = {
-  args: { pipeCode: 'nested_result', value: NESTED_RESULT },
+  args: { pipeCode: 'nested_result' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText('INV-2026-0042')).toHaveLength(2);
-    // The date is unwrapped out of its typed envelope rather than shown raw.
-    await expect(canvas.getAllByText('2026-03-14')).toHaveLength(2);
+    const payload = payloadFor('nested_result');
+    const issuedOn = (payload.issued_on as { date: string }).date;
+    await expect(canvas.getAllByText(String(payload.reference))).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByText(issuedOn)).toHaveLength(BOTH_THEMES);
     await expect(canvas.queryByText(/__class__/)).toBeNull();
   },
 };
@@ -86,14 +127,40 @@ export const NestedStructure: Story = {
 /**
  * A `Concept[]` output. Two things worth seeing at once: the descriptor is a
  * `list` node (plurality is carried by the descriptor, exactly as it is for a
- * plural input), and the payload is `{ items: [...] }` rather than a bare array.
+ * plural input), and the payload is `ListContent {items}` rather than a bare
+ * array — which the renderer unwraps by the same `contentKey` path a scalar
+ * uses, because the payload schema is `ListContent[…]` and names the property.
  */
 export const PluralResult: Story = {
-  args: { pipeCode: 'plural_result', value: PLURAL_RESULT },
+  args: { pipeCode: 'plural_result' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText('design retainer')).toHaveLength(2);
-    await expect(canvas.getAllByText('additional revisions')).toHaveLength(2);
+    const items = payloadFor('plural_result').items as { label: string }[];
+    await expect(items.length).toBeGreaterThan(1);
+    for (const item of items) {
+      await expect(canvas.getAllByText(item.label)).toHaveLength(BOTH_THEMES);
+    }
+  },
+};
+
+/**
+ * A generated image — the arm that used to render `[object Object]`.
+ *
+ * `native.Image`'s content model is read through `readImageContent`, and the
+ * `url` a run produces is a `pipelex-storage://` reference a browser cannot
+ * paint. Resolving one is the host's seam (`docs/upload-seam.md`), so with no
+ * resolver the reference is shown as what it is rather than as a broken image —
+ * which is exactly what a host without a resolver sees.
+ */
+export const ImageResult: Story = {
+  args: { pipeCode: 'image_result' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const url = payloadFor('image_result').url as string;
+    await expect(canvas.getAllByText(new RegExp(escapeRegExp(url.slice(0, 30))))).toHaveLength(
+      BOTH_THEMES,
+    );
+    await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
   },
 };
 
@@ -103,5 +170,10 @@ export const PluralResult: Story = {
  * is a normal state to render, not an error.
  */
 export const AbsentResult: Story = {
-  args: { pipeCode: 'flat_result', value: undefined },
+  args: { pipeCode: 'flat_result', absent: true },
 };
+
+/** A live payload is arbitrary text; a substring of it is not a valid pattern. */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

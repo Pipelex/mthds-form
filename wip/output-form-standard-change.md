@@ -1,6 +1,6 @@
 # Plan — describe a pipe's output the way its inputs are described
 
-**Status:** proposal, nothing landed upstream. A working simulation exists in this repo (`src/core/output-form.ts`, `scripts/dump-validate-views.py`, the `Outputs` stories) and is the evidence behind every claim below.
+**Status:** proposal, nothing landed upstream. A working simulation exists in this repo (`src/core/output-form.ts`, `src/core/native-content.ts`, `scripts/dump-validate-views.py`, the `Outputs` stories) and is the evidence behind every claim below. **T1–T5 are implemented** — see "What the implementation settled" at the end, which is the strongest part of the argument now: the branch demonstrates that requiring a schema on the output side deletes the guessing entirely, because it did.
 
 **Target repos:** `mthds` (the standard), `mthds-python`, `mthds-js`, `pipelex`, `conformance`. This document lives here because this is where the evidence was gathered; it moves to `wip/inbox/` addressed to `workspace` when it goes out.
 
@@ -173,23 +173,23 @@ Reused rather than rebuilt, which is most of why this is small:
 
 Synthesized from the review. Each derives from a specific finding; none is padding.
 
-- [ ] **T1 (P1, human: ~5h / CC: ~35min)** — `src/react/result-field.tsx` — Dispatch exhaustively on `kind`, with spec-backed `document` / `image` arms
+- [x] **T1 (P1, human: ~5h / CC: ~35min)** — `src/react/result-field.tsx` — Dispatch exhaustively on `kind`, with spec-backed `document` / `image` arms
   - Surfaced by: Architecture — a `document` output renders `[object Object]`; verified by render, output was `Outputnative.Document[object Object]`
   - Files: `src/react/result-field.tsx`
   - Verify: a `default:` arm asserting `field satisfies never`, so a twelfth kind fails the build rather than rendering wrong. `native.Page` then works by recursion (`{text_and_images, page_view}` → object → image).
-- [ ] **T2 (P1, human: ~3h / CC: ~25min)** — `src/core/derive.ts` — Make the output schema required and delete the guessing
+- [x] **T2 (P1, human: ~3h / CC: ~25min)** — `src/core/derive.ts` — Make the output schema required and delete the guessing
   - Surfaced by: Architecture — `unwrap` counts properties and `itemsOf` sniffs for `items`, the pattern the derivation swap removed
   - Files: `src/core/derive.ts`, `src/react/result-field.tsx`
   - Verify: `contentKey` is the only unwrap path; no branch inspects key counts. Proves a schema on the output contract is sufficient.
-- [ ] **T3 (P2, human: ~2h / CC: ~15min)** — `src/core/native-content.ts` — Move the native content-model readers into core and export them
+- [x] **T3 (P2, human: ~2h / CC: ~15min)** — `src/core/native-content.ts` — Move the native content-model readers into core and export them
   - Surfaced by: Code quality — the knowledge sits in a React component; `file-formats.ts` set the precedent that a host needs the same answer
   - Files: new `src/core/native-content.ts`, `src/core/index.ts`, `src/react/result-field.tsx`
   - Verify: header cites `native-concepts.md` § "The Pinned Set (MTHDS 1.0.0)"; `make assert-bundle` stays green (core must remain React-free).
-- [ ] **T4 (P1, human: ~4h / CC: ~30min)** — `src/react/__tests__/result-field.test.tsx` — Cover the renderer in jsdom
+- [x] **T4 (P1, human: ~4h / CC: ~30min)** — `src/react/__tests__/result-field.test.tsx` — Cover the renderer in jsdom
   - Surfaced by: Test review — React coverage is 0/6 paths; the file does not exist
   - Files: new `src/react/__tests__/result-field.test.tsx`
   - Verify: unwrap paths, absent/empty/boolean rendering, list index labels and `hideLabel`, and a document value that must never stringify to `[object Object]`.
-- [ ] **T5 (P1, human: ~30min / CC: ~5min)** — `src/__stories__/__tests__/corpus.test.ts` — Pin the plural wrap
+- [x] **T5 (P1, human: ~30min / CC: ~5min)** — `src/__stories__/__tests__/corpus.test.ts` — Pin the plural wrap
   - Surfaced by: Test review — REGRESSION. It shipped wrong once (a `LineItem[]` described as `object`) and nothing pins the fix.
   - Files: `src/__stories__/__tests__/corpus.test.ts`
   - Verify: `OUTPUT_FORM['results.plural_result'].field.kind === 'list'`, plus every generated module carries an `OUTPUT_FORM` export.
@@ -259,3 +259,37 @@ A fifth open decision was added to the spec-page list: the plural payload envelo
 **VERDICT:** ENG REVIEW COMPLETE — plan sound, argument strengthened, 5 implementation tasks queued. Not yet implementation-clear: T1 and T4 close a critical gap that exists in the branch today.
 
 NO UNRESOLVED DECISIONS
+
+## What the implementation settled
+
+T1–T5 landed together, and three of the open questions above stopped being open in the process. Recording them here so the standard conversation starts from evidence rather than from a design sketch.
+
+### The output schema is the PAYLOAD's schema, not the caller's — and that resolves open decision 4
+
+§"What to change" proposed following the input side verbatim: a plural output's schema as the bare array wrapper. **Building it that way does not work**, and the reason is worth stating in the spec rather than rediscovering.
+
+The two sides of the contract answer different questions. An input contract's `json_schema` describes what a caller **sends**, so a plural slot's schema is a bare array. An output's schema describes what **comes back**, and what comes back is the concept's content model — a `native.Text` result is `TextContent {text}`, a `Concept[]` result is `ListContent {items}`. Emitting a bare array for the plural arm would have produced a schema the real payload does not satisfy, which is worse than no schema at all.
+
+Taking the payload seriously is also what closes **open decision 4** (the unspecified `{items: [...]}` envelope). There is no `native.List` in the pinned set, but `ListContent` is a real runtime type with exactly one member, so it is describable by exactly the mechanism a scalar content model already uses: `contentKey` names the property, and the renderer unwraps by name. The generator asks pydantic to project `ListContent[Element]` rather than hand-building an envelope — a hand-built copy stops tracking the runtime the moment it changes.
+
+**What the standard should say:** the output contract's `json_schema` is the schema of the payload, and for a plural output that is the list content model, not a bare array.
+
+### The unwrap is gated on the KIND, not on the value — and that is what makes it not sniffing
+
+`buildResultField` unwraps once at the top, and only when the node's stated `kind` is not `object`. That gate is load-bearing: an `object` output IS its content model, so a structured concept declaring exactly one field would otherwise be mistaken for a wrapper. The kind comes from the descriptor, so this is a read of what the field is rather than an inference from what the value looks like — which is the whole distinction §"What the missing schema costs" turns on.
+
+The consequence for the spec: `output_form` and the output `json_schema` are not independently useful. The descriptor states the kind, the schema names the property, and neither alone is enough. **Land them together**, as §"What to change" already argued for other reasons.
+
+### `name: "output"` survived contact with a renderer
+
+Open decision 1 asked what an output node's `name` should be. `"output"` works, and the reason is narrower than it looks: the renderer never displays it. A top-level result is labelled by its concept pill, and a list item is labelled by its index — the same rule `input-form-descriptor.md` already states for list items. So the answer can be "any stable placeholder", and `"output"` is the one this implementation uses.
+
+### What is still open
+
+- **Open decision 2** (does the descriptor repeat `multiplicity` / `optional`) — untouched; nothing in a renderer needed either.
+- **Open decision 3** (native outputs are verbose) — confirmed but not a problem in practice: `native.Page` needs no renderer arm of its own, because its descriptor is an `object` over `{text_and_images, page_view}` and it works by recursion into the `document`/`image` arms.
+- **Open decision 5** (whether the crate stays the sanctioned route for shape) — untouched.
+
+### Evidence
+
+Everything above was measured on 2026-08-31 against pipelex v0.55.0. The story corpus is no longer partly hand-copied: `make fixtures-runs` executes each pipe through the real `pipelex run bundle` CLI and commits the `main_stuff.json` it wrote, including a `PipeImgGen` carrier producing a real `native.Image` result — which is the case that used to render `[object Object]`.

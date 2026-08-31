@@ -49,6 +49,7 @@ import sys
 from pathlib import Path
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -161,15 +162,45 @@ async def views_for(bundle: Path) -> dict[str, object]:
                 node = {k: v for k, v in node.items() if v is not None}
 
             output_form[pipe.pipe_ref] = {"field": node}
-        # The schema half, off the structure class the runtime already built. The
-        # input side carries this on the contract; there is nowhere on the output
-        # contract to put it, so it rides separately here.
+        # The schema half, off the structure class the runtime already built.
+        #
+        # **This is the schema of the PAYLOAD, not of a caller's argument**, and
+        # the distinction is what makes it usable. On the input side the contract
+        # states what a caller SENDS - a plural slot's schema is a bare array,
+        # because that is what the caller hands over. A result is the other
+        # direction: what comes back is the concept's CONTENT MODEL, so a
+        # `native.Text` result is `TextContent {text}` and a `Concept[]` result is
+        # `ListContent {items}`. A renderer reads the single wrapping property's
+        # NAME off this schema (the kernel's `contentKey`) and unwraps by name -
+        # which is precisely what lets it stop guessing at the shape.
+        #
+        # So the plural arm wraps in `ListContent[...]` rather than emitting the
+        # element schema, and it does it by asking pydantic to project the real
+        # generic rather than by hand-building an envelope. Hand-building it was
+        # the tempting version and it would have been wrong in a way nothing here
+        # could catch: the envelope IS a runtime type, and a hand-built copy
+        # stops tracking it the moment it changes.
+        #
+        # The output contract has nowhere to put any of this, so it rides
+        # separately - see the note above and `src/core/output-form.ts`.
         class_registry = get_class_registry()
         output_json_schema: dict[str, object] = {}
         for pipe in pipes:
             structure_class = class_registry.get_class(pipe.output.concept.structure_class_name)
-            if structure_class is not None and hasattr(structure_class, "model_json_schema"):
+            if structure_class is None or not hasattr(structure_class, "model_json_schema"):
+                # Loud, not lenient. `buildResultField` REQUIRES the schema, so a
+                # fixture emitted without one renders a result the renderer has to
+                # guess at - the exact failure the requirement exists to prevent.
+                raise RuntimeError(
+                    f"{pipe.pipe_ref}: no structure class for output concept "
+                    f"{pipe.output.concept.concept_ref} "
+                    f"(structure_class_name={pipe.output.concept.structure_class_name!r}). "
+                    "A result cannot be described without its payload schema."
+                )
+            if contracts[pipe.pipe_ref]["output"]["multiplicity"] == "single":
                 output_json_schema[pipe.pipe_ref] = structure_class.model_json_schema()
+            else:
+                output_json_schema[pipe.pipe_ref] = ListContent[structure_class].model_json_schema()
 
         return {
             "pipe_io_contracts": contracts,

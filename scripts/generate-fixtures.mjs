@@ -30,15 +30,50 @@
  * None of that is interesting to a story, and all of it is easy to get wrong.
  * So `synthesizeCarrier` owns it, and the author's file stays about structures.
  *
+ * ## Two passes, and only one of them costs anything
+ *
+ *   make fixtures        the DESCRIPTORS - what each pipe DECLARES
+ *   make fixtures-runs   the PAYLOADS    - what running it actually produced
+ *
+ * The first is offline and free: `pipe_io_contracts`, `input_form` and the
+ * output half are all projections of a declaration, so they need no run, no
+ * model deck and no network.
+ *
+ * The second RUNS the pipes, through the real `pipelex run bundle` CLI, and
+ * writes what came back. It costs inference budget every time, which is why it
+ * is a separate target you ask for rather than a step `make fixtures` drags
+ * along. It exists because a payload is the one artifact no projection can
+ * produce: the only way to know what a run returns is to run it. That is not
+ * pedantry - two shapes in this corpus are invisible from every descriptor and
+ * were both got wrong by hand before a real run corrected them: a `date` inside
+ * a structure arrives in the serializer's typed envelope rather than as an ISO
+ * string, and a plural result arrives as `{items: [...]}` rather than as a bare
+ * array.
+ *
  * ## Requirements
  *
- * The sibling `../pipelex` checkout's venv, because no CLI surfaces these two
- * views yet (see `dump-validate-views.py`). Dev-time only: the emitted `.ts`
- * files are committed, so `make storybook` needs nothing but node.
+ * The sibling `../pipelex` checkout, dev-time only - the emitted `.ts` files are
+ * committed, so `make storybook` needs nothing but node. The two passes want
+ * different executables and each asserts only its own, up front:
+ *
+ *   descriptors  PIPELEX_PYTHON  the venv INTERPRETER - `dump-validate-views.py`
+ *                                imports pipelex as a library, and no CLI
+ *                                surfaces those views yet
+ *   payloads     PIPELEX_BIN     the `pipelex` CLI, plus working inference
+ *                                credentials (a gateway key in ~/.pipelex/.env)
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,6 +88,15 @@ const OUT_DIR = path.join(REPO, 'src/__stories__/_generated');
  */
 const PIPELEX_PYTHON =
   process.env.PIPELEX_PYTHON ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'python');
+
+/**
+ * The CLI, not the interpreter. The payload pass runs pipes the way a user does
+ * - `pipelex run bundle` - rather than reaching into the library, because what a
+ * story renders should be what the shipped command produces, not what an
+ * in-process reimplementation of it produces.
+ */
+const PIPELEX_BIN =
+  process.env.PIPELEX_BIN ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'pipelex');
 
 const MULTIPLICITIES = new Set(['single', 'variable', 'fixed']);
 const PRESENCES = new Set(['plain', 'optional', 'force']);
@@ -72,6 +116,18 @@ function requirePython() {
       `  repo beside this one and create its venv, or set PIPELEX_PYTHON to an interpreter\n` +
       `  that has pipelex installed. Regenerating is dev-only: the committed .ts fixtures\n` +
       `  are what the stories read, so this is never needed just to run Storybook.`,
+  );
+}
+
+function requireCli() {
+  if (existsSync(PIPELEX_BIN)) return;
+  die(
+    `cannot find the pipelex CLI at ${PIPELEX_BIN}.\n` +
+      `  The payload pass runs the pipes for real, so it needs the CLI (and inference\n` +
+      `  credentials - a gateway key in ~/.pipelex/.env). Either check out the pipelex\n` +
+      `  repo beside this one and create its venv, or set PIPELEX_BIN. This is asserted\n` +
+      `  separately from PIPELEX_PYTHON because a machine can have one without the other,\n` +
+      `  and finding out halfway through a paid sweep is the wrong time.`,
   );
 }
 
@@ -127,7 +183,9 @@ function validateSlot(caseName, pipeCode, slot, seen) {
   }
   if (multiplicity === 'fixed') {
     if (!Number.isInteger(slot.itemCount) || slot.itemCount < 2) {
-      die(`${where}: a fixed slot needs an integer 'itemCount' of at least 2 (got ${slot.itemCount}).`);
+      die(
+        `${where}: a fixed slot needs an integer 'itemCount' of at least 2 (got ${slot.itemCount}).`,
+      );
     }
   } else if (slot.itemCount !== undefined) {
     die(`${where}: 'itemCount' applies only to a fixed slot.`);
@@ -155,20 +213,28 @@ function synthesizeCarrier(pipe) {
   // the fixtures describe outputs too: a corpus whose every pipe resolves to
   // `Text` can only ever produce one output descriptor, which describes nothing.
   const output = pipe.output ?? 'Text';
+  const type = pipe.type ?? 'PipeLLM';
   const inputs = pipe.slots
     .map((slot) => `${slot.name} = "${slotTypeExpression(slot)}"`)
     .join(', ');
-  const references = pipe.slots
-    .map((slot) => (slot.presence === 'optional' ? `@?${slot.name}` : `@${slot.name}`))
-    .join('\n');
+  // An authored prompt is for a case that needs the pipe to DO something
+  // specific when the payload pass runs it - an image generator has nothing to
+  // reference, and a synthesized wall of `@slot` lines is not an instruction.
+  // Everything else keeps the reference block, which is only there to satisfy
+  // the three rules in this file's header.
+  const prompt =
+    pipe.prompt ??
+    pipe.slots
+      .map((slot) => (slot.presence === 'optional' ? `@?${slot.name}` : `@${slot.name}`))
+      .join('\n');
   return [
     `[pipe.${pipe.code}]`,
-    `type        = "PipeLLM"`,
+    `type        = "${type}"`,
     `description = "Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored."`,
-    `inputs      = { ${inputs} }`,
+    ...(inputs ? [`inputs      = { ${inputs} }`] : []),
     `output      = "${output}"`,
     `prompt      = """`,
-    references,
+    prompt,
     `"""`,
     '',
   ].join('\n');
@@ -201,14 +267,42 @@ function readCase(caseName) {
     if (typeof pipe.code !== 'string' || !/^[a-z][a-z0-9_]*$/.test(pipe.code)) {
       die(`${caseName}: every pipe needs a snake_case 'code'.`);
     }
-    if (!Array.isArray(pipe.slots) || pipe.slots.length === 0) {
-      die(`${caseName}: pipe '${pipe.code}' needs a non-empty 'slots' array.`);
+    const slots = Array.isArray(pipe.slots) ? pipe.slots : [];
+    // A carrier normally exists to hold slots, so an empty list is an authoring
+    // slip - EXCEPT for a pipe that states its own prompt, which is how a case
+    // reaches an operator that takes no input at all (`PipeImgGen` is the one in
+    // the corpus). Requiring the prompt is what keeps the exception narrow.
+    if (slots.length === 0 && typeof pipe.prompt !== 'string') {
+      die(
+        `${caseName}: pipe '${pipe.code}' has no slots. A pipe may only be slotless if it ` +
+          `states its own 'prompt'.`,
+      );
+    }
+    if (pipe.type !== undefined && typeof pipe.type !== 'string') {
+      die(`${caseName}: pipe '${pipe.code}': 'type' must be a pipe type name, e.g. "PipeImgGen".`);
+    }
+    if (pipe.run !== undefined && (typeof pipe.run !== 'object' || pipe.run === null)) {
+      die(`${caseName}: pipe '${pipe.code}': 'run' must be an object of input values.`);
     }
     const seen = new Set();
-    return { ...pipe, slots: pipe.slots.map((slot) => validateSlot(caseName, pipe.code, slot, seen)) };
+    const validated = slots.map((slot) => validateSlot(caseName, pipe.code, slot, seen));
+    for (const name of Object.keys(pipe.run ?? {})) {
+      if (!seen.has(name)) {
+        die(
+          `${caseName}: pipe '${pipe.code}': 'run' names '${name}', which is not one of its slots.`,
+        );
+      }
+    }
+    return { ...pipe, slots: validated };
   });
 
-  return { caseName, structures, description: spec.description, pipes };
+  // The domain the bundle declares - the first half of every `pipe_ref` the
+  // builders key by, and the only way the payload pass can name its runs the
+  // same way the descriptor pass names its pipes.
+  const domain = /^\s*domain\s*=\s*"([^"]+)"/m.exec(structures)?.[1];
+  if (!domain) die(`${caseName}.mthds declares no domain.`);
+
+  return { caseName, domain, structures, description: spec.description, pipes };
 }
 
 /** Structures as authored, plus one synthesized carrier per slot group. */
@@ -286,7 +380,7 @@ function emitModule(entry, views) {
     '',
     '/**',
     ' * The output half. NOT a standard artifact yet - see the note in',
-    ' * `scripts/dump-validate-views.py`. Derived by pipelex\'s own',
+    " * `scripts/dump-validate-views.py`. Derived by pipelex's own",
     ' * `InputFormDeriver.derive_concept`, the method the input derivation already',
     ' * calls for every nested concept field, so it is as generated as the rest.',
     ' */',
@@ -305,6 +399,149 @@ function emitModule(entry, views) {
   return body;
 }
 
+/**
+ * A machine-local `file://` URL, redacted.
+ *
+ * A run on a laptop writes its generated files under the working directory and
+ * states the absolute path back on `public_url`. That path is a fact about the
+ * machine that ran the pipe, not about the run: it names somebody's home
+ * directory (in an open-source repo), it resolves on no other machine, and a
+ * browser refuses to load it from a served page anyway. So it is dropped, and
+ * the required `url` - the storage reference, which is the durable half - is
+ * kept exactly as it came back.
+ *
+ * The result renders as what a host with no storage resolver genuinely sees,
+ * which makes the redaction honest rather than merely tidy.
+ */
+function redactLocalUrls(value) {
+  if (Array.isArray(value)) return value.map(redactLocalUrls);
+  if (value === null || typeof value !== 'object') return value;
+  const out = {};
+  for (const [key, member] of Object.entries(value)) {
+    out[key] =
+      key === 'public_url' && typeof member === 'string' && member.startsWith('file:')
+        ? null
+        : redactLocalUrls(member);
+  }
+  return out;
+}
+
+/**
+ * Run one pipe for real and return what it produced.
+ *
+ * `main_stuff.json` is the run's own answer, written by the CLI - not a
+ * re-serialization of it by this script. Reading the file the command writes is
+ * what keeps the fixture a record of the shipped behaviour: if the runtime
+ * changes how it serializes a date, the next sweep says so.
+ */
+function runPipe(bundlePath, pipe, workDir) {
+  mkdirSync(workDir, { recursive: true });
+  const outDir = path.join(workDir, pipe.code);
+  const args = ['run', 'bundle', bundlePath, '--pipe', pipe.code, '-o', outDir];
+  args.push('--no-graph', '--no-pretty-print', '--no-save-working-memory');
+  if (pipe.run && Object.keys(pipe.run).length > 0) {
+    const inputsPath = path.join(workDir, `${pipe.code}.inputs.json`);
+    writeFileSync(inputsPath, JSON.stringify(pipe.run, null, 2));
+    args.push('-i', inputsPath);
+  }
+
+  try {
+    execFileSync(PIPELEX_BIN, args, {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, PIPELEX_NO_DECK_NOTICE: '1' },
+      cwd: REPO,
+    });
+  } catch (error) {
+    const detail = error.stderr || error.stdout || '';
+    die(`${pipe.code}: pipelex run failed.\n${detail}`);
+  }
+
+  // The CLI names the run directory after the pipe and numbers it, so read back
+  // whatever it created rather than predicting the suffix.
+  const produced = readdirSync(outDir).filter((entry) =>
+    existsSync(path.join(outDir, entry, 'main_stuff.json')),
+  );
+  if (produced.length !== 1) {
+    die(
+      `${pipe.code}: expected exactly one run directory with a main_stuff.json under ${outDir}, ` +
+        `found ${produced.length}.`,
+    );
+  }
+  const mainStuff = JSON.parse(
+    readFileSync(path.join(outDir, produced[0], 'main_stuff.json'), 'utf8'),
+  );
+  return redactLocalUrls(mainStuff);
+}
+
+/** The payload module for one case: `pipe_ref` -> what that pipe produced. */
+function emitPayloads(entry, payloads) {
+  const pipeRefs = Object.keys(payloads).sort();
+  return [
+    '/**',
+    ` * Real payloads from real runs of data/structures/${entry.caseName}.mthds - DO NOT EDIT.`,
+    ' *',
+    ' * Regenerate with `make fixtures-runs`, which runs each pipe through the real',
+    ' * `pipelex run bundle` CLI and copies back the `main_stuff.json` it wrote. This',
+    ' * costs inference budget, which is why it is its own target.',
+    ' *',
+    ' * **A payload is the one fixture no projection can produce.** Everything else',
+    ' * in `_generated/` is derived from what a pipe DECLARES; this is derived from',
+    ' * what running it returned, and the difference is not academic. Two shapes here',
+    ' * are invisible from every descriptor and were both written wrong by hand',
+    ' * before a real run corrected them: a `date` inside a structure arrives in the',
+    " * serializer's typed envelope (`{date, __class__, __module__}`) rather than as",
+    ' * an ISO string, and a plural result arrives as `{items: [...]}` rather than as',
+    ' * a bare array.',
+    ' *',
+    ' * The one edit the generator makes is to drop a machine-local `file://`',
+    ' * `public_url`: that names the home directory of whoever ran the sweep, and it',
+    ' * resolves nowhere else. See `redactLocalUrls` in the generator.',
+    ' */',
+    '',
+    `/** Every pipe_ref that was run for this case, in sorted order. */`,
+    `export const RUN_PIPE_REFS = ${JSON.stringify(pipeRefs)} as const;`,
+    '',
+    `export const PAYLOADS: Record<string, unknown> = ${JSON.stringify(payloads, null, 2)};`,
+    '',
+  ].join('\n');
+}
+
+/** The payload pass: run every pipe that declares a `run` block, per case. */
+function generatePayloads(cases) {
+  requireCli();
+  const workRoot = mkdtempSync(path.join(os.tmpdir(), 'mthds-form-runs-'));
+  try {
+    for (const caseName of cases) {
+      const entry = readCase(caseName);
+      const runnable = entry.pipes.filter((pipe) => pipe.run !== undefined || pipe.prompt);
+      if (runnable.length === 0) continue;
+
+      const bundlePath = path.join(workRoot, `${caseName}.mthds`);
+      writeFileSync(bundlePath, composeBundle(entry));
+
+      const payloads = {};
+      for (const pipe of runnable) {
+        process.stdout.write(`  ${caseName}: running ${pipe.code}…\n`);
+        payloads[`${entry.domain}.${pipe.code}`] = runPipe(
+          bundlePath,
+          pipe,
+          path.join(workRoot, caseName),
+        );
+      }
+      const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
+      writeFileSync(outPath, emitPayloads(entry, payloads));
+      process.stdout.write(
+        `  ${caseName}: ${runnable.length} run${runnable.length === 1 ? '' : 's'} -> ` +
+          `${path.relative(REPO, outPath)}\n`,
+      );
+    }
+  } finally {
+    rmSync(workRoot, { recursive: true, force: true });
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   const onlyIndex = args.indexOf('--only');
@@ -317,8 +554,18 @@ function main() {
     return;
   }
 
-  requirePython();
   mkdirSync(OUT_DIR, { recursive: true });
+
+  // The payload pass is a REPLACEMENT for the descriptor pass, not a step after
+  // it: it costs inference budget, so asking for payloads must never silently
+  // also re-run (and re-cost) anything else, and re-running the free pass must
+  // never silently spend.
+  if (args.includes('--runs')) {
+    generatePayloads(cases);
+    return;
+  }
+
+  requirePython();
 
   for (const caseName of cases) {
     const entry = readCase(caseName);

@@ -255,20 +255,52 @@ function mapNode(
  * the same questions with the same answers — and a second mapper would be a
  * second place for them to drift.
  *
- * `schema` is optional because the standard currently gives an output nowhere to
- * carry one. Without it a scalar output has no `contentKey`, so a renderer
- * cannot know that `native.Text`'s payload sits under `text` — which is the
- * output-side twin of the input bug that omission causes, and the reason to pass
- * it whenever it can be had.
+ * ## `schema` is REQUIRED, and that is the whole point
+ *
+ * It was optional once, and the renderer paid for it: with no schema it could
+ * not know that `native.Text`'s payload sits under `text`, so it worked the
+ * unwrapping out by COUNTING the value's properties, and worked a plural payload
+ * out by looking for an `items` key. Both are shape sniffing — the exact pattern
+ * [../../docs/derivation-swap.md] records deleting from the input side, where
+ * `contentKey` is read off a schema and handed to a control as a property NAME.
+ *
+ * So the parameter is required, the two heuristics are gone, and what the
+ * argument must be is stated precisely: **the schema of the PAYLOAD**, which for
+ * every kind but `object` is the content model that wraps it —
+ * `TextContent {text}` for a `native.Text` output, `ListContent {items}` for a
+ * plural one. That is a change the standard has to make on the output contract
+ * (see `./output-form`); until it does, a producer supplies it beside the
+ * descriptor.
  */
 export function buildResultField(
   descriptor: { field: InputFormField },
-  schema?: Record<string, unknown>,
+  schema: Record<string, unknown>,
 ): RunField {
   const node = descriptor.field;
   const defs: Record<string, JsonSchema> = {};
-  if (schema) collectSchemaDefs(schema as JsonSchema, defs, { traverseArrays: true });
-  return mapNode(node, node.name, schema as JsonSchema | undefined, defs);
+  collectSchemaDefs(schema as JsonSchema, defs, { traverseArrays: true });
+
+  // Unwrap the content model, ONCE, at the top.
+  //
+  // A result's payload is its concept's content model, and for every kind but
+  // `object` that model is a wrapper: the value sits under a single property the
+  // schema names. Reading it here rather than in `mapNode` is what keeps the
+  // schema walk ALIGNED with the descriptor beneath it — a plural output's node
+  // is a `list`, so the schema it must be walked against is the `items` array,
+  // not the `ListContent` object around it.
+  //
+  // Gated on the node's stated KIND, never on the value: an `object` output IS
+  // its content model, and a structured concept that happens to declare exactly
+  // one field would otherwise be mistaken for a wrapper. The kind comes from the
+  // descriptor, so this is a read of what the field is, not a guess at it.
+  const wrapperKey = node.kind === 'object' ? undefined : scalarWrapperKey(schema as JsonSchema);
+  const inner =
+    wrapperKey === undefined
+      ? (schema as JsonSchema)
+      : ((schema as JsonSchema).properties as Record<string, JsonSchema>)[wrapperKey];
+
+  const field = mapNode(node, node.name, inner, defs);
+  return wrapperKey === undefined ? field : { ...field, contentKey: wrapperKey };
 }
 
 export function buildRunFields(

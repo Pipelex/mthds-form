@@ -1,5 +1,5 @@
 {
-  "description": "Pipes whose OUTPUT is the interesting half: a scalar, a flat structure, a nested one, and a plural result. A Page[] output is deliberately absent - the carrier is a PipeLLM, and the language forbids a PipeLLM resolving to a concept that contains images.",
+  "description": "Pipes whose OUTPUT is the interesting half: a scalar, a flat structure, a nested one, a plural result, and a generated image. Each carries a 'run' block (or states its own prompt), so `make fixtures-runs` can produce the real payload beside the descriptor. A Page[] output is deliberately absent - a PipeLLM carrier may not resolve to a concept that contains images, which is also why the image case swaps the carrier for a PipeImgGen.",
   "pipes": [
     {
       "code": "plain_text_result",
@@ -9,7 +9,10 @@
           "name": "note",
           "concept": "Text"
         }
-      ]
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
     },
     {
       "code": "flat_result",
@@ -19,7 +22,10 @@
           "name": "note",
           "concept": "Text"
         }
-      ]
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
     },
     {
       "code": "nested_result",
@@ -29,7 +35,10 @@
           "name": "note",
           "concept": "Text"
         }
-      ]
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
     },
     {
       "code": "plural_result",
@@ -39,7 +48,17 @@
           "name": "note",
           "concept": "Text"
         }
-      ]
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
+    },
+    {
+      "code": "image_result",
+      "type": "PipeImgGen",
+      "output": "Image",
+      "prompt": "A small weathered wooden sign staked in dark garden soil, hand-painted with the word RHUBARB, morning light",
+      "slots": []
     }
   ]
 }

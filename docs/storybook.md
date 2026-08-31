@@ -32,10 +32,13 @@ An output is a concept ref exactly like an input is, so its stories are driven b
 
 What differs is presentation: a result is **read, not edited**, so `ResultField` renders values with labels rather than controls with values. Rendering a result as a disabled form would say "you may not change this" where the truth is "this is what came back".
 
-Two halves, sourced differently:
+Three artifacts, sourced differently, and all three generated:
 
-- **The descriptor** is generated, like every input fixture — but from an artifact the standard does not have yet. See `src/core/output-form.ts` for what `pipe_io_contracts` carries for an output today (identity and plurality, no schema) and what this simulates.
-- **The payloads** are copied verbatim from real runs, in `src/__stories__/payloads/`. A payload is what a run produced; there is no other way to get one. That is not ceremony: two shapes in them are invisible from the descriptor — a `date` arrives as kajson's typed `{date, __class__, __module__}`, and a plural payload is `{ items: [...] }` rather than a bare array. A payload written by hand from the descriptor would have been a bare string and a bare array, and the renderer would have been built to a shape that never occurs.
+- **The descriptor** is generated like every input fixture, but from an artifact the standard does not have yet. See `src/core/output-form.ts` for what `pipe_io_contracts` carries for an output today (identity and plurality, no schema) and what this simulates.
+- **The payload schema** rides beside it as `OUTPUT_SCHEMAS`, because the output contract has nowhere to put it. It is the schema of the **payload**, not of a caller's argument, and that is what makes it usable: a `native.Text` result is `TextContent {text}` and a `Concept[]` result is `ListContent {items}`, so the renderer reads the wrapping property's NAME off it and unwraps by name. `buildResultField` **requires** it — see [result-view.md](result-view.md).
+- **The payloads** are what the pipes actually returned, written by `make fixtures-runs` from real `pipelex run bundle` executions into `src/__stories__/_generated/<case>.payloads.ts`. A payload is the one artifact no projection can produce, and that is not ceremony: two shapes in these are invisible from every descriptor — a `date` arrives in the serializer's typed envelope `{date, __class__, __module__}`, and a plural payload is `{items: [...]}` rather than a bare array. Both were written wrong by hand before a real run corrected them.
+
+The story assertions read their expected values **out of the payload they render** rather than naming them. A live model does not answer the same way twice — the sentiment case came back `neutral` on one sweep and `positive` on the next, both defensible — so a hard-coded string asserts the model's mood instead of the renderer, and fails on the next sweep for a reason nobody should have to investigate.
 
 ## What a file slot accepts
 
@@ -123,15 +126,32 @@ None of that is interesting to a story. `synthesizeCarrier` owns it, and the gua
 }
 ```
 
+A pipe may also carry `output` (the concept its carrier resolves to, `Text` by default), `type` (the carrier's pipe type, `PipeLLM` by default), `prompt` (an authored prompt, for a carrier that must actually *do* something when the payload pass runs it) and `run` (the input values that pass sends). A pipe with no slots is rejected **unless** it states its own prompt, which is the narrow exception that lets a case reach an operator taking no input at all.
+
 `presence` is `plain` | `optional` | `force`; `multiplicity` is `single` | `variable` | `fixed`. The generator rejects the pairings the standard forbids **at authoring time**, because the alternative is a parser error against a file the author never wrote: a marker may not ride a plural slot (`PipeInputContract` says a plural slot is always `plain`), and a fixed count is always at least two, since `Concept[1]` is a way of writing `Concept`.
 
-### What regeneration needs
+### Two passes, and only one of them costs anything
 
-The sibling `../pipelex` checkout's venv, addressed through `PIPELEX_PYTHON` — `dump-validate-views.py` imports pipelex as a **library**, because no CLI surfaces these two views yet. That is dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node. A near-identical copy of that script lives in the graph-rendering sibling package; both retire when the agent CLI can emit the views itself.
+```
+make fixtures        the DESCRIPTORS - what each pipe DECLARES   (offline, free)
+make fixtures-runs   the PAYLOADS    - what running it produced  (real runs, billed)
+```
+
+They are separate targets and neither implies the other, because asking for descriptors must never silently spend inference budget and asking for payloads must never silently re-derive anything else.
+
+The descriptor pass needs the sibling `../pipelex` checkout's venv **interpreter**, addressed through `PIPELEX_PYTHON` — `dump-validate-views.py` imports pipelex as a **library**, because no CLI surfaces these views yet. A near-identical copy of that script lives in the graph-rendering sibling package; both retire when the agent CLI can emit the views itself.
+
+The payload pass needs the **CLI**, addressed through `PIPELEX_BIN`, plus working inference credentials (a gateway key in `~/.pipelex/.env`). It runs each pipe the way a user does and reads back the `main_stuff.json` the command wrote, so what a story renders is what the shipped command produces rather than what an in-process reimplementation of it produces. Each pass asserts only the executable it invokes, up front — a machine can have one without the other, and finding out halfway through a paid sweep is the wrong time.
+
+A pipe is run only if its slot spec gives it a `run` block naming its input values (or, for a slotless operator like `PipeImgGen`, its own `prompt`). The one edit the generator makes to what came back is dropping a machine-local `file://` `public_url`: a run writes generated files under the working directory and reports the absolute path back, which names somebody's home directory, in an open-source repo, and resolves on no other machine. What remains is the durable `pipelex-storage://` reference — which is exactly what a host with no storage resolver sees.
+
+Both passes are dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node.
 
 ### The guard
 
 `src/__stories__/__tests__/corpus.test.ts` (the `corpus` vitest project, node) asserts the corpus and the generated tree describe the same set. It cannot assert the *content* is current — only a regeneration can — but a case added, renamed or removed without regenerating is the shape this actually fails as, and nothing else would notice.
+
+It carries three more that are about the output half specifically: every generated module exports an `OUTPUT_FORM` and an `OUTPUT_SCHEMAS`; **a plural output is described as a `list`**, which is the one place the simulation does real work rather than delegating to pipelex and so the one place with nothing else guarding it (it shipped wrong once, describing a `LineItem[]` output as an `object`, which would have shown one line item where a run produced two); and no payload module carries a machine-local path.
 
 ## Where story code lives, and why it matters
 
