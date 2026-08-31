@@ -1,0 +1,40 @@
+{
+  "description": "The scalar kinds in isolation, one carrier pipe per axis.",
+  "pipes": [
+    {
+      "code": "text_kinds",
+      "slots": [
+        { "name": "headline", "concept": "Headline" },
+        { "name": "body", "concept": "Text" }
+      ]
+    },
+    {
+      "code": "number_kinds",
+      "slots": [
+        { "name": "amount", "concept": "Number" },
+        { "name": "agreed", "concept": "YesNo" },
+        { "name": "due", "concept": "Date" }
+      ]
+    },
+    {
+      "code": "presence_axis",
+      "slots": [
+        { "name": "required_plain", "concept": "Text", "presence": "plain" },
+        { "name": "required_forced", "concept": "Text", "presence": "force" },
+        { "name": "may_be_absent", "concept": "Text", "presence": "optional" }
+      ]
+    },
+    {
+      "code": "multiplicity_axis",
+      "slots": [
+        { "name": "one", "concept": "Headline" },
+        { "name": "many", "concept": "Headline", "multiplicity": "variable" },
+        { "name": "exactly_three", "concept": "Headline", "multiplicity": "fixed", "itemCount": 3 }
+      ]
+    },
+    {
+      "code": "enum_kind",
+      "slots": [{ "name": "priority", "concept": "Priority" }]
+    }
+  ]
+}

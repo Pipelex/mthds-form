@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **The optional badge met only 2.73:1 contrast in the light theme.** `field-shell.tsx`, `object-field.tsx` and `list-field.tsx` rendered it as `text-muted-foreground/70`, and dimming an already-muted token with an opacity is what did it — the token alone measures 4.83:1, the dimmed blend 2.73:1, against an AA threshold of 4.5:1. All three now use the token at full opacity. Found by the a11y gate on the first stories that rendered real controls. A second, narrower finding remains open and is deliberately not fixed here: the **default** palette's `--muted-foreground` measures 4.39:1 against `--muted`, which is the pairing a description line inside a card uses. Changing that changes the default colours of every host that has not defined its own tokens, so it is tracked separately rather than ridden along.
+
 ### Added
 
-- **Storybook, with the stories in this repo rather than in a consumer.** `make storybook` serves them; `make test` runs them in headless Chromium as a third vitest project beside the node and jsdom suites. The controls are this package's, so their visual coverage belongs here — a regression in a control was previously caught, if at all, by a story in a downstream app. Every story renders in **both themes side by side** through the `ThemePair` decorator, because the question a story answers is what a control looks like, and a toolbar toggle hides half of that behind a click. `a11y` runs at `test: 'error'` rather than a consumer's `todo`: a missing accessible name on a control is this repo's bug. See [docs/storybook.md](docs/storybook.md).
+- **Storybook, with the stories in this repo rather than in a consumer.** `make storybook` serves them; `make test` runs them in headless Chromium as a third vitest project beside the node and jsdom suites. The controls are this package's, so their visual coverage belongs here — a regression in a control was previously caught, if at all, by a story in a downstream app. Every story renders in **both themes side by side** through the `ThemePair` decorator, because the question a story answers is what a control looks like, and a toolbar toggle hides half of that behind a click. `a11y` runs at `test: 'error'` rather than a consumer's `todo`: a missing accessible name on a control is this repo's bug. **Story fixtures are generated, never written**: an author writes `.mthds` **structures only** plus a slot spec, and the carrier pipes are synthesized — the axes a story has to vary (presence marker, multiplicity, gating) are properties of a *slot*, and a slot only exists on a pipe. `make fixtures` projects them through the same builders the hosted `/validate` calls, and the emitted consts are annotated rather than cast, so a fixture that drifts out of the standard's shape is a compile error. See [docs/storybook.md](docs/storybook.md).
 
 ## [v0.5.0] - 2026-08-28
 

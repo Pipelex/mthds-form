@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures assert-bundle clean pack
 
 install:
 	npm install
@@ -46,6 +46,12 @@ st: storybook
 
 build-storybook:
 	npm run build-storybook
+
+# Regenerate the story fixtures from data/structures/. Needs the sibling
+# ../pipelex checkout's venv (PIPELEX_PYTHON) - dev-only, since the emitted .ts
+# files are committed and the stories read those. ONLY=<case> narrows it.
+fixtures:
+	node scripts/generate-fixtures.mjs $(if $(ONLY),--only $(ONLY))
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

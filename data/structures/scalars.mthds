@@ -1,0 +1,17 @@
+domain      = "scalars"
+description = "One concept per scalar input kind the standard can state."
+
+[concept.Headline]
+description = "A single line of text"
+refines     = "Text"
+
+[concept.Priority]
+description = "How urgent the request is"
+
+[concept.Priority.structure]
+level = { type = "text", description = "The urgency level", required = true, choices = [
+  "low",
+  "normal",
+  "high",
+  "urgent",
+] }

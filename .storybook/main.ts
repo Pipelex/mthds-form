@@ -41,6 +41,33 @@ const config: StorybookConfig = {
      * behind `npm run build:css` picks up a root postcss config too, which
      * would run the Tailwind plugin twice over the same entry.
      */
+    /**
+     * Pre-bundle the control set's runtime dependencies up front.
+     *
+     * Vite discovers dependencies lazily, and the first story that renders a
+     * real control pulls in the whole radix/lucide/dropzone set at once. That
+     * triggers a mid-run re-optimization and a page reload, which the story
+     * tests observe as `Failed to fetch dynamically imported module: .../sb-vitest/deps/...`
+     * against a Storybook-internal chunk - a failure that names nothing to do
+     * with the change that caused it. Naming them here means they are optimized
+     * before any story loads.
+     */
+    viteConfig.optimizeDeps = {
+      ...(viteConfig.optimizeDeps ?? {}),
+      include: [
+        ...(viteConfig.optimizeDeps?.include ?? []),
+        '@radix-ui/react-select',
+        '@radix-ui/react-switch',
+        '@radix-ui/react-toggle',
+        '@radix-ui/react-toggle-group',
+        'class-variance-authority',
+        'clsx',
+        'lucide-react',
+        'react-dropzone',
+        'tailwind-merge',
+      ],
+    };
+
     viteConfig.css = {
       ...(viteConfig.css ?? {}),
       postcss: {

@@ -7,8 +7,9 @@ import { defineConfig } from 'vitest/config';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Three suites, three environments, because the package is two layers and the
- * stories are a third question about them.
+ * Four suites, because the package is two layers, the stories are a third
+ * question about them, and the story CORPUS is a fourth - a fact about the
+ * repository's files rather than about any code.
  *
  * The core is headless by contract - it must import and run with no DOM
  * anywhere - so its suite runs in `node`, and a stray `document` reference in
@@ -60,6 +61,16 @@ export default defineConfig({
           environment: 'jsdom',
           include: ['src/react/**/*.test.{ts,tsx}'],
           setupFiles: ['./vitest.setup.react.ts'],
+        },
+      },
+      {
+        // Not a test of the package at all: a test that the generated fixture
+        // tree still matches the corpus it was generated from. Node, because it
+        // reads directories. See src/__stories__/__tests__/corpus.test.ts.
+        test: {
+          name: 'corpus',
+          environment: 'node',
+          include: ['src/__stories__/**/*.test.ts'],
         },
       },
       {
