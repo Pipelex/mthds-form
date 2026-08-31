@@ -1,0 +1,10 @@
+domain      = "files"
+description = "The two file-bearing native concepts, plain and refined."
+
+[concept.SignedContract]
+description = "A contract with signatures on it"
+refines     = "Document"
+
+[concept.Headshot]
+description = "A portrait photograph"
+refines     = "Image"

@@ -53,7 +53,7 @@ Cloned at `ec2e7da` (v0.5.0 merge). `npm install && make check && make test` gre
 
 **Checkpoint.** Phase 1 opens a new area (build tooling).
 
-### Phase 1 — Storybook toolchain and `make storybook`
+### Phase 1 — Storybook toolchain and `make storybook` — **DONE**
 
 - Add Storybook 10 + `@storybook/react-vite`, **pinned to the same versions `@pipelex/mthds-ui` uses** (`^10.3.3`, `storybook ^10.3.3`, vitest `^4.1.0`, `playwright ^1.58.2`) so the two Storybooks do not drift into different majors. Addons: `addon-vitest`, `addon-a11y`, `addon-docs`. Add `eslint-plugin-storybook` and wire it into `eslint.config.mjs`.
 - Extend the Makefile: `storybook` (`st`), `build-storybook`, and later `fixtures`. Keep npm scripts as the implementation underneath; the Makefile stays a facade.
@@ -66,7 +66,7 @@ Cloned at `ec2e7da` (v0.5.0 merge). `npm install && make check && make test` gre
 
 **Checkpoint.**
 
-### Phase 2 — The structures corpus and the generator
+### Phase 2 — The structures corpus and the generator — **DONE**
 
 - `data/structures/` — the authored `.mthds` files (structures only) plus their slot sidecars.
 - `scripts/generate-fixtures.mjs` — new, and far smaller than the consumer's: no graph specs, no live runs, no HTML renders. Reads each case, synthesizes carrier pipes, invokes the Python dump, writes `src/__stories__/_generated/<case>.ts` exporting a typed `InputForm` + `PipeIOContracts` pair.
@@ -77,7 +77,7 @@ Cloned at `ec2e7da` (v0.5.0 merge). `npm install && make check && make test` gre
 
 **Checkpoint.** From here it is story authoring; the machinery is done.
 
-### Phase 3 — Folder 1: **Field Kinds** — one story per input type
+### Phase 3 — Folder 1: **Field Kinds** — one story per input type — **DONE**
 
 The catalog: *"here is every input type we have, in isolation, with nothing else on screen"*. One story file per kind, `ThemePair` on every story.
 
@@ -99,7 +99,7 @@ The catalog: *"here is every input type we have, in isolation, with nothing else
 
 **A second axis, factored out rather than multiplied in.** Rather than crossing every kind with every state, add one `field-states.stories.tsx` walking a representative kind through `required` / `optional` (collapsed and expanded) / authored `!` presence marker / `gating: true` vs `false` / `defaultValue` / `examples` / `hints` / validation `error` / `disabled` / mid-upload. Then each kind's own file carries only the states where it behaves **differently** from the representative. Multiplying the axes in would make the catalog unreadable, which is the one thing it exists not to be.
 
-### Phase 4 — Folder 2: **Concepts** — one concept, many fields
+### Phase 4 — Folder 2: **Concepts** — one concept, many fields — **DONE**
 
 Where folder 1 isolates, folder 2 shows a realistic single structure: one concept whose structure declares many properties of mixed kinds, including lists.
 
@@ -108,7 +108,7 @@ Where folder 1 isolates, folder 2 shows a realistic single structure: one concep
 - A **list of that concept** (`Concept[]`) as its own story. N repeats is a materially different layout problem from one instance, and it is where spacing and add/remove chrome break.
 - One story per structure, plus an "all structures stacked" overview so visual consistency across them is checkable at a glance.
 
-### Phase 5 — Folder 3: **Complex** — nesting and the hard cases
+### Phase 5 — Folder 3: **Complex** — nesting and the hard cases — **DONE**
 
 The stress folder: correctness under composition, and the layouts most likely to be ugly.
 
@@ -120,7 +120,11 @@ The stress folder: correctness under composition, and the layouts most likely to
 - Wide: a structure with many properties. Then deep and wide together.
 - A kitchen sink — every kind in one form, the single canvas answering *"what does a maximal method's form look like?"*.
 
-### Phase 6 — Extra viewpoints
+### Phase 6 — Extra viewpoints — **PARTLY DONE**
+
+The gallery canvas exists (`Gallery/Every Kind`). Still open: an MDX docs page fronting the catalog, a concept-category story exercising all nine `conceptCategory()` values beyond the pill story, and play functions on the remaining interaction-bearing stories (list add/remove, optional expand/collapse, file drop). Two coverage boundaries are documented rather than closed — text/number constraints need a Python-class-backed corpus, and `unknown` is simulated. See `docs/storybook.md`.
+
+#### Original scope
 
 Per-story canvases alone do not give an overview.
 

@@ -31,6 +31,12 @@ export interface CaseFormProps {
   /** Field name to error message, for stories that show the invalid state. */
   errors?: Record<string, string>;
   disabled?: boolean;
+  /**
+   * DOM ids currently mid-upload, in the `<pipeCode>-<fieldName>` form this
+   * harness mints. A file control reads this to show its busy state, which is
+   * the one control state a host drives rather than the value.
+   */
+  uploadingIds?: readonly string[];
 }
 
 export function deriveCaseFields(
@@ -57,12 +63,17 @@ export function CaseForm({
   initialValues,
   errors,
   disabled,
+  uploadingIds,
 }: CaseFormProps) {
   const fields = React.useMemo(
     () => deriveCaseFields(contracts, inputForm, domain, pipeCode),
     [contracts, inputForm, domain, pipeCode],
   );
   const [values, setValues] = React.useState<Record<string, unknown>>(initialValues ?? {});
+  const env = React.useMemo(
+    () => ({ disabled, uploadingIds: uploadingIds ? new Set(uploadingIds) : undefined }),
+    [disabled, uploadingIds],
+  );
 
   return (
     <div style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
@@ -73,7 +84,7 @@ export function CaseForm({
           id={`${pipeCode}-${field.name}`}
           value={values[field.name]}
           error={errors?.[field.name]}
-          env={{ disabled }}
+          env={env}
           onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
         />
       ))}

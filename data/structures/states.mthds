@@ -1,0 +1,16 @@
+domain      = "states"
+description = "A concept exercising the field-level state axis: defaults, choices, optionality."
+
+[concept.Preferences]
+description = "How a report should be produced"
+
+[concept.Preferences.structure]
+recipient   = { type = "text", description = "Who the report goes to", required = true }
+format      = { type = "text", description = "Output format", required = false, default_value = "pdf", choices = [
+  "pdf",
+  "html",
+  "markdown",
+] }
+copies      = { type = "integer", description = "How many copies to produce", required = false, default_value = 1 }
+include_raw = { type = "boolean", description = "Attach the raw data too", required = false, default_value = false }
+footnote    = { type = "text", description = "An optional footnote", required = false }

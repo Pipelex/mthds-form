@@ -8,6 +8,26 @@ The `src/react/__tests__/` suites already assert the DOM facts: an input has an 
 
 What nothing else in this repo can answer is whether a control **renders correctly, in both themes, across every input shape the standard can produce**. That is the question the stories exist for. Read a failing story as "this looks wrong", and a failing unit test as "this behaves wrong"; when the two disagree, the unit test is the contract.
 
+## The folders
+
+| Folder | Question it answers |
+| --- | --- |
+| **Field Kinds** | What is every input type, in isolation, with nothing else on screen? One story file per kind, plus `Field States` for the state axis. |
+| **Concepts** | What does a realistic single structure look like — mixed scalars, an enum, an optional beside a required, a nested concept, a list of concepts? |
+| **Complex** | Does it survive composition — a list of objects containing lists, four levels deep, files inside a list, the whole tree disabled? |
+| **Gallery** | Do all of these read as one system? The question no per-kind story can answer. |
+| **Toolchain** | The pieces that need no descriptor, currently the concept pill across all nine categories. |
+
+The state axis is factored **out** of the per-kind catalog rather than multiplied into it: `Field States` walks one representative concept through defaults, the three presence markers, filled, invalid and disabled, and each kind's own file carries only the states where that kind behaves differently. Crossing every kind with every state produces a folder nobody can scan, which is the one thing the catalog exists not to be.
+
+## What the corpus cannot reach
+
+Two gaps, both structural rather than oversights, and both better stated than quietly missing.
+
+**Text and number constraints.** `minLength`, `maxLength`, `pattern` and numeric bounds are read from **pydantic metadata on a reflected Python structure class** (`MinLen`, `MaxLen`, `Gt`/`Ge`/`Lt`/`Le`), not from anything a `.mthds` structure can declare — `ConceptStructureBlueprint` has no such slots. So a structures-only corpus cannot produce a constrained `text` or a bounded `number`, and the catalog does not pretend otherwise. Covering them would mean a fixture whose concepts are backed by Python classes, which is a different corpus.
+
+**The `unknown` kind.** It is the standard's escape hatch for a field kind **newer than the pinned `mthds` peer**, so by definition no bundle authored here can produce one — the peer would have to not know a kind it does know. `unknown.stories.tsx` simulates the drift instead of inventing a fixture: it takes a real generated descriptor, rewrites one node's `kind` to a value this version does not have, and runs it through `buildRunFields` like every other story. That exercises the actual degradation path — the total mapping in `derive.ts` falling through with the field's name intact — rather than asserting against a hand-written `RunField`.
+
 ## Every story renders in both themes
 
 Dark mode is the `.dark` class convention ([theming.md](theming.md), Tailwind `darkMode: 'class'`). The `ThemePair` decorator in `.storybook/theme-pair.tsx` renders each story **twice, side by side** — one light pane, one `.dark` pane — and that is the default view rather than a toolbar toggle, because a toggle hides half the answer behind a click. The toolbar is still there for anyone who wants one pane full width.
