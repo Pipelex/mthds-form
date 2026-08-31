@@ -35,8 +35,9 @@ export { conceptCategory } from './descriptor';
 export type { InputForm, PipeInputFormDescriptor } from 'mthds/protocol';
 export { buildResultField, buildRunFields, getPipeInputForm } from './derive';
 
-// The output half. NOT a standard artifact yet - see ./output-form for what the
-// standard carries today and what this simulates.
+// The output half - a standard artifact since the version that grew `output_form`
+// and put a `json_schema` on the output contract. The types are the standard's,
+// re-exported beside the lookup; see ./output-form.
 export type { OutputForm, PipeOutputFormDescriptor } from './output-form';
 export { getPipeOutputForm } from './output-form';
 

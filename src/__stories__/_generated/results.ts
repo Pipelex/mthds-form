@@ -6,8 +6,7 @@
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
  */
-import type { InputForm, PipeIOContracts } from 'mthds/protocol';
-import type { OutputForm } from '../../core/output-form';
+import type { InputForm, OutputForm, PipeIOContracts } from 'mthds/protocol';
 
 /** Every pipe_ref this case projects, in sorted order. */
 export const PIPE_REFS = [
@@ -44,6 +43,38 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'results.Sentiment',
       item_count: null,
+      json_schema: {
+        description: 'How positive a piece of writing is',
+        properties: {
+          confidence: {
+            description: 'How sure the model is, from 0 to 1',
+            title: 'Confidence',
+            type: 'number',
+          },
+          label: {
+            description: 'The overall verdict',
+            enum: ['positive', 'neutral', 'negative'],
+            title: 'Label',
+            type: 'string',
+          },
+          rationale: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'Why it landed there',
+            title: 'Rationale',
+          },
+        },
+        required: ['label', 'confidence'],
+        title: 'results.Sentiment',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -53,6 +84,125 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Image',
       item_count: null,
+      json_schema: {
+        description: 'An image',
+        properties: {
+          caption: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The caption of the image',
+            title: 'Caption',
+          },
+          filename: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The original filename of the image',
+            title: 'Filename',
+          },
+          height: {
+            anyOf: [
+              {
+                exclusiveMinimum: 0,
+                type: 'integer',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The height of the image, in pixels',
+            title: 'Height',
+          },
+          mime_type: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The MIME type of the image',
+            title: 'Mime Type',
+          },
+          public_url: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The public URL of the image',
+            title: 'Public Url',
+          },
+          source_negative_prompt: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The source negative prompt of the image',
+            title: 'Source Negative Prompt',
+          },
+          source_prompt: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The source prompt of the image',
+            title: 'Source Prompt',
+          },
+          url: {
+            description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+            title: 'Url',
+            type: 'string',
+          },
+          width: {
+            anyOf: [
+              {
+                exclusiveMinimum: 0,
+                type: 'integer',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The width of the image, in pixels',
+            title: 'Width',
+          },
+        },
+        required: ['url'],
+        title: 'native.Image',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -82,6 +232,76 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'results.Invoice',
       item_count: null,
+      json_schema: {
+        $defs: {
+          results__LineItem: {
+            description: 'One billable line of an invoice',
+            properties: {
+              label: {
+                description: 'What was sold',
+                title: 'Label',
+                type: 'string',
+              },
+              quantity: {
+                description: 'How many units',
+                title: 'Quantity',
+                type: 'integer',
+              },
+              unit_price: {
+                description: 'Price of one unit',
+                title: 'Unit Price',
+                type: 'number',
+              },
+            },
+            required: ['label', 'quantity', 'unit_price'],
+            title: 'results__LineItem',
+            type: 'object',
+          },
+        },
+        description: 'A commercial invoice',
+        properties: {
+          issued_on: {
+            description: 'The date it was issued',
+            format: 'date',
+            title: 'Issued On',
+            type: 'string',
+          },
+          lines: {
+            description: 'The billable lines',
+            items: {
+              $ref: '#/$defs/results__LineItem',
+            },
+            title: 'Lines',
+            type: 'array',
+          },
+          paid: {
+            anyOf: [
+              {
+                type: 'boolean',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'Whether it has been settled',
+            title: 'Paid',
+          },
+          reference: {
+            description: 'The invoice reference',
+            title: 'Reference',
+            type: 'string',
+          },
+          total: {
+            description: 'Total amount due',
+            title: 'Total',
+            type: 'number',
+          },
+        },
+        required: ['reference', 'issued_on', 'total', 'lines'],
+        title: 'results.Invoice',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -111,6 +331,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -140,6 +373,45 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'results.LineItem',
       item_count: null,
+      json_schema: {
+        $defs: {
+          results__LineItem: {
+            description: 'One billable line of an invoice',
+            properties: {
+              label: {
+                description: 'What was sold',
+                title: 'Label',
+                type: 'string',
+              },
+              quantity: {
+                description: 'How many units',
+                title: 'Quantity',
+                type: 'integer',
+              },
+              unit_price: {
+                description: 'Price of one unit',
+                title: 'Unit Price',
+                type: 'number',
+              },
+            },
+            required: ['label', 'quantity', 'unit_price'],
+            title: 'results__LineItem',
+            type: 'object',
+          },
+        },
+        properties: {
+          items: {
+            items: {
+              $ref: '#/$defs/results__LineItem',
+            },
+            title: 'Items',
+            type: 'array',
+          },
+        },
+        required: ['items'],
+        title: 'ListContent[results__LineItem]',
+        type: 'object',
+      },
       multiplicity: 'variable',
       optional: false,
     },
@@ -205,10 +477,10 @@ export const INPUT_FORM: InputForm = {
 };
 
 /**
- * The output half. NOT a standard artifact yet - see the note in
- * `scripts/dump-validate-views.py`. Derived by pipelex's own
- * `InputFormDeriver.derive_concept`, the method the input derivation already
- * calls for every nested concept field, so it is as generated as the rest.
+ * The output half - a standard artifact, keyed by the same pipe_ref set as the
+ * two above because all three builders iterate one pipe sequence. The payload
+ * SCHEMA is not here: it rides `CONTRACTS[ref].output.json_schema`, where the
+ * standard puts it, beside the input schemas.
  */
 export const OUTPUT_FORM: OutputForm = {
   'results.flat_result': {
@@ -368,287 +640,5 @@ export const OUTPUT_FORM: OutputForm = {
       name: 'output',
       required: true,
     },
-  },
-};
-
-/**
- * The output schemas, keyed the same way. The input side carries these on the
- * contract; the output side has nowhere to put them, so they ride separately
- * rather than being smuggled onto `PipeIOContracts` - whose type would
- * rightly reject the extra member.
- */
-export const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
-  'results.flat_result': {
-    description: 'How positive a piece of writing is',
-    properties: {
-      confidence: {
-        description: 'How sure the model is, from 0 to 1',
-        title: 'Confidence',
-        type: 'number',
-      },
-      label: {
-        description: 'The overall verdict',
-        enum: ['positive', 'neutral', 'negative'],
-        title: 'Label',
-        type: 'string',
-      },
-      rationale: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'Why it landed there',
-        title: 'Rationale',
-      },
-    },
-    required: ['label', 'confidence'],
-    title: 'results__Sentiment',
-    type: 'object',
-  },
-  'results.image_result': {
-    description: 'An image',
-    properties: {
-      caption: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The caption of the image',
-        title: 'Caption',
-      },
-      filename: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The original filename of the image',
-        title: 'Filename',
-      },
-      height: {
-        anyOf: [
-          {
-            exclusiveMinimum: 0,
-            type: 'integer',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The height of the image, in pixels',
-        title: 'Height',
-      },
-      mime_type: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The MIME type of the image',
-        title: 'Mime Type',
-      },
-      public_url: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The public URL of the image',
-        title: 'Public Url',
-      },
-      source_negative_prompt: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The source negative prompt of the image',
-        title: 'Source Negative Prompt',
-      },
-      source_prompt: {
-        anyOf: [
-          {
-            type: 'string',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The source prompt of the image',
-        title: 'Source Prompt',
-      },
-      url: {
-        description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
-        title: 'Url',
-        type: 'string',
-      },
-      width: {
-        anyOf: [
-          {
-            exclusiveMinimum: 0,
-            type: 'integer',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'The width of the image, in pixels',
-        title: 'Width',
-      },
-    },
-    required: ['url'],
-    title: 'ImageContent',
-    type: 'object',
-  },
-  'results.nested_result': {
-    $defs: {
-      results__LineItem: {
-        description: 'One billable line of an invoice',
-        properties: {
-          label: {
-            description: 'What was sold',
-            title: 'Label',
-            type: 'string',
-          },
-          quantity: {
-            description: 'How many units',
-            title: 'Quantity',
-            type: 'integer',
-          },
-          unit_price: {
-            description: 'Price of one unit',
-            title: 'Unit Price',
-            type: 'number',
-          },
-        },
-        required: ['label', 'quantity', 'unit_price'],
-        title: 'results__LineItem',
-        type: 'object',
-      },
-    },
-    description: 'A commercial invoice',
-    properties: {
-      issued_on: {
-        description: 'The date it was issued',
-        format: 'date',
-        title: 'Issued On',
-        type: 'string',
-      },
-      lines: {
-        description: 'The billable lines',
-        items: {
-          $ref: '#/$defs/results__LineItem',
-        },
-        title: 'Lines',
-        type: 'array',
-      },
-      paid: {
-        anyOf: [
-          {
-            type: 'boolean',
-          },
-          {
-            type: 'null',
-          },
-        ],
-        default: null,
-        description: 'Whether it has been settled',
-        title: 'Paid',
-      },
-      reference: {
-        description: 'The invoice reference',
-        title: 'Reference',
-        type: 'string',
-      },
-      total: {
-        description: 'Total amount due',
-        title: 'Total',
-        type: 'number',
-      },
-    },
-    required: ['reference', 'issued_on', 'total', 'lines'],
-    title: 'results__Invoice',
-    type: 'object',
-  },
-  'results.plain_text_result': {
-    description: 'A text',
-    properties: {
-      text: {
-        description: 'The text',
-        title: 'Text',
-        type: 'string',
-      },
-    },
-    required: ['text'],
-    title: 'TextContent',
-    type: 'object',
-  },
-  'results.plural_result': {
-    $defs: {
-      results__LineItem: {
-        description: 'One billable line of an invoice',
-        properties: {
-          label: {
-            description: 'What was sold',
-            title: 'Label',
-            type: 'string',
-          },
-          quantity: {
-            description: 'How many units',
-            title: 'Quantity',
-            type: 'integer',
-          },
-          unit_price: {
-            description: 'Price of one unit',
-            title: 'Unit Price',
-            type: 'number',
-          },
-        },
-        required: ['label', 'quantity', 'unit_price'],
-        title: 'results__LineItem',
-        type: 'object',
-      },
-    },
-    properties: {
-      items: {
-        items: {
-          $ref: '#/$defs/results__LineItem',
-        },
-        title: 'Items',
-        type: 'array',
-      },
-    },
-    required: ['items'],
-    title: 'ListContent[results__LineItem]',
-    type: 'object',
   },
 };

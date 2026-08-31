@@ -23,6 +23,8 @@ One node in, one `RunField` out, through `mapNode` — the very function `buildR
 - an input contract's `json_schema` describes what a caller **sends** — a plural slot's schema is a bare array, because that is what the caller hands over;
 - an output's schema describes what **comes back**, which is the concept's content model — `TextContent {text}` for a `native.Text` result, `ListContent {items}` for a `Concept[]` one.
 
+That is now the standard's own rule, stated on [the output contract's page](https://github.com/mthds-ai/mthds/blob/main/docs/spec/pipe-io-contracts.md), and it is the rule the plan originally got wrong: the first proposal was to mirror the input side verbatim and emit a bare array for a plural output. Building it that way produces a schema the real payload does not satisfy, which is worse than emitting none.
+
 That distinction is what makes the schema usable rather than decorative. `buildResultField` reads the single wrapping property's **name** off it (the kernel's `contentKey`) and the renderer unwraps by name. Before the schema was required, the renderer had no name to unwrap by, so it worked one out by counting the value's properties and looked for an `items` key to decide a payload was a list. Both are shape sniffing — the exact pattern [derivation-swap.md](derivation-swap.md) records deleting from the input side — and both are gone.
 
 The unwrap happens **once, at the top**, and is gated on the node's stated `kind`, never on the value's shape:
@@ -36,7 +38,7 @@ Nested values are the other half of the same rule. A `date` **field** inside a s
 
 Plurality is not on the concept. `concept_ref` is the element with the multiplicity suffix stripped, on both sides of the contract, so a producer of an output descriptor must read `multiplicity` from the pipe's output contract and wrap the node as a `list` whose `item` is the element node minus its name.
 
-This is the one place the simulation does real work rather than delegating, and it shipped wrong once: a `LineItem[]` output described as an `object`, which every renderer would have shown as one line item where the run produced two. It is pinned by `corpus.test.ts` and it is the case a conformance test should carry when the standard grows the artifact.
+This is the one place a PRODUCER does real work rather than delegating, and it shipped wrong once here, while the artifact was still simulated: a `LineItem[]` output described as an `object`, which every renderer would have shown as one line item where the run produced two. The standard's page now asks implementations to carry a conformance case for exactly this, and both client mirrors pin it — so what was a local guard is now the producer's obligation, checked where the producer lives.
 
 To be clear about where this lands: **a consumer never sees it.** The emitted descriptor carries `kind: "list"`, exactly as a plural input's does, and a renderer reads plurality from the descriptor and never touches the contract.
 
@@ -68,4 +70,4 @@ Same reason `file-formats.ts` does: a host that renders a result its own way nee
 
 ## Fixtures
 
-The stories that exercise all of this are real runs, not mock-ups. See [storybook.md](storybook.md) § "Two passes, and only one of them costs anything": `make fixtures` projects the descriptors and the payload schemas offline, and `make fixtures-runs` executes the pipes through the real `pipelex run bundle` CLI and commits what came back.
+The stories that exercise all of this are real runs against the real artifacts, not mock-ups. See [storybook.md](storybook.md) § "Two passes, and only one of them costs anything": `make fixtures` reads `pipe_io_contracts`, `input_form` and `output_form` off the engine's own builders, and `make fixtures-runs` executes the pipes through the real `pipelex run bundle` CLI and commits what came back.

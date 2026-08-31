@@ -12,17 +12,17 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 Three, mirroring what the package is:
 
-| Section | What is in it |
-| --- | --- |
-| **Inputs** | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
-| **Outputs** | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one. |
-| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories. |
+| Section       | What is in it                                                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**    | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
+| **Outputs**   | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
+| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
 
 Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
 
 **A story isolates one comparison, and its doc comment names what varies.** A canvas with three near-identical dropzones and no statement of the difference is not a comparison, it is a coincidence — that is what the first `Files/Image` story was, and it is the failure mode a fixture-driven catalog invites, because putting more slots on a pipe is free. Prefer several small carrier pipes over one that shows everything.
 
-**A state story shows one slot.** `Uploading` on a three-slot form puts two idle dropzones beside the control the story is about, and a reader cannot tell which part of the canvas is the subject. So state stories render a single-slot carrier — `one_document`, `one_image` — and the multi-slot form stays for the stories whose subject *is* the form. When a state needs isolating, add a single-slot pipe to the case's `.slots.json` rather than filtering fields in the story: the fixture stays the thing that decides what renders.
+**A state story shows one slot.** `Uploading` on a three-slot form puts two idle dropzones beside the control the story is about, and a reader cannot tell which part of the canvas is the subject. So state stories render a single-slot carrier — `one_document`, `one_image` — and the multi-slot form stays for the stories whose subject _is_ the form. When a state needs isolating, add a single-slot pipe to the case's `.slots.json` rather than filtering fields in the story: the fixture stays the thing that decides what renders.
 
 The state axis is factored **out** of the per-kind stories rather than multiplied into them: `Field States` walks one representative concept through defaults, the three presence markers, filled, invalid and disabled, and each kind's own file carries only the states where that kind behaves differently. Crossing every kind with every state produces a folder nobody can scan, which is the one thing the catalog exists not to be.
 
@@ -34,8 +34,8 @@ What differs is presentation: a result is **read, not edited**, so `ResultField`
 
 Three artifacts, sourced differently, and all three generated:
 
-- **The descriptor** is generated like every input fixture, but from an artifact the standard does not have yet. See `src/core/output-form.ts` for what `pipe_io_contracts` carries for an output today (identity and plurality, no schema) and what this simulates.
-- **The payload schema** rides beside it as `OUTPUT_SCHEMAS`, because the output contract has nowhere to put it. It is the schema of the **payload**, not of a caller's argument, and that is what makes it usable: a `native.Text` result is `TextContent {text}` and a `Concept[]` result is `ListContent {items}`, so the renderer reads the wrapping property's NAME off it and unwraps by name. `buildResultField` **requires** it — see [result-view.md](result-view.md).
+- **The descriptor** is `output_form`, generated like every input fixture and off the same engine builders. It was a local simulation while the standard lacked the artifact; it is now a read. See [result-view.md](result-view.md).
+- **The payload schema** rides on the output contract, beside the input schemas, where the standard puts it: `CONTRACTS[ref].output.json_schema`. It is the schema of the **payload**, not of a caller's argument, and that is what makes it usable — a `native.Text` result is `TextContent {text}` and a `Concept[]` result is `ListContent {items}`, so the renderer reads the wrapping property's NAME off it and unwraps by name. `buildResultField` **requires** it.
 - **The payloads** are what the pipes actually returned, written by `make fixtures-runs` from real `pipelex run bundle` executions into `src/__stories__/_generated/<case>.payloads.ts`. A payload is the one artifact no projection can produce, and that is not ceremony: two shapes in these are invisible from every descriptor — a `date` arrives in the serializer's typed envelope `{date, __class__, __module__}`, and a plural payload is `{items: [...]}` rather than a bare array. Both were written wrong by hand before a real run corrected them.
 
 The story assertions read their expected values **out of the payload they render** rather than naming them. A live model does not answer the same way twice — the sentiment case came back `neutral` on one sweep and `positive` on the next, both defensible — so a hard-coded string asserts the model's mood instead of the renderer, and fails on the next sweep for a reason nobody should have to investigate.
@@ -44,10 +44,10 @@ The story assertions read their expected values **out of the payload they render
 
 Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree.
 
-| Slot | Accepts |
-| --- | --- |
+| Slot       | Accepts                                                           |
+| ---------- | ----------------------------------------------------------------- |
 | `document` | PDF, JPG, PNG — the extract model reads an image as a single page |
-| `image` | PNG, JPG, WEBP |
+| `image`    | PNG, JPG, WEBP                                                    |
 
 The asymmetry is real rather than an oversight: WEBP passes as an image and is refused as a document, which is what the extract gateway answers.
 
@@ -97,7 +97,7 @@ Two files per case, in `data/structures/`:
 
 ### Why the pipes are synthesized
 
-`input_form` is keyed by `pipe_ref` and projected from a **pipe's declared input slots**. A structure on its own has no slots, so there is nothing to project. But every axis the catalog has to vary — presence marker, multiplicity, whether the slot gates the run — is a property of a *slot*, not of a structure, which is why `<case>.slots.json` exists and why it is not inferable from the bundle.
+`input_form` is keyed by `pipe_ref` and projected from a **pipe's declared input slots**. A structure on its own has no slots, so there is nothing to project. But every axis the catalog has to vary — presence marker, multiplicity, whether the slot gates the run — is a property of a _slot_, not of a structure, which is why `<case>.slots.json` exists and why it is not inferable from the bundle.
 
 Making the author write the carrier pipe too would mean writing boilerplate with three non-obvious rules attached, each of which the engine **rejects** rather than ignores:
 
@@ -126,7 +126,7 @@ None of that is interesting to a story. `synthesizeCarrier` owns it, and the gua
 }
 ```
 
-A pipe may also carry `output` (the concept its carrier resolves to, `Text` by default), `type` (the carrier's pipe type, `PipeLLM` by default), `prompt` (an authored prompt, for a carrier that must actually *do* something when the payload pass runs it) and `run` (the input values that pass sends). A pipe with no slots is rejected **unless** it states its own prompt, which is the narrow exception that lets a case reach an operator taking no input at all.
+A pipe may also carry `output` (the concept its carrier resolves to, `Text` by default), `type` (the carrier's pipe type, `PipeLLM` by default), `prompt` (an authored prompt, for a carrier that must actually _do_ something when the payload pass runs it) and `run` (the input values that pass sends). A pipe with no slots is rejected **unless** it states its own prompt, which is the narrow exception that lets a case reach an operator taking no input at all.
 
 `presence` is `plain` | `optional` | `force`; `multiplicity` is `single` | `variable` | `fixed`. The generator rejects the pairings the standard forbids **at authoring time**, because the alternative is a parser error against a file the author never wrote: a marker may not ride a plural slot (`PipeInputContract` says a plural slot is always `plain`), and a fixed count is always at least two, since `Concept[1]` is a way of writing `Concept`.
 
@@ -149,9 +149,9 @@ Both passes are dev-only: the emitted `.ts` files are committed, so `make storyb
 
 ### The guard
 
-`src/__stories__/__tests__/corpus.test.ts` (the `corpus` vitest project, node) asserts the corpus and the generated tree describe the same set. It cannot assert the *content* is current — only a regeneration can — but a case added, renamed or removed without regenerating is the shape this actually fails as, and nothing else would notice.
+`src/__stories__/__tests__/corpus.test.ts` (the `corpus` vitest project, node) asserts the corpus and the generated tree describe the same set. It cannot assert the _content_ is current — only a regeneration can — but a case added, renamed or removed without regenerating is the shape this actually fails as, and nothing else would notice.
 
-It carries three more that are about the output half specifically: every generated module exports an `OUTPUT_FORM` and an `OUTPUT_SCHEMAS`; **a plural output is described as a `list`**, which is the one place the simulation does real work rather than delegating to pipelex and so the one place with nothing else guarding it (it shipped wrong once, describing a `LineItem[]` output as an `object`, which would have shown one line item where a run produced two); and no payload module carries a machine-local path.
+It carries three more that are about the output half specifically: every generated module exports an `OUTPUT_FORM`; every output contract states a `json_schema`, and it is an object rather than a bare array whatever the multiplicity; and no payload module carries a machine-local path. The **plural wrap** — a plural output described as a `list` — is pinned upstream now, in both client mirrors and in the engine that produces it, which is where a producer obligation belongs; it shipped wrong once here while the artifact was still simulated, describing a `LineItem[]` output as an `object`.
 
 ## Where story code lives, and why it matters
 

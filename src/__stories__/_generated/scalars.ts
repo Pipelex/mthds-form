@@ -6,8 +6,7 @@
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
  */
-import type { InputForm, PipeIOContracts } from 'mthds/protocol';
-import type { OutputForm } from '../../core/output-form';
+import type { InputForm, OutputForm, PipeIOContracts } from 'mthds/protocol';
 
 /** Every pipe_ref this case projects, in sorted order. */
 export const PIPE_REFS = [
@@ -45,6 +44,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -120,6 +132,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -211,6 +236,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -278,6 +316,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -326,6 +377,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -511,10 +575,10 @@ export const INPUT_FORM: InputForm = {
 };
 
 /**
- * The output half. NOT a standard artifact yet - see the note in
- * `scripts/dump-validate-views.py`. Derived by pipelex's own
- * `InputFormDeriver.derive_concept`, the method the input derivation already
- * calls for every nested concept field, so it is as generated as the rest.
+ * The output half - a standard artifact, keyed by the same pipe_ref set as the
+ * two above because all three builders iterate one pipe sequence. The payload
+ * SCHEMA is not here: it rides `CONTRACTS[ref].output.json_schema`, where the
+ * standard puts it, beside the input schemas.
  */
 export const OUTPUT_FORM: OutputForm = {
   'scalars.enum_kind': {
@@ -561,79 +625,5 @@ export const OUTPUT_FORM: OutputForm = {
       name: 'output',
       required: true,
     },
-  },
-};
-
-/**
- * The output schemas, keyed the same way. The input side carries these on the
- * contract; the output side has nowhere to put them, so they ride separately
- * rather than being smuggled onto `PipeIOContracts` - whose type would
- * rightly reject the extra member.
- */
-export const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
-  'scalars.enum_kind': {
-    description: 'A text',
-    properties: {
-      text: {
-        description: 'The text',
-        title: 'Text',
-        type: 'string',
-      },
-    },
-    required: ['text'],
-    title: 'TextContent',
-    type: 'object',
-  },
-  'scalars.multiplicity_axis': {
-    description: 'A text',
-    properties: {
-      text: {
-        description: 'The text',
-        title: 'Text',
-        type: 'string',
-      },
-    },
-    required: ['text'],
-    title: 'TextContent',
-    type: 'object',
-  },
-  'scalars.number_kinds': {
-    description: 'A text',
-    properties: {
-      text: {
-        description: 'The text',
-        title: 'Text',
-        type: 'string',
-      },
-    },
-    required: ['text'],
-    title: 'TextContent',
-    type: 'object',
-  },
-  'scalars.presence_axis': {
-    description: 'A text',
-    properties: {
-      text: {
-        description: 'The text',
-        title: 'Text',
-        type: 'string',
-      },
-    },
-    required: ['text'],
-    title: 'TextContent',
-    type: 'object',
-  },
-  'scalars.text_kinds': {
-    description: 'A text',
-    properties: {
-      text: {
-        description: 'The text',
-        title: 'Text',
-        type: 'string',
-      },
-    },
-    required: ['text'],
-    title: 'TextContent',
-    type: 'object',
   },
 };

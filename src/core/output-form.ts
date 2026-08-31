@@ -1,54 +1,43 @@
 /**
- * The output-form descriptor — the artifact the standard does not have yet.
+ * The output-form descriptor lookup.
  *
- * **An output is a concept ref, exactly like an input is.** The same concept,
- * the same structure, the same field kinds, the same nesting. What differs is
- * only the SLOT facts, and there are three of them: an input has an authored
- * `name`, a three-valued `presence` (the language forbids `!` on an output, so
- * an output carries a two-valued `optional` instead), and `gating` (does Run
- * wait for it — meaningless for a result). All three are already optional on the
- * standard's field node, precisely so a node can exist without them.
+ * **This module used to declare the artifact; now it only addresses it.** The
+ * types come from `mthds/protocol`, exactly as the input side's do — the
+ * standard grew `output_form` as a page of its own, and grew `json_schema` on
+ * the output contract in the same version, so a renderer reads both off the wire
+ * instead of having them supplied beside it. What is left here is the twin of
+ * `getPipeInputForm`: the lookup, and the tolerance for the same two key
+ * conventions. [docs/contract-mirror.md](../../docs/contract-mirror.md) states
+ * the rule this now obeys — the contract types are the standard's, not this
+ * package's, and a member this package wants on one is a change to the standard
+ * before it is a change here.
  *
- * So this module restates nothing. `PipeOutputFormDescriptor` wraps the
- * standard's own `InputFormField`, and the descriptors are produced by
- * pipelex's own `InputFormDeriver.derive_concept` — the public method the input
- * derivation already calls for every nested concept field. When `Invoice`
- * appears inside an input, that is the code describing it; pointing it at a
- * pipe's output is a projection nobody had made, not a new derivation.
- *
- * **What the standard carries today, and what it doesn't:**
+ * **An output is a concept ref exactly like an input is.** Same concept, same
+ * structure, same field kinds, same nesting; what differs is only the three SLOT
+ * facts an output has none of (an authored `name`, the three-valued `presence`,
+ * `gating`), all three optional on the standard's node precisely so a node can
+ * exist without them. That is why `buildResultField` maps an output node through
+ * the very mapper `buildRunFields` uses, and why there is no second node union
+ * anywhere in this package.
  *
  * | | Inputs | Outputs |
  * | --- | --- | --- |
- * | identity, plurality | `pipe_io_contracts` | `pipe_io_contracts` |
- * | shape / schema | `json_schema` on the contract | nowhere (obtainable from the library crate) |
- * | presentation view | `input_form` | nothing |
+ * | identity, plurality, optionality | `pipe_io_contracts` | `pipe_io_contracts` |
+ * | shape / JSON Schema | `json_schema` on the input contract | `json_schema` on the output contract |
+ * | presentation view | `input_form` | `output_form` |
  *
- * This module simulates the third row so a renderer can be built and judged
- * before a standard changes. **It is deliberately shaped like what the standard
- * would plausibly adopt**, so adopting it later is an import change rather than
- * a rewrite. If `output_form` lands on the wire, delete the local type and read
- * it.
+ * The two rows that used to read "nothing" are the change this package was built
+ * against while it was still a proposal; `wip/output-form-standard-change.md` is
+ * the argument that landed it. The one asymmetry the language keeps is
+ * `presence` versus `optional`: `!` MUST NOT appear on an output, so a
+ * three-valued output marker would have an arm nothing could ever produce.
  */
 
-import type { InputFormField } from 'mthds/protocol';
+import type { OutputForm, PipeOutputFormDescriptor } from 'mthds/protocol';
 import { buildPipeRef } from './contracts';
 import { ownProp } from './own-property';
 
-/**
- * One pipe's output, described.
- *
- * A single `field`, not a `fields` array: a pipe has exactly one output, where
- * it may have many inputs. That is the one shape difference from
- * `PipeInputFormDescriptor`, and it follows from the language rather than from
- * taste.
- */
-export interface PipeOutputFormDescriptor {
-  field: InputFormField;
-}
-
-/** `pipe_ref` → the pipe's output descriptor. Keyed exactly like `InputForm`. */
-export type OutputForm = Record<string, PipeOutputFormDescriptor>;
+export type { OutputForm, PipeOutputFormDescriptor };
 
 /**
  * Look a pipe's output descriptor up by code — the exact twin of

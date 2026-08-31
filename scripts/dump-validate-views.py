@@ -1,28 +1,36 @@
-"""Dump a bundle's `pipe_io_contracts` and `input_form` as JSON, for the Storybook form fixtures.
+"""Dump a bundle's `pipe_io_contracts`, `input_form` and `output_form` as JSON, for the Storybook fixtures.
 
-These are the two artifacts `buildRunFields` is fed, and they are **siblings,
-not a whole and a part**: the contract says what a pipe's slots ACCEPT (the JSON
-schema a payload is validated against), the descriptor says what each slot IS
-(kind, constraints, presence, gating, and the authored order the contract's
-`inputs` map deliberately does not carry). Since `0.5.0` the descriptor is what drives
-the derivation and the contract is co-walked beside it, so a fixture carrying
-only one renders no form at all.
+The three artifacts the kernel is fed, and they are **siblings, not a whole and
+parts**. The contract says what a pipe's slots ACCEPT and what its output
+RESOLVES TO, as JSON Schema; `input_form` says what each input slot IS (kind,
+constraints, presence, gating, and the authored order the contract's `inputs` map
+deliberately does not carry); `output_form` says the same about the one output.
+Since kernel `0.5.0` the descriptor is what drives the derivation and the
+contract is co-walked beside it, so a fixture carrying only one renders nothing
+at all — on either side.
 
-The hosted `/validate` returns both on `PipelexValidationReport` and lets a
-caller ask for them by name (`views: ["pipe_io_contracts", "input_form"]`), but
-**no pipelex CLI surfaces either today** — the agent CLI's `validate bundle
---format json` carries the verdict and the per-pipe sweep, not these. So this
-loads the bundle through pipelex's own library manager and calls
-`build_pipe_io_contracts` and `build_input_form`, the canonical builders every
-validate surface uses, then prints both maps on stdout under the same names the
-wire gives them.
+The hosted `/validate` returns all three on `PipelexValidationReport` and lets a
+caller ask for them by name, but **no pipelex CLI surfaces them today** — the
+agent CLI's `validate bundle --format json` carries the verdict and the per-pipe
+sweep, not these. So this loads the bundle through pipelex's own library manager
+and calls `build_pipe_io_contracts`, `build_input_form` and `build_output_form`,
+the canonical builders every validate surface uses, then prints the three maps on
+stdout under the names the wire gives them.
 
-Both are built from ONE load of ONE library window, which is not merely an
-optimization: the two builders iterate the same `pipes` sequence and therefore
-share one key set, and `build_input_form` reads the authored blueprints
-accumulated in that window. Two separate invocations could not promise either.
+**Nothing here is simulated any more.** This script used to derive the output
+half itself — pointing `InputFormDeriver.derive_concept` at each pipe's output
+concept and wrapping a plural one by hand — because the standard carried no
+`output_form` and no schema on the output contract. It carries both now, so this
+reads the engine's own builders like the input half always did. The wrap that was
+the risky part of the simulation is the producer's obligation, pinned by the
+engine's own tests rather than by this script getting it right.
 
-**It deliberately does not run the validation sweep.** Both artifacts are
+All three are built from ONE load of ONE library window, which is not merely an
+optimization: the builders iterate the same `pipes` sequence and therefore share
+one key set, and the descriptor builders read the authored blueprints accumulated
+in that window. Separate invocations could promise neither.
+
+**It deliberately does not run the validation sweep.** All three artifacts are
 projections of what a pipe DECLARES, not of what happens when it runs, and the
 builders take loaded pipes. Going through `validate_bundles_in_process` would
 drag the dry-run sweep in with it, which means every fixture in the corpus would
@@ -33,7 +41,7 @@ its inputs.
 Run through the sibling `../pipelex` checkout's venv, exactly like the rest of
 `scripts/generate-fixtures.mjs`:
 
-    ../pipelex/.venv/bin/python scripts/dump_validate_views.py <bundle.mthds>
+    ../pipelex/.venv/bin/python scripts/dump-validate-views.py <bundle.mthds>
 
 Retire this the moment the agent CLI can emit the views itself — the request is
 filed as ledger item `L-260823-d042fd`, owned by `pipelex`. Until then it is the
@@ -49,7 +57,6 @@ import sys
 from pathlib import Path
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -58,9 +65,8 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.pipeline.input_form import InputFormDeriver, build_input_form, qualify_current_library_crate
+from pipelex.pipeline.input_form import build_input_form, build_output_form, qualify_current_library_crate
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
-from pipelex.runtime_hub import get_class_registry
 
 
 async def views_for(bundle: Path) -> dict[str, object]:
@@ -105,108 +111,16 @@ async def views_for(bundle: Path) -> dict[str, object]:
                 pipes, qualified_crate=qualified_crate
             ).items()
         }
-        # ---- The output half, which the standard does not carry yet ------------
-        #
-        # `pipe_io_contracts`'s output member states identity and plurality and
-        # stops: `concept_ref`, `multiplicity`, `item_count`, `optional`, and no
-        # schema. There is no `output_form` at all. So a renderer has nothing to
-        # render an output FROM, even though an output is a concept ref exactly
-        # like an input is.
-        #
-        # Nothing here invents a descriptor. `InputFormDeriver.derive_concept` is
-        # a PUBLIC method the input derivation already calls for every nested
-        # concept field - when `Invoice` appears inside an input, this is the code
-        # that describes it. Pointing it at the output concept is the projection
-        # nobody has made, not a new derivation, which is why these fixtures are
-        # as generated as the input ones.
-        #
-        # `presence` and `gating` are absent from these nodes, and correctly:
-        # both are slot facts, both are optional on the protocol type, and
-        # `derive_concept` is the entry point that leaves them unset.
-        #
-        # This is a SIMULATION of a standard change under discussion. If the
-        # standard grows `output_form`, delete this block and read the wire.
-        deriver = InputFormDeriver(concepts=qualified_crate.concepts)
-        output_form = {}
-        for pipe in pipes:
-            node = deriver.derive_concept(
-                name="output", concept_ref=pipe.output.concept.concept_ref
-            ).model_dump(mode="json", exclude_none=True)
-
-            # Plurality is NOT on the concept: `concept_ref` is the element with
-            # the multiplicity suffix stripped, on both sides of the contract. The
-            # input side handles this in `derive_slot`, which knows the slot's
-            # multiplicity; `derive_concept` describes a concept alone and cannot.
-            # So a plural output is wrapped here, exactly as an input's list node
-            # is shaped: a `list` whose `item` is the element node minus its name.
-            #
-            # This is the one place the simulation does real work rather than
-            # delegating, and it is worth flagging in the standard discussion: an
-            # `output_form` producer has to make the same wrap, or a `Concept[]`
-            # output would describe a single item and every renderer would show
-            # one where there are many.
-            output_contract = contracts[pipe.pipe_ref]["output"]
-            multiplicity = output_contract["multiplicity"]
-            if multiplicity != "single":
-                item = {k: v for k, v in node.items() if k != "name"}
-                node = {
-                    "name": "output",
-                    "kind": "list",
-                    "concept_ref": node.get("concept_ref"),
-                    "description": node.get("description"),
-                    "required": node.get("required", True),
-                    "item": item,
-                }
-                if output_contract.get("item_count") is not None:
-                    node["item_count"] = output_contract["item_count"]
-                node = {k: v for k, v in node.items() if v is not None}
-
-            output_form[pipe.pipe_ref] = {"field": node}
-        # The schema half, off the structure class the runtime already built.
-        #
-        # **This is the schema of the PAYLOAD, not of a caller's argument**, and
-        # the distinction is what makes it usable. On the input side the contract
-        # states what a caller SENDS - a plural slot's schema is a bare array,
-        # because that is what the caller hands over. A result is the other
-        # direction: what comes back is the concept's CONTENT MODEL, so a
-        # `native.Text` result is `TextContent {text}` and a `Concept[]` result is
-        # `ListContent {items}`. A renderer reads the single wrapping property's
-        # NAME off this schema (the kernel's `contentKey`) and unwraps by name -
-        # which is precisely what lets it stop guessing at the shape.
-        #
-        # So the plural arm wraps in `ListContent[...]` rather than emitting the
-        # element schema, and it does it by asking pydantic to project the real
-        # generic rather than by hand-building an envelope. Hand-building it was
-        # the tempting version and it would have been wrong in a way nothing here
-        # could catch: the envelope IS a runtime type, and a hand-built copy
-        # stops tracking it the moment it changes.
-        #
-        # The output contract has nowhere to put any of this, so it rides
-        # separately - see the note above and `src/core/output-form.ts`.
-        class_registry = get_class_registry()
-        output_json_schema: dict[str, object] = {}
-        for pipe in pipes:
-            structure_class = class_registry.get_class(pipe.output.concept.structure_class_name)
-            if structure_class is None or not hasattr(structure_class, "model_json_schema"):
-                # Loud, not lenient. `buildResultField` REQUIRES the schema, so a
-                # fixture emitted without one renders a result the renderer has to
-                # guess at - the exact failure the requirement exists to prevent.
-                raise RuntimeError(
-                    f"{pipe.pipe_ref}: no structure class for output concept "
-                    f"{pipe.output.concept.concept_ref} "
-                    f"(structure_class_name={pipe.output.concept.structure_class_name!r}). "
-                    "A result cannot be described without its payload schema."
-                )
-            if contracts[pipe.pipe_ref]["output"]["multiplicity"] == "single":
-                output_json_schema[pipe.pipe_ref] = structure_class.model_json_schema()
-            else:
-                output_json_schema[pipe.pipe_ref] = ListContent[structure_class].model_json_schema()
+        # The output half. Since MTHDS grew `output_form` and a `json_schema` on the output
+        # contract, this is a READ, not a simulation: `build_output_form` is the engine's own
+        # builder, keyed by the same `pipe_ref` set as the two above because all three iterate
+        # the same `pipes` sequence, and the payload schema rides the contract where it belongs.
+        output_form = {pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in build_output_form(pipes, qualified_crate=qualified_crate).items()}
 
         return {
             "pipe_io_contracts": contracts,
             "input_form": input_form,
             "output_form": output_form,
-            "output_json_schema": output_json_schema,
         }
     finally:
         if previous_library_id is not None:

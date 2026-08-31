@@ -63,7 +63,7 @@
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
-    "mthds": "^0.24.0",
+    "mthds": "^0.25.0",
     "react": "^19",
     "react-dom": "^19"
   },
@@ -93,7 +93,7 @@
     "eslint": "^9.39.4",
     "eslint-plugin-storybook": "^10.5.10",
     "jsdom": "^30.0.1",
-    "mthds": "^0.24.0",
+    "mthds": "^0.25.0",
     "playwright": "^1.62.1",
     "prettier": "^3.8.1",
     "react": "^19",

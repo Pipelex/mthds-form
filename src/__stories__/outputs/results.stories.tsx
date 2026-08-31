@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import * as React from 'react';
-import { buildResultField, getPipeOutputForm } from '../../core';
+import { buildResultField, getPipeIOContract, getPipeOutputForm } from '../../core';
 import { ResultField } from '../../react';
-import { OUTPUT_FORM, OUTPUT_SCHEMAS } from '../_generated/results';
+import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 
 /**
@@ -21,9 +21,10 @@ import { PAYLOADS } from '../_generated/results.payloads';
  * same `buildResultField`/`buildRunFields` mapper, into the same `RunField`. The
  * only thing that differs is the presentation — a result is read, not edited.
  *
- * The descriptor half is a SIMULATION of a standard change under discussion:
- * `pipe_io_contracts` carries no schema for an output and there is no
- * `output_form` artifact. See `src/core/output-form.ts`.
+ * Both halves are standard artifacts read off the wire — `output_form` for the
+ * descriptor, `json_schema` on the output contract for the payload's shape. They
+ * were a local simulation while the change was under discussion; the argument
+ * that landed it is `wip/output-form-standard-change.md`.
  *
  * ## Why the assertions read the fixture instead of naming values
  *
@@ -41,11 +42,14 @@ function payloadFor(pipeCode: string): Record<string, unknown> {
 }
 
 function resultFieldFor(pipeCode: string) {
+  // Exactly what a host does, and exactly the shape of the input side's lookup:
+  // the descriptor says what the field IS, the contract's output states the
+  // payload's schema. Two artifacts off one wire, keyed by the same pipe_ref.
   const descriptor = getPipeOutputForm(OUTPUT_FORM, 'results', pipeCode);
   if (!descriptor) throw new Error(`No output descriptor for results.${pipeCode}`);
-  const schema = OUTPUT_SCHEMAS[`results.${pipeCode}`];
-  if (!schema) throw new Error(`No output schema for results.${pipeCode}`);
-  return buildResultField(descriptor, schema);
+  const contract = getPipeIOContract(CONTRACTS, 'results', pipeCode);
+  if (!contract) throw new Error(`No contract for results.${pipeCode}`);
+  return buildResultField(descriptor, contract.output.json_schema);
 }
 
 /**
