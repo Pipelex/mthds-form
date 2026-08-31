@@ -37,7 +37,7 @@ Three layers, because review alone does not hold a boundary:
 - **The build.** `scripts/assert-bundle.mjs` (`make assert-bundle`, run by `make all` and by both workflows) walks each entry's built chunk graph and fails if it reaches a banned package — React from `.`, ajv from `./react`, `mthds` from either. This catches what lint cannot see: a violation arriving through a shared chunk rather than a source import.
 - **The manifest.** Nothing outside the table above is in `dependencies`, and `mthds` is deliberately not one — a peer plus a devDependency, so the repo can typecheck and build against exactly what a consumer resolves.
 
-`devDependencies` are a different question and are not on the table: they ship in nothing, so a consumer never installs them. The DOM test stack (`jsdom`, `@testing-library/*`) is there for the control suites and is invisible to anyone consuming the package — which is the only property this budget is defending.
+`devDependencies` are a different question and are not on the table: they ship in nothing, so a consumer never installs them. The DOM test stack (`jsdom`, `@testing-library/*`) is there for the control suites, and the Storybook stack (`storybook`, `@storybook/*`, `playwright`) is there for the stories; both are invisible to anyone consuming the package — which is the only property this budget is defending. What the Storybook stack must not do is reach the *shipped* graph, and the rule that keeps it out is positional rather than a lint pattern: story code lives in `src/__stories__/`, outside the entry globs in `tsup.config.ts`, so `assert-bundle` never sees it. See [storybook.md](storybook.md).
 
 ## The chunk graph is part of the budget
 

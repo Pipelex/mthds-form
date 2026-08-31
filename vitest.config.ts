@@ -1,7 +1,14 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
+import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /**
- * Two suites, two environments, because the package is two layers.
+ * Three suites, three environments, because the package is two layers and the
+ * stories are a third question about them.
  *
  * The core is headless by contract - it must import and run with no DOM
  * anywhere - so its suite runs in `node`, and a stray `document` reference in
@@ -10,7 +17,13 @@ import { defineConfig } from 'vitest/config';
  * no accessible name, a button still live during an upload), and nothing short
  * of rendering them can assert those.
  *
- * The DOM stack is devDependencies only and ships in nothing - see
+ * The third project runs the STORIES, in a real browser through Playwright.
+ * jsdom answers "does this control expose the right accessible name"; only a
+ * browser answers "does it lay out, in both themes, at this input shape". The
+ * two are complementary and neither replaces the other, which is why this is a
+ * third project rather than a widened `include` on the second.
+ *
+ * The DOM and browser stacks are devDependencies only and ship in nothing - see
  * docs/dependency-budget.md, which governs what a consumer ships.
  *
  * This is the package's ONLY vitest config. It replaced a `vitest.config.mts`
@@ -47,6 +60,23 @@ export default defineConfig({
           environment: 'jsdom',
           include: ['src/react/**/*.test.{ts,tsx}'],
           setupFiles: ['./vitest.setup.react.ts'],
+        },
+      },
+      {
+        // The stories, run as tests: every story renders, and a story carrying
+        // a `play` function has it executed. `storybookTest` reads
+        // `.storybook/` for the story glob and the preview annotations, so the
+        // decorator and stylesheets that make a story look right in the
+        // Storybook UI are exactly the ones under test here.
+        plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
+        test: {
+          name: 'storybook',
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright({}),
+            instances: [{ browser: 'chromium' }],
+          },
         },
       },
     ],

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Storybook, with the stories in this repo rather than in a consumer.** `make storybook` serves them; `make test` runs them in headless Chromium as a third vitest project beside the node and jsdom suites. The controls are this package's, so their visual coverage belongs here — a regression in a control was previously caught, if at all, by a story in a downstream app. Every story renders in **both themes side by side** through the `ThemePair` decorator, because the question a story answers is what a control looks like, and a toolbar toggle hides half of that behind a click. `a11y` runs at `test: 'error'` rather than a consumer's `todo`: a missing accessible name on a control is this repo's bug. See [docs/storybook.md](docs/storybook.md).
+
 ## [v0.5.0] - 2026-08-28
 
 ### Added
