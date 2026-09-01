@@ -70,9 +70,17 @@ Three rules replaced it, and each follows from a fact the descriptor already sta
 
 **Prose and nesting fall back to cards.** A paragraph in a `<td>` forces one column to the width of the longest answer and drags every row's height with it, so `prose` is deliberately outside the tabular set. So are `object` and `list`-of-structures, for the obvious reason, and `document`/`image`, because a file's chrome is not a cell. The index label a card carries earns its place there — the entries are structures rather than values.
 
+**A list of images is a gallery; a list of files is rows.** A card per picture is a screenful each when the picture is the whole content, and a document's whole content is a name and a link — a bordered box with an index around two fields spends the chrome of a structure on them. A file is NAMED rather than printed whole: ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file". The full reference stays on the `title`, which is the part worth copying. An image nothing can paint gets a tile with an icon and its name — that is what a host with no storage resolver sees, so it has to be a design and not a fallback.
+
+**A list of scalars is chips, not cards** — unless the element is `prose`, which is the standard's way of saying "this may be long" and is what `native.Text` always derives to. A chip containing a paragraph is a box with a paragraph in it, so a prose list is plain lines instead: the values, one per line, divided by a hairline.
+
 **A list of scalars is chips, not cards.** `["optics", "calibration"]` as two bordered boxes with index numbers spends a screenful on two words, and the index was never information: the entries of a scalar list _are_ the values, and they identify themselves.
 
 **A field's description moves to a tooltip below the top level.** On an input it is guidance a person needs; on a result it is the same sentence beside a value they are there to read, and inside a structure of ten fields it is ten lines of chrome around ten values. It stays reachable on the label's `title` — worth having, not worth repeating — and is printed outright only on the output node itself, where it describes the whole result.
+
+**A wide table scrolls rather than crushing.** Twelve columns fit no panel, and the two ways to lose are to wrap a date over two lines to save a scrollbar, or to break the page's own width. So the table keeps a floor under each column, cells are one line with a cap and the full value on the `title`, and the container scrolls — focusable and named, because a scrollable region a keyboard cannot reach is an accessibility failure the a11y gate catches as `scrollable-region-focusable`. It is `role="group"` rather than `region`: a landmark per table would put every one of them in the document's landmark list, and two with the same name is `landmark-unique`.
+
+**The unwrap belongs to the field, not to the layout.** `contentKey` is a property of the descriptor node, so every layout has to apply it — a `native.Text[]`'s entries are `TextContent` records, and a chip, a line and a table cell each hold one. `LeafValue` owns it, which is why they cannot disagree; leaving it to the caller is what briefly turned a list of planet names into eight rows of `[object Object]`.
 
 None of this is a heuristic about the data. Every branch reads the descriptor: the element's `kind`, and its fields' kinds. A payload is never inspected to decide how to lay it out.
 

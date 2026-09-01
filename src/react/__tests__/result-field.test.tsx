@@ -183,7 +183,11 @@ describe('files', () => {
       />,
     );
     expect(screen.getByText('Q3 report')).toBeTruthy();
-    expect(screen.getByText(/pipelex-storage:\/\/abc\/report\.pdf/)).toBeTruthy();
+    // NAMED, not printed whole: ninety characters of UUID wrapped across the
+    // panel says one thing, and the thing it says is "this is a file". The whole
+    // reference stays on the title, which is the part worth copying.
+    expect(screen.getByText('report.pdf')).toBeTruthy();
+    expect(screen.getByTitle(/pipelex-storage:\/\/abc\/report\.pdf/)).toBeTruthy();
     expect(screen.getByText('Revenue grew.')).toBeTruthy();
     // The regression this whole file exists for.
     expect(screen.queryByText(/\[object Object\]/)).toBeNull();
@@ -229,7 +233,8 @@ describe('files', () => {
       />,
     );
     expect(screen.queryByRole('img')).toBeNull();
-    expect(screen.getByText(/pipelex-storage:\/\/x\/a\.png/)).toBeTruthy();
+    expect(screen.getByText('a.png')).toBeTruthy();
+    expect(screen.getByTitle(/pipelex-storage:\/\/x\/a\.png/)).toBeTruthy();
   });
 
   it('renders a file value with no url as an absence', () => {
@@ -360,6 +365,60 @@ describe('lists', () => {
   });
 });
 
+describe('lists of files', () => {
+  it('renders a list of images as a gallery, not a card each', () => {
+    // A card per picture is a screenful each, when the picture is the whole
+    // content. A grid shows them the way a person looks at images.
+    const { container } = render(
+      <ResultField
+        field={list('shots', file('item', 'image'))}
+        value={[
+          { url: 'https://cdn.example/a.png' },
+          { url: 'https://cdn.example/b.png' },
+          { url: 'https://cdn.example/c.png' },
+        ]}
+      />,
+    );
+    expect(container.querySelectorAll('img')).toHaveLength(3);
+    // No per-item index: a picture identifies itself.
+    expect(screen.queryByText('1')).toBeNull();
+  });
+
+  it('keeps an unpaintable image as its reference rather than a broken tile', () => {
+    // A grid of identical broken-image glyphs is worse than the text, and a
+    // storage reference is what a host with no resolver actually holds.
+    const { container } = render(
+      <ResultField
+        field={list('shots', file('item', 'image'))}
+        value={[{ url: 'pipelex-storage://x/a.png', mime_type: 'image/png' }]}
+      />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    // The tile says what it is - an icon and the file's name - rather than
+    // dumping the reference into a 140px box. This is what a host with no
+    // resolver sees, so it has to be a design and not a fallback.
+    expect(screen.getByText('a.png')).toBeTruthy();
+    expect(screen.getByTitle('pipelex-storage://x/a.png')).toBeTruthy();
+  });
+
+  it('renders a list of documents as rows, not cards', () => {
+    // A document's whole content is a name and a link; a bordered box with an
+    // index around two fields spends the chrome of a structure on them.
+    render(
+      <ResultField
+        field={list('sources', file('item', 'document'))}
+        value={[
+          { url: 'https://example.com/a.pdf', title: 'Adaptive optics' },
+          { url: 'https://example.com/b.pdf', title: 'Wavefront sensing' },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Adaptive optics')).toBeTruthy();
+    expect(screen.getByText('Wavefront sensing')).toBeTruthy();
+    expect(screen.queryByText('1')).toBeNull();
+  });
+});
+
 describe('objects', () => {
   it('reads a child by NAME, not through the prototype chain', () => {
     // `ownProp`: a structure field called `constructor` must read as absent, not
@@ -453,5 +512,63 @@ describe('markup', () => {
   it('renders an absence when the value carries no markup', () => {
     render(<ResultField field={htmlField()} value={{ css_class: 'invoice' }} />);
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.resultAbsent)).toBeTruthy();
+  });
+});
+
+describe('scalar lists', () => {
+  const listOf = (item: TextRunField | ProseRunField) => list('values', item);
+
+  it('renders a list of short scalars as chips', () => {
+    const { container } = render(<ResultField field={listOf(text('tag'))} value={['a', 'b']} />);
+    expect(container.querySelector('table')).toBeNull();
+    expect(screen.getByText('a')).toBeTruthy();
+  });
+
+  it('renders a list of PROSE as plain lines, not chips and not cards', () => {
+    // `prose` is the standard's way of saying "this may be long", and
+    // `native.Text` always derives to it - so this is what a list of plain
+    // strings actually is. A chip containing a paragraph is a box with a
+    // paragraph in it; a card around the word `Mercury` is worse.
+    render(<ResultField field={listOf(prose('planet'))} value={['Mercury', 'Venus']} />);
+    expect(screen.getByText('Mercury')).toBeTruthy();
+    expect(screen.getByText('Venus')).toBeTruthy();
+    // No index labels: the entries of a scalar list are the values.
+    expect(screen.queryByText('1')).toBeNull();
+    expect(screen.queryByText('2')).toBeNull();
+  });
+});
+
+describe('the unwrap reaches every layout', () => {
+  // REGRESSION. Unwrapping is a property of the FIELD, not of the layout, so a
+  // layout that renders a value without it prints `[object Object]` — which is
+  // exactly what a list of `native.Text` did the moment chips and lines stopped
+  // going through the recursive path. A `native.Text[]`'s entries are
+  // `TextContent` records; a chip, a line and a table cell each hold one.
+  const wrapped = (name: string) => ({ ...text(name), contentKey: 'text' });
+  const wrappedProse = (name: string) => ({ ...prose(name), contentKey: 'text' });
+
+  it('unwraps inside chips', () => {
+    render(<ResultField field={list('tags', wrapped('tag'))} value={[{ text: 'optics' }]} />);
+    expect(screen.getByText('optics')).toBeTruthy();
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull();
+  });
+
+  it('unwraps inside plain lines', () => {
+    render(
+      <ResultField field={list('planets', wrappedProse('planet'))} value={[{ text: 'Mercury' }]} />,
+    );
+    expect(screen.getByText('Mercury')).toBeTruthy();
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull();
+  });
+
+  it('unwraps inside a table cell', () => {
+    render(
+      <ResultField
+        field={list('rows', object('row', [wrapped('label'), number('week')]))}
+        value={[{ label: { text: 'kickoff' }, week: 1 }]}
+      />,
+    );
+    expect(screen.getByText('kickoff')).toBeTruthy();
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull();
   });
 });

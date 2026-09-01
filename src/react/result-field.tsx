@@ -12,6 +12,7 @@ import {
   readImageContent,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
+import { FileText, ImageOff } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
 import { HtmlPreview } from './html-preview';
 import { useFieldStrings } from './field-strings';
@@ -89,19 +90,31 @@ function Absent() {
   return <span className="text-[13px] italic text-muted-foreground">{s.resultAbsent}</span>;
 }
 
-function Scalar({ value }: { value: unknown }) {
+/**
+ * A value, as text.
+ *
+ * `compact` is the table-cell variant: a cell is one line, so the newlines a
+ * stacked field preserves must not open a row to three. Set by `LeafValue` when
+ * it renders into a `<td>`, never guessed from the value.
+ */
+function Scalar({ value, compact = false }: { value: unknown; compact?: boolean }) {
   if (value === null || value === undefined || value === '') return <Absent />;
   return (
-    <span className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+    <span
+      className={cn(
+        'text-[13px] leading-relaxed text-foreground',
+        compact ? 'whitespace-nowrap' : 'whitespace-pre-wrap',
+      )}
+    >
       {String(value)}
     </span>
   );
 }
 
-function Bool({ value }: { value: unknown }) {
+function Bool({ value, compact = false }: { value: unknown; compact?: boolean }) {
   const s = useFieldStrings();
   if (value === null || value === undefined || value === '') return <Absent />;
-  if (typeof value !== 'boolean') return <Scalar value={value} />;
+  if (typeof value !== 'boolean') return <Scalar value={value} compact={compact} />;
   return <span className="text-[13px] text-foreground">{value ? s.yes : s.no}</span>;
 }
 
@@ -112,27 +125,55 @@ function DateValue({ value }: { value: unknown }) {
 }
 
 /**
- * A file reference, as text.
+ * The name to put on a file: what it is CALLED, not where it lives.
+ *
+ * A `pipelex-storage://` reference is ninety characters of UUID and hash, and
+ * printing it whole is five wrapped lines that say one thing — this is a file.
+ * The last path segment is the part a person reads; the whole reference stays on
+ * the `title`, because it is the part they occasionally need to copy.
+ */
+function fileLabel(url: string, filename?: string): string {
+  if (filename) return filename;
+  const path = url.split(/[?#]/)[0] ?? url;
+  const segment = path.split('/').filter(Boolean).pop();
+  return segment && segment.length > 0 ? segment : url;
+}
+
+/**
+ * A file reference, as one line.
  *
  * A `pipelex-storage://` URL is not something a browser can follow, and this
  * component takes no resolver — resolving one is the host's seam
  * ([../../docs/upload-seam.md]), and a read-only result view is not the place to
- * open a network call nobody asked for. So an unresolvable reference is shown as
- * what it is, rather than as a dead link.
+ * open a network call nobody asked for. So an unresolvable reference is named
+ * rather than linked, and never wrapped across the panel: it truncates, with the
+ * whole of it on the `title`.
  */
-function FileRef({ url, mimeType }: { url: string; mimeType?: string }) {
-  const label = mimeType ? `${url} · ${mimeType}` : url;
+function FileRef({
+  url,
+  mimeType,
+  filename,
+}: {
+  url: string;
+  mimeType?: string;
+  filename?: string;
+}) {
+  const label = fileLabel(url, filename);
+  const title = mimeType ? `${url} · ${mimeType}` : url;
   return isViewableUrl(url) ? (
     <a
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="break-all font-mono text-[12px] text-foreground underline underline-offset-2"
+      title={title}
+      className="block truncate font-mono text-[12px] text-foreground underline underline-offset-2"
     >
       {label}
     </a>
   ) : (
-    <span className="break-all font-mono text-[12px] text-muted-foreground">{label}</span>
+    <span title={title} className="block truncate font-mono text-[12px] text-muted-foreground">
+      {label}
+    </span>
   );
 }
 
@@ -141,19 +182,26 @@ function DocumentValue({ value }: { value: unknown }) {
   if (!content) return <Absent />;
   const name = content.title ?? content.filename;
   return (
-    <div className="space-y-1">
-      {name && <span className="block text-[13px] text-foreground">{name}</span>}
-      <FileRef url={content.publicUrl ?? content.url} mimeType={content.mimeType} />
-      {content.snippet && (
-        <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-muted-foreground">
-          {content.snippet}
-        </p>
-      )}
+    <div className="flex min-w-0 items-start gap-2.5">
+      <FileText aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1 space-y-0.5">
+        {name && <span className="block truncate text-[13px] text-foreground">{name}</span>}
+        <FileRef
+          url={content.publicUrl ?? content.url}
+          mimeType={content.mimeType}
+          {...(content.filename ? { filename: content.filename } : {})}
+        />
+        {content.snippet && (
+          <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
+            {content.snippet}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-function ImageValue({ value }: { value: unknown }) {
+function ImageValue({ value, inGallery = false }: { value: unknown; inGallery?: boolean }) {
   const s = useFieldStrings();
   const content = readImageContent(value);
   if (!content) return <Absent />;
@@ -165,19 +213,50 @@ function ImageValue({ value }: { value: unknown }) {
     : isViewableUrl(content.url)
       ? content.url
       : undefined;
+  // In a gallery the tile IS the border, so the image fills it and the caption
+  // sits under it; on its own the image keeps its own frame and a height cap.
   return (
-    <div className="space-y-1.5">
+    <div className={inGallery ? 'space-y-1' : 'space-y-1.5'}>
       {src ? (
         <img
           src={src}
           alt={content.caption ?? s.preview}
-          className="max-h-64 w-auto rounded-lg border border-border"
+          className={
+            inGallery
+              ? 'block aspect-square w-full object-cover'
+              : 'max-h-64 w-auto rounded-lg border border-border'
+          }
         />
+      ) : inGallery ? (
+        // Nothing to paint, so the tile says what it is rather than dumping a
+        // ninety-character storage reference into a 140px box. This is what a
+        // host with no resolver sees, so it has to be a design and not a
+        // fallback.
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 px-2 text-center">
+          <ImageOff aria-hidden className="size-5 text-muted-foreground" />
+          <span
+            title={content.url}
+            className="w-full truncate font-mono text-[10.5px] text-muted-foreground"
+          >
+            {fileLabel(content.url, content.filename)}
+          </span>
+        </div>
       ) : (
-        <FileRef url={content.url} mimeType={content.mimeType} />
+        <FileRef
+          url={content.url}
+          mimeType={content.mimeType}
+          {...(content.filename ? { filename: content.filename } : {})}
+        />
       )}
       {content.caption && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{content.caption}</p>
+        <p
+          className={cn(
+            'text-[12px] leading-relaxed text-muted-foreground',
+            inGallery && 'px-2.5 pb-1.5',
+          )}
+        >
+          {content.caption}
+        </p>
       )}
     </div>
   );
@@ -202,8 +281,27 @@ function isTabularColumn(field: RunField): boolean {
   return TABULAR_KINDS.has(field.kind);
 }
 
-/** Just the value, with no label chrome — shared by the stacked and table layouts. */
-function LeafValue({ field, value }: { field: RunField; value: unknown }) {
+/**
+ * Just the value, with no label chrome — shared by every layout.
+ *
+ * **It unwraps, and that is not a convenience.** Unwrapping is a property of the
+ * FIELD (its `contentKey`), not of the layout that happens to be rendering it,
+ * so every path has to do it: a `native.Text[]`'s entries are `TextContent`
+ * records, and a chip, a line and a table cell each hold one. Leaving the unwrap
+ * to the caller is what turned a list of planet names into eight rows of
+ * `[object Object]` — the very failure this component exists to make impossible.
+ */
+function LeafValue({
+  field,
+  value: raw,
+  compact = false,
+}: {
+  field: RunField;
+  value: unknown;
+  /** Rendering into a table cell: one line, no preserved newlines. */
+  compact?: boolean;
+}) {
+  const value = unwrap(field, raw);
   switch (field.kind) {
     case 'list':
       // A short scalar list inside a cell: chips wrap, so a column of them stays
@@ -211,7 +309,7 @@ function LeafValue({ field, value }: { field: RunField; value: unknown }) {
       // than sending the whole list back to cards over its narrowest field.
       return <ScalarChips field={field.item} items={Array.isArray(value) ? value : []} />;
     case 'boolean':
-      return <Bool value={value} />;
+      return <Bool value={value} compact={compact} />;
     case 'date':
       return <DateValue value={value} />;
     case 'document':
@@ -219,7 +317,7 @@ function LeafValue({ field, value }: { field: RunField; value: unknown }) {
     case 'image':
       return <ImageValue value={value} />;
     default:
-      return <Scalar value={value} />;
+      return <Scalar value={value} compact={compact} />;
   }
 }
 
@@ -260,13 +358,39 @@ function ScalarChips({ field, items }: { field: RunField; items: readonly unknow
 function ObjectTable({
   columns,
   items,
+  label,
 }: {
   columns: readonly RunField[];
   items: readonly unknown[];
+  /** Names the scroll region, so a screen reader says which table it is. */
+  label: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full border-collapse text-[13px]">
+    // `min-w-full` rather than `w-full`, and a floor under each cell: with
+    // `w-full` the table is pinned to the container's width, so twelve columns
+    // do not overflow - they crush, and a reading's date wraps onto four lines.
+    // A floor makes the table wider than the panel instead, which is what the
+    // scroller is for.
+    //
+    // A scrollable region must be reachable by keyboard, and this one holds no
+    // focusable content of its own - a table of values has nothing to tab to -
+    // so the region itself takes focus. Without `tabIndex` the columns past the
+    // fold are reachable with a mouse and by no other means, which the a11y gate
+    // catches as `scrollable-region-focusable`. The name makes the focus stop
+    // announce itself rather than being a silent one.
+    //
+    // `group` rather than `region`, and that is not a detail: `region` is a
+    // LANDMARK, so every table would enter the document's landmark list, and two
+    // of them with the same name - which is what a result rendered twice, or a
+    // structure holding two lists, produces - is `landmark-unique`. A group is
+    // named without claiming to be a section of the page.
+    <div
+      role="group"
+      aria-label={label}
+      tabIndex={0}
+      className="overflow-x-auto rounded-lg border border-border"
+    >
+      <table className="min-w-full border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-border bg-card/40 text-left">
             {columns.map((column) => (
@@ -284,22 +408,102 @@ function ObjectTable({
         <tbody>
           {items.map((item, index) => (
             <tr key={index} className="border-b border-border/60 last:border-b-0">
-              {columns.map((column) => (
-                <td key={column.name} className="px-3 py-1.5 align-top">
-                  <LeafValue
-                    field={column}
-                    value={
-                      typeof item === 'object' && item !== null
-                        ? ownProp(item as Record<string, unknown>, column.name)
-                        : undefined
-                    }
-                  />
-                </td>
-              ))}
+              {columns.map((column) => {
+                const cell =
+                  typeof item === 'object' && item !== null
+                    ? ownProp(item as Record<string, unknown>, column.name)
+                    : undefined;
+                return (
+                  <td key={column.name} className="px-3 py-1.5 align-top">
+                    {/* One line per cell, and a cap on how wide one may push the
+                        column. Wrapping is what a `w-full` table does instead of
+                        overflowing, and it is the worse failure: a date broken
+                        over two lines to save a scrollbar. The cap stops the
+                        opposite failure - one long label making a 200-character
+                        column - and the full value stays on the title. */}
+                    <div
+                      className={cn(
+                        'max-w-[44ch]',
+                        column.kind === 'list' ? 'min-w-[16ch]' : 'truncate',
+                      )}
+                      {...(typeof cell === 'string' || typeof cell === 'number'
+                        ? { title: String(cell) }
+                        : {})}
+                    >
+                      <LeafValue field={column} value={cell} compact />
+                    </div>
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * A list of PROSE, as plain lines.
+ *
+ * `prose` is the standard's way of saying "this may be long", and `native.Text`
+ * always derives to it — so this is what a list of plain strings actually is,
+ * and it is the most common result list there is. Chips are wrong for it: a chip
+ * containing a paragraph is a box with a paragraph in it. Cards are worse: a
+ * bordered box and an index number around the word `Mercury`.
+ *
+ * So: the values, one per line, divided by a hairline. Nothing else — the index
+ * a card carried labels nothing, because the entries of a scalar list are the
+ * values.
+ */
+function ScalarLines({ field, items }: { field: RunField; items: readonly unknown[] }) {
+  return (
+    <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+      {items.map((item, index) => (
+        <div key={index} className="bg-card/40 px-3 py-1.5">
+          <LeafValue field={field} value={item} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A list of IMAGES is a gallery, not a stack of cards.
+ *
+ * The card layout gives every entry a bordered box, an index and a label row —
+ * a screenful per picture, when the picture is the entire content. A grid shows
+ * them the way a person looks at images: several at once, compared side by side.
+ * An entry whose URL the browser cannot paint keeps its reference, because a
+ * grid of identical broken-image glyphs would be worse than the text.
+ */
+function ImageGallery({ items }: { items: readonly unknown[] }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
+      {items.map((item, index) => (
+        <div key={index} className="overflow-hidden rounded-lg border border-border bg-card/40">
+          <ImageValue value={item} inGallery />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A list of FILES is a list of rows, not a list of cards.
+ *
+ * A document's whole content is a name and a link; wrapping each in a card with
+ * an index spends the chrome of a structure on two fields. Rows keep them
+ * scannable, which is what a list of sources is for.
+ */
+function DocumentRows({ items }: { items: readonly unknown[] }) {
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      {items.map((item, index) => (
+        <div key={index} className="bg-card/40 px-3.5 py-2">
+          <DocumentValue value={item} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -407,9 +611,19 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
           ) : columns ? (
             // Same shape every row: the labels are column headers, not per-row
             // labels. See `ObjectTable`.
-            <ObjectTable columns={columns} items={items} />
+            <ObjectTable
+              columns={columns}
+              items={items}
+              label={field.title ?? humanizeFieldName(field.name)}
+            />
           ) : TABULAR_KINDS.has(field.item.kind) ? (
             <ScalarChips field={field.item} items={items} />
+          ) : field.item.kind === 'prose' ? (
+            <ScalarLines field={field.item} items={items} />
+          ) : field.item.kind === 'image' ? (
+            <ImageGallery items={items} />
+          ) : field.item.kind === 'document' ? (
+            <DocumentRows items={items} />
           ) : (
             // Nested, or carrying prose: a card per entry is what a table cell
             // cannot hold. The index label earns its place here, where the
@@ -431,46 +645,20 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
     }
 
     case 'boolean':
-      return (
-        <div className="space-y-0.5">
-          {header}
-          <Bool value={unwrapped} />
-        </div>
-      );
-
     case 'date':
-      return (
-        <div className="space-y-0.5">
-          {header}
-          <DateValue value={unwrapped} />
-        </div>
-      );
-
     case 'document':
-      return (
-        <div className="space-y-1">
-          {header}
-          <DocumentValue value={unwrapped} />
-        </div>
-      );
-
     case 'image':
-      return (
-        <div className="space-y-1.5">
-          {header}
-          <ImageValue value={unwrapped} />
-        </div>
-      );
-
     case 'text':
     case 'prose':
     case 'number':
     case 'enum':
     case 'unknown':
       return (
-        <div className="space-y-0.5">
+        <div className={field.kind === 'image' ? 'space-y-1.5' : 'space-y-0.5'}>
           {header}
-          <Scalar value={unwrapped} />
+          {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
+              a table cell and this stacked row cannot disagree about it. */}
+          <LeafValue field={field} value={value} />
         </div>
       );
   }

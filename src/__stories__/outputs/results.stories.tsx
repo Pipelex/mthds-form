@@ -251,9 +251,12 @@ export const GeneratedImage: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const url = payload('image_result').url as string;
-    await expect(canvas.getAllByText(new RegExp(escapeRegExp(url.slice(0, 30))))).toHaveLength(
-      BOTH_THEMES,
-    );
+    // NAMED, not printed whole: ninety characters of UUID and hash wrapped over
+    // five lines says one thing, and the thing it says is "this is a file". The
+    // whole reference stays on the title, which is the part worth copying.
+    const name = url.split('/').pop()!;
+    await expect(canvas.getAllByText(name)).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByTitle(new RegExp(escapeRegExp(url)))).toHaveLength(BOTH_THEMES);
     await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
   },
 };

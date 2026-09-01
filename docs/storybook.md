@@ -38,6 +38,14 @@ A renderer that has only ever met one shape is a renderer nobody has tested, so 
 
 Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may not resolve to a concept containing images. So the image case is a `PipeImgGen` and the page case a `PipeExtract` over a committed PDF (`data/inputs/`) — which is what makes `native.Page[]`, the richest shape the standard defines, a real capture rather than an argument. Its tree is `list → object → object → prose + list of images + image`, and it is the case that proves `native.Page` needs no renderer arm of its own: it works by recursion into the arms that exist.
 
+### The lists corpus
+
+`data/structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table that scrolls), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
+
+It is a separate case rather than more pipes in `results` because the branches ARE the subject: a corpus that only ever met one of them proves nothing about the others, and the layout rules are the part most likely to be got wrong by someone who has only seen a two-row table.
+
+The gallery pins an image model explicitly (`options = { model = "$gen-image-testing" }`): the deck's default image backend refuses more than one image per call, so an `Image[3]` output needs one that does not.
+
 ### The three artifacts
 
 Sourced differently, and all three generated:

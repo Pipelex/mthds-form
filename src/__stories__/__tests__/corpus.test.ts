@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { OUTPUT_FORM as LIST_OUTPUT_FORM } from '../_generated/lists';
+import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 
@@ -155,12 +157,17 @@ describe('the run payloads', () => {
     // Statically imported rather than swept off disk: a dynamic read would have
     // to bypass the type system to load a module by path, and the whole reason
     // these fixtures are ANNOTATED rather than cast is that drift should be a
-    // compile error. The `results` case is the one with payloads; a second one
-    // is added here when it grows them.
-    for (const pipeRef of Object.keys(PAYLOADS)) {
-      expect(Object.keys(OUTPUT_FORM), `payload for ${pipeRef} has no descriptor`).toContain(
-        pipeRef,
-      );
+    // compile error. A case that grows payloads is added to this pair.
+    const cases: [Record<string, unknown>, Record<string, unknown>][] = [
+      [OUTPUT_FORM, PAYLOADS],
+      [LIST_OUTPUT_FORM, LIST_PAYLOADS],
+    ];
+    for (const [outputForm, payloads] of cases) {
+      for (const pipeRef of Object.keys(payloads)) {
+        expect(Object.keys(outputForm), `payload for ${pipeRef} has no descriptor`).toContain(
+          pipeRef,
+        );
+      }
     }
   });
 
