@@ -18,6 +18,14 @@
 
 ### Added
 
+- **A `native.Date` result reads as a date.** It rendered as a two-field card whose second field said _not provided_, because `native.Date`'s content model is `{date, time}` — two properties, so nothing unwraps it and the descriptor gives it `object`. `readDateContent` already took exactly that model; the arm never fired, because the kind said `object`. So `native.Date` joins `native.Html` as an arm keyed by CONCEPT, and for the same reason: the kind vocabulary has no name for a native concept whose content model is multi-property. New exports: `isNativeDateNode`, `NATIVE_DATE_CONCEPT_REF`.
+
+- **A record is a two-column grid, not a stack.** Label above value spends two lines on every field, so a structure of ten was twenty lines of alternating label and answer with nothing aligned. Side by side they take one line each and the values line up. Only a short value shares a line — the same test the table uses — because prose needs the full width, and so does anything with chrome of its own.
+
+  It is deliberately not a `<dl>`: a definition list may hold only ordered `<dt>`/`<dd>` groups, and this grid also holds tables, frames and galleries. Keeping the semantics would mean separating the short fields from the rest, which reorders them, and authored order is a fact the descriptor carries. Both attempts were caught by the a11y gate (`dlitem`, then `definition-list`) rather than by review.
+
+- **The JSON view has contrast.** Keys, braces and commas are muted; values are solid. Weight and the muted token rather than a palette, because the host owns its colours and a hand-picked green for strings fails somebody's theme. No collapsible tree — that would be a second structured browser competing with the view that reads the descriptor, which is "two, not three" one level down. A test pins that the coloured output is character-for-character what a copy gives.
+
 - **`ResultPanel` — every result carries a JSON view.** The component a host mounts: the header, a **Result / JSON** switch, and the field tree beneath them. `ResultField` stays exported for a host composing its own chrome, but the JSON view is a property of the panel rather than a feature some results have — it is the receipt for all of them.
 
   The two are deliberately not peers. Result is the answer for a person, and the only one that reads the descriptor; JSON is what came back, verbatim, keyed the way the payload is keyed rather than the way a label reads. Result opens first, and the switch is not a menu of equal options.

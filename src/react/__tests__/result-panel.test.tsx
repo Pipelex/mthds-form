@@ -42,12 +42,25 @@ describe('the result panel', () => {
   });
 
   it('shows the payload verbatim on the JSON view', async () => {
-    render(<ResultPanel field={invoice} value={{ reference: 'INV-1', paid: false }} />);
+    const { container } = render(
+      <ResultPanel field={invoice} value={{ reference: 'INV-1', paid: false }} />,
+    );
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
-    // Verbatim: the key the payload carries, not the humanised label the
-    // rendered view shows. That difference IS the reason the view exists.
-    expect(screen.getByText(/"reference": "INV-1"/)).toBeTruthy();
-    expect(screen.getByText(/"paid": false/)).toBeTruthy();
+    // Asserted on the rendered TEXT, not on a single node: the view splits the
+    // JSON into spans so the structure can recede and the data come forward, and
+    // a matcher that needed one node would be asserting the colouring rather
+    // than the content.
+    const rendered = container.querySelector('pre')!.textContent!;
+    expect(rendered).toContain('"reference": "INV-1"');
+    expect(rendered).toContain('"paid": false');
+  });
+
+  it('keeps the JSON exactly what a copy would give, after colouring', () => {
+    // The colouring is presentation: chunking it into spans must not add,
+    // reorder or drop a character, or the view stops being a receipt.
+    const value = { a: 1, b: [true, null, 'x"y'], c: { d: -1.5e3 } };
+    const { container } = render(<ResultPanel field={invoice} value={value} defaultView="json" />);
+    expect(container.querySelector('pre')!.textContent).toBe(JSON.stringify(value, null, 2));
   });
 
   it('keeps ONE header, across both views', async () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import type * as React from 'react';
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import type { RunField } from '../core';
@@ -41,6 +42,62 @@ export interface ResultPanelProps {
   className?: string;
 }
 
+/**
+ * JSON, with the structure receding and the data forward.
+ *
+ * A flat `<pre>` is the right shape for a receipt and stays one — what it was
+ * missing is contrast. Keys, braces and commas are scaffolding a reader skips;
+ * values are what they came for, and undifferentiated monospace makes finding
+ * one a character-by-character scan.
+ *
+ * Two decisions worth stating. **Weight and the muted token, never a palette**:
+ * the host owns its colours and a hand-picked green for strings is a colour that
+ * fails somebody's theme, so structure is `muted-foreground` and data is
+ * `foreground`. And **no collapsible tree**: that would be a second structured
+ * browser competing with the Result view, which already reads the descriptor and
+ * does structure properly. Two views, not three — the same argument, one level
+ * down.
+ */
+const JSON_TOKEN_RE =
+  /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+
+function highlight(json: string) {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of json.matchAll(JSON_TOKEN_RE)) {
+    const [token, key, str, literal] = match;
+    const at = match.index;
+    if (at > last) {
+      // Braces, brackets, commas and whitespace - the scaffolding.
+      out.push(
+        <span key={`p${last}`} className="text-muted-foreground">
+          {json.slice(last, at)}
+        </span>,
+      );
+    }
+    out.push(
+      <span
+        key={at}
+        className={
+          key ? 'text-muted-foreground' : str ? 'text-foreground' : 'font-semibold text-foreground'
+        }
+      >
+        {token}
+      </span>,
+    );
+    last = at + token.length;
+    void literal;
+  }
+  if (last < json.length) {
+    out.push(
+      <span key="tail" className="text-muted-foreground">
+        {json.slice(last)}
+      </span>,
+    );
+  }
+  return out;
+}
+
 /** The payload as JSON — the receipt, with the whole of it one click from the clipboard. */
 function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
@@ -79,8 +136,8 @@ function JsonView({ value }: { value: unknown }) {
           )}
         </button>
       )}
-      <pre className="overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed text-foreground">
-        {text}
+      <pre className="overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed">
+        {highlight(text)}
       </pre>
     </div>
   );

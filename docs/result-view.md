@@ -46,7 +46,7 @@ To be clear about where this lands: **a consumer never sees it.** The emitted de
 
 `ResultPanel` is the component a host mounts: the header, a **Result / JSON** switch, and the field tree beneath them. `ResultField` stays exported for a host composing its own chrome, but the panel is the default answer, and the JSON view is a property of it — not a feature some results have.
 
-**Result** is the answer for a person: the descriptor-driven view, which knows a field is an enum, that a date arrived in the serializer's typed envelope, that fifteen records are a table. **JSON** is the answer for whoever is debugging the pipe: what exactly came back, verbatim, copyable, keyed the way the payload is keyed rather than the way the label reads. Different jobs; neither substitutes for the other.
+**Result** is the answer for a person: the descriptor-driven view, which knows a field is an enum, that a date arrived in the serializer's typed envelope, that fifteen records are a table. **JSON** is the answer for whoever is debugging the pipe: what exactly came back, verbatim, copyable, keyed the way the payload is keyed rather than the way the label reads. Structure recedes and data comes forward — keys, braces and commas are muted, values are solid — using weight and the muted token rather than a palette, because the host owns its colours and a hand-picked green for strings is a colour that fails somebody's theme. **No collapsible tree**: that would be a second structured browser competing with the view that reads the descriptor, which is the same "two, not three" argument one level down. Different jobs; neither substitutes for the other.
 
 They are deliberately **not peers**, and the toggle should not read as a menu of equal options. One is the result, the other is the receipt, and Result opens first.
 
@@ -91,6 +91,10 @@ Three rules replaced it, and each follows from a fact the descriptor already sta
 **A list of scalars is chips, not cards** — unless the element is `prose`, which is the standard's way of saying "this may be long" and is what `native.Text` always derives to. A chip containing a paragraph is a box with a paragraph in it, so a prose list is plain lines instead: the values, one per line, divided by a hairline.
 
 **A list of scalars is chips, not cards.** `["optics", "calibration"]` as two bordered boxes with index numbers spends a screenful on two words, and the index was never information: the entries of a scalar list _are_ the values, and they identify themselves.
+
+**A record is a two-column grid, not a stack.** Label above value spends two lines on every field, so a structure of ten is twenty lines of alternating label and answer with nothing aligned. Side by side they take one line each and the values line up, which is what makes a record scannable. Only a _short_ value shares a line — the same `isInlineColumn` test the table uses — because prose needs the full width, and so does anything carrying chrome of its own.
+
+It is deliberately **not** a `<dl>`. A definition list may hold only ordered `<dt>`/`<dd>` groups, and this grid also holds tables, frames and galleries, which a `<dl>` rejects (`definition-list`). Keeping the semantics would mean separating the short fields from the rest — which reorders them, and authored order is a fact the descriptor carries deliberately. So it is a layout, honestly labelled as one.
 
 **A field's description moves to a tooltip below the top level.** On an input it is guidance a person needs; on a result it is the same sentence beside a value they are there to read, and inside a structure of ten fields it is ten lines of chrome around ten values. It stays reachable on the label's `title` — worth having, not worth repeating — and is printed outright only on the output node itself, where it describes the whole result.
 

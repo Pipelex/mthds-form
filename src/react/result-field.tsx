@@ -5,6 +5,7 @@ import { conceptCategory } from '../core/descriptor';
 import type { DocumentContentView } from '../core/native-content';
 import {
   formatDateContent,
+  isNativeDateNode,
   isNativeHtmlNode,
   isViewableUrl,
   readDateContent,
@@ -946,6 +947,21 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
     </>
   );
 
+  // A DATE, before the kind switch, for the same reason markup is: `native.Date`
+  // is `{date, time}`, two properties, so nothing unwraps it and its node is an
+  // `object`. Rendered structurally that is a two-field card whose second field
+  // says "not provided", where the answer is a date. `readDateContent` already
+  // takes exactly this model - the arm just never fired, because the kind says
+  // `object`.
+  if (isNativeDateNode(field)) {
+    return (
+      <div className="space-y-0.5">
+        {header}
+        <DateValue value={unwrapped} />
+      </div>
+    );
+  }
+
   // Markup, before the kind switch: a `native.Html` node's KIND is `object`, so
   // the switch below would render its two members as text and call it done.
   if (isNativeHtmlNode(field)) {
@@ -959,34 +975,60 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
   }
 
   switch (field.kind) {
-    case 'object':
+    case 'object': {
+      const memberValue = (child: RunField) =>
+        typeof unwrapped === 'object' && unwrapped !== null
+          ? ownProp(unwrapped as Record<string, unknown>, child.name)
+          : undefined;
       return (
         <div className="space-y-2">
           {header}
+          {/* Plain elements, NOT a `<dl>`, and that is a decision rather than an
+              oversight. A definition list may hold only ordered `<dt>`/`<dd>`
+              groups, and this grid also holds tables, frames and galleries -
+              blocks a `<dl>` rejects (`definition-list` in the a11y gate). The
+              only way to keep the semantics would be to separate the short
+              fields from the rest, which reorders them, and authored order is a
+              fact the descriptor carries deliberately. So: a layout, honestly
+              labelled as one. */}
           <div
             className={cn(
-              'space-y-2.5',
+              // A definition grid, not a stack. Label above value spends two
+              // lines on every field, so a structure of ten is twenty lines of
+              // alternating label and answer with nothing aligned. Beside each
+              // other they take one line and the values line up, which is what
+              // makes a record scannable.
+              'grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5',
               // A list item already sits in its own bordered row; nesting a
               // second card inside it draws a box in a box for no information
               // gained.
               !hideLabel && 'rounded-lg border border-border bg-card/40 px-3.5 py-3',
             )}
           >
-            {field.fields.map((child) => (
-              <ResultField
-                key={child.name}
-                field={child}
-                value={
-                  typeof unwrapped === 'object' && unwrapped !== null
-                    ? ownProp(unwrapped as Record<string, unknown>, child.name)
-                    : undefined
-                }
-                depth={depth + 1}
-              />
-            ))}
+            {field.fields.map((child) =>
+              // Only a SHORT value shares a line. Prose needs the full width, and
+              // so does anything with chrome of its own - a table, a gallery, a
+              // frame - which beside a label would be squeezed into whatever the
+              // longest label left over.
+              isInlineColumn(child) ? (
+                <Fragment key={child.name}>
+                  <div className="min-w-0">
+                    <Label field={child} describe />
+                  </div>
+                  <div className="min-w-0">
+                    <LeafValue field={child} value={memberValue(child)} />
+                  </div>
+                </Fragment>
+              ) : (
+                <div key={child.name} className="col-span-2 min-w-0">
+                  <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                </div>
+              ),
+            )}
           </div>
         </div>
       );
+    }
 
     case 'list': {
       // A bare array, always: a plural payload's `ListContent {items}` wrapper is

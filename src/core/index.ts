@@ -67,10 +67,12 @@ export type {
   ImageContentView,
 } from './native-content';
 export {
+  NATIVE_DATE_CONCEPT_REF,
   NATIVE_HTML_CONCEPT_REF,
   TYPED_SCALAR_MARKERS,
   formatDateContent,
   hasTypedScalarMarkers,
+  isNativeDateNode,
   isNativeHtmlNode,
   isViewableUrl,
   readDateContent,

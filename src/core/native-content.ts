@@ -160,8 +160,9 @@ export function readHtmlContent(value: unknown): HtmlContentView | undefined {
   return { innerHtml, cssClass: readText(value, 'css_class') };
 }
 
-/** The concept ref `native.Html` is pinned under, spelled once. */
+/** The concept refs whose content model is multi-property, spelled once each. */
 export const NATIVE_HTML_CONCEPT_REF = 'native.Html';
+export const NATIVE_DATE_CONCEPT_REF = 'native.Date';
 
 /**
  * Whether a descriptor node carries markup — its concept IS `native.Html`, or
@@ -176,8 +177,37 @@ export function isNativeHtmlNode(node: {
   conceptRef?: string;
   refines?: readonly string[];
 }): boolean {
-  if (node.conceptRef === NATIVE_HTML_CONCEPT_REF) return true;
-  return node.refines?.includes(NATIVE_HTML_CONCEPT_REF) ?? false;
+  return refinesNative(node, NATIVE_HTML_CONCEPT_REF);
+}
+
+/**
+ * Whether a node IS a `native.Date` — the other content model the kind
+ * vocabulary cannot name.
+ *
+ * `native.Date` is `{date, time}`, two properties, so nothing unwraps it and its
+ * node is an `object`. Correct for the descriptor and wrong for a reader: a date
+ * result rendered structurally is a two-field card whose second field says "not
+ * provided", where the answer is a date. The `date` ARM already reads exactly
+ * this model — `readDateContent` takes `{date, time}` — it just never fires,
+ * because the kind says `object`.
+ *
+ * A `date` FIELD inside a structure is a different thing and needs none of this:
+ * it carries `kind: "date"` already.
+ */
+export function isNativeDateNode(node: {
+  conceptRef?: string;
+  refines?: readonly string[];
+}): boolean {
+  return refinesNative(node, NATIVE_DATE_CONCEPT_REF);
+}
+
+/** Its concept IS the named native, or refines it. */
+function refinesNative(
+  node: { conceptRef?: string; refines?: readonly string[] },
+  ref: string,
+): boolean {
+  if (node.conceptRef === ref) return true;
+  return node.refines?.includes(ref) ?? false;
 }
 
 /**
