@@ -113,6 +113,8 @@ The markup is walked into React elements rather than injected ([`markdown.tsx`](
 
 **A record is a two-column grid, not a stack.** Label above value spends two lines on every field, so a structure of ten is twenty lines of alternating label and answer with nothing aligned. Side by side they take one line each and the values line up, which is what makes a record scannable. Only a _short_ value shares a line — the same `isInlineColumn` test the table uses — because prose needs the full width, and so does anything carrying chrome of its own.
 
+**The label column is capped at 40% of the grid.** A bare `auto` sizes to the widest label present — label text plus its concept pill — so one long field name starved every value beside it. Inside a 400px panel that turned a paragraph into a ten-line ribbon in a 130px column. `min-content` keeps a short label short and the cap stops any label taking more than its share, whatever width the host gives the panel.
+
 It is deliberately **not** a `<dl>`. A definition list may hold only ordered `<dt>`/`<dd>` groups, and this grid also holds tables, frames and galleries, which a `<dl>` rejects (`definition-list`). Keeping the semantics would mean separating the short fields from the rest — which reorders them, and authored order is a fact the descriptor carries deliberately. So it is a layout, honestly labelled as one.
 
 **A field's description is on hover and on focus, at every depth including the top.** On an input it is guidance a person needs before typing; on a result it is a sentence beside a value the reader came for — one line of chrome at the top, ten inside a structure of ten.

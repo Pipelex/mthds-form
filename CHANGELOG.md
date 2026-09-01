@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **One long field name starved every value beside it.** The record grid's label column was a bare `auto`, so it sized to the widest label present — label text plus its concept pill — and inside a 400px panel a paragraph came out as a ten-line ribbon in a 130px column. The column is now `minmax(min-content, 40%)`: a short label stays short, and no label takes more than its share whatever width the host gives the panel.
+
 - **A table of text columns had no way to open its rows.** The expand toggle keyed on `isInlineColumn`, which treats `text` as always-fitting because the standard calls it "a short single-line string". But short is not a property the kind carries — a `text` node is bounded only when the author wrote `max_length`, and an unbounded one is a slot a model fills with three sentences. So a `CandidateMatch[]` whose `gaps` and `overall_assessment` are plain `text` got no toggle, and every cell truncated with no way to read the rest. The toggle now keys on `fitsACellWhole`, which reads the guarantee from the descriptor's **constraint** rather than assuming it from the kind: bounded by what it is (boolean, date, number, enum), bounded because it says so (`max_length`), or openable. Still descriptor-driven — no value is measured, so a table's shape does not change with the data it happens to be showing.
 
 - **A plural result was labelled twice.** `ResultPanel` draws the header once and tells `ResultField` to skip its own; the `list` arm ignored `hideLabel` and drew a second one, one line below the first. The item count is not part of the label — it is a fact about the value rather than a name for it, and the panel's header does not carry it — so it stays.

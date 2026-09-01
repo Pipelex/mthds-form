@@ -1146,7 +1146,15 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
               // alternating label and answer with nothing aligned. Beside each
               // other they take one line and the values line up, which is what
               // makes a record scannable.
-              'grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5',
+              //
+              // The label column is CAPPED at 40%, and that is not cosmetic. A
+              // bare `auto` sizes to the widest label in the grid - label text
+              // plus its concept pill - so one long field name starved every
+              // value beside it, and inside a 400px panel a paragraph came out
+              // as a ten-line ribbon in a 130px column. `min-content` keeps a
+              // short label short; the cap stops any label taking more than its
+              // share, whatever the panel width turns out to be.
+              'grid grid-cols-[minmax(min-content,40%)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5',
               // A list item already sits in its own bordered row; nesting a
               // second card inside it draws a box in a box for no information
               // gained.
