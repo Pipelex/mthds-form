@@ -29,6 +29,7 @@ import {
 import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
+import { Markdown } from './markdown';
 import { useFieldStrings } from './field-strings';
 import { fieldLabel, humanizeFieldName, useFieldPresentation } from './field-presentation';
 import { cn } from './utils';
@@ -615,6 +616,23 @@ function LeafValue({
         <ItemCount count={entries.length} />
       );
     }
+    case 'prose':
+      // Prose is TYPESET, not just printed: what fills a `prose` slot is a
+      // model's answer, and those answers are markdown. Rendered as plain text
+      // a heading is a literal `#` and emphasis is a pair of asterisks, which
+      // is a wrong rendering rather than a neutral one. See `markdown.tsx`.
+      //
+      // Not in a cell, though. `compact` means a table cell or a chip, where
+      // the whole point is one line and the row expands for the rest - a
+      // heading, a list and a table have no business in there, and the plain
+      // string is the right thing at that size.
+      return compact ? (
+        <Scalar value={value} compact />
+      ) : typeof value === 'string' && value !== '' ? (
+        <Markdown text={value} />
+      ) : (
+        <Scalar value={value} />
+      );
     case 'boolean':
       return <Bool value={value} compact={compact} />;
     case 'date':
@@ -1114,7 +1132,17 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
             />
           ) : TABULAR_KINDS.has(field.item.kind) ? (
             <ScalarChips field={field.item} items={items} />
-          ) : field.item.kind === 'prose' ? (
+          ) : field.item.kind === 'prose' || field.item.kind === 'unknown' ? (
+            // `unknown` shares the LINES layout, and that is a reading of the
+            // standard rather than a convenience. `unknown` is the deliberate
+            // escape hatch: the producer could not map the node honestly and
+            // said so, which is what an untyped `type = "list"` field derives
+            // to. A card per entry would spend a bordered box and an index on
+            // each value to say nothing extra - the card earns its place around
+            // a STRUCTURE, and this is precisely the node we have been told is
+            // not known to be one. Lines cost nothing and read the same whether
+            // the entries turn out to be words or objects, because `LeafValue`
+            // falls through to `RawValue` either way.
             <ScalarLines field={field.item} items={items} />
           ) : field.item.kind === 'image' ? (
             <ImageGallery items={items} />

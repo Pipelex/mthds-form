@@ -31,6 +31,11 @@ export { ResultPanel } from './result-panel';
 // than an innerHTML write - see the module header for what the sandbox stops.
 export type { HtmlPreviewProps } from './html-preview';
 export { HtmlPreview } from './html-preview';
+// How every `prose` result is typeset. Exported because a host rendering its
+// own summary of a run wants the same typesetting the panel uses, and because
+// re-deriving it is how two markdown renderings on one page start to disagree.
+export type { MarkdownProps } from './markdown';
+export { Markdown } from './markdown';
 
 export { FieldShell } from './field-shell';
 export { ConceptPill } from './concept-pill';
