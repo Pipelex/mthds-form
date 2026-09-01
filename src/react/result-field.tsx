@@ -297,21 +297,36 @@ function fileLabel(url: string, filename?: string): string {
  * nothing is worse than no button. The link and the `title` still carry the
  * reference there.
  */
-function CopyUrlButton({ url }: { url: string }) {
-  const s = useFieldStrings();
+/**
+ * Copy a value to the clipboard.
+ *
+ * On a URL it is the obvious affordance; on TEXT it is the one that was
+ * missing, and its absence was the more expensive of the two. A result view is
+ * where a person goes to take something away — a report to paste into a
+ * document, an extracted paragraph to send on — and the alternative it left
+ * them was selecting a rendered heading, list and table by dragging, which
+ * picks up the layout and loses the markdown. So every text value carries one,
+ * markdown or not, and what it writes is the SOURCE the run produced rather
+ * than the typeset rendering.
+ *
+ * It renders nothing where there is no clipboard (an insecure origin, an
+ * environment without the API). A button that silently fails is worse than one
+ * that was never offered.
+ */
+function CopyButton({ value, label, title }: { value: string; label: string; title?: string }) {
   const [copied, setCopied] = useState(false);
   if (typeof navigator === 'undefined' || !navigator.clipboard) return null;
   return (
     <button
       type="button"
       onClick={() => {
-        void navigator.clipboard.writeText(url).then(() => {
+        void navigator.clipboard.writeText(value).then(() => {
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1500);
         });
       }}
-      title={url}
-      aria-label={s.copyUrl}
+      {...(title ? { title } : {})}
+      aria-label={label}
       className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
     >
       {copied ? (
@@ -321,6 +336,11 @@ function CopyUrlButton({ url }: { url: string }) {
       )}
     </button>
   );
+}
+
+function CopyUrlButton({ url }: { url: string }) {
+  const s = useFieldStrings();
+  return <CopyButton value={url} label={s.copyUrl} title={url} />;
 }
 
 /**
@@ -1021,6 +1041,17 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
   // reachable, and the dotted underline is what says it is there.
   const header = hideLabel ? null : <Label field={field} describe />;
 
+  // The text a copy control would write, or `undefined` where there is none to
+  // offer: only the two text kinds, and only when the value actually is a
+  // non-empty string. A button that copies "[object Object]" or an empty string
+  // is worse than no button - it reports success and hands over nothing.
+  const copyText =
+    (field.kind === 'text' || field.kind === 'prose') &&
+    typeof unwrapped === 'string' &&
+    unwrapped !== ''
+      ? unwrapped
+      : undefined;
+
   // A DATE, before the kind switch, for the same reason markup is: `native.Date`
   // is `{date, time}`, two properties, so nothing unwraps it and its node is an
   // `object`. Rendered structurally that is a two-field card whose second field
@@ -1179,7 +1210,25 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
     case 'unknown':
       return (
         <div className={field.kind === 'image' ? 'space-y-1.5' : 'space-y-0.5'}>
-          {header}
+          {/* The copy control rides the label row, and it is on every TEXT
+              value whether or not it turns out to be markdown. A result view is
+              where a person goes to take something away, and the alternative
+              was selecting a rendered heading, list and table by dragging -
+              which picks up the layout and loses the source. What it writes is
+              the source the run produced, not the typeset rendering.
+
+              The row survives `hideLabel`, which is the top-level case
+              `ResultPanel` uses: the header moves up to the panel, the button
+              does not follow it, and a text result with no way to copy it would
+              be exactly the one worth copying. */}
+          {copyText === undefined ? (
+            header
+          ) : (
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">{header}</div>
+              <CopyButton value={copyText} label={s.copyText} />
+            </div>
+          )}
           {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
               a table cell and this stacked row cannot disagree about it. */}
           <LeafValue field={field} value={value} />

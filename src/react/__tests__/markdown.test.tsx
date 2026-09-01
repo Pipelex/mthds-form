@@ -113,3 +113,17 @@ describe('a task list is read-only', () => {
     for (const box of boxes) expect(box.disabled).toBe(true);
   });
 });
+
+describe('a code block wraps rather than scrolling', () => {
+  it('never puts a horizontal scroller around one', () => {
+    // A fenced block in a side panel is usually not code: it is a model that
+    // opened a fence and did not close it, so the rest of a report ends up
+    // inside it. Scrolling that sideways hides prose behind a scrollbar.
+    const { container } = render(
+      <Markdown text={'```\nnot really code, just a long sentence\n```'} />,
+    );
+    const pre = container.querySelector('pre')!;
+    expect(pre.className).toContain('whitespace-pre-wrap');
+    expect(pre.className).not.toContain('overflow-x-auto');
+  });
+});

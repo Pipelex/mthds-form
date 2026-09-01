@@ -143,7 +143,14 @@ function Block({ token }: { token: Token }) {
     case 'code': {
       const code = token as Tokens.Code;
       return (
-        <pre className="overflow-x-auto rounded-md border border-border bg-card/40 p-2.5 text-[12px]">
+        // WRAPPED, not scrolled. A code block in a side panel is usually not
+        // code at all: it is a model that opened a fence and did not close it,
+        // or closed one it never opened, and the rest of a report ends up
+        // inside it. Scrolling that sideways hides the text behind a scrollbar
+        // for no gain — the lines are prose, and prose wraps. Real code loses
+        // its column alignment and keeps every character, which is the better
+        // half of that trade at this width.
+        <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-card/40 p-2.5 text-[12px]">
           <code>{code.text}</code>
         </pre>
       );

@@ -16,7 +16,7 @@
  * corpus contains, which is exactly why they belong here and not there. The
  * generated corpus is asserted in its own stories.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
@@ -728,5 +728,53 @@ describe('labels follow the presentation, exactly as the input side does', () =>
       </FieldPresentationProvider>,
     );
     expect(screen.getByRole('columnheader', { name: 'Unit price' })).toBeTruthy();
+  });
+});
+
+describe('a text value can always be copied', () => {
+  // A result view is where a person goes to take something away. Without a copy
+  // control the alternative is selecting a rendered heading, list and table by
+  // dragging, which picks up the layout and loses the markdown - so what the
+  // button writes is the SOURCE the run produced, not the typeset rendering.
+  const writeText = vi.fn(() => Promise.resolve());
+
+  beforeEach(() => {
+    writeText.mockClear();
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+  });
+
+  it('copies the markdown source, not the rendered text', async () => {
+    const source = '# Heading\n\nA **bold** claim.';
+    render(<ResultField field={prose('report')} value={source} />);
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText }));
+    expect(writeText).toHaveBeenCalledWith(source);
+  });
+
+  it('offers one on a plain text value too, markdown or not', async () => {
+    render(<ResultField field={text('reference')} value="INV-2026-0042" />);
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText }));
+    expect(writeText).toHaveBeenCalledWith('INV-2026-0042');
+  });
+
+  it('survives hideLabel, which is the top-level case the panel uses', () => {
+    // The header moves up to `ResultPanel` and the button does not follow it. A
+    // text result with no way to copy it would be exactly the one worth copying.
+    render(<ResultField field={prose('report')} value="Something to take away." hideLabel />);
+    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText })).toBeTruthy();
+  });
+
+  it('offers none where there is nothing to copy', () => {
+    // A button that reports success and hands over an empty string is worse
+    // than one that was never offered.
+    render(<ResultField field={prose('report')} value={undefined} />);
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText })).toBeNull();
+  });
+
+  it('offers none on a value that is not text', () => {
+    render(<ResultField field={number('total')} value={42} />);
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText })).toBeNull();
   });
 });
