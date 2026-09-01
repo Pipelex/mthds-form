@@ -32,7 +32,12 @@ export { conceptCategory } from './descriptor';
 // schema-derived facts (contentKey, nested list bounds). The wire types are
 // the standard's, re-exported so a host can type the artifacts it passes in;
 // `getPipeInputForm` is `getPipeIOContract`'s twin for the sibling artifact.
-export type { InputForm, PipeInputFormDescriptor } from 'mthds/protocol';
+// The descriptor and the NODE type it holds. The node is exported beside it
+// because a consumer that builds a descriptor - a test fixture, a host
+// synthesising one slot - needs to name the thing inside, and reaching past
+// this barrel into `mthds/protocol` to get it is a phantom import for anyone
+// who consumes this package through `@pipelex/mthds-ui`.
+export type { InputForm, InputFormTopLevelField, PipeInputFormDescriptor } from 'mthds/protocol';
 export { buildResultField, buildRunFields, getPipeInputForm } from './derive';
 
 // The output half - a standard artifact since the version that grew `output_form`
