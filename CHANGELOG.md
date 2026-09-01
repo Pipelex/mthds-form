@@ -18,6 +18,16 @@
 
 ### Added
 
+- **The result corpus spans the whole output surface, not one shape.** The `Outputs/Results` section grew from five stories to thirteen, each a real run: every native scalar (`Text`, `Number`, `YesNo`, `Date`, `Html` — a wrapping content model and a multi-property one), a flat structure, **four levels of nesting** (a company holding divisions holding teams holding people, with enums, dates, booleans, numbers and lists of plain text at four different depths), a structure carrying every scalar kind at once with optionals a run may leave empty, a **fifteen-entry list**, both plural arms, and both file-bearing kinds.
+
+  The last of those is `native.Page[]`, the richest shape the standard defines, from a real `PipeExtract` over a committed PDF. Its tree is `list → object → object → prose + list of images + image`, and it is the case that proves `native.Page` needs no renderer arm of its own — it works by recursion into the arms that exist. It also exercises a nested content-model unwrap the flat cases cannot reach: `text_and_images.text` arrives as `TextContent {text}`, and `contentKey` is read for it off the schema at that depth rather than at the top.
+
+  Two carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may not resolve to a concept containing images, so the image case is a `PipeImgGen` and the page case a `PipeExtract`. The slot spec grew what those need — a pipe may state its `type`, its own `prompt`, and operator `options` (`page_views = true` is what makes an extractor render the page images its concept declares; they are `null` without it, so the richest shape would have captured half empty). A prompt-less operator gets no `prompt` member at all, because the pipe types are closed shapes rather than lenient ones.
+
+  A file-bearing input is authored repo-relative (`data/inputs/solar_system.pdf`) and made absolute by the generator when it writes the run's inputs. The runtime resolves a relative path against the BUNDLE, which is composed into a temp directory — and the alternative, an absolute path in a committed fixture, names one machine and resolves on no other.
+
+  The stories now render through `ResultView`, the output twin of `case-form.tsx`: it pairs the descriptor with the payload schema off the contract and renders one `RunField`, which is exactly what a host does with the two artifacts.
+
 - **The output half is a standard artifact now — the simulation is deleted.** `output_form` and a `json_schema` on the output contract landed in MTHDS together, so this package reads both off the wire exactly as it reads `input_form` and the input schemas. `src/core/output-form.ts` no longer declares `PipeOutputFormDescriptor` and `OutputForm`; it re-exports them from `mthds/protocol` and keeps only `getPipeOutputForm`, the lookup — which restores the rule [docs/contract-mirror.md](docs/contract-mirror.md) states, that the contract types are the standard's and not this package's.
 
   The `OUTPUT_SCHEMAS` export is gone from the generated fixtures. It existed because the output contract had nowhere to put a schema; it does now, so a consumer reads `contract.output.json_schema` beside the input ones. Requires `mthds` 0.25.0.

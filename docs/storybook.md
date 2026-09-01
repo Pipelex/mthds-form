@@ -32,7 +32,15 @@ An output is a concept ref exactly like an input is, so its stories are driven b
 
 What differs is presentation: a result is **read, not edited**, so `ResultField` renders values with labels rather than controls with values. Rendering a result as a disabled form would say "you may not change this" where the truth is "this is what came back".
 
-Three artifacts, sourced differently, and all three generated:
+### What the corpus covers
+
+A renderer that has only ever met one shape is a renderer nobody has tested, so the result pipes span the surface rather than repeat it: every native scalar (a wrapping content model and a multi-property one), a flat structure, one and **four** levels of nesting, a list long enough to scroll, and both file-bearing kinds.
+
+Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may not resolve to a concept containing images. So the image case is a `PipeImgGen` and the page case a `PipeExtract` over a committed PDF (`data/inputs/`) — which is what makes `native.Page[]`, the richest shape the standard defines, a real capture rather than an argument. Its tree is `list → object → object → prose + list of images + image`, and it is the case that proves `native.Page` needs no renderer arm of its own: it works by recursion into the arms that exist.
+
+### The three artifacts
+
+Sourced differently, and all three generated:
 
 - **The descriptor** is `output_form`, generated like every input fixture and off the same engine builders. It was a local simulation while the standard lacked the artifact; it is now a read. See [result-view.md](result-view.md).
 - **The payload schema** rides on the output contract, beside the input schemas, where the standard puts it: `CONTRACTS[ref].output.json_schema`. It is the schema of the **payload**, not of a caller's argument, and that is what makes it usable — a `native.Text` result is `TextContent {text}` and a `Concept[]` result is `ListContent {items}`, so the renderer reads the wrapping property's NAME off it and unwraps by name. `buildResultField` **requires** it.

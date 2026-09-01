@@ -98,6 +98,9 @@ const PIPELEX_PYTHON =
 const PIPELEX_BIN =
   process.env.PIPELEX_BIN ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'pipelex');
 
+/** The carrier types whose declaration carries a `prompt`. See `synthesizeCarrier`. */
+const PROMPTED_PIPE_TYPES = new Set(['PipeLLM', 'PipeImgGen']);
+
 const MULTIPLICITIES = new Set(['single', 'variable', 'fixed']);
 const PRESENCES = new Set(['plain', 'optional', 'force']);
 const PRESENCE_SUFFIX = { plain: '', optional: '?', force: '!' };
@@ -208,6 +211,13 @@ function slotTypeExpression(slot) {
  * satisfy the reference rules, and the output is `Text` for every case because
  * no story reads it. See the three rules in this file's header.
  */
+/** A JSON scalar as TOML. Deliberately narrow: an option is a flag or a number. */
+function tomlScalar(value) {
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  if (typeof value === 'string') return JSON.stringify(value);
+  die(`unsupported option value ${JSON.stringify(value)}: options are booleans, numbers or strings.`);
+}
+
 function synthesizeCarrier(pipe) {
   // A carrier's OUTPUT is `Text` unless the case names one. It matters now that
   // the fixtures describe outputs too: a corpus whose every pipe resolves to
@@ -233,9 +243,19 @@ function synthesizeCarrier(pipe) {
     `description = "Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored."`,
     ...(inputs ? [`inputs      = { ${inputs} }`] : []),
     `output      = "${output}"`,
-    `prompt      = """`,
-    prompt,
-    `"""`,
+    // Operator options, verbatim. A carrier occasionally needs one to produce the
+    // shape a story is about - `page_views = true` is what makes an extractor
+    // render the page images its concept declares, which are null without it, so
+    // the richest result shape in the standard would otherwise capture as half
+    // empty. Kept a passthrough rather than a table: the options belong to the
+    // operator, and this script has no business knowing them.
+    ...Object.entries(pipe.options ?? {}).map(([key, value]) => `${key} = ${tomlScalar(value)}`),
+    // Only the operators that HAVE a prompt get one. An extractor reads its
+    // document slot and declares none, and the pipe types are closed shapes -
+    // handing one a member it does not define is a parse error, not an ignored
+    // extra. The set is small and explicit rather than inferred, because
+    // guessing wrong fails at capture time with a message about TOML.
+    ...(PROMPTED_PIPE_TYPES.has(type) ? [`prompt      = """`, prompt, `"""`] : []),
     '',
   ].join('\n');
 }
@@ -418,6 +438,33 @@ function redactLocalUrls(value) {
 }
 
 /**
+ * Resolve an authored file input against the REPO, not against the run.
+ *
+ * A file-bearing input is authored as `{"url": "data/inputs/thing.pdf"}` — a
+ * repo-relative path, because that is the only spelling that survives being
+ * committed and read on another machine. The runtime resolves a relative path
+ * against the BUNDLE, and the bundle is composed into a temp directory, so the
+ * authored spelling has to become absolute before the inputs file is written.
+ *
+ * Done here rather than asked of the author for the reason `synthesizeCarrier`
+ * exists: the alternative is an absolute path in a committed fixture, which
+ * names one machine's home directory and resolves on no other. Only a bare
+ * relative path is touched — anything carrying a scheme (`https:`,
+ * `pipelex-storage:`, `data:`) is already an address and is passed through.
+ */
+function absolutizeFileUrls(value) {
+  if (Array.isArray(value)) return value.map(absolutizeFileUrls);
+  if (value === null || typeof value !== 'object') return value;
+  const out = {};
+  for (const [key, member] of Object.entries(value)) {
+    const isBareRelativePath =
+      key === 'url' && typeof member === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(member) && !path.isAbsolute(member);
+    out[key] = isBareRelativePath ? path.resolve(REPO, member) : absolutizeFileUrls(member);
+  }
+  return out;
+}
+
+/**
  * Run one pipe for real and return what it produced.
  *
  * `main_stuff.json` is the run's own answer, written by the CLI - not a
@@ -432,7 +479,7 @@ function runPipe(bundlePath, pipe, workDir) {
   args.push('--no-graph', '--no-pretty-print', '--no-save-working-memory');
   if (pipe.run && Object.keys(pipe.run).length > 0) {
     const inputsPath = path.join(workDir, `${pipe.code}.inputs.json`);
-    writeFileSync(inputsPath, JSON.stringify(pipe.run, null, 2));
+    writeFileSync(inputsPath, JSON.stringify(absolutizeFileUrls(pipe.run), null, 2));
     args.push('-i', inputsPath);
   }
 
