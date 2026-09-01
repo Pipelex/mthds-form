@@ -46,6 +46,16 @@ It is a separate case rather than more pipes in `results` because the branches A
 
 The gallery pins an image model explicitly (`options = { model = "$gen-image-testing" }`): the deck's default image backend refuses more than one image per call, so an `Image[3]` output needs one that does not.
 
+### Files, and the one payload the corpus cannot produce
+
+`Outputs/Media` is the section for results carrying files, and it is the one place a story supplies its own payload. The reason is worth stating, because it is the exception that proves the rule rather than a corner cut.
+
+A run's file-bearing results carry `pipelex-storage://` references, which resolve only through the host's own resolver. A browser looking at Storybook cannot fetch one — so a corpus payload would show grey tiles and a preview button that could not fire, which is a case the section already covers on purpose (`A storage reference → no preview`). What it could not show is the other case: what this looks like when a URL IS fetchable, which is where a host in production mostly lives.
+
+So `data/inputs/` holds the served files — the corpus's own extraction PDF, and three real generated images downscaled to a size worth committing (the originals a run wrote are around two megabytes each). `.storybook/main.ts` serves that directory.
+
+The **descriptor is still the corpus's own**, and that is the half that matters: `results.nested_media_result` is generated from `data/structures/results.mthds` like every other, so the kinds are the engine's. That pipe carries no `run` block and cannot — the language forbids a `PipeLLM` resolving to a concept containing images, and no other operator produces a structure — which is exactly why the payload is supplied and the descriptor is not.
+
 ### The three artifacts
 
 Sourced differently, and all three generated:

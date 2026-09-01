@@ -332,10 +332,13 @@ function ImageValue({
   value,
   inGallery = false,
   inRow = false,
+  compact = false,
 }: {
   value: unknown;
   inGallery?: boolean;
   inRow?: boolean;
+  /** Rendering into a table cell: a thumbnail, not a picture. */
+  compact?: boolean;
 }) {
   const s = useFieldStrings();
   const content = readImageContent(value);
@@ -356,11 +359,15 @@ function ImageValue({
         <img
           src={src}
           alt={content.caption ?? s.preview}
-          className={
-            inGallery
-              ? 'block aspect-square w-full object-cover'
-              : 'max-h-64 w-auto rounded-lg border border-border'
-          }
+          className={cn(
+            inGallery && 'block aspect-square w-full object-cover',
+            // A cell is one line tall. An image column rendered at the standalone
+            // height turns every row into a picture and the table into a
+            // slideshow, so a cell gets a thumbnail and the row's expansion gets
+            // the picture.
+            compact && 'h-10 w-auto rounded border border-border object-cover',
+            !inGallery && !compact && 'max-h-64 w-auto rounded-lg border border-border',
+          )}
         />
       ) : inRow ? (
         // The row variant of "nothing to paint": an icon and a name, exactly as
@@ -464,7 +471,7 @@ function LeafValue({
     case 'document':
       return <DocumentValue value={value} />;
     case 'image':
-      return <ImageValue value={value} />;
+      return <ImageValue value={value} compact={compact} />;
     default:
       return <Scalar value={value} compact={compact} />;
   }

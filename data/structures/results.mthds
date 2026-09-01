@@ -125,3 +125,32 @@ priority  = { type = "text", description = "One of a fixed set", required = true
 tags      = { type = "list", item_type = "text", description = "A list of plain strings", required = true }
 aside     = { type = "text", description = "An optional note a run may leave empty", required = false }
 follow_up = { type = "date", description = "An optional date a run may leave empty", required = false }
+
+# ─── Files, nested ───────────────────────────────────────────────────────────
+#
+# The shape that reaches every file-bearing arm at once, and reaches them at
+# DEPTH: markup and a document as fields of a structure, and images one level
+# further down, inside the records of a list.
+#
+# It carries no `run` block, and cannot: the language forbids a PipeLLM
+# resolving to a concept that contains images, and no other operator produces a
+# structure. Its DESCRIPTOR is generated like every other — which is the half
+# that has to be real, because it is what states the kinds — and the story that
+# renders it supplies a payload of served files, because a run's own file URLs
+# are storage references a browser cannot fetch. See `docs/storybook.md`.
+
+[concept.Figure]
+description = "One illustration with its caption"
+
+[concept.Figure.structure]
+caption = { type = "text", description = "What the figure shows", required = true }
+image   = { type = "concept", concept_ref = "native.Image", description = "The picture itself", required = true }
+
+[concept.Report]
+description = "A report carrying markup, a source document and illustrated figures"
+
+[concept.Report.structure]
+title   = { type = "text", description = "The report's title", required = true }
+summary = { type = "concept", concept_ref = "native.Html", description = "The summary, as markup", required = true }
+source  = { type = "concept", concept_ref = "native.Document", description = "The document it was drawn from", required = true }
+figures = { type = "list", item_type = "concept", item_concept_ref = "Figure", description = "The illustrations", required = true }

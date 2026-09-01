@@ -1,7 +1,7 @@
 /**
  * Generated from data/structures/results.mthds - DO NOT EDIT.
  *
- * Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract.
+ * Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. One pipe carries no 'run' block and cannot: `nested_media_result` resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure. Its descriptor is generated like every other; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch.
  *
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
@@ -17,6 +17,7 @@ export const PIPE_REFS = [
   'results.html_result',
   'results.image_result',
   'results.long_list_result',
+  'results.nested_media_result',
   'results.nested_result',
   'results.number_result',
   'results.page_result',
@@ -704,6 +705,307 @@ export const CONTRACTS: PipeIOContracts = {
         type: 'object',
       },
       multiplicity: 'variable',
+      optional: false,
+    },
+  },
+  'results.nested_media_result': {
+    inputs: {
+      note: {
+        concept_ref: 'native.Text',
+        item_count: null,
+        json_schema: {
+          description: 'A text',
+          properties: {
+            text: {
+              description: 'The text',
+              title: 'Text',
+              type: 'string',
+            },
+          },
+          required: ['text'],
+          title: 'native.Text',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'results.Report',
+      item_count: null,
+      json_schema: {
+        $defs: {
+          DocumentContent: {
+            description: 'A document',
+            properties: {
+              filename: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The original filename of the document',
+                title: 'Filename',
+              },
+              mime_type: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The MIME type of the document',
+                title: 'Mime Type',
+              },
+              public_url: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The public HTTPS URL of the document',
+                title: 'Public Url',
+              },
+              snippet: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'A text snippet or excerpt from the document',
+                title: 'Snippet',
+              },
+              title: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The title of the document or source',
+                title: 'Title',
+              },
+              url: {
+                description:
+                  'The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+                title: 'Url',
+                type: 'string',
+              },
+            },
+            required: ['url'],
+            title: 'DocumentContent',
+            type: 'object',
+          },
+          HtmlContent: {
+            description: 'HTML content',
+            properties: {
+              css_class: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The CSS class of the content',
+                title: 'Css Class',
+              },
+              inner_html: {
+                description: 'The inner HTML of the content',
+                title: 'Inner Html',
+                type: 'string',
+              },
+            },
+            required: ['inner_html'],
+            title: 'HtmlContent',
+            type: 'object',
+          },
+          ImageContent: {
+            description: 'An image',
+            properties: {
+              caption: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The caption of the image',
+                title: 'Caption',
+              },
+              filename: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The original filename of the image',
+                title: 'Filename',
+              },
+              height: {
+                anyOf: [
+                  {
+                    exclusiveMinimum: 0,
+                    type: 'integer',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The height of the image, in pixels',
+                title: 'Height',
+              },
+              mime_type: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The MIME type of the image',
+                title: 'Mime Type',
+              },
+              public_url: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The public URL of the image',
+                title: 'Public Url',
+              },
+              source_negative_prompt: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The source negative prompt of the image',
+                title: 'Source Negative Prompt',
+              },
+              source_prompt: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The source prompt of the image',
+                title: 'Source Prompt',
+              },
+              url: {
+                description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+                title: 'Url',
+                type: 'string',
+              },
+              width: {
+                anyOf: [
+                  {
+                    exclusiveMinimum: 0,
+                    type: 'integer',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The width of the image, in pixels',
+                title: 'Width',
+              },
+            },
+            required: ['url'],
+            title: 'ImageContent',
+            type: 'object',
+          },
+          results__Figure: {
+            description: 'One illustration with its caption',
+            properties: {
+              caption: {
+                description: 'What the figure shows',
+                title: 'Caption',
+                type: 'string',
+              },
+              image: {
+                $ref: '#/$defs/ImageContent',
+                description: 'The picture itself',
+              },
+            },
+            required: ['caption', 'image'],
+            title: 'results__Figure',
+            type: 'object',
+          },
+        },
+        description: 'A report carrying markup, a source document and illustrated figures',
+        properties: {
+          figures: {
+            description: 'The illustrations',
+            items: {
+              $ref: '#/$defs/results__Figure',
+            },
+            title: 'Figures',
+            type: 'array',
+          },
+          source: {
+            $ref: '#/$defs/DocumentContent',
+            description: 'The document it was drawn from',
+          },
+          summary: {
+            $ref: '#/$defs/HtmlContent',
+            description: 'The summary, as markup',
+          },
+          title: {
+            description: "The report's title",
+            title: 'Title',
+            type: 'string',
+          },
+        },
+        required: ['title', 'summary', 'source', 'figures'],
+        title: 'results.Report',
+        type: 'object',
+      },
+      multiplicity: 'single',
       optional: false,
     },
   },
@@ -1405,6 +1707,19 @@ export const INPUT_FORM: InputForm = {
       },
     ],
   },
+  'results.nested_media_result': {
+    fields: [
+      {
+        concept_ref: 'native.Text',
+        description: 'A text',
+        gating: true,
+        kind: 'prose',
+        name: 'note',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
   'results.nested_result': {
     fields: [
       {
@@ -1870,6 +2185,79 @@ export const OUTPUT_FORM: OutputForm = {
         required: true,
       },
       kind: 'list',
+      name: 'output',
+      required: true,
+    },
+  },
+  'results.nested_media_result': {
+    field: {
+      concept_ref: 'results.Report',
+      description: 'A report carrying markup, a source document and illustrated figures',
+      fields: [
+        {
+          description: "The report's title",
+          kind: 'text',
+          name: 'title',
+          required: true,
+        },
+        {
+          concept_ref: 'native.Html',
+          description: 'The summary, as markup',
+          fields: [
+            {
+              description: 'The inner HTML of the content',
+              kind: 'text',
+              name: 'inner_html',
+              required: true,
+            },
+            {
+              description: 'The CSS class of the content',
+              kind: 'text',
+              name: 'css_class',
+              required: false,
+            },
+          ],
+          kind: 'object',
+          name: 'summary',
+          required: true,
+        },
+        {
+          concept_ref: 'native.Document',
+          description: 'The document it was drawn from',
+          kind: 'document',
+          name: 'source',
+          required: true,
+        },
+        {
+          concept_ref: 'results.Figure',
+          description: 'The illustrations',
+          item: {
+            concept_ref: 'results.Figure',
+            description: 'One illustration with its caption',
+            fields: [
+              {
+                description: 'What the figure shows',
+                kind: 'text',
+                name: 'caption',
+                required: true,
+              },
+              {
+                concept_ref: 'native.Image',
+                description: 'The picture itself',
+                kind: 'image',
+                name: 'image',
+                required: true,
+              },
+            ],
+            kind: 'object',
+            required: true,
+          },
+          kind: 'list',
+          name: 'figures',
+          required: true,
+        },
+      ],
+      kind: 'object',
       name: 'output',
       required: true,
     },

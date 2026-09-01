@@ -18,6 +18,12 @@
 
 ### Added
 
+- **A result carrying markup, a document and images — nested, and in one story.** `Outputs/Media` gains `results.Report`: a structure whose fields are `native.Html` and `native.Document`, holding a list whose records each hold a `native.Image`. Four layouts, each chosen from its own node — the markup in its sandboxed frame, the document as a named row with a working **Preview** over a real PDF, the figures as a table whose image column is a thumbnail, and the picture at full size when a row is expanded.
+
+  The image thumbnail is new and the shape is what asked for it: an image column rendered at the standalone height turns every row into a picture and the table into a slideshow, so a cell gets a thumbnail and the expansion gets the picture.
+
+  The descriptor is the corpus's own, generated like every other. The payload is not, and cannot be: the language forbids a `PipeLLM` resolving to a concept containing images, so no single carrier produces this shape — and a run's file URLs are storage references a browser cannot fetch, so it would render as grey tiles and a preview that could not fire. `data/inputs/` therefore holds the served files, three of them real generations downscaled to a size worth committing.
+
 - **Every list of records is a table now, and the rows expand.** Prose and nesting used to fall back to a card per entry, and that was the wrong trade: a table is how a list of records is READ, and giving it up over the widest column lost it for every other column too. The cell shows the first line — or, for a structure, how many entries it stands for — and the chevron opens the whole record underneath in the stacked layout. The toggle appears only when a row has more to show, so a table of short scalars gets no column of chevrons that reveal nothing, and the expanded panel is pinned to the scroller's width rather than inheriting the table's and running off into the horizontal scroll.
 
   **A column's description is on its header**, once, on hover, with a dotted underline saying it is there — a `title` nobody knows about is a fact nobody reads.

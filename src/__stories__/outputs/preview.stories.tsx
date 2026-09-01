@@ -2,9 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import type { FileRunField } from '../../core/descriptor';
 import { ResultField } from '../../react';
+import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
+import { ResultView } from '../result-view';
 
 /**
- * The preview seam — a result you can open where you are reading it.
+ * Results carrying FILES, and what it takes to show them.
  *
  * **These payloads are hand-built, and that is the point of the page.** Every
  * other result story renders what a run produced; a run's file-bearing results
@@ -63,7 +65,7 @@ function Preview({ value }: { value: unknown }) {
   );
 }
 
-const meta = { title: 'Outputs/Preview', component: Preview } satisfies Meta<typeof Preview>;
+const meta = { title: 'Outputs/Media', component: Preview } satisfies Meta<typeof Preview>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -125,5 +127,90 @@ export const AWordDocument: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.queryAllByRole('button')).toHaveLength(0);
     await expect(canvas.getAllByRole('link').length).toBeGreaterThan(0);
+  },
+};
+
+// ─── Nested ──────────────────────────────────────────────────────────────────
+
+/**
+ * The served files, absolute for the same reason `PDF_URL` is.
+ *
+ * They are three real generations, downscaled to a size worth committing — the
+ * originals a run wrote are around two megabytes each, which is a fixture nobody
+ * wants in a repository.
+ */
+const figureUrl = (n: number) =>
+  typeof window === 'undefined'
+    ? `https://example.invalid/figure_${n}.jpg`
+    : new URL(`/figure_${n}.jpg`, window.location.origin).href;
+
+/**
+ * A payload for `results.nested_media_result`, of files a browser can fetch.
+ *
+ * **Hand-built, and it has to be.** The descriptor is the corpus's own,
+ * generated like every other; the payload cannot be, twice over. The language
+ * forbids a `PipeLLM` resolving to a concept that contains images, so no single
+ * carrier produces this shape at all — and even if one did, its file URLs would
+ * be `pipelex-storage://` references a browser cannot fetch, so the story would
+ * show three grey tiles and a preview button that could not fire. Which is the
+ * case `A storage reference` above already covers.
+ */
+const REPORT = {
+  title: 'Retrofit review, March 2026',
+  summary: {
+    inner_html:
+      "<h3>Findings</h3><p>Two of the three findings <strong>block</strong>. The coating order has no confirmed delivery date, and the damping prototype has not been tested at the mount's real mass.</p><table><tr><th>Finding</th><th>Blocks</th></tr><tr><td>Coating delivery</td><td>Yes</td></tr><tr><td>Damping prototype</td><td>Yes</td></tr><tr><td>Handover checklist</td><td>No</td></tr></table>",
+    css_class: null,
+  },
+  source: {
+    url: PDF_URL,
+    filename: 'solar_system.pdf',
+    mime_type: 'application/pdf',
+    title: 'The Solar System: An Overview',
+    snippet: 'The source document the review was drawn from.',
+  },
+  figures: [
+    { caption: 'The bed sign as delivered', image: { url: figureUrl(1), mime_type: 'image/jpeg' } },
+    { caption: 'After recoating', image: { url: figureUrl(2), mime_type: 'image/jpeg' } },
+    { caption: 'Under morning light', image: { url: figureUrl(3), mime_type: 'image/jpeg' } },
+  ],
+};
+
+/**
+ * **Every file-bearing arm at once, and at depth.**
+ *
+ * A structure whose fields are markup and a document, holding a list whose
+ * records each hold an image. Four layouts, each chosen from its own node:
+ *
+ * - `summary` is `native.Html` → the sandboxed frame, rendering the markup;
+ * - `source` is `native.Document` → a named row with a **Preview** that frames
+ *   the real PDF;
+ * - `figures` is a list of records → a **table**, whose image column is a
+ *   thumbnail because a cell is one line tall;
+ * - expanding a figure's row → the picture at full size, beside its caption.
+ *
+ * The descriptor is the corpus's own — `results.nested_media_result`, generated
+ * from `data/structures/results.mthds` like every other. Only the payload is
+ * supplied here, and the docstring above `REPORT` says why it must be.
+ */
+export const ANestedReport: StoryObj<typeof ResultView> = {
+  name: 'Markup + PDF + images, nested',
+  render: (args) => <ResultView {...args} />,
+  args: {
+    contracts: CONTRACTS,
+    outputForm: OUTPUT_FORM,
+    domain: 'results',
+    pipeCode: 'nested_media_result',
+    value: REPORT,
+    maxWidth: 720,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // The markup arm, the file arm and the table, all from one descriptor.
+    await expect(canvas.getAllByTitle('HTML result').length).toBeGreaterThan(0);
+    await expect(canvas.getAllByRole('columnheader', { name: 'Caption' }).length).toBeGreaterThan(
+      0,
+    );
+    await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
   },
 };
