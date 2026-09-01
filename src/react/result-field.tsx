@@ -14,7 +14,16 @@ import {
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Eye, EyeOff, FileText, ImageOff } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eye,
+  EyeOff,
+  FileText,
+  ImageOff,
+} from 'lucide-react';
 import { ConceptPill } from './concept-pill';
 import { HtmlPreview } from './html-preview';
 import { useFieldStrings } from './field-strings';
@@ -195,6 +204,45 @@ function fileLabel(url: string, filename?: string): string {
 }
 
 /**
+ * Put the WHOLE reference on the clipboard, while the page shows a short name.
+ *
+ * The two requirements pull opposite ways and this is what resolves them: a
+ * ninety-character storage reference printed in full wraps across the panel and
+ * says nothing, and a name alone is not something a person can paste into a
+ * terminal. So the label is the name, and the button is the URL.
+ *
+ * Hidden when the API is absent rather than failing on click — `navigator
+ * .clipboard` is undefined outside a secure context, and a button that does
+ * nothing is worse than no button. The link and the `title` still carry the
+ * reference there.
+ */
+function CopyUrlButton({ url }: { url: string }) {
+  const s = useFieldStrings();
+  const [copied, setCopied] = useState(false);
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(url).then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      title={url}
+      aria-label={s.copyUrl}
+      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+    >
+      {copied ? (
+        <Check aria-hidden className="size-3.5" />
+      ) : (
+        <Copy aria-hidden className="size-3.5" />
+      )}
+    </button>
+  );
+}
+
+/**
  * A file reference, as one line.
  *
  * A `pipelex-storage://` URL is not something a browser can follow, and this
@@ -215,19 +263,27 @@ function FileRef({
 }) {
   const label = fileLabel(url, filename);
   const title = mimeType ? `${url} · ${mimeType}` : url;
-  return isViewableUrl(url) ? (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      title={title}
-      className="block truncate font-mono text-[12px] text-foreground underline underline-offset-2"
-    >
-      {label}
-    </a>
-  ) : (
-    <span title={title} className="block truncate font-mono text-[12px] text-muted-foreground">
-      {label}
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {isViewableUrl(url) ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title={title}
+          className="min-w-0 truncate font-mono text-[12px] text-foreground underline underline-offset-2"
+        >
+          {label}
+        </a>
+      ) : (
+        <span
+          title={title}
+          className="min-w-0 truncate font-mono text-[12px] text-muted-foreground"
+        >
+          {label}
+        </span>
+      )}
+      <CopyUrlButton url={url} />
     </span>
   );
 }
@@ -356,19 +412,25 @@ function ImageValue({
   return (
     <div className={inGallery ? 'space-y-1' : 'space-y-1.5'}>
       {src ? (
-        <img
-          src={src}
-          alt={content.caption ?? s.preview}
-          className={cn(
-            inGallery && 'block aspect-square w-full object-cover',
-            // A cell is one line tall. An image column rendered at the standalone
-            // height turns every row into a picture and the table into a
-            // slideshow, so a cell gets a thumbnail and the row's expansion gets
-            // the picture.
-            compact && 'h-10 w-auto rounded border border-border object-cover',
-            !inGallery && !compact && 'max-h-64 w-auto rounded-lg border border-border',
-          )}
-        />
+        // Wrapped in a link: the picture is a PREVIEW of a file, and clicking a
+        // preview to see the thing it previews is what a reader expects. The
+        // reference underneath is the other half - a picture with no URL beside
+        // it is a result you can look at and cannot use.
+        <a href={src} target="_blank" rel="noreferrer" title={content.url} className="inline-block">
+          <img
+            src={src}
+            alt={content.caption ?? s.preview}
+            className={cn(
+              inGallery && 'block aspect-square w-full object-cover',
+              // A cell is one line tall. An image column rendered at the standalone
+              // height turns every row into a picture and the table into a
+              // slideshow, so a cell gets a thumbnail and the row's expansion gets
+              // the picture.
+              compact && 'h-10 w-auto rounded border border-border object-cover',
+              !inGallery && !compact && 'max-h-64 w-auto rounded-lg border border-border',
+            )}
+          />
+        </a>
       ) : inRow ? (
         // The row variant of "nothing to paint": an icon and a name, exactly as
         // a document row reads, because that is what this has become.
@@ -402,6 +464,15 @@ function ImageValue({
           mimeType={content.mimeType}
           {...(content.filename ? { filename: content.filename } : {})}
         />
+      )}
+      {src && !compact && (
+        <div className={inGallery ? 'px-2.5' : undefined}>
+          <FileRef
+            url={content.publicUrl ?? content.url}
+            mimeType={content.mimeType}
+            {...(content.filename ? { filename: content.filename } : {})}
+          />
+        </div>
       )}
       {content.caption && (
         <p

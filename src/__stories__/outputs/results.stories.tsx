@@ -263,7 +263,10 @@ export const GeneratedImage: Story = {
     // whole reference stays on the title, which is the part worth copying.
     const name = url.split('/').pop()!;
     await expect(canvas.getAllByText(name)).toHaveLength(BOTH_THEMES);
-    await expect(canvas.getAllByTitle(new RegExp(escapeRegExp(url)))).toHaveLength(BOTH_THEMES);
+    // The whole reference is reachable: on the title, and on the clipboard.
+    await expect(canvas.getAllByTitle(new RegExp(escapeRegExp(url))).length).toBeGreaterThanOrEqual(
+      BOTH_THEMES,
+    );
     await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
   },
 };

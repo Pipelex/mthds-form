@@ -16,7 +16,7 @@
  * corpus contains, which is exactly why they belong here and not there. The
  * generated corpus is asserted in its own stories.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
@@ -602,5 +602,65 @@ describe('the unwrap reaches every layout', () => {
     );
     expect(screen.getByText('kickoff')).toBeTruthy();
     expect(screen.queryByText(/\[object Object\]/)).toBeNull();
+  });
+});
+
+describe('a file always exposes its URL', () => {
+  // A picture is a PREVIEW of a file, not a replacement for it: once the image
+  // painted, the URL vanished entirely and the result was something you could
+  // look at and could not use. Three ways out, and all three are wanted — open
+  // it, read it, paste it.
+  const image = file('output', 'image');
+
+  it('links a painted image to the file it previews', () => {
+    render(<ResultField field={image} value={{ url: 'https://cdn.example/a.png' }} />);
+    const link = screen.getAllByRole('link')[0]!;
+    expect(link.getAttribute('href')).toBe('https://cdn.example/a.png');
+  });
+
+  it('shows the reference beside a painted image', () => {
+    render(
+      <ResultField
+        field={image}
+        value={{ url: 'https://cdn.example/photos/a.png', mime_type: 'image/png' }}
+      />,
+    );
+    expect(screen.getByText('a.png')).toBeTruthy();
+  });
+
+  it('offers a copy control carrying the WHOLE url, not the short label', async () => {
+    // The two requirements pull opposite ways: ninety characters printed in full
+    // wraps across the panel and says nothing, and a name alone cannot be pasted
+    // into a terminal. The label is the name; the button is the URL.
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    const url = 'pipelex-storage://9c1f-4a2e-8b31/generated/8ec46786ddb6e281.png';
+    render(<ResultField field={image} value={{ url }} />);
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyUrl }));
+    expect(writeText).toHaveBeenCalledWith(url);
+    vi.unstubAllGlobals();
+  });
+
+  it('hides the copy control where the clipboard API is absent', () => {
+    // Outside a secure context `navigator.clipboard` is undefined, and a button
+    // that does nothing is worse than no button. The link and the title still
+    // carry the reference there.
+    vi.stubGlobal('navigator', { ...navigator, clipboard: undefined });
+    render(<ResultField field={image} value={{ url: 'https://cdn.example/a.png' }} />);
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.copyUrl })).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps a document reference copyable too', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'https://example.com/a.pdf', title: 'A paper' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyUrl })).toBeTruthy();
+    vi.unstubAllGlobals();
   });
 });

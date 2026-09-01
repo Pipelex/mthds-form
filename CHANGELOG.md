@@ -18,6 +18,10 @@
 
 ### Added
 
+- **A file always exposes its URL — openable, readable, pasteable.** A picture is a preview of a file, not a replacement for it, and once an image painted its URL vanished entirely: a result you could look at and could not use. A painted image is now wrapped in a link to the file it previews, its reference is printed beneath it, and every file reference — image and document alike — carries a copy control.
+
+  The copy control is what resolves two requirements that pull opposite ways: ninety characters of UUID printed in full wraps across the panel and says nothing, and a short name alone cannot be pasted into a terminal. **The label is the name; the button is the URL.** It hides itself where `navigator.clipboard` is undefined (outside a secure context), because a button that does nothing is worse than no button — the link and the `title` still carry the reference there.
+
 - **A result carrying markup, a document and images — nested, and in one story.** `Outputs/Media` gains `results.Report`: a structure whose fields are `native.Html` and `native.Document`, holding a list whose records each hold a `native.Image`. Four layouts, each chosen from its own node — the markup in its sandboxed frame, the document as a named row with a working **Preview** over a real PDF, the figures as a table whose image column is a thumbnail, and the picture at full size when a row is expanded.
 
   The image thumbnail is new and the shape is what asked for it: an image column rendered at the standalone height turns every row into a picture and the table into a slideshow, so a cell gets a thumbnail and the expansion gets the picture.

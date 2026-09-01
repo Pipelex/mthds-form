@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import type { FileRunField } from '../../core/descriptor';
-import { ResultField } from '../../react';
+import { DEFAULT_FIELD_STRINGS, ResultField } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
 
@@ -83,10 +83,11 @@ export const APdf: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const buttons = canvas.getAllByRole('button');
-    await expect(buttons.length).toBeGreaterThan(0);
-    await userEvent.click(buttons[0]!);
-    await expect(buttons[0]!.getAttribute('aria-expanded')).toBe('true');
+    // Named, not indexed: every file reference now carries a copy control beside
+    // it, so "the first button" stopped meaning "the preview".
+    const [preview] = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
+    await userEvent.click(preview!);
+    await expect(preview!.getAttribute('aria-expanded')).toBe('true');
   },
 };
 
@@ -105,7 +106,13 @@ export const AStorageReference: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryAllByRole('button')).toHaveLength(0);
+    // No PREVIEW - the reference is still copyable, which is a different job.
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
+    await expect(
+      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.copyUrl }).length,
+    ).toBeGreaterThan(0);
   },
 };
 
@@ -125,7 +132,9 @@ export const AWordDocument: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryAllByRole('button')).toHaveLength(0);
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
     await expect(canvas.getAllByRole('link').length).toBeGreaterThan(0);
   },
 };

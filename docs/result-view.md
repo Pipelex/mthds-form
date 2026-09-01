@@ -94,7 +94,9 @@ None of this is a heuristic about the data. Every branch reads the descriptor: t
 
 **A framed URL is not the `native.Html` question, and the difference is the origin.** Markup goes through a sandbox because injecting it into the host's document would run it ON the host's origin with the host's cookies. A URL in an `<iframe>` is a separate document at its own origin by construction — the browser's own boundary, not one this package has to build. So a PDF is framed the way every document viewer on the web frames one, with `no-referrer`, because a result view has no business telling a third party where it was opened from.
 
-**A file is NAMED rather than printed whole.** Ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file"; the last path segment is what a person reads, and the whole reference stays on the `title`.
+**A file always exposes its URL, three ways.** A picture is a _preview_ of a file, not a replacement for it — once the image painted, the URL used to vanish entirely, leaving a result you could look at and could not use. So a painted image is wrapped in a link to the file it previews, its reference is printed beneath it, and the reference carries a copy control.
+
+**A file is NAMED rather than printed whole.** Ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file"; the last path segment is what a person reads. The two requirements pull opposite ways — a name alone cannot be pasted into a terminal — and the copy control is what resolves them: **the label is the name, the button is the URL**. It hides itself where `navigator.clipboard` is undefined (outside a secure context), because a button that does nothing is worse than no button; the link and the `title` still carry the reference there.
 
 **A gallery of nothing is not a gallery.** When no image in a list can be painted — every URL a storage reference the host has no resolver for — the grid becomes rows, because three large blanks say less than three lines do. The layout follows what is actually showable rather than what the kind promises.
 

@@ -45,6 +45,8 @@ export interface FieldStrings {
   toggleRowDetails: (index: number) => string;
   /** The (visually hidden) header of the column those controls sit in. */
   rowDetailsColumn: string;
+  /** The control that puts a file's whole URL on the clipboard. */
+  copyUrl: string;
   yes: string;
   no: string;
   /**
@@ -85,6 +87,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   resultAbsent: 'not provided',
   toggleRowDetails: (index) => `Show or hide the details of row ${index}`,
   rowDetailsColumn: 'Details',
+  copyUrl: 'Copy the URL',
   yes: 'Yes',
   no: 'No',
   unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
