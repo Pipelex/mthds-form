@@ -163,6 +163,27 @@ export function readHtmlContent(value: unknown): HtmlContentView | undefined {
 /** The concept refs whose content model is multi-property, spelled once each. */
 export const NATIVE_HTML_CONCEPT_REF = 'native.Html';
 export const NATIVE_DATE_CONCEPT_REF = 'native.Date';
+export const NATIVE_COMPOSITE_CONCEPT_REF = 'native.Composite';
+
+/** One member of a composite: the name it was composed under, and its content. */
+export interface CompositeMember {
+  name: string;
+  value: unknown;
+}
+
+/**
+ * Read a `native.Composite` — a named composition of contents.
+ *
+ * The members are returned in the order the payload states them, which is the
+ * order the method composed them in and the only order there is: a composite
+ * declares no fields, so there is no authored order to prefer over it.
+ *
+ * `undefined` for anything that is not a record, so the caller falls back.
+ */
+export function readCompositeContent(value: unknown): CompositeMember[] | undefined {
+  if (!isRecord(value)) return undefined;
+  return Object.entries(value).map(([name, member]) => ({ name, value: member }));
+}
 
 /**
  * Whether a descriptor node carries markup — its concept IS `native.Html`, or
@@ -199,6 +220,27 @@ export function isNativeDateNode(node: {
   refines?: readonly string[];
 }): boolean {
   return refinesNative(node, NATIVE_DATE_CONCEPT_REF);
+}
+
+/**
+ * Whether a node is a `native.Composite` — a named bag of contents.
+ *
+ * The third concept the kind vocabulary cannot name, and the one where it is
+ * least able to: a composite declares no members at all, so its descriptor is
+ * `kind: "unknown"` and its payload schema is `{additionalProperties: true}`
+ * with no properties. Both are TRUE — the standard's escape hatch, honestly
+ * used — and both leave a renderer with nothing to read, so the default
+ * fallback prints the whole thing as a JSON blob.
+ *
+ * That is the worst available answer to a value that is, by definition, a map
+ * of ordinary `StuffContent`s. Keyed by concept, a renderer can at least show
+ * the members as the named things they are. See `CompositeValue`.
+ */
+export function isNativeCompositeNode(node: {
+  conceptRef?: string;
+  refines?: readonly string[];
+}): boolean {
+  return refinesNative(node, NATIVE_COMPOSITE_CONCEPT_REF);
 }
 
 /** Its concept IS the named native, or refines it. */

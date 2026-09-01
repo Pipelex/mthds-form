@@ -61,20 +61,24 @@ export {
 // does - a host showing a result its own way needs the same answer, and two
 // copies of an answer is two places for it to drift. See ./native-content.
 export type {
+  CompositeMember,
   DateContentView,
   DocumentContentView,
   HtmlContentView,
   ImageContentView,
 } from './native-content';
 export {
+  NATIVE_COMPOSITE_CONCEPT_REF,
   NATIVE_DATE_CONCEPT_REF,
   NATIVE_HTML_CONCEPT_REF,
   TYPED_SCALAR_MARKERS,
   formatDateContent,
   hasTypedScalarMarkers,
+  isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
   isViewableUrl,
+  readCompositeContent,
   readDateContent,
   readDocumentContent,
   readHtmlContent,

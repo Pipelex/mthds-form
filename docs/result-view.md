@@ -97,6 +97,8 @@ Three rules replaced it, and each follows from a fact the descriptor already sta
 
 **A column description lives on its header.** Once, on hover and on focus, through the same tooltip every other description uses. Under every value it would be the same sentence fifteen times.
 
+**An open row IS the record.** Opening a row used to grow a second row underneath and keep the clipped cells above it, which showed every value twice and left the reader scrolling sideways through the clipped copy of what they had just opened. The cells are now replaced by the full rendering, spanning the table's width. Column alignment is what that costs, and only while a row is open — an open row is not being scanned against its neighbours, it is being read.
+
 **A list of images is a gallery; a list of files is rows.** A card per picture is a screenful each when the picture is the whole content, and a document's whole content is a name and a link — a bordered box with an index around two fields spends the chrome of a structure on them. A file is NAMED rather than printed whole: ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file". The full reference stays on the `title`, which is the part worth copying. An image nothing can paint gets a tile with an icon and its name — that is what a host with no storage resolver sees, so it has to be a design and not a fallback.
 
 **A list of scalars is chips, not cards** — unless the element is `prose`, which is the standard's way of saying "this may be long" and is what `native.Text` always derives to. A chip containing a paragraph is a box with a paragraph in it, so a prose list is plain lines instead: the values, one per line, divided by a hairline.
@@ -154,6 +156,14 @@ It renders **in a sandboxed frame**, never through `dangerouslySetInnerHTML`. Th
 Two mechanisms, covering different things. `sandbox` **without** `allow-scripts` means no JavaScript runs at all — no `<script>`, no `on*`, no `javascript:` URL; `allow-same-origin` is granted beside it, which is the safe pairing (same-origin is dangerous only _together with_ scripts) and is what lets the parent measure the content to size the frame. A `Content-Security-Policy` meta then holds `default-src 'none'`, so markup carrying `<img src="https://tracker/…">` cannot phone home the moment a result is displayed — a privacy leak rather than a script one, and one that survives the sandbox on its own.
 
 The frame's typography is read off the mount point with `getComputedStyle` and written into its own stylesheet, because no host CSS crosses a document boundary and the alternative is browser defaults in the middle of a themed panel — black on white inside a dark theme.
+
+## `native.Composite`: the one arm that reads the value
+
+Every layout above is decided by the descriptor, and that rule is load-bearing. `native.Composite` is the documented exception, and the reason is that there is nothing to read: a composite declares no members, so the standard's own honest answer is `kind: "unknown"` with a payload schema of `{additionalProperties: true}` and no properties. Both are true. The standard's note on `unknown` says a renderer then falls back to raw entry against the contract's `json_schema` — and that schema says *any object*.
+
+So the descriptor has abdicated, deliberately, and the choice left is between printing the whole thing as a JSON blob and reading the members as the `StuffContent`s they are **by definition**. A composite is a named composition of contents; that is not a guess about a payload, it is what the concept means. `CompositeValue` therefore renders one labelled block per member, and `NativeValue` renders each member as the most specific content model it matches.
+
+The readers are the standard's own — `readHtmlContent`, `readDateContent`, `readDocumentContent` — the same ones the descriptor calls elsewhere in this file. The only difference is that nothing can choose between them here, so they are tried in order of narrowness: `inner_html` and `date` name themselves, `url` is a file, `items` is a list envelope, and `text` is last of the recognised set because several models carry a `text` member beside their own. A member matching none is shown raw, which is the honest floor — shown, not dropped, and not guessed at.
 
 ## Why the readers live in core
 

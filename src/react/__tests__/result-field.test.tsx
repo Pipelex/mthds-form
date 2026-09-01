@@ -27,6 +27,7 @@ import type {
   NumberRunField,
   ObjectRunField,
   ProseRunField,
+  RunField,
   TextRunField,
 } from '../../core';
 import { FieldPresentationProvider } from '../field-presentation';
@@ -353,12 +354,19 @@ describe('lists', () => {
     );
     const toggle = screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    // Before: the cell holds the prose truncated, so it is in the DOM once.
+    // Closed: the cell holds the prose, truncated by CSS, so it is in the DOM
+    // once.
     expect(screen.getAllByText('Grind and coat the primary optics')).toHaveLength(1);
     await userEvent.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    // After: the detail row renders the record in full, beside the cell.
-    expect(screen.getAllByText('Grind and coat the primary optics')).toHaveLength(2);
+    // Open: the row BECOMES the record - it does not keep its clipped cells and
+    // grow a second row underneath. Still exactly once in the DOM, because
+    // showing every value twice (clipped above, whole below) is what this
+    // replaced. The other field of the record proves the full rendering is the
+    // one now on screen.
+    expect(screen.getAllByText('Grind and coat the primary optics')).toHaveLength(1);
+    // Twice now: the column header, and the label inside the opened record.
+    expect(screen.getAllByText('mission')).toHaveLength(2);
   });
 
   it('offers no toggle when every column is BOUNDED', () => {
@@ -813,5 +821,78 @@ describe('a text value can always be copied', () => {
   it('offers none on a value that is not text', () => {
     render(<ResultField field={number('total')} value={42} />);
     expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText })).toBeNull();
+  });
+});
+
+describe('native.Composite', () => {
+  // The one arm in this file that reads the value, and the one place where
+  // that is the only option: a composite declares no members, so its node is
+  // `kind: "unknown"` and its payload schema is an open object. Both are true.
+  // What the descriptor cannot say, the CONCEPT does — a composite is a named
+  // composition of contents — so the members are read as the contents they are
+  // by definition, rather than printed as forty lines of escaped JSON.
+  const composite: RunField = {
+    kind: 'unknown',
+    name: 'output',
+    conceptRef: 'native.Composite',
+    required: true,
+  };
+
+  it('names each member and typesets a text content as markdown', () => {
+    render(
+      <ResultField
+        field={composite}
+        value={{
+          batch_result: { text: '## Findings\n\nRevenue is **up**.' },
+          search_summary: { text: 'Nothing else to report.' },
+        }}
+      />,
+    );
+    expect(screen.getByText('batch_result')).toBeTruthy();
+    expect(screen.getByText('search_summary')).toBeTruthy();
+    // Typeset, not printed: a heading is an element and the asterisks are gone.
+    expect(screen.getByRole('heading', { name: 'Findings' })).toBeTruthy();
+    expect(screen.getByText('up').tagName).toBe('STRONG');
+    expect(screen.queryByText(/## Findings/)).toBeNull();
+  });
+
+  it('unwraps a ListContent member into one line per entry', () => {
+    const { container } = render(
+      <ResultField
+        field={composite}
+        value={{ pages: { items: [{ text: 'one' }, { text: 'two' }] } }}
+      />,
+    );
+    expect(screen.getByText('pages')).toBeTruthy();
+    expect(container.textContent).toContain('one');
+    expect(container.textContent).toContain('two');
+    // Not the envelope: `items` is the wrapper's name and never a member's.
+    expect(screen.queryByText('items')).toBeNull();
+  });
+
+  it('names a file member rather than printing its record', () => {
+    render(
+      <ResultField
+        field={composite}
+        value={{ brief: { url: 'https://example.com/a.pdf', filename: 'brief.pdf' } }}
+      />,
+    );
+    expect(screen.getByText('brief')).toBeTruthy();
+    expect(screen.getAllByText('brief.pdf').length).toBeGreaterThan(0);
+  });
+
+  it('falls back to raw for a member whose model it does not know', () => {
+    // The honest floor: shown, not dropped, and not guessed at.
+    const { container } = render(
+      <ResultField field={composite} value={{ odd: { alpha: 1, beta: 2 } }} />,
+    );
+    expect(screen.getByText('odd')).toBeTruthy();
+    expect(container.textContent).toContain('alpha');
+    expect(container.textContent).not.toContain('[object Object]');
+  });
+
+  it('says absent for an empty composite', () => {
+    render(<ResultField field={composite} value={{}} />);
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.resultAbsentDescription)).toBeTruthy();
   });
 });

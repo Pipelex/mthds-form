@@ -3,12 +3,14 @@
 import type * as React from 'react';
 import type { RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
-import type { DocumentContentView } from '../core/native-content';
+import type { CompositeMember, DocumentContentView } from '../core/native-content';
 import {
   formatDateContent,
+  isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
   isViewableUrl,
+  readCompositeContent,
   readDateContent,
   readDocumentContent,
   readHtmlContent,
@@ -894,7 +896,7 @@ function ObjectTable({
             const isOpen = expanded.has(index);
             return (
               <Fragment key={index}>
-                <tr className={cn('border-b border-border/60', !isOpen && 'last:border-b-0')}>
+                <tr className="border-b border-border/60 last:border-b-0">
                   {canExpand && (
                     <td className="px-1 align-top">
                       <button
@@ -912,44 +914,18 @@ function ObjectTable({
                       </button>
                     </td>
                   )}
-                  {columns.map((column) => {
-                    const cell =
-                      typeof item === 'object' && item !== null
-                        ? ownProp(item as Record<string, unknown>, column.name)
-                        : undefined;
-                    return (
-                      <td key={column.name} className="px-3 py-1.5 align-top">
-                        {/* One line per cell, and a cap on how wide one may push
-                            the column. Wrapping is what a `w-full` table does
-                            instead of overflowing, and it is the worse failure: a
-                            date broken over two lines to save a scrollbar. The
-                            cap stops the opposite failure - one long label making
-                            a 200-character column - and the full value is a click
-                            or a hover away. */}
-                        <div
-                          className={cn(
-                            'max-w-[44ch]',
-                            column.kind === 'list' && isInlineColumn(column)
-                              ? 'min-w-[16ch]'
-                              : 'truncate',
-                          )}
-                          {...(typeof cell === 'string' || typeof cell === 'number'
-                            ? { title: String(cell) }
-                            : {})}
-                        >
-                          <LeafValue field={column} value={cell} compact />
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-                {isOpen && (
-                  <tr className="border-b border-border/60 last:border-b-0">
-                    {/* The whole record, in the stacked layout - which already
-                        renders prose, nesting and files properly. Spanning every
-                        column keeps it a row of the same table rather than a
-                        second widget beside it. */}
-                    <td colSpan={columns.length + 1} className="bg-card/40 p-0">
+                  {/* OPEN: the row BECOMES the record. It used to keep its
+                      truncated cells and grow a second row underneath, which
+                      showed every value twice — clipped above, whole below —
+                      and left the reader scrolling sideways through the clipped
+                      copy of what they had just opened. A row is one thing, so
+                      opening it replaces it rather than annotating it.
+
+                      Column alignment is what that costs, and only while a row
+                      is open: an open row is not being scanned against its
+                      neighbours, it is being read. */}
+                  {isOpen ? (
+                    <td colSpan={columns.length} className="bg-card/40 p-0">
                       <div
                         className="sticky left-0 px-3.5 py-3"
                         {...(viewportWidth ? { style: { width: viewportWidth } } : {})}
@@ -957,8 +933,39 @@ function ObjectTable({
                         <ResultField field={element} value={item} hideLabel />
                       </div>
                     </td>
-                  </tr>
-                )}
+                  ) : (
+                    columns.map((column) => {
+                      const cell =
+                        typeof item === 'object' && item !== null
+                          ? ownProp(item as Record<string, unknown>, column.name)
+                          : undefined;
+                      return (
+                        <td key={column.name} className="px-3 py-1.5 align-top">
+                          {/* One line per cell, and a cap on how wide one may push
+                            the column. Wrapping is what a `w-full` table does
+                            instead of overflowing, and it is the worse failure: a
+                            date broken over two lines to save a scrollbar. The
+                            cap stops the opposite failure - one long label making
+                            a 200-character column - and the full value is a click
+                            or a hover away. */}
+                          <div
+                            className={cn(
+                              'max-w-[44ch]',
+                              column.kind === 'list' && isInlineColumn(column)
+                                ? 'min-w-[16ch]'
+                                : 'truncate',
+                            )}
+                            {...(typeof cell === 'string' || typeof cell === 'number'
+                              ? { title: String(cell) }
+                              : {})}
+                          >
+                            <LeafValue field={column} value={cell} compact />
+                          </div>
+                        </td>
+                      );
+                    })
+                  )}
+                </tr>
               </Fragment>
             );
           })}
@@ -966,6 +973,113 @@ function ObjectTable({
       </table>
     </div>
   );
+}
+
+/**
+ * A `native.Composite` — its members, named, each rendered as what it is.
+ *
+ * ## Why this one reads the value, when nothing else here does
+ *
+ * Every other layout in this file is decided by the descriptor, and that rule
+ * is load-bearing. This arm is the documented exception, and the reason is that
+ * there is nothing to read: a composite declares no members, so the standard's
+ * own honest answer is `kind: "unknown"` with a payload schema of
+ * `{additionalProperties: true}` and no properties. Both are true. The
+ * standard's note on `unknown` says a renderer then "falls back to raw entry
+ * against the contract's `json_schema`" — and that schema says *any object*.
+ *
+ * So the descriptor has abdicated, deliberately, and the choice left is between
+ * printing the whole thing as a JSON blob and reading the members as the
+ * `StuffContent`s they are BY DEFINITION. A composite is a named composition of
+ * contents; that is not a guess about this payload, it is what the concept
+ * means.
+ *
+ * ## And the readers are the standard's, not sniffing
+ *
+ * `readHtmlContent`, `readDateContent`, `readDocumentContent` and the rest
+ * already exist and are already payload readers — elsewhere in this file the
+ * DESCRIPTOR chooses which one to call. Here nothing can, so they are tried in
+ * order of specificity, and a member that matches none is shown raw. What that
+ * costs is precision on a member whose content model this version does not
+ * know; what it buys is that a composite of two summaries reads as two
+ * summaries instead of forty lines of escaped JSON.
+ *
+ * The order matters and is by narrowness: `inner_html` and `date` name
+ * themselves, `url` is a file, `items` is a list envelope, and `text` is last
+ * of the recognised set because several models carry a `text` member beside
+ * their own (a `Page`, for one).
+ */
+function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
+  return (
+    <div className="space-y-3">
+      {members.map((member) => (
+        <div key={member.name} className="space-y-1">
+          <span className="font-mono text-[12px] font-semibold text-foreground">{member.name}</span>
+          <NativeValue value={member.value} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One content of unknown model, rendered as the most specific thing it matches.
+ *
+ * Only reachable from `CompositeValue` — see that component for why reading a
+ * value is allowed there and nowhere else in this file.
+ */
+function NativeValue({ value }: { value: unknown }) {
+  if (value === null || value === undefined || value === '') return <Absent />;
+
+  const html = readHtmlContent(value);
+  if (html) return <HtmlPreview content={html} />;
+
+  const date = readDateContent(value);
+  if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
+
+  const document = readDocumentContent(value);
+  if (document?.url !== undefined) {
+    return (
+      <FileRef
+        url={document.url}
+        {...(document.mimeType !== undefined ? { mimeType: document.mimeType } : {})}
+        {...(document.filename !== undefined ? { filename: document.filename } : {})}
+      />
+    );
+  }
+
+  // A `ListContent` envelope: the members of a composite are contents, and a
+  // plural one arrives wrapped exactly as a plural result does.
+  if (isRecord(value) && Array.isArray((value as Record<string, unknown>).items)) {
+    const items = (value as { items: unknown[] }).items;
+    if (items.length === 0) return <Absent />;
+    return (
+      <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+        {items.map((item, index) => (
+          <div key={index} className="bg-card/40 px-3 py-1.5">
+            <NativeValue value={item} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // `text` last of the recognised models: several carry one beside their own.
+  if (isRecord(value)) {
+    const text = (value as Record<string, unknown>).text;
+    if (typeof text === 'string') {
+      return text === '' ? <Absent /> : <Markdown text={text} />;
+    }
+  }
+
+  if (typeof value === 'string') return <Markdown text={value} />;
+  if (typeof value !== 'object') return <Scalar value={value} />;
+  return <RawValue value={value} compact={false} />;
+}
+
+/** A plain object, for the one arm that has to ask. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -1118,6 +1232,21 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
       <div className="space-y-2">
         {header}
         {content ? <HtmlPreview content={content} /> : <Absent />}
+      </div>
+    );
+  }
+
+  // A named bag of contents, before the kind switch for the same reason - and
+  // with the weakest descriptor of the three: a composite declares no members,
+  // so its node is `kind: "unknown"` and its payload schema is an open object.
+  // The default fallback for that is a JSON blob, which is the worst available
+  // answer to a value that is by definition a map of ordinary contents.
+  if (isNativeCompositeNode(field)) {
+    const members = readCompositeContent(unwrapped);
+    return (
+      <div className="space-y-2">
+        {header}
+        {members && members.length > 0 ? <CompositeValue members={members} /> : <Absent />}
       </div>
     );
   }
