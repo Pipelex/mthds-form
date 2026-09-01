@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
+import { DEFAULT_FIELD_STRINGS } from '../../react';
 import { ResultView } from '../result-view';
 
 /**
@@ -184,8 +185,12 @@ export const DeeplyNested: Story = {
     await expect(canvas.getAllByText(divisions[0]!.name)).toHaveLength(BOTH_THEMES);
     // Opening one row reaches the level beneath it, and the recursion continues
     // from there - each nested list a table of its own.
-    const toggles = canvas.getAllByRole('button');
-    await userEvent.click(toggles[0]!);
+    // Named, not indexed: the panel's Result/JSON switch comes first in the DOM,
+    // so "the first button" stopped meaning "the first row's chevron".
+    const [firstRow] = canvas.getAllByRole('button', {
+      name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1),
+    });
+    await userEvent.click(firstRow!);
     await expect(canvas.getAllByRole('columnheader', { name: 'Members' }).length).toBeGreaterThan(
       0,
     );

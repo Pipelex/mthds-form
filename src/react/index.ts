@@ -21,6 +21,11 @@ export { UnknownField } from './unknown-field';
 export type { ResultFieldProps } from './result-field';
 export { ResultField } from './result-field';
 
+// The panel a host mounts: the header, the Result/JSON switch, and the field
+// tree beneath them. `ResultField` stays exported for a host composing its own.
+export type { ResultPanelProps, ResultPanelView } from './result-panel';
+export { ResultPanel } from './result-panel';
+
 // The markup arm of the result view, exported on its own for a host that renders
 // a `native.Html` value outside a result tree. It is a sandboxed frame rather
 // than an innerHTML write - see the module header for what the sandbox stops.

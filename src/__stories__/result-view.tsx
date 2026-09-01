@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { OutputForm, PipeIOContracts, RunField } from '../core';
 import { buildResultField, getPipeIOContract, getPipeOutputForm } from '../core';
-import { ResultField } from '../react';
+import { ResultPanel } from '../react';
 
 /**
  * The one harness every result story renders through — the output twin of
@@ -20,6 +20,10 @@ import { ResultField } from '../react';
  * and names the property that payload sits under. Pairing them here rather than
  * in each story is the point — a story that reached for only one would be
  * demonstrating a consumer that has to guess.
+ *
+ * It renders through `ResultPanel`, the component a host actually mounts, so
+ * every story carries the **Result / JSON** switch. That is deliberate: the JSON
+ * view is not a feature of some results, it is the receipt for all of them.
  */
 
 export interface ResultViewProps {
@@ -62,7 +66,7 @@ export function ResultView({
   );
   return (
     <div style={{ maxWidth }}>
-      <ResultField field={field} value={value} />
+      <ResultPanel field={field} value={value} />
     </div>
   );
 }

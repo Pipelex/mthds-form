@@ -42,6 +42,18 @@ This is the one place a PRODUCER does real work rather than delegating, and it s
 
 To be clear about where this lands: **a consumer never sees it.** The emitted descriptor carries `kind: "list"`, exactly as a plural input's does, and a renderer reads plurality from the descriptor and never touches the contract.
 
+## `ResultPanel` — two views, and why not three
+
+`ResultPanel` is the component a host mounts: the header, a **Result / JSON** switch, and the field tree beneath them. `ResultField` stays exported for a host composing its own chrome, but the panel is the default answer, and the JSON view is a property of it — not a feature some results have.
+
+**Result** is the answer for a person: the descriptor-driven view, which knows a field is an enum, that a date arrived in the serializer's typed envelope, that fifteen records are a table. **JSON** is the answer for whoever is debugging the pipe: what exactly came back, verbatim, copyable, keyed the way the payload is keyed rather than the way the label reads. Different jobs; neither substitutes for the other.
+
+They are deliberately **not peers**, and the toggle should not read as a menu of equal options. One is the result, the other is the receipt, and Result opens first.
+
+**The third view is the one to resist.** An engine-rendered HTML or plain-text presentation — the shape a runtime's own viewer offers — is a second _human_ rendering of the same payload: produced by another codebase, carrying no descriptor (so it cannot know a kind, a plurality or a nesting), unable to match a host's design system, and unimprovable without shipping the engine. If a plain-text form is genuinely wanted, it is a **copy format** and belongs behind a copy control, not beside the view that reads the standard.
+
+The panel draws the header once and tells `ResultField` to skip its own. Two headers that agree today drift tomorrow, and the header must not move when the view changes — switching should not relocate the thing you are reading.
+
 ## `ResultField`
 
 The single dispatch point, mirroring `FieldRenderer` on the input side, and its switch over `RunFieldKind` is **exhaustive with a `satisfies never` fall-through**. That is not tidiness. It used to end in a `default:` that did `String(value)`, so a `document` result rendered as the literal text `[object Object]` — no exception, no warning, no failing type, just a wrong pixel. A twelfth kind now fails the build here instead.

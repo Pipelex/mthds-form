@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS } from '../_generated/lists.payloads';
+import { DEFAULT_FIELD_STRINGS } from '../../react';
 import { ResultView } from '../result-view';
 
 /**
@@ -162,7 +163,9 @@ export const OfNestedRecords: Story = {
     await expect(canvas.getAllByRole('columnheader', { name: 'Sections' })).toHaveLength(
       BOTH_THEMES,
     );
-    await expect(canvas.getAllByRole('button').length).toBeGreaterThan(0);
+    await expect(
+      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }).length,
+    ).toBeGreaterThan(0);
   },
 };
 

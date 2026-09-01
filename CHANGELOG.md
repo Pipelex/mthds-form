@@ -18,6 +18,14 @@
 
 ### Added
 
+- **`ResultPanel` — every result carries a JSON view.** The component a host mounts: the header, a **Result / JSON** switch, and the field tree beneath them. `ResultField` stays exported for a host composing its own chrome, but the JSON view is a property of the panel rather than a feature some results have — it is the receipt for all of them.
+
+  The two are deliberately not peers. Result is the answer for a person, and the only one that reads the descriptor; JSON is what came back, verbatim, keyed the way the payload is keyed rather than the way a label reads. Result opens first, and the switch is not a menu of equal options.
+
+  **The third view is the one to resist**, and the component says so where someone would go looking: an engine-rendered HTML or plain-text presentation is a second _human_ rendering of the same payload — no descriptor, so no kind, plurality or nesting; no way to match a host's design system; unimprovable without shipping the engine. A plain-text form, if wanted, is a copy format and belongs behind a copy control.
+
+  The panel draws the header once and tells the field tree to skip its own, and keeps it in place across the switch — changing view should not relocate the thing you are reading. New strings: `viewRendered`, `viewJson`, `copyJson`, `resultViewGroup`.
+
 - **A file always exposes its URL — openable, readable, pasteable.** A picture is a preview of a file, not a replacement for it, and once an image painted its URL vanished entirely: a result you could look at and could not use. A painted image is now wrapped in a link to the file it previews, its reference is printed beneath it, and every file reference — image and document alike — carries a copy control.
 
   The copy control is what resolves two requirements that pull opposite ways: ninety characters of UUID printed in full wraps across the panel and says nothing, and a short name alone cannot be pasted into a terminal. **The label is the name; the button is the URL.** It hides itself where `navigator.clipboard` is undefined (outside a secure context), because a button that does nothing is worse than no button — the link and the `title` still carry the reference there.

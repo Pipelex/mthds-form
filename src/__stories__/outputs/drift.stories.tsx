@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { RunField } from '../../core/descriptor';
-import { ResultField } from '../../react';
+import { ResultPanel } from '../../react';
 
 /**
  * What a renderer does with a value it has no arm for.
@@ -26,7 +26,7 @@ const scalar: RunField = {
 function Drift({ field, value }: { field: RunField; value: unknown }) {
   return (
     <div style={{ maxWidth: 560 }}>
-      <ResultField field={field} value={value} />
+      <ResultPanel field={field} value={value} />
     </div>
   );
 }

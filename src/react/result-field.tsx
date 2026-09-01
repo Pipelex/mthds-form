@@ -82,6 +82,21 @@ function unwrap(field: RunField, value: unknown): unknown {
   return unwrapped === undefined ? value : unwrapped;
 }
 
+/**
+ * The label row of a result node — exported so the panel that owns the top-level
+ * header draws the SAME one rather than a second that drifts from it.
+ */
+export function ResultHeader({ field }: { field: RunField }) {
+  return (
+    <>
+      <Label field={field} />
+      {field.description && (
+        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
+      )}
+    </>
+  );
+}
+
 function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
   return (
     <div
@@ -118,7 +133,7 @@ function Absent() {
  * know what it is holding. Raw JSON is the right answer to both: the reader sees
  * the value, and nobody has invented a shape for it.
  */
-function stringifyValue(value: object): string | undefined {
+export function stringifyValue(value: object): string | undefined {
   try {
     // A BigInt throws rather than serializing, and it can arrive from a JSON
     // parser configured to produce them. Naming it is better than failing.

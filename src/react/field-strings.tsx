@@ -47,6 +47,11 @@ export interface FieldStrings {
   rowDetailsColumn: string;
   /** The control that puts a file's whole URL on the clipboard. */
   copyUrl: string;
+  /** The result panel's two views, and the control that copies the payload. */
+  viewRendered: string;
+  viewJson: string;
+  copyJson: string;
+  resultViewGroup: string;
   yes: string;
   no: string;
   /**
@@ -88,6 +93,10 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   toggleRowDetails: (index) => `Show or hide the details of row ${index}`,
   rowDetailsColumn: 'Details',
   copyUrl: 'Copy the URL',
+  viewRendered: 'Result',
+  viewJson: 'JSON',
+  copyJson: 'Copy the JSON',
+  resultViewGroup: 'Result view',
   yes: 'Yes',
   no: 'No',
   unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
