@@ -127,3 +127,20 @@ describe('a code block wraps rather than scrolling', () => {
     expect(pre.className).not.toContain('overflow-x-auto');
   });
 });
+
+describe('emphasis inside a list is typeset like emphasis anywhere else', () => {
+  it('renders bold inside a tight list item', () => {
+    // A tight list's items are bare `text` tokens in block position, not
+    // paragraphs. Without an arm for that they fell to the raw fallback and a
+    // bulleted `**Type:** …` showed its asterisks — typeset everywhere except
+    // inside a list, which is where model output puts most of its emphasis.
+    const { container } = render(<Markdown text={'- **Type:** report\n- **Period:** Q4'} />);
+    expect(container.querySelectorAll('li strong')).toHaveLength(2);
+    expect(container.textContent).not.toContain('**');
+  });
+
+  it('renders a link inside a list item', () => {
+    const { container } = render(<Markdown text={'- see [docs](https://example.com)'} />);
+    expect(container.querySelector('li a')?.getAttribute('href')).toBe('https://example.com');
+  });
+});

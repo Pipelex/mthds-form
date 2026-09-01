@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **Emphasis inside a markdown list showed its asterisks.** A tight list's items are bare `text` tokens in block position, not paragraphs, and the block walk had no arm for that — so `- **Type:** report` rendered typeset everywhere except inside a list, which is where model output puts most of its emphasis.
+
 - **`native.Composite` rendered as a JSON blob.** A composite declares no members, so its descriptor is `kind: "unknown"` and its payload schema is `{additionalProperties: true}` with no properties — both true, both the standard's escape hatch honestly used, and both leaving the default fallback with nothing to do but print the whole value escaped. It now renders as what the CONCEPT says it is: a named composition of contents, one labelled block per member.
 
   **This is the one arm in the result renderer that reads the value, and the exception is deliberate.** Everywhere else the descriptor decides the layout; here the descriptor has abdicated, so the choice is between a JSON blob and reading the members as the `StuffContent`s they are by definition. The readers are the standard's own — `readHtmlContent`, `readDateContent`, `readDocumentContent` — the same ones the descriptor calls elsewhere; the only difference is that nothing can choose between them, so they are tried in order of narrowness and a member matching none is shown raw. A composite of two summaries now reads as two summaries.

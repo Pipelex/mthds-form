@@ -109,6 +109,15 @@ function Block({ token }: { token: Token }) {
         </p>
       );
 
+    // A `text` token in BLOCK position, which is what a tight list's items are
+    // made of: the lexer wraps a loose item's content in a paragraph and a
+    // tight one's in a bare `text`. Without this arm it fell through to the raw
+    // fallback below and a bulleted `**Type:** …` rendered with its asterisks
+    // showing - typeset everywhere except inside a list, which is where model
+    // output puts most of its emphasis.
+    case 'text':
+      return <Inline tokens={(token as Tokens.Text).tokens ?? [token]} />;
+
     case 'list': {
       const list = token as Tokens.List;
       const Tag = list.ordered ? 'ol' : 'ul';
