@@ -18,6 +18,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type {
   BooleanRunField,
   DateRunField,
@@ -309,7 +310,67 @@ describe('lists', () => {
     expect(screen.getByText('survey')).toBeTruthy();
   });
 
-  it('keeps a column description on the header rather than beside every value', () => {
+  it('keeps a record carrying PROSE a table, showing its first line', () => {
+    // Falling back to a card per entry was the wrong trade: a table is how you
+    // READ a list of records, and giving that up over the widest column loses it
+    // for every other column too. The cell shows the first line; the row expands
+    // for the rest.
+    const row = object('item', [text('name'), prose('mission')]);
+    const { container } = render(
+      <ResultField
+        field={list('teams', row)}
+        value={[{ name: 'Lenses', mission: 'Grind optics' }]}
+      />,
+    );
+    expect(container.querySelector('table')).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Mission' })).toBeTruthy();
+  });
+
+  it('keeps a record carrying a STRUCTURE a table, counting what the cell cannot hold', () => {
+    const row = object('item', [text('name'), list('members', object('member', [text('who')]))]);
+    render(
+      <ResultField
+        field={list('teams', row)}
+        value={[{ name: 'Lenses', members: [{ who: 'Amara' }, { who: 'Tomas' }] }]}
+      />,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeTruthy();
+    // The cell states the fact; the expansion carries the content.
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.itemsCount(2))).toBeTruthy();
+  });
+
+  it('expands a row to the whole record, and only when there is more to show', async () => {
+    const row = object('item', [text('name'), prose('mission')]);
+    render(
+      <ResultField
+        field={list('teams', row)}
+        value={[{ name: 'Lenses', mission: 'Grind and coat the primary optics' }]}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    // Before: the cell holds the prose truncated, so it is in the DOM once.
+    expect(screen.getAllByText('Grind and coat the primary optics')).toHaveLength(1);
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    // After: the detail row renders the record in full, beside the cell.
+    expect(screen.getAllByText('Grind and coat the primary optics')).toHaveLength(2);
+  });
+
+  it('offers no toggle when every column is shown whole', () => {
+    // A table of short scalars has nothing more to reveal, and a column of
+    // chevrons that open onto the same values is chrome pretending to be a
+    // feature.
+    render(
+      <ResultField
+        field={list('steps', object('item', [text('label'), number('week')]))}
+        value={[{ label: 'kickoff', week: 1 }]}
+      />,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('puts the column description on the header, where hovering finds it', () => {
     const described: TextRunField = { ...text('label'), description: 'What happens' };
     const { container } = render(
       <ResultField
@@ -318,50 +379,7 @@ describe('lists', () => {
       />,
     );
     expect(container.querySelector('thead th')?.getAttribute('title')).toBe('What happens');
-    // Printed once as a tooltip, never as a line under each row.
     expect(screen.queryByText('What happens')).toBeNull();
-  });
-
-  it('falls back to cards when an element carries prose', () => {
-    // A paragraph in a table cell forces one column to the width of the longest
-    // answer and drags every other row's height with it.
-    const row = object('item', [text('name'), prose('mission')]);
-    const { container } = render(
-      <ResultField
-        field={list('teams', row)}
-        value={[{ name: 'Lenses', mission: 'Grind optics' }]}
-      />,
-    );
-    expect(container.querySelector('table')).toBeNull();
-    expect(screen.getByText('Grind optics')).toBeTruthy();
-  });
-
-  it('keeps a record with a short scalar list a table, with chips in the cell', () => {
-    // A record does not stop being a row because one of its fields is a list of
-    // two words. Chips wrap, so a column of them stays a column - and sending the
-    // whole list back to cards over its narrowest field is the wrong trade.
-    const row = object('item', [text('name'), list('tags', text('tag'))]);
-    const { container } = render(
-      <ResultField field={list('teams', row)} value={[{ name: 'Lenses', tags: ['a', 'b'] }]} />,
-    );
-    expect(container.querySelector('table')).toBeTruthy();
-    expect(screen.getByText('a')).toBeTruthy();
-    expect(screen.getByText('b')).toBeTruthy();
-  });
-
-  it('falls back to cards when an element nests a STRUCTURE', () => {
-    // Asserted on the OUTER list's own layout rather than on "is there a table
-    // anywhere": the nested `members` list is a table in its own right, and
-    // finding it would have made this pass for the wrong reason.
-    const row = object('item', [text('name'), list('members', object('member', [text('who')]))]);
-    render(
-      <ResultField
-        field={list('teams', row)}
-        value={[{ name: 'Lenses', members: [{ who: 'Amara' }] }]}
-      />,
-    );
-    expect(screen.queryByRole('columnheader', { name: 'Name' })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: 'Who' })).toBeTruthy();
   });
 });
 
@@ -384,21 +402,35 @@ describe('lists of files', () => {
     expect(screen.queryByText('1')).toBeNull();
   });
 
-  it('keeps an unpaintable image as its reference rather than a broken tile', () => {
-    // A grid of identical broken-image glyphs is worse than the text, and a
-    // storage reference is what a host with no resolver actually holds.
+  it('drops the grid entirely when NOTHING in it can be painted', () => {
+    // A gallery of empty squares is not a gallery. Three large blanks say less
+    // than three lines do, so the layout follows what is actually showable
+    // rather than what the kind promises. This is what a host with no storage
+    // resolver sees, so it has to be a design and not a fallback.
     const { container } = render(
       <ResultField
         field={list('shots', file('item', 'image'))}
-        value={[{ url: 'pipelex-storage://x/a.png', mime_type: 'image/png' }]}
+        value={[
+          { url: 'pipelex-storage://x/a.png', mime_type: 'image/png' },
+          { url: 'pipelex-storage://x/b.png', mime_type: 'image/png' },
+        ]}
       />,
     );
     expect(container.querySelector('img')).toBeNull();
-    // The tile says what it is - an icon and the file's name - rather than
-    // dumping the reference into a 140px box. This is what a host with no
-    // resolver sees, so it has to be a design and not a fallback.
     expect(screen.getByText('a.png')).toBeTruthy();
-    expect(screen.getByTitle('pipelex-storage://x/a.png')).toBeTruthy();
+    expect(screen.getByText('b.png')).toBeTruthy();
+    expect(screen.getByTitle(/pipelex-storage:\/\/x\/a\.png/)).toBeTruthy();
+  });
+
+  it('keeps the grid when at least one image can be painted', () => {
+    const { container } = render(
+      <ResultField
+        field={list('shots', file('item', 'image'))}
+        value={[{ url: 'https://cdn.example/a.png' }, { url: 'pipelex-storage://x/b.png' }]}
+      />,
+    );
+    expect(container.querySelectorAll('img')).toHaveLength(1);
+    expect(screen.getByText('b.png')).toBeTruthy();
   });
 
   it('renders a list of documents as rows, not cards', () => {

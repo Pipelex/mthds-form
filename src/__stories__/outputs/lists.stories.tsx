@@ -13,13 +13,17 @@ import { ResultView } from '../result-view';
  * stories beside the rest: the branches are the interesting thing, and a corpus
  * that only ever met one of them proves nothing about the others.
  *
+ * Each story is named for the mapping it demonstrates — what the data IS, then
+ * what it LOOKS like — because that mapping is the only thing the section is
+ * about.
+ *
  * | The element is… | It renders as | Because |
  * | --- | --- | --- |
  * | a scalar | inline chips | the entries ARE the values; an index labels nothing |
  * | a short record | a **table** | every entry has the same keys — that is a table |
  * | a wide record | a table that **scrolls** | twelve columns fit no panel; crushing them is worse than scrolling |
- * | a record with prose | cards | a paragraph in a cell drags every row's height with it |
- * | a record holding records | cards, containing tables | the entries are structures, so the index earns its place |
+ * | a record with prose | a table, with the row **expandable** | a paragraph cannot be a cell, but giving up the table over one column loses it for the others |
+ * | a record holding records | the same | the cell says how many; the expansion shows them |
  * | an image | a **gallery** | a picture is the whole content; a card per picture is a screenful each |
  * | a document | rows | a name and a link is not a structure |
  *
@@ -57,6 +61,7 @@ function story(pipeCode: string, maxWidth?: number) {
  * screenful spent on nothing.
  */
 export const OfText: Story = {
+  name: 'Strings → lines',
   args: story('texts'),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -67,6 +72,7 @@ export const OfText: Story = {
 
 /** A list of `Number`. The same chips, because the layout follows the kind. */
 export const OfNumbers: Story = {
+  name: 'Numbers → chips',
   args: story('numbers'),
 };
 
@@ -76,6 +82,7 @@ export const OfNumbers: Story = {
  * is an `object` — and a list of two-column records is a table.
  */
 export const OfDates: Story = {
+  name: 'Dates → table',
   args: story('dates'),
 };
 
@@ -83,6 +90,7 @@ export const OfDates: Story = {
 
 /** A list of short records — a table, with the labels as headers stated once. */
 export const OfShortRecords: Story = {
+  name: 'Records → table',
   args: story('steps'),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -102,6 +110,7 @@ export const OfShortRecords: Story = {
  * Scroll it sideways.
  */
 export const OfWideRecords: Story = {
+  name: 'Wide records → scrolling table',
   args: story('readings', 640),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -112,15 +121,24 @@ export const OfWideRecords: Story = {
 };
 
 /**
- * A record carrying PROSE. Cards, deliberately: a paragraph in a `<td>` forces
- * one column to the width of the longest answer and drags every other row's
- * height with it, so `prose` is outside the tabular set.
+ * A record carrying PROSE — still a table, with the row expandable.
+ *
+ * This used to fall back to a card per entry, and that was the wrong trade: a
+ * table is how you READ a list of records, and giving it up over the widest
+ * column loses it for every other column too. What a table genuinely cannot do
+ * is hold a paragraph in a cell, so it does not try — the cell shows the first
+ * line, and **the chevron opens the whole record underneath**.
+ *
+ * Click one.
  */
 export const OfRecordsWithProse: Story = {
+  name: 'Records with paragraphs → table + expand',
   args: story('findings', 640),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryAllByRole('table')).toHaveLength(0);
+    // A table, with a way in rather than a fallback out.
+    await expect(canvas.getAllByRole('table')).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByRole('columnheader', { name: 'Detail' })).toHaveLength(BOTH_THEMES);
   },
 };
 
@@ -128,17 +146,23 @@ export const OfRecordsWithProse: Story = {
  * **A list of records holding lists of records holding lists.** Chapters, each
  * with sections, each with its points.
  *
- * The outer two levels are cards — their entries are structures, so the index
- * earns its place — and the innermost list is chips. Three list layouts in one
- * result, each chosen from its own element.
+ * The outer list is a table whose `Sections` cell says how many there are,
+ * because a list of structures is not a cell at any width. Expanding a row
+ * renders the chapter in full — and its sections are a table of their own, whose
+ * `Points` are chips. Three layouts, each chosen from its own element.
+ *
+ * Click a chevron.
  */
 export const OfNestedRecords: Story = {
+  name: 'Lists inside lists → table + expand',
   args: story('chapters', 720),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const chapters = items('chapters') as { sections: { points: string[] }[] }[];
-    const deepest = chapters[0]!.sections[0]!.points[0]!;
-    await expect(canvas.getAllByText(deepest)).toHaveLength(BOTH_THEMES);
+    // The outer table, and the count standing in for what a cell cannot hold.
+    await expect(canvas.getAllByRole('columnheader', { name: 'Sections' })).toHaveLength(
+      BOTH_THEMES,
+    );
+    await expect(canvas.getAllByRole('button').length).toBeGreaterThan(0);
   },
 };
 
@@ -150,6 +174,7 @@ export const OfNestedRecords: Story = {
  * chrome of a structure on two fields.
  */
 export const OfDocuments: Story = {
+  name: 'Documents → rows',
   args: story('sources', 640),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -169,6 +194,7 @@ export const OfDocuments: Story = {
  * with no storage resolver sees.
  */
 export const OfImages: Story = {
+  name: 'Images → gallery',
   args: story('gallery', 640),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -185,10 +211,12 @@ export const OfImages: Story = {
  * output optional — so this is a normal state, not an error.
  */
 export const Empty: Story = {
+  name: 'Nothing → empty',
   args: { pipeCode: 'steps', value: { items: [] } },
 };
 
 /** One entry. The table's header is still worth its line: it names the columns. */
 export const OneItem: Story = {
+  name: 'One entry',
   args: { pipeCode: 'steps', value: { items: items('steps').slice(0, 1) } },
 };

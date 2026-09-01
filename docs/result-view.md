@@ -64,11 +64,15 @@ The result view started as the input form with the controls swapped for values, 
 
 Three rules replaced it, and each follows from a fact the descriptor already states.
 
+**Every list of records is a table**, and the ones a cell cannot hold expand. Falling back to a card per entry over the widest column was the wrong trade: a table is how a list of records is READ — scannable, aligned, one row each — and giving that up for prose or nesting lost it for every other column too. So the cell shows the first line (or how many entries there are), and the row expands to the whole record in the stacked layout, arriving only when asked for. The toggle appears only when a row HAS more to show; a table of short scalars gets no column of chevrons that reveal nothing. The expanded panel is pinned to the scroller's width, because a detail spanning every column would otherwise inherit the table's and run off into the horizontal scroll.
+
 **A list of records with one shape is a table.** Every entry has the same keys — that is what a table is. So the labels become column headers, stated once instead of once per row, and the type pills go with them. `tableColumns` decides it: an `object` element whose every field is a short scalar, or a list of them.
 
 **A column can hold a short scalar list.** A record does not stop being a row because one of its fields is two words; chips wrap, so a column of them stays a column. Sending the whole list back to cards over its narrowest field is the wrong trade, and it is the difference between a five-column table of people and five stacked forms.
 
-**Prose and nesting fall back to cards.** A paragraph in a `<td>` forces one column to the width of the longest answer and drags every row's height with it, so `prose` is deliberately outside the tabular set. So are `object` and `list`-of-structures, for the obvious reason, and `document`/`image`, because a file's chrome is not a cell. The index label a card carries earns its place there — the entries are structures rather than values.
+**Prose and nesting are shown, not accommodated.** A paragraph in a `<td>` forces one column to the width of the longest answer, so a prose cell holds its first line and the row carries the rest; a structure is not a cell at any width, so its cell says how many entries it stands for. `TABULAR_KINDS` is what decides which columns are shown WHOLE, and therefore which rows get a toggle at all.
+
+**A column description lives on its header.** Once, on hover, with a dotted underline saying it is there — a `title` nobody knows about is a fact nobody reads. Under every value it would be the same sentence fifteen times.
 
 **A list of images is a gallery; a list of files is rows.** A card per picture is a screenful each when the picture is the whole content, and a document's whole content is a name and a link — a bordered box with an index around two fields spends the chrome of a structure on them. A file is NAMED rather than printed whole: ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file". The full reference stays on the `title`, which is the part worth copying. An image nothing can paint gets a tile with an icon and its name — that is what a host with no storage resolver sees, so it has to be a design and not a fallback.
 
@@ -83,6 +87,16 @@ Three rules replaced it, and each follows from a fact the descriptor already sta
 **The unwrap belongs to the field, not to the layout.** `contentKey` is a property of the descriptor node, so every layout has to apply it — a `native.Text[]`'s entries are `TextContent` records, and a chip, a line and a table cell each hold one. `LeafValue` owns it, which is why they cannot disagree; leaving it to the caller is what briefly turned a list of planet names into eight rows of `[object Object]`.
 
 None of this is a heuristic about the data. Every branch reads the descriptor: the element's `kind`, and its fields' kinds. A payload is never inspected to decide how to lay it out.
+
+## Files
+
+**A document offers a preview when the browser can both fetch and render it.** Two conditions, both necessary: `isViewableUrl` (a `pipelex-storage://` reference resolves nowhere without the host's resolver) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none.
+
+**A framed URL is not the `native.Html` question, and the difference is the origin.** Markup goes through a sandbox because injecting it into the host's document would run it ON the host's origin with the host's cookies. A URL in an `<iframe>` is a separate document at its own origin by construction — the browser's own boundary, not one this package has to build. So a PDF is framed the way every document viewer on the web frames one, with `no-referrer`, because a result view has no business telling a third party where it was opened from.
+
+**A file is NAMED rather than printed whole.** Ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file"; the last path segment is what a person reads, and the whole reference stays on the `title`.
+
+**A gallery of nothing is not a gallery.** When no image in a list can be painted — every URL a storage reference the host has no resolver for — the grid becomes rows, because three large blanks say less than three lines do. The layout follows what is actually showable rather than what the kind promises.
 
 ## Markup
 

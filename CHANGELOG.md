@@ -18,6 +18,16 @@
 
 ### Added
 
+- **Every list of records is a table now, and the rows expand.** Prose and nesting used to fall back to a card per entry, and that was the wrong trade: a table is how a list of records is READ, and giving it up over the widest column lost it for every other column too. The cell shows the first line — or, for a structure, how many entries it stands for — and the chevron opens the whole record underneath in the stacked layout. The toggle appears only when a row has more to show, so a table of short scalars gets no column of chevrons that reveal nothing, and the expanded panel is pinned to the scroller's width rather than inheriting the table's and running off into the horizontal scroll.
+
+  **A column's description is on its header**, once, on hover, with a dotted underline saying it is there — a `title` nobody knows about is a fact nobody reads.
+
+- **A document offers a preview, and a gallery of nothing becomes rows.** A `native.Document` whose URL the browser can both fetch and render gains a **Preview** button that frames it in place. Two conditions and both necessary: a `pipelex-storage://` reference resolves nowhere without the host's resolver, and a `.docx` is fetchable but not renderable — a preview that opens onto a download prompt is worse than none.
+
+  Framing a URL is not the `native.Html` question, and the difference is the origin: markup is sandboxed because injecting it into the host's document would run it ON the host's origin, where a URL in an `<iframe>` is a separate document at its own origin by construction. So a PDF is framed the way every document viewer on the web frames one, with `no-referrer`.
+
+  And when NO image in a list can be painted, the grid becomes rows: three large blanks say less than three lines do, so the layout follows what is actually showable rather than what the kind promises. New stories `Outputs/Preview` demonstrate all three cases against a real served PDF — the one thing the corpus cannot show, since nothing a run produces is a URL a browser can fetch.
+
 - **Every list layout, one story each, and a corpus that proves them.** `Outputs/Lists` is a section whose subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One real run per branch: scalars, prose scalars, a short record, a **twelve-column** record, a record carrying prose, a record carrying records that carry lists, a document and an image.
 
   It found four things a two-row table could not. **A list of images is a gallery** — a card per picture is a screenful each when the picture is the whole content. **A list of documents is rows** — a name and a link is not a structure. **A file is named, not printed whole**: ninety characters of UUID and hash wrapped across the panel says one thing, and the full reference belongs on the `title`; an image nothing can paint gets a tile with an icon and its name, which is what a host with no storage resolver sees and therefore has to be a design rather than a fallback. **A `prose` scalar list is plain lines** — a chip containing a paragraph is a box with a paragraph in it, and `native.Text` always derives to `prose`, so this is the most common result list there is.

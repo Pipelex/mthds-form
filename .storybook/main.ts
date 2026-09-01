@@ -21,6 +21,12 @@ const config: StorybookConfig = {
   // `.mdx` is deliberately absent until a docs page exists: Storybook warns on
   // every run for a glob that matches nothing. Add it back with the first one.
   stories: ['../src/__stories__/**/*.stories.@(ts|tsx)'],
+  // The corpus's own input files, served so a story can hand the result view a
+  // URL a browser can actually fetch. Nothing a RUN produces is one - a
+  // `pipelex-storage://` reference resolves only through the host's resolver -
+  // so the preview seam has no other way to be looked at. See
+  // `outputs/preview.stories.tsx`.
+  staticDirs: ['../data/inputs'],
   addons: ['@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-vitest'],
   framework: '@storybook/react-vite',
   viteFinal: async (viteConfig) => {

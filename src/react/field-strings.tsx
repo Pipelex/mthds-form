@@ -41,6 +41,10 @@ export interface FieldStrings {
   previewUnavailablePdf: string;
   /** A result slot the run resolved as an absence, or a value it left empty. */
   resultAbsent: string;
+  /** The control that opens a result table row to show the rest of the record. */
+  toggleRowDetails: (index: number) => string;
+  /** The (visually hidden) header of the column those controls sit in. */
+  rowDetailsColumn: string;
   yes: string;
   no: string;
   /**
@@ -79,6 +83,8 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
   resultAbsent: 'not provided',
+  toggleRowDetails: (index) => `Show or hide the details of row ${index}`,
+  rowDetailsColumn: 'Details',
   yes: 'Yes',
   no: 'No',
   unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 import { ResultView } from '../result-view';
@@ -176,12 +176,19 @@ export const DeeplyNested: Story = {
   args: story('deep_result', 720),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const company = payload('deep_result');
-    const divisions = company.divisions as { teams: { members: { name: string }[] }[] }[];
-    // Reach the deepest leaf the payload holds and assert it rendered: if the
-    // recursion stopped early, this is the assertion that notices.
-    const deepest = divisions[0]!.teams[0]!.members[0]!.name;
-    await expect(canvas.getAllByText(deepest)).toHaveLength(BOTH_THEMES);
+    const divisions = payload('deep_result').divisions as { name: string }[];
+    // The outer list is a table now, so the depth below it arrives on demand
+    // rather than all at once - which is the point: a company's every team
+    // member laid out at once was two thousand pixels of page.
+    await expect(canvas.getAllByRole('columnheader', { name: 'Teams' })).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByText(divisions[0]!.name)).toHaveLength(BOTH_THEMES);
+    // Opening one row reaches the level beneath it, and the recursion continues
+    // from there - each nested list a table of its own.
+    const toggles = canvas.getAllByRole('button');
+    await userEvent.click(toggles[0]!);
+    await expect(canvas.getAllByRole('columnheader', { name: 'Members' }).length).toBeGreaterThan(
+      0,
+    );
   },
 };
 
