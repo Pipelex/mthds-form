@@ -715,12 +715,52 @@ function ItemCount({ count }: { count: number }) {
  *
  * A short scalar is, and so is a list of them (chips wrap). Prose is not — it is
  * the standard's way of saying "this may be long", so a cell shows its first
- * line. A structure is not, at any width. Those are the columns the row's
- * expansion exists for, and the presence of one is what puts the toggle there.
+ * line. A structure is not, at any width.
  */
 function isInlineColumn(field: RunField): boolean {
   if (field.kind === 'list') return TABULAR_KINDS.has(field.item.kind);
   return TABULAR_KINDS.has(field.kind);
+}
+
+/**
+ * Beyond this a cell is a truncation rather than a value, so its row needs a way
+ * to open. Chosen as roughly what fits one line of a table column at this size.
+ */
+const CELL_LENGTH_LIMIT = 80;
+
+/**
+ * Whether a column is GUARANTEED to fit its cell — a stronger question than
+ * `isInlineColumn`, and the one the expand toggle is keyed on.
+ *
+ * The two came apart the first time a real method was rendered. `text` is the
+ * standard's "short single-line string", so it was treated as always-fitting and
+ * a table of nothing but `text` columns got no toggle at all. But *short* is not
+ * a property the kind carries: a `text` node is bounded only when the author
+ * wrote `max_length`, and an unbounded one is a slot a model will happily fill
+ * with three sentences — which is exactly what `gaps` and `overall_assessment`
+ * hold in the CV corpus. The cell then truncated with no way to read the rest,
+ * which is the one outcome a result view must not produce.
+ *
+ * So the guarantee is read from the CONSTRAINT rather than assumed from the
+ * kind. A boolean, a date, a number and an enum are bounded by what they are; a
+ * `text` is bounded when it says so. Everything else may be long, and its row
+ * gets a toggle. Still descriptor-driven — no value is measured, so a table's
+ * shape does not change with the data it happens to be showing.
+ */
+function fitsACellWhole(field: RunField): boolean {
+  switch (field.kind) {
+    case 'boolean':
+    case 'date':
+    case 'number':
+    case 'enum':
+      return true;
+    case 'text':
+      return field.maxLength !== undefined && field.maxLength <= CELL_LENGTH_LIMIT;
+    case 'list':
+      return fitsACellWhole(field.item);
+    default:
+      return false;
+  }
 }
 
 /**
@@ -740,7 +780,10 @@ function isInlineColumn(field: RunField): boolean {
  * the scannable shape and loses nothing, which the fallback could not claim.
  *
  * The toggle appears only when a row HAS more to show; a table of short scalars
- * gets no column of chevrons that reveal nothing.
+ * of nothing but bounded scalars — numbers, dates, enums, `max_length` text —
+ * gets no column of chevrons that reveal nothing. Bounded is read from the
+ * descriptor's constraint rather than assumed from the kind; see
+ * `fitsACellWhole` for why that distinction had to be made.
  */
 function ObjectTable({
   columns,
@@ -760,7 +803,7 @@ function ObjectTable({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const [viewportWidth, setViewportWidth] = useState<number>();
-  const canExpand = columns.some((column) => !isInlineColumn(column));
+  const canExpand = columns.some((column) => !fitsACellWhole(column));
 
   // The width of what is VISIBLE, not of the table.
   //

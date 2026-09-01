@@ -303,7 +303,10 @@ describe('lists', () => {
     );
     const table = container.querySelector('table');
     expect(table).toBeTruthy();
-    expect(table!.querySelectorAll('thead th')).toHaveLength(2);
+    // Three headers, not two: `label` is an UNBOUNDED text column, so the rows
+    // get an expand toggle and the toggle gets its own (visually hidden) header.
+    // See `fitsACellWhole`.
+    expect(table!.querySelectorAll('thead th')).toHaveLength(3);
     expect(table!.querySelectorAll('tbody tr')).toHaveLength(2);
     // The header carries the label ONCE, not once per row.
     expect(screen.getAllByText('label')).toHaveLength(1);
@@ -358,17 +361,51 @@ describe('lists', () => {
     expect(screen.getAllByText('Grind and coat the primary optics')).toHaveLength(2);
   });
 
-  it('offers no toggle when every column is shown whole', () => {
-    // A table of short scalars has nothing more to reveal, and a column of
-    // chevrons that open onto the same values is chrome pretending to be a
-    // feature.
+  it('offers no toggle when every column is BOUNDED', () => {
+    // A table of values that cannot overflow a cell has nothing more to reveal,
+    // and a column of chevrons opening onto the same values is chrome
+    // pretending to be a feature. Bounded means the descriptor SAYS so: a
+    // number and a `max_length` text, not a bare `text`.
+    const short: TextRunField = { ...text('label'), maxLength: 24 };
     render(
       <ResultField
-        field={list('steps', object('item', [text('label'), number('week')]))}
+        field={list('steps', object('item', [short, number('week')]))}
         value={[{ label: 'kickoff', week: 1 }]}
       />,
     );
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('offers a toggle when a text column states no length bound', () => {
+    // The bug this rule exists for. `text` is the standard's "short
+    // single-line string", so it was treated as always-fitting - but short is
+    // not a property the kind carries, and a model fills an unbounded slot with
+    // three sentences. A table of nothing but `text` columns then truncated
+    // every cell with no way to read the rest, which is the one outcome a
+    // result view must not produce.
+    render(
+      <ResultField
+        field={list('matches', object('item', [text('gaps')]))}
+        value={[
+          { gaps: 'The candidate is fundamentally misaligned with this role, and here is why.' },
+        ]}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reads the bound through a list, since chips of long text overflow too', () => {
+    const long: TextRunField = text('tags');
+    render(
+      <ResultField
+        field={list('rows', object('item', [{ ...list('tags', long) }]))}
+        value={[{ tags: ['one', 'two'] }]}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
   });
 
   it('puts the column description on the header, where hovering finds it', async () => {

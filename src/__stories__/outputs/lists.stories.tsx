@@ -116,8 +116,11 @@ export const OfWideRecords: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const headers = canvas.getAllByRole('columnheader');
-    // Twelve columns per theme, all of them stated.
-    await expect(headers.length).toBe(12 * BOTH_THEMES);
+    // Twelve stated columns plus the toggle's own visually-hidden header, per
+    // theme. The toggle is there because several of the twelve are UNBOUNDED
+    // text: `text` promises "short single-line" and nothing enforces it, so a
+    // cell may truncate and the row must be openable. See `fitsACellWhole`.
+    await expect(headers.length).toBe(13 * BOTH_THEMES);
   },
 };
 
