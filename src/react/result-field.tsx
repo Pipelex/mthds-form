@@ -1,5 +1,6 @@
 'use client';
 
+import type * as React from 'react';
 import type { RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import type { DocumentContentView } from '../core/native-content';
@@ -26,6 +27,7 @@ import {
   ImageOff,
 } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
+import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
 import { useFieldStrings } from './field-strings';
 import { humanizeFieldName } from './field-presentation';
@@ -84,6 +86,50 @@ function unwrap(field: RunField, value: unknown): unknown {
 }
 
 /**
+ * A description, on hover and on focus — and nothing at rest.
+ *
+ * ## Why no dotted underline, and no info icon either
+ *
+ * The dotted underline is the `<abbr>` convention, and it does not survive
+ * density: ten described fields in a record is ten underlined labels, which
+ * reads as damage rather than as an affordance. An info icon is the other usual
+ * answer and has the same problem one step removed — ten glyphs competing with
+ * the concept pill already sitting beside each label.
+ *
+ * So: **nothing at rest.** The cue arrives when the pointer does — `cursor:
+ * help` and a faint highlight, both at the moment the reader is already pointing
+ * at the label, and neither costing anything when they are not. That is the
+ * trade a supplementary fact deserves: the value is what the reader came for,
+ * and the description is available rather than advertised.
+ *
+ * ## The part that is not a trade
+ *
+ * A fact reachable only by pointing is a fact a keyboard user does not have, so
+ * the trigger is focusable and Radix shows the tooltip on focus as it does on
+ * hover, wiring `aria-describedby` either way. That costs a tab stop per
+ * described field, and it is the right cost: extra stops are an annoyance,
+ * unreachable content is a failure.
+ */
+function Described({ description, children }: { description?: string; children: React.ReactNode }) {
+  if (!description) return <>{children}</>;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <TooltipRoot>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            className="-mx-1 cursor-help rounded px-1 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {children}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{description}</TooltipContent>
+      </TooltipRoot>
+    </TooltipProvider>
+  );
+}
+
+/**
  * The label row of a result node — exported so the panel that owns the top-level
  * header draws the SAME one rather than a second that drifts from it.
  */
@@ -92,24 +138,13 @@ export function ResultHeader({ field }: { field: RunField }) {
 }
 
 function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
-  const described = describe && field.description !== undefined;
   return (
-    <div
-      className="flex flex-wrap items-baseline gap-x-2"
-      {...(described ? { title: field.description } : {})}
-    >
-      {/* One cue wherever a description hides on hover - a label, a column
-          header, the output itself. A `title` nobody knows about is a fact
-          nobody reads, and a cue that appears in some places and not others is
-          worse than none. */}
-      <span
-        className={cn(
-          'font-mono text-[13px] font-semibold text-foreground',
-          described && 'cursor-help underline decoration-dotted underline-offset-4',
-        )}
-      >
-        {field.title ?? humanizeFieldName(field.name)}
-      </span>
+    <div className="flex flex-wrap items-baseline gap-x-2">
+      <Described description={describe ? field.description : undefined}>
+        <span className="font-mono text-[13px] font-semibold text-foreground">
+          {field.title ?? humanizeFieldName(field.name)}
+        </span>
+      </Described>
       <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />
     </div>
   );
@@ -740,18 +775,13 @@ function ObjectTable({
               <th
                 key={column.name}
                 scope="col"
-                // The authored description, on hover. It is worth having and not
-                // worth repeating under every value, so the header is where it
-                // lives - and `cursor-help` is what tells a reader it is there,
-                // since a `title` nobody knows about is a fact nobody reads.
-                {...(column.description ? { title: column.description } : {})}
-                className={cn(
-                  'whitespace-nowrap px-3 py-2 font-mono text-[12px] font-semibold text-foreground',
-                  column.description &&
-                    'cursor-help underline decoration-dotted underline-offset-4',
-                )}
+                className="whitespace-nowrap px-3 py-2 font-mono text-[12px] font-semibold text-foreground"
               >
-                {column.title ?? humanizeFieldName(column.name)}
+                {/* The authored description, once, on the header - it is worth
+                    having and not worth repeating under every value. */}
+                <Described description={column.description}>
+                  {column.title ?? humanizeFieldName(column.name)}
+                </Described>
               </th>
             ))}
           </tr>

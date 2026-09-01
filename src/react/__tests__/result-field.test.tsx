@@ -370,16 +370,23 @@ describe('lists', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('puts the column description on the header, where hovering finds it', () => {
+  it('puts the column description on the header, where hovering finds it', async () => {
     const described: TextRunField = { ...text('label'), description: 'What happens' };
-    const { container } = render(
+    render(
       <ResultField
         field={list('milestones', object('item', [described]))}
         value={[{ label: 'a' }]}
       />,
     );
-    expect(container.querySelector('thead th')?.getAttribute('title')).toBe('What happens');
+    // Nothing at rest - not under each row, and not as a dotted underline on the
+    // header. It arrives when the pointer does.
     expect(screen.queryByText('What happens')).toBeNull();
+    // Asserted through FOCUS rather than hover, and that is the assertion worth
+    // having: a fact reachable only by pointing is a fact a keyboard user does
+    // not have. Radix opens on focus with no delay, so it is also the
+    // deterministic half.
+    screen.getByText('Label').focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('What happens');
   });
 });
 

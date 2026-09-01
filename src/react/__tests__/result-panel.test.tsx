@@ -72,10 +72,20 @@ describe('the result panel', () => {
     // everywhere else: a sentence beside the value a reader came for is one line
     // of chrome at the top and ten inside a structure of ten.
     render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
-    expect(screen.getAllByTitle('A commercial invoice')).toHaveLength(1);
+    expect(screen.getAllByText('Output')).toHaveLength(1);
+    // Nothing at rest: the description is tooltip content, not a line of chrome
+    // above the value the reader came for.
     expect(screen.queryByText('A commercial invoice')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
-    expect(screen.getAllByTitle('A commercial invoice')).toHaveLength(1);
+    expect(screen.getAllByText('Output')).toHaveLength(1);
+  });
+
+  it('shows the description on hover, and on focus', async () => {
+    // Focus matters as much as hover: a fact reachable only by pointing is a
+    // fact a keyboard user does not have.
+    render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
+    screen.getByText('Output').parentElement!.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('A commercial invoice');
   });
 
   it('offers exactly two views', () => {
