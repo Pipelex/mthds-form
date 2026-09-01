@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ObjectRunField, TextRunField } from '../../core';
+import type { ObjectRunField, RunField, TextRunField } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultPanel } from '../result-panel';
 
@@ -116,5 +116,25 @@ describe('the result panel', () => {
   it('opens on JSON when a host asks it to', () => {
     render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} defaultView="json" />);
     expect(screen.getByText(/"reference"/)).toBeTruthy();
+  });
+});
+
+describe('the header is drawn once for a LIST result too', () => {
+  it('does not repeat the panel header on the list beneath it', () => {
+    // `ResultPanel` draws the header and tells `ResultField` to skip its own;
+    // the list arm ignored that and drew a second one, so a plural result was
+    // labelled twice, one line apart.
+    const field: RunField = {
+      kind: 'list',
+      name: 'output',
+      conceptRef: 'x.Item',
+      required: true,
+      item: { kind: 'text', name: 'output', conceptRef: 'x.Item', required: true },
+    };
+    render(<ResultPanel field={field} value={['a', 'b']} />);
+    expect(screen.getAllByText('output')).toHaveLength(1);
+    // The count is a fact about the value rather than a name for it, and the
+    // panel's header does not carry it — so it stays.
+    expect(screen.getByText(/2 items/)).toBeTruthy();
   });
 });

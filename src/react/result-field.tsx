@@ -1144,8 +1144,13 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
       const columns = tableColumns(field.item);
       return (
         <div className="space-y-2">
+          {/* `hideLabel` is honoured here as everywhere else - it was not, and
+              the panel showed the label twice: once as its own header and again
+              on the list beneath it. The COUNT is not part of the label though,
+              so it survives on its own; it is a fact about this value rather
+              than a name for it, and the panel's header does not carry it. */}
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <Label field={field} />
+            {header}
             <span className="font-mono text-[10.5px] text-muted-foreground">
               {s.itemsCount(items.length)}
             </span>

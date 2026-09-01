@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **A plural result was labelled twice.** `ResultPanel` draws the header once and tells `ResultField` to skip its own; the `list` arm ignored `hideLabel` and drew a second one, one line below the first. The item count is not part of the label — it is a fact about the value rather than a name for it, and the panel's header does not carry it — so it stays.
+
 - **A fenced code block scrolled sideways instead of wrapping.** In a side panel a code block is usually not code at all: it is a model that opened a fence and did not close it (or closed one it never opened), so the rest of a report ends up inside it. Scrolling that horizontally hides prose behind a scrollbar for no gain. Real code loses its column alignment and keeps every character, which is the better half of that trade at this width.
 
 - **A list of `unknown` items was a card per entry.** An untyped `type = "list"` structure field derives to a `list` whose element is `kind: "unknown"` — the standard's escape hatch, meaning the producer could not map the node and said so. That fell through to the card layout, so a candidate's twelve skills were twelve bordered boxes with index numbers, each holding two words. `unknown` now shares the LINES layout with `prose`: the card earns its place around a *structure*, and this is precisely the node we have been told is not known to be one. Lines read the same whether the entries turn out to be words or objects, because `LeafValue` falls through to `RawValue` either way.
