@@ -67,10 +67,15 @@ describe('the result panel', () => {
     // The panel draws it and tells the field tree to skip its own: two headers
     // that agree today drift tomorrow. It also must not move when the view
     // changes — switching should not relocate the thing you are reading.
+    //
+    // Found by the TITLE, because the description hides on hover here as it does
+    // everywhere else: a sentence beside the value a reader came for is one line
+    // of chrome at the top and ten inside a structure of ten.
     render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
-    expect(screen.getAllByText('A commercial invoice')).toHaveLength(1);
+    expect(screen.getAllByTitle('A commercial invoice')).toHaveLength(1);
+    expect(screen.queryByText('A commercial invoice')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
-    expect(screen.getAllByText('A commercial invoice')).toHaveLength(1);
+    expect(screen.getAllByTitle('A commercial invoice')).toHaveLength(1);
   });
 
   it('offers exactly two views', () => {

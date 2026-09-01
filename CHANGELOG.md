@@ -18,6 +18,10 @@
 
 ### Added
 
+- **An absence is a dash, and the description is on hover.** `not provided` beside forty values in a grid is louder than the data; `-` (U+002D — not an en dash, not an em dash) reads as the blank it is. A column of hyphens read aloud is "hyphen, hyphen, hyphen", though, so the glyph is `aria-hidden` and a visually hidden sentence rides beside it: `resultAbsent` is what the page shows, `resultAbsentDescription` is what a screen reader hears, and both are host-overridable.
+
+  The field description now hides on hover at **every** depth, the top included — it was still printed there. On an input it is guidance a person needs before typing; on a result it is a sentence beside the value they came for. A **dotted underline** marks every label that carries one, in every position — a label, a column header, the output itself — because a `title` nobody knows about is a fact nobody reads, and a cue in some places but not others is worse than none.
+
 - **A `native.Date` result reads as a date.** It rendered as a two-field card whose second field said _not provided_, because `native.Date`'s content model is `{date, time}` — two properties, so nothing unwraps it and the descriptor gives it `object`. `readDateContent` already took exactly that model; the arm never fired, because the kind said `object`. So `native.Date` joins `native.Html` as an arm keyed by CONCEPT, and for the same reason: the kind vocabulary has no name for a native concept whose content model is multi-property. New exports: `isNativeDateNode`, `NATIVE_DATE_CONCEPT_REF`.
 
 - **A record is a two-column grid, not a stack.** Label above value spends two lines on every field, so a structure of ten was twenty lines of alternating label and answer with nothing aligned. Side by side they take one line each and the values line up. Only a short value shares a line — the same test the table uses — because prose needs the full width, and so does anything with chrome of its own.

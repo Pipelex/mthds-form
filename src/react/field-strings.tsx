@@ -39,8 +39,21 @@ export interface FieldStrings {
   preview: string;
   removeFileAria: string;
   previewUnavailablePdf: string;
-  /** A result slot the run resolved as an absence, or a value it left empty. */
+  /**
+   * What a result slot the run resolved as an absence SHOWS — a dash, not a
+   * sentence. Beside forty values in a grid, "not provided" repeated is louder
+   * than the data; a dash reads as the blank it is.
+   */
   resultAbsent: string;
+  /**
+   * What that dash SAYS, to a screen reader.
+   *
+   * The two are separate because a glyph and a sentence are answers to different
+   * questions. A table column of hyphens read aloud is "hyphen, hyphen, hyphen",
+   * which is noise rather than information — so the dash is `aria-hidden` and
+   * this rides beside it, visually hidden.
+   */
+  resultAbsentDescription: string;
   /** The control that opens a result table row to show the rest of the record. */
   toggleRowDetails: (index: number) => string;
   /** The (visually hidden) header of the column those controls sit in. */
@@ -89,7 +102,9 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
-  resultAbsent: 'not provided',
+  // U+002D HYPHEN-MINUS, deliberately: not an en dash, not an em dash.
+  resultAbsent: '-',
+  resultAbsentDescription: 'Not provided',
   toggleRowDetails: (index) => `Show or hide the details of row ${index}`,
   rowDetailsColumn: 'Details',
   copyUrl: 'Copy the URL',

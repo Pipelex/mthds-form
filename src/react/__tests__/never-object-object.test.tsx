@@ -37,6 +37,7 @@ import {
 import { PAYLOADS as LIST_PAYLOADS } from '../../__stories__/_generated/lists.payloads';
 import { CONTRACTS, OUTPUT_FORM } from '../../__stories__/_generated/results';
 import { PAYLOADS } from '../../__stories__/_generated/results.payloads';
+import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultField } from '../result-field';
 
 const FORBIDDEN = '[object Object]';
@@ -141,6 +142,9 @@ describe('a payload that disagrees with its descriptor still never renders it', 
 
   it('treats an empty record as an absence, because it holds nothing', () => {
     const { container } = render(<ResultField field={scalar} value={{}} />);
-    expect(container.textContent).toContain('not provided');
+    // The SPOKEN label, not the glyph: a dash is what the page shows and a
+    // sentence is what a screen reader hears, and the sentence is the one that
+    // says which state this is.
+    expect(container.textContent).toContain(DEFAULT_FIELD_STRINGS.resultAbsentDescription);
   });
 });

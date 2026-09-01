@@ -88,23 +88,26 @@ function unwrap(field: RunField, value: unknown): unknown {
  * header draws the SAME one rather than a second that drifts from it.
  */
 export function ResultHeader({ field }: { field: RunField }) {
-  return (
-    <>
-      <Label field={field} />
-      {field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
-      )}
-    </>
-  );
+  return <Label field={field} describe />;
 }
 
 function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
+  const described = describe && field.description !== undefined;
   return (
     <div
       className="flex flex-wrap items-baseline gap-x-2"
-      {...(describe && field.description ? { title: field.description } : {})}
+      {...(described ? { title: field.description } : {})}
     >
-      <span className="font-mono text-[13px] font-semibold text-foreground">
+      {/* One cue wherever a description hides on hover - a label, a column
+          header, the output itself. A `title` nobody knows about is a fact
+          nobody reads, and a cue that appears in some places and not others is
+          worse than none. */}
+      <span
+        className={cn(
+          'font-mono text-[13px] font-semibold text-foreground',
+          described && 'cursor-help underline decoration-dotted underline-offset-4',
+        )}
+      >
         {field.title ?? humanizeFieldName(field.name)}
       </span>
       <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />
@@ -112,9 +115,17 @@ function Label({ field, describe = false }: { field: RunField; describe?: boolea
   );
 }
 
-function Absent() {
+export function Absent() {
   const s = useFieldStrings();
-  return <span className="text-[13px] italic text-muted-foreground">{s.resultAbsent}</span>;
+  return (
+    <span className="text-[13px] text-muted-foreground">
+      {/* The glyph is hidden from assistive tech and the sentence is hidden from
+          the page: a column of hyphens read aloud is noise, and a column of
+          "not provided" read on the page is louder than the data beside it. */}
+      <span aria-hidden>{s.resultAbsent}</span>
+      <span className="sr-only">{s.resultAbsentDescription}</span>
+    </span>
+  );
 }
 
 /**
@@ -930,22 +941,15 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
   const s = useFieldStrings();
   const unwrapped = unwrap(field, value);
 
-  // The description rides the label's `title` on a nested field and is shown
-  // outright only at the top.
+  // The description rides the label's `title`, at every depth including this
+  // one.
   //
   // On an INPUT it is guidance a person needs before typing, so it is printed
-  // under every label. On a RESULT it is the same sentence beside a value the
-  // reader is there to read — and inside a structure of ten fields it is ten
-  // lines of chrome around ten values. The fact is worth having and is not worth
-  // repeating, so it stays reachable rather than printed.
-  const header = hideLabel ? null : (
-    <>
-      <Label field={field} describe={depth > 0} />
-      {depth === 0 && field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
-      )}
-    </>
-  );
+  // under every label. On a RESULT it is a sentence beside a value the reader is
+  // there to read — one line of chrome at the top, ten inside a structure of
+  // ten. The fact is worth having and is not worth printing, so it stays
+  // reachable, and the dotted underline is what says it is there.
+  const header = hideLabel ? null : <Label field={field} describe />;
 
   // A DATE, before the kind switch, for the same reason markup is: `native.Date`
   // is `{date, time}`, two properties, so nothing unwraps it and its node is an

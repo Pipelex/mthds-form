@@ -4,7 +4,7 @@ import type * as React from 'react';
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import type { RunField } from '../core';
-import { ResultField, ResultHeader, stringifyValue } from './result-field';
+import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
 import { useFieldStrings } from './field-strings';
 import { cn } from './utils';
 
@@ -113,7 +113,7 @@ function JsonView({ value }: { value: unknown }) {
         : JSON.stringify(value);
 
   if (text === undefined) {
-    return <span className="text-[13px] italic text-muted-foreground">{s.resultAbsent}</span>;
+    return <Absent />;
   }
   return (
     <div className="relative">
