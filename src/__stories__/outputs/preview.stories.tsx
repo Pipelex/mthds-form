@@ -217,7 +217,7 @@ export const ANestedReport: StoryObj<typeof ResultView> = {
     const canvas = within(canvasElement);
     // The markup arm, the file arm and the table, all from one descriptor.
     await expect(canvas.getAllByTitle('HTML result').length).toBeGreaterThan(0);
-    await expect(canvas.getAllByRole('columnheader', { name: 'Caption' }).length).toBeGreaterThan(
+    await expect(canvas.getAllByRole('columnheader', { name: 'caption' }).length).toBeGreaterThan(
       0,
     );
     await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();

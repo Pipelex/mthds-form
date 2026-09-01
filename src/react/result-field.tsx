@@ -30,7 +30,7 @@ import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
 import { useFieldStrings } from './field-strings';
-import { humanizeFieldName } from './field-presentation';
+import { fieldLabel, humanizeFieldName, useFieldPresentation } from './field-presentation';
 import { cn } from './utils';
 
 /**
@@ -138,14 +138,32 @@ export function ResultHeader({ field }: { field: RunField }) {
 }
 
 function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
+  // The same rule the input side follows, and for the same reason: in `studio`
+  // the label IS the identifier the method author wrote, so it is shown
+  // verbatim in mono beside its concept pill; in `app` it becomes a humanised
+  // sans label and the pill goes, because a person reading a result has never
+  // seen the bundle. Reading `useFieldPresentation` here rather than
+  // humanising unconditionally is what keeps a result's labels agreeing with
+  // the form's for the very same fields. See `field-presentation.tsx`.
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
+  const labelText = fieldLabel(field.title, field.name, presentation);
+  if (labelText.trim() === '') {
+    return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
+  }
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
       <Described description={describe ? field.description : undefined}>
-        <span className="font-mono text-[13px] font-semibold text-foreground">
-          {field.title ?? humanizeFieldName(field.name)}
+        <span
+          className={cn(
+            'text-[13px] font-semibold text-foreground',
+            isApp ? 'text-[13.5px]' : 'font-mono',
+          )}
+        >
+          {labelText}
         </span>
       </Described>
-      <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />
+      {!isApp && <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />}
     </div>
   );
 }
@@ -700,6 +718,7 @@ function ObjectTable({
   label: string;
 }) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const [viewportWidth, setViewportWidth] = useState<number>();
@@ -775,12 +794,15 @@ function ObjectTable({
               <th
                 key={column.name}
                 scope="col"
-                className="whitespace-nowrap px-3 py-2 font-mono text-[12px] font-semibold text-foreground"
+                className={cn(
+                  'whitespace-nowrap px-3 py-2 text-[12px] font-semibold text-foreground',
+                  presentation === 'app' ? undefined : 'font-mono',
+                )}
               >
                 {/* The authored description, once, on the header - it is worth
                     having and not worth repeating under every value. */}
                 <Described description={column.description}>
-                  {column.title ?? humanizeFieldName(column.name)}
+                  {fieldLabel(column.title, column.name, presentation)}
                 </Described>
               </th>
             ))}

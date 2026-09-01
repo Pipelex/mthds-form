@@ -97,7 +97,7 @@ export const OfShortRecords: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByRole('table')).toHaveLength(BOTH_THEMES);
     // The label appears once per theme - as a header - not once per row.
-    await expect(canvas.getAllByRole('columnheader', { name: 'Label' })).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByRole('columnheader', { name: 'label' })).toHaveLength(BOTH_THEMES);
   },
 };
 
@@ -139,7 +139,7 @@ export const OfRecordsWithProse: Story = {
     const canvas = within(canvasElement);
     // A table, with a way in rather than a fallback out.
     await expect(canvas.getAllByRole('table')).toHaveLength(BOTH_THEMES);
-    await expect(canvas.getAllByRole('columnheader', { name: 'Detail' })).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByRole('columnheader', { name: 'detail' })).toHaveLength(BOTH_THEMES);
   },
 };
 
@@ -160,7 +160,7 @@ export const OfNestedRecords: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     // The outer table, and the count standing in for what a cell cannot hold.
-    await expect(canvas.getAllByRole('columnheader', { name: 'Sections' })).toHaveLength(
+    await expect(canvas.getAllByRole('columnheader', { name: 'sections' })).toHaveLength(
       BOTH_THEMES,
     );
     await expect(

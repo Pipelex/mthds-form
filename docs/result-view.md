@@ -70,6 +70,15 @@ Three arms read a structure rather than a scalar, and they read it through `src/
 
 `native.Page` needs no arm of its own: its descriptor is an `object` over `{text_and_images, page_view}`, so it works by recursion into the arms above.
 
+## Labels follow the presentation, exactly as the form does
+
+A result and the form that produced it show the **same fields**, so they must read the same way. `ResultField` and `ObjectTable` therefore read `useFieldPresentation` and go through the same `fieldLabel(title, name, presentation)` expression as `FieldShell`:
+
+- **`studio`** (the default): the label is the identifier the method author wrote — `issued_on`, in mono, beside its concept pill. Nothing is prettified, because in this mode a prettified name is a name that no longer matches the bundle a builder would open and edit. An authored `title` is authoritative and shown verbatim in both modes.
+- **`app`**: the identifier is humanised into a sans label — `Issued on` — and the concept pill goes. A person reading a method app's result has never seen the source, and `results.Invoice` is the method's vocabulary, not theirs.
+
+This is worth stating because the result side got it wrong once: it humanised unconditionally, so a single screen could ask for `issued_on` and then announce **Issued on** for that same field. `Outputs/Results` carries `Studio Labels` and `App Labels` over one invoice so the pair can be compared, and `result-field.test.tsx` pins both, headers included.
+
 ## Layout: a result is read, not filled in
 
 The result view started as the input form with the controls swapped for values, and that was the wrong shape. Label, type pill, description, value — stacked, once per field — is right for something a person **fills in**: the guidance has to arrive before they type. For something they **read**, it is chrome around the one thing they came for, and it multiplies. A fifteen-entry list of four-field records rendered as fifteen forms: about 240 lines of page for 60 values.
@@ -84,7 +93,7 @@ Three rules replaced it, and each follows from a fact the descriptor already sta
 
 **Prose and nesting are shown, not accommodated.** A paragraph in a `<td>` forces one column to the width of the longest answer, so a prose cell holds its first line and the row carries the rest; a structure is not a cell at any width, so its cell says how many entries it stands for. `TABULAR_KINDS` is what decides which columns are shown WHOLE, and therefore which rows get a toggle at all.
 
-**A column description lives on its header.** Once, on hover, with a dotted underline saying it is there — a `title` nobody knows about is a fact nobody reads. Under every value it would be the same sentence fifteen times.
+**A column description lives on its header.** Once, on hover and on focus, through the same tooltip every other description uses. Under every value it would be the same sentence fifteen times.
 
 **A list of images is a gallery; a list of files is rows.** A card per picture is a screenful each when the picture is the whole content, and a document's whole content is a name and a link — a bordered box with an index around two fields spends the chrome of a structure on them. A file is NAMED rather than printed whole: ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file". The full reference stays on the `title`, which is the part worth copying. An image nothing can paint gets a tile with an icon and its name — that is what a host with no storage resolver sees, so it has to be a design and not a fallback.
 

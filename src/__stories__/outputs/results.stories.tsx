@@ -144,6 +144,47 @@ export const FlatStructure: Story = {
   },
 };
 
+// ─── Presentation ───────────────────────────────────────────────────────────────
+
+/**
+ * The SAME invoice, in the two presentations - the pair is the point.
+ *
+ * Every other story on this page renders in `studio`, the default, where a
+ * label is the identifier the author wrote in `data/structures/results.mthds`:
+ * `issued_on`, in mono, beside `results.Invoice`. Nothing is prettified,
+ * because in this mode a prettified name is a name that no longer matches the
+ * bundle you would go and edit.
+ *
+ * `app` is the other audience. There the person reading has never seen the
+ * source, so the identifier becomes a humanised sans label and the concept pill
+ * - the method's vocabulary, not the reader's - goes away.
+ *
+ * The result side follows this switch because the INPUT side does, and the two
+ * describe the same fields: a form asking for `issued_on` and a result
+ * announcing "Issued on" would be two spellings of one identifier on one
+ * screen. That divergence shipped once.
+ */
+export const StudioLabels: Story = {
+  args: story('nested_result'),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // The authored identifier, verbatim - and its humanised twin absent.
+    await expect(canvas.getAllByText('issued_on')).toHaveLength(BOTH_THEMES);
+    await expect(canvas.queryByText('Issued on')).toBeNull();
+    await expect(canvas.getAllByText('results.Invoice')).toHaveLength(BOTH_THEMES);
+  },
+};
+
+export const AppLabels: Story = {
+  args: { ...story('nested_result'), presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText('Issued on')).toHaveLength(BOTH_THEMES);
+    await expect(canvas.queryByText('issued_on')).toBeNull();
+    await expect(canvas.queryByText('results.Invoice')).toBeNull();
+  },
+};
+
 /**
  * One level of nesting: a structure carrying a date, a boolean and a list of
  * concepts.
@@ -181,7 +222,7 @@ export const DeeplyNested: Story = {
     // The outer list is a table now, so the depth below it arrives on demand
     // rather than all at once - which is the point: a company's every team
     // member laid out at once was two thousand pixels of page.
-    await expect(canvas.getAllByRole('columnheader', { name: 'Teams' })).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByRole('columnheader', { name: 'teams' })).toHaveLength(BOTH_THEMES);
     await expect(canvas.getAllByText(divisions[0]!.name)).toHaveLength(BOTH_THEMES);
     // Opening one row reaches the level beneath it, and the recursion continues
     // from there - each nested list a table of its own.
@@ -191,7 +232,7 @@ export const DeeplyNested: Story = {
       name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1),
     });
     await userEvent.click(firstRow!);
-    await expect(canvas.getAllByRole('columnheader', { name: 'Members' }).length).toBeGreaterThan(
+    await expect(canvas.getAllByRole('columnheader', { name: 'members' }).length).toBeGreaterThan(
       0,
     );
   },

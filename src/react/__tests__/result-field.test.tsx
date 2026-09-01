@@ -29,6 +29,7 @@ import type {
   ProseRunField,
   TextRunField,
 } from '../../core';
+import { FieldPresentationProvider } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultField } from '../result-field';
 
@@ -305,7 +306,7 @@ describe('lists', () => {
     expect(table!.querySelectorAll('thead th')).toHaveLength(2);
     expect(table!.querySelectorAll('tbody tr')).toHaveLength(2);
     // The header carries the label ONCE, not once per row.
-    expect(screen.getAllByText('Label')).toHaveLength(1);
+    expect(screen.getAllByText('label')).toHaveLength(1);
     expect(screen.getByText('kickoff')).toBeTruthy();
     expect(screen.getByText('survey')).toBeTruthy();
   });
@@ -323,7 +324,7 @@ describe('lists', () => {
       />,
     );
     expect(container.querySelector('table')).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'Mission' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'mission' })).toBeTruthy();
   });
 
   it('keeps a record carrying a STRUCTURE a table, counting what the cell cannot hold', () => {
@@ -334,7 +335,7 @@ describe('lists', () => {
         value={[{ name: 'Lenses', members: [{ who: 'Amara' }, { who: 'Tomas' }] }]}
       />,
     );
-    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'name' })).toBeTruthy();
     // The cell states the fact; the expansion carries the content.
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.itemsCount(2))).toBeTruthy();
   });
@@ -385,7 +386,7 @@ describe('lists', () => {
     // having: a fact reachable only by pointing is a fact a keyboard user does
     // not have. Radix opens on focus with no delay, so it is also the
     // deterministic half.
-    screen.getByText('Label').focus();
+    screen.getByText('label').focus();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('What happens');
   });
 });
@@ -669,5 +670,63 @@ describe('a file always exposes its URL', () => {
     );
     expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyUrl })).toBeTruthy();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('labels follow the presentation, exactly as the input side does', () => {
+  // A result and the form that produced it show the SAME fields, so they must
+  // read the same way. This was wrong once: the result renderer humanised
+  // unconditionally, so `issued_on` was a mono `issued_on` on the form and a
+  // sans-serif "Issued on" on the result - two spellings of one identifier, in
+  // a mode whose whole purpose is to show what the author actually wrote.
+  const invoice: ObjectRunField = {
+    kind: 'object',
+    name: 'output',
+    conceptRef: 'results.Invoice',
+    required: true,
+    fields: [text('issued_on')],
+  };
+
+  it('studio shows the authored identifier verbatim, with its concept pill', () => {
+    render(<ResultField field={invoice} value={{ issued_on: '2026-03-14' }} />);
+    expect(screen.getByText('issued_on')).toBeTruthy();
+    expect(screen.queryByText('Issued on')).toBeNull();
+    expect(screen.getByText('results.Invoice')).toBeTruthy();
+  });
+
+  it('app humanises it and drops the pill', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <ResultField field={invoice} value={{ issued_on: '2026-03-14' }} />
+      </FieldPresentationProvider>,
+    );
+    expect(screen.getByText('Issued on')).toBeTruthy();
+    expect(screen.queryByText('issued_on')).toBeNull();
+    // The concept is the method's vocabulary, not the reader's.
+    expect(screen.queryByText('results.Invoice')).toBeNull();
+  });
+
+  it('carries the rule into table headers, which are labels too', () => {
+    const list: ListRunField = {
+      kind: 'list',
+      name: 'lines',
+      conceptRef: 'results.LineItem',
+      required: true,
+      item: {
+        kind: 'object',
+        name: 'line',
+        conceptRef: 'results.LineItem',
+        required: true,
+        fields: [text('unit_price')],
+      },
+    };
+    const { rerender } = render(<ResultField field={list} value={[{ unit_price: '10' }]} />);
+    expect(screen.getByRole('columnheader', { name: 'unit_price' })).toBeTruthy();
+    rerender(
+      <FieldPresentationProvider presentation="app">
+        <ResultField field={list} value={[{ unit_price: '10' }]} />
+      </FieldPresentationProvider>,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Unit price' })).toBeTruthy();
   });
 });

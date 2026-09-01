@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { OutputForm, PipeIOContracts, RunField } from '../core';
 import { buildResultField, getPipeIOContract, getPipeOutputForm } from '../core';
-import { ResultPanel } from '../react';
+import { FieldPresentationProvider, ResultPanel, type FieldPresentation } from '../react';
 
 /**
  * The one harness every result story renders through — the output twin of
@@ -37,6 +37,14 @@ export interface ResultViewProps {
   value: unknown;
   /** Constrain the column the way a host panel would; results can be wide. */
   maxWidth?: number;
+  /**
+   * The same switch the input side carries, and it governs the same thing: in
+   * `studio` a label is the identifier the method author wrote, shown verbatim
+   * in mono beside its concept pill; in `app` it is a humanised sans label with
+   * no pill. Defaulting to `studio` is what makes a result page readable AS the
+   * bundle - `issued_on`, not "Issued on".
+   */
+  presentation?: FieldPresentation;
 }
 
 export function resultFieldFor(
@@ -59,6 +67,7 @@ export function ResultView({
   pipeCode,
   value,
   maxWidth = 560,
+  presentation = 'studio',
 }: ResultViewProps) {
   const field = React.useMemo(
     () => resultFieldFor(contracts, outputForm, domain, pipeCode),
@@ -66,7 +75,9 @@ export function ResultView({
   );
   return (
     <div style={{ maxWidth }}>
-      <ResultPanel field={field} value={value} />
+      <FieldPresentationProvider presentation={presentation}>
+        <ResultPanel field={field} value={value} />
+      </FieldPresentationProvider>
     </div>
   );
 }
