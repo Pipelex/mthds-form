@@ -266,12 +266,97 @@ describe('lists', () => {
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.noItemsYet)).toBeTruthy();
   });
 
-  it('labels items by index and does not repeat the parent label on every row', () => {
-    render(<ResultField field={list('lines', text('entry'))} value={['a', 'b']} />);
-    expect(screen.getByText('1')).toBeTruthy();
-    expect(screen.getByText('2')).toBeTruthy();
-    // `hideLabel` on the item: the item's own name must not appear per row.
+  it('renders a list of SCALARS inline, with no per-item card or index', () => {
+    // Two bordered cards with index numbers around two words is a screenful of
+    // chrome for no information: the entries of a scalar list ARE the values.
+    const { container } = render(
+      <ResultField field={list('lines', text('entry'))} value={['a', 'b']} />,
+    );
+    expect(screen.getByText('a')).toBeTruthy();
+    expect(screen.getByText('b')).toBeTruthy();
+    expect(screen.queryByText('1')).toBeNull();
+    // The item's own name is never a per-row label.
     expect(screen.queryByText('Entry')).toBeNull();
+    expect(container.querySelector('table')).toBeNull();
+  });
+
+  it('renders a list of uniform records as a TABLE, with the labels as headers', () => {
+    // Every entry has the same keys, so the labels are column headers. Repeating
+    // them down the page is what made a fifteen-entry result read as fifteen
+    // forms.
+    const row = object('item', [text('label'), number('week')]);
+    const { container } = render(
+      <ResultField
+        field={list('milestones', row)}
+        value={[
+          { label: 'kickoff', week: 1 },
+          { label: 'survey', week: 2 },
+        ]}
+      />,
+    );
+    const table = container.querySelector('table');
+    expect(table).toBeTruthy();
+    expect(table!.querySelectorAll('thead th')).toHaveLength(2);
+    expect(table!.querySelectorAll('tbody tr')).toHaveLength(2);
+    // The header carries the label ONCE, not once per row.
+    expect(screen.getAllByText('Label')).toHaveLength(1);
+    expect(screen.getByText('kickoff')).toBeTruthy();
+    expect(screen.getByText('survey')).toBeTruthy();
+  });
+
+  it('keeps a column description on the header rather than beside every value', () => {
+    const described: TextRunField = { ...text('label'), description: 'What happens' };
+    const { container } = render(
+      <ResultField
+        field={list('milestones', object('item', [described]))}
+        value={[{ label: 'a' }]}
+      />,
+    );
+    expect(container.querySelector('thead th')?.getAttribute('title')).toBe('What happens');
+    // Printed once as a tooltip, never as a line under each row.
+    expect(screen.queryByText('What happens')).toBeNull();
+  });
+
+  it('falls back to cards when an element carries prose', () => {
+    // A paragraph in a table cell forces one column to the width of the longest
+    // answer and drags every other row's height with it.
+    const row = object('item', [text('name'), prose('mission')]);
+    const { container } = render(
+      <ResultField
+        field={list('teams', row)}
+        value={[{ name: 'Lenses', mission: 'Grind optics' }]}
+      />,
+    );
+    expect(container.querySelector('table')).toBeNull();
+    expect(screen.getByText('Grind optics')).toBeTruthy();
+  });
+
+  it('keeps a record with a short scalar list a table, with chips in the cell', () => {
+    // A record does not stop being a row because one of its fields is a list of
+    // two words. Chips wrap, so a column of them stays a column - and sending the
+    // whole list back to cards over its narrowest field is the wrong trade.
+    const row = object('item', [text('name'), list('tags', text('tag'))]);
+    const { container } = render(
+      <ResultField field={list('teams', row)} value={[{ name: 'Lenses', tags: ['a', 'b'] }]} />,
+    );
+    expect(container.querySelector('table')).toBeTruthy();
+    expect(screen.getByText('a')).toBeTruthy();
+    expect(screen.getByText('b')).toBeTruthy();
+  });
+
+  it('falls back to cards when an element nests a STRUCTURE', () => {
+    // Asserted on the OUTER list's own layout rather than on "is there a table
+    // anywhere": the nested `members` list is a table in its own right, and
+    // finding it would have made this pass for the wrong reason.
+    const row = object('item', [text('name'), list('members', object('member', [text('who')]))]);
+    render(
+      <ResultField
+        field={list('teams', row)}
+        value={[{ name: 'Lenses', members: [{ who: 'Amara' }] }]}
+      />,
+    );
+    expect(screen.queryByRole('columnheader', { name: 'Name' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Who' })).toBeTruthy();
   });
 });
 
@@ -297,6 +382,76 @@ describe('objects', () => {
 
   it('renders every child as absent when the value is not a record', () => {
     render(<ResultField field={object('thing', [text('a')])} value="not an object" />);
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.resultAbsent)).toBeTruthy();
+  });
+});
+
+describe('markup', () => {
+  const htmlField = (over: Partial<ObjectRunField> = {}): ObjectRunField => ({
+    kind: 'object',
+    name: 'output',
+    conceptRef: 'native.Html',
+    required: true,
+    fields: [
+      { kind: 'text', name: 'inner_html', conceptRef: 'native.Text', required: true },
+      { kind: 'text', name: 'css_class', conceptRef: 'native.Text', required: false },
+    ],
+    ...over,
+  });
+
+  it('renders a native.Html value as markup, in a frame', () => {
+    // The arm keyed by CONCEPT rather than by kind: the standard's kind
+    // vocabulary has no `html`, so this node's kind is `object` and the switch
+    // would otherwise print the source at a reader.
+    const { container } = render(
+      <ResultField field={htmlField()} value={{ inner_html: '<h2>Invoice</h2>' }} />,
+    );
+    expect(container.querySelector('iframe')).toBeTruthy();
+    // NOT rendered as the two text members it structurally is.
+    expect(screen.queryByText('<h2>Invoice</h2>')).toBeNull();
+  });
+
+  it('never writes the markup into the host document', () => {
+    // THE security assertion. The markup is model output; an element of it in
+    // the parent tree means it reached the host's origin, which is the thing the
+    // frame exists to prevent.
+    const { container } = render(
+      <ResultField
+        field={htmlField()}
+        value={{ inner_html: '<h2 id="escaped">x</h2><script>window.pwned = 1</script>' }}
+      />,
+    );
+    expect(container.querySelector('#escaped')).toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+  });
+
+  it('sandboxes the frame without allow-scripts', () => {
+    // `allow-same-origin` alone is the safe pairing - it is what lets the parent
+    // measure the content - and granting scripts beside it would undo the whole
+    // arrangement.
+    const { container } = render(
+      <ResultField field={htmlField()} value={{ inner_html: '<p>hi</p>' }} />,
+    );
+    const sandbox = container.querySelector('iframe')?.getAttribute('sandbox') ?? '';
+    expect(sandbox).toContain('allow-same-origin');
+    expect(sandbox).not.toContain('allow-scripts');
+  });
+
+  it('renders a concept REFINING native.Html as markup too', () => {
+    // A method may declare `legal.ClauseMarkup` refining `native.Html`, and a
+    // reader of that result wants the markup rendered just the same. `refines` is
+    // on the wire for exactly this question.
+    const { container } = render(
+      <ResultField
+        field={htmlField({ conceptRef: 'legal.ClauseMarkup', refines: ['native.Html'] })}
+        value={{ inner_html: '<p>clause</p>' }}
+      />,
+    );
+    expect(container.querySelector('iframe')).toBeTruthy();
+  });
+
+  it('renders an absence when the value carries no markup', () => {
+    render(<ResultField field={htmlField()} value={{ css_class: 'invoice' }} />);
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.resultAbsent)).toBeTruthy();
   });
 });

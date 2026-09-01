@@ -21,6 +21,12 @@ export { UnknownField } from './unknown-field';
 export type { ResultFieldProps } from './result-field';
 export { ResultField } from './result-field';
 
+// The markup arm of the result view, exported on its own for a host that renders
+// a `native.Html` value outside a result tree. It is a sandboxed frame rather
+// than an innerHTML write - see the module header for what the sandbox stops.
+export type { HtmlPreviewProps } from './html-preview';
+export { HtmlPreview } from './html-preview';
+
 export { FieldShell } from './field-shell';
 export { ConceptPill } from './concept-pill';
 export { OptionalToggle } from './optional-toggle';

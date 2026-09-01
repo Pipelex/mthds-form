@@ -60,14 +60,22 @@ export {
 // than beside the control that renders it for the same reason the accept table
 // does - a host showing a result its own way needs the same answer, and two
 // copies of an answer is two places for it to drift. See ./native-content.
-export type { DateContentView, DocumentContentView, ImageContentView } from './native-content';
+export type {
+  DateContentView,
+  DocumentContentView,
+  HtmlContentView,
+  ImageContentView,
+} from './native-content';
 export {
+  NATIVE_HTML_CONCEPT_REF,
   TYPED_SCALAR_MARKERS,
   formatDateContent,
   hasTypedScalarMarkers,
+  isNativeHtmlNode,
   isViewableUrl,
   readDateContent,
   readDocumentContent,
+  readHtmlContent,
   readImageContent,
 } from './native-content';
 

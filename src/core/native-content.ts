@@ -130,6 +130,57 @@ export function readImageContent(value: unknown): ImageContentView | undefined {
 }
 
 /**
+ * `native.Html`, read.
+ *
+ * The only content model here that is NOT reached by a field kind, and the
+ * reason is a deliberate decision of the standard: the kind vocabulary has no
+ * `html` member, so a `native.Html` value is an `object` node over its two
+ * declared fields. That is right for the descriptor — the kinds name how a value
+ * is ENTERED, and markup is entered as text — and wrong for a result view, which
+ * would otherwise print a page's source at a reader.
+ *
+ * So this one is keyed by CONCEPT rather than by kind, through
+ * `isNativeHtmlNode` below. That is a membership test on facts the descriptor
+ * states (`concept_ref`, `refines`), which the standard's own page calls out as
+ * the supported way to ask "does this refine `native.X`?" — the opposite of
+ * inspecting a value to guess what it is.
+ */
+export interface HtmlContentView {
+  /** The markup itself. The one required member. */
+  innerHtml: string;
+  /** A class name for a wrapper a consumer may put around it, when stated. */
+  cssClass?: string;
+}
+
+/** Read an `native.Html` value. `undefined` when it carries no markup. */
+export function readHtmlContent(value: unknown): HtmlContentView | undefined {
+  if (!isRecord(value)) return undefined;
+  const innerHtml = readText(value, 'inner_html');
+  if (innerHtml === undefined) return undefined;
+  return { innerHtml, cssClass: readText(value, 'css_class') };
+}
+
+/** The concept ref `native.Html` is pinned under, spelled once. */
+export const NATIVE_HTML_CONCEPT_REF = 'native.Html';
+
+/**
+ * Whether a descriptor node carries markup — its concept IS `native.Html`, or
+ * refines it.
+ *
+ * The refinement chain is checked, not just the leaf, because a method may
+ * declare `legal.ClauseMarkup` refining `native.Html` and a reader of that result
+ * wants the markup rendered just the same. `refines` is on the wire for exactly
+ * this question.
+ */
+export function isNativeHtmlNode(node: {
+  conceptRef?: string;
+  refines?: readonly string[];
+}): boolean {
+  if (node.conceptRef === NATIVE_HTML_CONCEPT_REF) return true;
+  return node.refines?.includes(NATIVE_HTML_CONCEPT_REF) ?? false;
+}
+
+/**
  * Read a `date`-kind value, in any of the three shapes a run produces.
  *
  * The `date` member is read one level deep, because `native.Date`'s own `date`

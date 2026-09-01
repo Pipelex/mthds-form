@@ -58,6 +58,34 @@ Three arms read a structure rather than a scalar, and they read it through `src/
 
 `native.Page` needs no arm of its own: its descriptor is an `object` over `{text_and_images, page_view}`, so it works by recursion into the arms above.
 
+## Layout: a result is read, not filled in
+
+The result view started as the input form with the controls swapped for values, and that was the wrong shape. Label, type pill, description, value — stacked, once per field — is right for something a person **fills in**: the guidance has to arrive before they type. For something they **read**, it is chrome around the one thing they came for, and it multiplies. A fifteen-entry list of four-field records rendered as fifteen forms: about 240 lines of page for 60 values.
+
+Three rules replaced it, and each follows from a fact the descriptor already states.
+
+**A list of records with one shape is a table.** Every entry has the same keys — that is what a table is. So the labels become column headers, stated once instead of once per row, and the type pills go with them. `tableColumns` decides it: an `object` element whose every field is a short scalar, or a list of them.
+
+**A column can hold a short scalar list.** A record does not stop being a row because one of its fields is two words; chips wrap, so a column of them stays a column. Sending the whole list back to cards over its narrowest field is the wrong trade, and it is the difference between a five-column table of people and five stacked forms.
+
+**Prose and nesting fall back to cards.** A paragraph in a `<td>` forces one column to the width of the longest answer and drags every row's height with it, so `prose` is deliberately outside the tabular set. So are `object` and `list`-of-structures, for the obvious reason, and `document`/`image`, because a file's chrome is not a cell. The index label a card carries earns its place there — the entries are structures rather than values.
+
+**A list of scalars is chips, not cards.** `["optics", "calibration"]` as two bordered boxes with index numbers spends a screenful on two words, and the index was never information: the entries of a scalar list _are_ the values, and they identify themselves.
+
+**A field's description moves to a tooltip below the top level.** On an input it is guidance a person needs; on a result it is the same sentence beside a value they are there to read, and inside a structure of ten fields it is ten lines of chrome around ten values. It stays reachable on the label's `title` — worth having, not worth repeating — and is printed outright only on the output node itself, where it describes the whole result.
+
+None of this is a heuristic about the data. Every branch reads the descriptor: the element's `kind`, and its fields' kinds. A payload is never inspected to decide how to lay it out.
+
+## Markup
+
+`native.Html` is the one arm keyed by **concept** rather than by kind, and it is not an exception grudgingly made. The standard's kind vocabulary has no `html` member, so markup arrives as an `object` node over `{inner_html, css_class}` — right for the descriptor, since kinds name how a value is _entered_ and markup is entered as text, and useless for a result, which would otherwise print a page's source at a reader. Asking `refines`/`concept_ref` whether a node is `native.Html` is a membership test on stated facts, which the input-form page names as the supported way to ask it.
+
+It renders **in a sandboxed frame**, never through `dangerouslySetInnerHTML`. The markup is model output: injected into the host's document it would put a script tag, an `onerror` handler and a form posting elsewhere one prompt away from running on the host's origin with the host's cookies. "The host should sanitize it" is not a decision, it is a hope, and the failure is silent until it is a breach. Shipping a sanitizer is the alternative, and the [dependency budget](dependency-budget.md) makes that a reviewed decision rather than a convenience — so the frame, which is the platform's own answer and weighs nothing.
+
+Two mechanisms, covering different things. `sandbox` **without** `allow-scripts` means no JavaScript runs at all — no `<script>`, no `on*`, no `javascript:` URL; `allow-same-origin` is granted beside it, which is the safe pairing (same-origin is dangerous only _together with_ scripts) and is what lets the parent measure the content to size the frame. A `Content-Security-Policy` meta then holds `default-src 'none'`, so markup carrying `<img src="https://tracker/…">` cannot phone home the moment a result is displayed — a privacy leak rather than a script one, and one that survives the sandbox on its own.
+
+The frame's typography is read off the mount point with `getComputedStyle` and written into its own stylesheet, because no host CSS crosses a document boundary and the alternative is browser defaults in the middle of a themed panel — black on white inside a dark theme.
+
 ## Why the readers live in core
 
 Same reason `file-formats.ts` does: a host that renders a result its own way needs the same answer the control uses, and two copies of an answer is two places for it to drift. `isViewableUrl` is the clearest case — the input control asks it to decide whether to fetch a preview, the result view asks it to decide whether to paint an `<img>`, and those are the same question. It is defined once and both read it.

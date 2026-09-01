@@ -18,6 +18,22 @@
 
 ### Added
 
+- **A result is laid out as something read, not as something filled in.** The result view was the input form with the controls swapped for values, and that is the wrong shape: label, type pill, description, value — stacked, once per field — is guidance a person needs before typing, and chrome around the one thing they came for afterwards. A fifteen-entry list of four-field records rendered as fifteen forms, about 240 lines of page for 60 values.
+
+  **A list of records with one shape is now a table.** Every entry has the same keys, which is what a table is, so the labels become column headers stated once instead of once per row. A column may hold a short scalar list, rendered as chips — a record does not stop being a row because one of its fields is two words, and sending the whole list back to cards over its narrowest field is the wrong trade. Prose and nesting fall back to cards, deliberately: a paragraph in a `<td>` forces one column to the width of the longest answer and drags every row's height with it.
+
+  **A list of scalars is chips, not cards.** Two bordered boxes with index numbers around `optics` and `calibration` spends a screenful on two words, and the index was never information — the entries of a scalar list are the values.
+
+  **A field's description moves to the label's `title` below the top level**, and a column's to its header's. Worth having, not worth repeating ten times around ten values.
+
+  Every branch reads the DESCRIPTOR — the element's kind and its fields' kinds — and never inspects a payload to decide how to lay it out. The fifteen-entry list went from fifteen screenfuls to one; the four-level company from about 2400px to 1000.
+
+- **`native.Html` renders as markup, in a sandboxed frame.** It used to print the page's source at the reader, because the standard's kind vocabulary has no `html` member: markup arrives as an `object` node over `{inner_html, css_class}`, which is right for the descriptor (kinds name how a value is _entered_, and markup is entered as text) and useless for a result. So this is the one arm keyed by **concept** rather than by kind — a membership test on `refines`/`concept_ref`, which the input-form page names as the supported way to ask it, and which therefore also covers a concept refining `native.Html`.
+
+  It is a frame, never `dangerouslySetInnerHTML`. The markup is model output: injected into the host's document it would put a script tag, an `onerror` handler and a form posting elsewhere one prompt away from running on the host's origin with the host's cookies. Shipping a sanitizer instead is a [dependency budget](docs/dependency-budget.md) decision rather than a convenience, so the frame — the platform's own answer, weighing nothing. `sandbox` without `allow-scripts` means no JavaScript runs at all; `allow-same-origin` beside it is the safe pairing and is what lets the parent size the frame to its content. A CSP meta with `default-src 'none'` then stops markup carrying a remote `<img>` from phoning home the moment a result is displayed. The frame's typography is read off the mount point, so it follows a host's theme across a document boundary no CSS crosses.
+
+  New exports: `HtmlPreview` on `./react`, and `readHtmlContent`, `isNativeHtmlNode`, `NATIVE_HTML_CONCEPT_REF` plus the `HtmlContentView` type on `.`.
+
 - **The result corpus spans the whole output surface, not one shape.** The `Outputs/Results` section grew from five stories to thirteen, each a real run: every native scalar (`Text`, `Number`, `YesNo`, `Date`, `Html` — a wrapping content model and a multi-property one), a flat structure, **four levels of nesting** (a company holding divisions holding teams holding people, with enums, dates, booleans, numbers and lists of plain text at four different depths), a structure carrying every scalar kind at once with optionals a run may leave empty, a **fifteen-entry list**, both plural arms, and both file-bearing kinds.
 
   The last of those is `native.Page[]`, the richest shape the standard defines, from a real `PipeExtract` over a committed PDF. Its tree is `list → object → object → prose + list of images + image`, and it is the case that proves `native.Page` needs no renderer arm of its own — it works by recursion into the arms that exist. It also exercises a nested content-model unwrap the flat cases cannot reach: `text_and_images.text` arrives as `TextContent {text}`, and `contentKey` is read for it off the schema at that depth rather than at the top.

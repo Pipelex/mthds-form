@@ -4,13 +4,16 @@ import type { RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import {
   formatDateContent,
+  isNativeHtmlNode,
   isViewableUrl,
   readDateContent,
   readDocumentContent,
+  readHtmlContent,
   readImageContent,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
 import { ConceptPill } from './concept-pill';
+import { HtmlPreview } from './html-preview';
 import { useFieldStrings } from './field-strings';
 import { humanizeFieldName } from './field-presentation';
 import { cn } from './utils';
@@ -35,11 +38,20 @@ import { cn } from './utils';
  * It used to fall through to `String(value)`, which turned a `document` result
  * into the literal text `[object Object]` — silently, with no error anywhere.
  *
- * The three arms that read a structure (`document`, `image`, `date`) read it
- * through `../core/native-content`, keyed by the kind the descriptor STATES.
- * That is reading the standard's pinned content models; working out which kind a
- * value is by inspecting its keys would be guessing at them, and this file no
- * longer does any of it.
+ * The arms that read a structure (`document`, `image`, `date`) read it through
+ * `../core/native-content`, keyed by the kind the descriptor STATES. That is
+ * reading the standard's pinned content models; working out which kind a value
+ * is by inspecting its keys would be guessing at them, and this file no longer
+ * does any of it.
+ *
+ * **`native.Html` is the one arm keyed by CONCEPT rather than by kind**, and not
+ * as an exception grudgingly made: the standard's kind vocabulary has no `html`
+ * member, so markup arrives as an `object` node over `{inner_html, css_class}`.
+ * That is right for the descriptor — kinds name how a value is ENTERED, and
+ * markup is entered as text — and useless for a result, which would otherwise
+ * print a page's source at a reader. Asking `refines`/`concept_ref` whether a
+ * node is `native.Html` is a membership test on stated facts, which the
+ * standard's own page names as the supported way to ask it.
  */
 
 /**
@@ -58,9 +70,12 @@ function unwrap(field: RunField, value: unknown): unknown {
   return unwrapped === undefined ? value : unwrapped;
 }
 
-function Label({ field }: { field: RunField }) {
+function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2">
+    <div
+      className="flex flex-wrap items-baseline gap-x-2"
+      {...(describe && field.description ? { title: field.description } : {})}
+    >
       <span className="font-mono text-[13px] font-semibold text-foreground">
         {field.title ?? humanizeFieldName(field.name)}
       </span>
@@ -168,6 +183,133 @@ function ImageValue({ value }: { value: unknown }) {
   );
 }
 
+/**
+ * The kinds a table cell can hold — short, single-line values.
+ *
+ * `prose` is deliberately absent. A paragraph in a `<td>` is worse than a card:
+ * it forces one column to the width of the longest answer and drags every other
+ * row's height with it. A list whose element carries prose renders as cards, and
+ * that is the right answer rather than a limitation.
+ *
+ * `object` and `list` are absent for the obvious reason, and `document`/`image`
+ * because a file's chrome (a link, a preview) is not a cell.
+ */
+const TABULAR_KINDS = new Set<RunField['kind']>(['text', 'number', 'boolean', 'date', 'enum']);
+
+/** Whether a column can hold this field: a short scalar, or a list of them. */
+function isTabularColumn(field: RunField): boolean {
+  if (field.kind === 'list') return TABULAR_KINDS.has(field.item.kind);
+  return TABULAR_KINDS.has(field.kind);
+}
+
+/** Just the value, with no label chrome — shared by the stacked and table layouts. */
+function LeafValue({ field, value }: { field: RunField; value: unknown }) {
+  switch (field.kind) {
+    case 'list':
+      // A short scalar list inside a cell: chips wrap, so a column of them stays
+      // a column. This is what keeps a record with one small list a TABLE rather
+      // than sending the whole list back to cards over its narrowest field.
+      return <ScalarChips field={field.item} items={Array.isArray(value) ? value : []} />;
+    case 'boolean':
+      return <Bool value={value} />;
+    case 'date':
+      return <DateValue value={value} />;
+    case 'document':
+      return <DocumentValue value={value} />;
+    case 'image':
+      return <ImageValue value={value} />;
+    default:
+      return <Scalar value={value} />;
+  }
+}
+
+/**
+ * A list of SCALARS, inline.
+ *
+ * Rendering `["optics", "calibration"]` as two bordered cards with index numbers
+ * spends a screenful of chrome on two words. Chips say the same thing in one
+ * line, and the index a card carried was never information here — the entries of
+ * a scalar list are the values, and they identify themselves.
+ */
+function ScalarChips({ field, items }: { field: RunField; items: readonly unknown[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item, index) => (
+        <span
+          key={index}
+          className="rounded-md border border-border bg-card/40 px-2 py-0.5 text-[12.5px] text-foreground"
+        >
+          <LeafValue field={field} value={item} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A list of objects of ONE shape, as the table it is.
+ *
+ * Every entry has the same keys, so the labels are column headers rather than
+ * per-row labels — repeating them down the page is what made a fifteen-entry
+ * result read as fifteen forms. The description and the type pill move to the
+ * header too: on an INPUT they are guidance a person needs before typing, and on
+ * a result they are the same sentence fifteen times. The description stays
+ * reachable as the header's `title`, which is the honest place for a fact that
+ * is worth having and not worth repeating.
+ */
+function ObjectTable({
+  columns,
+  items,
+}: {
+  columns: readonly RunField[];
+  items: readonly unknown[];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full border-collapse text-[13px]">
+        <thead>
+          <tr className="border-b border-border bg-card/40 text-left">
+            {columns.map((column) => (
+              <th
+                key={column.name}
+                scope="col"
+                {...(column.description ? { title: column.description } : {})}
+                className="whitespace-nowrap px-3 py-2 font-mono text-[12px] font-semibold text-foreground"
+              >
+                {column.title ?? humanizeFieldName(column.name)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr key={index} className="border-b border-border/60 last:border-b-0">
+              {columns.map((column) => (
+                <td key={column.name} className="px-3 py-1.5 align-top">
+                  <LeafValue
+                    field={column}
+                    value={
+                      typeof item === 'object' && item !== null
+                        ? ownProp(item as Record<string, unknown>, column.name)
+                        : undefined
+                    }
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Whether a list's element is a uniform record of short scalars - i.e. a row. */
+function tableColumns(item: RunField): readonly RunField[] | undefined {
+  if (item.kind !== 'object' || item.fields.length === 0) return undefined;
+  return item.fields.every(isTabularColumn) ? item.fields : undefined;
+}
+
 export interface ResultFieldProps {
   field: RunField;
   value: unknown;
@@ -186,14 +328,34 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
   const s = useFieldStrings();
   const unwrapped = unwrap(field, value);
 
+  // The description rides the label's `title` on a nested field and is shown
+  // outright only at the top.
+  //
+  // On an INPUT it is guidance a person needs before typing, so it is printed
+  // under every label. On a RESULT it is the same sentence beside a value the
+  // reader is there to read — and inside a structure of ten fields it is ten
+  // lines of chrome around ten values. The fact is worth having and is not worth
+  // repeating, so it stays reachable rather than printed.
   const header = hideLabel ? null : (
     <>
-      <Label field={field} />
-      {field.description && (
+      <Label field={field} describe={depth > 0} />
+      {depth === 0 && field.description && (
         <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
       )}
     </>
   );
+
+  // Markup, before the kind switch: a `native.Html` node's KIND is `object`, so
+  // the switch below would render its two members as text and call it done.
+  if (isNativeHtmlNode(field)) {
+    const content = readHtmlContent(unwrapped);
+    return (
+      <div className="space-y-2">
+        {header}
+        {content ? <HtmlPreview content={content} /> : <Absent />}
+      </div>
+    );
+  }
 
   switch (field.kind) {
     case 'object':
@@ -202,7 +364,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
           {header}
           <div
             className={cn(
-              'space-y-3',
+              'space-y-2.5',
               // A list item already sits in its own bordered row; nesting a
               // second card inside it draws a box in a box for no information
               // gained.
@@ -231,6 +393,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
       // array property is bare on the wire to begin with. The `items`-key sniff
       // that used to stand in for the schema is gone.
       const items = Array.isArray(unwrapped) ? unwrapped : [];
+      const columns = tableColumns(field.item);
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-2">
@@ -241,7 +404,16 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
           </div>
           {items.length === 0 ? (
             <p className="text-[13px] italic text-muted-foreground">{s.noItemsYet}</p>
+          ) : columns ? (
+            // Same shape every row: the labels are column headers, not per-row
+            // labels. See `ObjectTable`.
+            <ObjectTable columns={columns} items={items} />
+          ) : TABULAR_KINDS.has(field.item.kind) ? (
+            <ScalarChips field={field.item} items={items} />
           ) : (
+            // Nested, or carrying prose: a card per entry is what a table cell
+            // cannot hold. The index label earns its place here, where the
+            // entries are structures rather than values.
             <div className="space-y-2">
               {items.map((item, index) => (
                 <div
@@ -260,7 +432,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
 
     case 'boolean':
       return (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {header}
           <Bool value={unwrapped} />
         </div>
@@ -268,7 +440,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
 
     case 'date':
       return (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {header}
           <DateValue value={unwrapped} />
         </div>
@@ -296,7 +468,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
     case 'enum':
     case 'unknown':
       return (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {header}
           <Scalar value={unwrapped} />
         </div>
