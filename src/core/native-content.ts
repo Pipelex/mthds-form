@@ -287,9 +287,22 @@ export function formatDateContent(content: DateContentView): string {
  * resolver must show the reference rather than a broken `<img>`. `file:` is
  * deliberately NOT viewable: a run on a developer's machine writes one, and a
  * browser refuses to load it from a page served over http.
+ *
+ * **A root-relative path counts**, and leaving it out was a real bug rather
+ * than an omission. A host's URL resolver naturally hands back a path on its
+ * OWN origin — `/api/assets/…`, an authenticated route that streams the object
+ * — which is the whole point of resolving rather than exposing storage. This
+ * predicate rejected it for having no scheme, so the resolved URL was thrown
+ * away and the arms fell back to the payload's `public_url`: a presigned URL
+ * that had already expired. The image stayed broken with the fix in place.
+ *
+ * `//host/path` is deliberately excluded. It is protocol-relative, so it points
+ * at another origin while looking like a path.
  */
 export function isViewableUrl(url: string | undefined): url is string {
-  return !!url && (/^https?:/i.test(url) || /^data:/i.test(url) || /^blob:/i.test(url));
+  if (!url) return false;
+  if (/^\/(?!\/)/.test(url)) return true;
+  return /^https?:/i.test(url) || /^data:/i.test(url) || /^blob:/i.test(url);
 }
 
 /**
