@@ -23,8 +23,10 @@ export { ResultField } from './result-field';
 
 // The panel a host mounts: the header, the Result/JSON switch, and the field
 // tree beneath them. `ResultField` stays exported for a host composing its own.
-export type { ResultPanelProps, ResultPanelView } from './result-panel';
-export { JsonView, ResultPanel } from './result-panel';
+export type { StuffViewerProps, StuffViewerView } from './stuff-viewer';
+export { JsonView, StuffViewer } from './stuff-viewer';
+export { downloadStuff } from './download-stuff';
+export type { ResolveForDownload } from './download-stuff';
 // The host's seam for turning a stored reference into a fetchable URL. Without
 // it a result view paints whatever `public_url` the payload carries, which on a
 // hosted platform is a presigned URL that expires — see result-env.tsx.

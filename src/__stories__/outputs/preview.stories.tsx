@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import type { FileRunField } from '../../core/descriptor';
-import { DEFAULT_FIELD_STRINGS, ResultPanel } from '../../react';
+import { DEFAULT_FIELD_STRINGS, StuffViewer } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
 
@@ -60,7 +60,7 @@ const document: FileRunField = {
 function Preview({ value }: { value: unknown }) {
   return (
     <div style={{ maxWidth: 640 }}>
-      <ResultPanel field={document} value={value} />
+      <StuffViewer field={document} value={value} />
     </div>
   );
 }

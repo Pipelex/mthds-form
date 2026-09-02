@@ -805,7 +805,7 @@ describe('a text value can always be copied', () => {
   });
 
   it('survives hideLabel, which is the top-level case the panel uses', () => {
-    // The header moves up to `ResultPanel` and the button does not follow it. A
+    // The header moves up to `StuffViewer` and the button does not follow it. A
     // text result with no way to copy it would be exactly the one worth copying.
     render(<ResultField field={prose('report')} value="Something to take away." hideLabel />);
     expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText })).toBeTruthy();

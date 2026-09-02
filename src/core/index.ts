@@ -45,6 +45,8 @@ export { buildResultField, buildRunFields, getPipeInputForm } from './derive';
 // re-exported beside the lookup; see ./output-form.
 export type { OutputForm, PipeOutputFormDescriptor } from './output-form';
 export { getPipeOutputForm } from './output-form';
+export { collectStuffFiles } from './stuff-files';
+export type { StuffFile } from './stuff-files';
 
 // What a `document` or `image` slot accepts - a mirror of the runtime's format
 // enums, exported because a host that uploads files needs the same answer the

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { OutputForm, PipeIOContracts, RunField } from '../core';
 import { buildResultField, getPipeIOContract, getPipeOutputForm } from '../core';
-import { FieldPresentationProvider, ResultPanel, type FieldPresentation } from '../react';
+import { FieldPresentationProvider, StuffViewer, type FieldPresentation } from '../react';
 
 /**
  * The one harness every result story renders through — the output twin of
@@ -21,7 +21,7 @@ import { FieldPresentationProvider, ResultPanel, type FieldPresentation } from '
  * in each story is the point — a story that reached for only one would be
  * demonstrating a consumer that has to guess.
  *
- * It renders through `ResultPanel`, the component a host actually mounts, so
+ * It renders through `StuffViewer`, the component a host actually mounts, so
  * every story carries the **Result / JSON** switch. That is deliberate: the JSON
  * view is not a feature of some results, it is the receipt for all of them.
  */
@@ -76,7 +76,7 @@ export function ResultView({
   return (
     <div style={{ maxWidth }}>
       <FieldPresentationProvider presentation={presentation}>
-        <ResultPanel field={field} value={value} />
+        <StuffViewer field={field} value={value} />
       </FieldPresentationProvider>
     </div>
   );

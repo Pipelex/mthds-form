@@ -13,7 +13,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ObjectRunField, RunField, TextRunField } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
-import { ResultPanel } from '../result-panel';
+import { StuffViewer } from '../stuff-viewer';
 
 const text = (name: string): TextRunField => ({
   kind: 'text',
@@ -32,7 +32,7 @@ const invoice: ObjectRunField = {
 
 describe('the result panel', () => {
   it('opens on the rendered view', () => {
-    render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
     expect(
       screen
         .getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewRendered })
@@ -43,7 +43,7 @@ describe('the result panel', () => {
 
   it('shows the payload verbatim on the JSON view', async () => {
     const { container } = render(
-      <ResultPanel field={invoice} value={{ reference: 'INV-1', paid: false }} />,
+      <StuffViewer field={invoice} value={{ reference: 'INV-1', paid: false }} />,
     );
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
     // Asserted on the rendered TEXT, not on a single node: the view splits the
@@ -59,7 +59,7 @@ describe('the result panel', () => {
     // The colouring is presentation: chunking it into spans must not add,
     // reorder or drop a character, or the view stops being a receipt.
     const value = { a: 1, b: [true, null, 'x"y'], c: { d: -1.5e3 } };
-    const { container } = render(<ResultPanel field={invoice} value={value} defaultView="json" />);
+    const { container } = render(<StuffViewer field={invoice} value={value} defaultView="json" />);
     expect(container.querySelector('pre')!.textContent).toBe(JSON.stringify(value, null, 2));
   });
 
@@ -71,7 +71,7 @@ describe('the result panel', () => {
     // Found by the TITLE, because the description hides on hover here as it does
     // everywhere else: a sentence beside the value a reader came for is one line
     // of chrome at the top and ten inside a structure of ten.
-    render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
     expect(screen.getAllByText('output')).toHaveLength(1);
     // Nothing at rest: the description is tooltip content, not a line of chrome
     // above the value the reader came for.
@@ -83,7 +83,7 @@ describe('the result panel', () => {
   it('shows the description on hover, and on focus', async () => {
     // Focus matters as much as hover: a fact reachable only by pointing is a
     // fact a keyboard user does not have.
-    render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
     screen.getByText('output').parentElement!.focus();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('A commercial invoice');
   });
@@ -92,7 +92,7 @@ describe('the result panel', () => {
     // The guard on the design: a third human rendering of the same payload —
     // engine-produced HTML or plain text — carries no descriptor, cannot match a
     // host's design system, and cannot be improved without shipping the engine.
-    render(<ResultPanel field={invoice} value={{}} />);
+    render(<StuffViewer field={invoice} value={{}} />);
     const group = screen.getByRole('group', { name: DEFAULT_FIELD_STRINGS.resultViewGroup });
     expect(group.querySelectorAll('button')).toHaveLength(2);
   });
@@ -100,7 +100,7 @@ describe('the result panel', () => {
   it('copies the whole payload from the JSON view', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
-    render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} />);
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyJson }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"reference"'));
@@ -108,20 +108,20 @@ describe('the result panel', () => {
   });
 
   it('renders an absent result as an absence on BOTH views', async () => {
-    render(<ResultPanel field={invoice} value={undefined} />);
+    render(<StuffViewer field={invoice} value={undefined} />);
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.resultAbsent)).toBeTruthy();
   });
 
   it('opens on JSON when a host asks it to', () => {
-    render(<ResultPanel field={invoice} value={{ reference: 'INV-1' }} defaultView="json" />);
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} defaultView="json" />);
     expect(screen.getByText(/"reference"/)).toBeTruthy();
   });
 });
 
 describe('the header is drawn once for a LIST result too', () => {
   it('does not repeat the panel header on the list beneath it', () => {
-    // `ResultPanel` draws the header and tells `ResultField` to skip its own;
+    // `StuffViewer` draws the header and tells `ResultField` to skip its own;
     // the list arm ignored that and drew a second one, so a plural result was
     // labelled twice, one line apart.
     const field: RunField = {
@@ -131,7 +131,7 @@ describe('the header is drawn once for a LIST result too', () => {
       required: true,
       item: { kind: 'text', name: 'output', conceptRef: 'x.Item', required: true },
     };
-    render(<ResultPanel field={field} value={['a', 'b']} />);
+    render(<StuffViewer field={field} value={['a', 'b']} />);
     expect(screen.getAllByText('output')).toHaveLength(1);
     // The count is a fact about the value rather than a name for it, and the
     // panel's header does not carry it — so it stays.

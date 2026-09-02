@@ -1,11 +1,13 @@
 'use client';
 
 import type * as React from 'react';
-import { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
 import { useFieldStrings } from './field-strings';
+import { downloadStuff } from './download-stuff';
+import { useResolveUrl } from './result-env';
 import { cn } from './utils';
 
 /**
@@ -32,13 +34,24 @@ import { cn } from './utils';
  * belongs behind a copy control, not beside the view that reads the standard.
  */
 
-export type ResultPanelView = 'rendered' | 'json';
+export type StuffViewerView = 'rendered' | 'json';
 
-export interface ResultPanelProps {
+export interface StuffViewerProps {
   field: RunField;
   value: unknown;
   /** Which view opens first. Rendered, unless a host has a reason. */
-  defaultView?: ResultPanelView;
+  defaultView?: StuffViewerView;
+  /**
+   * Names the saved files: `<baseName>.json`, and any file inside the stuff
+   * that carries no name of its own. Defaults to the field's name, which is
+   * what the header shows.
+   */
+  downloadBaseName?: string;
+  /**
+   * Hide the download control. For a host that saves results its own way, or a
+   * surface where saving makes no sense — a preview inside an editor, say.
+   */
+  hideDownload?: boolean;
   className?: string;
 }
 
@@ -153,15 +166,36 @@ export function JsonView({ value }: { value: unknown }) {
   );
 }
 
-export function ResultPanel({
+export function StuffViewer({
   field,
   value,
   defaultView = 'rendered',
+  downloadBaseName,
+  hideDownload = false,
   className,
-}: ResultPanelProps) {
+}: StuffViewerProps) {
   const s = useFieldStrings();
-  const [view, setView] = useState<ResultPanelView>(defaultView);
-  const views: { id: ResultPanelView; label: string }[] = [
+  const [view, setView] = useState<StuffViewerView>(defaultView);
+  const [saving, setSaving] = useState(false);
+  // The same resolver the rendered view paints images through, so a download
+  // fetches exactly what the reader is looking at — a host that proxies its
+  // storage does not need to configure the two separately.
+  const resolveUrl = useResolveUrl();
+
+  const handleDownload = useCallback(async () => {
+    setSaving(true);
+    try {
+      await downloadStuff({
+        field,
+        value,
+        baseName: downloadBaseName ?? field.name ?? 'result',
+        resolveUrl,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [field, value, downloadBaseName, resolveUrl]);
+  const views: { id: StuffViewerView; label: string }[] = [
     { id: 'rendered', label: s.viewRendered },
     { id: 'json', label: s.viewJson },
   ];
@@ -175,27 +209,45 @@ export function ResultPanel({
         <div className="min-w-0 space-y-1">
           <ResultHeader field={field} />
         </div>
-        <div
-          role="group"
-          aria-label={s.resultViewGroup}
-          className="flex shrink-0 rounded-md border border-border p-0.5"
-        >
-          {views.map(({ id, label }) => (
+        <div className="flex shrink-0 items-center gap-2">
+          {!hideDownload && (
             <button
-              key={id}
               type="button"
-              onClick={() => setView(id)}
-              aria-pressed={view === id}
-              className={cn(
-                'rounded px-2 py-0.5 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1',
-                view === id
-                  ? 'bg-card font-medium text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+              onClick={() => void handleDownload()}
+              disabled={saving}
+              aria-label={s.download}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
             >
-              {label}
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {saving ? s.downloading : s.download}
             </button>
-          ))}
+          )}
+          <div
+            role="group"
+            aria-label={s.resultViewGroup}
+            className="flex rounded-md border border-border p-0.5"
+          >
+            {views.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setView(id)}
+                aria-pressed={view === id}
+                className={cn(
+                  'rounded px-2 py-0.5 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1',
+                  view === id
+                    ? 'bg-card font-medium text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

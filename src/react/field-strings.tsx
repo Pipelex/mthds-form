@@ -69,6 +69,10 @@ export interface FieldStrings {
   copyUrl: string;
   /** The copy control beside any text value, markdown or not. */
   copyText: string;
+  /** The download control's label. */
+  download: string;
+  /** Announced while the files are being fetched. */
+  downloading: string;
   /** The result panel's two views, and the control that copies the payload. */
   viewRendered: string;
   viewJson: string;
@@ -119,6 +123,8 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   rowDetailsColumn: 'Details',
   copyUrl: 'Copy the URL',
   copyText: 'Copy the text',
+  download: 'Download',
+  downloading: 'Downloading…',
   viewRendered: 'Result',
   viewJson: 'JSON',
   copyJson: 'Copy the JSON',

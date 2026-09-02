@@ -1554,7 +1554,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
               the source the run produced, not the typeset rendering.
 
               The row survives `hideLabel`, which is the top-level case
-              `ResultPanel` uses: the header moves up to the panel, the button
+              `StuffViewer` uses: the header moves up to the panel, the button
               does not follow it, and a text result with no way to copy it would
               be exactly the one worth copying. */}
           {copyText === undefined ? (
