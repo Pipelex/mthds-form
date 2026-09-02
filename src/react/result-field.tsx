@@ -343,7 +343,18 @@ function CopyButton({ value, label, title }: { value: string; label: string; tit
 
 function CopyUrlButton({ url }: { url: string }) {
   const s = useFieldStrings();
-  return <CopyButton value={url} label={s.copyUrl} title={url} />;
+  // ABSOLUTE on the clipboard, relative on the page. A host resolver returns a
+  // path on its own origin (`/api/assets/…`), which an `<img>` and an `<a>`
+  // both resolve correctly — and which is useless pasted into another tab.
+  // Copying is the one place the origin has to be spelled out.
+  const copied = absoluteUrl(url);
+  return <CopyButton value={copied} label={s.copyUrl} title={copied} />;
+}
+
+/** A root-relative path made absolute against the current origin; anything else verbatim. */
+function absoluteUrl(url: string): string {
+  if (!/^\/(?!\/)/.test(url) || typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
 }
 
 /**
@@ -470,11 +481,15 @@ function DocumentPreview({ url, name }: { url: string; name: string }) {
 
 function DocumentValue({ value }: { value: unknown }) {
   const s = useFieldStrings();
+  // Above the early return: a hook after one runs conditionally, which React
+  // forbids and which the `<Absent />` path would trigger on any payload
+  // missing a URL.
+  const resolve = useResolveUrl();
   const [open, setOpen] = useState(false);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
   const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename);
-  const preview = previewableUrl(content, useResolveUrl());
+  const preview = previewableUrl(content, resolve);
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -482,7 +497,7 @@ function DocumentValue({ value }: { value: unknown }) {
         <div className="min-w-0 flex-1 space-y-0.5">
           {name && <span className="block truncate text-[13px] text-foreground">{name}</span>}
           <FileRef
-            url={content.publicUrl ?? content.url}
+            url={paintableUrl(content, resolve) ?? content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
           />
@@ -526,9 +541,10 @@ function ImageValue({
   compact?: boolean;
 }) {
   const s = useFieldStrings();
+  const resolve = useResolveUrl();
   const content = readImageContent(value);
   if (!content) return <Absent />;
-  const src = paintableUrl(content, useResolveUrl());
+  const src = paintableUrl(content, resolve);
   // In a gallery the tile IS the border, so the image fills it and the caption
   // sits under it; on its own the image keeps its own frame and a height cap.
   return (
@@ -590,7 +606,7 @@ function ImageValue({
       {src && !compact && (
         <div className={inGallery ? 'px-2.5' : undefined}>
           <FileRef
-            url={content.publicUrl ?? content.url}
+            url={paintableUrl(content, resolve) ?? content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
           />
