@@ -607,7 +607,18 @@ function ImageValue({
         // preview to see the thing it previews is what a reader expects. The
         // reference underneath is the other half - a picture with no URL beside
         // it is a result you can look at and cannot use.
-        <a href={src} target="_blank" rel="noreferrer" title={content.url} className="inline-block">
+        <a
+          href={src}
+          target="_blank"
+          rel="noreferrer"
+          title={content.url}
+          // BLOCK when the image fills its column, inline-block otherwise. An
+          // `inline-block` anchor shrink-wraps, so a `w-full` image inside one
+          // resolves to zero width — the panel showed a tall empty sliver with
+          // the spinner clipped inside it. A gallery tile and a table cell size
+          // themselves, so they keep the inline box.
+          className={inGallery || compact ? 'inline-block' : 'block w-full'}
+        >
           <LoadingImage
             src={src}
             alt={content.caption ?? s.preview}

@@ -65,7 +65,7 @@
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
-    "mthds": "^0.25.0",
+    "mthds": "file:../mthds-js",
     "react": "^19",
     "react-dom": "^19"
   },
