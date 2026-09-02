@@ -618,7 +618,14 @@ function ImageValue({
               // slideshow, so a cell gets a thumbnail and the row's expansion gets
               // the picture.
               compact && 'h-10 w-auto rounded border border-border object-cover',
-              !inGallery && !compact && 'max-h-64 w-auto rounded-lg border border-border',
+              // On its own: the full width it is given, capped generously in
+              // height. `max-h-64` was a 256px thumbnail in a panel several
+              // times that tall — a generated report image is the RESULT here,
+              // not a decoration beside one, and it was unreadable at that size.
+              // `object-contain` keeps the aspect ratio when the cap bites.
+              !inGallery &&
+                !compact &&
+                'max-h-[44rem] w-full rounded-lg border border-border object-contain',
             )}
           />
         </a>
@@ -780,7 +787,7 @@ function LoadingImage({ src, alt, className }: { src: string; alt: string; class
     setState('loading');
   }
   return (
-    <span className="relative inline-block">
+    <span className="relative block">
       {state === 'loading' && (
         <span
           role="status"
@@ -795,7 +802,7 @@ function LoadingImage({ src, alt, className }: { src: string; alt: string; class
         alt={alt}
         onLoad={() => setState('done')}
         onError={() => setState('done')}
-        className={cn(className, state === 'loading' && 'min-h-16 min-w-16 opacity-0')}
+        className={cn(className, state === 'loading' && 'min-h-40 opacity-0')}
       />
     </span>
   );
