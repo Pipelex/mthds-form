@@ -61,11 +61,11 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.462.0",
     "marked": "^18.0.11",
+    "mthds": "file:../mthds-js",
     "react-dropzone": "^14.3.8",
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
-    "mthds": "^0.25.0",
     "react": "^19",
     "react-dom": "^19"
   },
@@ -95,7 +95,6 @@
     "eslint": "^9.39.4",
     "eslint-plugin-storybook": "^10.5.10",
     "jsdom": "^30.0.1",
-    "mthds": "^0.25.0",
     "playwright": "^1.62.1",
     "prettier": "^3.8.1",
     "react": "^19",
