@@ -61,7 +61,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.462.0",
     "marked": "^18.0.11",
-    "mthds": "file:../mthds-js",
+    "mthds": "^0.25.0",
     "react-dropzone": "^14.3.8",
     "tailwind-merge": "^2.6.0"
   },
