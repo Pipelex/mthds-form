@@ -1,8 +1,19 @@
 # Changelog
 
-## [Unreleased]
+## [v0.6.0] - 2026-09-02
+
+### Changed
+
+- **`ResultPanel` is `StuffViewer` (breaking).** The component never viewed an "output". It views a **stuff** — the standard's word for one data item — and which stuff it happens to be is the caller's business: a pipe's result, an intermediate, a method's own input. Naming it after one of those three made the other two read as a borrowed component. `ResultPanelProps` and `ResultPanelView` follow it to `StuffViewerProps` and `StuffViewerView`; the module is `stuff-viewer.tsx`. `ResultField` and `buildResultField` keep their names — a field is not a stuff.
+
+- **`mthds` is a dependency, not a peer (breaking for a host that declared it).** A peer is a promise the host must keep, and **pnpm does not keep it**: it reports an unmet peer and installs nothing, even with `auto-install-peers`. So a host that installs this package through `@pipelex/mthds-ui` — the arrangement that exists precisely so a host need not name the kernel — ended up with no `mthds` in the tree at all, which silently degraded every re-exported protocol type to its widest arm and surfaced as a member "not existing" on a type that plainly declares it. The reasoning that makes React a peer does not reach this one: `mthds` holds no React context and no module state, so a second copy costs disk and nothing else, while an unmet peer costs correctness.
 
 ### Added
+
+- **Every viewer downloads what the stuff actually contains.** A stuff is not always JSON — it can BE a document, or hold three images among its fields — so the control saves the data as JSON and saves any image, document or HTML page inside it **as itself**. A JSON file holding a URL to a picture is not the picture, and a reader who clicks download on a report with attachments wants the attachments. When the stuff is nothing but one file, only the file is written: the JSON beside it would say strictly less than the thing it points at.
+
+  **What finds the files walks the DESCRIPTOR, never the value.** A payload walk would have to decide what a file is by looking at it — an object with a `url`, a string ending in `.pdf` — which is the guessing this package exists to remove, and it is wrong in both directions: a method with a legitimate `url` text field is not a document, and a stored image whose reference has no extension is one. `collectStuffFiles` reads `kind: "image"` / `"document"` from the declaration and consults the value only for the members that declaration promises. Markup is handled ahead of the kind switch for the reason the renderer already handles it there: a `native.Html` node's *kind* is `object`, so a plain walk finds its two text members, no files, and falls through to JSON — losing the page. Files are named by their own `filename` when they carry one and by their descriptor path otherwise, so two images from one result cannot both land as `image.png`; one that cannot be fetched opens in a tab rather than failing silently, which is what a remote URL with no CORS header will do. New strings on the i18n seam: `download`, `downloading`.
+
 
 - **A copy control on every text value, markdown or not.** A result view is where a person goes to take something away — a report to paste into a document, an extracted paragraph to send on — and the alternative it left them was selecting a rendered heading, list and table by dragging, which picks up the layout and loses the source. Every `text` and `prose` value now carries a copy button, and what it writes is the **source the run produced**, not the typeset rendering. It survives `hideLabel` (the top-level case `ResultPanel` uses, where the header moves up to the panel), renders nothing where the clipboard API is absent, and is not offered where there is nothing to copy — a button that reports success and hands over an empty string is worse than one that was never there. New string on the i18n seam: `copyText`.
 
