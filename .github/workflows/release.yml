@@ -79,6 +79,21 @@ jobs:
         if: steps.check_published.outputs.already_published == 'false'
         run: make check
 
+      # The story suite runs in a real browser, so `make test` needs one. The
+      # install is explicit here for the same reason it is in quality-checks.yml,
+      # and it is REQUIRED here rather than merely tidy: the install step above
+      # runs `npm ci --ignore-scripts`, so Playwright's postinstall — the thing
+      # that would otherwise fetch the browser — never runs. Without this the
+      # publish job fails with "Executable doesn't exist", which reads like a
+      # broken runner image rather than like a skipped lifecycle script.
+      #
+      # Only chromium, and only its own dependencies: this installs ~150 MB, and
+      # `--with-deps` is required on the runner because headless chromium links
+      # against system libraries the base image does not carry.
+      - name: Install Playwright chromium
+        if: steps.check_published.outputs.already_published == 'false'
+        run: npx playwright install --with-deps chromium
+
       - name: Run tests
         if: steps.check_published.outputs.already_published == 'false'
         run: make test
