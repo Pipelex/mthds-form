@@ -1,13 +1,28 @@
 import { ownProp } from './own-property';
-import { readDocumentContent, readImageContent } from './native-content';
+import {
+  isNativeHtmlNode,
+  readDocumentContent,
+  readHtmlContent,
+  readImageContent,
+} from './native-content';
 import type { RunField } from './descriptor';
 
 /**
  * One file a stuff carries: what to fetch, and what to call it once saved.
  */
 export interface StuffFile {
-  /** The durable reference or URL the value states. Resolve before fetching. */
-  url: string;
+  /**
+   * The durable reference or URL the value states, for a file held BY
+   * REFERENCE. Absent for inline content, which needs no fetch.
+   */
+  url?: string;
+  /**
+   * The content itself, for a file the stuff carries INLINE — markup, today.
+   * Exactly one of `url` and `text` is set.
+   */
+  text?: string;
+  /** The extension to save inline content under, without the dot. */
+  extension?: string;
   /**
    * The URL that works outside this session, when the value carries one. A host
    * whose display URL is session-scoped (an owner-checked proxy route) needs
@@ -19,7 +34,7 @@ export interface StuffFile {
   mimeType?: string;
   /** Where it sat, dotted: `report.attachments.2.scan`. Names a saved file. */
   path: string;
-  kind: 'image' | 'document';
+  kind: 'image' | 'document' | 'markup';
 }
 
 /**
@@ -47,6 +62,29 @@ export function collectStuffFiles(field: RunField, value: unknown): StuffFile[] 
 function walk(field: RunField, raw: unknown, path: string[], out: StuffFile[]): void {
   const value = unwrapContent(field, raw);
   const here = path.length > 0 ? path : [field.name];
+
+  // Markup, before the kind switch, exactly as the renderer takes it: a
+  // `native.Html` node's KIND is `object` (its content model has two members),
+  // so the switch below would walk into it looking for files and find none.
+  //
+  // It is a file even though nothing stores it as one. The stuff IS a page —
+  // the reader is looking at a rendered report — and handing them a JSON
+  // envelope with the page inside it as a string is the same mistake as handing
+  // them a URL instead of a picture. `isNativeHtmlNode` asks the descriptor
+  // whether the concept refines `native.Html`, which is the standard's own way
+  // to ask; it never looks at the value to decide.
+  if (isNativeHtmlNode(field)) {
+    const content = readHtmlContent(value);
+    if (content?.innerHtml) {
+      out.push({
+        text: content.innerHtml,
+        extension: 'html',
+        path: here.join('.'),
+        kind: 'markup',
+      });
+    }
+    return;
+  }
 
   switch (field.kind) {
     case 'image': {

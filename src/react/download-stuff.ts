@@ -22,6 +22,11 @@ function saveBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(href), 0);
 }
 
+/** The type to save inline content under. Text either way; the extension leads. */
+function mimeForExtension(extension: string | undefined): string {
+  return extension === 'html' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8';
+}
+
 /** The extension a URL states, or none — never guessed from the bytes. */
 function extensionOf(url: string, filename: string | undefined): string {
   const named = filename?.match(/\.([A-Za-z0-9]{1,8})$/)?.[1];
@@ -42,7 +47,7 @@ function extensionOf(url: string, filename: string | undefined): string {
  */
 function fileNameFor(file: StuffFile, base: string): string {
   if (file.filename) return file.filename;
-  const extension = extensionOf(file.url, file.filename);
+  const extension = file.extension ?? extensionOf(file.url ?? '', file.filename);
   const stem = `${base}-${file.path.replace(/\./g, '-')}`;
   return extension ? `${stem}.${extension}` : stem;
 }
@@ -80,12 +85,23 @@ export async function downloadStuff({
 }): Promise<void> {
   const files = collectStuffFiles(field, value);
 
-  // A stuff that is nothing but one file: save the file, and no JSON.
-  const isBareFile = files.length === 1 && (field.kind === 'image' || field.kind === 'document');
+  // A stuff that is nothing BUT one file: save the file, and no JSON. Read from
+  // the collector rather than from `field.kind`, because the case that matters
+  // most does not announce itself there — a `native.Html` node's kind is
+  // `object`, and the whole stuff is still the page.
+  const isBareFile = files.length === 1 && files[0]?.path === field.name;
 
   for (const file of files) {
-    const href = resolveUrl?.(file.url) ?? file.publicUrl ?? file.url;
     const name = fileNameFor(file, baseName);
+
+    // Inline content: nothing to fetch, so nothing that can fail.
+    if (file.text !== undefined) {
+      saveBlob(new Blob([file.text], { type: mimeForExtension(file.extension) }), name);
+      continue;
+    }
+
+    const href = resolveUrl?.(file.url ?? '') ?? file.publicUrl ?? file.url;
+    if (!href) continue;
     try {
       const response = await fetch(href);
       if (!response.ok) throw new Error(String(response.status));

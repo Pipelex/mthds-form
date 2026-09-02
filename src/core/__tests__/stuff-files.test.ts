@@ -121,3 +121,52 @@ describe('collectStuffFiles', () => {
     });
   });
 });
+
+describe('collectStuffFiles — markup', () => {
+  const html: RunField = {
+    kind: 'object',
+    name: 'output',
+    conceptRef: 'native.Html',
+    required: true,
+    fields: [text('inner_html'), text('css_class')],
+  };
+
+  it('reads a native.Html stuff as an inline .html file', () => {
+    const files = collectStuffFiles(html, { inner_html: '<h1>Report</h1>' });
+    expect(files).toEqual([
+      { text: '<h1>Report</h1>', extension: 'html', path: 'output', kind: 'markup' },
+    ]);
+  });
+
+  it('reads markup nested in a record, beside the files around it', () => {
+    const field: RunField = {
+      kind: 'object',
+      name: 'report',
+      conceptRef: 'demo.Report',
+      required: true,
+      fields: [text('title'), { ...html, name: 'body' }, image('cover')],
+    };
+    const files = collectStuffFiles(field, {
+      title: 'Q2',
+      body: { inner_html: '<p>hi</p>' },
+      cover: { url: 'https://example.test/c.png' },
+    });
+    expect(files.map((file) => [file.path, file.kind])).toEqual([
+      ['report.body', 'markup'],
+      ['report.cover', 'image'],
+    ]);
+  });
+
+  it('skips markup that carries none', () => {
+    expect(collectStuffFiles(html, { css_class: 'report' })).toEqual([]);
+  });
+
+  it('does not walk into a native.Html node looking for files', () => {
+    // Its kind is `object`, so a plain switch would recurse through its two
+    // text members. Nothing there is a file, and the markup itself would be
+    // missed entirely — which is the bug this arm exists to prevent.
+    const files = collectStuffFiles(html, { inner_html: '<img src="https://x/a.png">' });
+    expect(files).toHaveLength(1);
+    expect(files[0]?.kind).toBe('markup');
+  });
+});
