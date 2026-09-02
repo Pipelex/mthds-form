@@ -16,7 +16,7 @@ import { CONTRACTS, INPUT_FORM } from '../_generated/states';
  */
 
 const meta = {
-  title: 'States/Field States',
+  title: 'Inputs/Field States',
   component: CaseForm,
   args: { contracts: CONTRACTS, inputForm: INPUT_FORM, domain: 'states' },
 } satisfies Meta<typeof CaseForm>;

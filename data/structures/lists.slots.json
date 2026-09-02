@@ -1,0 +1,119 @@
+{
+  "description": "One case per ELEMENT shape a result list can hold, because the layout a list gets is decided from its element's descriptor and nothing else. Scalars, a short record, a twelve-column record, a record carrying prose, a record carrying records that carry lists, and both file kinds. Every pipe runs for real; the image case is a PipeImgGen because the language forbids a PipeLLM resolving to a concept that contains images. The gallery pins an image model explicitly: the deck's default backend refuses more than one image per call (`can't generate multiple images at once`), so a `Image[3]` output needs one that does not.",
+  "pipes": [
+    {
+      "code": "texts",
+      "output": "Text[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Name the eight planets of the solar system, in order from the sun."
+      }
+    },
+    {
+      "code": "numbers",
+      "output": "Number[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Give the orbital period in earth years of each of the eight planets, in order from the sun."
+      }
+    },
+    {
+      "code": "dates",
+      "output": "Date[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Give the launch dates of Sputnik 1, Apollo 11, Voyager 1 and the Hubble Space Telescope, in that order."
+      }
+    },
+    {
+      "code": "steps",
+      "output": "Step[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Morning checklist for the observatory, with how long each step takes and what it needs:\nuncover the mirror, 5 minutes, dust cover;\ncheck the drive oil, 10 minutes, dipstick;\nalign the finder, 15 minutes, alignment laser;\ncool the camera, 20 minutes, chiller;\ntake a dark frame, 8 minutes, shutter cap;\nlog the seeing, 3 minutes, seeing monitor."
+      }
+    },
+    {
+      "code": "readings",
+      "output": "Reading[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Instrument readings from last night. Give me all six as records.\nR-101, Spectrograph A, taken by Sofia at Ridge Site on 2026-03-14, visible band, wavelength 550.2 nm, intensity 0.87, 3 exposures, calibrated, seeing 1.2, accepted.\nR-102, Spectrograph A, Sofia, Ridge Site, 2026-03-14, infrared, 1250.0 nm, 0.41, 5 exposures, calibrated, seeing 1.4, accepted.\nR-103, Spectrograph B, Dan, Valley Site, 2026-03-15, ultraviolet, 310.7 nm, 0.12, 2 exposures, not calibrated, seeing 2.9, suspect.\nR-104, Spectrograph B, Dan, Valley Site, 2026-03-15, visible, 486.1 nm, 0.66, 4 exposures, calibrated, seeing 1.9, accepted.\nR-105, Spectrograph C, Amara, Ridge Site, 2026-03-16, infrared, 1640.0 nm, 0.05, 8 exposures, not calibrated, seeing 3.4, rejected.\nR-106, Spectrograph C, Amara, Ridge Site, 2026-03-16, visible, 656.3 nm, 0.93, 3 exposures, calibrated, seeing 1.1, accepted."
+      }
+    },
+    {
+      "code": "findings",
+      "output": "Finding[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Review of the retrofit plan. Report each finding with a title, a full paragraph of detail, and whether it blocks:\nThe coating order has no confirmed delivery date, which puts weeks 9 to 11 at risk \u2014 this blocks.\nThe damping prototype has not been vibration-tested at the mount's real mass, so the model rerun may be measuring the wrong thing \u2014 this blocks.\nThe handover checklist is not written yet, which is fine this early \u2014 this does not block."
+      }
+    },
+    {
+      "code": "chapters",
+      "output": "Chapter[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Outline of a short book on optics, as chapters, each with its sections, each section with the points it makes and the page it starts on.\nChapter 'Light': section 'Waves and rays' on page 3, making the points that light travels in straight lines, that it bends at a boundary, and that both models are useful; section 'Colour' on page 11, making the points that colour is wavelength and that the eye samples it with three receptors.\nChapter 'Lenses': section 'Refraction' on page 21, making the points that a curved surface focuses, that focal length follows curvature, and that glass disperses; section 'Aberration' on page 33, making the points that no single lens is perfect and that combinations cancel errors."
+      }
+    },
+    {
+      "code": "sources",
+      "output": "Document[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "List three published papers on adaptive optics as documents. For each, give a plausible https URL to a PDF, a filename, a title, and a one-line snippet."
+      }
+    },
+    {
+      "code": "gallery",
+      "type": "PipeImgGen",
+      "output": "Image[3]",
+      "prompt": "A small weathered wooden sign staked in dark garden soil, hand-painted with a vegetable name, morning light",
+      "slots": [],
+      "options": {
+        "model": "$gen-image-testing"
+      }
+    }
+  ]
+}

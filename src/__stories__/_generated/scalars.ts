@@ -6,7 +6,7 @@
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
  */
-import type { InputForm, PipeIOContracts } from 'mthds/protocol';
+import type { InputForm, OutputForm, PipeIOContracts } from 'mthds/protocol';
 
 /** Every pipe_ref this case projects, in sorted order. */
 export const PIPE_REFS = [
@@ -44,6 +44,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -119,6 +132,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -210,6 +236,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -277,6 +316,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -325,6 +377,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -506,5 +571,59 @@ export const INPUT_FORM: InputForm = {
         required: true,
       },
     ],
+  },
+};
+
+/**
+ * The output half - a standard artifact, keyed by the same pipe_ref set as the
+ * two above because all three builders iterate one pipe sequence. The payload
+ * SCHEMA is not here: it rides `CONTRACTS[ref].output.json_schema`, where the
+ * standard puts it, beside the input schemas.
+ */
+export const OUTPUT_FORM: OutputForm = {
+  'scalars.enum_kind': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+  'scalars.multiplicity_axis': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+  'scalars.number_kinds': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+  'scalars.presence_axis': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+  'scalars.text_kinds': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
   },
 };

@@ -32,8 +32,21 @@ export { conceptCategory } from './descriptor';
 // schema-derived facts (contentKey, nested list bounds). The wire types are
 // the standard's, re-exported so a host can type the artifacts it passes in;
 // `getPipeInputForm` is `getPipeIOContract`'s twin for the sibling artifact.
-export type { InputForm, PipeInputFormDescriptor } from 'mthds/protocol';
-export { buildRunFields, getPipeInputForm } from './derive';
+// The descriptor and the NODE type it holds. The node is exported beside it
+// because a consumer that builds a descriptor - a test fixture, a host
+// synthesising one slot - needs to name the thing inside, and reaching past
+// this barrel into `mthds/protocol` to get it is a phantom import for anyone
+// who consumes this package through `@pipelex/mthds-ui`.
+export type { InputForm, InputFormTopLevelField, PipeInputFormDescriptor } from 'mthds/protocol';
+export { buildResultField, buildRunFields, getPipeInputForm } from './derive';
+
+// The output half - a standard artifact since the version that grew `output_form`
+// and put a `json_schema` on the output contract. The types are the standard's,
+// re-exported beside the lookup; see ./output-form.
+export type { OutputForm, PipeOutputFormDescriptor } from './output-form';
+export { getPipeOutputForm } from './output-form';
+export { collectStuffFiles } from './stuff-files';
+export type { StuffFile } from './stuff-files';
 
 // What a `document` or `image` slot accepts - a mirror of the runtime's format
 // enums, exported because a host that uploads files needs the same answer the
@@ -47,6 +60,37 @@ export {
   formatsForKind,
   isAcceptedFile,
 } from './file-formats';
+
+// ...and how to READ what one comes back as. The result side's twin of that
+// table: the pinned content models of `native.Document`, `native.Image` and
+// `native.Date`, read by the kind the descriptor STATES. It lives in core rather
+// than beside the control that renders it for the same reason the accept table
+// does - a host showing a result its own way needs the same answer, and two
+// copies of an answer is two places for it to drift. See ./native-content.
+export type {
+  CompositeMember,
+  DateContentView,
+  DocumentContentView,
+  HtmlContentView,
+  ImageContentView,
+} from './native-content';
+export {
+  NATIVE_COMPOSITE_CONCEPT_REF,
+  NATIVE_DATE_CONCEPT_REF,
+  NATIVE_HTML_CONCEPT_REF,
+  TYPED_SCALAR_MARKERS,
+  formatDateContent,
+  hasTypedScalarMarkers,
+  isNativeCompositeNode,
+  isNativeDateNode,
+  isNativeHtmlNode,
+  isViewableUrl,
+  readCompositeContent,
+  readDateContent,
+  readDocumentContent,
+  readHtmlContent,
+  readImageContent,
+} from './native-content';
 
 // Readiness - what the Run button gates on.
 //

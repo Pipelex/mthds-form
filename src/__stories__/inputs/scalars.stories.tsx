@@ -12,7 +12,7 @@ import { CONTRACTS, INPUT_FORM } from '../_generated/scalars';
  */
 
 const meta = {
-  title: 'Field Kinds/Scalars',
+  title: 'Inputs/Scalars',
   component: CaseForm,
   args: { contracts: CONTRACTS, inputForm: INPUT_FORM, domain: 'scalars' },
 } satisfies Meta<typeof CaseForm>;

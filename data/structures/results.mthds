@@ -1,0 +1,156 @@
+domain      = "results"
+description = "Concepts used as pipe OUTPUTS, so the fixtures can describe results as well as inputs — across every field kind, at depth, and at length."
+
+# ─── Flat ────────────────────────────────────────────────────────────────────
+
+[concept.Sentiment]
+description = "How positive a piece of writing is"
+
+[concept.Sentiment.structure]
+label      = { type = "text", description = "The overall verdict", required = true, choices = [
+  "positive",
+  "neutral",
+  "negative",
+] }
+confidence = { type = "number", description = "How sure the model is, from 0 to 1", required = true }
+rationale  = { type = "text", description = "Why it landed there", required = false, hints = { intent = "prose" } }
+
+# ─── One level of nesting ────────────────────────────────────────────────────
+
+[concept.LineItem]
+description = "One billable line of an invoice"
+
+[concept.LineItem.structure]
+label      = { type = "text", description = "What was sold", required = true }
+quantity   = { type = "integer", description = "How many units", required = true }
+unit_price = { type = "number", description = "Price of one unit", required = true }
+
+[concept.Invoice]
+description = "A commercial invoice"
+
+[concept.Invoice.structure]
+reference = { type = "text", description = "The invoice reference", required = true }
+issued_on = { type = "date", description = "The date it was issued", required = true }
+total     = { type = "number", description = "Total amount due", required = true }
+paid      = { type = "boolean", description = "Whether it has been settled", required = false }
+lines     = { type = "list", item_type = "concept", item_concept_ref = "LineItem", description = "The billable lines", required = true }
+
+# ─── Four levels of nesting ──────────────────────────────────────────────────
+#
+# Company > Division[] > Team[] > TeamMember, each level adding a different kind
+# beside its list, so the renderer's recursion is exercised against enums, dates,
+# booleans, numbers and lists of plain text at four different depths rather than
+# against one shape repeated.
+
+[concept.TeamMember]
+description = "One person on a team"
+
+[concept.TeamMember.structure]
+name         = { type = "text", description = "Their name", required = true }
+role         = { type = "text", description = "What they do", required = true, choices = [
+  "engineer",
+  "designer",
+  "researcher",
+  "manager",
+] }
+started_on   = { type = "date", description = "When they joined", required = true }
+remote       = { type = "boolean", description = "Whether they work remotely", required = false }
+focus_areas  = { type = "list", item_type = "text", description = "What they spend their time on", required = false }
+
+[concept.Team]
+description = "A team inside a division"
+
+[concept.Team.structure]
+name      = { type = "text", description = "The team's name", required = true }
+mission   = { type = "text", description = "What the team is for", required = true, hints = { intent = "prose" } }
+headcount = { type = "integer", description = "How many people it holds", required = true }
+members   = { type = "list", item_type = "concept", item_concept_ref = "TeamMember", description = "The people on it", required = true }
+
+[concept.Division]
+description = "A division of a company"
+
+[concept.Division.structure]
+name   = { type = "text", description = "The division's name", required = true }
+region = { type = "text", description = "Where it operates", required = true, choices = [
+  "emea",
+  "americas",
+  "apac",
+] }
+budget = { type = "number", description = "Its annual budget, in millions", required = true }
+teams  = { type = "list", item_type = "concept", item_concept_ref = "Team", description = "The teams it holds", required = true }
+
+[concept.Company]
+description = "A company, described down to its people"
+
+[concept.Company.structure]
+name        = { type = "text", description = "The company's name", required = true }
+founded_on  = { type = "date", description = "When it was founded", required = true }
+is_public   = { type = "boolean", description = "Whether it is publicly traded", required = true }
+summary     = { type = "text", description = "What the company does", required = true, hints = { intent = "prose" } }
+divisions   = { type = "list", item_type = "concept", item_concept_ref = "Division", description = "Its divisions", required = true }
+
+# ─── Length ──────────────────────────────────────────────────────────────────
+
+[concept.Milestone]
+description = "One step of a project plan"
+
+[concept.Milestone.structure]
+label  = { type = "text", description = "What happens", required = true }
+week   = { type = "integer", description = "Which week it falls in", required = true }
+owner  = { type = "text", description = "Who is accountable", required = true }
+status = { type = "text", description = "Where it stands", required = true, choices = [
+  "done",
+  "in_progress",
+  "blocked",
+  "not_started",
+] }
+
+# ─── Every scalar kind at once ───────────────────────────────────────────────
+
+[concept.KitchenSink]
+description = "One structure carrying every scalar kind the standard defines, plus optionals a run may leave empty"
+
+[concept.KitchenSink.structure]
+title     = { type = "text", description = "A short label", required = true }
+abstract  = { type = "text", description = "A paragraph of prose", required = true, hints = { intent = "prose" } }
+quantity  = { type = "integer", description = "A whole number", required = true }
+ratio     = { type = "number", description = "A fractional number", required = true }
+confirmed = { type = "boolean", description = "A yes or no", required = true }
+due_on    = { type = "date", description = "A calendar date", required = true }
+priority  = { type = "text", description = "One of a fixed set", required = true, choices = [
+  "low",
+  "medium",
+  "high",
+] }
+tags      = { type = "list", item_type = "text", description = "A list of plain strings", required = true }
+aside     = { type = "text", description = "An optional note a run may leave empty", required = false }
+follow_up = { type = "date", description = "An optional date a run may leave empty", required = false }
+
+# ─── Files, nested ───────────────────────────────────────────────────────────
+#
+# The shape that reaches every file-bearing arm at once, and reaches them at
+# DEPTH: markup and a document as fields of a structure, and images one level
+# further down, inside the records of a list.
+#
+# It carries no `run` block, and cannot: the language forbids a PipeLLM
+# resolving to a concept that contains images, and no other operator produces a
+# structure. Its DESCRIPTOR is generated like every other — which is the half
+# that has to be real, because it is what states the kinds — and the story that
+# renders it supplies a payload of served files, because a run's own file URLs
+# are storage references a browser cannot fetch. See `docs/storybook.md`.
+
+[concept.Figure]
+description = "One illustration with its caption"
+
+[concept.Figure.structure]
+caption = { type = "text", description = "What the figure shows", required = true }
+image   = { type = "concept", concept_ref = "native.Image", description = "The picture itself", required = true }
+
+[concept.Report]
+description = "A report carrying markup, a source document and illustrated figures"
+
+[concept.Report.structure]
+title   = { type = "text", description = "The report's title", required = true }
+summary = { type = "concept", concept_ref = "native.Html", description = "The summary, as markup", required = true }
+source  = { type = "concept", concept_ref = "native.Document", description = "The document it was drawn from", required = true }
+figures = { type = "list", item_type = "concept", item_concept_ref = "Figure", description = "The illustrations", required = true }

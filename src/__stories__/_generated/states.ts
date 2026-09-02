@@ -6,7 +6,7 @@
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
  */
-import type { InputForm, PipeIOContracts } from 'mthds/protocol';
+import type { InputForm, OutputForm, PipeIOContracts } from 'mthds/protocol';
 
 /** Every pipe_ref this case projects, in sorted order. */
 export const PIPE_REFS = ['states.defaults', 'states.presence'] as const;
@@ -90,6 +90,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -316,6 +329,19 @@ export const CONTRACTS: PipeIOContracts = {
     output: {
       concept_ref: 'native.Text',
       item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
       multiplicity: 'single',
       optional: false,
     },
@@ -514,5 +540,32 @@ export const INPUT_FORM: InputForm = {
         required: false,
       },
     ],
+  },
+};
+
+/**
+ * The output half - a standard artifact, keyed by the same pipe_ref set as the
+ * two above because all three builders iterate one pipe sequence. The payload
+ * SCHEMA is not here: it rides `CONTRACTS[ref].output.json_schema`, where the
+ * standard puts it, beside the input schemas.
+ */
+export const OUTPUT_FORM: OutputForm = {
+  'states.defaults': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
+  'states.presence': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
   },
 };

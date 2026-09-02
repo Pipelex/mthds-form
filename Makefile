@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs assert-bundle clean pack
 
 install:
 	npm install
@@ -52,6 +52,14 @@ build-storybook:
 # files are committed and the stories read those. ONLY=<case> narrows it.
 fixtures:
 	node scripts/generate-fixtures.mjs $(if $(ONLY),--only $(ONLY))
+
+# The PAYLOADS: what the pipes actually produced, from real runs through the real
+# `pipelex run bundle` CLI. Separate from `fixtures` because it COSTS inference
+# budget every time, and because it needs credentials the descriptor pass does
+# not. It is the only way to get a payload - no projection of a declaration can
+# tell you what a run returns. ONLY=<case> narrows it.
+fixtures-runs:
+	node scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY))
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

@@ -59,8 +59,19 @@ export function plainFixed(count: number) {
   return { presence: 'plain', multiplicity: 'fixed', item_count: count } as const;
 }
 
-/** A plain, single, non-optional output - what a fixture's `output` usually is. */
-export const SINGLE_OUTPUT = { multiplicity: 'single', item_count: null, optional: false } as const;
+/** A plain, single, non-optional output - what a fixture's `output` usually is.
+ *
+ * `json_schema` is the PAYLOAD's schema, which is where the output side departs
+ * from the input side: an input's states what a caller SENDS, an output's states
+ * what comes back, and what comes back is the concept's content model. These
+ * tests exercise the input half, so the value here only has to be a well-formed
+ * content model, not the one any particular concept would produce. */
+export const SINGLE_OUTPUT = {
+  multiplicity: 'single',
+  item_count: null,
+  optional: false,
+  json_schema: { type: 'object', properties: { text: { type: 'string' } } },
+} as const;
 
 // ─── Wire input-form descriptor fixtures ─────────────────────────────────────
 //

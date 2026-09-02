@@ -1,0 +1,54 @@
+domain      = "lists"
+description = "Concepts that exist to be produced as LISTS — every element shape a result list can hold, so the layout rules are exercised rather than argued about."
+
+# The layout a list gets is decided from its ELEMENT's descriptor, so this corpus
+# is organised by what the element is: a scalar, a short record, a wide record, a
+# record carrying prose, a record carrying more records, and a file.
+
+[concept.Step]
+description = "One step of a checklist — a short record, which is a table row"
+
+[concept.Step.structure]
+label  = { type = "text", description = "What to do", required = true }
+minute = { type = "integer", description = "How long it takes", required = true }
+tool   = { type = "text", description = "What it needs", required = true }
+
+[concept.Reading]
+description = "One instrument reading — a WIDE record, twelve columns, which no panel is wide enough for"
+
+[concept.Reading.structure]
+reference   = { type = "text", description = "The reading's reference", required = true }
+instrument  = { type = "text", description = "Which instrument took it", required = true }
+operator    = { type = "text", description = "Who took it", required = true }
+site        = { type = "text", description = "Where it was taken", required = true }
+status      = { type = "text", description = "Where it stands", required = true, choices = ["accepted", "suspect", "rejected"] }
+band        = { type = "text", description = "Which band it covers", required = true, choices = ["visible", "infrared", "ultraviolet"] }
+taken_on    = { type = "date", description = "When it was taken", required = true }
+wavelength  = { type = "number", description = "Wavelength in nanometres", required = true }
+intensity   = { type = "number", description = "Measured intensity", required = true }
+exposures   = { type = "integer", description = "How many exposures", required = true }
+calibrated  = { type = "boolean", description = "Whether it was calibrated", required = true }
+seeing      = { type = "number", description = "Seeing, in arcseconds", required = true }
+
+[concept.Finding]
+description = "One review finding — a record carrying PROSE, which a table cell cannot hold"
+
+[concept.Finding.structure]
+title   = { type = "text", description = "What was found", required = true }
+detail  = { type = "text", description = "The finding in full", required = true, hints = { intent = "prose" } }
+serious = { type = "boolean", description = "Whether it blocks", required = true }
+
+[concept.Section]
+description = "One section of a chapter — a record carrying a list of its own"
+
+[concept.Section.structure]
+heading = { type = "text", description = "The section's heading", required = true }
+page    = { type = "integer", description = "Which page it starts on", required = true }
+points  = { type = "list", item_type = "text", description = "The points it makes", required = true }
+
+[concept.Chapter]
+description = "One chapter — a record carrying a list of records that carry lists"
+
+[concept.Chapter.structure]
+title    = { type = "text", description = "The chapter's title", required = true }
+sections = { type = "list", item_type = "concept", item_concept_ref = "Section", description = "Its sections", required = true }
