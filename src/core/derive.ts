@@ -33,6 +33,7 @@ import type { PipeInputFormDescriptor } from 'mthds/protocol';
 import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
 
 import { buildPipeRef, type PipeInputContract } from './contracts';
+import { acceptLabelForKind } from './file-formats';
 import type { RunField, RunFieldCommon } from './descriptor';
 import { ownProp } from './own-property';
 import { collectSchemaDefs, resolveSchemaNode, type JsonSchema } from './schema-utils';
@@ -182,11 +183,15 @@ function mapNode(
       // control set renders and stores strings, as it always has.
       return { ...common, kind: 'enum', options: node.choices.map(String) };
     case 'document':
-      // `accept` is a renderer-side affordance the wire deliberately does not
-      // state - a presentation default keyed on the WIRE's kind, not a guess.
-      return { ...common, kind: 'document', accept: 'PDF, DOCX, TXT' };
     case 'image':
-      return { ...common, kind: 'image', accept: 'PNG, JPG, WEBP' };
+      // `accept` is a renderer-side affordance the wire deliberately does not
+      // state - which bytes a runtime can decode is a property of the runtime,
+      // not of the method. The list is therefore ours, and it is one table
+      // (`./file-formats`) rather than a literal here, so the label a user reads
+      // and the filter the dropzone enforces cannot disagree. They used to: this
+      // line advertised `TXT`, which no DocumentFormat covers, and omitted PPTX,
+      // which is one.
+      return { ...common, kind: node.kind, accept: acceptLabelForKind(node.kind) };
     case 'object': {
       const props = schema?.properties as Record<string, JsonSchema> | undefined;
       return {
@@ -237,6 +242,67 @@ function mapNode(
  * `required` to the presence marker, and `gating` is the producer-derived
  * answer `mustBeFilled` reads - the kernel re-derives none of them.
  */
+/**
+ * The same mapping, for a single node that belongs to no slot — a pipe's OUTPUT.
+ *
+ * `buildRunFields` maps a descriptor's fields and then stamps each with the slot
+ * facts (`presence`, `gating`) the wire states per input. An output has no slot,
+ * so this stamps nothing: the node arrives without them and leaves without them,
+ * which is exactly what the standard's optional members are for.
+ *
+ * Everything else is shared, deliberately. An output is a concept ref like an
+ * input is, so its kinds, its nesting, its list bounds and its `contentKey` are
+ * the same questions with the same answers — and a second mapper would be a
+ * second place for them to drift.
+ *
+ * ## `schema` is REQUIRED, and that is the whole point
+ *
+ * It was optional once, and the renderer paid for it: with no schema it could
+ * not know that `native.Text`'s payload sits under `text`, so it worked the
+ * unwrapping out by COUNTING the value's properties, and worked a plural payload
+ * out by looking for an `items` key. Both are shape sniffing — the exact pattern
+ * [../../docs/derivation-swap.md] records deleting from the input side, where
+ * `contentKey` is read off a schema and handed to a control as a property NAME.
+ *
+ * So the parameter is required, the two heuristics are gone, and what the
+ * argument must be is stated precisely: **the schema of the PAYLOAD**, which for
+ * every kind but `object` is the content model that wraps it —
+ * `TextContent {text}` for a `native.Text` output, `ListContent {items}` for a
+ * plural one. That is a change the standard has to make on the output contract
+ * (see `./output-form`); until it does, a producer supplies it beside the
+ * descriptor.
+ */
+export function buildResultField(
+  descriptor: { field: InputFormField },
+  schema: Record<string, unknown>,
+): RunField {
+  const node = descriptor.field;
+  const defs: Record<string, JsonSchema> = {};
+  collectSchemaDefs(schema as JsonSchema, defs, { traverseArrays: true });
+
+  // Unwrap the content model, ONCE, at the top.
+  //
+  // A result's payload is its concept's content model, and for every kind but
+  // `object` that model is a wrapper: the value sits under a single property the
+  // schema names. Reading it here rather than in `mapNode` is what keeps the
+  // schema walk ALIGNED with the descriptor beneath it — a plural output's node
+  // is a `list`, so the schema it must be walked against is the `items` array,
+  // not the `ListContent` object around it.
+  //
+  // Gated on the node's stated KIND, never on the value: an `object` output IS
+  // its content model, and a structured concept that happens to declare exactly
+  // one field would otherwise be mistaken for a wrapper. The kind comes from the
+  // descriptor, so this is a read of what the field is, not a guess at it.
+  const wrapperKey = node.kind === 'object' ? undefined : scalarWrapperKey(schema as JsonSchema);
+  const inner =
+    wrapperKey === undefined
+      ? (schema as JsonSchema)
+      : ((schema as JsonSchema).properties as Record<string, JsonSchema>)[wrapperKey];
+
+  const field = mapNode(node, node.name, inner, defs);
+  return wrapperKey === undefined ? field : { ...field, contentKey: wrapperKey };
+}
+
 export function buildRunFields(
   descriptor: PipeInputFormDescriptor,
   inputs: Record<string, PipeInputContract>,

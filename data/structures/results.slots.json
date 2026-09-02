@@ -1,0 +1,184 @@
+{
+  "description": "Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. One pipe carries no 'run' block and cannot: `nested_media_result` resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure. Its descriptor is generated like every other; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch.",
+  "pipes": [
+    {
+      "code": "plain_text_result",
+      "output": "Text",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
+    },
+    {
+      "code": "number_result",
+      "output": "Number",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "The invoice total is 1840.50 EUR. Answer with that amount."
+      }
+    },
+    {
+      "code": "yes_no_result",
+      "output": "YesNo",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 is still unpaid. Has it been settled?"
+      }
+    },
+    {
+      "code": "date_result",
+      "output": "Date",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 was issued on 14 March 2026. When was it issued?"
+      }
+    },
+    {
+      "code": "html_result",
+      "output": "Html",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Render this invoice as a small HTML fragment with a heading and a two-column table: Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
+    },
+    {
+      "code": "flat_result",
+      "output": "Sentiment",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
+    },
+    {
+      "code": "nested_result",
+      "output": "Invoice",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
+    },
+    {
+      "code": "plural_result",
+      "output": "LineItem[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Invoice INV-2026-0042 for Acme Logistics, issued 14 March 2026, still unpaid. Lines: design retainer, 1 unit at 1200.00 EUR; additional revisions, 4 units at 160.13 EUR. Total 1840.50 EUR. The client was delighted with the turnaround."
+      }
+    },
+    {
+      "code": "deep_result",
+      "output": "Company",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Meridian Optics was founded on 3 February 2014 and is not publicly traded. It builds measurement instruments for astronomy.\n\nEMEA division, budget 12.4 million. It holds two teams. The Lenses team (mission: grind and coat the primary optics; headcount 3) has Amara Diallo, an engineer who joined 12 January 2019, works remotely, focused on coatings and tolerancing; Tomas Berg, an engineer who joined 4 September 2021, on site, focused on grinding; and Rea Kovac, a manager who joined 1 March 2017, on site.\n\nThe Mounts team (mission: hold the optics still while the earth turns; headcount 2) has Nils Ostrom, a designer who joined 20 June 2022, remote, focused on damping and materials; and Priya Raman, a researcher who joined 15 November 2020, remote, focused on vibration modelling.\n\nAmericas division, budget 8.1 million. It holds one team, Calibration (mission: prove the instrument reads true; headcount 2), with Sofia Marchetti, a researcher who joined 8 April 2023, on site, focused on interferometry; and Dan Whitfield, an engineer who joined 2 May 2018, remote, focused on test rigs and automation."
+      }
+    },
+    {
+      "code": "long_list_result",
+      "output": "Milestone[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Project plan for the observatory retrofit, fifteen milestones:\nweek 1, kickoff and scope freeze, owner Rea, done\nweek 2, site survey, owner Tomas, done\nweek 3, optical bench teardown, owner Amara, done\nweek 4, mirror inspection, owner Amara, done\nweek 5, coating order placed, owner Rea, in progress\nweek 6, mount redesign, owner Nils, in progress\nweek 7, damping prototype, owner Nils, blocked\nweek 8, vibration model rerun, owner Priya, in progress\nweek 9, coating delivery, owner Rea, not started\nweek 10, recoating, owner Amara, not started\nweek 11, reassembly, owner Tomas, not started\nweek 12, first light, owner Sofia, not started\nweek 13, interferometry pass, owner Sofia, not started\nweek 14, automation of the test rig, owner Dan, not started\nweek 15, handover and sign-off, owner Rea, not started"
+      }
+    },
+    {
+      "code": "every_kind_result",
+      "output": "KitchenSink",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Task: recalibrate the spectrometer. It is a medium priority job covering 7 optical elements, with a measured drift ratio of 0.043, due on 21 April 2026. It has not been confirmed with the customer yet. Tag it as: optics, calibration, spectrometer, maintenance."
+      }
+    },
+    {
+      "code": "image_result",
+      "type": "PipeImgGen",
+      "output": "Image",
+      "prompt": "A small weathered wooden sign staked in dark garden soil, hand-painted with the word RHUBARB, morning light",
+      "slots": []
+    },
+    {
+      "code": "page_result",
+      "type": "PipeExtract",
+      "output": "Page[]",
+      "slots": [
+        {
+          "name": "document",
+          "concept": "Document"
+        }
+      ],
+      "run": {
+        "document": {
+          "url": "data/inputs/solar_system.pdf"
+        }
+      },
+      "options": {
+        "page_views": true
+      }
+    },
+    {
+      "code": "nested_media_result",
+      "output": "Report",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ]
+    }
+  ]
+}

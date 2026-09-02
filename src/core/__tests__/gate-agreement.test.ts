@@ -37,6 +37,9 @@ const OUTPUT: PipeOutputContract = {
   multiplicity: 'single',
   item_count: null,
   optional: false,
+  // `native.Text`'s content model. Required on the contract, and nothing in the
+  // gate reads it: the gate validates what a caller SENDS.
+  json_schema: { type: 'object', properties: { text: { type: 'string' } } },
 };
 
 const textSchema = {

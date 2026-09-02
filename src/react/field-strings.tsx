@@ -39,6 +39,53 @@ export interface FieldStrings {
   preview: string;
   removeFileAria: string;
   previewUnavailablePdf: string;
+  /**
+   * What a result slot the run resolved as an absence SHOWS — a dash, not a
+   * sentence. Beside forty values in a grid, "not provided" repeated is louder
+   * than the data; a dash reads as the blank it is.
+   */
+  resultAbsent: string;
+  /**
+   * What that dash SAYS, to a screen reader.
+   *
+   * The two are separate because a glyph and a sentence are answers to different
+   * questions. A table column of hyphens read aloud is "hyphen, hyphen, hyphen",
+   * which is noise rather than information — so the dash is `aria-hidden` and
+   * this rides beside it, visually hidden.
+   */
+  resultAbsentDescription: string;
+  /**
+   * Shown above the raw value when a result cannot be laid out because the
+   * artifacts describing it are absent. It names the CAUSE — the descriptor,
+   * not the data — because the value is right there underneath and a reader
+   * who is not told why will assume the view is broken.
+   */
+  resultUndescribed: string;
+  /** The control that opens a result table row to show the rest of the record. */
+  toggleRowDetails: (index: number) => string;
+  /** The (visually hidden) header of the column those controls sit in. */
+  rowDetailsColumn: string;
+  /** The control that puts a file's whole URL on the clipboard. */
+  copyUrl: string;
+  /** The copy control beside any text value, markdown or not. */
+  copyText: string;
+  /** The download control's label. */
+  download: string;
+  /** Announced while the files are being fetched. */
+  downloading: string;
+  /** The result panel's two views, and the control that copies the payload. */
+  viewRendered: string;
+  viewJson: string;
+  copyJson: string;
+  resultViewGroup: string;
+  yes: string;
+  no: string;
+  /**
+   * Shown when a picked file is not a format this slot accepts. Takes the
+   * accept label so the message names what WOULD have worked - "not accepted"
+   * on its own leaves the user guessing at the list they just failed.
+   */
+  unsupportedFileType: (accept: string) => string;
   /** The optional-entries disclosure ("field" inside a concept, "input" at top level). */
   hideOptionalFields: string;
   hideOptionalInputs: string;
@@ -68,6 +115,23 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
+  // U+002D HYPHEN-MINUS, deliberately: not an en dash, not an em dash.
+  resultAbsent: '-',
+  resultAbsentDescription: 'Not provided',
+  resultUndescribed: 'No output descriptor for this pipe — showing the raw value.',
+  toggleRowDetails: (index) => `Show or hide the details of row ${index}`,
+  rowDetailsColumn: 'Details',
+  copyUrl: 'Copy the URL',
+  copyText: 'Copy the text',
+  download: 'Download',
+  downloading: 'Downloading…',
+  viewRendered: 'Result',
+  viewJson: 'JSON',
+  copyJson: 'Copy the JSON',
+  resultViewGroup: 'Result view',
+  yes: 'Yes',
+  no: 'No',
+  unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
   hideOptionalFields: 'Hide optional fields',
   hideOptionalInputs: 'Hide optional inputs',
   optionalFieldsCount: (count) => (count === 1 ? '1 optional field' : `${count} optional fields`),

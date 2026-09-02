@@ -1,0 +1,1581 @@
+'use client';
+
+import type * as React from 'react';
+import type { RunField } from '../core';
+import { conceptCategory } from '../core/descriptor';
+import type { CompositeMember, DocumentContentView } from '../core/native-content';
+import {
+  formatDateContent,
+  isNativeCompositeNode,
+  isNativeDateNode,
+  isNativeHtmlNode,
+  isViewableUrl,
+  readCompositeContent,
+  readDateContent,
+  readDocumentContent,
+  readHtmlContent,
+  readImageContent,
+} from '../core/native-content';
+import { ownProp } from '../core/own-property';
+import { useResolveShareUrl, useResolveUrl, type ResolveUrl } from './result-env';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eye,
+  EyeOff,
+  FileText,
+  ImageOff,
+  Loader2,
+} from 'lucide-react';
+import { ConceptPill } from './concept-pill';
+import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
+import { HtmlPreview } from './html-preview';
+import { Markdown } from './markdown';
+import { useFieldStrings } from './field-strings';
+import { fieldLabel, humanizeFieldName, useFieldPresentation } from './field-presentation';
+import { cn } from './utils';
+
+/**
+ * A pipe's RESULT, rendered read-only.
+ *
+ * The same `RunField` the input controls are driven by — because an output is a
+ * concept ref exactly like an input is, so its kinds, its nesting and its list
+ * bounds are the same questions with the same answers. `buildResultField` maps
+ * an output descriptor through the very mapper `buildRunFields` uses.
+ *
+ * What is NOT shared is the presentation, and deliberately: a result is read,
+ * not edited. Rendering it as a disabled form would say "you may not change
+ * this" where the truth is "this is what came back". So these are values with
+ * labels, not controls with values.
+ *
+ * ## The dispatch is exhaustive, and that is load-bearing
+ *
+ * Every `RunFieldKind` gets an arm and the fall-through asserts `never`, so a
+ * kind added to the descriptor fails the BUILD here rather than rendering wrong.
+ * It used to fall through to `String(value)`, which turned a `document` result
+ * into the literal text `[object Object]` — silently, with no error anywhere.
+ *
+ * The arms that read a structure (`document`, `image`, `date`) read it through
+ * `../core/native-content`, keyed by the kind the descriptor STATES. That is
+ * reading the standard's pinned content models; working out which kind a value
+ * is by inspecting its keys would be guessing at them, and this file no longer
+ * does any of it.
+ *
+ * **`native.Html` is the one arm keyed by CONCEPT rather than by kind**, and not
+ * as an exception grudgingly made: the standard's kind vocabulary has no `html`
+ * member, so markup arrives as an `object` node over `{inner_html, css_class}`.
+ * That is right for the descriptor — kinds name how a value is ENTERED, and
+ * markup is entered as text — and useless for a result, which would otherwise
+ * print a page's source at a reader. Asking `refines`/`concept_ref` whether a
+ * node is `native.Html` is a membership test on stated facts, which the
+ * standard's own page names as the supported way to ask it.
+ */
+
+/**
+ * The wire wraps a scalar (and a plural) payload inside its content model; this
+ * unwraps by the property NAME the descriptor carries.
+ *
+ * `contentKey` is the only unwrap path there is. The property-counting fallback
+ * that used to sit here is deleted, not bypassed: it was the output side
+ * reintroducing the shape sniffing the derivation swap removed, and requiring a
+ * schema on `buildResultField` is what made deleting it possible.
+ */
+function unwrap(field: RunField, value: unknown): unknown {
+  if (!field.contentKey) return value;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const unwrapped = ownProp(value as Record<string, unknown>, field.contentKey);
+  return unwrapped === undefined ? value : unwrapped;
+}
+
+/**
+ * A description, on hover and on focus — and nothing at rest.
+ *
+ * ## Why no dotted underline, and no info icon either
+ *
+ * The dotted underline is the `<abbr>` convention, and it does not survive
+ * density: ten described fields in a record is ten underlined labels, which
+ * reads as damage rather than as an affordance. An info icon is the other usual
+ * answer and has the same problem one step removed — ten glyphs competing with
+ * the concept pill already sitting beside each label.
+ *
+ * So: **nothing at rest.** The cue arrives when the pointer does — `cursor:
+ * help` and a faint highlight, both at the moment the reader is already pointing
+ * at the label, and neither costing anything when they are not. That is the
+ * trade a supplementary fact deserves: the value is what the reader came for,
+ * and the description is available rather than advertised.
+ *
+ * ## The part that is not a trade
+ *
+ * A fact reachable only by pointing is a fact a keyboard user does not have, so
+ * the trigger is focusable and Radix shows the tooltip on focus as it does on
+ * hover, wiring `aria-describedby` either way. That costs a tab stop per
+ * described field, and it is the right cost: extra stops are an annoyance,
+ * unreachable content is a failure.
+ */
+function Described({ description, children }: { description?: string; children: React.ReactNode }) {
+  if (!description) return <>{children}</>;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <TooltipRoot>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            className="-mx-1 cursor-help rounded px-1 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {children}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{description}</TooltipContent>
+      </TooltipRoot>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * The label row of a result node — exported so the panel that owns the top-level
+ * header draws the SAME one rather than a second that drifts from it.
+ */
+export function ResultHeader({ field }: { field: RunField }) {
+  return <Label field={field} describe />;
+}
+
+function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
+  // The same rule the input side follows, and for the same reason: in `studio`
+  // the label IS the identifier the method author wrote, so it is shown
+  // verbatim in mono beside its concept pill; in `app` it becomes a humanised
+  // sans label and the pill goes, because a person reading a result has never
+  // seen the bundle. Reading `useFieldPresentation` here rather than
+  // humanising unconditionally is what keeps a result's labels agreeing with
+  // the form's for the very same fields. See `field-presentation.tsx`.
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
+  const labelText = fieldLabel(field.title, field.name, presentation);
+  if (labelText.trim() === '') {
+    return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
+  }
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2">
+      <Described description={describe ? field.description : undefined}>
+        <span
+          className={cn(
+            'text-[13px] font-semibold text-foreground',
+            isApp ? 'text-[13.5px]' : 'font-mono',
+          )}
+        >
+          {labelText}
+        </span>
+      </Described>
+      {!isApp && <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />}
+    </div>
+  );
+}
+
+export function Absent() {
+  const s = useFieldStrings();
+  return (
+    <span className="text-[13px] text-muted-foreground">
+      {/* The glyph is hidden from assistive tech and the sentence is hidden from
+          the page: a column of hyphens read aloud is noise, and a column of
+          "not provided" read on the page is louder than the data beside it. */}
+      <span aria-hidden>{s.resultAbsent}</span>
+      <span className="sr-only">{s.resultAbsentDescription}</span>
+    </span>
+  );
+}
+
+/**
+ * A structured value nothing named — as JSON, never as `[object Object]`.
+ *
+ * **`String(anObject)` is `"[object Object]"`, and that string must never reach
+ * a reader.** It is not a rendering of anything: it says a value was present and
+ * throws it away, which is strictly worse than both honest answers. There are
+ * only two of those — *there is nothing here*, or *here is what is here* — and
+ * this is the second.
+ *
+ * When it happens at all is a narrower question than it looks. A descriptor
+ * states a `kind`, and every structured kind has an arm; so a record reaching
+ * this component means the payload disagrees with the descriptor that described
+ * it, or the node is `unknown` — the standard's own escape hatch for a kind
+ * newer than the pinned peer, whose entire contract is that a consumer may not
+ * know what it is holding. Raw JSON is the right answer to both: the reader sees
+ * the value, and nobody has invented a shape for it.
+ */
+export function stringifyValue(value: object): string | undefined {
+  try {
+    // A BigInt throws rather than serializing, and it can arrive from a JSON
+    // parser configured to produce them. Naming it is better than failing.
+    const text = JSON.stringify(value, (_key, member) =>
+      typeof member === 'bigint' ? member.toString() : member,
+    );
+    if (text === undefined || text === '{}' || text === '[]') return undefined;
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    // Circular, and so unserializable. Still SOMETHING: name its members rather
+    // than falling back to the one string this whole function exists to avoid.
+    const keys = Array.isArray(value) ? [] : Object.keys(value);
+    return keys.length > 0 ? `{ ${keys.join(', ')} }` : undefined;
+  }
+}
+
+function RawValue({ value, compact }: { value: object; compact: boolean }) {
+  const text = stringifyValue(value);
+  // `{}` and `[]` are the EMPTY half of the rule: a value that holds nothing is
+  // an absence, and printing two braces at a reader is not more honest.
+  if (text === undefined) return <Absent />;
+  return compact ? (
+    <span title={text} className="truncate font-mono text-[12px] text-foreground">
+      {text}
+    </span>
+  ) : (
+    <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border bg-card/40 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-foreground">
+      {text}
+    </pre>
+  );
+}
+
+/**
+ * A value, as text.
+ *
+ * `compact` is the table-cell variant: a cell is one line, so the newlines a
+ * stacked field preserves must not open a row to three. Set by `LeafValue` when
+ * it renders into a `<td>`, never guessed from the value.
+ */
+function Scalar({ value, compact = false }: { value: unknown; compact?: boolean }) {
+  if (value === null || value === undefined || value === '') return <Absent />;
+  // The one branch that matters: `String()` is never reached by an object, so
+  // `[object Object]` cannot be produced here however the payload drifts.
+  if (typeof value === 'object') return <RawValue value={value} compact={compact} />;
+  return (
+    <span
+      className={cn(
+        'text-[13px] leading-relaxed text-foreground',
+        compact ? 'whitespace-nowrap' : 'whitespace-pre-wrap',
+      )}
+    >
+      {String(value)}
+    </span>
+  );
+}
+
+function Bool({ value, compact = false }: { value: unknown; compact?: boolean }) {
+  const s = useFieldStrings();
+  if (value === null || value === undefined || value === '') return <Absent />;
+  if (typeof value !== 'boolean') return <Scalar value={value} compact={compact} />;
+  return <span className="text-[13px] text-foreground">{value ? s.yes : s.no}</span>;
+}
+
+function DateValue({ value }: { value: unknown }) {
+  const content = readDateContent(value);
+  if (!content) return <Absent />;
+  return <span className="text-[13px] text-foreground">{formatDateContent(content)}</span>;
+}
+
+/**
+ * The name to put on a file: what it is CALLED, not where it lives.
+ *
+ * A `pipelex-storage://` reference is ninety characters of UUID and hash, and
+ * printing it whole is five wrapped lines that say one thing — this is a file.
+ * The last path segment is the part a person reads; the whole reference stays on
+ * the `title`, because it is the part they occasionally need to copy.
+ */
+function fileLabel(url: string, filename?: string): string {
+  if (filename) return filename;
+  const path = url.split(/[?#]/)[0] ?? url;
+  const segment = path.split('/').filter(Boolean).pop();
+  return segment && segment.length > 0 ? segment : url;
+}
+
+/**
+ * Put the WHOLE reference on the clipboard, while the page shows a short name.
+ *
+ * The two requirements pull opposite ways and this is what resolves them: a
+ * ninety-character storage reference printed in full wraps across the panel and
+ * says nothing, and a name alone is not something a person can paste into a
+ * terminal. So the label is the name, and the button is the URL.
+ *
+ * Hidden when the API is absent rather than failing on click — `navigator
+ * .clipboard` is undefined outside a secure context, and a button that does
+ * nothing is worse than no button. The link and the `title` still carry the
+ * reference there.
+ */
+/**
+ * Copy a value to the clipboard.
+ *
+ * On a URL it is the obvious affordance; on TEXT it is the one that was
+ * missing, and its absence was the more expensive of the two. A result view is
+ * where a person goes to take something away — a report to paste into a
+ * document, an extracted paragraph to send on — and the alternative it left
+ * them was selecting a rendered heading, list and table by dragging, which
+ * picks up the layout and loses the markdown. So every text value carries one,
+ * markdown or not, and what it writes is the SOURCE the run produced rather
+ * than the typeset rendering.
+ *
+ * It renders nothing where there is no clipboard (an insecure origin, an
+ * environment without the API). A button that silently fails is worse than one
+ * that was never offered.
+ */
+function CopyButton({
+  value,
+  provide,
+  label,
+  title,
+}: {
+  value?: string;
+  /** Produces the text at click time — for a URL that must be minted fresh. */
+  provide?: () => Promise<string>;
+  label: string;
+  title?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // `ClipboardItem` with a PROMISE, not `writeText` after an await.
+        // Safari drops a clipboard write once the user gesture has been
+        // consumed by an await, so minting a share URL first and writing second
+        // silently copies nothing there. Handing the promise to the clipboard
+        // keeps the write inside the gesture. `writeText` stays the path where
+        // there is nothing to mint, and the fallback covers a browser without
+        // `ClipboardItem`.
+        const done = () => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        };
+        if (!provide) {
+          void navigator.clipboard.writeText(value ?? '').then(done);
+          return;
+        }
+        const text = provide();
+        if (typeof ClipboardItem === 'function' && 'write' in navigator.clipboard) {
+          void navigator.clipboard
+            .write([
+              new ClipboardItem({
+                'text/plain': text.then((t) => new Blob([t], { type: 'text/plain' })),
+              }),
+            ])
+            .then(done, () => void text.then((t) => navigator.clipboard.writeText(t)).then(done));
+          return;
+        }
+        void text.then((t) => navigator.clipboard.writeText(t)).then(done);
+      }}
+      {...(title ? { title } : {})}
+      aria-label={label}
+      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+    >
+      {copied ? (
+        <Check aria-hidden className="size-3.5" />
+      ) : (
+        <Copy aria-hidden className="size-3.5" />
+      )}
+    </button>
+  );
+}
+
+function CopyUrlButton({ url, storageUrl }: { url: string; storageUrl?: string }) {
+  const s = useFieldStrings();
+  const resolveShare = useResolveShareUrl();
+  // What the page SHOWS and what the clipboard should CARRY are different URLs,
+  // and this is the one control that wants the second.
+  //
+  // The display URL may be a path behind the host's session (`/api/assets/…`)
+  // — right for an `<img>` under a strict `img-src 'self'`, useless to whoever
+  // pastes it. So when the host can mint a share URL from the underlying
+  // reference, this asks for one per click: it carries its own credential and
+  // starts expiring immediately, so holding one would be worse than minting it.
+  //
+  // Absolutising is the fallback for a host with no minter: a relative path at
+  // least becomes a link that works for someone already signed in.
+  const provide = async () => {
+    if (resolveShare && storageUrl) {
+      const shared = await resolveShare(storageUrl);
+      if (shared) return shared;
+    }
+    return absoluteUrl(url);
+  };
+  return <CopyButton provide={provide} label={s.copyUrl} title={url} />;
+}
+
+/** A root-relative path made absolute against the current origin; anything else verbatim. */
+function absoluteUrl(url: string): string {
+  if (!/^\/(?!\/)/.test(url) || typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
+}
+
+/**
+ * A file reference, as one line.
+ *
+ * A `pipelex-storage://` URL is not something a browser can follow, and this
+ * component takes no resolver — resolving one is the host's seam
+ * ([../../docs/upload-seam.md]), and a read-only result view is not the place to
+ * open a network call nobody asked for. So an unresolvable reference is named
+ * rather than linked, and never wrapped across the panel: it truncates, with the
+ * whole of it on the `title`.
+ */
+function FileRef({
+  url,
+  storageUrl,
+  mimeType,
+  filename,
+}: {
+  url: string;
+  /** The underlying reference, so the copy control can mint a share URL from it. */
+  storageUrl?: string;
+  mimeType?: string;
+  filename?: string;
+}) {
+  const label = fileLabel(url, filename);
+  const title = mimeType ? `${url} · ${mimeType}` : url;
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {isViewableUrl(url) ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title={title}
+          className="min-w-0 truncate font-mono text-[12px] text-foreground underline underline-offset-2"
+        >
+          {label}
+        </a>
+      ) : (
+        <span
+          title={title}
+          className="min-w-0 truncate font-mono text-[12px] text-muted-foreground"
+        >
+          {label}
+        </span>
+      )}
+      <CopyUrlButton url={url} {...(storageUrl ? { storageUrl } : {})} />
+    </span>
+  );
+}
+
+/**
+ * The URL to actually paint, in order of DURABILITY rather than convenience.
+ *
+ * 1. **The host's resolver, applied to `url`.** `url` is the runtime's own
+ *    reference (`pipelex-storage://…`) — the identity of the object, which does
+ *    not rot. A host that can turn one into a fetchable URL should always be
+ *    asked, because what it returns it can mint again tomorrow.
+ * 2. **`public_url`.** Fetchable with no host help, and the reason this used to
+ *    come first — but on the hosted platform it is a PRESIGNED S3 URL with an
+ *    hour's life, baked into the stored result. A run opened the next morning
+ *    shows a broken image, and the URL says `403` rather than anything about
+ *    permissions, so it reads as "the app cannot see my own file" when it means
+ *    "this signature expired at 20:42 yesterday". That is why the order flipped.
+ * 3. **`url` unresolved**, for a producer that states only the required member
+ *    and already puts something fetchable in it.
+ *
+ * `undefined` when nothing here can be painted — the arms then name the file
+ * instead, which is the honest floor.
+ */
+function paintableUrl(
+  content: { url: string; publicUrl?: string },
+  resolve?: ResolveUrl,
+): string | undefined {
+  const resolved = resolve?.(content.url);
+  if (isViewableUrl(resolved)) return resolved;
+  if (isViewableUrl(content.publicUrl)) return content.publicUrl;
+  return isViewableUrl(content.url) ? content.url : undefined;
+}
+
+/** The extensions a browser renders in a frame with no plugin and no library. */
+const PREVIEWABLE_EXT_RE = /\.(pdf|png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
+const PREVIEWABLE_MIME_RE = /^(application\/pdf|image\/)/i;
+
+/**
+ * Whether a document can be shown here, rather than only linked to.
+ *
+ * Two conditions, and both are necessary: the browser must be able to FETCH the
+ * URL (`isViewableUrl` — a `pipelex-storage://` reference resolves nowhere
+ * without the host's resolver) and to RENDER it with nothing installed. A `.docx`
+ * satisfies the first and not the second, and offering a preview that opens onto
+ * a download prompt is worse than offering none.
+ */
+function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): string | undefined {
+  const url = paintableUrl(content, resolve);
+  if (!url) return undefined;
+  const named = content.filename ?? url;
+  const renderable = content.mimeType
+    ? PREVIEWABLE_MIME_RE.test(content.mimeType)
+    : PREVIEWABLE_EXT_RE.test(named);
+  return renderable ? url : undefined;
+}
+
+/**
+ * The document itself, in a frame.
+ *
+ * **Not the same question as `native.Html`, and the difference is the origin.**
+ * Markup goes through a sandbox because injecting it into the host's document
+ * would run it ON the host's origin, with the host's cookies. A URL in an
+ * `<iframe>` is a separate document at its own origin by construction — the
+ * browser's own boundary, not one this package has to build — so a PDF is framed
+ * the way every document viewer on the web frames one. `no-referrer` is there
+ * because a result view has no business telling a third party where it was
+ * opened from.
+ */
+function DocumentPreview({ url, name }: { url: string; name: string }) {
+  return (
+    <iframe
+      src={url}
+      title={name}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      className="h-[28rem] w-full rounded-lg border border-border bg-card/40"
+    />
+  );
+}
+
+function DocumentValue({ value }: { value: unknown }) {
+  const s = useFieldStrings();
+  // Above the early return: a hook after one runs conditionally, which React
+  // forbids and which the `<Absent />` path would trigger on any payload
+  // missing a URL.
+  const resolve = useResolveUrl();
+  const [open, setOpen] = useState(false);
+  const content = readDocumentContent(value);
+  if (!content) return <Absent />;
+  const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename);
+  const preview = previewableUrl(content, resolve);
+  return (
+    <div className="space-y-2">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <FileText aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1 space-y-0.5">
+          {name && <span className="block truncate text-[13px] text-foreground">{name}</span>}
+          <FileRef
+            url={paintableUrl(content, resolve) ?? content.url}
+            storageUrl={content.url}
+            mimeType={content.mimeType}
+            {...(content.filename ? { filename: content.filename } : {})}
+          />
+          {content.snippet && (
+            <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
+              {content.snippet}
+            </p>
+          )}
+        </div>
+        {preview && (
+          <button
+            type="button"
+            onClick={() => setOpen((current) => !current)}
+            aria-expanded={open}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+          >
+            {open ? (
+              <EyeOff aria-hidden className="size-3.5" />
+            ) : (
+              <Eye aria-hidden className="size-3.5" />
+            )}
+            {s.preview}
+          </button>
+        )}
+      </div>
+      {preview && open && <DocumentPreview url={preview} name={name} />}
+    </div>
+  );
+}
+
+function ImageValue({
+  value,
+  inGallery = false,
+  inRow = false,
+  compact = false,
+}: {
+  value: unknown;
+  inGallery?: boolean;
+  inRow?: boolean;
+  /** Rendering into a table cell: a thumbnail, not a picture. */
+  compact?: boolean;
+}) {
+  const s = useFieldStrings();
+  const resolve = useResolveUrl();
+  const content = readImageContent(value);
+  if (!content) return <Absent />;
+  const src = paintableUrl(content, resolve);
+  // In a gallery the tile IS the border, so the image fills it and the caption
+  // sits under it; on its own the image keeps its own frame and a height cap.
+  return (
+    <div className={inGallery ? 'space-y-1' : 'space-y-1.5'}>
+      {src ? (
+        // Wrapped in a link: the picture is a PREVIEW of a file, and clicking a
+        // preview to see the thing it previews is what a reader expects. The
+        // reference underneath is the other half - a picture with no URL beside
+        // it is a result you can look at and cannot use.
+        <a
+          href={src}
+          target="_blank"
+          rel="noreferrer"
+          title={content.url}
+          // BLOCK when the image fills its column, inline-block otherwise. An
+          // `inline-block` anchor shrink-wraps, so a `w-full` image inside one
+          // resolves to zero width — the panel showed a tall empty sliver with
+          // the spinner clipped inside it. A gallery tile and a table cell size
+          // themselves, so they keep the inline box.
+          className={inGallery || compact ? 'inline-block' : 'block w-full'}
+        >
+          <LoadingImage
+            src={src}
+            alt={content.caption ?? s.preview}
+            className={cn(
+              inGallery && 'block aspect-square w-full object-cover',
+              // A cell is one line tall. An image column rendered at the standalone
+              // height turns every row into a picture and the table into a
+              // slideshow, so a cell gets a thumbnail and the row's expansion gets
+              // the picture.
+              compact && 'h-10 w-auto rounded border border-border object-cover',
+              // On its own: the full width it is given, capped generously in
+              // height. `max-h-64` was a 256px thumbnail in a panel several
+              // times that tall — a generated report image is the RESULT here,
+              // not a decoration beside one, and it was unreadable at that size.
+              // `object-contain` keeps the aspect ratio when the cap bites.
+              !inGallery &&
+                !compact &&
+                'max-h-[44rem] w-full rounded-lg border border-border object-contain',
+            )}
+          />
+        </a>
+      ) : inRow ? (
+        // The row variant of "nothing to paint": an icon and a name, exactly as
+        // a document row reads, because that is what this has become.
+        <div className="flex min-w-0 items-center gap-2.5">
+          <ImageOff aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <FileRef
+              url={content.url}
+              mimeType={content.mimeType}
+              {...(content.filename ? { filename: content.filename } : {})}
+            />
+          </div>
+        </div>
+      ) : inGallery ? (
+        // Nothing to paint, so the tile says what it is rather than dumping a
+        // ninety-character storage reference into a 140px box. This is what a
+        // host with no resolver sees, so it has to be a design and not a
+        // fallback.
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 px-2 text-center">
+          <ImageOff aria-hidden className="size-5 text-muted-foreground" />
+          <span
+            title={content.url}
+            className="w-full truncate font-mono text-[10.5px] text-muted-foreground"
+          >
+            {fileLabel(content.url, content.filename)}
+          </span>
+        </div>
+      ) : (
+        <FileRef
+          url={content.url}
+          mimeType={content.mimeType}
+          {...(content.filename ? { filename: content.filename } : {})}
+        />
+      )}
+      {src && !compact && (
+        <div className={inGallery ? 'px-2.5' : undefined}>
+          <FileRef
+            url={paintableUrl(content, resolve) ?? content.url}
+            storageUrl={content.url}
+            mimeType={content.mimeType}
+            {...(content.filename ? { filename: content.filename } : {})}
+          />
+        </div>
+      )}
+      {content.caption && (
+        <p
+          className={cn(
+            'text-[12px] leading-relaxed text-muted-foreground',
+            inGallery && 'px-2.5 pb-1.5',
+          )}
+        >
+          {content.caption}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The kinds a table cell can hold — short, single-line values.
+ *
+ * `prose` is deliberately absent. A paragraph in a `<td>` is worse than a card:
+ * it forces one column to the width of the longest answer and drags every other
+ * row's height with it. A list whose element carries prose renders as cards, and
+ * that is the right answer rather than a limitation.
+ *
+ * `object` and `list` are absent for the obvious reason, and `document`/`image`
+ * because a file's chrome (a link, a preview) is not a cell.
+ */
+const TABULAR_KINDS = new Set<RunField['kind']>(['text', 'number', 'boolean', 'date', 'enum']);
+
+/**
+ * Just the value, with no label chrome — shared by every layout.
+ *
+ * **It unwraps, and that is not a convenience.** Unwrapping is a property of the
+ * FIELD (its `contentKey`), not of the layout that happens to be rendering it,
+ * so every path has to do it: a `native.Text[]`'s entries are `TextContent`
+ * records, and a chip, a line and a table cell each hold one. Leaving the unwrap
+ * to the caller is what turned a list of planet names into eight rows of
+ * `[object Object]` — the very failure this component exists to make impossible.
+ */
+function LeafValue({
+  field,
+  value: raw,
+  compact = false,
+}: {
+  field: RunField;
+  value: unknown;
+  /** Rendering into a table cell: one line, no preserved newlines. */
+  compact?: boolean;
+}) {
+  const value = unwrap(field, raw);
+  switch (field.kind) {
+    case 'list': {
+      const entries = Array.isArray(value) ? value : [];
+      // A short scalar list inside a cell: chips wrap, so a column of them stays
+      // a column. A list of STRUCTURES cannot be a cell at any width, so it says
+      // how many there are and the row's detail shows them - the cell states the
+      // fact, the expansion carries the content.
+      return TABULAR_KINDS.has(field.item.kind) ? (
+        <ScalarChips field={field.item} items={entries} />
+      ) : (
+        <ItemCount count={entries.length} />
+      );
+    }
+    case 'prose':
+      // Prose is TYPESET, not just printed: what fills a `prose` slot is a
+      // model's answer, and those answers are markdown. Rendered as plain text
+      // a heading is a literal `#` and emphasis is a pair of asterisks, which
+      // is a wrong rendering rather than a neutral one. See `markdown.tsx`.
+      //
+      // Not in a cell, though. `compact` means a table cell or a chip, where
+      // the whole point is one line and the row expands for the rest - a
+      // heading, a list and a table have no business in there, and the plain
+      // string is the right thing at that size.
+      return compact ? (
+        <Scalar value={value} compact />
+      ) : typeof value === 'string' && value !== '' ? (
+        <Markdown text={value} />
+      ) : (
+        <Scalar value={value} />
+      );
+    case 'boolean':
+      return <Bool value={value} compact={compact} />;
+    case 'date':
+      return <DateValue value={value} />;
+    case 'document':
+      return <DocumentValue value={value} />;
+    case 'image':
+      return <ImageValue value={value} compact={compact} />;
+    default:
+      return <Scalar value={value} compact={compact} />;
+  }
+}
+
+/**
+ * An image that says it is coming.
+ *
+ * A run's images are fetched through the host's own route, and a generated PNG
+ * on a cold cache takes long enough that the panel sat blank — indistinguishable
+ * from the broken-image state it had just stopped being. A spinner is the
+ * difference between "loading" and "failed", and those are the two states a
+ * reader is actually trying to tell apart here.
+ *
+ * The `<img>` is mounted the whole time and only hidden, never swapped: React
+ * would otherwise remount it on each state change and restart the download.
+ * `onError` clears the spinner too — a failure that spins forever is the worst
+ * of the three states.
+ */
+function LoadingImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [state, setState] = useState<'loading' | 'done'>('loading');
+  // `src` changing means a different picture: show the spinner again.
+  const [current, setCurrent] = useState(src);
+  if (current !== src) {
+    setCurrent(src);
+    setState('loading');
+  }
+  return (
+    <span className="relative block">
+      {state === 'loading' && (
+        <span
+          role="status"
+          aria-label={alt}
+          className="absolute inset-0 flex items-center justify-center rounded-lg border border-border bg-card/40"
+        >
+          <Loader2 aria-hidden className="size-4 animate-spin text-muted-foreground" />
+        </span>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setState('done')}
+        onError={() => setState('done')}
+        className={cn(className, state === 'loading' && 'min-h-40 opacity-0')}
+      />
+    </span>
+  );
+}
+
+/**
+ * A list of SCALARS, inline.
+ *
+ * Rendering `["optics", "calibration"]` as two bordered cards with index numbers
+ * spends a screenful of chrome on two words. Chips say the same thing in one
+ * line, and the index a card carried was never information here — the entries of
+ * a scalar list are the values, and they identify themselves.
+ */
+function ScalarChips({ field, items }: { field: RunField; items: readonly unknown[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item, index) => (
+        <span
+          key={index}
+          className="rounded-md border border-border bg-card/40 px-2 py-0.5 text-[12.5px] text-foreground"
+        >
+          <LeafValue field={field} value={item} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A list of objects of ONE shape, as the table it is.
+ *
+ * Every entry has the same keys, so the labels are column headers rather than
+ * per-row labels — repeating them down the page is what made a fifteen-entry
+ * result read as fifteen forms. The description and the type pill move to the
+ * header too: on an INPUT they are guidance a person needs before typing, and on
+ * a result they are the same sentence fifteen times. The description stays
+ * reachable as the header's `title`, which is the honest place for a fact that
+ * is worth having and not worth repeating.
+ */
+/** How many entries a cell stands for, when the entries themselves cannot fit. */
+function ItemCount({ count }: { count: number }) {
+  const s = useFieldStrings();
+  return (
+    <span className="whitespace-nowrap text-[12.5px] text-muted-foreground">
+      {s.itemsCount(count)}
+    </span>
+  );
+}
+
+/**
+ * Whether a column is shown WHOLE in its cell.
+ *
+ * A short scalar is, and so is a list of them (chips wrap). Prose is not — it is
+ * the standard's way of saying "this may be long", so a cell shows its first
+ * line. A structure is not, at any width.
+ */
+function isInlineColumn(field: RunField): boolean {
+  if (field.kind === 'list') return TABULAR_KINDS.has(field.item.kind);
+  return TABULAR_KINDS.has(field.kind);
+}
+
+/**
+ * Beyond this a cell is a truncation rather than a value, so its row needs a way
+ * to open. Chosen as roughly what fits one line of a table column at this size.
+ */
+const CELL_LENGTH_LIMIT = 80;
+
+/**
+ * Whether a column is GUARANTEED to fit its cell — a stronger question than
+ * `isInlineColumn`, and the one the expand toggle is keyed on.
+ *
+ * The two came apart the first time a real method was rendered. `text` is the
+ * standard's "short single-line string", so it was treated as always-fitting and
+ * a table of nothing but `text` columns got no toggle at all. But *short* is not
+ * a property the kind carries: a `text` node is bounded only when the author
+ * wrote `max_length`, and an unbounded one is a slot a model will happily fill
+ * with three sentences — which is exactly what `gaps` and `overall_assessment`
+ * hold in the CV corpus. The cell then truncated with no way to read the rest,
+ * which is the one outcome a result view must not produce.
+ *
+ * So the guarantee is read from the CONSTRAINT rather than assumed from the
+ * kind. A boolean, a date, a number and an enum are bounded by what they are; a
+ * `text` is bounded when it says so. Everything else may be long, and its row
+ * gets a toggle. Still descriptor-driven — no value is measured, so a table's
+ * shape does not change with the data it happens to be showing.
+ */
+function fitsACellWhole(field: RunField): boolean {
+  switch (field.kind) {
+    case 'boolean':
+    case 'date':
+    case 'number':
+    case 'enum':
+      return true;
+    case 'text':
+      return field.maxLength !== undefined && field.maxLength <= CELL_LENGTH_LIMIT;
+    case 'list':
+      return fitsACellWhole(field.item);
+    default:
+      return false;
+  }
+}
+
+/**
+ * A list of records, as the table it is — with the rest of each record one click
+ * away.
+ *
+ * **Every record list is a table now**, including the ones carrying prose and
+ * the ones carrying more records. The old answer was to fall back to a card per
+ * entry, and it was the wrong trade: a table is how you READ a list of records —
+ * scannable, aligned, one row each — and giving that up over the widest column
+ * loses it for every other column too.
+ *
+ * What a table genuinely cannot do is hold a paragraph or a nested structure in
+ * a cell. So it does not try: the cell shows the first line (or how many entries
+ * there are), and the row expands to a full rendering of the record underneath —
+ * the same stacked layout a card used, arriving only when asked for. That keeps
+ * the scannable shape and loses nothing, which the fallback could not claim.
+ *
+ * The toggle appears only when a row HAS more to show; a table of short scalars
+ * of nothing but bounded scalars — numbers, dates, enums, `max_length` text —
+ * gets no column of chevrons that reveal nothing. Bounded is read from the
+ * descriptor's constraint rather than assumed from the kind; see
+ * `fitsACellWhole` for why that distinction had to be made.
+ */
+function ObjectTable({
+  columns,
+  element,
+  items,
+  label,
+}: {
+  columns: readonly RunField[];
+  /** The element descriptor, used to render an expanded row in full. */
+  element: RunField;
+  items: readonly unknown[];
+  /** Names the scroll region, so a screen reader says which table it is. */
+  label: string;
+}) {
+  const s = useFieldStrings();
+  const presentation = useFieldPresentation();
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
+  const [viewportWidth, setViewportWidth] = useState<number>();
+  const canExpand = columns.some((column) => !fitsACellWhole(column));
+
+  // The width of what is VISIBLE, not of the table.
+  //
+  // An expanded row is a cell spanning every column, so it inherits the table's
+  // width - and the table is deliberately wider than its container whenever the
+  // columns do not fit. Left alone, the detail then runs off into the scroll: a
+  // paragraph readable only by scrolling sideways, which is the failure the
+  // expansion exists to avoid. Measuring the scroller and pinning the detail to
+  // it makes the panel stay put while the columns above it scroll.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const measure = () => setViewportWidth(scroller.clientWidth);
+    measure();
+    // Guarded rather than assumed: a host rendering on the server, or a test
+    // environment without the API, gets a detail that simply wraps at the
+    // table's width instead of a component that throws.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
+
+  const toggle = (index: number) =>
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (!next.delete(index)) next.add(index);
+      return next;
+    });
+
+  return (
+    // `min-w-full` rather than `w-full`, and a floor under each cell: with
+    // `w-full` the table is pinned to the container's width, so twelve columns
+    // do not overflow - they crush, and a reading's date wraps onto four lines.
+    // A floor makes the table wider than the panel instead, which is what the
+    // scroller is for.
+    //
+    // A scrollable region must be reachable by keyboard. A table of values has
+    // nothing to tab to, so the region itself takes focus; without `tabIndex` the
+    // columns past the fold are reachable with a mouse and by no other means,
+    // which the a11y gate catches as `scrollable-region-focusable`. The name
+    // makes the focus stop announce itself rather than being a silent one.
+    //
+    // `group` rather than `region`, and that is not a detail: `region` is a
+    // LANDMARK, so every table would enter the document's landmark list, and two
+    // of them with the same name - which is what a result rendered twice, or a
+    // structure holding two lists, produces - is `landmark-unique`. A group is
+    // named without claiming to be a section of the page.
+    <div
+      ref={scrollerRef}
+      role="group"
+      aria-label={label}
+      tabIndex={0}
+      className="overflow-x-auto rounded-lg border border-border"
+    >
+      <table className="min-w-full border-collapse text-[13px]">
+        <thead>
+          <tr className="border-b border-border bg-card/40 text-left">
+            {/* Named, not empty: a header cell with no text is `empty-table-header`
+                to an auditor and an unlabelled column to a screen reader. The
+                name is visually hidden because the chevron below it is the whole
+                affordance a sighted reader needs. */}
+            {canExpand && (
+              <th scope="col" className="w-8 px-1">
+                <span className="sr-only">{s.rowDetailsColumn}</span>
+              </th>
+            )}
+            {columns.map((column) => (
+              <th
+                key={column.name}
+                scope="col"
+                className={cn(
+                  'whitespace-nowrap px-3 py-2 text-[12px] font-semibold text-foreground',
+                  presentation === 'app' ? undefined : 'font-mono',
+                )}
+              >
+                {/* The authored description, once, on the header - it is worth
+                    having and not worth repeating under every value. */}
+                <Described description={column.description}>
+                  {fieldLabel(column.title, column.name, presentation)}
+                </Described>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => {
+            const isOpen = expanded.has(index);
+            return (
+              <Fragment key={index}>
+                <tr className="border-b border-border/60 last:border-b-0">
+                  {canExpand && (
+                    <td className="px-1 align-top">
+                      <button
+                        type="button"
+                        onClick={() => toggle(index)}
+                        aria-expanded={isOpen}
+                        aria-label={s.toggleRowDetails(index + 1)}
+                        className="mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                      >
+                        {isOpen ? (
+                          <ChevronDown aria-hidden className="size-3.5" />
+                        ) : (
+                          <ChevronRight aria-hidden className="size-3.5" />
+                        )}
+                      </button>
+                    </td>
+                  )}
+                  {/* OPEN: the row BECOMES the record. It used to keep its
+                      truncated cells and grow a second row underneath, which
+                      showed every value twice — clipped above, whole below —
+                      and left the reader scrolling sideways through the clipped
+                      copy of what they had just opened. A row is one thing, so
+                      opening it replaces it rather than annotating it.
+
+                      Column alignment is what that costs, and only while a row
+                      is open: an open row is not being scanned against its
+                      neighbours, it is being read. */}
+                  {isOpen ? (
+                    <td colSpan={columns.length} className="bg-card/40 p-0">
+                      <div
+                        className="sticky left-0 px-3.5 py-3"
+                        {...(viewportWidth ? { style: { width: viewportWidth } } : {})}
+                      >
+                        <ResultField field={element} value={item} hideLabel />
+                      </div>
+                    </td>
+                  ) : (
+                    columns.map((column) => {
+                      const cell =
+                        typeof item === 'object' && item !== null
+                          ? ownProp(item as Record<string, unknown>, column.name)
+                          : undefined;
+                      return (
+                        <td key={column.name} className="px-3 py-1.5 align-top">
+                          {/* One line per cell, and a cap on how wide one may push
+                            the column. Wrapping is what a `w-full` table does
+                            instead of overflowing, and it is the worse failure: a
+                            date broken over two lines to save a scrollbar. The
+                            cap stops the opposite failure - one long label making
+                            a 200-character column - and the full value is a click
+                            or a hover away. */}
+                          <div
+                            className={cn(
+                              'max-w-[44ch]',
+                              column.kind === 'list' && isInlineColumn(column)
+                                ? 'min-w-[16ch]'
+                                : 'truncate',
+                            )}
+                            {...(typeof cell === 'string' || typeof cell === 'number'
+                              ? { title: String(cell) }
+                              : {})}
+                          >
+                            <LeafValue field={column} value={cell} compact />
+                          </div>
+                        </td>
+                      );
+                    })
+                  )}
+                </tr>
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * A `native.Composite` — its members, named, each rendered as what it is.
+ *
+ * ## Why this one reads the value, when nothing else here does
+ *
+ * Every other layout in this file is decided by the descriptor, and that rule
+ * is load-bearing. This arm is the documented exception, and the reason is that
+ * there is nothing to read: a composite declares no members, so the standard's
+ * own honest answer is `kind: "unknown"` with a payload schema of
+ * `{additionalProperties: true}` and no properties. Both are true. The
+ * standard's note on `unknown` says a renderer then "falls back to raw entry
+ * against the contract's `json_schema`" — and that schema says *any object*.
+ *
+ * So the descriptor has abdicated, deliberately, and the choice left is between
+ * printing the whole thing as a JSON blob and reading the members as the
+ * `StuffContent`s they are BY DEFINITION. A composite is a named composition of
+ * contents; that is not a guess about this payload, it is what the concept
+ * means.
+ *
+ * ## And the readers are the standard's, not sniffing
+ *
+ * `readHtmlContent`, `readDateContent`, `readDocumentContent` and the rest
+ * already exist and are already payload readers — elsewhere in this file the
+ * DESCRIPTOR chooses which one to call. Here nothing can, so they are tried in
+ * order of specificity, and a member that matches none is shown raw. What that
+ * costs is precision on a member whose content model this version does not
+ * know; what it buys is that a composite of two summaries reads as two
+ * summaries instead of forty lines of escaped JSON.
+ *
+ * The order matters and is by narrowness: `inner_html` and `date` name
+ * themselves, `url` is a file, `items` is a list envelope, and `text` is last
+ * of the recognised set because several models carry a `text` member beside
+ * their own (a `Page`, for one).
+ */
+function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
+  return (
+    <div className="space-y-3">
+      {members.map((member) => (
+        <div key={member.name} className="space-y-1">
+          <span className="font-mono text-[12px] font-semibold text-foreground">{member.name}</span>
+          <NativeValue value={member.value} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One content of unknown model, rendered as the most specific thing it matches.
+ *
+ * Only reachable from `CompositeValue` — see that component for why reading a
+ * value is allowed there and nowhere else in this file.
+ */
+function NativeValue({ value }: { value: unknown }) {
+  if (value === null || value === undefined || value === '') return <Absent />;
+
+  const html = readHtmlContent(value);
+  if (html) return <HtmlPreview content={html} />;
+
+  const date = readDateContent(value);
+  if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
+
+  const document = readDocumentContent(value);
+  if (document?.url !== undefined) {
+    return (
+      <FileRef
+        url={document.url}
+        {...(document.mimeType !== undefined ? { mimeType: document.mimeType } : {})}
+        {...(document.filename !== undefined ? { filename: document.filename } : {})}
+      />
+    );
+  }
+
+  // A `ListContent` envelope: the members of a composite are contents, and a
+  // plural one arrives wrapped exactly as a plural result does.
+  if (isRecord(value) && Array.isArray((value as Record<string, unknown>).items)) {
+    const items = (value as { items: unknown[] }).items;
+    if (items.length === 0) return <Absent />;
+    return (
+      <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+        {items.map((item, index) => (
+          <div key={index} className="bg-card/40 px-3 py-1.5">
+            <NativeValue value={item} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // `text` last of the recognised models: several carry one beside their own.
+  if (isRecord(value)) {
+    const text = (value as Record<string, unknown>).text;
+    if (typeof text === 'string') {
+      return text === '' ? <Absent /> : <Markdown text={text} />;
+    }
+  }
+
+  if (typeof value === 'string') return <Markdown text={value} />;
+  if (typeof value !== 'object') return <Scalar value={value} />;
+  return <RawValue value={value} compact={false} />;
+}
+
+/** A plain object, for the one arm that has to ask. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A list of PROSE, as plain lines.
+ *
+ * `prose` is the standard's way of saying "this may be long", and `native.Text`
+ * always derives to it — so this is what a list of plain strings actually is,
+ * and it is the most common result list there is. Chips are wrong for it: a chip
+ * containing a paragraph is a box with a paragraph in it. Cards are worse: a
+ * bordered box and an index number around the word `Mercury`.
+ *
+ * So: the values, one per line, divided by a hairline. Nothing else — the index
+ * a card carried labels nothing, because the entries of a scalar list are the
+ * values.
+ */
+function ScalarLines({ field, items }: { field: RunField; items: readonly unknown[] }) {
+  return (
+    <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+      {items.map((item, index) => (
+        <div key={index} className="bg-card/40 px-3 py-1.5">
+          <LeafValue field={field} value={item} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A list of IMAGES is a gallery, not a stack of cards.
+ *
+ * The card layout gives every entry a bordered box, an index and a label row —
+ * a screenful per picture, when the picture is the entire content. A grid shows
+ * them the way a person looks at images: several at once, compared side by side.
+ * An entry whose URL the browser cannot paint keeps its reference, because a
+ * grid of identical broken-image glyphs would be worse than the text.
+ */
+function ImageGallery({ items }: { items: readonly unknown[] }) {
+  // A grid of empty squares is not a gallery. When NOTHING here can be painted -
+  // every URL a storage reference the host has no resolver for - the tiles carry
+  // no picture, and three large blanks say less than three lines would. So the
+  // layout follows what is actually showable rather than what the kind promises.
+  const anyViewable = items.some((item) => {
+    const content = readImageContent(item);
+    return content ? isViewableUrl(content.publicUrl) || isViewableUrl(content.url) : false;
+  });
+  if (!anyViewable) return <FileRows items={items} kind="image" />;
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
+      {items.map((item, index) => (
+        <div key={index} className="overflow-hidden rounded-lg border border-border bg-card/40">
+          <ImageValue value={item} inGallery />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A list of FILES is a list of rows, not a list of cards.
+ *
+ * A document's whole content is a name and a link; wrapping each in a card with
+ * an index spends the chrome of a structure on two fields. Rows keep them
+ * scannable, which is what a list of sources is for.
+ */
+function FileRows({ items, kind }: { items: readonly unknown[]; kind: 'document' | 'image' }) {
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      {items.map((item, index) => (
+        <div key={index} className="bg-card/40 px-3.5 py-2">
+          {kind === 'document' ? <DocumentValue value={item} /> : <ImageValue value={item} inRow />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The columns a list's element contributes — every field it declares.
+ *
+ * There is no longer a shape that disqualifies a record from being a row. Prose
+ * and nesting used to send the whole list back to cards, which lost the
+ * scannable shape for every other column to accommodate the widest one; they are
+ * now shown in the row's expansion instead. What is left is the one case that is
+ * not a record at all.
+ */
+function tableColumns(item: RunField): readonly RunField[] | undefined {
+  if (item.kind !== 'object' || item.fields.length === 0) return undefined;
+  return item.fields;
+}
+
+export interface ResultFieldProps {
+  field: RunField;
+  value: unknown;
+  /** Nesting depth, used only for indentation. */
+  depth?: number;
+  /**
+   * Suppress the field's own label. Set on a LIST ITEM, where the index already
+   * identifies the entry: the standard says an element descriptor's `name` is
+   * unused, and rendering it repeats the parent's label on every row.
+   */
+  hideLabel?: boolean;
+}
+
+/** The single dispatch point, mirroring `FieldRenderer` on the input side. */
+export function ResultField({ field, value, depth = 0, hideLabel = false }: ResultFieldProps) {
+  const s = useFieldStrings();
+  const unwrapped = unwrap(field, value);
+
+  // The description rides the label's `title`, at every depth including this
+  // one.
+  //
+  // On an INPUT it is guidance a person needs before typing, so it is printed
+  // under every label. On a RESULT it is a sentence beside a value the reader is
+  // there to read — one line of chrome at the top, ten inside a structure of
+  // ten. The fact is worth having and is not worth printing, so it stays
+  // reachable, and the dotted underline is what says it is there.
+  const header = hideLabel ? null : <Label field={field} describe />;
+
+  // The text a copy control would write, or `undefined` where there is none to
+  // offer: only the two text kinds, and only when the value actually is a
+  // non-empty string. A button that copies "[object Object]" or an empty string
+  // is worse than no button - it reports success and hands over nothing.
+  const copyText =
+    (field.kind === 'text' || field.kind === 'prose') &&
+    typeof unwrapped === 'string' &&
+    unwrapped !== ''
+      ? unwrapped
+      : undefined;
+
+  // A DATE, before the kind switch, for the same reason markup is: `native.Date`
+  // is `{date, time}`, two properties, so nothing unwraps it and its node is an
+  // `object`. Rendered structurally that is a two-field card whose second field
+  // says "not provided", where the answer is a date. `readDateContent` already
+  // takes exactly this model - the arm just never fired, because the kind says
+  // `object`.
+  if (isNativeDateNode(field)) {
+    return (
+      <div className="space-y-0.5">
+        {header}
+        <DateValue value={unwrapped} />
+      </div>
+    );
+  }
+
+  // Markup, before the kind switch: a `native.Html` node's KIND is `object`, so
+  // the switch below would render its two members as text and call it done.
+  if (isNativeHtmlNode(field)) {
+    const content = readHtmlContent(unwrapped);
+    return (
+      <div className="space-y-2">
+        {header}
+        {content ? <HtmlPreview content={content} /> : <Absent />}
+      </div>
+    );
+  }
+
+  // A named bag of contents, before the kind switch for the same reason - and
+  // with the weakest descriptor of the three: a composite declares no members,
+  // so its node is `kind: "unknown"` and its payload schema is an open object.
+  // The default fallback for that is a JSON blob, which is the worst available
+  // answer to a value that is by definition a map of ordinary contents.
+  if (isNativeCompositeNode(field)) {
+    const members = readCompositeContent(unwrapped);
+    return (
+      <div className="space-y-2">
+        {header}
+        {members && members.length > 0 ? <CompositeValue members={members} /> : <Absent />}
+      </div>
+    );
+  }
+
+  switch (field.kind) {
+    case 'object': {
+      const memberValue = (child: RunField) =>
+        typeof unwrapped === 'object' && unwrapped !== null
+          ? ownProp(unwrapped as Record<string, unknown>, child.name)
+          : undefined;
+      return (
+        <div className="space-y-2">
+          {header}
+          {/* Plain elements, NOT a `<dl>`, and that is a decision rather than an
+              oversight. A definition list may hold only ordered `<dt>`/`<dd>`
+              groups, and this grid also holds tables, frames and galleries -
+              blocks a `<dl>` rejects (`definition-list` in the a11y gate). The
+              only way to keep the semantics would be to separate the short
+              fields from the rest, which reorders them, and authored order is a
+              fact the descriptor carries deliberately. So: a layout, honestly
+              labelled as one. */}
+          <div
+            className={cn(
+              // A definition grid, not a stack. Label above value spends two
+              // lines on every field, so a structure of ten is twenty lines of
+              // alternating label and answer with nothing aligned. Beside each
+              // other they take one line and the values line up, which is what
+              // makes a record scannable.
+              //
+              // The label column is CAPPED at 40%, and that is not cosmetic. A
+              // bare `auto` sizes to the widest label in the grid - label text
+              // plus its concept pill - so one long field name starved every
+              // value beside it, and inside a 400px panel a paragraph came out
+              // as a ten-line ribbon in a 130px column. `min-content` keeps a
+              // short label short; the cap stops any label taking more than its
+              // share, whatever the panel width turns out to be.
+              'grid grid-cols-[minmax(min-content,40%)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5',
+              // A list item already sits in its own bordered row; nesting a
+              // second card inside it draws a box in a box for no information
+              // gained.
+              !hideLabel && 'rounded-lg border border-border bg-card/40 px-3.5 py-3',
+            )}
+          >
+            {field.fields.map((child) =>
+              // Only a SHORT value shares a line. Prose needs the full width, and
+              // so does anything with chrome of its own - a table, a gallery, a
+              // frame - which beside a label would be squeezed into whatever the
+              // longest label left over.
+              isInlineColumn(child) ? (
+                <Fragment key={child.name}>
+                  <div className="min-w-0">
+                    <Label field={child} describe />
+                  </div>
+                  <div className="min-w-0">
+                    <LeafValue field={child} value={memberValue(child)} />
+                  </div>
+                </Fragment>
+              ) : (
+                <div key={child.name} className="col-span-2 min-w-0">
+                  <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    case 'list': {
+      // A bare array, always: a plural payload's `ListContent {items}` wrapper is
+      // unwrapped by `contentKey` above, exactly as a scalar's is, and a nested
+      // array property is bare on the wire to begin with. The `items`-key sniff
+      // that used to stand in for the schema is gone.
+      const items = Array.isArray(unwrapped) ? unwrapped : [];
+      const columns = tableColumns(field.item);
+      return (
+        <div className="space-y-2">
+          {/* `hideLabel` is honoured here as everywhere else - it was not, and
+              the panel showed the label twice: once as its own header and again
+              on the list beneath it. The COUNT is not part of the label though,
+              so it survives on its own; it is a fact about this value rather
+              than a name for it, and the panel's header does not carry it. */}
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            {header}
+            <span className="font-mono text-[10.5px] text-muted-foreground">
+              {s.itemsCount(items.length)}
+            </span>
+          </div>
+          {items.length === 0 ? (
+            <p className="text-[13px] italic text-muted-foreground">{s.noItemsYet}</p>
+          ) : columns ? (
+            // Same shape every row: the labels are column headers, not per-row
+            // labels. See `ObjectTable`.
+            <ObjectTable
+              columns={columns}
+              element={field.item}
+              items={items}
+              label={field.title ?? humanizeFieldName(field.name)}
+            />
+          ) : TABULAR_KINDS.has(field.item.kind) ? (
+            <ScalarChips field={field.item} items={items} />
+          ) : field.item.kind === 'prose' || field.item.kind === 'unknown' ? (
+            // `unknown` shares the LINES layout, and that is a reading of the
+            // standard rather than a convenience. `unknown` is the deliberate
+            // escape hatch: the producer could not map the node honestly and
+            // said so, which is what an untyped `type = "list"` field derives
+            // to. A card per entry would spend a bordered box and an index on
+            // each value to say nothing extra - the card earns its place around
+            // a STRUCTURE, and this is precisely the node we have been told is
+            // not known to be one. Lines cost nothing and read the same whether
+            // the entries turn out to be words or objects, because `LeafValue`
+            // falls through to `RawValue` either way.
+            <ScalarLines field={field.item} items={items} />
+          ) : field.item.kind === 'image' ? (
+            <ImageGallery items={items} />
+          ) : field.item.kind === 'document' ? (
+            <FileRows items={items} kind="document" />
+          ) : (
+            // Nested, or carrying prose: a card per entry is what a table cell
+            // cannot hold. The index label earns its place here, where the
+            // entries are structures rather than values.
+            <div className="space-y-2">
+              {items.map((item, index) => (
+                <div
+                  key={index}
+                  className="space-y-2 rounded-lg border border-border bg-card/40 px-3.5 py-3"
+                >
+                  <span className="font-mono text-[10px] text-muted-foreground">{index + 1}</span>
+                  <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    case 'boolean':
+    case 'date':
+    case 'document':
+    case 'image':
+    case 'text':
+    case 'prose':
+    case 'number':
+    case 'enum':
+    case 'unknown':
+      return (
+        <div className={field.kind === 'image' ? 'space-y-1.5' : 'space-y-0.5'}>
+          {/* The copy control rides the label row, and it is on every TEXT
+              value whether or not it turns out to be markdown. A result view is
+              where a person goes to take something away, and the alternative
+              was selecting a rendered heading, list and table by dragging -
+              which picks up the layout and loses the source. What it writes is
+              the source the run produced, not the typeset rendering.
+
+              The row survives `hideLabel`, which is the top-level case
+              `StuffViewer` uses: the header moves up to the panel, the button
+              does not follow it, and a text result with no way to copy it would
+              be exactly the one worth copying. */}
+          {copyText === undefined ? (
+            header
+          ) : (
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">{header}</div>
+              <CopyButton value={copyText} label={s.copyText} />
+            </div>
+          )}
+          {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
+              a table cell and this stacked row cannot disagree about it. */}
+          <LeafValue field={field} value={value} />
+        </div>
+      );
+  }
+
+  // Unreachable while the switch covers `RunFieldKind`. A twelfth kind added to
+  // the descriptor fails to compile HERE — which is the point of the assertion,
+  // and is what a `default:` returning `String(value)` cost: a `document` result
+  // rendered as `[object Object]`, silently, with nothing to notice it.
+  field satisfies never;
+  return null;
+}

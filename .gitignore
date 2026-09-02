@@ -1,8 +1,12 @@
 node_modules/
 dist/
 coverage/
+storybook-static/
 *.tsbuildinfo
 *.tgz
 .DS_Store
 .vscode/
 .idea/
+
+# A pipelex run writes its config, traces and generated files here.
+.pipelex/

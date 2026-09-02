@@ -23,6 +23,6 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/", "vitest.config.ts", "vitest.setup.react.ts"],
+  "include": ["src/", ".storybook/**/*.ts", ".storybook/**/*.tsx", "vitest.config.ts", "vitest.setup.react.ts"],
   "exclude": ["node_modules", "dist"]
 }

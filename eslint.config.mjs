@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import storybook from 'eslint-plugin-storybook';
 import tseslint from 'typescript-eslint';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -123,5 +124,33 @@ export default tseslint.config(
     // Tests reach into loose shapes on purpose to assert on nested wire data.
     files: ['src/**/__tests__/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  ...storybook.configs['flat/recommended'],
+  {
+    /**
+     * Story code is NOT package code, and the difference is enforced here
+     * rather than assumed.
+     *
+     * Stories sit in `src/__stories__/`, outside both entry trees, so
+     * `tsup.config.ts` never globs them and `scripts/assert-bundle.mjs` never
+     * sees them - which is precisely why the budget's other rules do not reach
+     * them either. The two that must still hold are restated:
+     *
+     *  - The framework bans stay. A story importing Next.js or RJSF would be
+     *    demonstrating something this package does not support.
+     *  - `mthds` stays types-only. The wire fixtures are typed against the
+     *    standard's declarations; a VALUE import would mean a story had started
+     *    depending on the standard's CLI closure to describe an input shape,
+     *    which is the point at which the fixture stops being a fixture.
+     *
+     * The core-barrel rule deliberately does NOT apply: a story is a consumer,
+     * and a consumer imports from `../../core` exactly as the published entry
+     * point presents it. Reaching for a deep module here would be testing a
+     * path no consumer can take.
+     */
+    files: ['src/__stories__/**/*.{ts,tsx}', '.storybook/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: BUDGET_PATTERNS }],
+    },
   },
 );

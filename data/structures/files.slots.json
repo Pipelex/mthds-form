@@ -1,0 +1,41 @@
+{
+  "description": "Document and image slots. Each pipe isolates ONE comparison, so a story can name what varies.",
+  "pipes": [
+    {
+      "code": "one_document",
+      "slots": [{ "name": "attachment", "concept": "Document" }]
+    },
+    {
+      "code": "one_image",
+      "slots": [{ "name": "picture", "concept": "Image" }]
+    },
+    {
+      "code": "native_vs_refined_document",
+      "slots": [
+        { "name": "attachment", "concept": "Document" },
+        { "name": "contract", "concept": "SignedContract" }
+      ]
+    },
+    {
+      "code": "native_vs_refined_image",
+      "slots": [
+        { "name": "picture", "concept": "Image" },
+        { "name": "headshot", "concept": "Headshot" }
+      ]
+    },
+    {
+      "code": "required_vs_optional",
+      "slots": [
+        { "name": "attachment", "concept": "Document" },
+        { "name": "cover_letter", "concept": "Document", "presence": "optional" }
+      ]
+    },
+    {
+      "code": "many_files",
+      "slots": [
+        { "name": "attachments", "concept": "Document", "multiplicity": "variable" },
+        { "name": "gallery", "concept": "Image", "multiplicity": "variable" }
+      ]
+    }
+  ]
+}

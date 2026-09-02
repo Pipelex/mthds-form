@@ -80,6 +80,7 @@ const TEXT_OUTPUT: PipeOutputContract = {
   multiplicity: 'single',
   item_count: null,
   optional: false,
+  json_schema: { type: 'object', properties: { text: { type: 'string' } } },
 };
 
 const OPTIONAL_INPUT: PipeInputContract = { ...TEXT_INPUT, ...OPTIONAL_SINGLE };

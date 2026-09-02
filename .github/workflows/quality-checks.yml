@@ -23,8 +23,22 @@ jobs:
       - name: Run quality checks (lint + format + typecheck)
         run: make check
 
+      # The story suite runs in a real browser, so `make test` needs one. Only
+      # chromium, and only its own dependencies: this installs ~150 MB, and
+      # `--with-deps` is required on the runner because headless chromium links
+      # against system libraries the base image does not carry.
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Run tests
         run: make test
+
+      # A story that renders in dev but breaks the static build is a real
+      # regression for anyone deploying the Storybook, and nothing else here
+      # would catch it - `make test` renders stories through vitest, not through
+      # a production build.
+      - name: Build Storybook
+        run: make build-storybook
 
       - name: Build both entry points
         run: make build

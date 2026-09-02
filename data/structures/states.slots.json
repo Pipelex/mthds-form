@@ -1,0 +1,14 @@
+{
+  "description": "The state axis, factored out of the per-kind catalog: defaults, optionality, presence.",
+  "pipes": [
+    { "code": "defaults", "slots": [{ "name": "preferences", "concept": "Preferences" }] },
+    {
+      "code": "presence",
+      "slots": [
+        { "name": "plain_slot", "concept": "Preferences", "presence": "plain" },
+        { "name": "forced_slot", "concept": "Preferences", "presence": "force" },
+        { "name": "optional_slot", "concept": "Preferences", "presence": "optional" }
+      ]
+    }
+  ]
+}
