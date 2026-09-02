@@ -17,6 +17,7 @@ import {
   readImageContent,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
+import { useResolveUrl, type ResolveUrl } from './result-env';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Check,
@@ -391,6 +392,35 @@ function FileRef({
   );
 }
 
+/**
+ * The URL to actually paint, in order of DURABILITY rather than convenience.
+ *
+ * 1. **The host's resolver, applied to `url`.** `url` is the runtime's own
+ *    reference (`pipelex-storage://…`) — the identity of the object, which does
+ *    not rot. A host that can turn one into a fetchable URL should always be
+ *    asked, because what it returns it can mint again tomorrow.
+ * 2. **`public_url`.** Fetchable with no host help, and the reason this used to
+ *    come first — but on the hosted platform it is a PRESIGNED S3 URL with an
+ *    hour's life, baked into the stored result. A run opened the next morning
+ *    shows a broken image, and the URL says `403` rather than anything about
+ *    permissions, so it reads as "the app cannot see my own file" when it means
+ *    "this signature expired at 20:42 yesterday". That is why the order flipped.
+ * 3. **`url` unresolved**, for a producer that states only the required member
+ *    and already puts something fetchable in it.
+ *
+ * `undefined` when nothing here can be painted — the arms then name the file
+ * instead, which is the honest floor.
+ */
+function paintableUrl(
+  content: { url: string; publicUrl?: string },
+  resolve?: ResolveUrl,
+): string | undefined {
+  const resolved = resolve?.(content.url);
+  if (isViewableUrl(resolved)) return resolved;
+  if (isViewableUrl(content.publicUrl)) return content.publicUrl;
+  return isViewableUrl(content.url) ? content.url : undefined;
+}
+
 /** The extensions a browser renders in a frame with no plugin and no library. */
 const PREVIEWABLE_EXT_RE = /\.(pdf|png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
 const PREVIEWABLE_MIME_RE = /^(application\/pdf|image\/)/i;
@@ -404,12 +434,8 @@ const PREVIEWABLE_MIME_RE = /^(application\/pdf|image\/)/i;
  * satisfies the first and not the second, and offering a preview that opens onto
  * a download prompt is worse than offering none.
  */
-function previewableUrl(content: DocumentContentView): string | undefined {
-  const url = isViewableUrl(content.publicUrl)
-    ? content.publicUrl
-    : isViewableUrl(content.url)
-      ? content.url
-      : undefined;
+function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): string | undefined {
+  const url = paintableUrl(content, resolve);
   if (!url) return undefined;
   const named = content.filename ?? url;
   const renderable = content.mimeType
@@ -448,7 +474,7 @@ function DocumentValue({ value }: { value: unknown }) {
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
   const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename);
-  const preview = previewableUrl(content);
+  const preview = previewableUrl(content, useResolveUrl());
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -502,14 +528,7 @@ function ImageValue({
   const s = useFieldStrings();
   const content = readImageContent(value);
   if (!content) return <Absent />;
-  // The public URL first: it is the one a browser can paint. Falling back to
-  // `url` covers a producer that states only the required member, and
-  // `isViewableUrl` is what decides whether either can be painted at all.
-  const src = isViewableUrl(content.publicUrl)
-    ? content.publicUrl
-    : isViewableUrl(content.url)
-      ? content.url
-      : undefined;
+  const src = paintableUrl(content, useResolveUrl());
   // In a gallery the tile IS the border, so the image fills it and the caption
   // sits under it; on its own the image keeps its own frame and a height cap.
   return (

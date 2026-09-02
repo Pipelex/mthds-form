@@ -54,6 +54,13 @@ export interface FieldStrings {
    * this rides beside it, visually hidden.
    */
   resultAbsentDescription: string;
+  /**
+   * Shown above the raw value when a result cannot be laid out because the
+   * artifacts describing it are absent. It names the CAUSE — the descriptor,
+   * not the data — because the value is right there underneath and a reader
+   * who is not told why will assume the view is broken.
+   */
+  resultUndescribed: string;
   /** The control that opens a result table row to show the rest of the record. */
   toggleRowDetails: (index: number) => string;
   /** The (visually hidden) header of the column those controls sit in. */
@@ -107,6 +114,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   // U+002D HYPHEN-MINUS, deliberately: not an en dash, not an em dash.
   resultAbsent: '-',
   resultAbsentDescription: 'Not provided',
+  resultUndescribed: 'No output descriptor for this pipe — showing the raw value.',
   toggleRowDetails: (index) => `Show or hide the details of row ${index}`,
   rowDetailsColumn: 'Details',
   copyUrl: 'Copy the URL',

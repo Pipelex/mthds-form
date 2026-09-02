@@ -98,8 +98,18 @@ function highlight(json: string) {
   return out;
 }
 
-/** The payload as JSON — the receipt, with the whole of it one click from the clipboard. */
-function JsonView({ value }: { value: unknown }) {
+/**
+ * The payload as JSON — the receipt, with the whole of it one click from the
+ * clipboard.
+ *
+ * Exported because it is also the honest FLOOR: a host that holds a value but
+ * not the artifacts describing it (an older engine, a spec restored without its
+ * validate report) should show the value and say why it is not laid out, rather
+ * than show nothing. That is a different thing from what `StuffViewer`'s JSON
+ * tab was — one labelled fallback, not one of three guesses offered as a
+ * choice.
+ */
+export function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
   const [copied, setCopied] = useState(false);
   // `stringifyValue` handles the shapes `JSON.stringify` refuses (a BigInt, a

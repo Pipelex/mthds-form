@@ -30,10 +30,20 @@ import type { HtmlContentView } from '../core/native-content';
  *   one — same-origin is only dangerous *together with* scripts, and without it
  *   the parent could not measure the content to size the frame.
  * - **A `Content-Security-Policy` meta.** `default-src 'none'` with inline
- *   styles allowed and `img-src data:` — so the frame reaches the network for
- *   nothing. Markup carrying `<img src="https://tracker/…">` would otherwise
- *   phone home the moment a result was displayed, which is a privacy leak rather
- *   than a script one and survives the sandbox on its own.
+ *   styles allowed, and `img-src` carrying whatever `imgSrc` says — `data:` and
+ *   `https:` by default.
+ *
+ *   `https:` was NOT in that list at first, and the reasoning was that markup
+ *   carrying `<img src="https://tracker/…">` phones home the moment a result is
+ *   displayed — a privacy leak that survives the sandbox, since it needs no
+ *   script. That is a real leak and it is still the reason `imgSrc` exists as a
+ *   prop. What it got wrong is whose markup this is: a method's HTML result
+ *   embeds the images that method produced, so blocking remote images broke the
+ *   ordinary case — a generated report rendered with a broken-image glyph where
+ *   its own illustration belongs — to defend against an unusual one. A host that
+ *   would rather pay that cost passes `imgSrc="data:"`, or names its own origin.
+ *
+ *   Everything else stays shut: no scripts, no fetch, no forms, no navigation.
  *
  * Navigation is not granted either (`allow-top-navigation` is absent and no
  * `allow-popups`), so a link cannot move the host anywhere.
@@ -54,6 +64,9 @@ import type { HtmlContentView } from '../core/native-content';
  * from the DOM rather than from tokens is what makes it follow a host's theme
  * without this package knowing what the host's tokens are called.
  */
+
+/** What `img-src` allows by default: inline data and ordinary remote images. */
+const DEFAULT_IMG_SRC = 'data: https:';
 
 /** The frame's own stylesheet: the host's typography, and table chrome. */
 function frameStyles(color: string, mutedColor: string, borderColor: string, font: string): string {
@@ -94,7 +107,7 @@ function frameStyles(color: string, mutedColor: string, borderColor: string, fon
 }
 
 /** The whole frame document. The CSP rides a meta because there is no header. */
-function frameDocument(content: HtmlContentView, styles: string): string {
+function frameDocument(content: HtmlContentView, styles: string, imgSrc: string): string {
   const body = content.cssClass
     ? // The class the value states, honoured the way the runtime's own HTML
       // rendering honours it: as a wrapper, not as something merged into ours.
@@ -102,7 +115,7 @@ function frameDocument(content: HtmlContentView, styles: string): string {
     : content.innerHtml;
   return [
     '<!doctype html><html><head><meta charset="utf-8">',
-    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">`,
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${imgSrc}; base-uri 'none'; form-action 'none'">`,
     `<style>${styles}</style></head><body>${body}</body></html>`,
   ].join('');
 }
@@ -117,11 +130,29 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
 
 export interface HtmlPreviewProps {
   content: HtmlContentView;
-  /** Beyond this the frame scrolls rather than growing. */
+  /**
+   * Beyond this the frame scrolls rather than growing.
+   *
+   * Generous on purpose. A `native.Html` result is usually a whole report, and
+   * 480px showed three paragraphs of one with a scrollbar down the side while
+   * the panel around it sat empty — the reader scrolls twice to read once. The
+   * frame still sizes itself to its CONTENT, so a short snippet stays short;
+   * this only says how far it may grow before scrolling instead.
+   */
   maxHeight?: number;
+  /**
+   * The frame's `img-src`. Defaults to `data: https:` — a method's HTML result
+   * embeds the images that method produced. Pass `"data:"` to block remote
+   * images entirely, or name an origin to allow only your own storage.
+   */
+  imgSrc?: string;
 }
 
-export function HtmlPreview({ content, maxHeight = 480 }: HtmlPreviewProps) {
+export function HtmlPreview({
+  content,
+  maxHeight = 1400,
+  imgSrc = DEFAULT_IMG_SRC,
+}: HtmlPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState<string | null>(null);
@@ -143,9 +174,10 @@ export function HtmlPreview({ content, maxHeight = 480 }: HtmlPreviewProps) {
           computed.borderColor || computed.color,
           computed.fontFamily,
         ),
+        imgSrc,
       ),
     );
-  }, [content]);
+  }, [content, imgSrc]);
 
   // Size the frame to its content. `allow-same-origin` is what makes this
   // readable; a frame we could not measure would be a fixed box with a scrollbar
