@@ -28,8 +28,8 @@ export { JsonView, ResultPanel } from './result-panel';
 // The host's seam for turning a stored reference into a fetchable URL. Without
 // it a result view paints whatever `public_url` the payload carries, which on a
 // hosted platform is a presigned URL that expires — see result-env.tsx.
-export type { ResolveUrl } from './result-env';
-export { ResultEnvProvider, useResolveUrl, useResolvedUrl } from './result-env';
+export type { ResolveShareUrl, ResolveUrl } from './result-env';
+export { ResultEnvProvider, useResolveShareUrl, useResolveUrl, useResolvedUrl } from './result-env';
 
 // The markup arm of the result view, exported on its own for a host that renders
 // a `native.Html` value outside a result tree. It is a sandboxed frame rather

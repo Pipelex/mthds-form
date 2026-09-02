@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, use, type ReactNode } from 'react';
+import { createContext, use, useMemo, type ReactNode } from 'react';
 
 /**
  * The host's seam for turning a stored reference into something a browser can
@@ -43,16 +43,39 @@ import { createContext, use, type ReactNode } from 'react';
  */
 export type ResolveUrl = (url: string) => string | undefined;
 
-const ResultEnvContext = createContext<ResolveUrl | undefined>(undefined);
+/**
+ * How a stored reference becomes a URL that works OUTSIDE this page — pasted
+ * into another tab, another app, a colleague's message.
+ *
+ * Separate from `resolveUrl`, because the two answer different questions and a
+ * host's answers genuinely differ. A display URL may be a path on the host's
+ * own origin behind its session (`/api/assets/…`), which is what lets a strict
+ * `img-src 'self'` policy stand and what keeps a picture from expiring while
+ * the tab is open. That URL is useless on the clipboard: whoever pastes it has
+ * no session. A share URL therefore carries its own credential — a freshly
+ * minted presigned URL — and is minted per click rather than held, because it
+ * starts expiring the moment it exists.
+ *
+ * Async for the same reason: minting one is a round trip. Omit it and the copy
+ * control falls back to the display URL, which is right for a host whose
+ * storage is public anyway.
+ */
+export type ResolveShareUrl = (url: string) => Promise<string | undefined>;
+
+interface ResultEnv {
+  resolveUrl?: ResolveUrl;
+  resolveShareUrl?: ResolveShareUrl;
+}
+
+const ResultEnvContext = createContext<ResultEnv>({});
 
 export function ResultEnvProvider({
   resolveUrl,
+  resolveShareUrl,
   children,
-}: {
-  resolveUrl: ResolveUrl;
-  children: ReactNode;
-}) {
-  return <ResultEnvContext value={resolveUrl}>{children}</ResultEnvContext>;
+}: ResultEnv & { children: ReactNode }) {
+  const env = useMemo(() => ({ resolveUrl, resolveShareUrl }), [resolveUrl, resolveShareUrl]);
+  return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
 }
 
 /**
@@ -65,11 +88,15 @@ export function ResultEnvProvider({
  * `isViewableUrl` check still decides whether it can be linked or only named.
  */
 export function useResolvedUrl(url: string): string {
-  const resolve = use(ResultEnvContext);
-  return resolve?.(url) ?? url;
+  return use(ResultEnvContext).resolveUrl?.(url) ?? url;
 }
 
 /** For the non-React readers that need the same answer (previewability). */
 export function useResolveUrl(): ResolveUrl | undefined {
-  return use(ResultEnvContext);
+  return use(ResultEnvContext).resolveUrl;
+}
+
+/** The share-URL minter, when the host supplies one. */
+export function useResolveShareUrl(): ResolveShareUrl | undefined {
+  return use(ResultEnvContext).resolveShareUrl;
 }

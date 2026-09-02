@@ -17,7 +17,7 @@ import {
   readImageContent,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { useResolveUrl, type ResolveUrl } from './result-env';
+import { useResolveShareUrl, useResolveUrl, type ResolveUrl } from './result-env';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Check,
@@ -28,6 +28,7 @@ import {
   EyeOff,
   FileText,
   ImageOff,
+  Loader2,
 } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
@@ -316,17 +317,51 @@ function fileLabel(url: string, filename?: string): string {
  * environment without the API). A button that silently fails is worse than one
  * that was never offered.
  */
-function CopyButton({ value, label, title }: { value: string; label: string; title?: string }) {
+function CopyButton({
+  value,
+  provide,
+  label,
+  title,
+}: {
+  value?: string;
+  /** Produces the text at click time — for a URL that must be minted fresh. */
+  provide?: () => Promise<string>;
+  label: string;
+  title?: string;
+}) {
   const [copied, setCopied] = useState(false);
   if (typeof navigator === 'undefined' || !navigator.clipboard) return null;
   return (
     <button
       type="button"
       onClick={() => {
-        void navigator.clipboard.writeText(value).then(() => {
+        // `ClipboardItem` with a PROMISE, not `writeText` after an await.
+        // Safari drops a clipboard write once the user gesture has been
+        // consumed by an await, so minting a share URL first and writing second
+        // silently copies nothing there. Handing the promise to the clipboard
+        // keeps the write inside the gesture. `writeText` stays the path where
+        // there is nothing to mint, and the fallback covers a browser without
+        // `ClipboardItem`.
+        const done = () => {
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1500);
-        });
+        };
+        if (!provide) {
+          void navigator.clipboard.writeText(value ?? '').then(done);
+          return;
+        }
+        const text = provide();
+        if (typeof ClipboardItem === 'function' && 'write' in navigator.clipboard) {
+          void navigator.clipboard
+            .write([
+              new ClipboardItem({
+                'text/plain': text.then((t) => new Blob([t], { type: 'text/plain' })),
+              }),
+            ])
+            .then(done, () => void text.then((t) => navigator.clipboard.writeText(t)).then(done));
+          return;
+        }
+        void text.then((t) => navigator.clipboard.writeText(t)).then(done);
       }}
       {...(title ? { title } : {})}
       aria-label={label}
@@ -341,14 +376,28 @@ function CopyButton({ value, label, title }: { value: string; label: string; tit
   );
 }
 
-function CopyUrlButton({ url }: { url: string }) {
+function CopyUrlButton({ url, storageUrl }: { url: string; storageUrl?: string }) {
   const s = useFieldStrings();
-  // ABSOLUTE on the clipboard, relative on the page. A host resolver returns a
-  // path on its own origin (`/api/assets/…`), which an `<img>` and an `<a>`
-  // both resolve correctly — and which is useless pasted into another tab.
-  // Copying is the one place the origin has to be spelled out.
-  const copied = absoluteUrl(url);
-  return <CopyButton value={copied} label={s.copyUrl} title={copied} />;
+  const resolveShare = useResolveShareUrl();
+  // What the page SHOWS and what the clipboard should CARRY are different URLs,
+  // and this is the one control that wants the second.
+  //
+  // The display URL may be a path behind the host's session (`/api/assets/…`)
+  // — right for an `<img>` under a strict `img-src 'self'`, useless to whoever
+  // pastes it. So when the host can mint a share URL from the underlying
+  // reference, this asks for one per click: it carries its own credential and
+  // starts expiring immediately, so holding one would be worse than minting it.
+  //
+  // Absolutising is the fallback for a host with no minter: a relative path at
+  // least becomes a link that works for someone already signed in.
+  const provide = async () => {
+    if (resolveShare && storageUrl) {
+      const shared = await resolveShare(storageUrl);
+      if (shared) return shared;
+    }
+    return absoluteUrl(url);
+  };
+  return <CopyButton provide={provide} label={s.copyUrl} title={url} />;
 }
 
 /** A root-relative path made absolute against the current origin; anything else verbatim. */
@@ -369,10 +418,13 @@ function absoluteUrl(url: string): string {
  */
 function FileRef({
   url,
+  storageUrl,
   mimeType,
   filename,
 }: {
   url: string;
+  /** The underlying reference, so the copy control can mint a share URL from it. */
+  storageUrl?: string;
   mimeType?: string;
   filename?: string;
 }) {
@@ -398,7 +450,7 @@ function FileRef({
           {label}
         </span>
       )}
-      <CopyUrlButton url={url} />
+      <CopyUrlButton url={url} {...(storageUrl ? { storageUrl } : {})} />
     </span>
   );
 }
@@ -498,6 +550,7 @@ function DocumentValue({ value }: { value: unknown }) {
           {name && <span className="block truncate text-[13px] text-foreground">{name}</span>}
           <FileRef
             url={paintableUrl(content, resolve) ?? content.url}
+            storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
           />
@@ -555,7 +608,7 @@ function ImageValue({
         // reference underneath is the other half - a picture with no URL beside
         // it is a result you can look at and cannot use.
         <a href={src} target="_blank" rel="noreferrer" title={content.url} className="inline-block">
-          <img
+          <LoadingImage
             src={src}
             alt={content.caption ?? s.preview}
             className={cn(
@@ -607,6 +660,7 @@ function ImageValue({
         <div className={inGallery ? 'px-2.5' : undefined}>
           <FileRef
             url={paintableUrl(content, resolve) ?? content.url}
+            storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
           />
@@ -701,6 +755,50 @@ function LeafValue({
     default:
       return <Scalar value={value} compact={compact} />;
   }
+}
+
+/**
+ * An image that says it is coming.
+ *
+ * A run's images are fetched through the host's own route, and a generated PNG
+ * on a cold cache takes long enough that the panel sat blank — indistinguishable
+ * from the broken-image state it had just stopped being. A spinner is the
+ * difference between "loading" and "failed", and those are the two states a
+ * reader is actually trying to tell apart here.
+ *
+ * The `<img>` is mounted the whole time and only hidden, never swapped: React
+ * would otherwise remount it on each state change and restart the download.
+ * `onError` clears the spinner too — a failure that spins forever is the worst
+ * of the three states.
+ */
+function LoadingImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [state, setState] = useState<'loading' | 'done'>('loading');
+  // `src` changing means a different picture: show the spinner again.
+  const [current, setCurrent] = useState(src);
+  if (current !== src) {
+    setCurrent(src);
+    setState('loading');
+  }
+  return (
+    <span className="relative inline-block">
+      {state === 'loading' && (
+        <span
+          role="status"
+          aria-label={alt}
+          className="absolute inset-0 flex items-center justify-center rounded-lg border border-border bg-card/40"
+        >
+          <Loader2 aria-hidden className="size-4 animate-spin text-muted-foreground" />
+        </span>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setState('done')}
+        onError={() => setState('done')}
+        className={cn(className, state === 'loading' && 'min-h-16 min-w-16 opacity-0')}
+      />
+    </span>
+  );
 }
 
 /**
