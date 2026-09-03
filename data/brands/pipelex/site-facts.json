@@ -1,0 +1,769 @@
+{
+  "url": "https://pipelex.com/",
+  "finalUrl": "https://pipelex.com/",
+  "fetchedAt": "2026-09-03",
+  "site": {
+    "name": "Pipelex",
+    "title": "Pipelex — Executable AI Methods for information processing",
+    "description": "MTHDS is the open standard for executable AI methods — the shared artifact between business, agents, and engineering. Pipelex is the reference runtime.",
+    "lang": "en"
+  },
+  "scheme": {
+    "htmlClass": "dark",
+    "htmlDataAttributes": {
+      "data-dpl-id": "dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD"
+    },
+    "bodyClass": "inter_5972bc34-module__OU16Qa__className bg-[#0a0a0b] text-white antialiased",
+    "bodyDataAttributes": {},
+    "themeColorMetas": [
+      {
+        "content": "#2a1048",
+        "media": null
+      }
+    ],
+    "colorSchemeDeclarations": [],
+    "rulesUnderADarkSelector": 0,
+    "rulesUnderPrefersDark": 0
+  },
+  "stylesheets": [
+    {
+      "url": "https://pipelex.com/_next/static/chunks/0tlu8lvfuidr~.css?dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD",
+      "bytes": 57944
+    }
+  ],
+  "inlineStyleBlocks": 0,
+  "colors": {
+    "customProperties": [
+      {
+        "name": "--foreground-rgb",
+        "asServed": "255, 255, 255",
+        "values": [
+          {
+            "value": "255, 255, 255",
+            "under": ":root"
+          }
+        ]
+      },
+      {
+        "name": "--background-start-rgb",
+        "asServed": "8, 6, 14",
+        "values": [
+          {
+            "value": "8, 6, 14",
+            "under": ":root"
+          }
+        ]
+      },
+      {
+        "name": "--background-end-rgb",
+        "asServed": "12, 8, 20",
+        "values": [
+          {
+            "value": "12, 8, 20",
+            "under": ":root"
+          }
+        ]
+      },
+      {
+        "name": "--accent-teal",
+        "asServed": "#00bb95",
+        "values": [
+          {
+            "value": "#00bb95",
+            "under": ":root"
+          }
+        ]
+      },
+      {
+        "name": "--accent-purple",
+        "asServed": "#6b21a8",
+        "values": [
+          {
+            "value": "#6b21a8",
+            "under": ":root"
+          }
+        ]
+      },
+      {
+        "name": "--orb-color",
+        "asServed": null,
+        "values": [
+          {
+            "value": "#6b21a8b3",
+            "under": ".blur-orb-purple"
+          },
+          {
+            "value": "#00bb95b3",
+            "under": ".blur-orb-cyan"
+          },
+          {
+            "value": "#2a1048b3",
+            "under": ".blur-orb-blue"
+          }
+        ]
+      }
+    ],
+    "literalsByFrequency": [
+      {
+        "value": "#0000",
+        "count": 16
+      },
+      {
+        "value": "rgb(0 187 149/1)",
+        "count": 7
+      },
+      {
+        "value": "#00bb954d",
+        "count": 6
+      },
+      {
+        "value": "rgb(255 255 255/1)",
+        "count": 6
+      },
+      {
+        "value": "#00bb95",
+        "count": 5
+      },
+      {
+        "value": "#ffffff1a",
+        "count": 5
+      },
+      {
+        "value": "rgb(209 213 219/1)",
+        "count": 5
+      },
+      {
+        "value": "#00bb951a",
+        "count": 4
+      },
+      {
+        "value": "#00bb9580",
+        "count": 4
+      },
+      {
+        "value": "#ffffff0d",
+        "count": 4
+      },
+      {
+        "value": "#00a080",
+        "count": 3
+      },
+      {
+        "value": "#00bb9533",
+        "count": 3
+      },
+      {
+        "value": "#9ca3af",
+        "count": 3
+      },
+      {
+        "value": "#ffffff05",
+        "count": 3
+      },
+      {
+        "value": "rgb(75 85 99/1)",
+        "count": 3
+      },
+      {
+        "value": "#0000000f",
+        "count": 2
+      },
+      {
+        "value": "#00bb9566",
+        "count": 2
+      },
+      {
+        "value": "#00bb9599",
+        "count": 2
+      },
+      {
+        "value": "#00bb95e6",
+        "count": 2
+      },
+      {
+        "value": "#6b21a880",
+        "count": 2
+      },
+      {
+        "value": "#fff",
+        "count": 2
+      },
+      {
+        "value": "#fff3",
+        "count": 2
+      },
+      {
+        "value": "#ffffff08",
+        "count": 2
+      },
+      {
+        "value": "#ffffff0f",
+        "count": 2
+      },
+      {
+        "value": "#ffffff26",
+        "count": 2
+      },
+      {
+        "value": "rgb(13 11 20/1)",
+        "count": 2
+      },
+      {
+        "value": "rgb(156 163 175/1)",
+        "count": 2
+      },
+      {
+        "value": "#0000001a",
+        "count": 1
+      },
+      {
+        "value": "#0000004d",
+        "count": 1
+      },
+      {
+        "value": "#00000080",
+        "count": 1
+      },
+      {
+        "value": "#000000bf",
+        "count": 1
+      },
+      {
+        "value": "#0003",
+        "count": 1
+      },
+      {
+        "value": "#000c",
+        "count": 1
+      },
+      {
+        "value": "#00bb9500",
+        "count": 1
+      },
+      {
+        "value": "#00bb9526",
+        "count": 1
+      },
+      {
+        "value": "#00bb95b3",
+        "count": 1
+      },
+      {
+        "value": "#00bb95cc",
+        "count": 1
+      },
+      {
+        "value": "#08060ee6",
+        "count": 1
+      },
+      {
+        "value": "#08060ef2",
+        "count": 1
+      },
+      {
+        "value": "#22c55e33",
+        "count": 1
+      }
+    ],
+    "utilitiesByFrequency": [
+      {
+        "value": "text-white",
+        "count": 83,
+        "resolves": "rgb(255 255 255/1)"
+      },
+      {
+        "value": "text-gray-300",
+        "count": 74,
+        "resolves": "rgb(209 213 219/1)"
+      },
+      {
+        "value": "text-gray-400",
+        "count": 55,
+        "resolves": "rgb(156 163 175/1)"
+      },
+      {
+        "value": "text-accent-teal",
+        "count": 36,
+        "resolves": "rgb(0 187 149/1)"
+      },
+      {
+        "value": "bg-white/5",
+        "count": 21,
+        "resolves": "#ffffff0d"
+      },
+      {
+        "value": "border-white/10",
+        "count": 20,
+        "resolves": "#ffffff1a"
+      },
+      {
+        "value": "text-gray-500",
+        "count": 18,
+        "resolves": "rgb(107 114 128/1)"
+      },
+      {
+        "value": "bg-accent-teal",
+        "count": 17,
+        "resolves": "rgb(0 187 149/1)"
+      },
+      {
+        "value": "bg-white/[0.06]",
+        "count": 12,
+        "resolves": "#ffffff0f"
+      },
+      {
+        "value": "bg-accent-teal/10",
+        "count": 11,
+        "resolves": "#00bb951a"
+      },
+      {
+        "value": "bg-white/10",
+        "count": 8,
+        "resolves": "#ffffff1a"
+      },
+      {
+        "value": "border-accent-teal",
+        "count": 8,
+        "resolves": "rgb(0 187 149/1)"
+      },
+      {
+        "value": "border-accent-teal/30",
+        "count": 7,
+        "resolves": "#00bb954d"
+      },
+      {
+        "value": "border-white/5",
+        "count": 7,
+        "resolves": "#ffffff0d"
+      },
+      {
+        "value": "bg-bg-darker",
+        "count": 4,
+        "resolves": "rgb(13 11 20/1)"
+      },
+      {
+        "value": "bg-teal-gradient",
+        "count": 3,
+        "resolves": "linear-gradient(135deg,#00bb95 0%,#00a080 100%)"
+      },
+      {
+        "value": "border-[#0d0b14]",
+        "count": 3,
+        "resolves": "#0d0b14"
+      },
+      {
+        "value": "text-[11px]",
+        "count": 3,
+        "resolves": null
+      },
+      {
+        "value": "text-2xs",
+        "count": 3,
+        "resolves": null
+      },
+      {
+        "value": "text-accent-teal/60",
+        "count": 3,
+        "resolves": "#00bb9599"
+      },
+      {
+        "value": "text-orange-400",
+        "count": 3,
+        "resolves": "rgb(251 146 60/1)"
+      },
+      {
+        "value": "text-orange-400/60",
+        "count": 3,
+        "resolves": "#fb923c99"
+      },
+      {
+        "value": "text-rose-400",
+        "count": 3,
+        "resolves": "rgb(251 113 133/1)"
+      },
+      {
+        "value": "text-rose-400/60",
+        "count": 3,
+        "resolves": "#fb718599"
+      },
+      {
+        "value": "bg-black/75",
+        "count": 2,
+        "resolves": "#000000bf"
+      },
+      {
+        "value": "bg-gradient-to-r",
+        "count": 2,
+        "resolves": null
+      },
+      {
+        "value": "border-white/20",
+        "count": 2,
+        "resolves": null
+      },
+      {
+        "value": "fill-yellow-400",
+        "count": 2,
+        "resolves": "#facc15"
+      },
+      {
+        "value": "ring-white/10",
+        "count": 2,
+        "resolves": null
+      },
+      {
+        "value": "text-yellow-400",
+        "count": 2,
+        "resolves": "rgb(250 204 21/1)"
+      },
+      {
+        "value": "bg-[#0a0a0b]",
+        "count": 1,
+        "resolves": "#0a0a0b"
+      },
+      {
+        "value": "bg-accent-teal/15",
+        "count": 1,
+        "resolves": "#00bb9526"
+      },
+      {
+        "value": "bg-accent-teal/20",
+        "count": 1,
+        "resolves": "#00bb9533"
+      },
+      {
+        "value": "bg-accent-teal/30",
+        "count": 1,
+        "resolves": "#00bb954d"
+      },
+      {
+        "value": "bg-accent-teal/40",
+        "count": 1,
+        "resolves": "#00bb9566"
+      },
+      {
+        "value": "bg-accent-teal/70",
+        "count": 1,
+        "resolves": "#00bb95b3"
+      },
+      {
+        "value": "bg-accent-teal/90",
+        "count": 1,
+        "resolves": "#00bb95e6"
+      },
+      {
+        "value": "bg-bg-deep/95",
+        "count": 1,
+        "resolves": "#08060ef2"
+      },
+      {
+        "value": "bg-black/20",
+        "count": 1,
+        "resolves": "#0003"
+      },
+      {
+        "value": "bg-black/30",
+        "count": 1,
+        "resolves": "#0000004d"
+      },
+      {
+        "value": "bg-black/80",
+        "count": 1,
+        "resolves": "#000c"
+      },
+      {
+        "value": "bg-green-500/80",
+        "count": 1,
+        "resolves": "#22c55ecc"
+      },
+      {
+        "value": "bg-orange-500",
+        "count": 1,
+        "resolves": "rgb(249 115 22/1)"
+      },
+      {
+        "value": "bg-orange-500/10",
+        "count": 1,
+        "resolves": "#f973161a"
+      },
+      {
+        "value": "bg-red-500/80",
+        "count": 1,
+        "resolves": "#ef4444cc"
+      },
+      {
+        "value": "bg-rose-500",
+        "count": 1,
+        "resolves": "rgb(244 63 94/1)"
+      },
+      {
+        "value": "bg-rose-500/10",
+        "count": 1,
+        "resolves": "#f43f5e1a"
+      },
+      {
+        "value": "bg-white/[0.03]",
+        "count": 1,
+        "resolves": "#ffffff08"
+      },
+      {
+        "value": "bg-yellow-500/80",
+        "count": 1,
+        "resolves": "#eab308cc"
+      },
+      {
+        "value": "border-accent-teal/20",
+        "count": 1,
+        "resolves": "#00bb9533"
+      },
+      {
+        "value": "border-blue-500/20",
+        "count": 1,
+        "resolves": "#3b82f633"
+      },
+      {
+        "value": "border-orange-500/20",
+        "count": 1,
+        "resolves": "#f9731633"
+      },
+      {
+        "value": "border-white/30",
+        "count": 1,
+        "resolves": "#ffffff4d"
+      },
+      {
+        "value": "from-accent-purple/10",
+        "count": 1,
+        "resolves": null
+      },
+      {
+        "value": "from-rose-500/30",
+        "count": 1,
+        "resolves": null
+      },
+      {
+        "value": "ring-accent-teal/30",
+        "count": 1,
+        "resolves": null
+      },
+      {
+        "value": "shadow-accent-teal/20",
+        "count": 1,
+        "resolves": null
+      },
+      {
+        "value": "shadow-accent-teal/40",
+        "count": 1,
+        "resolves": null
+      },
+      {
+        "value": "text-[#d1d5db]",
+        "count": 1,
+        "resolves": "#d1d5db"
+      },
+      {
+        "value": "text-[44px]/[1.2]",
+        "count": 1,
+        "resolves": null
+      }
+    ]
+  },
+  "typography": {
+    "fontFamiliesByFrequency": [
+      {
+        "value": "Inter",
+        "count": 7
+      },
+      {
+        "value": "inherit",
+        "count": 4
+      },
+      {
+        "value": "ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace",
+        "count": 2
+      },
+      {
+        "value": "Inter Fallback",
+        "count": 1
+      },
+      {
+        "value": "Inter,Inter Fallback",
+        "count": 1
+      },
+      {
+        "value": "ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji",
+        "count": 1
+      }
+    ],
+    "fontFaces": [
+      "Inter",
+      "Inter Fallback"
+    ],
+    "webfontLinks": [],
+    "googleFamilies": [],
+    "fontPreloads": [
+      "https://pipelex.com/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2?dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD"
+    ],
+    "utilitiesByFrequency": [
+      {
+        "value": "font-mono",
+        "count": 5
+      }
+    ]
+  },
+  "shape": {
+    "radiiByFrequency": [
+      {
+        "value": ".5rem",
+        "count": 4
+      },
+      {
+        "value": "inherit",
+        "count": 4
+      },
+      {
+        "value": ".375rem",
+        "count": 3
+      },
+      {
+        "value": "1rem",
+        "count": 2
+      },
+      {
+        "value": ".25rem",
+        "count": 1
+      },
+      {
+        "value": ".3125rem",
+        "count": 1
+      },
+      {
+        "value": ".75rem",
+        "count": 1
+      },
+      {
+        "value": "0",
+        "count": 1
+      },
+      {
+        "value": "1.5rem",
+        "count": 1
+      },
+      {
+        "value": "4px",
+        "count": 1
+      },
+      {
+        "value": "9999px",
+        "count": 1
+      }
+    ],
+    "utilitiesByFrequency": [
+      {
+        "value": "rounded-full",
+        "count": 37
+      },
+      {
+        "value": "rounded-xl",
+        "count": 19
+      },
+      {
+        "value": "rounded-lg",
+        "count": 18
+      },
+      {
+        "value": "rounded-2xl",
+        "count": 10
+      },
+      {
+        "value": "rounded-md",
+        "count": 7
+      },
+      {
+        "value": "rounded",
+        "count": 3
+      },
+      {
+        "value": "rounded-t-lg",
+        "count": 2
+      }
+    ],
+    "radiusProperties": []
+  },
+  "logos": {
+    "candidates": [
+      {
+        "url": "https://pipelex.com/_next/image?url=%2Flogo.png&w=384&q=75&dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD",
+        "alt": "Pipelex home",
+        "width": "140",
+        "height": "44",
+        "class": "h-8 w-auto",
+        "original": "https://pipelex.com/logo.png"
+      },
+      {
+        "url": "https://pipelex.com/_next/image?url=%2Ftrust%2F21st-logo-couleur.webp&w=3840&q=75&dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD",
+        "alt": "21st",
+        "width": "500",
+        "height": "500",
+        "class": "w-auto brightness-75 group-hover:brightness-100 transition-all",
+        "original": "https://pipelex.com/trust/21st-logo-couleur.webp"
+      },
+      {
+        "url": "https://pipelex.com/_next/image?url=%2Flogo.png&w=256&q=75&dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD",
+        "alt": "Pipelex",
+        "width": "120",
+        "height": "38",
+        "class": "h-7 w-auto",
+        "original": "https://pipelex.com/logo.png"
+      },
+      {
+        "url": "https://pipelex.com/icon.png?icon.08xkc052~txej.png?dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD",
+        "rel": "icon",
+        "sizes": "32x32",
+        "type": "image/png"
+      },
+      {
+        "url": "https://pipelex.com/apple-icon.png?apple-icon.0h.uxq~b2m~66.png?dpl=dpl_88uzkPuueFbwFRsbbgM5A9WLwHuD",
+        "rel": "apple-touch-icon",
+        "sizes": "180x180",
+        "type": "image/png"
+      },
+      {
+        "url": "https://pipelex.com/og-banner.jpg",
+        "rel": "og:image"
+      }
+    ],
+    "headerSvgs": [
+      {
+        "ariaLabel": null,
+        "class": "w-4 h-4 text-gray-400 group-hover:text-white transition-colors",
+        "viewBox": "0 0 24 24"
+      },
+      {
+        "ariaLabel": null,
+        "class": "w-4 h-4 text-gray-400 group-hover:text-white transition-colors",
+        "viewBox": "0 0 24 24"
+      },
+      {
+        "ariaLabel": null,
+        "class": "lucide lucide-star w-3.5 h-3.5 text-yellow-400 fill-yellow-400",
+        "viewBox": "0 0 24 24"
+      },
+      {
+        "ariaLabel": null,
+        "class": "lucide lucide-menu w-6 h-6",
+        "viewBox": "0 0 24 24"
+      },
+      {
+        "ariaLabel": null,
+        "class": "w-4 h-4",
+        "viewBox": "0 0 24 24"
+      },
+      {
+        "ariaLabel": null,
+        "class": "w-4 h-4",
+        "viewBox": "0 0 24 24"
+      }
+    ]
+  }
+}

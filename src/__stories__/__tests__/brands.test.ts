@@ -155,7 +155,8 @@ describe('the brands corpus', () => {
           .map((token) => token.variable)
           .sort(),
       );
-      expect(fixture.css).not.toMatch(/:root/);
+      // Scoped means no rule at the root; a description may well mention `:root`.
+      expect(fixture.css.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/:root/);
     }
   });
 });

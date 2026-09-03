@@ -13,8 +13,8 @@ import { PIPELEX_TRIP_SPEC } from './pipelex-trip.spec';
 import { resolveColor } from './tokens-schema';
 
 /**
- * The Pipelex brand: the trip planner as a product page, painted from each
- * producer's `data/brands/pipelex/<producer>/` - one story per producer,
+ * The MTHDS brand: the trip planner as a product page, painted from each
+ * producer's `data/brands/mthds/<producer>/` - one story per producer,
  * titled by what produced the tokens. The page, the spec and the components
  * are the same in every story; only the data differs, which is the point.
  *
@@ -23,12 +23,12 @@ import { resolveColor } from './tokens-schema';
  * derived mode is seen. Full width, at the size a web page is.
  */
 
-const BRAND = 'pipelex';
+const BRAND = 'mthds';
 const PIPE_REF = 'trips.plan_trip';
 const hero = HEROES.find((candidate) => `${candidate.domain}.${candidate.pipeCode}` === PIPE_REF)!;
 const fields = loadInputHero(hero, CONTRACTS, INPUT_FORM);
 
-function PipelexTripPlanner({ producerId }: { producerId: string }) {
+function MthdsTripPlanner({ producerId }: { producerId: string }) {
   const brand = BRANDS.find(
     (candidate) => candidate.brand === BRAND && candidate.producerId === producerId,
   );
@@ -37,8 +37,8 @@ function PipelexTripPlanner({ producerId }: { producerId: string }) {
 }
 
 const meta = {
-  title: 'Generative/Brand/Pipelex · trip planner',
-  component: PipelexTripPlanner,
+  title: 'Generative/Brand/MTHDS · trip planner',
+  component: MthdsTripPlanner,
   parameters: {
     themePairPadding: 0,
     /**
@@ -62,7 +62,7 @@ const meta = {
       },
     },
   },
-} satisfies Meta<typeof PipelexTripPlanner>;
+} satisfies Meta<typeof MthdsTripPlanner>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -108,5 +108,4 @@ const paintsFromTheTokens: Story['play'] = skippable(async ({ canvasElement }) =
 
 const stories = brandStories<Story>(BRANDS, BRAND, paintsFromTheTokens);
 
-export const SessionByHand = stories.of('claude-code-session--claude-fable-5-1');
 export const MethodOpus48 = stories.of('pipelex-method--claude-4.8-opus');

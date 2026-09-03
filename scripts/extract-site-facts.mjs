@@ -4,7 +4,8 @@
  *
  * The brand producer's first input, and deliberately not a model: what a
  * site declares is a matter of fact - which class its `<html>` carries, which
- * custom properties its stylesheets set and under which selector, which colour
+ * custom properties its stylesheets set, under which selector, and which of
+ * those declarations wins for the page as it is served, which colour
  * utilities its markup uses most, which typefaces it loads, which radii it
  * uses, which images could be its logo - and a script reads facts exactly,
  * every time, for nothing. What a model is for is the JUDGMENT that follows:
@@ -231,14 +232,112 @@ function count(counts, key) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
-/** Substitute `var(--x)` from the collected properties, a few levels deep, when the value is known. */
+/**
+ * Whether a rule's selector chain applies to the document AS SERVED: at its
+ * root, in the scheme it starts in, on a screen. What the facts then report as
+ * winning is source order among the declarations that apply - which is what
+ * decides between a framework's `:root` default and the site's own `:root`
+ * override loaded after it, the case that matters. Specificity is not
+ * weighed, and a chain this reader cannot parse (a descendant, a pseudo-class,
+ * an unknown at-rule) is taken as not applying at the root.
+ */
+function appliesAsServed(selectors, htmlAttrs, bodyAttrs) {
+  return selectors.every((member) => {
+    if (member.startsWith('@')) {
+      if (!/^@media\b/.test(member)) return /^@(?:layer|supports)\b/.test(member);
+      if (/prefers-color-scheme\s*:\s*dark/.test(member)) return false;
+      return !/\bprint\b/.test(member) || /\bscreen\b/.test(member);
+    }
+    return member
+      .split(',')
+      .map((alternative) => alternative.trim())
+      .some((alternative) => rootSelectorMatches(alternative, htmlAttrs, bodyAttrs));
+  });
+}
+
+/**
+ * A compound selector for the root or the body - `:root`, `html.dark`,
+ * `body[data-theme=x]`, `[data-md-color-scheme="default"]`, `:not(.light)` -
+ * against the attributes the page was served with.
+ */
+function rootSelectorMatches(selector, htmlAttrs, bodyAttrs) {
+  const head = /^(:root|html|body|\*)/.exec(selector);
+  const rest = head ? selector.slice(head[0].length) : selector;
+  if (!head && rest === '') return false;
+  if (/[\s>+~]/.test(rest)) return false;
+  const parts =
+    rest.match(/\.(?:\\.|[\w-])+|\[[^\]]*\]|:not\([^)]*\)|::?[\w-]+(?:\([^)]*\))?/g) ?? [];
+  if (parts.join('') !== rest) return false;
+  const candidates =
+    head?.[0] === 'body'
+      ? [bodyAttrs]
+      : head && head[0] !== '*'
+        ? [htmlAttrs]
+        : [htmlAttrs, bodyAttrs];
+  return candidates.some((attrs) => parts.every((part) => partMatches(part, attrs)));
+}
+
+function partMatches(part, attrs) {
+  if (part.startsWith('.')) {
+    const name = part.slice(1).replace(/\\(.)/g, '$1');
+    return (attrs.class ?? '').split(/\s+/).includes(name);
+  }
+  if (part.startsWith('[')) {
+    const match = /^\[\s*([\w-]+)\s*(?:([~|^$*]?=)\s*("[^"]*"|'[^']*'|[^\]\s]+))?\s*\]$/.exec(part);
+    if (!match) return false;
+    const name = match[1].toLowerCase();
+    if (!(name in attrs)) return false;
+    if (!match[2]) return true;
+    const wanted = match[3].replace(/^["']|["']$/g, '');
+    const actual = attrs[name];
+    switch (match[2]) {
+      case '=':
+        return actual === wanted;
+      case '~=':
+        return actual.split(/\s+/).includes(wanted);
+      case '^=':
+        return actual.startsWith(wanted);
+      case '$=':
+        return actual.endsWith(wanted);
+      case '*=':
+        return actual.includes(wanted);
+      case '|=':
+        return actual === wanted || actual.startsWith(`${wanted}-`);
+      default:
+        return false;
+    }
+  }
+  if (part.startsWith(':not(')) {
+    const inner = part.slice(5, -1).trim();
+    const innerParts = inner.match(/\.(?:\\.|[\w-])+|\[[^\]]*\]/g) ?? [];
+    if (innerParts.join('') !== inner) return false;
+    return !innerParts.every((innerPart) => partMatches(innerPart, attrs));
+  }
+  return part === ':root';
+}
+
+/** The value a custom property has for the page as served, by the cascade above; null when nothing applies. */
+function asServed(entries) {
+  return entries.findLast((entry) => entry.applies)?.value ?? null;
+}
+
+/** A custom property as the facts report it: what wins as served first, then every declaration. */
+function propertyFacts(name, entries) {
+  return {
+    name,
+    asServed: asServed(entries),
+    values: entries.map(({ value, under }) => ({ value, under })),
+  };
+}
+
+/** Substitute `var(--x)` from the collected properties, a few levels deep, by the value served. */
 function resolveVars(value, properties, depth = 0) {
   if (depth > 4 || !/var\(/.test(value)) return value;
   const substituted = value.replace(
     /var\((--[\w-]+)(?:\s*,\s*([^)]*))?\)/g,
     (whole, name, fallback) => {
       const known = properties.get(name);
-      if (known) return known[0].value;
+      if (known) return asServed(known) ?? known[0].value;
       return fallback ?? whole;
     },
   );
@@ -345,7 +444,11 @@ export async function extractSiteFacts(inputUrl) {
         if (property.startsWith('--tw-')) continue;
         if (!looksLikeColorProperty(property, value)) continue;
         if (!properties.has(property)) properties.set(property, []);
-        properties.get(property).push({ value, under: chain || ':root' });
+        properties.get(property).push({
+          value,
+          under: chain || ':root',
+          applies: appliesAsServed(rule.selectors, htmlAttrs, bodyAttrs),
+        });
         continue;
       }
       if (property === 'font-family') count(fontFamilies, value.replace(/\s+/g, ' '));
@@ -471,6 +574,9 @@ export async function extractSiteFacts(inputUrl) {
         Object.entries(htmlAttrs).filter(([key]) => key.startsWith('data-')),
       ),
       bodyClass: bodyAttrs.class ?? null,
+      bodyDataAttributes: Object.fromEntries(
+        Object.entries(bodyAttrs).filter(([key]) => key.startsWith('data-')),
+      ),
       themeColorMetas: themeColors,
       colorSchemeDeclarations: rank(colorSchemes, 8).map((entry) => entry.value),
       rulesUnderADarkSelector: darkSelectors,
@@ -485,7 +591,7 @@ export async function extractSiteFacts(inputUrl) {
     colors: {
       customProperties: [...properties.entries()]
         .slice(0, KEEP.properties)
-        .map(([name, values]) => ({ name, values })),
+        .map(([name, values]) => propertyFacts(name, values)),
       literalsByFrequency: rank(literals, KEEP.literals),
       utilitiesByFrequency: rank(utilities, KEEP.utilities).map((entry) => ({
         ...entry,
@@ -505,7 +611,7 @@ export async function extractSiteFacts(inputUrl) {
       utilitiesByFrequency: rank(radiusUtilities, KEEP.radiusUtilities),
       radiusProperties: [...properties.entries()]
         .filter(([name]) => /radius/i.test(name))
-        .map(([name, values]) => ({ name, values })),
+        .map(([name, values]) => propertyFacts(name, values)),
     },
     logos: { candidates: logos.slice(0, KEEP.logos), headerSvgs: headerSvgs.slice(0, 6) },
   };

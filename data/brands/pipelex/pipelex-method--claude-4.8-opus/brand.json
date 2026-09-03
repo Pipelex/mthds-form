@@ -1,0 +1,12 @@
+{
+  "name": "Pipelex",
+  "website": "https://pipelex.com/",
+  "logo": {
+    "onLight": "https://pipelex.com/logo.png",
+    "onDark": "https://pipelex.com/logo.png"
+  },
+  "webfont": {
+    "provider": "google-fonts",
+    "family": "Inter"
+  }
+}

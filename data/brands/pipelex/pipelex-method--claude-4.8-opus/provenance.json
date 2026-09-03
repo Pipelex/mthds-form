@@ -1,0 +1,9 @@
+{
+  "producer": "pipelex-method",
+  "model": "claude-4.8-opus",
+  "date": "2026-09-03",
+  "brief": "wip/generative-ui/briefs/brand-contract.md",
+  "contractHash": "639319fbd5f6",
+  "siteFacts": "data/brands/pipelex/site-facts.json",
+  "rounds": 1
+}
