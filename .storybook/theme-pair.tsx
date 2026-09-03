@@ -76,8 +76,9 @@ function Pane({
  * page that IS a theme rather than one rendered in a theme: `themeView`
  * ('light' | 'dark') overrides the toolbar, and `themePairPadding` (a number
  * of pixels, default 16) removes the pane's gutter so a full-bleed page reaches
- * the edges. The branded prototype under `src/__stories__/generative/prototype/`
- * is the one story that sets them.
+ * the edges. The brand stories under `src/__stories__/generative/brand/` set
+ * the padding, since a product page reaches the edges; nothing pins the view
+ * at present, and the parameter stays for a page that IS one theme.
  */
 export const ThemePair: Decorator = (Story, context) => {
   const view =

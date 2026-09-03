@@ -9,20 +9,27 @@ import { fieldControlClass } from '../../../react/field-styles';
 import { cn } from '../../../react/utils';
 import { generativeRenderers, useDescriptorScope } from '../registry';
 import { brandCatalog } from './brand-catalog';
+import { useBrand } from './brand-context';
 
 /**
  * What the brand catalog's components RENDER as - the product page's chrome,
- * over the same tokens the kernel's controls read. The layer's renderers are
- * reused as they are; two of shadcn's are replaced (`Input`, `Textarea`) so
- * that every text field on the page is drawn on the kernel's own control
- * surface (`fieldControlClass`) and reads as one family with the dates, the
- * lists and the upload the kernel renders itself.
+ * over the same tokens the kernel's controls read, and over NOTHING else: no
+ * literal colour, no literal radius, no literal typeface. The rail's panel is
+ * `bg-card` on `border-border`, a hairline is `border-border`, the call to
+ * action's glow is the accent composed with `color-mix()`, the corners are
+ * `--radius` and its multiples, the logo is the manifest's pair. That is what
+ * lets one set of components render any brand the build produces - and what
+ * makes anything the tokens cannot state absent from the page by
+ * construction.
  *
- * A spike: nothing here ships, and nothing here reads a schema - a brand
- * component takes copy and bound values, and that is all.
+ * The layer's renderers are reused as they are; two of shadcn's are replaced
+ * (`Input`, `Textarea`) so that every text field on the page is drawn on the
+ * kernel's own control surface (`fieldControlClass`) and reads as one family
+ * with the dates, the lists and the upload the kernel renders itself.
+ *
+ * Nothing here ships, and nothing here reads a schema - a brand component
+ * takes copy and bound values, and that is all.
  */
-
-const LOGO_ON_DARK = 'https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-wot-1119x352.png';
 
 const CONTAINER = 'mx-auto w-full max-w-6xl px-6 sm:px-8';
 
@@ -38,11 +45,13 @@ interface AppBarProps {
 }
 
 function AppBar({ props }: BaseComponentProps<AppBarProps>) {
+  const brand = useBrand();
   return (
-    <header className="border-b border-white/10">
+    <header className="border-b border-border">
       <div className={cn(CONTAINER, 'flex h-16 items-center gap-5')}>
-        <img src={LOGO_ON_DARK} alt="Pipelex" width={1119} height={352} className="h-7 w-auto" />
-        <span aria-hidden="true" className="h-5 w-px bg-white/15" />
+        <img src={brand.logo.onLight} alt={brand.name} className="h-7 w-auto dark:hidden" />
+        <img src={brand.logo.onDark} alt={brand.name} className="hidden h-7 w-auto dark:block" />
+        <span aria-hidden="true" className="h-5 w-px bg-border" />
         <span className="text-sm font-medium text-foreground/80">{props.app}</span>
         <div className="ml-auto flex items-center gap-6">
           {props.links && props.links.length > 0 ? (
@@ -128,7 +137,7 @@ interface SectionProps {
 
 function Section({ props, children }: BaseComponentProps<SectionProps>) {
   return (
-    <section className="border-t border-white/10 py-9 first:border-t-0 first:pt-0">
+    <section className="border-t border-border py-9 first:border-t-0 first:pt-0">
       <div className="mb-6">
         <div className="flex items-baseline gap-3">
           {props.number ? (
@@ -145,7 +154,7 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
 
 function Rail({ props, children }: BaseComponentProps<{ title: string }>) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.6)]">
+    <div className="rounded-[calc(var(--radius)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
       <h2 className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {props.title}
       </h2>
@@ -172,7 +181,7 @@ function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
     .map(String)
     .join(props.separator ?? ' ');
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-white/[0.06] py-3 first:pt-0 last:border-b-0">
+    <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-3 first:pt-0 last:border-b-0">
       <span className="shrink-0 text-[13px] text-muted-foreground">{props.label}</span>
       {text ? (
         <span className="text-right text-[13px] font-medium text-foreground">{text}</span>
@@ -190,8 +199,8 @@ function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string 
         type="button"
         onClick={() => emit('press')}
         className={cn(
-          'inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground',
-          'shadow-[0_0_28px_rgba(0,187,149,0.35)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_rgba(0,187,149,0.5)]',
+          'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground',
+          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary)_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary)_50%,transparent)]',
           'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden',
         )}
       >
@@ -208,7 +217,7 @@ function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string 
 
 function Footer({ props }: BaseComponentProps<{ text: string; tag?: string | null }>) {
   return (
-    <footer className="border-t border-white/10">
+    <footer className="border-t border-border">
       <div
         className={cn(
           CONTAINER,

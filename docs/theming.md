@@ -16,6 +16,8 @@ Each is a whole CSS colour, in any syntax a browser accepts — `hsl(0 0% 100%)`
 
 `--input` is the control surface and is meaningfully distinct from `--background`: fields read as a family because they share it. Dark mode follows the `.dark` class convention.
 
+The same contract is stated as data in the generative study's brand pipeline (`src/__stories__/generative/brand/contract.ts`, a table of which design token sets which of these properties), where a node test keeps it equal to this file's `:root` and `.dark` blocks. That pipeline compiles a DTCG token file into a stylesheet setting these properties on a scope class — which is a working demonstration that a token tool can emit this contract directly, and the reason the tokens are whole colours.
+
 If your app is already a shadcn/ui codebase, you have all of these and there is nothing to do.
 
 ## Host setup

@@ -73,8 +73,10 @@ const PRODUCER_LABEL: Record<Producer, string> = {
   'claude-code-session': 'Claude Code session, by hand',
 };
 
-/** The honest title: what made the page. `Pipelex method · gpt-5.5 · with a seed`. */
-export function fixtureLabel(fixture: SpecFixture): string {
+/** The honest title: what made the page - or the brand. `Pipelex method · gpt-5.5 · with a seed`. */
+export function fixtureLabel(
+  fixture: Pick<SpecFixture, 'producer' | 'model' | 'seed' | 'critic'>,
+): string {
   const parts = [PRODUCER_LABEL[fixture.producer], fixture.model];
   if (fixture.seed) parts.push('with a seed');
   if (fixture.critic) {

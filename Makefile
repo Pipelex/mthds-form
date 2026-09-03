@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs brands assert-bundle clean pack
 
 install:
 	npm install
@@ -76,6 +76,15 @@ briefs:
 # data/generative/ui-designer.mthds for a comparative run.
 fixtures-specs:
 	MODEL="$(MODEL)" npx tsx scripts/generate-fixtures.mjs --specs $(if $(ONLY),--only $(ONLY))
+
+# The BRANDS: each directory under data/brands/<brand>/<producer>/ validated
+# against the brand contract and compiled through Terrazzo into the scoped
+# stylesheet a brand story loads, under src/__stories__/_generated/brands/.
+# Free and offline, like `fixtures`; a brand's data is produced separately
+# (by hand, or by `brand-from-site`, which costs inference). Under tsx for the
+# same reason `briefs` is.
+brands:
+	npx tsx scripts/build-brands.mjs
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

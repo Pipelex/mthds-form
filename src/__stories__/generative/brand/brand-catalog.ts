@@ -4,16 +4,18 @@ import { generativeActions, generativeComponents } from '../catalog';
 import { generativeSchema } from '../schema';
 
 /**
- * The branded prototype's catalog: everything the layer's catalog has, plus
- * the vocabulary of a PRODUCT PAGE - the bar with the logo, the hero, the
+ * The brand pages' catalog: everything the layer's catalog has, plus the
+ * vocabulary of a PRODUCT PAGE - the bar with the logo, the hero, the
  * workspace with its rail, a numbered section, the summary rows the rail is
- * made of, the one call to action, the footer line.
+ * made of, the one call to action, the footer line. The vocabulary names no
+ * brand: the logo is whichever the manifest carries and the accent is
+ * whichever the tokens set.
  *
- * A spike. It extends the layer's catalog rather than changing it, so the
- * study's prompt and its hash are untouched; nothing here is in the shipped
- * package. Rule 1 holds as it does everywhere in the layer: a component takes
- * copy and bound values, never a schema, and the fields the kernel owns are
- * still `MthdsField` elements naming a path.
+ * It extends the layer's catalog rather than changing it, so the study's
+ * prompt and its hash are untouched; nothing here is in the shipped package.
+ * Rule 1 holds as it does everywhere in the layer: a component takes copy and
+ * bound values, never a schema, and the fields the kernel owns are still
+ * `MthdsField` elements naming a path.
  */
 
 export const BRAND_COMPONENTS = [
@@ -38,7 +40,7 @@ const brand = {
     }),
     slots: [],
     description:
-      'The top bar: the Pipelex logo, the name of this app beside it, a few muted links, and a small mono tag at the right (the method behind the page). Once, first on the page.',
+      "The top bar: the brand's logo, the name of this app beside it, a few muted links, and a small mono tag at the right (the method behind the page). Once, first on the page.",
     example: { app: 'Trip planner', links: ['Methods', 'Runs'], tag: 'plan_trip' },
   },
   Hero: {
@@ -49,7 +51,7 @@ const brand = {
     }),
     slots: [],
     description:
-      "The opening: one bold headline that says what happens here, one muted line under it at most, and an optional small teal eyebrow above. Once, right under the AppBar. The headline is the page's only h1.",
+      "The opening: one bold headline that says what happens here, one muted line under it at most, and an optional small eyebrow in the accent colour above. Once, right under the AppBar. The headline is the page's only h1.",
     example: { headline: 'Plan a trip worth taking.', lede: 'Tell us where and who is coming.' },
   },
   Workspace: {
@@ -67,14 +69,14 @@ const brand = {
     }),
     slots: ['default'],
     description:
-      'A stage of the work: a small mono number in teal, an h2 title, an optional muted line, then its children - flat, separated from the next Section by a hairline, never boxed. Put the inputs of one concern inside.',
+      'A stage of the work: a small mono number in the accent colour, an h2 title, an optional muted line, then its children - flat, separated from the next Section by a hairline, never boxed. Put the inputs of one concern inside.',
     example: { number: '01', title: 'Where and when' },
   },
   Rail: {
     props: z.object({ title: z.string() }),
     slots: ['default'],
     description:
-      'The glass panel beside the work: an h2 title, then its children - SummaryRows that mirror what the person has filled in, and the Cta last. The one boxed thing on the page.',
+      'The raised panel beside the work: an h2 title, then its children - SummaryRows that mirror what the person has filled in, and the Cta last. The one boxed thing on the page.',
     example: { title: 'Your trip' },
   },
   SummaryRow: {
@@ -99,7 +101,7 @@ const brand = {
     slots: [],
     events: ['press'],
     description:
-      'The one call to action: a full-width teal button that runs the method, with an optional one-line hint under it. Exactly one per page, last in the Rail; bind on.press to validateForm then run.',
+      'The one call to action: a full-width button in the accent colour that runs the method, with an optional one-line hint under it. Exactly one per page, last in the Rail; bind on.press to validateForm then run.',
     example: { label: 'Plan my trip', hint: 'Nothing runs until the request is complete.' },
   },
   Footer: {
