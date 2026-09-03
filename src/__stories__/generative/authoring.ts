@@ -34,16 +34,22 @@ type OptionalKeys<T> = {
   [P in keyof T]: undefined extends T[P] ? P : null extends T[P] ? P : never;
 }[keyof T];
 
+/** Inside a `repeat`, a prop reads the current item's field. */
+export interface ItemExpression {
+  $item: string;
+}
+
 /**
  * The same props, each admitting a `$state` / `$bindState` / `$cond` /
- * `$template` expression, with the nullable ones optional - a spec omits a prop
- * it does not set, it never writes `null`.
+ * `$template` expression or, inside a repeat, an `$item` read, with the
+ * nullable ones optional - a spec omits a prop it does not set, it never
+ * writes `null`.
  */
 export type DynamicProps<K extends ComponentName> = {
   [P in Exclude<keyof PropsOf<K>, OptionalKeys<PropsOf<K>>>]:
-    PropsOf<K>[P] | PropExpression<PropsOf<K>[P]>;
+    PropsOf<K>[P] | PropExpression<PropsOf<K>[P]> | ItemExpression;
 } & {
-  [P in OptionalKeys<PropsOf<K>>]?: PropsOf<K>[P] | PropExpression<PropsOf<K>[P]>;
+  [P in OptionalKeys<PropsOf<K>>]?: PropsOf<K>[P] | PropExpression<PropsOf<K>[P]> | ItemExpression;
 };
 
 export interface ElementExtras {

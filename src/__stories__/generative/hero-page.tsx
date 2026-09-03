@@ -1,9 +1,11 @@
 import * as React from 'react';
 import { createStateStore, type Spec, type StateModel } from '@json-render/core';
-import type { OutputForm, PipeIOContracts, Readiness, RunField } from '../../core';
+import type { InputForm, OutputForm, PipeIOContracts, Readiness, RunField } from '../../core';
 import {
   buildResultField,
+  buildRunFields,
   computeReadiness,
+  getPipeInputForm,
   getPipeIOContract,
   getPipeOutputForm,
 } from '../../core';
@@ -44,6 +46,20 @@ export function loadResultHero(
   const field = buildResultField(descriptor, contract.output.json_schema);
   const payload = payloads[`${hero.domain}.${hero.pipeCode}`];
   return { field, payload, state: payloadToState(field, payload) };
+}
+
+/** An input hero's fields, off the case's generated modules. */
+export function loadInputHero(
+  hero: Hero,
+  contracts: PipeIOContracts,
+  inputForm: InputForm,
+): RunField[] {
+  const contract = getPipeIOContract(contracts, hero.domain, hero.pipeCode);
+  const descriptor = getPipeInputForm(inputForm, hero.domain, hero.pipeCode);
+  if (!contract || !descriptor) {
+    throw new Error(`No fixture entry for ${hero.domain}.${hero.pipeCode}. Run \`make fixtures\`.`);
+  }
+  return buildRunFields(descriptor, contract.inputs);
 }
 
 export interface ResultHeroPageProps {
@@ -102,7 +118,11 @@ export function InputHeroPage({
   );
 }
 
-/** The `/inputs` tree and its readiness, live. Inline styles: chrome, not a control. */
+/**
+ * The `/inputs` tree and its readiness, live. Inline styles: chrome, not a
+ * control - and a plain div rather than a landmark, because the ThemePair
+ * decorator renders it twice and two landmarks with one name fail axe.
+ */
 function InputsReceipt({
   store,
   fields,
@@ -114,8 +134,8 @@ function InputsReceipt({
   const inputs = (snapshot.inputs ?? {}) as Record<string, unknown>;
   const readiness: Readiness = computeReadiness(fields, inputs);
   return (
-    <section
-      aria-label="State receipt"
+    <div
+      data-testid="state-receipt"
       style={{
         font: '12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
         color: 'hsl(var(--muted-foreground))',
@@ -132,6 +152,6 @@ function InputsReceipt({
       <pre style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap' }} data-testid="inputs-receipt">
         {JSON.stringify(inputs, null, 2)}
       </pre>
-    </section>
+    </div>
   );
 }

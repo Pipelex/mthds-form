@@ -122,6 +122,14 @@ export function projectInputSpec(fields: readonly RunField[], meta: PageMeta): S
 
 // ─── Results ─────────────────────────────────────────────────────────────────
 
+/** A structure with no nested structure or list among its members. */
+function isFlat(item: RunField): boolean {
+  return (
+    item.kind === 'object' &&
+    item.fields.every((child) => child.kind !== 'object' && child.kind !== 'list')
+  );
+}
+
 function scalarColumns(item: RunField): { path: string; label: string }[] {
   if (item.kind !== 'object') return [];
   return item.fields
@@ -168,7 +176,10 @@ function projectMember(elements: Elements, field: RunField, path: string): strin
       );
     }
     case 'list': {
-      if (field.item.kind === 'object' && !isDelegatedResult(field.item)) {
+      // A table shows scalar columns and nothing else; a list whose items
+      // nest further would lose the depth, so the whole subtree goes to the
+      // kernel's expandable view instead.
+      if (field.item.kind === 'object' && !isDelegatedResult(field.item) && isFlat(field.item)) {
         return add(elements, key, 'DataTable', {
           rows: { $state: path },
           columns: scalarColumns(field.item),

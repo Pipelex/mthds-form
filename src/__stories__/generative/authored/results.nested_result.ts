@@ -3,7 +3,7 @@ import { defineAuthoredSpec, element } from '../authoring';
 /**
  * AUTHORED by Claude Code on 2026-09-03, from
  * `wip/generative-ui/briefs/results.nested_result.md` and the catalog prompt
- * it carries (hash `99033e4a2881`), and from nothing else: no payload beyond
+ * it carries (hash `b452d10a8ff7`), and from nothing else: no payload beyond
  * the one run the brief shows, no source, no schema.
  *
  * The ceiling of the comparison: what the catalog can express when the author
@@ -32,7 +32,7 @@ export const AUTHORED_INVOICE = defineAuthoredSpec({
   pipeRef: 'results.nested_result',
   author: 'Claude Code',
   date: '2026-09-03',
-  promptHash: '99033e4a2881',
+  promptHash: 'b452d10a8ff7',
   brief: 'wip/generative-ui/briefs/results.nested_result.md',
   spec: {
     root: 'page',

@@ -39,6 +39,9 @@ const EXPRESSION_KEYS = [
   '$template',
 ];
 
+/** The two escape hatches: their `path` is resolved by the layer, so it is never an expression. */
+const HATCHES = new Set(['MthdsField', 'MthdsResult']);
+
 function isExpression(value: unknown): boolean {
   return (
     typeof value === 'object' &&
@@ -91,7 +94,15 @@ export function validateAgainstCatalog(spec: Spec): SpecVerdict {
         });
         continue;
       }
-      if (isExpression(value)) continue;
+      if (isExpression(value)) {
+        if (HATCHES.has(element.type) && name === 'path') {
+          problems.push({
+            elementKey: key,
+            message: `${element.type}.path must be a literal string - absolute, or the item's field name inside a repeat - never an expression.`,
+          });
+        }
+        continue;
+      }
       const parsed = propSchema.safeParse(value);
       if (!parsed.success) {
         problems.push({

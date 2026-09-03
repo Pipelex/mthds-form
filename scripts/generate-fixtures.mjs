@@ -215,7 +215,9 @@ function slotTypeExpression(slot) {
 function tomlScalar(value) {
   if (typeof value === 'boolean' || typeof value === 'number') return String(value);
   if (typeof value === 'string') return JSON.stringify(value);
-  die(`unsupported option value ${JSON.stringify(value)}: options are booleans, numbers or strings.`);
+  die(
+    `unsupported option value ${JSON.stringify(value)}: options are booleans, numbers or strings.`,
+  );
 }
 
 function synthesizeCarrier(pipe) {
@@ -458,7 +460,10 @@ function absolutizeFileUrls(value) {
   const out = {};
   for (const [key, member] of Object.entries(value)) {
     const isBareRelativePath =
-      key === 'url' && typeof member === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(member) && !path.isAbsolute(member);
+      key === 'url' &&
+      typeof member === 'string' &&
+      !/^[a-z][a-z0-9+.-]*:/i.test(member) &&
+      !path.isAbsolute(member);
     out[key] = isBareRelativePath ? path.resolve(REPO, member) : absolutizeFileUrls(member);
   }
   return out;
@@ -613,7 +618,8 @@ async function renderHeroBrief(hero, g) {
   const pipeRef = g.pipeRefOf(hero);
   const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
   const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
-  if (!contract) die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
+  if (!contract)
+    die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
   if (hero.side === 'input') {
     const descriptor = g.core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
     if (!descriptor) die(`${pipeRef}: no input descriptor.`);
@@ -713,12 +719,16 @@ async function generateSpecs(only) {
   const today = new Date().toISOString().slice(0, 10);
 
   let bundle = readFileSync(DESIGNER_BUNDLE, 'utf8');
-  const pinned = /^model\s*=\s*"([^"]+)"/m.exec(bundle)?.[1];
+  // The method pins its model in the object form: `model = { model = "...", max_tokens = N }`.
+  const MODEL_PIN = /^(model\s*=\s*\{\s*model\s*=\s*)"([^"]+)"/m;
+  const pinned = MODEL_PIN.exec(bundle)?.[2];
   if (!pinned) die(`${path.relative(REPO, DESIGNER_BUNDLE)} pins no model.`);
   const model = process.env.MODEL || pinned;
-  if (model !== pinned) bundle = bundle.replace(/^(model\s*=\s*)"[^"]+"/m, `$1"${model}"`);
+  if (model !== pinned) bundle = bundle.replace(MODEL_PIN, `$1"${model}"`);
 
-  const heroes = g.HEROES.filter((hero) => !only || hero.pipeCode === only || hero.caseName === only);
+  const heroes = g.HEROES.filter(
+    (hero) => !only || hero.pipeCode === only || hero.caseName === only,
+  );
   if (heroes.length === 0) die(`no hero named '${only}'.`);
 
   const workRoot = mkdtempSync(path.join(os.tmpdir(), 'mthds-form-specs-'));
@@ -744,7 +754,17 @@ async function generateSpecs(only) {
       const inputsPath = path.join(workRoot, `${pipeRef}.inputs.json`);
       writeFileSync(inputsPath, JSON.stringify({ catalog_rules: prompt, brief: briefText }));
       const outDir = path.join(workRoot, pipeRef);
-      const args = ['run', 'bundle', bundlePath, '--pipe', DESIGNER_PIPE, '-i', inputsPath, '-o', outDir];
+      const args = [
+        'run',
+        'bundle',
+        bundlePath,
+        '--pipe',
+        DESIGNER_PIPE,
+        '-i',
+        inputsPath,
+        '-o',
+        outDir,
+      ];
       args.push('--no-graph', '--no-pretty-print', '--no-save-working-memory');
       try {
         execFileSync(PIPELEX_BIN, args, {
@@ -798,7 +818,9 @@ async function generateSpecs(only) {
       const outPath = path.join(OUT_DIR, `${caseName}.specs.ts`);
       writeFileSync(outPath, emitSpecs(caseName, specs));
       execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
-      process.stdout.write(`  ${caseName}: ${Object.keys(specs).length} spec${Object.keys(specs).length === 1 ? '' : 's'} -> ${path.relative(REPO, outPath)}\n`);
+      process.stdout.write(
+        `  ${caseName}: ${Object.keys(specs).length} spec${Object.keys(specs).length === 1 ? '' : 's'} -> ${path.relative(REPO, outPath)}\n`,
+      );
     }
   } finally {
     rmSync(workRoot, { recursive: true, force: true });
@@ -814,11 +836,11 @@ function emitSpecs(caseName, specs) {
     ` * Specs the designer method produced for the heroes of data/structures/${caseName}.mthds - DO NOT EDIT.`,
     ' *',
     ' * Regenerate with `make fixtures-specs`, which runs `data/generative/ui-designer.mthds`',
-    ' * through the real `pipelex run bundle` CLI over each hero\'s brief and validates',
+    " * through the real `pipelex run bundle` CLI over each hero's brief and validates",
     ' * what came back against the catalog. This costs inference budget, which is why it',
     ' * is its own target.',
     ' *',
-    ' * **A spec is a payload\'s twin: the one artifact no projection can produce.** Each',
+    " * **A spec is a payload's twin: the one artifact no projection can produce.** Each",
     ' * entry records the model that produced it and the hash of the catalog prompt it was',
     ' * produced against; the corpus test compares that hash with the current prompt, so a',
     ' * catalog change that invalidates a spec is a failing test rather than a stale page.',

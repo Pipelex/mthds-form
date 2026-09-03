@@ -21,7 +21,12 @@ type = "PipeLLM"
 description = "Design one page from the catalog rules and the brief: emit the JSONL patches of a spec bound to the host's state."
 inputs = { catalog_rules = "Text", brief = "Text" }
 output = "Text"
-model = "claude-5-sonnet"
+# The object form, because the default output cap (4096 tokens on this model)
+# is not enough for a page over a deeply nested result: the Company hero's
+# first run spent exactly 4096 tokens and came back empty. The object form
+# requires a temperature; this is the runtime's own default, so the setting
+# the earlier captures ran under is unchanged.
+model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 16384 }
 prompt = """
 @catalog_rules
 

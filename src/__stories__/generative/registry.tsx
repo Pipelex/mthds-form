@@ -4,14 +4,24 @@ import {
   JSONUIProvider,
   Renderer,
   defineRegistry,
-  useStateStore,
-  useStateValue,
   type BaseComponentProps,
   type Components,
+  useBoundProp,
+  useFieldValidation,
+  useRepeatScope,
+  useStateStore,
+  useStateValue,
 } from '@json-render/react';
 import { shadcnComponents } from '@json-render/shadcn';
 import type { RunField } from '../../core';
 import { FieldRenderer, ResultField, type FieldEnv } from '../../react';
+import {
+  Select as SelectRoot,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../react/ui/select';
 import { catalog, type METRIC_FORMATS } from './catalog';
 import { inputFieldAtPath, resultFieldAtPath } from './paths';
 
@@ -73,21 +83,33 @@ function domIdFor(prefix: string | undefined, path: string): string {
   return `${prefix ?? 'gen'}${path.replace(/\//g, '-')}`;
 }
 
+/**
+ * The path a hatch resolves: absolute as written, or, inside a repeat, the
+ * item's field name joined onto the current item's base path. A relative path
+ * outside any repeat resolves to nothing, and the hatch says so.
+ */
+function useAbsolutePath(path: string): string | undefined {
+  const repeat = useRepeatScope();
+  if (path.startsWith('/')) return path;
+  return repeat ? `${repeat.basePath}/${path}` : undefined;
+}
+
 // ─── The escape hatches ──────────────────────────────────────────────────────
 
 function MthdsField({ props }: BaseComponentProps<{ path: string }>) {
   const scope = React.useContext(DescriptorContext);
-  const field = scope.inputs ? inputFieldAtPath(scope.inputs, props.path) : undefined;
-  const value = useStateValue<unknown>(props.path);
+  const path = useAbsolutePath(props.path) ?? '';
+  const field = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
+  const value = useStateValue<unknown>(path);
   const { set } = useStateStore();
-  const onChange = React.useCallback((next: unknown) => set(props.path, next), [set, props.path]);
+  const onChange = React.useCallback((next: unknown) => set(path, next), [set, path]);
   if (!field) return <Unresolved path={props.path} side="input" />;
   return (
     <FieldRenderer
       field={field}
       value={value}
       onChange={onChange}
-      id={domIdFor(scope.idPrefix, props.path)}
+      id={domIdFor(scope.idPrefix, path)}
       env={scope.env}
     />
   );
@@ -95,10 +117,69 @@ function MthdsField({ props }: BaseComponentProps<{ path: string }>) {
 
 function MthdsResult({ props }: BaseComponentProps<{ path: string; hideLabel?: boolean | null }>) {
   const scope = React.useContext(DescriptorContext);
-  const field = scope.result ? resultFieldAtPath(scope.result, props.path) : undefined;
-  const value = useStateValue<unknown>(props.path);
+  const path = useAbsolutePath(props.path) ?? '';
+  const field = scope.result && path ? resultFieldAtPath(scope.result, path) : undefined;
+  const value = useStateValue<unknown>(path);
   if (!field) return <Unresolved path={props.path} side="result" />;
   return <ResultField field={field} value={value} hideLabel={props.hideLabel ?? false} />;
+}
+
+// ─── A Select with an accessible name ────────────────────────────────────────
+
+interface SelectProps {
+  label: string;
+  name: string;
+  options: string[];
+  placeholder?: string | null;
+  value?: string | null;
+  checks?: { type: string; message: string; args?: Record<string, unknown> }[] | null;
+  validateOn?: 'change' | 'blur' | 'submit' | null;
+}
+
+function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectProps>) {
+  const scope = React.useContext(DescriptorContext);
+  const [boundValue, setBoundValue] = useBoundProp<string>(
+    props.value ?? undefined,
+    bindings?.value,
+  );
+  const [localValue, setLocalValue] = React.useState('');
+  const isBound = Boolean(bindings?.value);
+  const value = isBound ? (boundValue ?? '') : localValue;
+  const setValue = isBound ? setBoundValue : setLocalValue;
+  const validateOn = props.validateOn ?? 'change';
+  const hasValidation = Boolean(bindings?.value && props.checks?.length);
+  const { errors, validate } = useFieldValidation(
+    bindings?.value ?? '',
+    hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
+  );
+  const id = `${scope.idPrefix ?? 'gen'}-select-${props.name}`;
+  return (
+    <div className="space-y-2">
+      <label htmlFor={id} className="text-sm leading-none font-medium">
+        {props.label}
+      </label>
+      <SelectRoot
+        value={value}
+        onValueChange={(next) => {
+          setValue(next);
+          if (hasValidation && validateOn === 'change') validate();
+          emit('change');
+        }}
+      >
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder={props.placeholder ?? 'Select...'} />
+        </SelectTrigger>
+        <SelectContent>
+          {(props.options ?? []).map((option, index) => (
+            <SelectItem key={`${index}-${option}`} value={option || `option-${index}`}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </SelectRoot>
+      {errors.length > 0 ? <p className="text-sm text-destructive">{errors[0]}</p> : null}
+    </div>
+  );
 }
 
 // ─── The bound equivalents of what a model most wants to inline ──────────────
@@ -249,7 +330,10 @@ const components: Components<typeof catalog> = {
   Progress: shadcnComponents.Progress,
   Input: shadcnComponents.Input,
   Textarea: shadcnComponents.Textarea,
-  Select: shadcnComponents.Select,
+  // shadcn's Select renders a Label beside a trigger with no accessible name,
+  // which axe reports as a button without a name (`a11y` runs at error). Ours
+  // is the package's own vendored select under a label that names the trigger.
+  Select: (ctx) => <AccessibleSelect {...ctx} />,
   Switch: shadcnComponents.Switch,
   Button: shadcnComponents.Button,
   // Ours are React components (they use hooks), so each is MOUNTED rather than

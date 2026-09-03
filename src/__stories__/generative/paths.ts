@@ -1,3 +1,4 @@
+import type { Spec } from '@json-render/core';
 import type { RunField } from '../../core';
 
 /**
@@ -79,4 +80,39 @@ export function resultFieldAtPath(field: RunField, path: string): RunField | und
 export function keyForPath(path: string, suffix?: string): string {
   const base = path.replace(/^\//, '').replace(/\//g, '-');
   return suffix ? `${base}-${suffix}` : base;
+}
+
+/**
+ * The base path a relative hatch path resolves against, statically: the chain
+ * of `repeat`s from the root down to `key`, each contributing its list path
+ * and a first index. `undefined` outside any repeat. Mirrors what
+ * `useRepeatScope` gives the hatch at render time, for a test that never
+ * renders.
+ */
+export function repeatBasePathOf(spec: Spec, key: string): string | undefined {
+  const parents = new Map<string, string>();
+  for (const [parentKey, element] of Object.entries(spec.elements)) {
+    for (const child of element.children ?? []) parents.set(child, parentKey);
+  }
+  const chain: string[] = [];
+  for (let current: string | undefined = key; current; current = parents.get(current)) {
+    chain.unshift(current);
+  }
+  let base: string | undefined;
+  for (const elementKey of chain) {
+    const repeat = spec.elements[elementKey]?.repeat;
+    if (!repeat) continue;
+    const statePath = repeat.statePath;
+    if (typeof statePath === 'string') base = `${statePath}/0`;
+    else if (base) base = `${base}/${statePath.$item}/0`;
+    else return undefined;
+  }
+  return base;
+}
+
+/** A hatch's path as the layer resolves it: absolute as written, or relative to the repeat it sits in. */
+export function absoluteHatchPath(spec: Spec, key: string, path: string): string | undefined {
+  if (path.startsWith('/')) return path;
+  const base = repeatBasePathOf(spec, key);
+  return base ? `${base}/${path}` : undefined;
 }

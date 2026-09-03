@@ -1,3 +1,4 @@
+import type { Spec } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import type { InputForm, OutputForm, PipeIOContracts, RunField } from '../../core';
 import {
@@ -11,15 +12,21 @@ import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
 import * as results from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
-import { SPECS } from '../_generated/results.specs';
+import { SPECS as RESULT_SPECS } from '../_generated/results.specs';
 import * as scalars from '../_generated/scalars';
 import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
+import { SPECS as INPUT_SPECS } from '../_generated/structured.specs';
 import { renderInputBrief, renderResultBrief } from '../generative/brief';
 import { CUSTOM_COMPONENTS, PICKED_SHADCN, catalog, catalogPrompt } from '../generative/catalog';
 import { AUTHORED } from '../generative/authored';
 import { HEROES, pipeRefOf } from '../generative/heroes';
-import { inputFieldAtPath, resultFieldAtPath } from '../generative/paths';
+import {
+  absoluteHatchPath,
+  inputFieldAtPath,
+  repeatBasePathOf,
+  resultFieldAtPath,
+} from '../generative/paths';
 import { currentPromptHash } from '../generative/prompt-hash';
 import { projectInputSpec, projectResultSpec } from '../generative/project-spec';
 import { CUSTOM_RULES } from '../generative/rules';
@@ -290,8 +297,90 @@ describe('the briefs', () => {
   });
 });
 
+describe('a hatch path inside a repeat', () => {
+  const spec: Spec = {
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['division'] },
+      division: {
+        type: 'Card',
+        props: {},
+        repeat: { statePath: '/result/divisions', key: 'name' },
+        children: ['teams', 'team'],
+      },
+      teams: { type: 'MthdsResult', props: { path: 'teams' }, children: [] },
+      team: {
+        type: 'Collapsible',
+        props: { title: 'x' },
+        repeat: { statePath: { $item: 'teams' }, key: 'name' },
+        children: ['members', 'founded'],
+      },
+      members: { type: 'MthdsResult', props: { path: 'members' }, children: [] },
+      founded: { type: 'MthdsResult', props: { path: '/result/founded_on' }, children: [] },
+    },
+  };
+
+  it('resolves against the chain of repeats above it, first item at each level', () => {
+    expect(repeatBasePathOf(spec, 'page')).toBeUndefined();
+    expect(repeatBasePathOf(spec, 'teams')).toBe('/result/divisions/0');
+    expect(repeatBasePathOf(spec, 'members')).toBe('/result/divisions/0/teams/0');
+    expect(absoluteHatchPath(spec, 'teams', 'teams')).toBe('/result/divisions/0/teams');
+    expect(absoluteHatchPath(spec, 'members', 'members')).toBe(
+      '/result/divisions/0/teams/0/members',
+    );
+  });
+
+  it('leaves an absolute path alone, and a relative one outside a repeat unresolved', () => {
+    expect(absoluteHatchPath(spec, 'founded', '/result/founded_on')).toBe('/result/founded_on');
+    expect(absoluteHatchPath(spec, 'page', 'name')).toBeUndefined();
+  });
+
+  it('names the descriptor node through the list indexes', () => {
+    const hero = HEROES.find((candidate) => pipeRefOf(candidate) === 'results.deep_result')!;
+    const contract = getPipeIOContract(results.CONTRACTS, hero.domain, hero.pipeCode)!;
+    const descriptor = getPipeOutputForm(results.OUTPUT_FORM, hero.domain, hero.pipeCode)!;
+    const field = buildResultField(descriptor, contract.output.json_schema);
+    expect(resultFieldAtPath(field, '/result/divisions/0/teams')?.kind).toBe('list');
+    expect(resultFieldAtPath(field, '/result/divisions/0/teams/0/members')?.kind).toBe('list');
+  });
+
+  it('is what the validator demands of a hatch: a literal string, never an expression', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: {
+          type: 'Stack',
+          props: {},
+          repeat: { statePath: '/result/divisions', key: 'name' },
+          children: ['teams'],
+        },
+        teams: { type: 'MthdsResult', props: { path: { $item: 'teams' } }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toMatch(/MthdsResult\.path must be a literal string/);
+  });
+});
+
 describe('the spec fixtures', () => {
+  const SPECS = { ...RESULT_SPECS, ...INPUT_SPECS };
   const fixtures = [...Object.values(SPECS), ...Object.values(AUTHORED)];
+
+  /** Every `{ $bindState: path }` anywhere in an element's props. */
+  function boundPaths(spec: Spec): string[] {
+    const found: string[] = [];
+    const walk = (value: unknown) => {
+      if (Array.isArray(value)) {
+        value.forEach(walk);
+      } else if (typeof value === 'object' && value !== null) {
+        const record = value as Record<string, unknown>;
+        if (typeof record.$bindState === 'string') found.push(record.$bindState);
+        Object.values(record).forEach(walk);
+      }
+    };
+    for (const element of Object.values(spec.elements)) walk(element.props);
+    return found;
+  }
 
   /** The descriptor a fixture's paths resolve against, off the hero's case module. */
   function descriptorFor(pipeRef: string): { inputs?: RunField[]; result?: RunField } {
@@ -307,9 +396,11 @@ describe('the spec fixtures', () => {
     return { result: buildResultField(descriptor, contract.output.json_schema) };
   }
 
-  it('has at least one captured and one authored spec', () => {
-    expect(Object.keys(SPECS).length).toBeGreaterThan(0);
-    expect(Object.keys(AUTHORED).length).toBeGreaterThan(0);
+  it('has a captured and an authored spec for every hero', () => {
+    for (const hero of HEROES) {
+      expect(SPECS[pipeRefOf(hero)], `captured ${pipeRefOf(hero)}`).toBeDefined();
+      expect(AUTHORED[pipeRefOf(hero)], `authored ${pipeRefOf(hero)}`).toBeDefined();
+    }
   });
 
   for (const fixture of fixtures) {
@@ -339,7 +430,9 @@ describe('the spec fixtures', () => {
       it('delegates only to paths the descriptor has', () => {
         const scope = descriptorFor(fixture.pipeRef);
         for (const [key, element] of Object.entries(fixture.spec.elements)) {
-          const path = (element.props as { path?: unknown }).path;
+          const written = (element.props as { path?: unknown }).path;
+          const path =
+            typeof written === 'string' ? absoluteHatchPath(fixture.spec, key, written) : undefined;
           if (element.type === 'MthdsField') {
             expect(
               typeof path === 'string' && inputFieldAtPath(scope.inputs ?? [], path),
@@ -357,6 +450,27 @@ describe('the spec fixtures', () => {
 
       it('carries no /state on a result page', () => {
         if (descriptorFor(fixture.pipeRef).result) expect(fixture.spec.state).toBeUndefined();
+      });
+
+      it('binds only to paths the descriptor has, and only on an input page', () => {
+        const scope = descriptorFor(fixture.pipeRef);
+        const bound = boundPaths(fixture.spec);
+        if (!scope.inputs) {
+          expect(bound).toEqual([]);
+          return;
+        }
+        for (const path of bound) expect(inputFieldAtPath(scope.inputs, path), path).toBeTruthy();
+      });
+
+      it('ends an input page with one Run button firing validateForm then run', () => {
+        if (!descriptorFor(fixture.pipeRef).inputs) return;
+        const buttons = Object.values(fixture.spec.elements).filter(
+          (element) => element.type === 'Button',
+        );
+        expect(buttons).toHaveLength(1);
+        const press = buttons[0]!.on?.press;
+        const actions = (Array.isArray(press) ? press : [press]).map((binding) => binding?.action);
+        expect(actions).toEqual(['validateForm', 'run']);
       });
     });
   }

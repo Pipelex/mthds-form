@@ -83,7 +83,7 @@ const components = {
     }),
     slots: [],
     description:
-      'The kernel\'s own control for ONE input, bound two-way at "path" (a /inputs path from the brief). Use it for every path the brief marks as delegated - a file, a date, a list, a structure you would rather not lay out - and for any scalar you would rather not style. It renders its own label and description.',
+      'The kernel\'s own control for ONE input, bound two-way at "path" (a /inputs path from the brief). Use it for every path the brief marks as delegated - a file, a date, a list, a structure you would rather not lay out - and for any scalar you would rather not style. It renders its own label and description. Inside a repeat, "path" is the item\'s field name relative to the item ("lines"), never an $item expression.',
     example: { path: '/inputs/source' },
   },
   MthdsResult: {
@@ -93,7 +93,7 @@ const components = {
     }),
     slots: [],
     description:
-      'The kernel\'s own read-only rendering of ONE result subtree at "path" (a /result path from the brief). Use it for every path the brief marks as delegated - a file, a date, a document, prose, markup - and for any structure you choose not to lay out. It renders its own label unless hideLabel is true.',
+      'The kernel\'s own read-only rendering of ONE result subtree at "path" (a /result path from the brief). Use it for every path the brief marks as delegated - a file, a date, a document, prose, markup - and for any structure you choose not to lay out. It renders its own label unless hideLabel is true. Inside a repeat, "path" is the item\'s field name relative to the item ("teams"), never an $item expression - the way to delegate one subtree of every item.',
     example: { path: '/result/issued_on' },
   },
   DataTable: {
@@ -122,7 +122,7 @@ const components = {
     }),
     slots: [],
     description:
-      'A labelled figure - the one number a reader looks for first. "value" is bound with { "$state": "/path" } (never inline); "unit" is a short suffix ("EUR", "%", "M"); "format" is plain, integer, decimal (two places) or compact.',
+      'A labelled figure - the one number a reader looks for first. "value" is bound with { "$state": "/path" } (never inline); "unit" is a short suffix and ONLY one the brief states (a currency the structure carries, "%" for a rate, "M" when the brief says "in millions") - never invent a currency the state does not carry; "format" is plain, integer, decimal (two places) or compact.',
     example: { label: 'Total', value: { $state: '/result/total' }, unit: 'EUR', format: 'decimal' },
   },
 };
