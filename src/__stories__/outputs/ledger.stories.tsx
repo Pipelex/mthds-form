@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import type { OutputForm, PipeIOContracts } from '../../core';
 import { ResultView } from '../result-view';
 
@@ -293,6 +293,22 @@ export const AnnualReportLedger: Story = {
     const table = canvas.getAllByRole('table')[0] as HTMLTableElement;
     const head = table.tHead as HTMLTableSectionElement;
     expect(head.getBoundingClientRect().width).toBeCloseTo(table.getBoundingClientRect().width, 0);
+
+    // An OPEN row's detail stays inside the scroller. It spans every column
+    // except the chevron's, so pinning it to the full visible width overhung
+    // the right edge by exactly that column - which cost nothing while the
+    // detail's values started at the left, and cut the last characters off
+    // every one of them once they ended at the right.
+    const scroller = table.closest('[role="group"]') as HTMLElement;
+    const toggle = within(scroller).getAllByRole('button', { expanded: false })[0] as HTMLElement;
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      const detail = scroller.querySelector('td[colspan] > div') as HTMLElement | null;
+      expect(detail).not.toBeNull();
+      expect((detail as HTMLElement).getBoundingClientRect().right).toBeLessThanOrEqual(
+        scroller.getBoundingClientRect().right + 1,
+      );
+    });
   },
 };
 
