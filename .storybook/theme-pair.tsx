@@ -37,7 +37,7 @@ const CAPTION: React.CSSProperties = {
   font: '600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: 'hsl(var(--muted-foreground))',
+  color: 'var(--muted-foreground)',
   padding: '10px 16px 0',
 };
 
@@ -46,8 +46,8 @@ const PANE: React.CSSProperties = {
   minWidth: 0,
   display: 'flex',
   flexDirection: 'column',
-  background: 'hsl(var(--background))',
-  color: 'hsl(var(--foreground))',
+  background: 'var(--background)',
+  color: 'var(--foreground)',
 };
 
 const BODY_PADDING = 16;
@@ -102,7 +102,7 @@ export const ThemePair: Decorator = (Story, context) => {
       <Pane theme="light" captioned padding={padding}>
         {story}
       </Pane>
-      <div style={{ width: 1, background: 'hsl(var(--border))', flex: '0 0 auto' }} />
+      <div style={{ width: 1, background: 'var(--border)', flex: '0 0 auto' }} />
       <Pane theme="dark" captioned padding={padding}>
         {story}
       </Pane>

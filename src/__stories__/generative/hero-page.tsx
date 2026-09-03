@@ -138,8 +138,8 @@ function InputsReceipt({
       data-testid="state-receipt"
       style={{
         font: '12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
-        color: 'hsl(var(--muted-foreground))',
-        borderTop: '1px solid hsl(var(--border))',
+        color: 'var(--muted-foreground)',
+        borderTop: '1px solid var(--border)',
         paddingTop: 12,
       }}
     >

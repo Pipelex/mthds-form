@@ -89,7 +89,7 @@ function StreamedInvoice({ lineMs }: { lineMs: number }) {
           data-testid="stream-progress"
           style={{
             font: '12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
-            color: 'hsl(var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
           }}
         >
           {done}/{LINES.length} lines
