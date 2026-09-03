@@ -7,7 +7,6 @@ import { revealInput } from '../play-helpers';
 import { skippable } from '../source-stories';
 import { BrandPage } from './brand-page';
 import { PIPELEX_TRIP_SPEC, PROTOTYPE_LABEL } from './pipelex-trip.spec';
-import './pipelex-brand.css';
 
 /**
  * The branded prototype: ONE page, the trip planner as a product page in the
@@ -15,7 +14,8 @@ import './pipelex-brand.css';
  * rendered through a registry, the five inputs the kernel owns rendered by the
  * kernel's own controls at their paths. A spike, and the one story that pins
  * its theme: the brand is dark, so it renders dark, full width, at the size a
- * web page is.
+ * web page is. It renders through the stock tokens until the brand build
+ * exists: the hand-written brand stylesheet was retired with the orbs.
  */
 
 const PIPE_REF = 'trips.plan_trip';

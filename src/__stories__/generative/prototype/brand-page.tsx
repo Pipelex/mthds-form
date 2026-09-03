@@ -8,11 +8,15 @@ import { seedInputs } from '../state';
 import { brandRegistry } from './brand-registry';
 
 /**
- * The branded page's harness: the canvas and its orbs, the token layer, the
- * store seeded from the descriptor's defaults, the brand registry - and, under
- * the page, the one piece of chrome a person would never see: the `/inputs`
- * tree exactly as the run would receive it, folded away, with the readiness
- * the kernel computes from it. Full width, dark: the brand is a dark brand.
+ * The branded page's harness: the store seeded from the descriptor's defaults,
+ * the brand registry - and, under the page, the one piece of chrome a person
+ * would never see: the `/inputs` tree exactly as the run would receive it,
+ * folded away, with the readiness the kernel computes from it. Full width.
+ *
+ * Nothing here paints. The orbs, the canvas gradient and the hand-written
+ * brand stylesheet the first prototype carried are gone, because none of it
+ * was data a token file can state; the page renders through the theme tokens
+ * alone, which is what the brand build will set.
  */
 
 export interface BrandPageProps {
@@ -25,10 +29,8 @@ export function BrandPage({ fields, spec, idPrefix = 'pipelex' }: BrandPageProps
   const store = React.useMemo(() => createStateStore({ inputs: seedInputs(fields) }), [fields]);
   const [lastRun, setLastRun] = React.useState<StateModel | null>(null);
   return (
-    <div className="pipelex-brand relative min-h-screen overflow-hidden">
-      <div aria-hidden="true" className="pipelex-brand__orb pipelex-brand__orb--teal" />
-      <div aria-hidden="true" className="pipelex-brand__orb pipelex-brand__orb--purple" />
-      <div className="relative">
+    <div className="min-h-screen bg-background text-foreground">
+      <div>
         <FieldPresentationProvider presentation="app">
           <GenerativePage
             spec={spec}
