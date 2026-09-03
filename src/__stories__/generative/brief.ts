@@ -23,6 +23,12 @@ export interface BriefSubject {
   pipeRef: string;
   /** The pipe's description, when the wire carries one. */
   description?: string;
+  /**
+   * The component that runs the page: the layer's `Button` unless the brief
+   * is for a catalog that runs it from something else (the brand catalog's
+   * `Cta`). Only the Run section names it.
+   */
+  callToAction?: string;
 }
 
 /** On the input side, the kinds the catalog's inputs cannot enter. */
@@ -264,9 +270,9 @@ export function renderInputBrief(subject: BriefSubject, fields: readonly RunFiel
     '## Run',
     '',
     gating.length > 0
-      ? `The run waits for ${gating.join(', ')}; say so near the Run button, briefly.`
+      ? `The run waits for ${gating.join(', ')}; say so near the ${subject.callToAction ?? 'Run button'}, briefly.`
       : 'Nothing gates the run.',
-    "The page has exactly one `Button`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.",
+    `The page has exactly one \`${subject.callToAction ?? 'Button'}\`, \`on.press\` bound to \`validateForm\` then \`run\`; label it with what the method does, in a person's words.`,
     '',
   ].join('\n');
 }

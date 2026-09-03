@@ -18,8 +18,15 @@ import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
 import { SPECS as INPUT_SPECS } from '../_generated/structured.specs';
 import * as trips from '../_generated/trips';
+import { SPECS as BRAND_TRIP_SPECS } from '../_generated/trips.brand.specs';
 import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
 import { renderInputBrief, renderResultBrief } from '../generative/brief';
+import {
+  BRAND_COMPONENTS,
+  brandCatalog,
+  brandCatalogPrompt,
+} from '../generative/brand/brand-catalog';
+import { BRAND_RULES, PRODUCT_PAGE_RULES, RUN_CTA_RULE } from '../generative/brand/brand-rules';
 import { CUSTOM_COMPONENTS, PICKED_SHADCN, catalog, catalogPrompt } from '../generative/catalog';
 import { AUTHORED } from '../generative/authored';
 import { APP_DIRECTION, SEED_PROCEDURE } from '../generative/direction';
@@ -30,9 +37,9 @@ import {
   repeatBasePathOf,
   resultFieldAtPath,
 } from '../generative/paths';
-import { currentPromptHash } from '../generative/prompt-hash';
+import { currentBrandPromptHash, currentPromptHash } from '../generative/prompt-hash';
 import { projectInputSpec, projectResultSpec } from '../generative/project-spec';
-import { CUSTOM_RULES } from '../generative/rules';
+import { CUSTOM_RULES, RUN_BUTTON_RULE } from '../generative/rules';
 import { fixtureId, fixtureLabel, type Producer } from '../generative/spec-fixture';
 import { payloadToState, seedInputs } from '../generative/state';
 import { specFromJsonl, specToJsonl } from '../generative/stream';
@@ -116,6 +123,44 @@ describe('the catalog prompt', () => {
   it('hashes to a stable twelve-hex stamp', () => {
     expect(currentPromptHash()).toMatch(/^[0-9a-f]{12}$/);
     expect(currentPromptHash()).toBe(currentPromptHash());
+  });
+});
+
+describe('the brand catalog prompt', () => {
+  const prompt = brandCatalogPrompt();
+
+  it("lists every brand component with its description, after the layer's own", () => {
+    const components = brandCatalog.data.components as Record<string, { description: string }>;
+    for (const name of [...PICKED_SHADCN, ...CUSTOM_COMPONENTS])
+      expect(prompt).toContain(`- ${name}:`);
+    for (const name of BRAND_COMPONENTS) {
+      expect(prompt).toContain(`- ${name}:`);
+      expect(prompt).toContain(components[name]!.description);
+    }
+  });
+
+  it('restates the Button rule for the Cta in its place, then appends the grammar of the page', () => {
+    expect(prompt).not.toContain(RUN_BUTTON_RULE);
+    expect(BRAND_RULES.indexOf(RUN_CTA_RULE)).toBe(CUSTOM_RULES.indexOf(RUN_BUTTON_RULE));
+    let cursor = -1;
+    for (const rule of BRAND_RULES) {
+      const at = prompt.indexOf(rule);
+      expect(at, rule).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+    for (const rule of PRODUCT_PAGE_RULES) expect(BRAND_RULES).toContain(rule);
+  });
+
+  it('carries the same direction and seed procedure, under a hash of its own', () => {
+    for (const paragraph of APP_DIRECTION) expect(prompt).toContain(paragraph);
+    for (const paragraph of SEED_PROCEDURE) expect(prompt).toContain(paragraph);
+    expect(currentBrandPromptHash()).toMatch(/^[0-9a-f]{12}$/);
+    expect(currentBrandPromptHash()).not.toBe(currentPromptHash());
+  });
+
+  it("leaves the layer's own prompt untouched", () => {
+    expect(catalogPrompt()).not.toContain('AppBar');
+    expect(catalogPrompt()).toContain(RUN_BUTTON_RULE);
   });
 });
 
@@ -587,6 +632,114 @@ describe('the spec fixtures', () => {
           expect(field?.kind, `${key} binds ${path}`).toBe('enum');
           if (field?.kind === 'enum') expect(props.options, key).toEqual(field.options);
         }
+      });
+    });
+  }
+});
+
+describe('the brand-catalog spec fixtures', () => {
+  const fixtures = [...BRAND_TRIP_SPECS];
+
+  /** The one element that runs: exactly one Cta, no Button, firing validateForm then run. */
+  function runner(spec: Spec) {
+    const buttons = Object.values(spec.elements).filter((element) => element.type === 'Button');
+    const ctas = Object.entries(spec.elements).filter(([, element]) => element.type === 'Cta');
+    return { buttons, ctas };
+  }
+
+  it('has at least the run that answered the question', () => {
+    expect(fixtures.map(fixtureId)).toContain('pipelex-method--claude-4.8-opus--brand');
+  });
+
+  for (const fixture of fixtures) {
+    describe(`${fixture.pipeRef} (${fixtureId(fixture)})`, () => {
+      const inputs = (() => {
+        const hero = HEROES.find((candidate) => pipeRefOf(candidate) === fixture.pipeRef)!;
+        const mod = CASES[hero.caseName]!;
+        const contract = getPipeIOContract(mod.CONTRACTS, hero.domain, hero.pipeCode)!;
+        const descriptor = getPipeInputForm(mod.INPUT_FORM, hero.domain, hero.pipeCode)!;
+        return buildRunFields(descriptor, contract.inputs);
+      })();
+
+      it('records the brand catalog, and is titled by it', () => {
+        expect(fixture.catalog).toBe('brand');
+        expect(fixtureId(fixture)).toMatch(/--brand$/);
+        expect(fixtureLabel(fixture)).toContain('brand catalog');
+        expect(fixture.brief).toMatch(/\.brand\.md$/);
+      });
+
+      it("validates against the brand catalog, and not against the layer's own", () => {
+        const verdict = validateAgainstCatalog(fixture.spec, brandCatalog);
+        expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+        expect(validateAgainstCatalog(fixture.spec).ok).toBe(false);
+      });
+
+      it('was produced against the current brand prompt', () => {
+        expect(fixture.promptHash).toBe(currentBrandPromptHash());
+      });
+
+      it('compiles from its own JSONL to its spec', () => {
+        expect(specFromJsonl(fixture.jsonl)).toEqual(fixture.spec);
+      });
+
+      it('carries the grammar of a product page: bar first, hero once, footer last, one Cta and no Button', () => {
+        const root = fixture.spec.elements[fixture.spec.root]!;
+        const types = (root.children ?? []).map((key) => fixture.spec.elements[key]!.type);
+        expect(types[0]).toBe('AppBar');
+        expect(types[types.length - 1]).toBe('Footer');
+        const count = (type: string) =>
+          Object.values(fixture.spec.elements).filter((element) => element.type === type).length;
+        for (const once of ['AppBar', 'Hero', 'Workspace', 'Rail', 'Footer']) {
+          expect(count(once), once).toBe(1);
+        }
+        const { buttons, ctas } = runner(fixture.spec);
+        expect(buttons).toHaveLength(0);
+        expect(ctas).toHaveLength(1);
+        const [[ctaKey, cta]] = ctas as [[string, (typeof ctas)[0][1]]];
+        const press = cta.on?.press;
+        const actions = (Array.isArray(press) ? press : [press]).map((binding) => binding?.action);
+        expect(actions).toEqual(['validateForm', 'run']);
+        const rail = Object.values(fixture.spec.elements).find(
+          (element) => element.type === 'Rail',
+        )!;
+        expect(rail.children?.[rail.children.length - 1]).toBe(ctaKey);
+        expect(
+          Object.values(fixture.spec.elements).filter(
+            (element) => element.type === 'Heading' && element.props.level === 'h1',
+          ),
+        ).toHaveLength(0);
+      });
+
+      it('delegates and binds only to paths the descriptor has', () => {
+        for (const [key, element] of Object.entries(fixture.spec.elements)) {
+          if (element.type === 'MthdsField') {
+            const written = (element.props as { path?: unknown }).path;
+            const path =
+              typeof written === 'string'
+                ? absoluteHatchPath(fixture.spec, key, written)
+                : undefined;
+            expect(typeof path === 'string' && inputFieldAtPath(inputs, path), key).toBeTruthy();
+          }
+          if (element.type === 'SummaryRow') {
+            for (const prop of ['value', 'detail'] as const) {
+              const bound = (element.props as Record<string, { $state?: unknown }>)[prop]?.$state;
+              if (bound === undefined) continue;
+              expect(
+                typeof bound === 'string' && inputFieldAtPath(inputs, bound),
+                `${key}.${prop}`,
+              ).toBeTruthy();
+            }
+          }
+        }
+      });
+
+      it('writes the budget as a number', () => {
+        const budget = Object.values(fixture.spec.elements).find(
+          (element) =>
+            (element.props as { value?: { $bindState?: string } }).value?.$bindState ===
+            '/inputs/request/budget',
+        );
+        expect(budget?.type).toBe('NumberInput');
       });
     });
   }

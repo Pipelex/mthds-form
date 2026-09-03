@@ -1,7 +1,7 @@
 import type { Spec } from '@json-render/core';
 import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
-import { catalog } from './catalog';
+import { catalog as baseCatalog } from './catalog';
 
 /**
  * Whether a spec is one this catalog can render - the check every source
@@ -16,7 +16,17 @@ import { catalog } from './catalog';
  * the component's own zod schema (`z.string()`) would reject, so a dynamic
  * expression is accepted wherever the prop EXISTS and a literal is parsed
  * against the prop's schema.
+ *
+ * The checks are the same whichever catalog a spec was written against; the
+ * catalog is a parameter, the layer's own by default, so the brand study's
+ * wider vocabulary is validated by the same code and not by a copy of it.
  */
+
+/** What the validator reads off a catalog: its names and its definitions. */
+export interface ValidationCatalog {
+  componentNames: readonly string[];
+  data: unknown;
+}
 
 export interface SpecProblem {
   elementKey?: string;
@@ -52,15 +62,19 @@ function isExpression(value: unknown): boolean {
 }
 
 /** The zod object each component's props are declared with, by component name. */
-function propsSchemaOf(type: string): z.ZodObject | undefined {
-  const components = catalog.data.components as Record<string, { props: unknown }>;
+function propsSchemaOf(catalog: ValidationCatalog, type: string): z.ZodObject | undefined {
+  const components = (catalog.data as { components: Record<string, { props: unknown }> })
+    .components;
   const props = components[type]?.props;
   return props && typeof props === 'object' && 'shape' in props
     ? (props as z.ZodObject)
     : undefined;
 }
 
-export function validateAgainstCatalog(spec: Spec): SpecVerdict {
+export function validateAgainstCatalog(
+  spec: Spec,
+  catalog: ValidationCatalog = baseCatalog,
+): SpecVerdict {
   const problems: SpecProblem[] = [];
 
   // 1. Structure: root, children, misplaced fields.
@@ -81,7 +95,7 @@ export function validateAgainstCatalog(spec: Spec): SpecVerdict {
 
   // 3. Every prop exists on its component, and every literal parses.
   for (const [key, element] of Object.entries(spec.elements)) {
-    const schema = propsSchemaOf(element.type);
+    const schema = propsSchemaOf(catalog, element.type);
     if (!schema) continue;
     const shape = schema.shape as Record<string, z.ZodType>;
     const props = (element.props ?? {}) as Record<string, unknown>;

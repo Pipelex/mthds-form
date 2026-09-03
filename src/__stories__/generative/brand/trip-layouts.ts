@@ -1,4 +1,5 @@
 import type { Spec } from '@json-render/core';
+import { SPECS as BRAND_TRIP_SPECS } from '../../_generated/trips.brand.specs';
 import { SPECS as TRIP_SPECS } from '../../_generated/trips.specs';
 import { fixtureId, type SpecFixture } from '../spec-fixture';
 import { PIPELEX_TRIP_SPEC } from './pipelex-trip.spec';
@@ -20,7 +21,7 @@ export const TRIP_PIPE_REF = 'trips.plan_trip';
 export const HAND_LAYOUT = 'hand';
 
 /** Every captured trip layout, whichever catalog it was written against. */
-export const TRIP_LAYOUTS: readonly SpecFixture[] = TRIP_SPECS.filter(
+export const TRIP_LAYOUTS: readonly SpecFixture[] = [...TRIP_SPECS, ...BRAND_TRIP_SPECS].filter(
   (fixture) => fixture.pipeRef === TRIP_PIPE_REF,
 );
 

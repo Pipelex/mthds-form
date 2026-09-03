@@ -271,6 +271,14 @@ Planned in [`plan-brand-as-data.md`](plan-brand-as-data.md), a plan that stands 
 
 The step ran to both of its checkpoints, the pipeline (Checkpoint 5) and the producer (Checkpoint 6), read in [`plan-brand-as-data.md`](plan-brand-as-data.md). The headline findings, for this record: the loop runs end to end from a URL and every run validated on the first call or after one repair round, every repair being an alias written without its dark value; a light mode derived from a dark-only site reads as the brand; the extractor had to compute the cascade for the page as served, because a model handed every declaration of a custom property took a framework's default over the site's override; and on a site that shows no button the accent is a design decision rather than a reading, where everything the facts state stayed stable across runs. Louis's three decisions on that reading, and their build, are Checkpoint 7 in the same plan: tokens are the second validated artifact, a person may state beside the URL what a site does not show, and an alias stands for both modes; after which both brands validate on the first call, under the minute. What the campaign has seen working end to end with no agent in the loop, and the one join not yet run, is summarised in that plan under "What has been seen working".
 
+## Phase 7 — The join
+
+Planned in [`plan-the-join.md`](plan-the-join.md), which stands on its own after the closing section of the brand plan.
+
+#### Phase 7 — recorded 2026-09-04
+
+The step ran to both checkpoints. Checkpoint 8, the floor: the method's base-catalog layouts under the method's tokens are the brand's palette on a well-made form, and the gap to the hand-written product page is the chrome vocabulary, not the tokens. Checkpoint 9, the answer: the designer method handed the brand catalog's prompt produced, on three models, a page in the product page's grammar on the first call with zero repairs, rendered under both method-made brands with the kernel owning the inputs; the chain from the descriptor to the painted page ran with no agent in it. The answer to the question asked after Checkpoint 7 is confirmed under two stated conditions, both ours: a gap the brand `Section` does not put between its children, and the per-mode accent for a dark canvas the mthds brand needs. Both are read in that plan under Checkpoint 9.
+
 ## Phase 4 — Docs, closing the step
 
 Written before the checkpoint so the decision is made on a documented layer, and kept whichever way it goes: the record of what was tried is the deliverable if json-render is not adopted.

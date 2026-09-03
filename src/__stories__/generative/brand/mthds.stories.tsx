@@ -97,3 +97,8 @@ export const LayoutOpus48Seeded = stories.join(TOKENS, 'pipelex-method--claude-4
 export const LayoutSonnet5 = stories.join(TOKENS, 'pipelex-method--claude-5-sonnet');
 export const LayoutGpt55 = stories.join(TOKENS, 'pipelex-method--gpt-5.5');
 export const LayoutGpt55Seeded = stories.join(TOKENS, 'pipelex-method--gpt-5.5--seeded');
+
+// The join, Experiment B: the method handed the brand catalog, under the method's tokens.
+export const BrandLayoutOpus48 = stories.join(TOKENS, 'pipelex-method--claude-4.8-opus--brand');
+export const BrandLayoutSonnet5 = stories.join(TOKENS, 'pipelex-method--claude-5-sonnet--brand');
+export const BrandLayoutGpt55 = stories.join(TOKENS, 'pipelex-method--gpt-5.5--brand');

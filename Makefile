@@ -73,9 +73,11 @@ briefs:
 # real `pipelex run bundle` CLI, validated against the catalog. Costs inference
 # budget and needs credentials, like `fixtures-runs`, and is asked for the same
 # way. ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides the pin in
-# data/generative/ui-designer.mthds for a comparative run.
+# data/generative/ui-designer.mthds for a comparative run; CATALOG=brand hands
+# the method the brand study's product-page catalog instead of the layer's own,
+# validates against it, and writes <case>.brand.specs.ts beside the base module.
 fixtures-specs:
-	MODEL="$(MODEL)" npx tsx scripts/generate-fixtures.mjs --specs $(if $(ONLY),--only $(ONLY))
+	MODEL="$(MODEL)" npx tsx scripts/generate-fixtures.mjs --specs $(if $(ONLY),--only $(ONLY)) $(if $(CATALOG),--catalog $(CATALOG))
 
 # The BRANDS: each directory under data/brands/<brand>/<producer>/ validated
 # against the brand contract and compiled through Terrazzo into the scoped

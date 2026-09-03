@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { brandCatalogPrompt } from './brand/brand-catalog';
 import { catalogPrompt } from './catalog';
 
 /**
@@ -16,4 +17,9 @@ export function promptHashOf(prompt: string): string {
 
 export function currentPromptHash(): string {
   return promptHashOf(catalogPrompt());
+}
+
+/** The brand catalog's own stamp - a different prompt, so a different hash. */
+export function currentBrandPromptHash(): string {
+  return promptHashOf(brandCatalogPrompt());
 }

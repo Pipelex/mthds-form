@@ -2,6 +2,7 @@ import { defineCatalog } from '@json-render/core';
 import { z } from 'zod';
 import { generativeActions, generativeComponents } from '../catalog';
 import { generativeSchema } from '../schema';
+import { BRAND_RULES } from './brand-rules';
 
 /**
  * The brand pages' catalog: everything the layer's catalog has, plus the
@@ -12,7 +13,9 @@ import { generativeSchema } from '../schema';
  * whichever the tokens set.
  *
  * It extends the layer's catalog rather than changing it, so the study's
- * prompt and its hash are untouched; nothing here is in the shipped package.
+ * prompt and its hash are untouched: `brandCatalogPrompt()` is a second
+ * prompt with a second hash, rendered by the same template over the wider
+ * vocabulary and the brand rules. Nothing here is in the shipped package.
  * Rule 1 holds as it does everywhere in the layer: a component takes copy and
  * bound values, never a schema, and the fields the kernel owns are still
  * `MthdsField` elements naming a path.
@@ -51,7 +54,7 @@ const brand = {
     }),
     slots: [],
     description:
-      "The opening: one bold headline that says what happens here, one muted line under it at most, and an optional small eyebrow in the accent colour above. Once, right under the AppBar. The headline is the page's only h1.",
+      "The opening: one bold headline that says what happens here, one muted line under it at most, and an optional small eyebrow in the accent colour above. Once, first in the work column, right under the AppBar. The headline is the page's only h1.",
     example: { headline: 'Plan a trip worth taking.', lede: 'Tell us where and who is coming.' },
   },
   Workspace: {
@@ -120,3 +123,14 @@ export const brandCatalog = defineCatalog(generativeSchema, {
 
 /** The spec type the prototype is written against. */
 export type BrandSpec = typeof brandCatalog._specType;
+
+/**
+ * The prompt the designer method receives when it is handed THIS catalog,
+ * exactly: the layer's template - the same design direction, the same seed
+ * procedure - over the product page's vocabulary, with the brand rules. One
+ * function so the specs pass, the briefs and the tests render one text, and
+ * the hash stamped on a brand-catalog spec is computed over what was sent.
+ */
+export function brandCatalogPrompt(): string {
+  return brandCatalog.prompt({ mode: 'standalone', customRules: [...BRAND_RULES] });
+}

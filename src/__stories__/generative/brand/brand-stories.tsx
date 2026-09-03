@@ -12,7 +12,9 @@ import { HAND_LAYOUT } from './trip-layouts';
  * is the study's join: a layout a producer wrote under tokens a producer
  * wrote, titled by both - `layout Pipelex method · claude-4.8-opus · tokens
  * Pipelex method · claude-4.8-opus` - so a page is never labelled with a role
- * but with what actually made each half of it.
+ * but with what actually made each half of it. A layout written against the
+ * brand catalog says so in its title and gets the brand play in full; one
+ * from the layer's own catalog gets the play without the chrome.
  *
  * A brand's story file names the ids it shows; a producer the build has not
  * produced, or a layout no pass has captured, renders a notice rather than
@@ -30,7 +32,7 @@ export function brandStories<Story extends StoryObj<BrandStoryArgs>>(
   brands: readonly BrandFixture[],
   layouts: readonly SpecFixture[],
   brand: string,
-  plays: { reference: Story['play']; join: Story['play'] },
+  plays: { reference: Story['play']; join: Story['play']; brandCatalog: Story['play'] },
 ) {
   const brandOf = (producerId: string) =>
     brands.find((candidate) => candidate.brand === brand && candidate.producerId === producerId);
@@ -52,10 +54,11 @@ export function brandStories<Story extends StoryObj<BrandStoryArgs>>(
         fixture && layout
           ? `layout ${fixtureLabel(layout)} · tokens ${fixtureLabel(fixture)}`
           : `${layoutId} under ${producerId} (${layout ? 'tokens not built' : 'layout not captured'})`;
+      const play = layout?.catalog === 'brand' ? plays.brandCatalog : plays.join;
       return {
         name,
         args: { producerId, layout: layoutId },
-        play: fixture && layout ? plays.join : undefined,
+        play: fixture && layout ? play : undefined,
       } as Story;
     },
   };
