@@ -44,3 +44,28 @@ export async function revealInput(
   }
   throw new Error(`No input labelled ${label} on the page, on any step, tab or section.`);
 }
+
+/**
+ * Find a button by its accessible name, opening whatever hides it the way
+ * `revealInput` does: the one button that runs an app-shaped page sits in
+ * the last Step, and a play that asserts its paint has to get there first.
+ */
+export async function revealButton(canvasElement: HTMLElement, name: RegExp): Promise<HTMLElement> {
+  const canvas = within(canvasElement);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const found = canvas.queryAllByRole('button', { name });
+    if (found.length > 0) return found[0]!;
+    const next = canvas.queryAllByTestId('steps-next')[0];
+    if (next) {
+      await userEvent.click(next);
+      continue;
+    }
+    const tab = canvas.queryAllByRole('tab', { selected: false })[0];
+    if (tab) {
+      await userEvent.click(tab);
+      continue;
+    }
+    break;
+  }
+  throw new Error(`No button named ${name} on the page, on any step or tab.`);
+}

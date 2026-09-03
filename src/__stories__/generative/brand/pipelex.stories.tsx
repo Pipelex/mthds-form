@@ -1,22 +1,27 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
 import '../../_generated/brands/index.css';
 import { BRANDS } from '../../_generated/brands/brands';
 import { CONTRACTS, INPUT_FORM } from '../../_generated/trips';
 import { HEROES } from '../heroes';
 import { loadInputHero } from '../hero-page';
-import { revealInput } from '../play-helpers';
-import { skippable } from '../source-stories';
 import { BrandPage } from './brand-page';
-import { brandStories } from './brand-stories';
-import { PIPELEX_TRIP_SPEC } from './pipelex-trip.spec';
-import { resolveColor } from './tokens-schema';
+import { type BrandStoryArgs, brandStories } from './brand-stories';
+import {
+  HAND_LAYOUT,
+  TRIP_LAYOUTS,
+  TRIP_PIPE_REF,
+  tripLayout,
+  tripLayoutFixture,
+} from './trip-layouts';
+import { tripPlays } from './trip-plays';
 
 /**
  * The Pipelex brand: the trip planner as a product page, painted from each
- * producer's `data/brands/pipelex/<producer>/` - one story per producer,
- * titled by what produced the tokens. The page, the spec and the components
- * are the same in every story; only the data differs, which is the point.
+ * producer's `data/brands/pipelex/<producer>/` - one story per producer with
+ * the hand-written layout, titled by what produced the tokens; then the JOIN,
+ * one story per captured layout under the method's tokens, titled by what
+ * produced each half. The page and the components are the same in every
+ * story; only the data differs, which is the point.
  *
  * Both themes, side by side, because a brand is two palettes: the tokens
  * carry a light and a dark value each, and the pair view is how a wrong
@@ -24,16 +29,29 @@ import { resolveColor } from './tokens-schema';
  */
 
 const BRAND = 'pipelex';
-const PIPE_REF = 'trips.plan_trip';
-const hero = HEROES.find((candidate) => `${candidate.domain}.${candidate.pipeCode}` === PIPE_REF)!;
+const hero = HEROES.find(
+  (candidate) => `${candidate.domain}.${candidate.pipeCode}` === TRIP_PIPE_REF,
+)!;
 const fields = loadInputHero(hero, CONTRACTS, INPUT_FORM);
 
-function PipelexTripPlanner({ producerId }: { producerId: string }) {
+function PipelexTripPlanner({ producerId, layout }: BrandStoryArgs) {
   const brand = BRANDS.find(
     (candidate) => candidate.brand === BRAND && candidate.producerId === producerId,
   );
   if (!brand) return <brandStories.Missing brand={BRAND} id={producerId} />;
-  return <BrandPage brand={brand} fields={fields} spec={PIPELEX_TRIP_SPEC} idPrefix={producerId} />;
+  const spec = tripLayout(layout);
+  if (!spec) return <brandStories.Missing brand={BRAND} id={producerId} layout={layout} />;
+  // A layout from the layer's own catalog brings no chrome and no container.
+  const bare = layout !== HAND_LAYOUT && tripLayoutFixture(layout)?.catalog !== 'brand';
+  return (
+    <BrandPage
+      brand={brand}
+      fields={fields}
+      spec={spec}
+      idPrefix={`${producerId}-${layout}`}
+      contained={bare}
+    />
+  );
 }
 
 const meta = {
@@ -67,46 +85,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every story renders twice - the `ThemePair` decorator shows both themes. */
-const BOTH_THEMES = 2;
+const stories = brandStories<Story>(BRANDS, TRIP_LAYOUTS, BRAND, tripPlays(fields));
 
-/** `rgb(r, g, b)`, as a browser reports a computed opaque colour. */
-function computedRgb(components: readonly number[]) {
-  return `rgb(${components.map((channel) => Math.round(channel * 255)).join(', ')})`;
-}
-
-const paintsFromTheTokens: Story['play'] = skippable(async ({ canvasElement }) => {
-  const canvas = within(canvasElement);
-  const [lightPage] = canvas.getAllByTestId('brand-page');
-  const brand = BRANDS.find(
-    (candidate) =>
-      candidate.brand === lightPage!.dataset.brand &&
-      candidate.producerId === lightPage!.dataset.producer,
-  )!;
-
-  // The manifest reaches the page: one logo per pane, each pane showing the
-  // mark for its own canvas and hiding the other.
-  await expect(canvas.getAllByRole('img', { name: brand.manifest.name })).toHaveLength(BOTH_THEMES);
-  await expect(canvas.getAllByRole('heading', { level: 1 })[0]).toHaveTextContent(/trip/i);
-
-  // The tokens reach the paint: the call to action is the brand's accent in
-  // the light pane, and the page is set in the brand's typeface.
-  const [cta] = within(lightPage!).getAllByRole('button', { name: /plan my trip/i });
-  const primary = resolveColor(brand.tokens, 'primary', 'light')!;
-  await expect(getComputedStyle(cta!).backgroundColor).toBe(computedRgb(primary.components));
-  await expect(getComputedStyle(lightPage!).fontFamily).toContain(
-    brand.tokens.font.sans.$value[0]!,
-  );
-
-  // The kernel still owns the inputs: what is typed lands in the /inputs tree
-  // and the rail mirrors it through a bound SummaryRow, not a second input.
-  const budget = await revealInput(canvasElement, /^budget$/i, 'budget');
-  await userEvent.type(budget, '2500');
-  await expect(canvas.getAllByTestId('inputs-receipt')[0]).toHaveTextContent(/"budget": 2500/);
-  await expect(canvas.getAllByText(/^2500$/)[0]).toBeInTheDocument();
-});
-
-const stories = brandStories<Story>(BRANDS, BRAND, paintsFromTheTokens);
-
+// The reference: the hand-written brand spec under each producer's tokens.
 export const SessionByHand = stories.of('claude-code-session--claude-fable-5-1');
 export const MethodOpus48 = stories.of('pipelex-method--claude-4.8-opus');
+
+// The join, Experiment A: the method's base-catalog layouts under the method's tokens.
+const TOKENS = 'pipelex-method--claude-4.8-opus';
+export const LayoutOpus48 = stories.join(TOKENS, 'pipelex-method--claude-4.8-opus');
+export const LayoutOpus48Seeded = stories.join(TOKENS, 'pipelex-method--claude-4.8-opus--seeded');
+export const LayoutSonnet5 = stories.join(TOKENS, 'pipelex-method--claude-5-sonnet');
+export const LayoutGpt55 = stories.join(TOKENS, 'pipelex-method--gpt-5.5');
+export const LayoutGpt55Seeded = stories.join(TOKENS, 'pipelex-method--gpt-5.5--seeded');

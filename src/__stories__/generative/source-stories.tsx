@@ -1,7 +1,11 @@
 import type { StoryObj } from '@storybook/react-vite';
 import { fixtureId, fixtureLabel, type SpecFixture } from './spec-fixture';
 
-type PlayContext = { canvasElement: HTMLElement; globals?: Record<string, unknown> };
+type PlayContext = {
+  canvasElement: HTMLElement;
+  globals?: Record<string, unknown>;
+  args?: Record<string, unknown>;
+};
 
 /**
  * A play that stands down when the `play` global is `off`. The screenshot

@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260903-35eb46
 ---
 
@@ -65,7 +65,7 @@ What each failure means. If 1 fails repeatedly, the brand catalog's prompt is on
 
 ### Order of work
 
-- [ ] **Experiment A.** The joined stories in both brand story files, the play, `make check` and `make test`, `npm run build-storybook`, the shots in both themes, Checkpoint 8 written.
+- [x] **Experiment A.** The joined stories in both brand story files, the play, `make check` and `make test`, `npm run build-storybook`, the shots in both themes, Checkpoint 8 written.
 - [ ] **The brand prompt.** `BRAND_RULES`, `brandCatalogPrompt()` and its hash; `make briefs` writing the brand brief per input hero; the corpus test's assertions on the prompt.
 - [ ] **The seams.** The validator taking a catalog; `catalog` on `SpecFixture` and in `fixtureLabel`; `--catalog` on the specs pass writing `<case>.brand.specs.ts`; the corpus test's `brand` describe over those modules.
 - [ ] **The runs.** `make fixtures-specs CATALOG=brand ONLY=plan_trip MODEL=claude-4.8-opus`; the repair rounds, if any, as committed rule changes; then the two other models if the first holds.
@@ -81,3 +81,16 @@ Experiment A costs nothing but a build and a screenshot pass. Experiment B costs
 ### Out of scope for this step
 
 The critic loop over the shots (Phase 5's, still unrun, and not what the question asks). New brands and new brand runs. The per-mode stated accent Checkpoint 7 named, unless the dark shots make it the thing that decides criterion 4. A result page in the brand catalog: its vocabulary is an input page's today, and a branded result page is the step after this one. New agent-made specs: the question is about a chain with no agent, and the one hand-written brand spec is kept only as the ceiling to read against. The kernel controls' own chrome inside a brand (`L-260903-7ec51b`). Hosted generation and caching per method version, the `./generative` entry and the agent skill: the archive plan's follow-ups, unchanged.
+
+## Checkpoint 8 — the floor (2026-09-04)
+
+Experiment A ran as planned and cost nothing: the five trip layouts the method wrote against the base catalog (`claude-4.8-opus` plain and seeded, `gpt-5.5` plain and seeded, `claude-5-sonnet`) each render in `BrandPage` under each method-made brand, as `stories.join(tokens, layout)` in both brand story files, titled `layout Pipelex method · <model> · tokens Pipelex method · claude-4.8-opus`. The play holds on every story: the run button's computed colour is the token's accent, the page is set in the token's typeface, a typed budget reaches `/inputs/request/budget`, and the readiness on the receipt agrees with `computeReadiness`. The shots are `temp/generative/join/a--*`, both themes, beside the reference stories shot in the same build.
+
+**One harness fact surfaced first.** A base-catalog layout carries no container: the brand components give themselves the page's width (`max-w-6xl`), the base catalog has no notion of a page's width, and the first shots ran edge to edge at 1440 pixels while the receipt under them sat centred. That is neither the tokens' limit nor the vocabulary's, so `BrandPage` gained `contained`, which a story sets for a layout that brings no chrome, and the shots were retaken. It is recorded because it is the kind of thing that would otherwise be read as a finding.
+
+**What the tokens do on their own.** Everything they can reach, they reach: the accent is on the step indicator and the Next button, the kernel's controls are painted exactly as on the reference page (the same input surface, the same date and list controls, the same dropzone), the typeface is the brand's, and the dark canvas is the site's. Under the mthds tokens the near-black accent and Roboto make the wizard read as mthds.ai's monochrome; under the pipelex tokens the teal and Inter read as pipelex.com's. Nothing on these pages is off-brand.
+
+**What only the chrome vocabulary can add,** and the reading is not close. The predicted absences hold by construction: no bar, no logo, no hero, no footer. Two more separate the pages from the reference and were not predicted. The page has no weight: the base catalog's `Heading` at h1 is the size of a section title, where the reference's `Hero` sets a 44-pixel headline over a lede, so the method's page opens like a settings screen and the reference opens like a landing page. And the work is boxed: every `gpt-5.5` layout and the seeded `claude-4.8-opus` one put their work in `Card`s, which under the brand's card token read as grey panels on the light canvas, where the reference's `Section` is flat with a hairline and its one boxed thing is the rail. The step wizard, the strongest app gesture the base catalog has, does not compensate: a numbered indicator over one panel at a time is a form with pagination once the chrome is missing.
+
+**Where the floor is.** A method-made layout under method-made tokens is recognisably the brand's palette on a well-made form. It is not a product page, and the gap is the vocabulary, not the tokens; Experiment B is measured against the reference under the same tokens, and criterion 6's third reading (A nearly as good as B) is already unlikely on this evidence. One layout defect seen on the way is the model's, not the join's: the seeded `gpt-5.5` layout's rail prints a `$template` sentence over empty state ("Budget:", "days, mostly ."), which was there in the stock theme too.
+

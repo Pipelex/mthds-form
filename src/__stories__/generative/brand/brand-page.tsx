@@ -21,6 +21,12 @@ import { brandRegistry } from './brand-registry';
  * the tokens it always reads. `font-sans` on the root makes Tailwind emit
  * `--font-sans`, which is what lets the scoped token override the typeface.
  *
+ * A layout written against the layer's own catalog carries no chrome of its
+ * own - no bar, no footer, and no container either, because the base catalog
+ * has no notion of a page's width. `contained` gives such a layout the width
+ * the brand components give themselves, so what the tokens do to it can be
+ * read against the brand's pages rather than against the harness.
+ *
  * Under the page, the chrome a person would never see, folded away: the
  * `/inputs` tree exactly as the run would receive it with the readiness the
  * kernel computes from it, and the stylesheet the brand was painted from,
@@ -32,9 +38,11 @@ export interface BrandPageProps {
   fields: RunField[];
   spec: Spec;
   idPrefix?: string;
+  /** Wrap the page in the brand's container - for a layout that brings none. */
+  contained?: boolean;
 }
 
-export function BrandPage({ brand, fields, spec, idPrefix }: BrandPageProps) {
+export function BrandPage({ brand, fields, spec, idPrefix, contained }: BrandPageProps) {
   const store = React.useMemo(() => createStateStore({ inputs: seedInputs(fields) }), [fields]);
   const [lastRun, setLastRun] = React.useState<StateModel | null>(null);
   return (
@@ -49,13 +57,15 @@ export function BrandPage({ brand, fields, spec, idPrefix }: BrandPageProps) {
     >
       <BrandProvider manifest={brand.manifest}>
         <FieldPresentationProvider presentation="app">
-          <GenerativePage
-            spec={spec}
-            store={store}
-            scope={{ inputs: fields, idPrefix: idPrefix ?? brand.brand }}
-            onRun={setLastRun}
-            registry={brandRegistry}
-          />
+          <div className={contained ? cn(CONTAINER, 'py-10 sm:py-12') : undefined}>
+            <GenerativePage
+              spec={spec}
+              store={store}
+              scope={{ inputs: fields, idPrefix: idPrefix ?? brand.brand }}
+              onRun={setLastRun}
+              registry={brandRegistry}
+            />
+          </div>
         </FieldPresentationProvider>
         <Receipt store={store} fields={fields} ran={lastRun !== null} />
         <Stylesheet brand={brand} />
@@ -64,8 +74,10 @@ export function BrandPage({ brand, fields, spec, idPrefix }: BrandPageProps) {
   );
 }
 
-const CHROME =
-  'mx-auto w-full max-w-6xl px-6 pb-8 font-mono text-[11px] text-muted-foreground/70 sm:px-8';
+/** The width the brand components give themselves. */
+const CONTAINER = 'mx-auto w-full max-w-6xl px-6 sm:px-8';
+
+const CHROME = cn(CONTAINER, 'pb-8 font-mono text-[11px] text-muted-foreground/70');
 
 function Receipt({
   store,
