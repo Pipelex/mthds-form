@@ -148,6 +148,27 @@ Paused on a clean tree with every Phase 2 box ticked, so a cold session can pick
 
 The first captured spec renders in Storybook from a real generation, and the first authored spec renders beside it. Record the model, how many repair rounds the first spec took and what each changed, what the brief looks like now, and the first reading of the three sources side by side. This is the point at which criterion 2 of the checkpoint (the model produces the spec unaided) is first known, and if it is failing badly the step can stop here with a clear finding.
 
+#### Checkpoint 2 — recorded 2026-09-03
+
+**Criterion 2 holds.** `claude-5-sonnet`, through `data/generative/ui-designer.mthds` over the committed brief, produced a spec the validator accepted on the first call, twice: once against prompt hash `0d820ada0c06` (the Phase 2 capture) and once against `99033e4a2881` after the heading-order rule was added. Zero repair rounds in either run; the brief and the method's prompt are as Phase 2 left them. The brief is the shape Checkpoint 1 describes, 133 lines with the prompt, of which the descriptor is a dozen lines and the loaded run is a JSON block. The screenshots are under `temp/generative/checkpoint-2/` (gitignored locally), one file per story, both themes side by side.
+
+**The reading, four sources one click apart.**
+
+- **Kernel.** The record: every member with its code, its kind tag and its value, right-aligned, and the lines as the expandable table. Complete, and the only one of the four that shows what the wire carries. It is a record, not a page.
+- **Projected.** The floor. A heading with the concept's name, then one element per member in the descriptor's order: the reference as a label-value pair, the date through the loader, the total as a metric, paid as a badge, the lines as a table inside a card. Everything is there and nothing is arranged; the metric is the one thing that reads better than the kernel.
+- **Authored.** The ceiling as one patient author saw it: `Invoice INV-2026-0042` as the h1 with the `Unpaid` badge beside it, an `Outstanding` alert shown only while unpaid, a two-column summary (total as a metric, date delegated), a separator, then `Lines` as an h2 over the table with human headers.
+- **Generated.** The same page, minus the alert and the separator: the templated h1 and the state-driven badge, a two-column summary with the total and the delegated date, `Billable lines` as an h2, the table with `Description`, `Qty`, `Unit price` and a caption. The first capture had three columns with a settled/outstanding sentence in the third; the second dropped the sentence and the column. Both are designs a reviewer would accept.
+
+**What the comparison says.** Generated is within a few elements of Authored, and both are well clear of Projected: the model is not the problem, and the layer earns its place over the projection on the first hero. Where Authored is better it is by one alert and one separator, which is taste rather than capability. The two captures disagree with each other on the third column and the wording, and agree with each other and with the author on every decision that matters: the reference is the title, the paid state is a badge whose variant follows it, the total is the metric, the date is delegated, the lines are a table with human headers and the unit price last.
+
+**Findings, and what each changed.**
+
+- *The model invented a currency, and so did the author.* The first capture set `unit: "EUR"` on the total metric and the authored spec did the same; the brief names no currency (the Invoice structure has none), and `EUR` is the example in the catalog's description of `Metric.unit`. The second capture, under the same prompt plus the heading rule, set no unit. Rule 1 says inline nothing the state does not carry, and a unit the state does not carry is exactly that; the authored spec is corrected and the finding is that a prompt example is a value the model will copy. The catalog's own examples should name no value a brief could fail to carry.
+- *shadcn's `Stack` defaults `align` to `start`.* Every child of a vertical stack hugged its content: the two-column grid sat in the left third of the page and the table was as wide as its longest cell. Neither the model nor the author set `align`, and neither should have to. The registry's `Stack` wrapper now defaults a vertical stack to `stretch` (a horizontal one keeps shadcn's default), which is what put the badge at the right edge and the table across the page. A finding about the catalog's defaults, fixed in the layer.
+- *`DataTable` typeset every number as two-place decimal*, so a quantity of 1 read `1.00`. Cells now format with grouping and at most two places, which reads `1`, `1,200` and `160.13` as the kernel does.
+- *The heading-order rule*, from Pause 2, is in `CUSTOM_RULES`; the prompt hash moved to `99033e4a2881`, the brief and the captured spec were regenerated, and the authored spec re-stamped.
+- *Run-to-run variance is real and cheap.* Two captures of the same brief differ in a column and a sentence. The corpus test pins the hash, not the design; a regeneration is a design review, not a diff to approve.
+
 ## Phase 3 — The heroes
 
 Three, each a group of four adjacent stories over the very same fixture, so the sidebar shows the kernel's rendering, the floor, the ceiling and the model's output one click apart. `Generative` is appended to `storySort.order` in `.storybook/preview.tsx`; within a hero the order is `Kernel`, `Projected`, `Authored`, `Generated`.

@@ -3,7 +3,7 @@ import { defineAuthoredSpec, element } from '../authoring';
 /**
  * AUTHORED by Claude Code on 2026-09-03, from
  * `wip/generative-ui/briefs/results.nested_result.md` and the catalog prompt
- * it carries (hash `0d820ada0c06`), and from nothing else: no payload beyond
+ * it carries (hash `99033e4a2881`), and from nothing else: no payload beyond
  * the one run the brief shows, no source, no schema.
  *
  * The ceiling of the comparison: what the catalog can express when the author
@@ -15,7 +15,9 @@ import { defineAuthoredSpec, element } from '../authoring';
  *  - the reference is the page title, and the status sits beside it as a badge
  *    whose colour follows the state, so the first line answers "which invoice,
  *    and is it paid";
- *  - the total is the one figure, large, with its unit; the issue date is the
+ *  - the total is the one figure, large, and without a unit, because the brief
+ *    names no currency and inventing one is the very thing rule 1 forbids; the
+ *    issue date is the
  *    kernel's rendering, because the catalog has no date and a date typeset as
  *    a metric would be a number pretending;
  *  - an outstanding invoice gets a warning that a settled one does not, through
@@ -30,7 +32,7 @@ export const AUTHORED_INVOICE = defineAuthoredSpec({
   pipeRef: 'results.nested_result',
   author: 'Claude Code',
   date: '2026-09-03',
-  promptHash: '0d820ada0c06',
+  promptHash: '99033e4a2881',
   brief: 'wip/generative-ui/briefs/results.nested_result.md',
   spec: {
     root: 'page',
@@ -70,7 +72,6 @@ export const AUTHORED_INVOICE = defineAuthoredSpec({
       total: element('Metric', {
         label: 'Total due',
         value: { $state: '/result/total' },
-        unit: 'EUR',
         format: 'decimal',
       }),
       issued: element('MthdsResult', { path: '/result/issued_on' }),

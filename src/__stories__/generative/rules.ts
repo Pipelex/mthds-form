@@ -18,6 +18,7 @@ export const CUSTOM_RULES: readonly string[] = [
   'Lay out what you understand and delegate what you do not. A structure you choose not to lay out is delegated whole by its path; that is a valid choice, not a failure.',
   'An input page has exactly one Button labelled "Run", at the end, with on.press bound to validateForm and then run, in that order.',
   'One root element, and it is a layout container (Stack or Card). Every element carries a "children" array, empty for leaves.',
+  'Heading levels increase by one: the page title is the only h1, its sections are h2, and their sections h3. Never skip a level.',
   'Never set a "className" prop. Colour, spacing and type come from the components as they are.',
   'Prefer a short, clear layout over a dense one: a heading, the values that matter first, grouped by meaning, and a table or a delegated block for the rest.',
 ];

@@ -112,10 +112,13 @@ function valueAt(row: unknown, relativePath: string): unknown {
   return current;
 }
 
+/** A cell shows a number as it is: grouped, with the places it has, never padded. */
+const CELL_NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'number') return numberFormat('decimal').format(value);
+  if (typeof value === 'number') return CELL_NUMBER.format(value);
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(formatCell).join(', ');
   return JSON.stringify(value);
@@ -223,7 +226,19 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
  */
 const components: Components<typeof catalog> = {
   Card: (ctx) => shadcnComponents.Card({ ...ctx, props: { ...ctx.props, className: null } }),
-  Stack: (ctx) => shadcnComponents.Stack({ ...ctx, props: { ...ctx.props, className: null } }),
+  // shadcn's Stack defaults `align` to `start`, so a table or a grid inside a
+  // vertical stack hugs its content instead of taking the page's width - the
+  // one layout a result page never wants. A vertical stack stretches unless
+  // the spec says otherwise; a horizontal one keeps shadcn's default.
+  Stack: (ctx) =>
+    shadcnComponents.Stack({
+      ...ctx,
+      props: {
+        ...ctx.props,
+        align: ctx.props.align ?? (ctx.props.direction === 'horizontal' ? null : 'stretch'),
+        className: null,
+      },
+    }),
   Grid: (ctx) => shadcnComponents.Grid({ ...ctx, props: { ...ctx.props, className: null } }),
   Separator: shadcnComponents.Separator,
   Collapsible: shadcnComponents.Collapsible,

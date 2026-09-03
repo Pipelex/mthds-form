@@ -21,11 +21,11 @@ export const SPECS: Record<string, SpecFixture> = {
     pipeRef: 'results.nested_result',
     source: 'generated',
     model: 'claude-5-sonnet',
-    promptHash: '0d820ada0c06',
+    promptHash: '99033e4a2881',
     date: '2026-09-03',
     brief: 'wip/generative-ui/briefs/results.nested_result.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["header","summary-grid","lines-heading","lines-table"]}}\n{"op":"add","path":"/elements/header","value":{"type":"Stack","props":{"direction":"horizontal","gap":"md","align":"center","justify":"between"},"children":["title","paid-badge"]}}\n{"op":"add","path":"/elements/title","value":{"type":"Heading","props":{"text":{"$template":"Invoice ${/result/reference}"},"level":"h1"},"children":[]}}\n{"op":"add","path":"/elements/paid-badge","value":{"type":"Badge","props":{"text":{"$cond":{"$state":"/result/paid","eq":true},"$then":"Paid","$else":"Unpaid"},"variant":{"$cond":{"$state":"/result/paid","eq":true},"$then":"secondary","$else":"destructive"}},"children":[]}}\n{"op":"add","path":"/elements/summary-grid","value":{"type":"Grid","props":{"columns":3,"gap":"md"},"children":["issued-on-field","total-metric","paid-metric"]}}\n{"op":"add","path":"/elements/issued-on-field","value":{"type":"MthdsResult","props":{"path":"/result/issued_on"},"children":[]}}\n{"op":"add","path":"/elements/total-metric","value":{"type":"Metric","props":{"label":"Total","value":{"$state":"/result/total"},"unit":"EUR","format":"decimal"},"children":[]}}\n{"op":"add","path":"/elements/paid-metric","value":{"type":"Text","props":{"text":{"$cond":{"$state":"/result/paid","eq":true},"$then":"This invoice has been settled.","$else":"This invoice is still outstanding."},"variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/lines-heading","value":{"type":"Heading","props":{"text":"Billable lines","level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/lines-table","value":{"type":"DataTable","props":{"rows":{"$state":"/result/lines"},"columns":[{"path":"label","label":"Description"},{"path":"quantity","label":"Qty"},{"path":"unit_price","label":"Unit price"}],"caption":"Billable lines"},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["header","summary-grid","lines-section"]}}\n{"op":"add","path":"/elements/header","value":{"type":"Stack","props":{"direction":"horizontal","justify":"between","align":"center"},"children":["title","paid-badge"]}}\n{"op":"add","path":"/elements/title","value":{"type":"Heading","props":{"text":{"$template":"Invoice ${/result/reference}"},"level":"h1"},"children":[]}}\n{"op":"add","path":"/elements/paid-badge","value":{"type":"Badge","props":{"text":{"$cond":{"$state":"/result/paid","eq":true},"$then":"Paid","$else":"Unpaid"},"variant":{"$cond":{"$state":"/result/paid","eq":true},"$then":"default","$else":"destructive"}},"children":[]}}\n{"op":"add","path":"/elements/summary-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["total-metric","issued-on"]}}\n{"op":"add","path":"/elements/total-metric","value":{"type":"Metric","props":{"label":"Total due","value":{"$state":"/result/total"},"format":"decimal"},"children":[]}}\n{"op":"add","path":"/elements/issued-on","value":{"type":"MthdsResult","props":{"path":"/result/issued_on"},"children":[]}}\n{"op":"add","path":"/elements/lines-section","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["lines-heading","lines-table"]}}\n{"op":"add","path":"/elements/lines-heading","value":{"type":"Heading","props":{"text":"Billable lines","level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/lines-table","value":{"type":"DataTable","props":{"rows":{"$state":"/result/lines"},"columns":[{"path":"label","label":"Description"},{"path":"quantity","label":"Qty"},{"path":"unit_price","label":"Unit price"}],"caption":"Line items"},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -35,15 +35,14 @@ export const SPECS: Record<string, SpecFixture> = {
             direction: 'vertical',
             gap: 'lg',
           },
-          children: ['header', 'summary-grid', 'lines-heading', 'lines-table'],
+          children: ['header', 'summary-grid', 'lines-section'],
         },
         header: {
           type: 'Stack',
           props: {
             direction: 'horizontal',
-            gap: 'md',
-            align: 'center',
             justify: 'between',
+            align: 'center',
           },
           children: ['title', 'paid-badge'],
         },
@@ -73,7 +72,7 @@ export const SPECS: Record<string, SpecFixture> = {
                 $state: '/result/paid',
                 eq: true,
               },
-              $then: 'secondary',
+              $then: 'default',
               $else: 'destructive',
             },
           },
@@ -82,44 +81,36 @@ export const SPECS: Record<string, SpecFixture> = {
         'summary-grid': {
           type: 'Grid',
           props: {
-            columns: 3,
+            columns: 2,
             gap: 'md',
           },
-          children: ['issued-on-field', 'total-metric', 'paid-metric'],
+          children: ['total-metric', 'issued-on'],
         },
-        'issued-on-field': {
+        'total-metric': {
+          type: 'Metric',
+          props: {
+            label: 'Total due',
+            value: {
+              $state: '/result/total',
+            },
+            format: 'decimal',
+          },
+          children: [],
+        },
+        'issued-on': {
           type: 'MthdsResult',
           props: {
             path: '/result/issued_on',
           },
           children: [],
         },
-        'total-metric': {
-          type: 'Metric',
+        'lines-section': {
+          type: 'Stack',
           props: {
-            label: 'Total',
-            value: {
-              $state: '/result/total',
-            },
-            unit: 'EUR',
-            format: 'decimal',
+            direction: 'vertical',
+            gap: 'md',
           },
-          children: [],
-        },
-        'paid-metric': {
-          type: 'Text',
-          props: {
-            text: {
-              $cond: {
-                $state: '/result/paid',
-                eq: true,
-              },
-              $then: 'This invoice has been settled.',
-              $else: 'This invoice is still outstanding.',
-            },
-            variant: 'muted',
-          },
-          children: [],
+          children: ['lines-heading', 'lines-table'],
         },
         'lines-heading': {
           type: 'Heading',
@@ -149,7 +140,7 @@ export const SPECS: Record<string, SpecFixture> = {
                 label: 'Unit price',
               },
             ],
-            caption: 'Billable lines',
+            caption: 'Line items',
           },
           children: [],
         },
