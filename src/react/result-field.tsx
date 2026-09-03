@@ -829,7 +829,13 @@ function LoadingImage({ src, alt, className }: { src: string; alt: string; class
  */
 function ScalarChips({ field, items }: { field: RunField; items: readonly unknown[] }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    // `data-chips` is the hook the definition grid's value cell reaches through:
+    // `text-right` has no effect on flex children, so a row of tags would keep
+    // starting under its label while every value beside it ended at the right
+    // edge. The attribute keeps that one selector out of this component's own
+    // class list - chips are laid out the same way everywhere, and only the
+    // caller knows which edge they should end on.
+    <div data-chips className="flex flex-wrap gap-1.5">
       {items.map((item, index) => (
         <span
           key={index}
@@ -880,6 +886,19 @@ function isInlineColumn(field: RunField): boolean {
  * to open. Chosen as roughly what fits one line of a table column at this size.
  */
 const CELL_LENGTH_LIMIT = 80;
+
+/**
+ * The chevron column's width, stated ONCE because two places need to agree on
+ * it: the header cell that reserves it, and the pinned width of an open row's
+ * detail panel, which begins after it and must therefore be that much narrower.
+ *
+ * They did not agree, and the failure was invisible until the detail's values
+ * moved to the right edge. The panel spanned every column EXCEPT this one while
+ * being pinned to the full visible width, so it overhung the scroller by exactly
+ * this much - harmless while its content started at the left, and a clean cut
+ * through the last characters of every value once they ended at the right.
+ */
+const EXPAND_COLUMN = '2rem';
 
 /**
  * Whether a column is GUARANTEED to fit its cell — a stronger question than
@@ -1012,15 +1031,29 @@ function ObjectTable({
       tabIndex={0}
       className="overflow-x-auto rounded-lg border border-border"
     >
-      <table className="min-w-full border-collapse text-[13px]">
+      {/* `w-full` BESIDE `min-w-full`, not instead of it. `min-w-full` alone
+          left the table content-sized whenever the columns were narrower than
+          the panel, so the header band and every row rule stopped mid-box with
+          empty bordered space to their right - the table looked half-drawn. The
+          pair fixes that without giving up the overflow this scroller exists
+          for: `width` and `min-width` agree at 100% while the content is narrow,
+          and once the columns need more than that, auto table layout grows past
+          both rather than crushing them (headers are `whitespace-nowrap` and
+          cells `truncate`, so nothing wraps to buy the space back). */}
+      <table className="w-full min-w-full border-collapse text-[13px]">
         <thead>
-          <tr className="border-b border-border bg-card/40 text-left">
+          {/* A filled band, not a hairline. The header is the one row that is
+              not data, and on a long list the reader scrolls it out of sight and
+              back; a rule alone leaves it reading as the first entry. `bg-muted`
+              rather than a literal grey so it follows the host's light and dark
+              palettes - the same token the rest of the kernel's surfaces use. */}
+          <tr className="border-b border-border bg-muted text-left">
             {/* Named, not empty: a header cell with no text is `empty-table-header`
                 to an auditor and an unlabelled column to a screen reader. The
                 name is visually hidden because the chevron below it is the whole
                 affordance a sighted reader needs. */}
             {canExpand && (
-              <th scope="col" className="w-8 px-1">
+              <th scope="col" style={{ width: EXPAND_COLUMN }} className="px-1">
                 <span className="sr-only">{s.rowDetailsColumn}</span>
               </th>
             )}
@@ -1079,7 +1112,19 @@ function ObjectTable({
                     <td colSpan={columns.length} className="bg-card/40 p-0">
                       <div
                         className="sticky left-0 px-3.5 py-3"
-                        {...(viewportWidth ? { style: { width: viewportWidth } } : {})}
+                        {...(viewportWidth
+                          ? {
+                              style: {
+                                // Minus the chevron column: this cell starts
+                                // after it, so pinning it to the FULL visible
+                                // width pushes its right edge that far past the
+                                // scroller. See `EXPAND_COLUMN`.
+                                width: canExpand
+                                  ? `calc(${viewportWidth}px - ${EXPAND_COLUMN})`
+                                  : viewportWidth,
+                              },
+                            }
+                          : {})}
                       >
                         <ResultField field={element} value={item} hideLabel />
                       </div>
@@ -1451,7 +1496,23 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
                   <div className="min-w-0">
                     <Label field={child} describe />
                   </div>
-                  <div className="min-w-0">
+                  {/* The value sits at the RIGHT EDGE of its column, not against
+                      the label. Names vary in length and answers do not line up
+                      behind them, so a left-aligned value column leaves a ragged
+                      seam down the middle of the record and the eye has to find
+                      each answer again. Flushed right, the answers form one
+                      column the reader can run down - the same reason a receipt,
+                      a spec sheet and a settings panel all do it.
+
+                      Only INLINE columns get this. Anything that took the
+                      `col-span-2` branch (prose, a table, a gallery, a frame)
+                      owns its full width and reads left-to-right like the
+                      paragraph or grid it is; right-aligning those would be
+                      aligning a block, not an answer. `text-right` also travels
+                      into a chip row through `justify-end`, so a list of tags
+                      ends where the numbers above it do rather than starting
+                      under the label. */}
+                  <div className="min-w-0 text-right [&_[data-chips]]:justify-end">
                     <LeafValue field={child} value={memberValue(child)} />
                   </div>
                 </Fragment>
