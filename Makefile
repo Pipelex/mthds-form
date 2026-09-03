@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs assert-bundle clean pack
 
 install:
 	npm install
@@ -60,6 +60,14 @@ fixtures:
 # tell you what a run returns. ONLY=<case> narrows it.
 fixtures-runs:
 	node scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY))
+
+# The BRIEFS: for each generative hero, the Markdown brief rendered from the
+# committed descriptors and payloads, plus the full catalog prompt and its hash.
+# Committed under wip/generative-ui/briefs/, because it is the record of exactly
+# what a model and an author were given. Node cannot resolve this repo's
+# extensionless TypeScript imports on its own, so the pass runs under tsx.
+briefs:
+	npx tsx scripts/generate-fixtures.mjs --briefs
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

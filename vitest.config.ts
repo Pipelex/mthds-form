@@ -59,7 +59,10 @@ export default defineConfig({
         test: {
           name: 'react',
           environment: 'jsdom',
-          include: ['src/react/**/*.test.{ts,tsx}'],
+          // The `.tsx` tests under the story tree are the generative layer's
+          // DOM tests; its node tests are `.ts` and belong to the corpus
+          // project below.
+          include: ['src/react/**/*.test.{ts,tsx}', 'src/__stories__/**/*.test.tsx'],
           setupFiles: ['./vitest.setup.react.ts'],
         },
       },

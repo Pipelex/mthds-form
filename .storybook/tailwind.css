@@ -10,3 +10,5 @@
  */
 @import '../src/styles/tailwind-entry.css';
 @source '../src/__stories__';
+/* The shadcn registry the generative stories render through ships its class strings in JavaScript. */
+@source '../node_modules/@json-render/shadcn/dist';

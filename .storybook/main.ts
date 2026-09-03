@@ -63,6 +63,13 @@ const config: StorybookConfig = {
         'lucide-react',
         'react-dropzone',
         'tailwind-merge',
+        // The generative layer's runtime (dev-only, story tree only): the
+        // first generative story pulls all of it at once otherwise.
+        '@json-render/core',
+        '@json-render/react',
+        '@json-render/shadcn',
+        'radix-ui',
+        'zod',
       ],
     };
 
