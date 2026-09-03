@@ -131,6 +131,12 @@ Not in this step. Recorded so the step does not quietly absorb them.
 - **The `MthdsField` schema**: a zod mirror of `RunField` so the prompt can describe it, once the layer ships.
 - **Intent hints** (`L-260823-d905b9`): the brief already carries `hints`, so a model reads them for free; the kernel's controls honouring them is the separate item it always was.
 
+## The second artifact: the brand as data — decided 2026-09-03
+
+Checkpoint 4 of the plan records the finding that opened this: the layout of a page is validated data, and the brand on it was not. The prototype in the Pipelex brand applied its colours, its type and its logo through hand-written CSS and a hand-picked URL, which is exactly the kind of artifact the layer exists to avoid. The decision, ratified by Louis in conversation the same day, is that a brand is a second validated artifact beside the spec, and that **the model writes data files only**: a DTCG token file with a light and a dark mode for the theme contract, and a small manifest for the logo and the font source. No TypeScript, no CSS, nothing the schema does not name. What a token cannot express is not on the page.
+
+The division of labour it fixes: the model decides the layout, the copy and the mapping of a site's facts onto the theme contract; a build written once turns tokens into the custom properties the controls already read; the registry and the kernel own what a control is. The controls are re-skinned by tokens because the theming contract was designed that way; the one change the decision forces on the package is that the contract states full colours instead of HSL triplets, which no token tool emits and which is modern shadcn's own convention under Tailwind v4. Terrazzo is the token pipeline; design-token-kit, if it appears at all, is an optional checker at the edge. The plan's Phase 6 schedules it, with its criteria stated before the work.
+
 ## Open questions at the kickoff, and what became of them
 
 - Which model the designer method pins: settled, `claude-5-sonnet` (see "Ratification").

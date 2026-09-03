@@ -5,7 +5,7 @@ item: L-260903-35eb46
 
 # Generative UI over json-render — plan for the first step
 
-**Written 2026-09-03, ratified by Louis the same day.** Schedules [`design.md`](design.md); read that first. This is a conviction step with an exit: it ends at Checkpoint 3, where Louis decides whether json-render goes further. Nothing ships from the generative layer in this step and no release is cut. The kickoff gesture is on the item: `cd _mthds-form--generative-ui && ledger claim L-260903-35eb46 --renew`.
+**Written 2026-09-03, ratified by Louis the same day.** Schedules [`design.md`](design.md); read that first. This is a conviction step with an exit: it ends at Checkpoint 3, where Louis decides whether json-render goes further. It went further: Phase 5 followed on the verdict at Checkpoint 3, and Phase 6 on the redirect at Checkpoint 4. Nothing ships from the generative layer in this step and no release is cut. The kickoff gesture is on the item: `cd _mthds-form--generative-ui && ledger claim L-260903-35eb46 --renew`.
 
 ## Decisions
 
@@ -224,11 +224,24 @@ Louis read the heroes and decided to push on, and he framed the next question sh
 - [ ] **The comparison.** For each input hero: the package's own form; the deterministic projection; the Pipelex method on `claude-5-sonnet`, `claude-4.8-opus` and `gpt-5.5`; the two stronger models again with a seed; Claude Code subagents on Fable 5.1 and Opus 5 with the same prompt and brief, one of them with a seed; one subagent run through a fresh-context critic loop; and the session's own hand-written spec. For the two result heroes: the method on the two stronger models, so the earlier reading has its counterpart. Every page screenshotted in both themes into `temp/generative/ambition/`, with a viewer beside the Checkpoint 3 one.
 - [ ] **The record.** Findings under "Phase 5 — recorded", the gates green, the docs and changelog updated, and this plan's Checkpoint 4 written for Louis's next reading.
 
-### Checkpoint 4 — the reading
+**Stopped on 2026-09-03 by Louis's redirect, recorded at Checkpoint 4.** The captures and the screenshots exist and are committed; the critic loop was not run and the two boxes above stay open on purpose: the comparison was not testing what Louis wanted, and finishing it would have been a record of the wrong question.
 
-Written when the comparison is on the page.
+### Checkpoint 4 — the redirect, recorded 2026-09-03
+
+**Louis's verdict, on reading the Phase 5 comparison:** "we are not in the right ballpark"; stop generating examples and screenshots for comparisons, and build one prototype of what he actually wants: a web page in a real brand, with the deterministic elements inside it. If the setting cannot do it, say so.
+
+**The prototype.** One page for `trips.plan_trip` in the Pipelex brand, built by a Claude Code subagent on `claude-fable-5-1` writing the spec by hand, three rounds against its own screenshots, commit `68ba9c7`. It lives in `src/__stories__/generative/prototype/` as a deletable spike: a brand catalog extending the study's (the prompt hash untouched), a brand registry, a full-width dark-only page harness, the spec, and a token layer in `pipelex-brand.css`; the shots are in `temp/generative/prototype/` on this machine. The page reads as a product page at a glance, the logo and the teal call to action are right, the dates, lists and the upload are the kernel's own controls re-skinned through the theme tokens. Its own honest score was 7.5/10, and what limits it is precise:
+
+- The kernel's list, date and file controls speak a studio's voice inside the brand (mono item counts, the OPTIONAL tag, dashed add rows, the browser's native date face, the drop-zone copy). A spec cannot reach them, by design. Filed as `L-260903-7ec51b`.
+- The descriptions under delegated fields restate their labels, which is the fixture's authoring, not a control's.
+- No imagery, and a blank summary rail until something is typed.
+- The brand itself was applied entirely outside the spec: hand-written CSS for the tokens, the canvas gradient and two blur orbs, and a hand-picked logo URL in the registry. That is the finding that opens Phase 6: the layout is validated data, the brand is not.
+
+**What was concluded in conversation, and holds from here.** json-render is kept for what it does: the model composes the page and writes the copy, the output is JSON that validates, can be stored per method, versioned and rendered by a fixed registry, and every capture across three model families and two harnesses validated on its first call. It carries no taste: in any catalog, shadcn's or ours, the model chooses and arranges components and cannot change their look, which is owned by the registry and by the host's theme tokens. Swapping the kernel controls for shadcn's would change who wrote the controls, not what the model can do with them. The missing layer is the design system as validated data, and two DTCG token toolchains were assessed for it: Terrazzo (`@terrazzo/parser` and `@terrazzo/plugin-css`, MIT, since 2021, modes on a token, any selector for dark, a lint layer, a parser that runs in the browser) as the pipeline, and design-token-kit (`@design-token-kit/core`, Apache-2.0, three months old, two authors, DTCG 2025.10 schema validation and a DESIGN.md bridge) as a checker at the edge, if at all. The shared prerequisite is ours: the theme contract is HSL triplets, which no token tool emits.
 
 ### Pause 2 — 2026-09-03, the comparison is on the page, the critic loop is half-run
+
+**Superseded by Checkpoint 4 the same day.** Kept as the record of where the comparison stopped; the three next steps at its end were not run and are not to be.
 
 Paused on Louis's request as the context filled, at a clean boundary: the layer, the prompt, the new hero and every capture are committed, every gate is green, and the only thing in flight is the critic loop, whose round-1 critiques are saved and whose revisers have not been run. A cold session resumes from this block and from `temp/generative/phase5/README.md` on this machine.
 
@@ -250,6 +263,58 @@ Paused on Louis's request as the context filled, at a clean boundary: the layer,
 2. Read every shot in `temp/generative/index.html` and write Checkpoint 4: the reading per hero, which producer and model did what, the run-to-run variance the seeds show, and what the catalog still cannot express (the critic's notes about the kernel's descriptions and empty-list boxes are findings about `MthdsField`, worth their own item).
 3. Tick the two remaining Phase 5 boxes, then open the PR against `dev` with `Closes L-260903-35eb46` or `Advances`, as Louis decides.
 
+## Phase 6 — The brand as data
+
+**Written 2026-09-03 on Louis's redirect, ratified by him the same day; continues on this branch.** The use case, in his words: a person has built a method that implies an input form, and to put their brand on it they hand over a logo, a colour palette, a font, whatever can be pulled off their website; what renders in Storybook is that brand on the method's page. The rule that governs the phase: **the model writes data files only.** No TypeScript, no CSS. Each file is validated against a schema and recorded with its producer, exactly as the layout spec is. Anything the data cannot express is not on the page: the blur orbs, the canvas gradient and the hand-written `pipelex-brand.css` of the prototype go, and nothing replaces them by hand.
+
+### The two artifacts of a brand
+
+Beside the layout spec per method, two files per brand under `data/brands/<slug>/`, with the producer's JSONL beside them as the specs pass does:
+
+- **`tokens.json`, DTCG.** The theme contract as tokens, each with a `light` and a `dark` mode (Terrazzo's `$extensions.mode`): the shadcn semantic colours the controls read (background, foreground, card and its foreground, popover and its foreground, primary and its foreground, secondary and its foreground, muted and its foreground, accent and its foreground, destructive and its foreground, border, input, ring), the radius, the font families (sans and mono), and a shadow only if a control or a brand component consumes one. Colours in any DTCG colour space; the build decides how they are written.
+- **`brand.json`, the manifest**, validated by a zod schema written once: the brand name, the website it was read from, one logo URL per scheme (light and dark), and the font source when the family is a webfont the host must load (a Google Fonts family name, or none). A URL and a name are data; a `<link>` and an `@font-face` are the host's, written once.
+
+The contract the producer writes against is generated, never hand-written: `make briefs` gains `wip/generative-ui/briefs/brand-contract.md`, the list of token ids with what each one paints, rendered from the same table the theme reads, so the producer and the build cannot disagree on a name.
+
+### The pipeline, ours, written once
+
+`scripts/build-brands.mjs`, run as `make brands`: for each brand, `@terrazzo/parser` parses and lints the tokens (both modes required, every colour valid, no duplicate values, descriptions present), `@terrazzo/plugin-css` emits the custom properties with `modeSelectors` for `.dark` and variable names that ARE the theme contract's, scoped under `.brand-<slug>`, into `src/__stories__/_generated/brands/<slug>.css`, committed like the specs modules. A brand that fails validation gets the repair loop the specs have (the validator's messages back to the producer, a bounded number of rounds, every round recorded) and, past the bound, a rejected file beside the brief. The Terrazzo packages are devDependencies imported from the story tree and the scripts only; `docs/dependency-budget.md` records them, and `make assert-bundle` keeps proving nothing reached the entries.
+
+**The one package change, and the prerequisite for all of it: the theme contract moves from HSL triplets to full colours.** `src/styles/theme.css` states `--primary: #00bb95` (or an `oklch()`), and `@theme inline` in `src/styles/tailwind-entry.css` maps `--color-primary: var(--primary)`. This is modern shadcn's own convention under Tailwind v4, a contained edit to two files and to `docs/theming.md`, and a breaking change for hosts that set the triplets, noted as such in the changelog. It is done first, on its own commit, with every gate green, because nothing in the phase works without it and because it must be judged on its own.
+
+### The producer
+
+A Pipelex method, `brand.tokens_from_site` in `data/generative/`, on `claude-4.8-opus` and nothing else in this phase: the phase compares nothing, it proves one path. Its inputs are the brand contract (the generated brief) and **site facts**: what a script pulled off the website deterministically, `scripts/extract-site-facts.mjs`, which fetches the page and its stylesheets and records, as data, the colour scheme, every colour custom property and the colour utilities by frequency, the font families and font links, the radii in use, and the image candidates for a logo. The method's judgment is the mapping, which colour is primary and which is the surface, what the light mode of a dark-only site is, and it writes the two files. Provenance is the specs' record: producer, model, date, the hash of the brief. The first brand is Pipelex, from pipelex.com, because the facts were already read by hand on 2026-09-03 (`temp/generative/prototype/pipelex-design-system.md`) and the script must reproduce them; a second, light-first site is run only if the first holds, to show the mapping is not tuned to one page.
+
+### The rendering
+
+The prototype page, re-based on the data: the brand components keep their structure and lose their hand styling (the `Logo` reads the manifest through a brand provider and carries no URL in the spec, `AppBar`, `Hero` and `Glass` paint from tokens only), the kernel controls take the tokens as they do today, and the story becomes one per brand, `Generative/Brand/<name> · trip planner`, titled with the producer, rendered in both themes by `ThemePair` from the two modes of one file. The trip planner's layout spec is the one already on the branch; this phase changes nothing about how a layout is produced.
+
+### Checkpoints
+
+- **Checkpoint 5, the pipeline.** After the contract change and the build script: a Pipelex token file written by the Claude Code session by hand, labelled as such, renders the trip planner in both themes with no hand-written CSS on the page. Louis judges the contract change and whether the page still looks like the prototype without its orbs.
+- **Checkpoint 6, the producer.** The method's files for pipelex.com, validated and rendered; the reading against the criteria below; Louis decides whether tokens become the second validated artifact beside the spec.
+
+### Go/no-go, stated before the work
+
+1. The model-written token file validates on the first call or after one repair round.
+2. Light and dark come from the one file, and both read as the brand.
+3. The generated CSS restyles every kernel control and every brand component with nothing hand-written on the page.
+4. The loop, extract, generate, validate, build, screenshot, runs in under a minute per brand.
+5. The two files, the JSONL and the provenance are enough for a cold session to rebuild the page.
+
+### Order of work
+
+- [ ] **Retire what the data cannot express.** Remove the orbs, the canvas gradient and `pipelex-brand.css` from the prototype; keep the page and its story rendering through the stock tokens until the brand build exists.
+- [ ] **The theme contract as full colours.** `theme.css`, `tailwind-entry.css`, `docs/theming.md`, the changelog's breaking note; `make check`, `make test`, `npm run build`, `make assert-bundle`; one commit.
+- [ ] **The brand artifacts and the build.** The manifest schema, the brand contract brief in `make briefs`, the Terrazzo config, `scripts/build-brands.mjs` and `make brands`, the `_generated/brands/` output, the brand provider and the re-based brand components, the story per brand; the session's hand-written Pipelex tokens as the first brand. Checkpoint 5.
+- [ ] **The producer.** `scripts/extract-site-facts.mjs`, the method `brand.tokens_from_site`, the capture with provenance and the repair loop, the Pipelex brand from pipelex.com; the second site if the first holds. Checkpoint 6.
+- [ ] **The record.** `docs/generative-ui.md` ("The brand as data", replacing "The branded prototype"), `docs/theming.md`, `docs/dependency-budget.md`, `docs/storybook.md`, the changelog; the findings under "Phase 6 — recorded" and this plan's Checkpoint 6 written for Louis's reading.
+
+### Out of scope for this phase
+
+The orbs and any effect a token does not name; gradients until a component consumes a gradient token; imagery beyond the logo; component-level style variants in the catalog; design-token-kit as the pipeline (a `dtokens check` second opinion is allowed as an optional gate, dev-only, droppable); rebuilding the CSS in the browser from tokens a model adjusts live (possible with Terrazzo's parser, noted, not built); hosting the brand files; the kernel controls' chrome (`L-260903-7ec51b`).
+
 ## Phase 4 — Docs, closing the step
 
 Written before the checkpoint so the decision is made on a documented layer, and kept whichever way it goes: the record of what was tried is the deliverable if json-render is not adopted.
@@ -261,4 +326,4 @@ Written before the checkpoint so the decision is made on a documented layer, and
 
 ## Out of scope for this step
 
-Recorded so nothing below is absorbed silently: a `./generative` entry or a sibling package; any release of this package; hosted generation and caching of the spec per method version; the MCP app view; code export; the agent skill for the `Authored` path; a zod mirror of `RunField` for `MthdsField`; adoption in the host webapp's method app; the starters' and the playground's Tailwind migrations; intent hints in the kernel's controls (`L-260823-d905b9`).
+Recorded so nothing below is absorbed silently: a `./generative` entry or a sibling package; any release of this package; hosted generation and caching of the spec per method version; the MCP app view; code export; the agent skill for the `Authored` path; a zod mirror of `RunField` for `MthdsField`; adoption in the host webapp's method app; the starters' and the playground's Tailwind migrations; intent hints in the kernel's controls (`L-260823-d905b9`). Added on the redirect: anything the model writes that is not a validated data file, TypeScript and CSS in particular; and any brand effect the token data cannot express.
