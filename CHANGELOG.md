@@ -14,6 +14,12 @@ Three things a real result made obvious, all in `ResultField`.
 
 - **An open row's detail no longer runs off the right edge.** It spans every column EXCEPT the chevron's, and it was pinned to the FULL visible width, so it overhung the scroller by exactly that column. That cost nothing while its values started at the left; the moment they ended at the right, the overhang cut the last characters off every one of them. The chevron column's width is now stated once, as `EXPAND_COLUMN`, and both the header cell that reserves it and the pinned width that must exclude it read the same constant.
 
+### Added - `StuffViewer` takes the stuff's name
+
+The header announced **`output`** for every result there has ever been. That is the descriptor's root node name, and `build_output_form` gives it to every pipe — correct in the artifact, where the descriptor describes an output SLOT with no name of its own, and wrong on screen, where the reader has just clicked a node called `report_pages` and the input panel beside it is headed `annual_report`.
+
+`StuffViewer` now takes an optional `name`, because only the caller knows it: the graph knows which node was opened, a run page knows which variable it is showing. It replaces the descriptor's name on the field itself rather than being handed to the header alone, so the download's default base name reads the same property — a reader who saves what they are reading gets `report_pages.json`, not `output.json`. Absent, the descriptor's own name still stands, which keeps a host with nothing better to say honest rather than blank.
+
 ### Added - the annual-report ledger, as a story
 
 `Outputs/Ledger` reproduces the payload the three faults above were reported against: a record of short scalars with one long table of records among them, and `?` numbers beside required strings. No generated case carried that shape, which is why the faults reached a real run before a story caught them. Three arms — at panel width, in a narrow column, and with the optional totals absent — and the play function asserts from the computed style rather than the markup, because the stacked layout and the aligned one render the same text in the same order.

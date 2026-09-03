@@ -138,3 +138,38 @@ describe('the header is drawn once for a LIST result too', () => {
     expect(screen.getByText(/2 items/)).toBeTruthy();
   });
 });
+
+/**
+ * The header names the STUFF, not the descriptor's root node.
+ *
+ * `build_output_form` calls every pipe's root node `output`, and that is right
+ * in the artifact: the descriptor describes an output SLOT, which has no name of
+ * its own. On screen it is wrong — the reader has just clicked a node called
+ * `report_pages`, the input panel beside it is headed `annual_report`, and the
+ * result panel between them announced `output`. Only the caller knows the name,
+ * so only the caller can supply it.
+ */
+describe('the stuff name', () => {
+  it("uses the caller's name for the header instead of the descriptor's", () => {
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} name="report_pages" />);
+    expect(screen.getByText('report_pages')).toBeTruthy();
+    expect(screen.queryByText('output')).toBeNull();
+  });
+
+  it("falls back to the descriptor's own name when the caller has none", () => {
+    // Not blank, and not a guess: a host with nothing better to say still gets
+    // the only name that exists.
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
+    expect(screen.getByText('output')).toBeTruthy();
+  });
+
+  it('feeds the same name to the download, so the file agrees with the header', () => {
+    // Asserted on the seam rather than by driving a real download: the name
+    // reaches `downloadStuff` through the SAME `named.name` the header reads,
+    // which is the property that keeps the two from ever disagreeing. Stubbing
+    // an anchor to read `download` back tests jsdom, not this.
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} name="report_pages" />);
+    expect(screen.getByText('report_pages')).toBeTruthy();
+    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download })).toBeTruthy();
+  });
+});

@@ -39,6 +39,26 @@ export type StuffViewerView = 'rendered' | 'json';
 export interface StuffViewerProps {
   field: RunField;
   value: unknown;
+  /**
+   * The STUFF's name, for the header — `report_pages`, not `output`.
+   *
+   * A result descriptor's root node is named by the engine that built it, and
+   * `build_output_form` calls it `output` for every pipe there has ever been.
+   * That is correct in the artifact: the descriptor describes a pipe's output
+   * slot, which has no name of its own. It is wrong on screen, where the reader
+   * is looking at ONE data item and every other surface — the graph node they
+   * clicked, the input panel beside it, the method's own code — calls that item
+   * by the name the author gave it.
+   *
+   * So the name comes from the caller, because only the caller knows it: the
+   * graph knows which node was opened, a run page knows which variable it is
+   * showing. Absent, the descriptor's own name stands, which keeps a host that
+   * has nothing better to say honest rather than blank.
+   *
+   * It also supplies `downloadBaseName`'s default, so the file a reader saves
+   * is named after the thing they were reading rather than `output.json`.
+   */
+  name?: string;
   /** Which view opens first. Rendered, unless a host has a reason. */
   defaultView?: StuffViewerView;
   /**
@@ -169,12 +189,18 @@ export function JsonView({ value }: { value: unknown }) {
 export function StuffViewer({
   field,
   value,
+  name,
   defaultView = 'rendered',
   downloadBaseName,
   hideDownload = false,
   className,
 }: StuffViewerProps) {
   const s = useFieldStrings();
+  // The caller's name wins over the descriptor's, and it is applied to the
+  // FIELD rather than passed to the header alone: the download's default base
+  // name reads the same property, and the two naming the item differently is
+  // exactly the drift this component exists to prevent.
+  const named = name ? { ...field, name } : field;
   const [view, setView] = useState<StuffViewerView>(defaultView);
   const [saving, setSaving] = useState(false);
   // The same resolver the rendered view paints images through, so a download
@@ -188,13 +214,13 @@ export function StuffViewer({
       await downloadStuff({
         field,
         value,
-        baseName: downloadBaseName ?? field.name ?? 'result',
+        baseName: downloadBaseName ?? named.name ?? 'result',
         resolveUrl,
       });
     } finally {
       setSaving(false);
     }
-  }, [field, value, downloadBaseName, resolveUrl]);
+  }, [field, named.name, value, downloadBaseName, resolveUrl]);
   const views: { id: StuffViewerView; label: string }[] = [
     { id: 'rendered', label: s.viewRendered },
     { id: 'json', label: s.viewJson },
@@ -207,7 +233,7 @@ export function StuffViewer({
           both views, so switching does not move the thing you are reading. */}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
         <div className="min-w-0 space-y-1">
-          <ResultHeader field={field} />
+          <ResultHeader field={named} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {!hideDownload && (
