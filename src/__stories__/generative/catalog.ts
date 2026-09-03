@@ -326,6 +326,14 @@ const actions = {
 
 export const catalog = defineCatalog(generativeSchema, { components, actions });
 
+/**
+ * The two maps, for a catalog that EXTENDS this one - the branded prototype
+ * under `prototype/` adds its own components on top of these. Exporting them
+ * changes nothing about the prompt or its hash.
+ */
+export const generativeComponents = components;
+export const generativeActions = actions;
+
 /** The spec type an authored spec is written against. */
 export type GenerativeSpec = typeof catalog._specType;
 

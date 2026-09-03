@@ -50,33 +50,47 @@ const PANE: React.CSSProperties = {
   color: 'hsl(var(--foreground))',
 };
 
-const BODY: React.CSSProperties = { padding: 16, flex: '1 1 auto' };
+const BODY_PADDING = 16;
 
 function Pane({
   theme,
   captioned,
+  padding,
   children,
 }: {
   theme: 'light' | 'dark';
   captioned: boolean;
+  padding: number;
   children: React.ReactNode;
 }) {
   return (
     <div className={theme === 'dark' ? 'dark' : undefined} style={PANE}>
       {captioned ? <div style={CAPTION}>{theme}</div> : null}
-      <div style={BODY}>{children}</div>
+      <div style={{ padding, flex: '1 1 auto' }}>{children}</div>
     </div>
   );
 }
 
+/**
+ * A story may pin its own view through two parameters, and both are for a
+ * page that IS a theme rather than one rendered in a theme: `themeView`
+ * ('light' | 'dark') overrides the toolbar, and `themePairPadding` (a number
+ * of pixels, default 16) removes the pane's gutter so a full-bleed page reaches
+ * the edges. The branded prototype under `src/__stories__/generative/prototype/`
+ * is the one story that sets them.
+ */
 export const ThemePair: Decorator = (Story, context) => {
-  const view = (context.globals.themeView as ThemeView | undefined) ?? 'pair';
+  const view =
+    (context.parameters.themeView as ThemeView | undefined) ??
+    (context.globals.themeView as ThemeView | undefined) ??
+    'pair';
+  const padding = (context.parameters.themePairPadding as number | undefined) ?? BODY_PADDING;
   const story = <Story />;
 
   if (view === 'light' || view === 'dark') {
     return (
       <div style={{ display: 'flex', minHeight: '100vh' }}>
-        <Pane theme={view} captioned={false}>
+        <Pane theme={view} captioned={false} padding={padding}>
           {story}
         </Pane>
       </div>
@@ -85,11 +99,11 @@ export const ThemePair: Decorator = (Story, context) => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'stretch' }}>
-      <Pane theme="light" captioned>
+      <Pane theme="light" captioned padding={padding}>
         {story}
       </Pane>
       <div style={{ width: 1, background: 'hsl(var(--border))', flex: '0 0 auto' }} />
-      <Pane theme="dark" captioned>
+      <Pane theme="dark" captioned padding={padding}>
         {story}
       </Pane>
     </div>

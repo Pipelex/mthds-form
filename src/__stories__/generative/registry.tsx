@@ -131,6 +131,11 @@ export interface DescriptorScope {
 
 const DescriptorContext = React.createContext<DescriptorScope>({});
 
+/** The scope the nearest `DescriptorProvider` set - for a renderer defined outside this file. */
+export function useDescriptorScope(): DescriptorScope {
+  return React.useContext(DescriptorContext);
+}
+
 export function DescriptorProvider({
   scope,
   children,
@@ -228,7 +233,7 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
   const id = `${scope.idPrefix ?? 'gen'}-select-${props.name}`;
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="text-sm leading-none font-medium">
+      <label htmlFor={id} className="block text-sm leading-none font-medium">
         {props.label}
       </label>
       <SelectRoot
@@ -690,7 +695,7 @@ function NumberInput({ props, bindings, emit }: BaseComponentProps<NumberInputPr
   const id = `${scope.idPrefix ?? 'gen'}-number-${props.name}`;
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="text-sm leading-none font-medium">
+      <label htmlFor={id} className="block text-sm leading-none font-medium">
         {props.label}
       </label>
       <div className="flex items-center gap-2">
@@ -792,6 +797,12 @@ export const { registry: generativeRegistry } = defineRegistry(catalog, {
   actions: { run: async () => {} },
 });
 
+/** The renderers, for a registry over a catalog that extends this one. */
+export const generativeRenderers = components;
+
+/** What `GenerativePage` renders through: this registry unless a page brings its own. */
+export type PageRegistry = React.ComponentProps<typeof Renderer>['registry'];
+
 // ─── The page ────────────────────────────────────────────────────────────────
 
 export interface GenerativePageProps {
@@ -805,6 +816,8 @@ export interface GenerativePageProps {
   onRun?: (state: StateModel) => void;
   /** Whether a stream is still arriving. */
   loading?: boolean;
+  /** A registry over a catalog that extends the layer's, when a page has one. */
+  registry?: PageRegistry;
 }
 
 /**
@@ -814,7 +827,14 @@ export interface GenerativePageProps {
  * for the receipt under the form - so what the page writes is exactly what the
  * kernel's readiness is computed from.
  */
-export function GenerativePage({ spec, store, scope, onRun, loading }: GenerativePageProps) {
+export function GenerativePage({
+  spec,
+  store,
+  scope,
+  onRun,
+  loading,
+  registry = generativeRegistry,
+}: GenerativePageProps) {
   const handlers = React.useMemo(
     () => ({
       run: () => {
@@ -825,8 +845,8 @@ export function GenerativePage({ spec, store, scope, onRun, loading }: Generativ
   );
   return (
     <DescriptorProvider scope={scope}>
-      <JSONUIProvider registry={generativeRegistry} store={store} handlers={handlers}>
-        <Renderer spec={spec} registry={generativeRegistry} loading={loading} />
+      <JSONUIProvider registry={registry} store={store} handlers={handlers}>
+        <Renderer spec={spec} registry={registry} loading={loading} />
       </JSONUIProvider>
     </DescriptorProvider>
   );

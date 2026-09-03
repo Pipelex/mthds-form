@@ -1,0 +1,93 @@
+/*
+ * The Pipelex brand as a token layer - a spike, for the branded prototype story.
+ *
+ * Every value is read off pipelex.com (the canvas, the teal, the glass, Inter)
+ * and set on the SAME shadcn tokens the controls are themed through, which is
+ * what re-skins the kernel's own controls without touching them: `--input` is
+ * the glass a field is made of, `--primary` is the teal the pills and the run
+ * button take, `--ring` the focus. The orbs and the canvas gradient are the
+ * page's, under the tokens, and the two classes that follow the tokens are
+ * brand-scoped overrides of chrome the kernel draws in a colour the tokens
+ * cannot reach (a dashed placeholder box, the description under a field).
+ */
+.pipelex-brand {
+  --background: 250 40% 4%;
+  --foreground: 0 0% 100%;
+  --card: 250 30% 6%;
+  --card-foreground: 0 0% 100%;
+  --popover: 250 30% 7%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 166 100% 37%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 250 15% 12%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 250 15% 11%;
+  --muted-foreground: 220 9% 65%;
+  --accent: 250 15% 14%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 350 89% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 250 12% 16%;
+  --input: 250 16% 9%;
+  --ring: 166 100% 37%;
+  --radius: 0.75rem;
+
+  font-family:
+    Inter,
+    'Inter Fallback',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  color: hsl(var(--foreground));
+  background: linear-gradient(to bottom, rgb(8 6 14), rgb(12 8 20));
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The blur orbs behind the page: one teal, one purple, both faint, both decorative. */
+.pipelex-brand__orb {
+  position: absolute;
+  width: 820px;
+  height: 820px;
+  border-radius: 9999px;
+  opacity: 0.45;
+  pointer-events: none;
+  filter: blur(110px);
+  contain: layout;
+}
+.pipelex-brand__orb--teal {
+  top: -380px;
+  left: -220px;
+  background: radial-gradient(circle closest-side, rgb(0 187 149 / 0.75), transparent 92%);
+}
+.pipelex-brand__orb--purple {
+  top: -120px;
+  right: -300px;
+  background: radial-gradient(circle closest-side, rgb(107 33 168 / 0.8), transparent 92%);
+}
+
+/*
+ * Two brand-scoped reads of the kernel's chrome, both findings against the
+ * controls rather than against this page (recorded in the study's plan):
+ * the date control's mono face, and a list's empty placeholder box, which
+ * stacks a second dashed box over the dashed "Add item" row.
+ */
+.pipelex-brand input[type='date'] {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+.pipelex-brand p.border-dashed {
+  display: none;
+}
+
+/* A number input's spinner has no place on this page. */
+.pipelex-brand input[type='number']::-webkit-outer-spin-button,
+.pipelex-brand input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pipelex-brand input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
