@@ -123,6 +123,81 @@ export function validateAgainstCatalog(spec: Spec): SpecVerdict {
     }
   }
 
+  // 4. A panelled container has one child per panel, in order. The renderer
+  //    would silently show fewer panels than tabs, or a step with nothing in
+  //    it; the validator says so instead.
+  for (const [key, element] of Object.entries(spec.elements)) {
+    const props = (element.props ?? {}) as Record<string, unknown>;
+    const panels =
+      element.type === 'Tabs'
+        ? (props.tabs as unknown[] | undefined)?.length
+        : element.type === 'Steps'
+          ? (props.steps as unknown[] | undefined)?.length
+          : undefined;
+    if (panels === undefined) continue;
+    const children = element.children?.length ?? 0;
+    if (children !== panels) {
+      problems.push({
+        elementKey: key,
+        message: `${element.type} declares ${panels} panel${panels === 1 ? '' : 's'} but has ${children} child${children === 1 ? '' : 'ren'}: exactly one child per ${element.type === 'Tabs' ? 'tab' : 'step'}, in order.`,
+      });
+    }
+    if (element.type === 'Steps' || element.type === 'Tabs') {
+      const runs = (element.children ?? []).filter(
+        (child) => spec.elements[child]?.type === 'Button',
+      );
+      if (runs.length > 0) {
+        problems.push({
+          elementKey: key,
+          message: `${element.type} has a Button as a direct child; a panel is a container (a Stack), and the Button belongs inside the last one.`,
+        });
+      }
+    }
+  }
+  // 5. Heading levels increase by one, in render order. The Storybook a11y
+  //    gate runs axe's `heading-order` at error, and a page that jumps from
+  //    h1 to h3 fails it; saying so here makes it a rejected spec with a
+  //    re-run rather than a failing story with a fixture nobody may edit.
+  const levels: { key: string; level: number }[] = [];
+  const seen = new Set<string>();
+  const walk = (key: string) => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    const element = spec.elements[key];
+    if (!element) return;
+    if (element.type === 'Heading') {
+      const level = String((element.props as { level?: unknown }).level ?? 'h2');
+      const match = /^h([1-4])$/.exec(level);
+      if (match) levels.push({ key, level: Number(match[1]) });
+    }
+    for (const child of element.children ?? []) walk(child);
+    for (const slot of Object.values(element.slots ?? {})) for (const child of slot) walk(child);
+  };
+  if (spec.root) walk(spec.root);
+  // The first heading sets the page's level, as axe reads it; every one after
+  // it may go deeper by one at most.
+  let previous: number | undefined;
+  for (const heading of levels) {
+    if (previous !== undefined && heading.level > previous + 1) {
+      problems.push({
+        elementKey: heading.key,
+        message: `Heading jumps to h${heading.level} after h${previous}: levels increase by one, never by more.`,
+      });
+    }
+    previous = heading.level;
+  }
+
+  const splits = Object.entries(spec.elements).filter(([, element]) => element.type === 'Split');
+  for (const [key, element] of splits) {
+    const children = element.children?.length ?? 0;
+    if (children !== 2) {
+      problems.push({
+        elementKey: key,
+        message: `Split takes exactly two children (left, right); this one has ${children}.`,
+      });
+    }
+  }
+
   return { ok: problems.length === 0, problems };
 }
 

@@ -7,6 +7,7 @@ import { PAYLOADS } from '../_generated/results.payloads';
 import { SPECS } from '../_generated/results.specs';
 import { HEROES } from './heroes';
 import { ResultHeroPage, loadResultHero } from './hero-page';
+import { findFixture } from './spec-fixture';
 import { jsonlLines } from './stream';
 
 /**
@@ -16,14 +17,20 @@ import { jsonlLines } from './stream';
  * root first, parents before children, over state the host loaded before the
  * first line arrived.
  *
- * The lines are the very JSONL the designer method emitted, as captured; the
- * pacing is the story's. Nothing here is inference.
+ * The lines are the very JSONL the designer method emitted on the model it
+ * pins, as captured; the pacing is the story's. Nothing here is inference.
  */
 
 const PIPE_REF = 'results.nested_result';
 const hero = HEROES.find((candidate) => `${candidate.domain}.${candidate.pipeCode}` === PIPE_REF)!;
 const data = loadResultHero(hero, CONTRACTS, OUTPUT_FORM, PAYLOADS);
-const LINES = jsonlLines(SPECS[PIPE_REF]!.jsonl);
+/** The designer method's own capture, on the model it pins. */
+const FIXTURE_ID = 'pipelex-method--claude-5-sonnet';
+const LINES = jsonlLines(
+  SPECS.some((fixture) => fixture.pipeRef === PIPE_REF)
+    ? findFixture(SPECS, PIPE_REF, FIXTURE_ID).jsonl
+    : '',
+);
 
 const EMPTY: Spec = { root: '', elements: {} };
 

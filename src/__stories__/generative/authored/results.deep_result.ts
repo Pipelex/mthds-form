@@ -26,9 +26,9 @@ import { defineAuthoredSpec, element } from '../authoring';
  */
 export const AUTHORED_COMPANY = defineAuthoredSpec({
   pipeRef: 'results.deep_result',
-  author: 'Claude Code',
+  model: 'claude-fable-5-1',
   date: '2026-09-03',
-  promptHash: 'b452d10a8ff7',
+  promptHash: '74ecce11615e',
   brief: 'wip/generative-ui/briefs/results.deep_result.md',
   spec: {
     root: 'page',

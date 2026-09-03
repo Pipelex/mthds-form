@@ -1,4 +1,5 @@
 import { defineSchema, type PromptContext } from '@json-render/core';
+import { APP_DIRECTION, SEED_PROCEDURE } from './direction';
 
 /**
  * Our own json-render schema: the React schema's SHAPE and built-in actions,
@@ -12,7 +13,8 @@ import { defineSchema, type PromptContext } from '@json-render/core';
  * it and loses. This layer's posture is the opposite - every value is bound to
  * a path the HOST loads - so the prompt is composed here, from the same
  * building blocks (the component list is rendered with the package's own
- * `formatZodType`), and the sample-data rules never reach the model.
+ * `formatZodType`), the design direction and the seed procedure are its own
+ * sections (`direction.ts`), and the sample-data rules never reach the model.
  *
  * The spec shape is unchanged because the renderer, the stream compiler and the
  * validator read it, and because a spec written against it renders through any
@@ -102,7 +104,7 @@ function renderPrompt(context: PromptContext): string {
 
   lines.push(
     options.system ??
-      'You are a UI designer. You lay out ONE page for a method - its inputs, or its result - as a JSON spec over a fixed catalog of components, bound to state the host provides.',
+      'You are a product designer with taste. You lay out ONE page for a method - its inputs, or its result - as a JSON spec over a fixed catalog of components, bound to state the host provides. The page must read as a small, purpose-built web app, never as a form.',
   );
   lines.push('');
   lines.push('OUTPUT FORMAT (JSONL, RFC 6902 JSON Patch):');
@@ -165,6 +167,9 @@ function renderPrompt(context: PromptContext): string {
     '1. Read-only value: { "$state": "/path" }. 2. Two-way input binding: { "$bindState": "/path" } on value/checked. 3. Conditional: { "$cond": <condition>, "$then": <value>, "$else": <value> }, where a condition is { "$state": "/path" } (truthy), with optional "eq", "neq", "gt", "gte", "lt", "lte" or "not": true. 4. Template: { "$template": "Invoice ${/result/reference}" } interpolates state paths; inside a repeat, bare names read the item.',
   );
   lines.push('');
+  lines.push('DESIGN DIRECTION:');
+  for (const paragraph of APP_DIRECTION) lines.push(`- ${paragraph}`);
+  lines.push('');
   lines.push(`AVAILABLE COMPONENTS (${componentNames.length}):`);
   lines.push('');
   for (const name of componentNames) {
@@ -208,5 +213,8 @@ function renderPrompt(context: PromptContext): string {
   lines.push('RULES:');
   const rules = [...(generativeSchema.defaultRules ?? []), ...(options.customRules ?? [])];
   rules.forEach((rule, index) => lines.push(`${index + 1}. ${rule}`));
+  lines.push('');
+  lines.push('CREATIVE SEED:');
+  for (const paragraph of SEED_PROCEDURE) lines.push(paragraph);
   return lines.join('\n');
 }

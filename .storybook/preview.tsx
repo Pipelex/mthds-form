@@ -65,7 +65,12 @@ const preview: Preview = {
       },
     },
   },
-  initialGlobals: { themeView: 'pair' },
+  // `play` is declared so a URL may set it: Storybook applies a global from
+  // the URL only when the preview declares it. The screenshot pass of the
+  // generative study sets `play:off` to shoot a page as a person first sees
+  // it; the plays that honour it are wrapped in `skippable` (see
+  // `src/__stories__/generative/source-stories.tsx`).
+  initialGlobals: { themeView: 'pair', play: 'on' },
   decorators: [ThemePair],
 };
 

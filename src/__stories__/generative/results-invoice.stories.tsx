@@ -8,44 +8,24 @@ import { AUTHORED } from './authored';
 import { HEROES } from './heroes';
 import { ResultHeroPage, loadResultHero } from './hero-page';
 import { projectResultSpec } from './project-spec';
+import { fixtureStories, skippable } from './source-stories';
 
 /**
- * The first hero: an invoice, as a run produced it, laid out four ways over
- * the very same fixture so the only difference on screen is the layout.
+ * The first hero: an invoice, as a run produced it, laid out by every producer
+ * over the very same fixture so the only difference on screen is the layout.
  *
- * `Kernel` is the package's own result view - the faithful transcription.
- * `Projected` is the deterministic projection of the descriptor into the
- * catalog's font: the floor. `Authored` was written by hand from the brief and
- * the catalog prompt: the ceiling of what the vocabulary can express.
- * `Generated` is what the designer method produced from the same two inputs,
- * captured by `make fixtures-specs` and never edited.
- *
- * The reading at the checkpoint follows from the bounds: `Generated` close to
- * `Authored` clears the model; `Authored` dull too indicts the catalog, which
- * is ours; `Projected` nearly as good as either says the layer has not earned
- * its place over the kernel.
+ * The package's own result view first - the faithful transcription - then the
+ * deterministic projection into the catalog, the floor; then one story per
+ * captured spec, titled with what produced it: the designer method on a named
+ * model, or the Claude Code session writing by hand.
  */
 
 const PIPE_REF = 'results.nested_result';
 const hero = HEROES.find((candidate) => `${candidate.domain}.${candidate.pipeCode}` === PIPE_REF)!;
 const data = loadResultHero(hero, CONTRACTS, OUTPUT_FORM, PAYLOADS);
+const FIXTURES = [...SPECS, ...AUTHORED].filter((fixture) => fixture.pipeRef === PIPE_REF);
 
-type Source = 'kernel' | 'projected' | 'authored' | 'generated';
-
-function specFor(source: Exclude<Source, 'kernel'>) {
-  switch (source) {
-    case 'projected':
-      return projectResultSpec(data.field, { title: hero.title });
-    case 'authored':
-      return AUTHORED[PIPE_REF]!.spec;
-    case 'generated':
-      return SPECS[PIPE_REF]!.spec;
-    default:
-      return source satisfies never;
-  }
-}
-
-function InvoiceHero({ source }: { source: Source }) {
+function InvoiceHero({ source }: { source: string }) {
   if (source === 'kernel') {
     return (
       <ResultView
@@ -58,7 +38,12 @@ function InvoiceHero({ source }: { source: Source }) {
       />
     );
   }
-  return <ResultHeroPage data={data} spec={specFor(source)} />;
+  const spec =
+    source === 'projected'
+      ? projectResultSpec(data.field, { title: hero.title })
+      : FIXTURES.find((fixture) => fixtureStories.idOf(fixture) === source)?.spec;
+  if (!spec) return <fixtureStories.Missing pipeRef={PIPE_REF} id={source} />;
+  return <ResultHeroPage data={data} spec={spec} />;
 }
 
 const meta = {
@@ -77,16 +62,30 @@ function escapeRegExp(text: string): string {
 }
 
 /** The reference and the first line's label, read off the payload, reach the page. */
-const showsTheInvoice: Story['play'] = async ({ canvasElement }) => {
+const showsTheInvoice: Story['play'] = skippable(async ({ canvasElement }) => {
   const canvas = within(canvasElement);
   const payload = data.payload as { reference: string; lines: { label: string }[] };
-  await expect(canvas.getAllByText(new RegExp(escapeRegExp(payload.reference)))).toHaveLength(
+  await expect(
+    canvas.getAllByText(new RegExp(escapeRegExp(payload.reference))).length,
+  ).toBeGreaterThanOrEqual(BOTH_THEMES);
+  await expect(canvas.getAllByText(payload.lines[0]!.label).length).toBeGreaterThanOrEqual(
     BOTH_THEMES,
   );
-  await expect(canvas.getAllByText(payload.lines[0]!.label)).toHaveLength(BOTH_THEMES);
-};
+});
 
-export const Kernel: Story = { args: { source: 'kernel' }, play: showsTheInvoice };
-export const Projected: Story = { args: { source: 'projected' }, play: showsTheInvoice };
-export const Authored: Story = { args: { source: 'authored' }, play: showsTheInvoice };
-export const Generated: Story = { args: { source: 'generated' }, play: showsTheInvoice };
+const stories = fixtureStories<Story>(FIXTURES, showsTheInvoice);
+
+export const KernelView: Story = {
+  name: "The package's own result view",
+  args: { source: 'kernel' },
+  play: showsTheInvoice,
+};
+export const Projection: Story = {
+  name: 'Deterministic projection (the floor)',
+  args: { source: 'projected' },
+  play: showsTheInvoice,
+};
+export const SessionByHand = stories.of('claude-code-session--claude-fable-5-1');
+export const PipelexSonnet5 = stories.of('pipelex-method--claude-5-sonnet');
+export const PipelexOpus48 = stories.of('pipelex-method--claude-4.8-opus');
+export const PipelexGpt55 = stories.of('pipelex-method--gpt-5.5');

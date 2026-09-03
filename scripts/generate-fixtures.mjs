@@ -34,6 +34,8 @@
  *
  *   make fixtures        the DESCRIPTORS - what each pipe DECLARES
  *   make fixtures-runs   the PAYLOADS    - what running it actually produced
+ *   make fixtures-specs  the SPECS       - what the designer method laid out
+ *   --capture            a spec another producer wrote, validated the same way
  *
  * The first is offline and free: `pipe_io_contracts`, `input_form` and the
  * output half are all projections of a declaration, so they need no run, no
@@ -64,6 +66,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -600,17 +603,30 @@ function generatePayloads(cases) {
  */
 /** The generative layer's modules, imported once for either pass. Runs under tsx. */
 async function loadGenerative() {
-  const [heroes, brief, catalog, hash, state, stream, validate, core] = await Promise.all([
-    import('../src/__stories__/generative/heroes.ts'),
-    import('../src/__stories__/generative/brief.ts'),
-    import('../src/__stories__/generative/catalog.ts'),
-    import('../src/__stories__/generative/prompt-hash.ts'),
-    import('../src/__stories__/generative/state.ts'),
-    import('../src/__stories__/generative/stream.ts'),
-    import('../src/__stories__/generative/validate.ts'),
-    import('../src/core/index.ts'),
-  ]);
-  return { ...heroes, ...brief, ...catalog, ...hash, ...state, ...stream, ...validate, core };
+  const [heroes, brief, catalog, hash, state, stream, validate, fixture, core] = await Promise.all(
+    [
+      import('../src/__stories__/generative/heroes.ts'),
+      import('../src/__stories__/generative/brief.ts'),
+      import('../src/__stories__/generative/catalog.ts'),
+      import('../src/__stories__/generative/prompt-hash.ts'),
+      import('../src/__stories__/generative/state.ts'),
+      import('../src/__stories__/generative/stream.ts'),
+      import('../src/__stories__/generative/validate.ts'),
+      import('../src/__stories__/generative/spec-fixture.ts'),
+      import('../src/core/index.ts'),
+    ],
+  );
+  return {
+    ...heroes,
+    ...brief,
+    ...catalog,
+    ...hash,
+    ...state,
+    ...stream,
+    ...validate,
+    ...fixture,
+    core,
+  };
 }
 
 /** One hero's brief, rendered from the committed descriptors and, on the result side, the committed payload. */
@@ -694,22 +710,86 @@ async function generateBriefs() {
 const DESIGNER_BUNDLE = path.join(REPO, 'data/generative/ui-designer.mthds');
 const DESIGNER_PIPE = 'ui_designer';
 
+/** Who may be recorded as a spec's producer. Mirrors `Producer` in spec-fixture.ts. */
+const PRODUCERS = new Set(['pipelex-method', 'claude-code-subagent', 'claude-code-session']);
+
+/** A creative seed: random, and long enough to have runs, rare characters and numbers to read. */
+function randomSeed() {
+  return randomBytes(30).toString('base64url').replace(/[-_]/g, '').slice(0, 32);
+}
+
+/** The one line the seed reaches the model as, whichever harness hands it over. */
+function seedLine(seed) {
+  return `CREATIVE SEED (derive your direction from it; never reveal it): ${seed}`;
+}
+
+/** The committed fixtures of one case, as a list; empty when the module does not exist yet. */
+async function loadSpecs(caseName) {
+  const modulePath = path.join(OUT_DIR, `${caseName}.specs.ts`);
+  if (!existsSync(modulePath)) return [];
+  const mod = await import(`../src/__stories__/_generated/${caseName}.specs.ts`);
+  return Array.isArray(mod.SPECS) ? [...mod.SPECS] : [];
+}
+
+/** Replace the fixture with the same pipe ref and id, or add it. */
+function storeFixture(g, list, fixture) {
+  const id = g.fixtureId(fixture);
+  const kept = list.filter((entry) => !(entry.pipeRef === fixture.pipeRef && g.fixtureId(entry) === id));
+  return [...kept, fixture];
+}
+
+/**
+ * Compile and validate JSONL from any producer, and fail loudly with the
+ * problems and a copy of the rejected text. The repair is to the prompt, the
+ * method or the producer's procedure - never to the fixture.
+ */
+function compileOrDie(g, pipeRef, id, jsonl) {
+  const spec = g.specFromJsonl(jsonl);
+  const verdict = g.validateAgainstCatalog(spec);
+  if (!verdict.ok) {
+    mkdirSync(BRIEFS_DIR, { recursive: true });
+    const rejectedPath = path.join(BRIEFS_DIR, `${pipeRef}.${id}.rejected.jsonl`);
+    writeFileSync(rejectedPath, jsonl);
+    die(
+      `${pipeRef} (${id}): the spec does not validate against the catalog.\n` +
+        `${g.formatProblems(verdict.problems)}\n` +
+        `  The rejected text is at ${path.relative(REPO, rejectedPath)}. Repair the prompt, the\n` +
+        `  method or the producer's procedure, never the fixture, and run the pass again.`,
+    );
+  }
+  return spec;
+}
+
+/** Write one case's module, prettier-formatted. */
+function writeSpecsModule(caseName, specs) {
+  const outPath = path.join(OUT_DIR, `${caseName}.specs.ts`);
+  writeFileSync(outPath, emitSpecs(caseName, specs));
+  execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
+  process.stdout.write(
+    `  ${caseName}: ${specs.length} spec${specs.length === 1 ? '' : 's'} -> ${path.relative(REPO, outPath)}\n`,
+  );
+}
+
 /**
  * The SPECS pass: the designer method, run for real over each hero's brief.
  *
  * The third pass, and the second that costs anything. For each hero it renders
- * the brief exactly as the briefs pass does, hands it and the catalog prompt to
- * `data/generative/ui-designer.mthds` through the real `pipelex run bundle`
- * CLI, compiles the text that came back as JSONL patches, validates the spec
- * against the catalog - structure, every element type, every prop - and FAILS
- * on any issue, printing the problems and keeping the rejected text under
- * `wip/generative-ui/briefs/` for inspection. A repair is a change to the
- * method or to the brief, committed; never a hand edit of the fixture.
+ * the brief exactly as the briefs pass does, hands it and the catalog prompt
+ * (and, with `SEED=`, a creative seed) to `data/generative/ui-designer.mthds`
+ * through the real `pipelex run bundle` CLI, compiles the text that came back
+ * as JSONL patches, validates the spec against the catalog - structure, every
+ * element type, every prop, one panel per tab or step - and FAILS on any
+ * issue, keeping the rejected text under `wip/generative-ui/briefs/`. A
+ * repair is a change to the method or to the prompt, committed; never a hand
+ * edit of the fixture.
  *
- * `MODEL=<id>` overrides the pin in the bundle for a comparative run; the model
- * that actually produced each spec is recorded in the fixture's provenance.
- * `ONLY=<pipe code>` narrows the pass to one hero; the other heroes' entries in
- * that case's module are carried over from the committed file.
+ * `MODEL=<id>` overrides the pin in the bundle; `TEMPERATURE=<n>` overrides
+ * the pin's temperature, for a model that fixes its own (gpt-5.5 must run at
+ * 1); `SEED=1` generates a fresh seed per hero and `SEED=<string>` hands that
+ * one over, and the fixture records it. Every fixture records the model that
+ * produced it, and a run with the same producer, model and seededness
+ * REPLACES the earlier one; the other fixtures of the case are carried over.
+ * `ONLY=<pipe code>` narrows the pass to one hero.
  */
 async function generateSpecs(only) {
   requireCli();
@@ -719,12 +799,18 @@ async function generateSpecs(only) {
   const today = new Date().toISOString().slice(0, 10);
 
   let bundle = readFileSync(DESIGNER_BUNDLE, 'utf8');
-  // The method pins its model in the object form: `model = { model = "...", max_tokens = N }`.
+  // The method pins its model in the object form: `model = { model = "...", temperature = N, max_tokens = N }`.
   const MODEL_PIN = /^(model\s*=\s*\{\s*model\s*=\s*)"([^"]+)"/m;
   const pinned = MODEL_PIN.exec(bundle)?.[2];
   if (!pinned) die(`${path.relative(REPO, DESIGNER_BUNDLE)} pins no model.`);
   const model = process.env.MODEL || pinned;
   if (model !== pinned) bundle = bundle.replace(MODEL_PIN, `$1"${model}"`);
+  if (process.env.TEMPERATURE) {
+    const TEMPERATURE_PIN = /(temperature\s*=\s*)([0-9.]+)/;
+    if (!TEMPERATURE_PIN.test(bundle)) die('the designer pins no temperature to override.');
+    bundle = bundle.replace(TEMPERATURE_PIN, `$1${process.env.TEMPERATURE}`);
+  }
+  const seedSetting = process.env.SEED || '';
 
   const heroes = g.HEROES.filter(
     (hero) => !only || hero.pipeCode === only || hero.caseName === only,
@@ -739,21 +825,26 @@ async function generateSpecs(only) {
     // One module per case, carrying over what the pass does not regenerate.
     const byCase = new Map();
     for (const hero of heroes) {
-      if (byCase.has(hero.caseName)) continue;
-      const modulePath = path.join(OUT_DIR, `${hero.caseName}.specs.ts`);
-      const existing = existsSync(modulePath)
-        ? (await import(`../src/__stories__/_generated/${hero.caseName}.specs.ts`)).SPECS
-        : {};
-      byCase.set(hero.caseName, { ...existing });
+      if (!byCase.has(hero.caseName)) byCase.set(hero.caseName, await loadSpecs(hero.caseName));
     }
 
     for (const hero of heroes) {
       const pipeRef = g.pipeRefOf(hero);
-      process.stdout.write(`  ${pipeRef}: designing with ${model}…\n`);
+      const seed = seedSetting === '1' ? randomSeed() : seedSetting || undefined;
+      const provenance = { producer: 'pipelex-method', model, seed };
+      const id = g.fixtureId(provenance);
+      process.stdout.write(`  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`);
       const briefText = await renderHeroBrief(hero, g);
-      const inputsPath = path.join(workRoot, `${pipeRef}.inputs.json`);
-      writeFileSync(inputsPath, JSON.stringify({ catalog_rules: prompt, brief: briefText }));
-      const outDir = path.join(workRoot, pipeRef);
+      const inputsPath = path.join(workRoot, `${pipeRef}.${id}.inputs.json`);
+      writeFileSync(
+        inputsPath,
+        JSON.stringify({
+          catalog_rules: prompt,
+          brief: briefText,
+          ...(seed ? { seed: seedLine(seed) } : {}),
+        }),
+      );
+      const outDir = path.join(workRoot, `${pipeRef}.${id}`);
       const args = [
         'run',
         'bundle',
@@ -786,71 +877,143 @@ async function generateSpecs(only) {
       );
       const jsonl = typeof mainStuff?.text === 'string' ? mainStuff.text : null;
       if (jsonl === null) die(`${pipeRef}: the run's main_stuff carries no text.`);
-
-      const spec = g.specFromJsonl(jsonl);
-      const verdict = g.validateAgainstCatalog(spec);
-      if (!verdict.ok) {
-        mkdirSync(BRIEFS_DIR, { recursive: true });
-        const rejectedPath = path.join(BRIEFS_DIR, `${pipeRef}.rejected.jsonl`);
-        writeFileSync(rejectedPath, jsonl);
+      if (jsonl.trim() === '') {
         die(
-          `${pipeRef}: the designer's spec does not validate against the catalog.\n` +
-            `${g.formatProblems(verdict.problems)}\n` +
-            `  The rejected text is at ${path.relative(REPO, rejectedPath)}. Repair the method or the\n` +
-            `  brief, never the fixture, and run the pass again.`,
+          `${pipeRef}: the run came back with an EMPTY text. On this runtime that is what a\n` +
+            `  completion truncated at the model's output cap looks like; raise max_tokens in the\n` +
+            `  designer's model pin, or check .pipelex/traces for the run's token counts.`,
         );
       }
 
-      byCase.get(hero.caseName)[pipeRef] = {
-        pipeRef,
-        source: 'generated',
-        model,
-        promptHash: hash,
-        date: today,
-        brief: briefRelPath(pipeRef),
-        jsonl,
-        spec,
-      };
-      process.stdout.write(`  ${pipeRef}: ${Object.keys(spec.elements).length} elements, valid\n`);
-    }
-
-    for (const [caseName, specs] of byCase) {
-      const outPath = path.join(OUT_DIR, `${caseName}.specs.ts`);
-      writeFileSync(outPath, emitSpecs(caseName, specs));
-      execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
+      const spec = compileOrDie(g, pipeRef, id, jsonl);
+      byCase.set(
+        hero.caseName,
+        storeFixture(g, byCase.get(hero.caseName), {
+          pipeRef,
+          ...provenance,
+          promptHash: hash,
+          date: today,
+          brief: briefRelPath(pipeRef),
+          jsonl,
+          spec,
+        }),
+      );
       process.stdout.write(
-        `  ${caseName}: ${Object.keys(specs).length} spec${Object.keys(specs).length === 1 ? '' : 's'} -> ${path.relative(REPO, outPath)}\n`,
+        `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid\n`,
       );
     }
+
+    for (const [caseName, specs] of byCase) writeSpecsModule(caseName, specs);
   } finally {
     rmSync(workRoot, { recursive: true, force: true });
   }
 }
 
-/** The specs module for one case: `pipe_ref` -> the captured spec with its provenance. */
+/**
+ * The CAPTURE command: a spec another producer wrote, taken in under the same
+ * discipline as the method's.
+ *
+ *   --capture <file.jsonl> --pipe <pipeRef> --producer <producer> --model <id>
+ *             [--seed <string>] [--critic <model>:<rounds>] [--check]
+ *
+ * `--check` validates and reports without storing anything - for a producer
+ * whose text is in hand while another pass still holds the case module.
+ *
+ * A Claude Code subagent given the prompt and the brief writes its JSONL to a
+ * file; this validates it exactly as the specs pass validates the method's
+ * text, stamps it with the current prompt hash and the provenance named on the
+ * command line, and stores it in the hero's case module beside the others. It
+ * never edits the text: a spec that does not validate is refused with its
+ * problems, and the producer runs again.
+ */
+async function captureSpec(args) {
+  const g = await loadGenerative();
+  const option = (name) => {
+    const at = args.indexOf(name);
+    return at === -1 ? undefined : args[at + 1];
+  };
+  const file = option('--capture');
+  const pipeRef = option('--pipe');
+  const producer = option('--producer');
+  const model = option('--model');
+  const seed = option('--seed');
+  const criticText = option('--critic');
+  if (!file || !pipeRef || !producer || !model) {
+    die('--capture needs <file.jsonl> --pipe <pipeRef> --producer <producer> --model <id>.');
+  }
+  if (!PRODUCERS.has(producer)) die(`unknown producer '${producer}'. One of: ${[...PRODUCERS].join(', ')}.`);
+  const hero = g.HEROES.find((candidate) => g.pipeRefOf(candidate) === pipeRef);
+  if (!hero) die(`${pipeRef} is not a hero.`);
+  let critic;
+  if (criticText) {
+    const match = /^(.+):(\d+)$/.exec(criticText);
+    if (!match) die(`--critic wants <model>:<rounds>, got '${criticText}'.`);
+    critic = { model: match[1], rounds: Number(match[2]) };
+  }
+  if (!existsSync(file)) die(`no such file: ${file}`);
+  const jsonl = readFileSync(file, 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
+  if (!jsonl) die(`${file} is empty.`);
+
+  const provenance = { producer, model, ...(seed ? { seed } : {}), ...(critic ? { critic } : {}) };
+  const id = g.fixtureId(provenance);
+  const spec = compileOrDie(g, pipeRef, id, jsonl);
+  if (args.includes('--check')) {
+    process.stdout.write(
+      `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid (not stored)\n`,
+    );
+    return;
+  }
+  const fixture = {
+    pipeRef,
+    ...provenance,
+    promptHash: g.promptHashOf(g.catalogPrompt()),
+    date: new Date().toISOString().slice(0, 10),
+    brief: briefRelPath(pipeRef),
+    jsonl,
+    spec,
+  };
+  const specs = storeFixture(g, await loadSpecs(hero.caseName), fixture);
+  process.stdout.write(`  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid\n`);
+  writeSpecsModule(hero.caseName, specs);
+}
+
+/** The specs module for one case: every captured spec of its heroes, with provenance. */
 function emitSpecs(caseName, specs) {
-  const pipeRefs = Object.keys(specs).sort();
-  const ordered = Object.fromEntries(pipeRefs.map((ref) => [ref, specs[ref]]));
+  const ordered = [...specs].sort((a, b) => {
+    if (a.pipeRef !== b.pipeRef) return a.pipeRef < b.pipeRef ? -1 : 1;
+    const ida = `${a.producer}--${a.model}--${a.seed ? 1 : 0}--${a.critic ? 1 : 0}`;
+    const idb = `${b.producer}--${b.model}--${b.seed ? 1 : 0}--${b.critic ? 1 : 0}`;
+    return ida < idb ? -1 : ida > idb ? 1 : 0;
+  });
+  const pipeRefs = [...new Set(ordered.map((entry) => entry.pipeRef))];
   return [
     '/**',
-    ` * Specs the designer method produced for the heroes of data/structures/${caseName}.mthds - DO NOT EDIT.`,
+    ` * Specs captured for the heroes of data/structures/${caseName}.mthds - DO NOT EDIT.`,
     ' *',
-    ' * Regenerate with `make fixtures-specs`, which runs `data/generative/ui-designer.mthds`',
-    " * through the real `pipelex run bundle` CLI over each hero's brief and validates",
-    ' * what came back against the catalog. This costs inference budget, which is why it',
-    ' * is its own target.',
+    ' * Regenerate the designer method\'s entries with `make fixtures-specs`, which runs',
+    ' * `data/generative/ui-designer.mthds` through the real `pipelex run bundle` CLI over',
+    " * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates",
+    ' * what came back against the catalog. Take in another producer\'s JSONL with the',
+    ' * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same',
+    ' * way. Both cost inference budget, which is why neither is implied by `make fixtures`.',
     ' *',
     " * **A spec is a payload's twin: the one artifact no projection can produce.** Each",
-    ' * entry records the model that produced it and the hash of the catalog prompt it was',
+    ' * entry records WHO produced it (the method through the CLI, a Claude Code subagent in',
+    ' * a fresh context, or the Claude Code session by hand), on which model, with which',
+    ' * seed and critic loop when there was one, and the hash of the catalog prompt it was',
     ' * produced against; the corpus test compares that hash with the current prompt, so a',
-    ' * catalog change that invalidates a spec is a failing test rather than a stale page.',
+    ' * prompt change that invalidates a spec is a failing test rather than a stale page.',
     ' */',
     "import type { SpecFixture } from '../generative/spec-fixture';",
     '',
     '/** Every pipe_ref a spec was captured for, in sorted order. */',
     `export const SPEC_PIPE_REFS = ${JSON.stringify(pipeRefs)} as const;`,
     '',
-    `export const SPECS: Record<string, SpecFixture> = ${JSON.stringify(ordered, null, 2)};`,
+    `export const SPECS: SpecFixture[] = ${JSON.stringify(ordered, null, 2)};`,
     '',
   ].join('\n');
 }
@@ -865,6 +1028,10 @@ function main() {
   }
   if (args.includes('--specs')) {
     generateSpecs(only).catch((error) => die(error?.stack ?? String(error)));
+    return;
+  }
+  if (args.includes('--capture')) {
+    captureSpec(args).catch((error) => die(error?.stack ?? String(error)));
     return;
   }
   const cases = discoverCases().filter((name) => !only || name === only);

@@ -1,5 +1,5 @@
 /**
- * The three heroes - the fixtures every source of a spec is judged on.
+ * The heroes - the fixtures every producer of a spec is judged on.
  *
  * Named here, once, because four things read the list: the briefs pass, the
  * specs pass, the corpus test and the stories. A hero is a pipe of the
@@ -47,6 +47,15 @@ export const HEROES: readonly Hero[] = [
     pipeCode: 'invoice_with_source',
     title: 'Invoice',
     summary: 'Describe an invoice and attach the document it came from.',
+  },
+  {
+    side: 'input',
+    caseName: 'trips',
+    domain: 'trips',
+    pipeCode: 'plan_trip',
+    title: 'Trip',
+    summary:
+      'Plan a trip: who is going, where and when, the budget, and the spirit of it - with a photo for the mood, if there is one.',
   },
 ];
 

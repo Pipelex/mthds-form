@@ -13,8 +13,77 @@ import {
   useStateValue,
 } from '@json-render/react';
 import { shadcnComponents } from '@json-render/shadcn';
+import {
+  Accessibility,
+  AlertCircle,
+  Baby,
+  Banknote,
+  BarChart3,
+  Bookmark,
+  Briefcase,
+  Building2,
+  Calendar,
+  Camera,
+  Car,
+  CheckCircle2,
+  Clock,
+  Coffee,
+  Coins,
+  Compass,
+  FileText,
+  Flag,
+  Gift,
+  Globe,
+  Hash,
+  Heart,
+  Home,
+  Hotel,
+  Hourglass,
+  Image,
+  Info,
+  Landmark,
+  Layers,
+  Leaf,
+  Lightbulb,
+  ListChecks,
+  type LucideIcon,
+  Mail,
+  Map,
+  MapPin,
+  Moon,
+  Mountain,
+  Music,
+  Package,
+  Paperclip,
+  Pencil,
+  Percent,
+  Phone,
+  Plane,
+  Receipt,
+  Rocket,
+  Route,
+  Send,
+  Shield,
+  Ship,
+  Sparkles,
+  Star,
+  Sun,
+  Tag,
+  Ticket,
+  Train,
+  TrendingUp,
+  Truck,
+  Upload,
+  User,
+  Users,
+  Utensils,
+  Wallet,
+  Zap,
+} from 'lucide-react';
+import { Tabs as TabsPrimitive } from 'radix-ui';
 import type { RunField } from '../../core';
 import { FieldRenderer, ResultField, type FieldEnv } from '../../react';
+import { fieldControlClass } from '../../react/field-styles';
 import {
   Select as SelectRoot,
   SelectContent,
@@ -22,15 +91,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../react/ui/select';
-import { catalog, type METRIC_FORMATS } from './catalog';
+import { ToggleGroup, ToggleGroupItem } from '../../react/ui/toggle-group';
+import { cn } from '../../react/utils';
+import { catalog, type ICON_NAMES, type METRIC_FORMATS } from './catalog';
 import { inputFieldAtPath, resultFieldAtPath } from './paths';
 
 /**
  * The registry: what each catalog entry RENDERS as.
  *
- * The shadcn subset binds the package's own implementations. The four custom
+ * The shadcn subset binds the package's own implementations. The custom
  * components are implemented here over this package's controls and vendored
- * primitives, and two of them are the escape hatches the design rests on:
+ * primitives - the vocabulary of an app (Split, Tabs, Steps, Icon, Segmented,
+ * NumberInput), the bound equivalents of what a model most wants to inline
+ * (DataTable, Metric), and the two escape hatches the design rests on:
  *
  *  - `MthdsField` renders ONE input through `FieldRenderer`, two-way at the
  *    path the spec names. It is the arm for the kinds the catalog cannot
@@ -298,6 +371,354 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
   );
 }
 
+// ─── The vocabulary of an app ────────────────────────────────────────────────
+
+type SplitRatio = '1:1' | '1:2' | '2:1';
+
+const SPLIT_COLUMNS: Record<SplitRatio, string> = {
+  '1:1': 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
+  '1:2': 'sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]',
+  '2:1': 'sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]',
+};
+
+const SPLIT_GAP: Record<'md' | 'lg' | 'xl', string> = { md: 'gap-4', lg: 'gap-6', xl: 'gap-8' };
+
+/** Two columns from two children, stacking under the `sm` breakpoint. */
+function Split({
+  props,
+  children,
+}: BaseComponentProps<{ ratio?: SplitRatio | null; gap?: 'md' | 'lg' | 'xl' | null }>) {
+  return (
+    <div
+      className={cn(
+        'grid grid-cols-1 items-start',
+        SPLIT_COLUMNS[props.ratio ?? '1:2'],
+        SPLIT_GAP[props.gap ?? 'lg'],
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface TabsProps {
+  tabs: { label: string; value: string }[];
+}
+
+/**
+ * Tabs whose panels follow the active tab - the reason shadcn's is not in the
+ * catalog. The nth child is the nth tab's panel; the active tab is local
+ * state, so a spec never touches /state for it. Radix unmounts an inactive
+ * panel, and the inputs in it keep their values in the store.
+ */
+function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
+  const tabs = props.tabs ?? [];
+  const panels = React.Children.toArray(children);
+  const [value, setValue] = React.useState(tabs[0]?.value ?? '');
+  return (
+    <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
+      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground">
+        {tabs.map((tab) => (
+          <TabsPrimitive.Trigger
+            key={tab.value}
+            value={tab.value}
+            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            {tab.label}
+          </TabsPrimitive.Trigger>
+        ))}
+      </TabsPrimitive.List>
+      {tabs.map((tab, index) => (
+        <TabsPrimitive.Content
+          key={tab.value}
+          value={tab.value}
+          className="mt-4 focus-visible:outline-hidden"
+        >
+          {panels[index] ?? null}
+        </TabsPrimitive.Content>
+      ))}
+    </TabsPrimitive.Root>
+  );
+}
+
+const BUTTON_BASE =
+  'inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50';
+const PRIMARY_BUTTON = cn(BUTTON_BASE, 'bg-primary text-primary-foreground hover:bg-primary/90');
+const SECONDARY_BUTTON = cn(
+  BUTTON_BASE,
+  'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+);
+
+interface StepsProps {
+  steps: string[];
+  nextLabel?: string | null;
+  backLabel?: string | null;
+}
+
+/**
+ * A journey: a numbered indicator, one panel at a time, and its own Back and
+ * Next. The nth child is the nth step's panel; the spec's one Button sits
+ * inside the last one, which is why Next disappears there. The current step
+ * is local state. A hidden panel is unmounted, and its inputs keep their
+ * values in the store - a step hides from the eye, never from the run.
+ */
+function Steps({ props, children }: BaseComponentProps<StepsProps>) {
+  const steps = props.steps ?? [];
+  const panels = React.Children.toArray(children);
+  const [index, setIndex] = React.useState(0);
+  const last = steps.length - 1;
+  return (
+    <div className="flex flex-col gap-5">
+      <ol className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {steps.map((label, position) => (
+          <li
+            key={`${position}-${label}`}
+            aria-current={position === index ? 'step' : undefined}
+            className={cn(
+              'flex items-center gap-2 text-sm',
+              position === index ? 'font-medium text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            <span
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums',
+                position < index
+                  ? 'bg-primary/15 text-primary'
+                  : position === index
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground',
+              )}
+            >
+              {position + 1}
+            </span>
+            {label}
+          </li>
+        ))}
+      </ol>
+      <div>{panels[index] ?? null}</div>
+      {index > 0 || index < last ? (
+        <div className="flex items-center justify-between gap-3">
+          {index > 0 ? (
+            <button
+              type="button"
+              data-testid="steps-back"
+              onClick={() => setIndex((current) => Math.max(0, current - 1))}
+              className={SECONDARY_BUTTON}
+            >
+              {props.backLabel ?? 'Back'}
+            </button>
+          ) : (
+            <span />
+          )}
+          {index < last ? (
+            <button
+              type="button"
+              data-testid="steps-next"
+              onClick={() => setIndex((current) => Math.min(last, current + 1))}
+              className={PRIMARY_BUTTON}
+            >
+              {props.nextLabel ?? 'Next'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type IconName = (typeof ICON_NAMES)[number];
+
+/** The closed list the catalog names, each bound to its lucide component. */
+const ICONS: Record<IconName, LucideIcon> = {
+  Sparkles,
+  Rocket,
+  Compass,
+  Map,
+  MapPin,
+  Route,
+  Plane,
+  Train,
+  Car,
+  Ship,
+  Hotel,
+  Home,
+  Building2,
+  Landmark,
+  Globe,
+  Mountain,
+  Leaf,
+  Sun,
+  Moon,
+  Calendar,
+  Clock,
+  Hourglass,
+  Users,
+  User,
+  Baby,
+  Accessibility,
+  Heart,
+  Star,
+  Utensils,
+  Coffee,
+  Music,
+  Camera,
+  Image,
+  Ticket,
+  Gift,
+  Wallet,
+  Banknote,
+  Coins,
+  Receipt,
+  Percent,
+  Hash,
+  TrendingUp,
+  BarChart3,
+  FileText,
+  Upload,
+  Paperclip,
+  Mail,
+  Phone,
+  Tag,
+  Layers,
+  ListChecks,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  Shield,
+  Flag,
+  Bookmark,
+  Briefcase,
+  Package,
+  Truck,
+  Lightbulb,
+  Zap,
+  Pencil,
+  Send,
+};
+
+/** Decorative: hidden from assistive technology, because it carries no text. */
+function Icon({ props }: BaseComponentProps<{ name: IconName; size?: 'sm' | 'md' | 'lg' | null }>) {
+  const Glyph = ICONS[props.name];
+  if (!Glyph) return null;
+  const size = props.size === 'lg' ? 'h-7 w-7' : props.size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+  return <Glyph aria-hidden="true" className={cn(size, 'shrink-0 text-muted-foreground')} />;
+}
+
+interface SegmentedProps {
+  label: string;
+  name: string;
+  options: string[];
+  value?: string | null;
+}
+
+/**
+ * A choice as a row of pills, over the package's own toggle group. The group
+ * is named by its visible label; each pill is a button with its option as its
+ * text. Deselecting is ignored, as shadcn's toggle group does, so the bound
+ * path never holds an empty string.
+ */
+function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>) {
+  const scope = React.useContext(DescriptorContext);
+  const [boundValue, setBoundValue] = useBoundProp<string>(
+    props.value ?? undefined,
+    bindings?.value,
+  );
+  const [localValue, setLocalValue] = React.useState('');
+  const isBound = Boolean(bindings?.value);
+  const value = isBound ? (boundValue ?? '') : localValue;
+  const setValue = isBound ? setBoundValue : setLocalValue;
+  const labelId = `${scope.idPrefix ?? 'gen'}-segmented-${props.name}`;
+  return (
+    <div className="space-y-2">
+      <span id={labelId} className="block text-sm leading-none font-medium">
+        {props.label}
+      </span>
+      <ToggleGroup
+        type="single"
+        aria-labelledby={labelId}
+        value={value}
+        onValueChange={(next: string) => {
+          if (!next) return;
+          setValue(next);
+          emit('change');
+        }}
+        className="flex-wrap justify-start gap-1.5"
+      >
+        {(props.options ?? []).map((option) => (
+          <ToggleGroupItem
+            key={option}
+            value={option}
+            variant="outline"
+            size="sm"
+            className="rounded-full px-3.5 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          >
+            {option}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+}
+
+interface NumberInputProps {
+  label: string;
+  name: string;
+  value?: number | null;
+  placeholder?: string | null;
+  unit?: string | null;
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+}
+
+/**
+ * A figure that writes a NUMBER to state - the gap Checkpoint 3 recorded
+ * against shadcn's `Input type="number"`, which writes the DOM's string. An
+ * emptied field writes `undefined`, which the kernel's readiness reads as
+ * absent, exactly as its own number control does.
+ */
+function NumberInput({ props, bindings, emit }: BaseComponentProps<NumberInputProps>) {
+  const scope = React.useContext(DescriptorContext);
+  const [boundValue, setBoundValue] = useBoundProp<number | undefined>(
+    props.value ?? undefined,
+    bindings?.value,
+  );
+  const [localValue, setLocalValue] = React.useState<number | undefined>(undefined);
+  const isBound = Boolean(bindings?.value);
+  const value = isBound ? boundValue : localValue;
+  const setValue = isBound ? setBoundValue : setLocalValue;
+  const id = `${scope.idPrefix ?? 'gen'}-number-${props.name}`;
+  return (
+    <div className="space-y-2">
+      <label htmlFor={id} className="text-sm leading-none font-medium">
+        {props.label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id={id}
+          type="number"
+          inputMode="decimal"
+          value={typeof value === 'number' ? value : ''}
+          min={props.min ?? undefined}
+          max={props.max ?? undefined}
+          step={props.step ?? 'any'}
+          placeholder={props.placeholder ?? undefined}
+          onChange={(event) => {
+            const raw = event.target.value;
+            setValue(raw === '' ? undefined : Number(raw));
+            emit('change');
+          }}
+          className={cn(
+            fieldControlClass,
+            'h-10 px-3 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none',
+          )}
+        />
+        {props.unit ? <span className="text-sm text-muted-foreground">{props.unit}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 // ─── The registry ────────────────────────────────────────────────────────────
 
 /**
@@ -306,7 +727,14 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
  * the implementation treats as "no extra class".
  */
 const components: Components<typeof catalog> = {
-  Card: (ctx) => shadcnComponents.Card({ ...ctx, props: { ...ctx.props, className: null } }),
+  // shadcn's Card takes a `maxWidth` whose "lg" is 448px - a card a model
+  // meant as large came out narrower than its page. The catalog omits the
+  // prop, and every card is as wide as its column.
+  Card: (ctx) =>
+    shadcnComponents.Card({
+      ...ctx,
+      props: { ...ctx.props, maxWidth: null, centered: null, className: null },
+    }),
   // shadcn's Stack defaults `align` to `start`, so a table or a grid inside a
   // vertical stack hugs its content instead of taking the page's width - the
   // one layout a result page never wants. A vertical stack stretches unless
@@ -328,14 +756,23 @@ const components: Components<typeof catalog> = {
   Badge: shadcnComponents.Badge,
   Alert: shadcnComponents.Alert,
   Progress: shadcnComponents.Progress,
+  Avatar: shadcnComponents.Avatar,
   Input: shadcnComponents.Input,
   Textarea: shadcnComponents.Textarea,
   // shadcn's Select renders a Label beside a trigger with no accessible name,
   // which axe reports as a button without a name (`a11y` runs at error). Ours
   // is the package's own vendored select under a label that names the trigger.
   Select: (ctx) => <AccessibleSelect {...ctx} />,
+  Radio: shadcnComponents.Radio,
+  Checkbox: shadcnComponents.Checkbox,
   Switch: shadcnComponents.Switch,
   Button: shadcnComponents.Button,
+  Split: (ctx) => <Split {...ctx} />,
+  Tabs: (ctx) => <Tabs {...ctx} />,
+  Steps: (ctx) => <Steps {...ctx} />,
+  Icon: (ctx) => <Icon {...ctx} />,
+  Segmented: (ctx) => <Segmented {...ctx} />,
+  NumberInput: (ctx) => <NumberInput {...ctx} />,
   // Ours are React components (they use hooks), so each is MOUNTED rather than
   // called: a render function that called hooks itself would run them inside
   // the registry's wrapper and break the moment the wrapper re-ordered them.

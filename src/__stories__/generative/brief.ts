@@ -266,7 +266,7 @@ export function renderInputBrief(subject: BriefSubject, fields: readonly RunFiel
     gating.length > 0
       ? `The run waits for ${gating.join(', ')}; say so near the Run button, briefly.`
       : 'Nothing gates the run.',
-    'The page ends with one `Button` labelled "Run", `on.press` bound to `validateForm` then `run`.',
+    "The page has exactly one `Button`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.",
     '',
   ].join('\n');
 }

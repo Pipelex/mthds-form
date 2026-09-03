@@ -62,10 +62,9 @@ function projectInput(elements: Elements, field: RunField, path: string): string
         value: { $bindState: path },
       });
     case 'number':
-      return add(elements, key, 'Input', {
+      return add(elements, key, 'NumberInput', {
         label,
         name: key,
-        type: 'number',
         placeholder: field.description ?? null,
         value: { $bindState: path },
       });

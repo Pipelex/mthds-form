@@ -1,0 +1,12 @@
+{
+  "description": "The trip planner's input side: one structure with every app-shaped control's natural home, plus an optional photo for the mood.",
+  "pipes": [
+    {
+      "code": "plan_trip",
+      "slots": [
+        { "name": "request", "concept": "TripRequest" },
+        { "name": "inspiration", "concept": "Image", "presence": "optional" }
+      ]
+    }
+  ]
+}

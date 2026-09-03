@@ -133,3 +133,98 @@ describe('GenerativePage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('/inputs/nope');
   });
 });
+
+describe('the vocabulary of an app', () => {
+  it('NumberInput writes a number, and an emptied field writes nothing', async () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['total'] },
+        total: {
+          type: 'NumberInput',
+          props: { label: 'Total', name: 'total', value: { $bindState: '/inputs/total' } },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({ inputs: {} });
+    render(<GenerativePage spec={spec} store={store} scope={{ inputs: INPUT_FIELDS }} />);
+    const input = screen.getByLabelText('Total');
+    await userEvent.type(input, '12.5');
+    expect(store.get('/inputs/total')).toBe(12.5);
+    await userEvent.clear(input);
+    expect(store.get('/inputs/total')).toBeUndefined();
+  });
+
+  it('Segmented writes the chosen option and names its group by the label', async () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['status'] },
+        status: {
+          type: 'Segmented',
+          props: {
+            label: 'Status',
+            name: 'status',
+            options: ['draft', 'sent'],
+            value: { $bindState: '/inputs/status' },
+          },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({ inputs: {} });
+    render(<GenerativePage spec={spec} store={store} scope={{ inputs: INPUT_FIELDS }} />);
+    expect(screen.getByRole('radiogroup', { name: 'Status' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'sent' }));
+    expect(store.get('/inputs/status')).toBe('sent');
+  });
+
+  it('Steps shows one panel at a time and moves with its own buttons', async () => {
+    const spec: Spec = {
+      root: 'journey',
+      elements: {
+        journey: { type: 'Steps', props: { steps: ['Where', 'How'] }, children: ['where', 'how'] },
+        where: { type: 'Stack', props: {}, children: ['city'] },
+        city: { type: 'Heading', props: { text: 'Where to', level: 'h2' }, children: [] },
+        how: { type: 'Stack', props: {}, children: ['pace'] },
+        pace: { type: 'Heading', props: { text: 'How fast', level: 'h2' }, children: [] },
+      },
+    };
+    const store = createStateStore({ inputs: {} });
+    render(<GenerativePage spec={spec} store={store} scope={{ inputs: INPUT_FIELDS }} />);
+    expect(screen.getByRole('heading', { name: 'Where to' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'How fast' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('heading', { name: 'How fast' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('heading', { name: 'Where to' })).toBeInTheDocument();
+  });
+
+  it('Tabs shows the panel of the active tab only', async () => {
+    const spec: Spec = {
+      root: 'tabs',
+      elements: {
+        tabs: {
+          type: 'Tabs',
+          props: {
+            tabs: [
+              { label: 'One', value: 'one' },
+              { label: 'Two', value: 'two' },
+            ],
+          },
+          children: ['one', 'two'],
+        },
+        one: { type: 'Heading', props: { text: 'First panel', level: 'h2' }, children: [] },
+        two: { type: 'Heading', props: { text: 'Second panel', level: 'h2' }, children: [] },
+      },
+    };
+    const store = createStateStore({ inputs: {} });
+    render(<GenerativePage spec={spec} store={store} scope={{ inputs: INPUT_FIELDS }} />);
+    expect(screen.getByRole('heading', { name: 'First panel' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Second panel' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Two' }));
+    expect(screen.getByRole('heading', { name: 'Second panel' })).toBeInTheDocument();
+  });
+});

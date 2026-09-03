@@ -17,9 +17,12 @@ import * as scalars from '../_generated/scalars';
 import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
 import { SPECS as INPUT_SPECS } from '../_generated/structured.specs';
+import * as trips from '../_generated/trips';
+import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
 import { renderInputBrief, renderResultBrief } from '../generative/brief';
 import { CUSTOM_COMPONENTS, PICKED_SHADCN, catalog, catalogPrompt } from '../generative/catalog';
 import { AUTHORED } from '../generative/authored';
+import { APP_DIRECTION, SEED_PROCEDURE } from '../generative/direction';
 import { HEROES, pipeRefOf } from '../generative/heroes';
 import {
   absoluteHatchPath,
@@ -30,6 +33,7 @@ import {
 import { currentPromptHash } from '../generative/prompt-hash';
 import { projectInputSpec, projectResultSpec } from '../generative/project-spec';
 import { CUSTOM_RULES } from '../generative/rules';
+import { fixtureId, fixtureLabel, type Producer } from '../generative/spec-fixture';
 import { payloadToState, seedInputs } from '../generative/state';
 import { specFromJsonl, specToJsonl } from '../generative/stream';
 import { formatProblems, validateAgainstCatalog } from '../generative/validate';
@@ -50,7 +54,15 @@ interface CaseModule {
   OUTPUT_FORM: OutputForm;
 }
 
-const CASES: Record<string, CaseModule> = { files, lists, results, scalars, states, structured };
+const CASES: Record<string, CaseModule> = {
+  files,
+  lists,
+  results,
+  scalars,
+  states,
+  structured,
+  trips,
+};
 
 function splitRef(pipeRef: string): [string, string] {
   const dot = pipeRef.indexOf('.');
@@ -84,6 +96,14 @@ describe('the catalog prompt', () => {
   it('never asks for sample data', () => {
     expect(prompt.toLowerCase()).not.toContain('sample data');
     expect(prompt).not.toContain('INITIAL STATE');
+  });
+
+  it('carries the design direction and the seed procedure, so the hash covers both', () => {
+    expect(prompt).toContain('DESIGN DIRECTION:');
+    for (const paragraph of APP_DIRECTION) expect(prompt).toContain(paragraph);
+    expect(prompt).toContain('CREATIVE SEED:');
+    for (const paragraph of SEED_PROCEDURE) expect(prompt).toContain(paragraph);
+    expect(prompt).toContain('never as a form');
   });
 
   it('strips className from every picked definition', () => {
@@ -138,6 +158,7 @@ describe('the projection', () => {
     expect(spec.elements['inputs-invoice-reference']!.props.value).toEqual({
       $bindState: '/inputs/invoice/reference',
     });
+    expect(spec.elements['inputs-invoice-total']!.type).toBe('NumberInput');
     expect(spec.elements['inputs-invoice-issued_on']!.type).toBe('MthdsField');
     expect(spec.elements['inputs-invoice-lines']!.type).toBe('MthdsField');
     expect(spec.elements['inputs-source']!).toEqual({
@@ -168,15 +189,68 @@ describe('the validator', () => {
       root: 'page',
       elements: {
         page: { type: 'Stack', props: { direction: 'sideways' }, children: ['a', 'b'] },
-        a: { type: 'Tabs', props: {}, children: [] },
+        a: { type: 'Carousel', props: {}, children: [] },
         b: { type: 'Heading', props: { text: 'x', size: 'xl' }, children: [] },
       },
     });
     expect(verdict.ok).toBe(false);
     const text = formatProblems(verdict.problems);
-    expect(text).toContain('unknown component type "Tabs"');
+    expect(text).toContain('unknown component type "Carousel"');
     expect(text).toContain('Heading has no prop "size"');
     expect(text).toContain('Stack.direction');
+  });
+
+  it('wants one child per tab or step, two per split, and no Button as a panel', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: { type: 'Split', props: { ratio: '1:2' }, children: ['tabs', 'steps', 'x'] },
+        tabs: {
+          type: 'Tabs',
+          props: {
+            tabs: [
+              { label: 'A', value: 'a' },
+              { label: 'B', value: 'b' },
+            ],
+          },
+          children: ['a'],
+        },
+        steps: { type: 'Steps', props: { steps: ['One', 'Two'] }, children: ['a', 'run'] },
+        a: { type: 'Stack', props: {}, children: [] },
+        x: { type: 'Stack', props: {}, children: [] },
+        run: { type: 'Button', props: { label: 'Run' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    const text = formatProblems(verdict.problems);
+    expect(text).toContain('Tabs declares 2 panels but has 1 child');
+    expect(text).toContain('Steps has a Button as a direct child');
+    expect(text).toContain('Split takes exactly two children');
+  });
+
+  it('refuses a heading that skips a level, in render order', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['title', 'section', 'sub'] },
+        title: { type: 'Heading', props: { text: 'Trip', level: 'h1' }, children: [] },
+        section: { type: 'Heading', props: { text: 'Where', level: 'h3' }, children: [] },
+        sub: { type: 'Heading', props: { text: 'Fine', level: 'h4' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    const text = formatProblems(verdict.problems);
+    expect(text).toContain('[section] Heading jumps to h3 after h1');
+    expect(text).not.toContain('[sub]');
+  });
+
+  it('refuses an icon the catalog does not name', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'i',
+      elements: { i: { type: 'Icon', props: { name: 'Unicorn' }, children: [] } },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('Icon.name');
   });
 
   it('accepts a bound prop where a literal would be the wrong type', () => {
@@ -363,8 +437,8 @@ describe('a hatch path inside a repeat', () => {
 });
 
 describe('the spec fixtures', () => {
-  const SPECS = { ...RESULT_SPECS, ...INPUT_SPECS };
-  const fixtures = [...Object.values(SPECS), ...Object.values(AUTHORED)];
+  const fixtures = [...RESULT_SPECS, ...INPUT_SPECS, ...TRIP_SPECS, ...AUTHORED];
+  const PRODUCERS: Producer[] = ['pipelex-method', 'claude-code-subagent', 'claude-code-session'];
 
   /** Every `{ $bindState: path }` anywhere in an element's props. */
   function boundPaths(spec: Spec): string[] {
@@ -396,23 +470,40 @@ describe('the spec fixtures', () => {
     return { result: buildResultField(descriptor, contract.output.json_schema) };
   }
 
-  it('has a captured and an authored spec for every hero', () => {
+  it('has, for every hero, a spec by the designer method and one written by hand', () => {
     for (const hero of HEROES) {
-      expect(SPECS[pipeRefOf(hero)], `captured ${pipeRefOf(hero)}`).toBeDefined();
-      expect(AUTHORED[pipeRefOf(hero)], `authored ${pipeRefOf(hero)}`).toBeDefined();
+      const ref = pipeRefOf(hero);
+      const producers = fixtures
+        .filter((fixture) => fixture.pipeRef === ref)
+        .map((f) => f.producer);
+      expect(producers, `${ref}: pipelex-method`).toContain('pipelex-method');
+      expect(producers, `${ref}: claude-code-session`).toContain('claude-code-session');
+    }
+  });
+
+  it('gives every fixture of a hero its own id, and titles it by what made it', () => {
+    for (const hero of HEROES) {
+      const ref = pipeRefOf(hero);
+      const ids = fixtures.filter((fixture) => fixture.pipeRef === ref).map(fixtureId);
+      expect(new Set(ids).size, ref).toBe(ids.length);
+    }
+    for (const fixture of fixtures) {
+      const label = fixtureLabel(fixture);
+      expect(label).toContain(fixture.model);
+      expect(label.toLowerCase()).not.toMatch(/\b(authored|generated)\b/);
     }
   });
 
   for (const fixture of fixtures) {
-    describe(`${fixture.pipeRef} (${fixture.source})`, () => {
+    describe(`${fixture.pipeRef} (${fixtureId(fixture)})`, () => {
       it('validates against the catalog', () => {
         const verdict = validateAgainstCatalog(fixture.spec);
         expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
       });
 
       it('was produced against the current catalog prompt', () => {
-        // A stale hash means the catalog moved under the fixture: regenerate a
-        // captured spec, re-read an authored one against the new prompt and
+        // A stale hash means the prompt moved under the fixture: regenerate a
+        // captured spec, re-read a hand-written one against the new prompt and
         // re-stamp it.
         expect(fixture.promptHash).toBe(currentPromptHash());
       });
@@ -424,7 +515,18 @@ describe('the spec fixtures', () => {
       it('names its brief and its provenance', () => {
         expect(fixture.brief).toMatch(/^wip\/generative-ui\/briefs\/.+\.md$/);
         expect(fixture.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-        expect(fixture.source === 'generated' ? fixture.model : fixture.author).toBeTruthy();
+        expect(PRODUCERS).toContain(fixture.producer);
+        expect(fixture.model).toBeTruthy();
+        if (fixture.seed !== undefined) expect(fixture.seed.length).toBeGreaterThan(8);
+        if (fixture.critic) {
+          expect(fixture.critic.model).toBeTruthy();
+          expect(fixture.critic.rounds).toBeGreaterThanOrEqual(1);
+        }
+      });
+
+      it('never quotes its seed on the page', () => {
+        if (!fixture.seed) return;
+        expect(fixture.jsonl).not.toContain(fixture.seed);
       });
 
       it('delegates only to paths the descriptor has', () => {
@@ -462,7 +564,7 @@ describe('the spec fixtures', () => {
         for (const path of bound) expect(inputFieldAtPath(scope.inputs, path), path).toBeTruthy();
       });
 
-      it('ends an input page with one Run button firing validateForm then run', () => {
+      it('has, on an input page, exactly one Button, firing validateForm then run', () => {
         if (!descriptorFor(fixture.pipeRef).inputs) return;
         const buttons = Object.values(fixture.spec.elements).filter(
           (element) => element.type === 'Button',
@@ -471,6 +573,20 @@ describe('the spec fixtures', () => {
         const press = buttons[0]!.on?.press;
         const actions = (Array.isArray(press) ? press : [press]).map((binding) => binding?.action);
         expect(actions).toEqual(['validateForm', 'run']);
+      });
+
+      it("lists, on an input page, exactly the brief's choices wherever it offers a choice", () => {
+        const scope = descriptorFor(fixture.pipeRef);
+        if (!scope.inputs) return;
+        for (const [key, element] of Object.entries(fixture.spec.elements)) {
+          if (!['Segmented', 'Radio', 'Select'].includes(element.type)) continue;
+          const props = element.props as { options?: unknown; value?: { $bindState?: string } };
+          const path = props.value?.$bindState;
+          if (!path) continue;
+          const field = inputFieldAtPath(scope.inputs, path);
+          expect(field?.kind, `${key} binds ${path}`).toBe('enum');
+          if (field?.kind === 'enum') expect(props.options, key).toEqual(field.options);
+        }
       });
     });
   }

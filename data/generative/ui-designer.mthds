@@ -14,12 +14,18 @@ description = "Lays out one page for a method - its inputs, or its result - as a
 # fails loudly on any issue, so a repair is a change HERE, never to the fixture.
 #
 # The model is pinned. The specs pass takes MODEL=<id> to override the pin for a
-# comparative run, and records which model produced each fixture.
+# comparative run (and TEMPERATURE=<n> for a model that fixes its own), and
+# records which model produced each fixture.
+#
+# The optional `seed` is the creative seed of the catalog rules' last section:
+# a random string the harness generates, handed over as one line the prompt
+# labels, so two runs of the same brief diverge. Absent, the model designs from
+# the brief alone, and the guarded reference below prints nothing.
 
 [pipe.ui_designer]
 type = "PipeLLM"
 description = "Design one page from the catalog rules and the brief: emit the JSONL patches of a spec bound to the host's state."
-inputs = { catalog_rules = "Text", brief = "Text" }
+inputs = { catalog_rules = "Text", brief = "Text", seed = "Text?" }
 output = "Text"
 # The object form, because the default output cap (4096 tokens on this model)
 # is not enough for a page over a deeply nested result: the Company hero's
@@ -35,6 +41,10 @@ prompt = """
 Below is the brief for the page you are designing. It is the ONLY source of paths: every value you show or bind must be at a path the brief lists, spelled exactly as written.
 
 @brief
+
+---
+
+@?seed
 
 ---
 

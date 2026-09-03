@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { computeReadiness } from '../../core';
-import { CONTRACTS, INPUT_FORM } from '../_generated/structured';
-import { SPECS } from '../_generated/structured.specs';
+import { CONTRACTS, INPUT_FORM } from '../_generated/trips';
+import { SPECS } from '../_generated/trips.specs';
 import { CaseForm } from '../case-form';
 import { AUTHORED } from './authored';
 import { HEROES } from './heroes';
@@ -12,26 +12,24 @@ import { projectInputSpec } from './project-spec';
 import { fixtureStories, skippable } from './source-stories';
 
 /**
- * The input hero: an invoice and the document it came from, as a page, laid
- * out by every producer over the very same descriptor.
+ * The richer input hero: a trip request - who is going, where and when, the
+ * budget, the spirit of it, a photo for the mood. Every app-shaped control has
+ * a natural home in it, and "plan my trip" is the kind of page people expect
+ * to look designed, which is what this hero exists to test.
  *
- * The first story is the package's own form; the second the deterministic
- * projection into the catalog, the floor. Every other story is one captured
- * spec, titled with what produced it - the harness, the model, the seed or
- * the critic loop when there was one - and never with a role. Each generative
- * story shows, under the page, the receipt a host never shows: the `/inputs`
- * tree as the run would receive it and the readiness the kernel computes from
- * it. That receipt is what the play function checks - typing into whichever
- * control the producer chose lands in the tree at the bound path, and the
- * readiness line agrees with `computeReadiness` over that very tree.
+ * Same discipline as the invoice: the package's own form first, the floor
+ * second, then one story per captured spec titled with what produced it. The
+ * play types a budget into whichever control the producer chose and reads it
+ * back off the receipt - as a NUMBER when the producer used NumberInput, and
+ * as text when it did not, which the reading records rather than the gate.
  */
 
-const PIPE_REF = 'structured.invoice_with_source';
+const PIPE_REF = 'trips.plan_trip';
 const hero = HEROES.find((candidate) => `${candidate.domain}.${candidate.pipeCode}` === PIPE_REF)!;
 const fields = loadInputHero(hero, CONTRACTS, INPUT_FORM);
 const FIXTURES = [...SPECS, ...AUTHORED].filter((fixture) => fixture.pipeRef === PIPE_REF);
 
-function InvoiceInputs({ source }: { source: string }) {
+function TripInputs({ source }: { source: string }) {
   if (source === 'kernel') {
     return (
       <CaseForm
@@ -51,9 +49,9 @@ function InvoiceInputs({ source }: { source: string }) {
 }
 
 const meta = {
-  title: 'Generative/Inputs/Invoice',
-  component: InvoiceInputs,
-} satisfies Meta<typeof InvoiceInputs>;
+  title: 'Generative/Inputs/Trip',
+  component: TripInputs,
+} satisfies Meta<typeof TripInputs>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -61,20 +59,14 @@ type Story = StoryObj<typeof meta>;
 /** Every story renders twice - the `ThemePair` decorator shows both themes. */
 const BOTH_THEMES = 2;
 
-/**
- * Type a reference into the first pane's reference input - wherever the
- * producer put it - and read it back off the receipt; then check the
- * readiness line against the kernel's own computation over the receipt's
- * tree. Both panes have a receipt; the first is the one typed into.
- */
 const writesThroughToInputs: Story['play'] = skippable(async ({ canvasElement }) => {
   const canvas = within(canvasElement);
   const receipts = canvas.getAllByTestId('inputs-receipt');
   await expect(receipts).toHaveLength(BOTH_THEMES);
 
-  const reference = await revealInput(canvasElement, /reference/i, 'reference');
-  await userEvent.type(reference, 'INV-2026-0042');
-  await expect(receipts[0]).toHaveTextContent('"reference": "INV-2026-0042"');
+  const budget = await revealInput(canvasElement, /budget/i, 'budget');
+  await userEvent.type(budget, '2500');
+  await expect(receipts[0]).toHaveTextContent(/"budget": "?2500"?/);
 
   const tree = JSON.parse(receipts[0]!.textContent ?? '{}') as Record<string, unknown>;
   const readiness = computeReadiness(fields, tree);
@@ -83,10 +75,9 @@ const writesThroughToInputs: Story['play'] = skippable(async ({ canvasElement })
   );
 });
 
-/** The kernel form has no receipt; it shows the reference control and that is the check. */
 const showsTheForm: Story['play'] = skippable(async ({ canvasElement }) => {
   const canvas = within(canvasElement);
-  await expect(canvas.getAllByLabelText(/reference/i)).toHaveLength(BOTH_THEMES);
+  await expect(canvas.getAllByLabelText(/budget/i)).toHaveLength(BOTH_THEMES);
 });
 
 const stories = fixtureStories<Story>(FIXTURES, writesThroughToInputs);

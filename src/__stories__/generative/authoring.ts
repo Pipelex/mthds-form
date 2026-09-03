@@ -71,19 +71,25 @@ export function element<K extends ComponentName>(
 
 export interface AuthoredSpecInput {
   pipeRef: string;
-  author: string;
+  /** The model behind the session that wrote it, as an id: `claude-fable-5-1`. */
+  model: string;
   date: string;
   promptHash: string;
   brief: string;
   spec: Spec;
 }
 
-/** An authored spec as a fixture: the same shape a captured one has, with `source: 'authored'`. */
+/**
+ * A hand-written spec as a fixture: the same shape a captured one has, with
+ * the producer recorded as the Claude Code session that wrote it in the repo -
+ * a session with the whole codebase in context, which is what distinguishes
+ * it from a subagent given the prompt and the brief alone.
+ */
 export function defineAuthoredSpec(input: AuthoredSpecInput): SpecFixture {
   return {
     pipeRef: input.pipeRef,
-    source: 'authored',
-    author: input.author,
+    producer: 'claude-code-session',
+    model: input.model,
     promptHash: input.promptHash,
     date: input.date,
     brief: input.brief,
