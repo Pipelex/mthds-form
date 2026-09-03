@@ -1,9 +1,5 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { StorybookConfig } from '@storybook/react-vite';
-import tailwindcss from 'tailwindcss';
-
-const dirname = path.dirname(fileURLToPath(import.meta.url));
+import tailwindcss from '@tailwindcss/vite';
 
 /**
  * Storybook is where the controls are LOOKED at. The unit suites already assert
@@ -38,14 +34,10 @@ const config: StorybookConfig = {
      * Tailwind build of its own. This repo has one, and pointing its own
      * Storybook at the prebuilt artifact would defeat the purpose: a control
      * styled with a utility that is not in the LAST BUILT `styles.css` would
-     * render unstyled in the very Storybook meant to catch that. Reading
-     * `tailwind-entry.css` through this postcss pass regenerates the utilities
-     * from the current source on every reload.
-     *
-     * The plugin is declared INLINE rather than through a root
-     * `postcss.config.cjs`, and that is not a style choice: the Tailwind CLI
-     * behind `npm run build:css` picks up a root postcss config too, which
-     * would run the Tailwind plugin twice over the same entry.
+     * render unstyled in the very Storybook meant to catch that. The
+     * `@tailwindcss/vite` plugin below compiles `.storybook/tailwind.css` -
+     * which imports `src/styles/tailwind-entry.css` and widens its scan to the
+     * stories - from the current source on every reload.
      */
     /**
      * Pre-bundle the control set's runtime dependencies up front.
@@ -74,12 +66,7 @@ const config: StorybookConfig = {
       ],
     };
 
-    viteConfig.css = {
-      ...(viteConfig.css ?? {}),
-      postcss: {
-        plugins: [tailwindcss({ config: path.resolve(dirname, '../tailwind.config.cjs') })],
-      },
-    };
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), tailwindcss()];
     return viteConfig;
   },
 };

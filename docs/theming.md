@@ -22,21 +22,21 @@ If your app is already a shadcn/ui codebase, you have all of these and there is 
 
 ### A host that runs Tailwind (the common case)
 
-Your build has to see the package's classes, since they live in shipped JavaScript rather than in your source tree.
+Your build has to see the package's classes, since they live in shipped JavaScript rather than in your source tree — and **that build must be Tailwind v4.** The controls are written in v4's vocabulary (`outline-hidden`, `aria-invalid:`, `data-placeholder:`, the `(--radix-…)` variable form, `wrap-break-word`), and a v3 build compiles those names to nothing: the controls render, but without their focus, invalid and placeholder states.
 
-Tailwind v3 — add the package to `content`:
-
-```js
-content: ['./src/**/*.{ts,tsx}', './node_modules/@pipelex/mthds-form/dist/**/*.js'],
-```
-
-Tailwind v4 — add a source directive to your stylesheet:
+Add a source directive to your stylesheet, and import `tw-animate-css` — the select popover's and the tooltip's enter and exit transitions are its utilities:
 
 ```css
+@import 'tailwindcss';
+@import 'tw-animate-css';
 @source "../node_modules/@pipelex/mthds-form/dist";
 ```
 
-Either way you also need `tailwindcss-animate` in your plugins: the select popover's enter and exit transitions are its utilities. Do **not** load `styles.css` in this setup — your own build already produces those utilities, and the prebuilt sheet carries a second copy of Tailwind's preflight.
+Then make sure your theme maps the token names the controls use. In v4 the names a utility resolves are the theme's `--color-*` and `--radius-*` keys, and the mapping this package itself uses is the `@theme inline` block in `src/styles/tailwind-entry.css` — `--color-border: hsl(var(--border))` and so on, over the shadcn/ui HSL triplets. A shadcn/ui v4 codebase already maps the same keys onto its own token format, and that works as well: the utilities in `dist` compile against **your** theme, so what matters is that `--color-border`, `--color-input`, `--color-ring`, `--color-background`, `--color-foreground`, the `primary`/`secondary`/`destructive`/`muted`/`accent`/`popover`/`card` pairs and `--radius-lg`/`-md`/`-sm` resolve to something. The HSL-triplet form is only baked into the prebuilt sheet.
+
+Do **not** load `styles.css` in this setup — your own build already produces those utilities, and the prebuilt sheet carries a second copy of Tailwind's preflight.
+
+Two v4 preflight facts the package relies on, in case your build restricts preflight: the controls name every border colour explicitly, so the default border colour is irrelevant, and the package's own stylesheet restores `cursor: pointer` on enabled buttons, which v4's preflight no longer does. A Tailwind host gets its own preflight, so the second one is worth adding to your base layer if your buttons are meant to be pointers — the controls' buttons carry no cursor class.
 
 ### A host that does not run Tailwind
 

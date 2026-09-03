@@ -9,7 +9,6 @@ docs/
 wip/
 vitest.config.mts
 tsup.config.ts
-tailwind.config.cjs
 eslint.config.mjs
 .prettierrc
 Makefile

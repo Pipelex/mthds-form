@@ -98,13 +98,11 @@ Two consequences worth knowing before writing a story:
 
 ## Styling: source, not the prebuilt sheet
 
-`.storybook/preview.tsx` loads `src/styles/theme.css` and `src/styles/tailwind-entry.css`, and `.storybook/main.ts` runs the Tailwind plugin over them through an inline postcss pass.
+`.storybook/preview.tsx` loads `src/styles/theme.css` and `.storybook/tailwind.css`, and `.storybook/main.ts` compiles the latter with the `@tailwindcss/vite` plugin.
 
 This is deliberately **not** what a consumer's Storybook does. A consumer with no Tailwind build loads the prebuilt `dist/styles.css`; this repo has a Tailwind build, and pointing its own Storybook at the prebuilt artifact would defeat the purpose — a control styled with a utility that is not in the last built `styles.css` would render unstyled in the very Storybook meant to catch that.
 
-The Tailwind plugin is declared inline in `viteFinal` rather than through a root `postcss.config.cjs`, because the Tailwind CLI behind `npm run build:css` would pick up a root postcss config too and run the plugin twice over the same entry.
-
-Note that `tailwind.config.cjs` scans `src/react/**` only, and that stays true: story chrome uses inline styles over the theme tokens, never Tailwind utilities. Widening those content globs to cover story code would put utilities into a consumer's stylesheet that no control uses.
+`.storybook/tailwind.css` is a superset entry: it imports the package's own `src/styles/tailwind-entry.css` and adds `@source` directives for the story tree. The package's entry scans `src/react` only, through `source(none)` and one `@source`, so the shipped sheet carries nothing a control does not use; widening the scan to story code happens in this file, which ships nowhere. Story chrome still uses inline styles over the theme tokens rather than utilities, so that it cannot be mistaken for a control.
 
 ## Fixtures are generated, never written
 
