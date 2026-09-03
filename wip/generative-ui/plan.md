@@ -267,6 +267,10 @@ Paused on Louis's request as the context filled, at a clean boundary: the layer,
 
 Planned in [`plan-brand-as-data.md`](plan-brand-as-data.md), a plan that stands on its own: it opens with a compact record of Checkpoints 0 to 4 and the facts a cold session needs, so the work continues from that file alone. This plan keeps the full record of the first step and of the redirect above.
 
+#### Phase 6 — recorded 2026-09-03
+
+The step ran to both of its checkpoints, the pipeline (Checkpoint 5) and the producer (Checkpoint 6), read in [`plan-brand-as-data.md`](plan-brand-as-data.md). The headline findings, for this record: the loop runs end to end from a URL and every run validated on the first call or after one repair round, every repair being an alias written without its dark value; a light mode derived from a dark-only site reads as the brand; the extractor had to compute the cascade for the page as served, because a model handed every declaration of a custom property took a framework's default over the site's override; and on a site that shows no button the accent is a design decision rather than a reading, where everything the facts state stayed stable across runs.
+
 ## Phase 4 — Docs, closing the step
 
 Written before the checkpoint so the decision is made on a documented layer, and kept whichever way it goes: the record of what was tried is the deliverable if json-render is not adopted.
