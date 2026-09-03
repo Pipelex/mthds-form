@@ -12,6 +12,12 @@ Three things a real result made obvious, all in `ResultField`.
 
 - **And the table fills its box.** `min-w-full` alone left the table content-sized whenever its columns were narrower than the panel, so the header band and every row rule stopped mid-box with empty bordered space to their right and the table looked half-drawn. It is now `w-full` **beside** `min-w-full`, which costs nothing: the two agree at 100% while the content is narrow, and once the columns need more, auto table layout grows past both into the scroller rather than crushing them — headers are `whitespace-nowrap` and cells truncate, so nothing wraps to buy the space back.
 
+### Added - the annual-report ledger, as a story
+
+`Outputs/Ledger` reproduces the payload the three faults above were reported against: a record of short scalars with one long table of records among them, and `?` numbers beside required strings. No generated case carried that shape, which is why the faults reached a real run before a story caught them. Three arms — at panel width, in a narrow column, and with the optional totals absent — and the play function asserts from the computed style rather than the markup, because the stacked layout and the aligned one render the same text in the same order.
+
+Its artifacts are hand-written rather than generated from `data/structures/`, the documented exception to that rule (`drift.stories.tsx` is the other): regenerating needs the engine, and a fixture that cannot be produced offline is a fixture that stops being run.
+
 See [docs/result-view.md](docs/result-view.md).
 
 ## [v0.6.0] - 2026-09-02
