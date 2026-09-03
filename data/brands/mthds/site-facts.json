@@ -9,7 +9,10 @@
     "lang": "en"
   },
   "stated": {
-    "accent": "#1a1a1a",
+    "accent": {
+      "light": "#1a1a1a",
+      "dark": "#e5e5e5"
+    },
     "logo": {
       "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png"
     }

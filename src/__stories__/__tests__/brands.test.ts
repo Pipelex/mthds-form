@@ -10,7 +10,7 @@ import {
 } from '../generative/brand/brand-fixture';
 import { BRAND_CONTRACT, renderBrandContract } from '../generative/brand/contract';
 import { assembleBrand } from '../generative/brand/pipeline';
-import { resolveColor, validateBrandTokens } from '../generative/brand/tokens-schema';
+import { colorHex, resolveColor, validateBrandTokens } from '../generative/brand/tokens-schema';
 import { promptHashOf } from '../generative/prompt-hash';
 
 /**
@@ -158,6 +158,62 @@ describe('the brands corpus', () => {
       // Scoped means no rule at the root; a description may well mention `:root`.
       expect(fixture.css.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/:root/);
     }
+  });
+});
+
+describe('the stated facts', () => {
+  // The brand whose accent was stated beside the URL: a site that shows no
+  // button, so its accent is a reading of what its owner said, per mode.
+  const entry = brandDirs().find((candidate) => {
+    const provenance = readJson(candidate.dir, 'provenance.json') as {
+      stated?: { accent?: unknown };
+    };
+    return provenance.stated?.accent !== undefined;
+  })!;
+  const fixture = BRANDS.find((candidate) => keyOf(candidate) === keyOf(entry))!;
+  const primaryHex = (mode: 'light' | 'dark') =>
+    colorHex(resolveColor(fixture.tokens, 'primary', mode)!);
+
+  const problemsOf = async (stated: unknown) => {
+    const result = await assembleBrand({
+      brand: entry.brand,
+      producerId: entry.producerId,
+      manifest: readJson(entry.dir, 'brand.json'),
+      tokens: readJson(entry.dir, 'tokens.json'),
+      provenance: { ...(readJson(entry.dir, 'provenance.json') as object), stated },
+      contractHash,
+    });
+    return result.ok ? [] : result.problems;
+  };
+
+  it('states the accent per mode, and the committed brand carries another in the dark', () => {
+    // A near-black accent on a white canvas vanishes on a dark one: the
+    // stated accent names each mode, and the brand's primary follows each.
+    expect(fixture.stated?.accent).toEqual({
+      light: primaryHex('light'),
+      dark: primaryHex('dark'),
+    });
+    expect(fixture.stated?.accent?.light).not.toBe(fixture.stated?.accent?.dark);
+  });
+
+  it('refuses a primary that is not the accent stated for its mode, naming the mode', async () => {
+    expect(await problemsOf({ accent: { light: primaryHex('light'), dark: '#123456' } })).toEqual([
+      `tokens.json: color.primary (dark) resolves to ${primaryHex('dark')}, but the accent for dark mode was stated as #123456`,
+    ]);
+  });
+
+  it('checks only the modes that were stated', async () => {
+    expect(await problemsOf({ accent: { dark: primaryHex('dark') } })).toEqual([]);
+    const problems = await problemsOf({ accent: { light: '#123456' } });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('color.primary (light)');
+  });
+
+  it('refuses an accent stated for no mode in particular', async () => {
+    const problems = await problemsOf({ accent: '#123456' });
+    expect(problems.some((problem) => problem.startsWith('provenance.json: stated.accent'))).toBe(
+      true,
+    );
   });
 });
 

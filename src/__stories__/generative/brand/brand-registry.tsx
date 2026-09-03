@@ -147,7 +147,9 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
         </div>
         {props.lede ? <p className="mt-1.5 text-sm text-muted-foreground">{props.lede}</p> : null}
       </div>
-      {children}
+      {/* The rules put a concern's inputs flat inside the Section, so the
+          Section spaces them: the gap the hand-written spec's Stack gave its. */}
+      <div className="flex flex-col gap-4">{children}</div>
     </section>
   );
 }

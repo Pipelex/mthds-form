@@ -3,13 +3,16 @@
  * Produce a brand from a website: extract, generate, validate, build.
  *
  *   make brand-from-site BRAND=<slug> URL=<url>   [MODEL=<id>] [ROUNDS=<n>] [TEMPERATURE=<n>]
- *                        [ACCENT=#rrggbb] [LOGO_ON_LIGHT=<url>] [LOGO_ON_DARK=<url>]
+ *                        [ACCENT=#rrggbb] [ACCENT_DARK=#rrggbb]
+ *                        [LOGO_ON_LIGHT=<url>] [LOGO_ON_DARK=<url>]
  *
- * The three optional values are what the person who owns the site STATES
- * beside its URL, for what the site does not show: the accent of a site with
- * no button, the logo for a canvas the site draws none for. They enter the
- * facts as `stated`, the method is told a stated fact outranks a reading, the
- * build checks the brand honours them, and the provenance records them.
+ * The optional values are what the person who owns the site STATES beside
+ * its URL, for what the site does not show: the accent of a site with no
+ * button - `ACCENT=` is the accent in both modes, `ACCENT_DARK=` the dark
+ * mode's when it differs - and the logo for a canvas the site draws none
+ * for. They enter the facts as `stated`, the accent per mode, the method is
+ * told a stated fact outranks a reading, the build checks the brand honours
+ * them, and the provenance records them.
  *
  * The producer's loop, end to end and timed - the go/no-go asks for it to run
  * in under a minute per brand:
@@ -167,8 +170,13 @@ async function main() {
     import('../src/__stories__/generative/brand/brand-fixture.ts'),
   ]);
 
+  const accent = argValue(args, '--accent');
+  const accentDark = argValue(args, '--accent-dark');
   const statedInput = {
-    ...(argValue(args, '--accent') ? { accent: argValue(args, '--accent') } : {}),
+    // ACCENT= is the accent in both modes; ACCENT_DARK= is the dark mode's, when it differs.
+    ...(accent || accentDark
+      ? { accent: { ...(accent ? { light: accent } : {}), dark: accentDark ?? accent } }
+      : {}),
     ...(argValue(args, '--logo-on-light') || argValue(args, '--logo-on-dark')
       ? {
           logo: {

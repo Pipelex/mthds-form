@@ -4,89 +4,89 @@
  * ------------------------------------------- */
 
 .brand-mthds-pipelex-method--claude-4-8-opus {
-  /* A hover fill: --md-accent-bg-color--light is #f5f5f5 in light, the quiet fill under the pointer. */
-  --accent: rgb(96.08% 96.08% 96.08%);
-  /* Text on a hover fill: --md-accent-fg-color as served is #525252 in light. */
-  --accent-foreground: rgb(32.16% 32.16% 32.16%);
-  /* The page canvas: --md-default-bg-color is #fff in the default (light) scheme. */
+  /* A hover fill: --md-accent-fg-color as served, #525252, the site's neutral interaction colour. */
+  --accent: rgb(32.16% 32.16% 32.16%);
+  /* Text on an accent fill: white on the dark neutral hover, mirroring --md-accent-bg-color. */
+  --accent-foreground: rgb(100% 100% 100%);
+  /* The page canvas: --md-default-bg-color, #fff in the served default scheme. */
   --background: rgb(100% 100% 100%);
-  /* The hairline: --md-default-fg-color--lightest is black at 12% in light. */
+  /* The hairline: --md-default-fg-color--lightest, black at 0.12 over the canvas. */
   --border: rgb(0% 0% 0% / 0.12);
-  /* The site has no distinct card surface in light mode; a raised surface is the canvas. */
-  --card: var(--background);
+  /* A raised surface: --md-code-bg-color / --md-default-bg-color--light, #f5f5f5, a step off the white canvas. */
+  --card: rgb(96.08% 96.08% 96.08%);
   /* Text on a card is the page ink, in both modes. */
   --card-foreground: var(--foreground);
-  /* The error colour: --md-code-hl-number-color is #d52a2a in light. */
+  /* The error colour: --md-code-hl-number-color, #d52a2a, the site's red. */
   --destructive: rgb(83.53% 16.47% 16.47%);
-  /* Text on the destructive colour: white, to read on the red mark. */
+  /* Text on the destructive colour: white, derived to sit on the red. */
   --destructive-foreground: rgb(100% 100% 100%);
-  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */
+  /* Text on the canvas: --md-default-fg-color / --md-typeset-color, #525252 as served. */
   --foreground: rgb(32.16% 32.16% 32.16%);
-  /* The control surface: the site's #f5f5f5 code/field fill, a step off the white canvas. */
+  /* The control surface: derived as a neutral step off the canvas, matching the code/field fill #f5f5f5. */
   --input: rgb(96.08% 96.08% 96.08%);
-  /* A subdued fill: --md-default-bg-color--lighter is #fafafa in light. */
-  --muted: rgb(98.04% 98.04% 98.04%);
-  /* Secondary text: --md-default-fg-color--light is #6b6b6b in light. */
+  /* A subdued fill: the code band --md-code-bg-color, #f5f5f5. */
+  --muted: rgb(96.08% 96.08% 96.08%);
+  /* Secondary text: --md-default-fg-color--light, #6b6b6b, meeting AA on the white canvas. */
   --muted-foreground: rgb(41.96% 41.96% 41.96%);
-  /* A floating surface is the opaque canvas; derived from --md-default-bg-color #fff in light. */
-  --popover: rgb(100% 100% 100%);
+  /* A floating surface: --md-default-bg-color--lighter, #fafafa, an opaque step off the canvas. */
+  --popover: rgb(98.04% 98.04% 98.04%);
   /* Text on a popover is the page ink, in both modes. */
   --popover-foreground: var(--foreground);
-  /* The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces. */
-  --primary: rgb(10.19% 10.19% 10.19%);
-  /* Text on the accent: --md-primary-bg-color is #e5e5e5 against the near-black primary in the slate scheme. */
-  --primary-foreground: rgb(89.8% 89.8% 89.8%);
-  /* The focus ring follows the accent, the site's near-black primary, in both modes. */
+  /* The accent, stated by the site owner: #1a1a1a in light mode, a near-black monochrome accent. */
+  --primary: rgb(10.2% 10.2% 10.2%);
+  /* Text on the accent: --md-primary-bg-color's contrasting ink, white on the dark primary in light mode. */
+  --primary-foreground: rgb(100% 100% 100%);
+  /* The focus ring follows the accent, the stated primary, in both modes. */
   --ring: var(--primary);
-  /* A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in light. */
+  /* A quiet filled surface: --md-primary-fg-color as served, #f5f5f5, a neutral fill off the canvas. */
   --secondary: rgb(96.08% 96.08% 96.08%);
   /* Text on a secondary surface is the page ink, in both modes. */
   --secondary-foreground: var(--foreground);
-  /* Tags, numbers and code: Roboto Mono, the site's monospace face, with the system stack behind it. */
+  /* The site's monospace for tags, numbers and code: Roboto Mono, with the system stack behind it. */
   --font-mono: 'Roboto Mono', 'SFMono-Regular', 'Menlo', monospace;
-  /* The site's typeface: Roboto, the most frequent family, with a system stack behind it. */
+  /* The site's typeface for everything: Roboto, loaded from Google Fonts, with a system stack behind it. */
   --font-sans: 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
-  /* The control corner radius: the site's most frequent radius is .1rem. */
+  /* The most frequent control radius on the site: .1rem. */
   --radius: 0.1rem;
 }
 
 .dark .brand-mthds-pipelex-method--claude-4-8-opus {
-  /* A hover fill: --md-accent-bg-color--light is #f5f5f5 in light, the quiet fill under the pointer. */
-  --accent: rgb(20% 20% 20%);
-  /* Text on a hover fill: --md-accent-fg-color as served is #525252 in light. */
-  --accent-foreground: rgb(83.14% 83.14% 83.14%);
-  /* The page canvas: --md-default-bg-color is #fff in the default (light) scheme. */
+  /* A hover fill: --md-accent-fg-color as served, #525252, the site's neutral interaction colour. */
+  --accent: rgb(83.14% 83.14% 83.14%);
+  /* Text on an accent fill: white on the dark neutral hover, mirroring --md-accent-bg-color. */
+  --accent-foreground: rgb(10.2% 10.2% 10.2%);
+  /* The page canvas: --md-default-bg-color, #fff in the served default scheme. */
   --background: rgb(5.88% 5.88% 5.88%);
-  /* The page canvas: --md-default-bg-color is #fff in the default (light) scheme. */
-  --card: rgb(14.9% 14.9% 14.9%);
-  /* The hairline: --md-default-fg-color--lightest is black at 12% in light. */
+  /* The hairline: --md-default-fg-color--lightest, black at 0.12 over the canvas. */
   --border: rgb(83.14% 83.14% 83.14% / 0.12);
+  /* A raised surface: --md-code-bg-color / --md-default-bg-color--light, #f5f5f5, a step off the white canvas. */
+  --card: rgb(10.2% 10.2% 10.2%);
   /* Text on a card is the page ink, in both modes. */
   --card-foreground: var(--foreground);
-  /* The error colour: --md-code-hl-number-color is #d52a2a in light. */
+  /* The error colour: --md-code-hl-number-color, #d52a2a, the site's red. */
   --destructive: rgb(90.2% 41.18% 35.69%);
-  /* Text on the destructive colour: white, to read on the red mark. */
+  /* Text on the destructive colour: white, derived to sit on the red. */
   --destructive-foreground: rgb(5.88% 5.88% 5.88%);
-  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */
+  /* Text on the canvas: --md-default-fg-color / --md-typeset-color, #525252 as served. */
   --foreground: rgb(83.14% 83.14% 83.14%);
-  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */
+  /* Text on the canvas: --md-default-fg-color / --md-typeset-color, #525252 as served. */
   --popover-foreground: var(--foreground);
-  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */
+  /* Text on the canvas: --md-default-fg-color / --md-typeset-color, #525252 as served. */
   --secondary-foreground: var(--foreground);
-  /* The control surface: the site's #f5f5f5 code/field fill, a step off the white canvas. */
-  --input: rgb(10.19% 10.19% 10.19%);
-  /* A subdued fill: --md-default-bg-color--lighter is #fafafa in light. */
-  --muted: rgb(14.9% 14.9% 14.9%);
-  /* Secondary text: --md-default-fg-color--light is #6b6b6b in light. */
+  /* The control surface: derived as a neutral step off the canvas, matching the code/field fill #f5f5f5. */
+  --input: rgb(10.2% 10.2% 10.2%);
+  /* A subdued fill: the code band --md-code-bg-color, #f5f5f5. */
+  --muted: rgb(10.2% 10.2% 10.2%);
+  /* Secondary text: --md-default-fg-color--light, #6b6b6b, meeting AA on the white canvas. */
   --muted-foreground: rgb(62.75% 62.75% 62.75%);
-  /* A floating surface is the opaque canvas; derived from --md-default-bg-color #fff in light. */
+  /* A floating surface: --md-default-bg-color--lighter, #fafafa, an opaque step off the canvas. */
   --popover: rgb(14.9% 14.9% 14.9%);
-  /* The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces. */
-  --primary: rgb(10.19% 10.19% 10.19%);
-  /* The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces. */
+  /* The accent, stated by the site owner: #1a1a1a in light mode, a near-black monochrome accent. */
+  --primary: rgb(89.8% 89.8% 89.8%);
+  /* The accent, stated by the site owner: #1a1a1a in light mode, a near-black monochrome accent. */
   --ring: var(--primary);
-  /* Text on the accent: --md-primary-bg-color is #e5e5e5 against the near-black primary in the slate scheme. */
-  --primary-foreground: rgb(89.8% 89.8% 89.8%);
-  /* A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in light. */
-  --secondary: rgb(10.19% 10.19% 10.19%);
+  /* Text on the accent: --md-primary-bg-color's contrasting ink, white on the dark primary in light mode. */
+  --primary-foreground: rgb(10.2% 10.2% 10.2%);
+  /* A quiet filled surface: --md-primary-fg-color as served, #f5f5f5, a neutral fill off the canvas. */
+  --secondary: rgb(10.2% 10.2% 10.2%);
 }

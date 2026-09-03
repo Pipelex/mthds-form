@@ -5,7 +5,10 @@
   "brief": "wip/generative-ui/briefs/brand-contract.md",
   "contractHash": "27d1d3c2bc39",
   "stated": {
-    "accent": "#1a1a1a",
+    "accent": {
+      "light": "#1a1a1a",
+      "dark": "#e5e5e5"
+    },
     "logo": {
       "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png"
     }

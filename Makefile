@@ -94,11 +94,12 @@ brands:
 # rebuild. Costs inference and needs credentials, like `fixtures-specs`.
 # MODEL=<id> overrides the pin; ROUNDS=<n> bounds the repair (2 by default).
 # ACCENT=#rrggbb, LOGO_ON_LIGHT=<url> and LOGO_ON_DARK=<url> state what the site
-# does not show; a stated fact outranks a reading and is recorded in the
-# provenance.
+# does not show, and ACCENT_DARK=#rrggbb states the dark mode's accent when it
+# differs from the light one; a stated fact outranks a reading and is recorded
+# in the provenance.
 brand-from-site:
-	@test -n "$(BRAND)" -a -n "$(URL)" || (echo "usage: make brand-from-site BRAND=<slug> URL=<url> [ACCENT=#rrggbb] [LOGO_ON_LIGHT=<url>] [LOGO_ON_DARK=<url>]" && exit 2)
-	MODEL="$(MODEL)" npx tsx scripts/generate-brand.mjs --brand $(BRAND) --url $(URL) $(if $(ACCENT),--accent "$(ACCENT)") $(if $(LOGO_ON_LIGHT),--logo-on-light "$(LOGO_ON_LIGHT)") $(if $(LOGO_ON_DARK),--logo-on-dark "$(LOGO_ON_DARK)")
+	@test -n "$(BRAND)" -a -n "$(URL)" || (echo "usage: make brand-from-site BRAND=<slug> URL=<url> [ACCENT=#rrggbb] [ACCENT_DARK=#rrggbb] [LOGO_ON_LIGHT=<url>] [LOGO_ON_DARK=<url>]" && exit 2)
+	MODEL="$(MODEL)" npx tsx scripts/generate-brand.mjs --brand $(BRAND) --url $(URL) $(if $(ACCENT),--accent "$(ACCENT)") $(if $(ACCENT_DARK),--accent-dark "$(ACCENT_DARK)") $(if $(LOGO_ON_LIGHT),--logo-on-light "$(LOGO_ON_LIGHT)") $(if $(LOGO_ON_DARK),--logo-on-dark "$(LOGO_ON_DARK)")
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

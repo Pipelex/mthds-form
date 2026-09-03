@@ -57,14 +57,14 @@ function checkStated(
   problems: string[],
 ) {
   if (!stated) return;
-  if (stated.accent) {
-    for (const mode of ['light', 'dark'] as const) {
-      const primary = resolveColor(tokens, 'primary', mode);
-      if (primary && !colorIsHex(primary, stated.accent)) {
-        problems.push(
-          `tokens.json: color.primary (${mode}) resolves to ${colorHex(primary)}, but the accent was stated as ${stated.accent}`,
-        );
-      }
+  for (const mode of ['light', 'dark'] as const) {
+    const accent = stated.accent?.[mode];
+    if (!accent) continue;
+    const primary = resolveColor(tokens, 'primary', mode);
+    if (primary && !colorIsHex(primary, accent)) {
+      problems.push(
+        `tokens.json: color.primary (${mode}) resolves to ${colorHex(primary)}, but the accent for ${mode} mode was stated as ${accent}`,
+      );
     }
   }
   for (const canvas of ['onLight', 'onDark'] as const) {

@@ -21,16 +21,20 @@ export const PRODUCERS = ['pipelex-method', 'claude-code-subagent', 'claude-code
 
 /**
  * What a person stated beside the site's URL - the things a site does not
- * show and no reading can supply: the accent of a site with no button, the
- * logo for a canvas the site draws none for. A stated fact enters the site
- * facts as `stated`, outranks any reading, and the build checks the brand
- * honours it.
+ * show and no reading can supply: the accent of a site with no button, per
+ * mode when its dark canvas needs another, and the logo for a canvas the site
+ * draws none for. A stated fact enters the site facts as `stated`, outranks
+ * any reading, and the build checks the brand honours it.
  */
+const statedHex = z.string().regex(/^#[0-9a-f]{6}$/i, 'a stated accent is #rrggbb');
+
 export const statedFactsSchema = z.strictObject({
-  /** The accent, `#rrggbb`: `color.primary` in both modes. */
+  /** The accent per mode, `#rrggbb`: what `color.primary` resolves to in that mode. */
   accent: z
-    .string()
-    .regex(/^#[0-9a-f]{6}$/i, 'a stated accent is #rrggbb')
+    .strictObject({
+      light: statedHex.optional(),
+      dark: statedHex.optional(),
+    })
     .optional(),
   /** The logo for a canvas, an absolute URL: `logo.onLight` / `logo.onDark` in the manifest. */
   logo: z

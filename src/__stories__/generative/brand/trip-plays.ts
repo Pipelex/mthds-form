@@ -13,7 +13,7 @@ import { tripLayout } from './trip-layouts';
  *
  * Three plays over one core. The core is the claim every brand page makes:
  * the tokens reach the paint (the one button that runs the method is the
- * brand's accent, the page is set in the brand's typeface) and the kernel
+ * brand's accent in each pane, the page is set in the brand's typeface) and the kernel
  * still owns the inputs (what is typed lands in the /inputs tree, and the
  * readiness on the receipt is the kernel's own). The brand-catalog plays add
  * the manifest - one logo per pane - and the page's grammar: the one h1, the
@@ -57,7 +57,7 @@ interface Core {
 
 async function paintsFromTheTokens({ canvasElement, layout, fields, chrome }: Core) {
   const canvas = within(canvasElement);
-  const [lightPage] = canvas.getAllByTestId('brand-page');
+  const [lightPage, darkPage] = canvas.getAllByTestId('brand-page');
   const brand = BRANDS.find(
     (candidate) =>
       candidate.brand === lightPage!.dataset.brand &&
@@ -99,6 +99,12 @@ async function paintsFromTheTokens({ canvasElement, layout, fields, chrome }: Co
   await expect(getComputedStyle(lightPage!).fontFamily).toContain(
     brand.tokens.font.sans.$value[0]!,
   );
+  // And in the dark pane the same button is the brand's DARK accent, which a
+  // stated accent may name on its own - a near-black accent on a white canvas
+  // is a near-white one on a dark canvas.
+  const darkRun = await revealButton(darkPage!, runLabel(spec));
+  const darkPrimary = resolveColor(brand.tokens, 'primary', 'dark')!;
+  await expect(getComputedStyle(darkRun).backgroundColor).toBe(computedRgb(darkPrimary.components));
   return { canvas, lightPage: lightPage! };
 }
 
