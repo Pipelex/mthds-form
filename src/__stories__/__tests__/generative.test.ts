@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { InputForm, OutputForm, PipeIOContracts } from '../../core';
+import type { InputForm, OutputForm, PipeIOContracts, RunField } from '../../core';
 import {
   buildResultField,
   buildRunFields,
@@ -11,12 +11,15 @@ import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
 import * as results from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
+import { SPECS } from '../_generated/results.specs';
 import * as scalars from '../_generated/scalars';
 import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
 import { renderInputBrief, renderResultBrief } from '../generative/brief';
 import { CUSTOM_COMPONENTS, PICKED_SHADCN, catalog, catalogPrompt } from '../generative/catalog';
+import { AUTHORED } from '../generative/authored';
 import { HEROES, pipeRefOf } from '../generative/heroes';
+import { inputFieldAtPath, resultFieldAtPath } from '../generative/paths';
 import { currentPromptHash } from '../generative/prompt-hash';
 import { projectInputSpec, projectResultSpec } from '../generative/project-spec';
 import { CUSTOM_RULES } from '../generative/rules';
@@ -285,4 +288,76 @@ describe('the briefs', () => {
     expect(brief).toContain('"issued_on": "2026-03-14"');
     expect(brief).not.toContain('__class__');
   });
+});
+
+describe('the spec fixtures', () => {
+  const fixtures = [...Object.values(SPECS), ...Object.values(AUTHORED)];
+
+  /** The descriptor a fixture's paths resolve against, off the hero's case module. */
+  function descriptorFor(pipeRef: string): { inputs?: RunField[]; result?: RunField } {
+    const hero = HEROES.find((candidate) => pipeRefOf(candidate) === pipeRef);
+    if (!hero) throw new Error(`${pipeRef} is not a hero`);
+    const mod = CASES[hero.caseName]!;
+    const contract = getPipeIOContract(mod.CONTRACTS, hero.domain, hero.pipeCode)!;
+    if (hero.side === 'input') {
+      const descriptor = getPipeInputForm(mod.INPUT_FORM, hero.domain, hero.pipeCode)!;
+      return { inputs: buildRunFields(descriptor, contract.inputs) };
+    }
+    const descriptor = getPipeOutputForm(mod.OUTPUT_FORM, hero.domain, hero.pipeCode)!;
+    return { result: buildResultField(descriptor, contract.output.json_schema) };
+  }
+
+  it('has at least one captured and one authored spec', () => {
+    expect(Object.keys(SPECS).length).toBeGreaterThan(0);
+    expect(Object.keys(AUTHORED).length).toBeGreaterThan(0);
+  });
+
+  for (const fixture of fixtures) {
+    describe(`${fixture.pipeRef} (${fixture.source})`, () => {
+      it('validates against the catalog', () => {
+        const verdict = validateAgainstCatalog(fixture.spec);
+        expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+      });
+
+      it('was produced against the current catalog prompt', () => {
+        // A stale hash means the catalog moved under the fixture: regenerate a
+        // captured spec, re-read an authored one against the new prompt and
+        // re-stamp it.
+        expect(fixture.promptHash).toBe(currentPromptHash());
+      });
+
+      it('compiles from its own JSONL to its spec', () => {
+        expect(specFromJsonl(fixture.jsonl)).toEqual(fixture.spec);
+      });
+
+      it('names its brief and its provenance', () => {
+        expect(fixture.brief).toMatch(/^wip\/generative-ui\/briefs\/.+\.md$/);
+        expect(fixture.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(fixture.source === 'generated' ? fixture.model : fixture.author).toBeTruthy();
+      });
+
+      it('delegates only to paths the descriptor has', () => {
+        const scope = descriptorFor(fixture.pipeRef);
+        for (const [key, element] of Object.entries(fixture.spec.elements)) {
+          const path = (element.props as { path?: unknown }).path;
+          if (element.type === 'MthdsField') {
+            expect(
+              typeof path === 'string' && inputFieldAtPath(scope.inputs ?? [], path),
+              key,
+            ).toBeTruthy();
+          }
+          if (element.type === 'MthdsResult') {
+            expect(
+              typeof path === 'string' && scope.result && resultFieldAtPath(scope.result, path),
+              key,
+            ).toBeTruthy();
+          }
+        }
+      });
+
+      it('carries no /state on a result page', () => {
+        if (descriptorFor(fixture.pipeRef).result) expect(fixture.spec.state).toBeUndefined();
+      });
+    });
+  }
 });

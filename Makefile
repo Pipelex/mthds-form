@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
 
 install:
 	npm install
@@ -68,6 +68,14 @@ fixtures-runs:
 # extensionless TypeScript imports on its own, so the pass runs under tsx.
 briefs:
 	npx tsx scripts/generate-fixtures.mjs --briefs
+
+# The SPECS: what the designer method produced for each hero's brief, through the
+# real `pipelex run bundle` CLI, validated against the catalog. Costs inference
+# budget and needs credentials, like `fixtures-runs`, and is asked for the same
+# way. ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides the pin in
+# data/generative/ui-designer.mthds for a comparative run.
+fixtures-specs:
+	MODEL="$(MODEL)" npx tsx scripts/generate-fixtures.mjs --specs $(if $(ONLY),--only $(ONLY))
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

@@ -593,45 +593,75 @@ function generatePayloads(cases) {
  * Imports TypeScript straight from `src/`, which node cannot resolve on its own
  * (the imports are extensionless), so the Makefile runs this pass under tsx.
  */
-async function generateBriefs() {
-  const [{ HEROES, pipeRefOf }, brief, { catalogPrompt }, { promptHashOf }, { payloadToState }, core] =
-    await Promise.all([
-      import('../src/__stories__/generative/heroes.ts'),
-      import('../src/__stories__/generative/brief.ts'),
-      import('../src/__stories__/generative/catalog.ts'),
-      import('../src/__stories__/generative/prompt-hash.ts'),
-      import('../src/__stories__/generative/state.ts'),
-      import('../src/core/index.ts'),
-    ]);
-  const prompt = catalogPrompt();
-  const hash = promptHashOf(prompt);
-  const briefsDir = path.join(REPO, 'wip/generative-ui/briefs');
-  mkdirSync(briefsDir, { recursive: true });
+/** The generative layer's modules, imported once for either pass. Runs under tsx. */
+async function loadGenerative() {
+  const [heroes, brief, catalog, hash, state, stream, validate, core] = await Promise.all([
+    import('../src/__stories__/generative/heroes.ts'),
+    import('../src/__stories__/generative/brief.ts'),
+    import('../src/__stories__/generative/catalog.ts'),
+    import('../src/__stories__/generative/prompt-hash.ts'),
+    import('../src/__stories__/generative/state.ts'),
+    import('../src/__stories__/generative/stream.ts'),
+    import('../src/__stories__/generative/validate.ts'),
+    import('../src/core/index.ts'),
+  ]);
+  return { ...heroes, ...brief, ...catalog, ...hash, ...state, ...stream, ...validate, core };
+}
 
-  for (const hero of HEROES) {
-    const pipeRef = pipeRefOf(hero);
-    const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
-    const contract = core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
-    if (!contract) die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
-    let text;
-    if (hero.side === 'input') {
-      const descriptor = core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
-      if (!descriptor) die(`${pipeRef}: no input descriptor.`);
-      const fields = core.buildRunFields(descriptor, contract.inputs);
-      text = brief.renderInputBrief({ pipeRef, description: hero.summary }, fields);
-    } else {
-      const descriptor = core.getPipeOutputForm(fixtures.OUTPUT_FORM, hero.domain, hero.pipeCode);
-      if (!descriptor) die(`${pipeRef}: no output descriptor.`);
-      const field = core.buildResultField(descriptor, contract.output.json_schema);
-      const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
-      if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
-      text = brief.renderResultBrief(
-        { pipeRef, description: hero.summary },
-        field,
-        payloadToState(field, PAYLOADS[pipeRef]),
-      );
-    }
-    const outPath = path.join(briefsDir, `${pipeRef}.md`);
+/** One hero's brief, rendered from the committed descriptors and, on the result side, the committed payload. */
+async function renderHeroBrief(hero, g) {
+  const pipeRef = g.pipeRefOf(hero);
+  const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
+  const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
+  if (!contract) die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
+  if (hero.side === 'input') {
+    const descriptor = g.core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
+    if (!descriptor) die(`${pipeRef}: no input descriptor.`);
+    const fields = g.core.buildRunFields(descriptor, contract.inputs);
+    return g.renderInputBrief({ pipeRef, description: hero.summary }, fields);
+  }
+  const descriptor = g.core.getPipeOutputForm(fixtures.OUTPUT_FORM, hero.domain, hero.pipeCode);
+  if (!descriptor) die(`${pipeRef}: no output descriptor.`);
+  const field = g.core.buildResultField(descriptor, contract.output.json_schema);
+  const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
+  if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
+  return g.renderResultBrief(
+    { pipeRef, description: hero.summary },
+    field,
+    g.payloadToState(field, PAYLOADS[pipeRef]),
+  );
+}
+
+const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
+
+/** `wip/generative-ui/briefs/<pipeRef>.md`, repo-relative - the provenance a spec fixture names. */
+function briefRelPath(pipeRef) {
+  return path.relative(REPO, path.join(BRIEFS_DIR, `${pipeRef}.md`));
+}
+
+/**
+ * The BRIEFS pass: the generative layer's view of each hero, written down.
+ *
+ * For each hero, the Markdown brief is rendered from the committed descriptors
+ * (and, on the result side, the committed payload loaded into the result tree),
+ * and written beside the full catalog prompt and its hash under
+ * `wip/generative-ui/briefs/`. That file is the record of exactly what the
+ * designer method and a human author were given - the two artifacts every
+ * source of a spec is produced from.
+ *
+ * Imports TypeScript straight from `src/`, which node cannot resolve on its own
+ * (the imports are extensionless), so the Makefile runs this pass under tsx.
+ */
+async function generateBriefs() {
+  const g = await loadGenerative();
+  const prompt = g.catalogPrompt();
+  const hash = g.promptHashOf(prompt);
+  mkdirSync(BRIEFS_DIR, { recursive: true });
+
+  for (const hero of g.HEROES) {
+    const pipeRef = g.pipeRefOf(hero);
+    const text = await renderHeroBrief(hero, g);
+    const outPath = path.join(BRIEFS_DIR, `${pipeRef}.md`);
     writeFileSync(
       outPath,
       [
@@ -655,15 +685,166 @@ async function generateBriefs() {
   }
 }
 
+const DESIGNER_BUNDLE = path.join(REPO, 'data/generative/ui-designer.mthds');
+const DESIGNER_PIPE = 'ui_designer';
+
+/**
+ * The SPECS pass: the designer method, run for real over each hero's brief.
+ *
+ * The third pass, and the second that costs anything. For each hero it renders
+ * the brief exactly as the briefs pass does, hands it and the catalog prompt to
+ * `data/generative/ui-designer.mthds` through the real `pipelex run bundle`
+ * CLI, compiles the text that came back as JSONL patches, validates the spec
+ * against the catalog - structure, every element type, every prop - and FAILS
+ * on any issue, printing the problems and keeping the rejected text under
+ * `wip/generative-ui/briefs/` for inspection. A repair is a change to the
+ * method or to the brief, committed; never a hand edit of the fixture.
+ *
+ * `MODEL=<id>` overrides the pin in the bundle for a comparative run; the model
+ * that actually produced each spec is recorded in the fixture's provenance.
+ * `ONLY=<pipe code>` narrows the pass to one hero; the other heroes' entries in
+ * that case's module are carried over from the committed file.
+ */
+async function generateSpecs(only) {
+  requireCli();
+  const g = await loadGenerative();
+  const prompt = g.catalogPrompt();
+  const hash = g.promptHashOf(prompt);
+  const today = new Date().toISOString().slice(0, 10);
+
+  let bundle = readFileSync(DESIGNER_BUNDLE, 'utf8');
+  const pinned = /^model\s*=\s*"([^"]+)"/m.exec(bundle)?.[1];
+  if (!pinned) die(`${path.relative(REPO, DESIGNER_BUNDLE)} pins no model.`);
+  const model = process.env.MODEL || pinned;
+  if (model !== pinned) bundle = bundle.replace(/^(model\s*=\s*)"[^"]+"/m, `$1"${model}"`);
+
+  const heroes = g.HEROES.filter((hero) => !only || hero.pipeCode === only || hero.caseName === only);
+  if (heroes.length === 0) die(`no hero named '${only}'.`);
+
+  const workRoot = mkdtempSync(path.join(os.tmpdir(), 'mthds-form-specs-'));
+  try {
+    const bundlePath = path.join(workRoot, 'ui-designer.mthds');
+    writeFileSync(bundlePath, bundle);
+
+    // One module per case, carrying over what the pass does not regenerate.
+    const byCase = new Map();
+    for (const hero of heroes) {
+      if (byCase.has(hero.caseName)) continue;
+      const modulePath = path.join(OUT_DIR, `${hero.caseName}.specs.ts`);
+      const existing = existsSync(modulePath)
+        ? (await import(`../src/__stories__/_generated/${hero.caseName}.specs.ts`)).SPECS
+        : {};
+      byCase.set(hero.caseName, { ...existing });
+    }
+
+    for (const hero of heroes) {
+      const pipeRef = g.pipeRefOf(hero);
+      process.stdout.write(`  ${pipeRef}: designing with ${model}…\n`);
+      const briefText = await renderHeroBrief(hero, g);
+      const inputsPath = path.join(workRoot, `${pipeRef}.inputs.json`);
+      writeFileSync(inputsPath, JSON.stringify({ catalog_rules: prompt, brief: briefText }));
+      const outDir = path.join(workRoot, pipeRef);
+      const args = ['run', 'bundle', bundlePath, '--pipe', DESIGNER_PIPE, '-i', inputsPath, '-o', outDir];
+      args.push('--no-graph', '--no-pretty-print', '--no-save-working-memory');
+      try {
+        execFileSync(PIPELEX_BIN, args, {
+          encoding: 'utf8',
+          maxBuffer: 64 * 1024 * 1024,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, PIPELEX_NO_DECK_NOTICE: '1' },
+          cwd: REPO,
+        });
+      } catch (error) {
+        die(`${pipeRef}: the designer run failed.\n${error.stderr || error.stdout || ''}`);
+      }
+      const produced = readdirSync(outDir).filter((entry) =>
+        existsSync(path.join(outDir, entry, 'main_stuff.json')),
+      );
+      if (produced.length !== 1) die(`${pipeRef}: expected one run directory under ${outDir}.`);
+      const mainStuff = JSON.parse(
+        readFileSync(path.join(outDir, produced[0], 'main_stuff.json'), 'utf8'),
+      );
+      const jsonl = typeof mainStuff?.text === 'string' ? mainStuff.text : null;
+      if (jsonl === null) die(`${pipeRef}: the run's main_stuff carries no text.`);
+
+      const spec = g.specFromJsonl(jsonl);
+      const verdict = g.validateAgainstCatalog(spec);
+      if (!verdict.ok) {
+        mkdirSync(BRIEFS_DIR, { recursive: true });
+        const rejectedPath = path.join(BRIEFS_DIR, `${pipeRef}.rejected.jsonl`);
+        writeFileSync(rejectedPath, jsonl);
+        die(
+          `${pipeRef}: the designer's spec does not validate against the catalog.\n` +
+            `${g.formatProblems(verdict.problems)}\n` +
+            `  The rejected text is at ${path.relative(REPO, rejectedPath)}. Repair the method or the\n` +
+            `  brief, never the fixture, and run the pass again.`,
+        );
+      }
+
+      byCase.get(hero.caseName)[pipeRef] = {
+        pipeRef,
+        source: 'generated',
+        model,
+        promptHash: hash,
+        date: today,
+        brief: briefRelPath(pipeRef),
+        jsonl,
+        spec,
+      };
+      process.stdout.write(`  ${pipeRef}: ${Object.keys(spec.elements).length} elements, valid\n`);
+    }
+
+    for (const [caseName, specs] of byCase) {
+      const outPath = path.join(OUT_DIR, `${caseName}.specs.ts`);
+      writeFileSync(outPath, emitSpecs(caseName, specs));
+      execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
+      process.stdout.write(`  ${caseName}: ${Object.keys(specs).length} spec${Object.keys(specs).length === 1 ? '' : 's'} -> ${path.relative(REPO, outPath)}\n`);
+    }
+  } finally {
+    rmSync(workRoot, { recursive: true, force: true });
+  }
+}
+
+/** The specs module for one case: `pipe_ref` -> the captured spec with its provenance. */
+function emitSpecs(caseName, specs) {
+  const pipeRefs = Object.keys(specs).sort();
+  const ordered = Object.fromEntries(pipeRefs.map((ref) => [ref, specs[ref]]));
+  return [
+    '/**',
+    ` * Specs the designer method produced for the heroes of data/structures/${caseName}.mthds - DO NOT EDIT.`,
+    ' *',
+    ' * Regenerate with `make fixtures-specs`, which runs `data/generative/ui-designer.mthds`',
+    ' * through the real `pipelex run bundle` CLI over each hero\'s brief and validates',
+    ' * what came back against the catalog. This costs inference budget, which is why it',
+    ' * is its own target.',
+    ' *',
+    ' * **A spec is a payload\'s twin: the one artifact no projection can produce.** Each',
+    ' * entry records the model that produced it and the hash of the catalog prompt it was',
+    ' * produced against; the corpus test compares that hash with the current prompt, so a',
+    ' * catalog change that invalidates a spec is a failing test rather than a stale page.',
+    ' */',
+    "import type { SpecFixture } from '../generative/spec-fixture';",
+    '',
+    '/** Every pipe_ref a spec was captured for, in sorted order. */',
+    `export const SPEC_PIPE_REFS = ${JSON.stringify(pipeRefs)} as const;`,
+    '',
+    `export const SPECS: Record<string, SpecFixture> = ${JSON.stringify(ordered, null, 2)};`,
+    '',
+  ].join('\n');
+}
+
 function main() {
   const args = process.argv.slice(2);
+  const onlyIndex = args.indexOf('--only');
+  const only = onlyIndex === -1 ? null : args[onlyIndex + 1];
   if (args.includes('--briefs')) {
     generateBriefs().catch((error) => die(error?.stack ?? String(error)));
     return;
   }
-  const onlyIndex = args.indexOf('--only');
-  const only = onlyIndex === -1 ? null : args[onlyIndex + 1];
-
+  if (args.includes('--specs')) {
+    generateSpecs(only).catch((error) => die(error?.stack ?? String(error)));
+    return;
+  }
   const cases = discoverCases().filter((name) => !only || name === only);
   if (only && cases.length === 0) die(`no case named '${only}' in data/structures/.`);
   if (cases.length === 0) {

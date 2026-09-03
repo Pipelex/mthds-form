@@ -22,7 +22,7 @@ const preview: Preview = {
      */
     options: {
       storySort: {
-        order: ['Inputs', 'Outputs', 'Toolchain'],
+        order: ['Inputs', 'Outputs', 'Generative', 'Toolchain'],
       },
     },
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },

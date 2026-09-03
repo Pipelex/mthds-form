@@ -35,7 +35,10 @@ function authoredCases(): string[] {
 /** The descriptor modules - `<case>.ts`, one per authored case. */
 function generatedCases(): string[] {
   return readdirSync(GENERATED_DIR)
-    .filter((file) => file.endsWith('.ts') && !file.endsWith('.payloads.ts'))
+    .filter(
+      (file) =>
+        file.endsWith('.ts') && !file.endsWith('.payloads.ts') && !file.endsWith('.specs.ts'),
+    )
     .map((file) => file.slice(0, -'.ts'.length))
     .sort();
 }
