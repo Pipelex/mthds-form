@@ -1,0 +1,8 @@
+{
+  "producer": "claude-code-session",
+  "model": "claude-fable-5-1",
+  "date": "2026-09-03",
+  "brief": "wip/generative-ui/briefs/brand-contract.md",
+  "contractHash": "pending: stamped by the build once `make briefs` renders the contract",
+  "siteFacts": "read by hand on 2026-09-03 from pipelex.com; see wip/generative-ui/pipelex-design-system.md"
+}
