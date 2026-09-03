@@ -279,6 +279,14 @@ Planned in [`plan-the-join.md`](plan-the-join.md), which stands on its own after
 
 The step ran to both checkpoints. Checkpoint 8, the floor: the method's base-catalog layouts under the method's tokens are the brand's palette on a well-made form, and the gap to the hand-written product page is the chrome vocabulary, not the tokens. Checkpoint 9, the answer: the designer method handed the brand catalog's prompt produced, on three models, a page in the product page's grammar on the first call with zero repairs, rendered under both method-made brands with the kernel owning the inputs; the chain from the descriptor to the painted page ran with no agent in it. The answer to the question asked after Checkpoint 7 is confirmed under two stated conditions, both ours: a gap the brand `Section` does not put between its children, and the per-mode accent for a dark canvas the mthds brand needs. Both are read in that plan under Checkpoint 9. Both were then fixed on the same branch at Louis's ask, and the fix is read there under "After the answer": the brand `Section` spaces its children, a person may state the accent per mode (`ACCENT_DARK=`), and the mthds brand was re-run with its dark header ink stated as the dark accent, validating on the first call.
 
+## Phase 8 — The whole chain
+
+Planned in [`plan-the-whole-chain.md`](plan-the-whole-chain.md), written 2026-09-04 for Louis's ratification: the last experiment before integration is considered. Every experiment so far started from carrier pipes the fixtures pass synthesized and ended at a run button that does nothing; this step takes three authored methods from the public cookbook through the unchanged chain, closes the run through the hosted API from the page, and paints the result in place through the kernel's viewer, with the reading at a desktop and a phone width.
+
+## Phase 9 — Integration
+
+Planned in [`plan-integration.md`](plan-integration.md), written 2026-09-04 for Louis's ratification, to be read after Phase 8 has run: the decisions the integration asks for, with a recommendation on each (a `./generative` entry, the brand catalog first, the fallback rule, the layout stored per method version by a publish-time job, the result page through the kernel's viewer first, the brand as a stylesheet), the budget on a shipped surface, and three phases with checkpoints, one per repo. The integration spans repos, so it gets an epic and a program directory of its own when it starts.
+
 ## Phase 4 — Docs, closing the step
 
 Written before the checkpoint so the decision is made on a documented layer, and kept whichever way it goes: the record of what was tried is the deliverable if json-render is not adopted.
