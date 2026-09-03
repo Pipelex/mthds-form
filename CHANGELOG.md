@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.7.0] - 2026-09-03
+
+### Changed - the result view reads like a record again
+
+Three things a real result made obvious, all in `ResultField`.
+
+- **A structure's value sits at the RIGHT EDGE of its column.** The two-column grid was already there, but the values were flushed left against the labels — and names vary in length while answers do not line up behind them, so the record grew a ragged seam down its middle and the eye had to find each answer again. Flushed right they form one column the reader runs down, which is why a receipt, a spec sheet and a settings panel all do it. Only the inline half changes: anything on the full-width branch (prose, a table, a gallery, a frame) still reads left-to-right like the block it is. A chip row follows through a new `data-chips` hook, because `text-right` does nothing to flex children and a row of tags starting under its label beside numbers ending at the right edge is the same ragged seam one row lower.
+
+- **A table's header is a filled band.** It carries `bg-muted` instead of the near-invisible `bg-card/40`, so the one row that is not data stops reading as the first entry — token-based, so it follows the host's light and dark palettes rather than being a literal grey.
+
+- **And the table fills its box.** `min-w-full` alone left the table content-sized whenever its columns were narrower than the panel, so the header band and every row rule stopped mid-box with empty bordered space to their right and the table looked half-drawn. It is now `w-full` **beside** `min-w-full`, which costs nothing: the two agree at 100% while the content is narrow, and once the columns need more, auto table layout grows past both into the scroller rather than crushing them — headers are `whitespace-nowrap` and cells truncate, so nothing wraps to buy the space back.
+
+See [docs/result-view.md](docs/result-view.md).
+
 ## [v0.6.0] - 2026-09-02
 
 ### Changed
