@@ -4,89 +4,89 @@
  * ------------------------------------------- */
 
 .brand-pipelex-pipelex-method--claude-4-8-opus {
-  /* A hover fill: the site's bg-accent-teal/10, a teal wash under the pointer. */
-  --accent: rgb(0% 73.33% 58.43% / 0.1);
-  /* Text on an accent fill: the teal accent, as text-accent-teal reads on its own wash. */
-  --accent-foreground: rgb(0% 73.33% 58.43%);
-  /* The page canvas: the site is dark (body bg-[#0a0a0b]), so light mode is the inverted canvas. */
-  --background: rgb(95.69% 95.69% 96.47%);
-  /* The hairline: the site's border-white/10, inverted to a black hairline on the light canvas. */
+  /* A hover fill is the site's bg-white/10; inverted to a faint black over the light canvas. */
+  --accent: rgb(0% 0% 0% / 0.1);
+  /* Text on a hover fill is the page ink, in both modes. */
+  --accent-foreground: var(--foreground);
+  /* The site is dark-only; its page background is #0a0a0b, so the light canvas here is the derived inversion: white. */
+  --background: rgb(100% 100% 100%);
+  /* The hairline is the site's border-white/10; inverted to black over the light canvas. */
   --border: rgb(0% 0% 0% / 0.1);
-  /* A raised surface: the site's bg-white/5 panels, a translucent step off the canvas; inverted to a black wash on the light canvas. */
-  --card: rgb(0% 0% 0% / 0.04);
-  /* Text on a card: the same ink as the canvas text. */
-  --card-foreground: rgb(3.92% 3.92% 4.31%);
-  /* The error colour: the site's bg-rose-500 (#f43f5e) remove and invalid marks. */
+  /* A raised surface is bg-white/5 over the canvas; in light mode a step off white is the same faint fill inverted to black. */
+  --card: rgb(0% 0% 0% / 0.05);
+  /* Text on a card is the page ink, in both modes. */
+  --card-foreground: var(--foreground);
+  /* The error colour is the site's bg-rose-500 / text-rose-400, used for remove and invalid marks. */
   --destructive: rgb(95.69% 24.71% 36.86%);
-  /* Text on the destructive colour: white. */
+  /* Text on the destructive colour is white, matching the site's filled rose buttons. */
   --destructive-foreground: rgb(100% 100% 100%);
-  /* Text on the canvas: the site's text-white ink, inverted for light mode. */
+  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */
   --foreground: rgb(3.92% 3.92% 4.31%);
-  /* The control surface: a step off the canvas matching the site's bg-white/10 fields, inverted for light mode. */
+  /* The control surface is a step off the canvas, taken from the site's white/[0.06] field fill; inverted to black for light mode. */
   --input: rgb(0% 0% 0% / 0.06);
-  /* A subdued fill: the site's faintest bg-white/[0.03] band, inverted for the light canvas. */
+  /* A subdued fill is the site's faintest bg-white/[0.03] band; inverted to black over the light canvas. */
   --muted: rgb(0% 0% 0% / 0.03);
-  /* Secondary text: the site's text-gray-400 (#9ca3af) hints, darkened for contrast on the light canvas. */
-  --muted-foreground: rgb(33.73% 36.08% 40%);
-  /* A floating surface, opaque: derived a step off the light canvas, inverted from the site's dark bg-bg-darker menus. */
+  /* Secondary text is the site's text-gray-400 (#9ca3af); darkened to gray-500 for the light canvas to hold the 4.5 contrast bar. */
+  --muted-foreground: rgb(41.96% 44.71% 50.2%);
+  /* A floating surface is opaque; the site's overlays sit on the near-black bg-bg-darker (#0d0b14), inverted to white for light mode. */
   --popover: rgb(100% 100% 100%);
-  /* Text on a popover: the ink. */
-  --popover-foreground: rgb(3.92% 3.92% 4.31%);
-  /* The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes. */
+  /* Text on a popover is the page ink, in both modes. */
+  --popover-foreground: var(--foreground);
+  /* The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes. */
   --primary: rgb(0% 73.33% 58.43%);
-  /* Text on the accent: white, as the site sets on its bg-accent-teal buttons. */
+  /* Text on the teal accent is white, matching the site's filled teal buttons. */
   --primary-foreground: rgb(100% 100% 100%);
-  /* The focus ring: the site's ring-accent-teal, the teal accent. */
+  /* The focus ring is the teal accent, matching the site's ring-accent-teal/30. */
   --ring: var(--primary);
-  /* A quiet filled surface: the site's bg-white/[0.06] fills, inverted to a black wash on the light canvas. */
+  /* A quiet filled surface is the site's bg-white/[0.06]; in light mode the same faint fill inverted to black. */
   --secondary: rgb(0% 0% 0% / 0.06);
-  /* Text on a secondary surface: the ink. */
-  --secondary-foreground: rgb(3.92% 3.92% 4.31%);
-  /* The site's font-mono stack for tags and numbers: ui-monospace and the system stack. */
+  /* Text on a secondary surface is the page ink, in both modes. */
+  --secondary-foreground: var(--foreground);
+  /* The site's font-mono utility resolves to the system monospace stack it declares. */
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
-  /* The site's one typeface, Inter, loaded as a web font, with the system stack behind it. */
+  /* The site's one typeface is Inter, loaded as a web font, with the system stack behind it. */
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  /* The site's controls and cards are rounded-xl (.75rem), its most frequent bounded corner. */
+  /* The site's controls are rounded-xl (0.75rem), its most frequent square-cornered radius after pills. */
   --radius: 0.75rem;
 }
 
 .dark .brand-pipelex-pipelex-method--claude-4-8-opus {
-  /* A hover fill: the site's bg-accent-teal/10, a teal wash under the pointer. */
-  --accent: rgb(0% 73.33% 58.43% / 0.1);
-  /* Text on an accent fill: the teal accent, as text-accent-teal reads on its own wash. */
-  --accent-foreground: rgb(0% 73.33% 58.43%);
-  /* The page canvas: the site is dark (body bg-[#0a0a0b]), so light mode is the inverted canvas. */
+  /* A hover fill is the site's bg-white/10; inverted to a faint black over the light canvas. */
+  --accent: rgb(100% 100% 100% / 0.1);
+  /* Text on a hover fill is the page ink, in both modes. */
+  --accent-foreground: var(--foreground);
+  /* The site is dark-only; its page background is #0a0a0b, so the light canvas here is the derived inversion: white. */
   --background: rgb(3.92% 3.92% 4.31%);
-  /* The hairline: the site's border-white/10, inverted to a black hairline on the light canvas. */
+  /* The hairline is the site's border-white/10; inverted to black over the light canvas. */
   --border: rgb(100% 100% 100% / 0.1);
-  /* A raised surface: the site's bg-white/5 panels, a translucent step off the canvas; inverted to a black wash on the light canvas. */
+  /* A raised surface is bg-white/5 over the canvas; in light mode a step off white is the same faint fill inverted to black. */
   --card: rgb(100% 100% 100% / 0.05);
-  /* Text on a card: the same ink as the canvas text. */
-  --card-foreground: rgb(100% 100% 100%);
-  /* The error colour: the site's bg-rose-500 (#f43f5e) remove and invalid marks. */
-  --destructive: rgb(95.69% 24.71% 36.86%);
-  /* Text on the destructive colour: white. */
+  /* Text on a card is the page ink, in both modes. */
+  --card-foreground: var(--foreground);
+  /* The error colour is the site's bg-rose-500 / text-rose-400, used for remove and invalid marks. */
+  --destructive: rgb(98.43% 44.31% 52.16%);
+  /* Text on the destructive colour is white, matching the site's filled rose buttons. */
   --destructive-foreground: rgb(100% 100% 100%);
-  /* Text on the canvas: the site's text-white ink, inverted for light mode. */
+  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */
   --foreground: rgb(100% 100% 100%);
-  /* The control surface: a step off the canvas matching the site's bg-white/10 fields, inverted for light mode. */
-  --input: rgb(100% 100% 100% / 0.1);
-  /* A subdued fill: the site's faintest bg-white/[0.03] band, inverted for the light canvas. */
+  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */
+  --popover-foreground: var(--foreground);
+  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */
+  --secondary-foreground: var(--foreground);
+  /* The control surface is a step off the canvas, taken from the site's white/[0.06] field fill; inverted to black for light mode. */
+  --input: rgb(100% 100% 100% / 0.06);
+  /* A subdued fill is the site's faintest bg-white/[0.03] band; inverted to black over the light canvas. */
   --muted: rgb(100% 100% 100% / 0.03);
-  /* Secondary text: the site's text-gray-400 (#9ca3af) hints, darkened for contrast on the light canvas. */
+  /* Secondary text is the site's text-gray-400 (#9ca3af); darkened to gray-500 for the light canvas to hold the 4.5 contrast bar. */
   --muted-foreground: rgb(61.57% 63.92% 68.63%);
-  /* A floating surface, opaque: derived a step off the light canvas, inverted from the site's dark bg-bg-darker menus. */
-  --popover: rgb(5.1% 4.31% 7.84%);
-  /* Text on a popover: the ink. */
-  --popover-foreground: rgb(100% 100% 100%);
-  /* The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes. */
+  /* A floating surface is opaque; the site's overlays sit on the near-black bg-bg-darker (#0d0b14), inverted to white for light mode. */
+  --popover: rgb(5.1% 4.3% 7.8%);
+  /* The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes. */
   --primary: rgb(0% 73.33% 58.43%);
-  /* The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes. */
+  /* The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes. */
   --ring: var(--primary);
-  /* Text on the accent: white, as the site sets on its bg-accent-teal buttons. */
+  /* Text on the teal accent is white, matching the site's filled teal buttons. */
   --primary-foreground: rgb(100% 100% 100%);
-  /* A quiet filled surface: the site's bg-white/[0.06] fills, inverted to a black wash on the light canvas. */
+  /* A quiet filled surface is the site's bg-white/[0.06]; in light mode the same faint fill inverted to black. */
   --secondary: rgb(100% 100% 100% / 0.06);
-  /* Text on a secondary surface: the ink. */
-  --secondary-foreground: rgb(100% 100% 100%);
 }

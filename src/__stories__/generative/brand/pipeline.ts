@@ -1,12 +1,19 @@
-import { brandManifestSchema } from './manifest';
+import { type BrandManifest, brandManifestSchema } from './manifest';
 import {
   type BrandFixture,
   brandProducerId,
   brandProvenanceSchema,
   brandScope,
+  type StatedFacts,
 } from './brand-fixture';
 import { compileBrandTokens } from './terrazzo';
-import { validateBrandTokens } from './tokens-schema';
+import {
+  type BrandTokens,
+  colorHex,
+  colorIsHex,
+  resolveColor,
+  validateBrandTokens,
+} from './tokens-schema';
 
 /**
  * One brand directory's three files in, a `BrandFixture` or every problem
@@ -42,6 +49,34 @@ function issues(prefix: string, error: { issues: { path: PropertyKey[]; message:
   });
 }
 
+/** A stated fact outranks a reading: the brand must carry what the person said. */
+function checkStated(
+  stated: StatedFacts | undefined,
+  manifest: BrandManifest,
+  tokens: BrandTokens,
+  problems: string[],
+) {
+  if (!stated) return;
+  if (stated.accent) {
+    for (const mode of ['light', 'dark'] as const) {
+      const primary = resolveColor(tokens, 'primary', mode);
+      if (primary && !colorIsHex(primary, stated.accent)) {
+        problems.push(
+          `tokens.json: color.primary (${mode}) resolves to ${colorHex(primary)}, but the accent was stated as ${stated.accent}`,
+        );
+      }
+    }
+  }
+  for (const canvas of ['onLight', 'onDark'] as const) {
+    const url = stated.logo?.[canvas];
+    if (url && manifest.logo[canvas] !== url) {
+      problems.push(
+        `brand.json: logo.${canvas} is ${manifest.logo[canvas]}, but the logo for that canvas was stated as ${url}`,
+      );
+    }
+  }
+}
+
 export async function assembleBrand(source: BrandSource): Promise<AssembleResult> {
   const problems: string[] = [];
   const manifest = brandManifestSchema.safeParse(source.manifest);
@@ -63,6 +98,9 @@ export async function assembleBrand(source: BrandSource): Promise<AssembleResult
   }
   const tokens = validateBrandTokens(source.tokens);
   if (!tokens.ok) problems.push(...tokens.problems.map((problem) => `tokens.json: ${problem}`));
+  if (manifest.success && provenance.success && tokens.ok) {
+    checkStated(provenance.data.stated, manifest.data, tokens.tokens, problems);
+  }
   if (problems.length > 0 || !manifest.success || !provenance.success || !tokens.ok) {
     return { ok: false, problems, warnings: [] };
   }

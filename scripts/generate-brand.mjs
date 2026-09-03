@@ -3,6 +3,13 @@
  * Produce a brand from a website: extract, generate, validate, build.
  *
  *   make brand-from-site BRAND=<slug> URL=<url>   [MODEL=<id>] [ROUNDS=<n>] [TEMPERATURE=<n>]
+ *                        [ACCENT=#rrggbb] [LOGO_ON_LIGHT=<url>] [LOGO_ON_DARK=<url>]
+ *
+ * The three optional values are what the person who owns the site STATES
+ * beside its URL, for what the site does not show: the accent of a site with
+ * no button, the logo for a canvas the site draws none for. They enter the
+ * facts as `stated`, the method is told a stated fact outranks a reading, the
+ * build checks the brand honours them, and the provenance records them.
  *
  * The producer's loop, end to end and timed - the go/no-go asks for it to run
  * in under a minute per brand:
@@ -146,15 +153,44 @@ async function main() {
   const maxRounds = Number(process.env.ROUNDS || 2);
   requireCli();
 
-  const [{ renderBrandContract }, { promptHashOf }, { assembleBrand }, { brandProducerId }] =
-    await Promise.all([
-      import('../src/__stories__/generative/brand/contract.ts'),
-      import('../src/__stories__/generative/brand/prompt-hash.ts').catch(
-        () => import('../src/__stories__/generative/prompt-hash.ts'),
-      ),
-      import('../src/__stories__/generative/brand/pipeline.ts'),
-      import('../src/__stories__/generative/brand/brand-fixture.ts'),
-    ]);
+  const [
+    { renderBrandContract },
+    { promptHashOf },
+    { assembleBrand },
+    { brandProducerId, statedFactsSchema },
+  ] = await Promise.all([
+    import('../src/__stories__/generative/brand/contract.ts'),
+    import('../src/__stories__/generative/brand/prompt-hash.ts').catch(
+      () => import('../src/__stories__/generative/prompt-hash.ts'),
+    ),
+    import('../src/__stories__/generative/brand/pipeline.ts'),
+    import('../src/__stories__/generative/brand/brand-fixture.ts'),
+  ]);
+
+  const statedInput = {
+    ...(argValue(args, '--accent') ? { accent: argValue(args, '--accent') } : {}),
+    ...(argValue(args, '--logo-on-light') || argValue(args, '--logo-on-dark')
+      ? {
+          logo: {
+            ...(argValue(args, '--logo-on-light')
+              ? { onLight: argValue(args, '--logo-on-light') }
+              : {}),
+            ...(argValue(args, '--logo-on-dark')
+              ? { onDark: argValue(args, '--logo-on-dark') }
+              : {}),
+          },
+        }
+      : {}),
+  };
+  const statedParsed = statedFactsSchema.safeParse(statedInput);
+  if (!statedParsed.success) {
+    die(
+      `the stated facts do not validate:\n${statedParsed.error.issues
+        .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+        .join('\n')}`,
+    );
+  }
+  const stated = Object.keys(statedInput).length > 0 ? statedParsed.data : null;
 
   const contract = renderBrandContract();
   const contractHash = promptHashOf(contract);
@@ -183,7 +219,19 @@ async function main() {
   mkdirSync(brandDir, { recursive: true });
 
   let step = performance.now();
-  const facts = await extractSiteFacts(url);
+  const read = await extractSiteFacts(url);
+  // What the person stated sits right after the site's identity, ahead of
+  // every reading, because it outranks them.
+  const facts = stated
+    ? {
+        url: read.url,
+        finalUrl: read.finalUrl,
+        fetchedAt: read.fetchedAt,
+        site: read.site,
+        stated,
+        ...read,
+      }
+    : read;
   const factsPath = path.join(brandDir, 'site-facts.json');
   writeFileSync(factsPath, `${JSON.stringify(facts, null, 2)}\n`);
   const factsText = JSON.stringify(facts, null, 2);
@@ -199,6 +247,7 @@ async function main() {
     brief: BRIEF_REL,
     contractHash,
     siteFacts: path.relative(REPO, factsPath),
+    ...(stated ? { stated } : {}),
   };
   const producerId = brandProducerId(provenance);
 

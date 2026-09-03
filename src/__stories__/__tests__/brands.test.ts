@@ -10,7 +10,7 @@ import {
 } from '../generative/brand/brand-fixture';
 import { BRAND_CONTRACT, renderBrandContract } from '../generative/brand/contract';
 import { assembleBrand } from '../generative/brand/pipeline';
-import { validateBrandTokens } from '../generative/brand/tokens-schema';
+import { resolveColor, validateBrandTokens } from '../generative/brand/tokens-schema';
 import { promptHashOf } from '../generative/prompt-hash';
 
 /**
@@ -196,9 +196,29 @@ describe('the token validator', () => {
 
   it('refuses a mode other than dark', () => {
     const tokens = base();
-    (tokens.color.primary.$extensions.mode as Record<string, unknown>).light =
+    (tokens.color.primary.$extensions!.mode as Record<string, unknown>).light =
       tokens.color.primary.$value;
     expect(problemsOf(tokens).join('\n')).toMatch(/mode/);
+  });
+
+  it('accepts an alias with no dark value, which stands for both modes', () => {
+    const tokens = base();
+    tokens.color['card-foreground'] = {
+      $value: '{color.foreground}',
+      $description: 'Text on a card: the page ink, in both modes.',
+    };
+    const result = validateBrandTokens(tokens);
+    expect(result.ok ? [] : result.problems).toEqual([]);
+    if (!result.ok) throw new Error('unreachable');
+    expect(resolveColor(result.tokens, 'card-foreground', 'dark')).toEqual(
+      resolveColor(result.tokens, 'foreground', 'dark'),
+    );
+  });
+
+  it('refuses a colour with no dark value: only an alias stands for both modes', () => {
+    const tokens = base();
+    delete (tokens.color.primary as { $extensions?: unknown }).$extensions;
+    expect(problemsOf(tokens).join('\n')).toMatch(/color\.primary\.\$extensions/);
   });
 
   it('refuses an alias cycle', () => {
@@ -227,7 +247,7 @@ describe('the token validator', () => {
 
   it('refuses a pair below AA in the dark mode, which Terrazzo checks only in the light one', () => {
     const tokens = base();
-    tokens.color['muted-foreground'].$extensions.mode.dark = {
+    tokens.color['muted-foreground'].$extensions!.mode.dark = {
       colorSpace: 'srgb',
       components: [0.2, 0.2, 0.2],
       alpha: 1,

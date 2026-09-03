@@ -1,9 +1,9 @@
 {
   "name": "MTHDS",
-  "website": "https://mthds.ai/latest/",
+  "website": "https://mthds.ai/",
   "logo": {
     "onLight": "https://mthds.ai/latest/images/mthds-black_on_transparent.png",
-    "onDark": "https://mthds.ai/latest/images/mthds-black_on_transparent.png"
+    "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png"
   },
   "webfont": {
     "provider": "google-fonts",

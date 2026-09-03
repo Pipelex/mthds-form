@@ -10,17 +10,23 @@ export const BRANDS: BrandFixture[] = [
     model: 'claude-4.8-opus',
     date: '2026-09-03',
     brief: 'wip/generative-ui/briefs/brand-contract.md',
-    contractHash: '639319fbd5f6',
+    contractHash: '27d1d3c2bc39',
+    stated: {
+      accent: '#1a1a1a',
+      logo: {
+        onDark: 'https://mthds.ai/latest/images/mthds-white_on_transparent.png',
+      },
+    },
     siteFacts: 'data/brands/mthds/site-facts.json',
     rounds: 0,
     brand: 'mthds',
     producerId: 'pipelex-method--claude-4.8-opus',
     manifest: {
       name: 'MTHDS',
-      website: 'https://mthds.ai/latest/',
+      website: 'https://mthds.ai/',
       logo: {
         onLight: 'https://mthds.ai/latest/images/mthds-black_on_transparent.png',
-        onDark: 'https://mthds.ai/latest/images/mthds-black_on_transparent.png',
+        onDark: 'https://mthds.ai/latest/images/mthds-white_on_transparent.png',
       },
       webfont: {
         provider: 'google-fonts',
@@ -38,7 +44,7 @@ export const BRANDS: BrandFixture[] = [
             hex: '#ffffff',
           },
           $description:
-            "The site's page canvas: --md-default-bg-color is #ffffff in the default scheme; #0f0f0f in the slate scheme.",
+            'The page canvas: --md-default-bg-color is #fff in the default (light) scheme.',
           $extensions: {
             mode: {
               dark: {
@@ -58,7 +64,7 @@ export const BRANDS: BrandFixture[] = [
             hex: '#525252',
           },
           $description:
-            "The site's body text: --md-default-fg-color as served is #525252 in the default scheme; #d4d4d4 in the slate scheme.",
+            'Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light.',
           $extensions: {
             mode: {
               dark: {
@@ -71,14 +77,9 @@ export const BRANDS: BrandFixture[] = [
           },
         },
         card: {
-          $value: {
-            colorSpace: 'srgb',
-            components: [0.9804, 0.9804, 0.9804],
-            alpha: 1,
-            hex: '#fafafa',
-          },
+          $value: '{color.background}',
           $description:
-            'A raised surface: --md-default-bg-color--lighter is #fafafa in the default scheme, a step off the white canvas; #262626 in the slate scheme.',
+            'The site has no distinct card surface in light mode; a raised surface is the canvas.',
           $extensions: {
             mode: {
               dark: {
@@ -92,13 +93,7 @@ export const BRANDS: BrandFixture[] = [
         },
         'card-foreground': {
           $value: '{color.foreground}',
-          $description:
-            "Text on a card is the site's ordinary ink; MkDocs draws surface text in --md-default-fg-color.",
-          $extensions: {
-            mode: {
-              dark: '{color.foreground}',
-            },
-          },
+          $description: 'Text on a card is the page ink, in both modes.',
         },
         popover: {
           $value: {
@@ -108,41 +103,36 @@ export const BRANDS: BrandFixture[] = [
             hex: '#ffffff',
           },
           $description:
-            'A floating surface: MkDocs menus and tooltips sit on --md-default-bg-color, #ffffff in the default scheme; #0f0f0f in the slate scheme.',
+            'A floating surface is the opaque canvas; derived from --md-default-bg-color #fff in light.',
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.0588, 0.0588, 0.0588],
+                components: [0.149, 0.149, 0.149],
                 alpha: 1,
-                hex: '#0f0f0f',
+                hex: '#262626',
               },
             },
           },
         },
         'popover-foreground': {
           $value: '{color.foreground}',
-          $description: "Text on a popover is the site's ordinary ink, --md-default-fg-color.",
-          $extensions: {
-            mode: {
-              dark: '{color.foreground}',
-            },
-          },
+          $description: 'Text on a popover is the page ink, in both modes.',
         },
         primary: {
           $value: {
             colorSpace: 'srgb',
-            components: [0.9608, 0.9608, 0.9608],
+            components: [0.1019, 0.1019, 0.1019],
             alpha: 1,
-            hex: '#f5f5f5',
+            hex: '#1a1a1a',
           },
           $description:
-            "The site's primary surface: --md-primary-fg-color as served is a near-white grey #f5f5f5 in the default scheme; the dark grey #1a1a1a in the slate scheme.",
+            'The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces.',
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.102, 0.102, 0.102],
+                components: [0.1019, 0.1019, 0.1019],
                 alpha: 1,
                 hex: '#1a1a1a',
               },
@@ -152,12 +142,12 @@ export const BRANDS: BrandFixture[] = [
         'primary-foreground': {
           $value: {
             colorSpace: 'srgb',
-            components: [0.102, 0.102, 0.102],
+            components: [0.898, 0.898, 0.898],
             alpha: 1,
-            hex: '#1a1a1a',
+            hex: '#e5e5e5',
           },
           $description:
-            'Text on the primary surface: --md-primary-bg-color as served is #1a1a1a in the default scheme; #e5e5e5 in the slate scheme.',
+            'Text on the accent: --md-primary-bg-color is #e5e5e5 against the near-black primary in the slate scheme.',
           $extensions: {
             mode: {
               dark: {
@@ -177,12 +167,12 @@ export const BRANDS: BrandFixture[] = [
             hex: '#f5f5f5',
           },
           $description:
-            'A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in the default scheme; #1a1a1a in the slate scheme.',
+            'A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in light.',
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.102, 0.102, 0.102],
+                components: [0.1019, 0.1019, 0.1019],
                 alpha: 1,
                 hex: '#1a1a1a',
               },
@@ -191,30 +181,23 @@ export const BRANDS: BrandFixture[] = [
         },
         'secondary-foreground': {
           $value: '{color.foreground}',
-          $description:
-            "Text on the secondary surface is the site's ordinary ink, --md-default-fg-color.",
-          $extensions: {
-            mode: {
-              dark: '{color.foreground}',
-            },
-          },
+          $description: 'Text on a secondary surface is the page ink, in both modes.',
         },
         muted: {
           $value: {
             colorSpace: 'srgb',
-            components: [0.9608, 0.9608, 0.9608],
+            components: [0.9804, 0.9804, 0.9804],
             alpha: 1,
-            hex: '#f5f5f5',
+            hex: '#fafafa',
           },
-          $description:
-            'A subdued fill: the code/table band uses --md-code-bg-color #f5f5f5 in the default scheme; #1a1a1a in the slate scheme.',
+          $description: 'A subdued fill: --md-default-bg-color--lighter is #fafafa in light.',
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.102, 0.102, 0.102],
+                components: [0.149, 0.149, 0.149],
                 alpha: 1,
-                hex: '#1a1a1a',
+                hex: '#262626',
               },
             },
           },
@@ -226,8 +209,7 @@ export const BRANDS: BrandFixture[] = [
             alpha: 1,
             hex: '#6b6b6b',
           },
-          $description:
-            'Secondary text: --md-default-fg-color--light as served is #6b6b6b in the default scheme; #a0a0a0 in the slate scheme.',
+          $description: 'Secondary text: --md-default-fg-color--light is #6b6b6b in light.',
           $extensions: {
             mode: {
               dark: {
@@ -247,14 +229,14 @@ export const BRANDS: BrandFixture[] = [
             hex: '#f5f5f5',
           },
           $description:
-            'A hover fill: MkDocs menu items under the pointer take --md-default-bg-color--light #f5f5f5 in the default scheme; #1a1a1a in the slate scheme.',
+            'A hover fill: --md-accent-bg-color--light is #f5f5f5 in light, the quiet fill under the pointer.',
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.102, 0.102, 0.102],
+                components: [0.2, 0.2, 0.2],
                 alpha: 1,
-                hex: '#1a1a1a',
+                hex: '#333333',
               },
             },
           },
@@ -266,8 +248,7 @@ export const BRANDS: BrandFixture[] = [
             alpha: 1,
             hex: '#525252',
           },
-          $description:
-            'Text on a hover fill: --md-accent-fg-color as served is the grey #525252 in the default scheme; #d4d4d4 in the slate scheme.',
+          $description: 'Text on a hover fill: --md-accent-fg-color as served is #525252 in light.',
           $extensions: {
             mode: {
               dark: {
@@ -286,8 +267,7 @@ export const BRANDS: BrandFixture[] = [
             alpha: 1,
             hex: '#d52a2a',
           },
-          $description:
-            'The error colour: --md-code-hl-number-color is #d52a2a in the default scheme; #e6695b in the slate scheme.',
+          $description: 'The error colour: --md-code-hl-number-color is #d52a2a in light.',
           $extensions: {
             mode: {
               dark: {
@@ -306,7 +286,7 @@ export const BRANDS: BrandFixture[] = [
             alpha: 1,
             hex: '#ffffff',
           },
-          $description: "Text on the destructive colour: white, the page's on-strong-colour ink.",
+          $description: 'Text on the destructive colour: white, to read on the red mark.',
           $extensions: {
             mode: {
               dark: {
@@ -325,8 +305,7 @@ export const BRANDS: BrandFixture[] = [
             alpha: 0.12,
             hex: '#000000',
           },
-          $description:
-            'The hairline: --md-default-fg-color--lightest is black at 0.12 alpha in the default scheme; light ink at 0.12 in the slate scheme.',
+          $description: 'The hairline: --md-default-fg-color--lightest is black at 12% in light.',
           $extensions: {
             mode: {
               dark: {
@@ -346,12 +325,12 @@ export const BRANDS: BrandFixture[] = [
             hex: '#f5f5f5',
           },
           $description:
-            "The control surface: fields take the site's light fill --md-default-bg-color--light #f5f5f5, a step off the white canvas; #1a1a1a in the slate scheme.",
+            "The control surface: the site's #f5f5f5 code/field fill, a step off the white canvas.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.102, 0.102, 0.102],
+                components: [0.1019, 0.1019, 0.1019],
                 alpha: 1,
                 hex: '#1a1a1a',
               },
@@ -359,14 +338,9 @@ export const BRANDS: BrandFixture[] = [
           },
         },
         ring: {
-          $value: '{color.accent-foreground}',
+          $value: '{color.primary}',
           $description:
-            'The focus ring follows the accent ink --md-accent-fg-color, the grey #525252 in the default scheme; #d4d4d4 in the slate scheme.',
-          $extensions: {
-            mode: {
-              dark: '{color.accent-foreground}',
-            },
-          },
+            "The focus ring follows the accent, the site's near-black primary, in both modes.",
         },
       },
       radius: {
@@ -376,8 +350,7 @@ export const BRANDS: BrandFixture[] = [
             value: 0.1,
             unit: 'rem',
           },
-          $description:
-            "The site's dominant corner radius: .1rem, the most frequent radius across its stylesheets.",
+          $description: "The control corner radius: the site's most frequent radius is .1rem.",
         },
       },
       font: {
@@ -385,30 +358,29 @@ export const BRANDS: BrandFixture[] = [
         sans: {
           $value: ['Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
           $description:
-            "The site's body typeface: Roboto, loaded via the Google Fonts stylesheet, ahead of a system sans fallback.",
+            "The site's typeface: Roboto, the most frequent family, with a system stack behind it.",
         },
         mono: {
           $value: ['Roboto Mono', 'SFMono-Regular', 'Menlo', 'monospace'],
           $description:
-            "The site's monospace face for code: Roboto Mono, with a system mono fallback.",
+            "Tags, numbers and code: Roboto Mono, the site's monospace face, with the system stack behind it.",
         },
       },
     },
     scope: 'brand-mthds-pipelex-method--claude-4-8-opus',
-    css: "/* -------------------------------------------\n *  Autogenerated by ⛋ Terrazzo. DO NOT EDIT!\n * ------------------------------------------- */\n\n.brand-mthds-pipelex-method--claude-4-8-opus {\n  /* A hover fill: MkDocs menu items under the pointer take --md-default-bg-color--light #f5f5f5 in the default scheme; #1a1a1a in the slate scheme. */\n  --accent: rgb(96.08% 96.08% 96.08%);\n  /* Text on a hover fill: --md-accent-fg-color as served is the grey #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --accent-foreground: rgb(32.16% 32.16% 32.16%);\n  /* The site's page canvas: --md-default-bg-color is #ffffff in the default scheme; #0f0f0f in the slate scheme. */\n  --background: rgb(100% 100% 100%);\n  /* The hairline: --md-default-fg-color--lightest is black at 0.12 alpha in the default scheme; light ink at 0.12 in the slate scheme. */\n  --border: rgb(0% 0% 0% / 0.12);\n  /* A raised surface: --md-default-bg-color--lighter is #fafafa in the default scheme, a step off the white canvas; #262626 in the slate scheme. */\n  --card: rgb(98.04% 98.04% 98.04%);\n  /* Text on a card is the site's ordinary ink; MkDocs draws surface text in --md-default-fg-color. */\n  --card-foreground: var(--foreground);\n  /* The error colour: --md-code-hl-number-color is #d52a2a in the default scheme; #e6695b in the slate scheme. */\n  --destructive: rgb(83.53% 16.47% 16.47%);\n  /* Text on the destructive colour: white, the page's on-strong-colour ink. */\n  --destructive-foreground: rgb(100% 100% 100%);\n  /* The site's body text: --md-default-fg-color as served is #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --foreground: rgb(32.16% 32.16% 32.16%);\n  /* The control surface: fields take the site's light fill --md-default-bg-color--light #f5f5f5, a step off the white canvas; #1a1a1a in the slate scheme. */\n  --input: rgb(96.08% 96.08% 96.08%);\n  /* A subdued fill: the code/table band uses --md-code-bg-color #f5f5f5 in the default scheme; #1a1a1a in the slate scheme. */\n  --muted: rgb(96.08% 96.08% 96.08%);\n  /* Secondary text: --md-default-fg-color--light as served is #6b6b6b in the default scheme; #a0a0a0 in the slate scheme. */\n  --muted-foreground: rgb(41.96% 41.96% 41.96%);\n  /* A floating surface: MkDocs menus and tooltips sit on --md-default-bg-color, #ffffff in the default scheme; #0f0f0f in the slate scheme. */\n  --popover: rgb(100% 100% 100%);\n  /* Text on a popover is the site's ordinary ink, --md-default-fg-color. */\n  --popover-foreground: var(--foreground);\n  /* The site's primary surface: --md-primary-fg-color as served is a near-white grey #f5f5f5 in the default scheme; the dark grey #1a1a1a in the slate scheme. */\n  --primary: rgb(96.08% 96.08% 96.08%);\n  /* Text on the primary surface: --md-primary-bg-color as served is #1a1a1a in the default scheme; #e5e5e5 in the slate scheme. */\n  --primary-foreground: rgb(10.2% 10.2% 10.2%);\n  /* The focus ring follows the accent ink --md-accent-fg-color, the grey #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --ring: var(--accent-foreground);\n  /* A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in the default scheme; #1a1a1a in the slate scheme. */\n  --secondary: rgb(96.08% 96.08% 96.08%);\n  /* Text on the secondary surface is the site's ordinary ink, --md-default-fg-color. */\n  --secondary-foreground: var(--foreground);\n  /* The site's monospace face for code: Roboto Mono, with a system mono fallback. */\n  --font-mono: \"Roboto Mono\", \"SFMono-Regular\", \"Menlo\", monospace;\n  /* The site's body typeface: Roboto, loaded via the Google Fonts stylesheet, ahead of a system sans fallback. */\n  --font-sans: \"Roboto\", \"Helvetica Neue\", \"Arial\", sans-serif;\n  /* The site's dominant corner radius: .1rem, the most frequent radius across its stylesheets. */\n  --radius: 0.1rem;\n}\n\n.dark .brand-mthds-pipelex-method--claude-4-8-opus {\n  /* A hover fill: MkDocs menu items under the pointer take --md-default-bg-color--light #f5f5f5 in the default scheme; #1a1a1a in the slate scheme. */\n  --accent: rgb(10.2% 10.2% 10.2%);\n  /* Text on a hover fill: --md-accent-fg-color as served is the grey #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --accent-foreground: rgb(83.14% 83.14% 83.14%);\n  /* Text on a hover fill: --md-accent-fg-color as served is the grey #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --ring: var(--accent-foreground);\n  /* The site's page canvas: --md-default-bg-color is #ffffff in the default scheme; #0f0f0f in the slate scheme. */\n  --background: rgb(5.88% 5.88% 5.88%);\n  /* The hairline: --md-default-fg-color--lightest is black at 0.12 alpha in the default scheme; light ink at 0.12 in the slate scheme. */\n  --border: rgb(83.14% 83.14% 83.14% / 0.12);\n  /* A raised surface: --md-default-bg-color--lighter is #fafafa in the default scheme, a step off the white canvas; #262626 in the slate scheme. */\n  --card: rgb(14.9% 14.9% 14.9%);\n  /* Text on a card is the site's ordinary ink; MkDocs draws surface text in --md-default-fg-color. */\n  --card-foreground: var(--foreground);\n  /* The error colour: --md-code-hl-number-color is #d52a2a in the default scheme; #e6695b in the slate scheme. */\n  --destructive: rgb(90.2% 41.18% 35.69%);\n  /* Text on the destructive colour: white, the page's on-strong-colour ink. */\n  --destructive-foreground: rgb(5.88% 5.88% 5.88%);\n  /* The site's body text: --md-default-fg-color as served is #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --foreground: rgb(83.14% 83.14% 83.14%);\n  /* The site's body text: --md-default-fg-color as served is #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --popover-foreground: var(--foreground);\n  /* The site's body text: --md-default-fg-color as served is #525252 in the default scheme; #d4d4d4 in the slate scheme. */\n  --secondary-foreground: var(--foreground);\n  /* The control surface: fields take the site's light fill --md-default-bg-color--light #f5f5f5, a step off the white canvas; #1a1a1a in the slate scheme. */\n  --input: rgb(10.2% 10.2% 10.2%);\n  /* A subdued fill: the code/table band uses --md-code-bg-color #f5f5f5 in the default scheme; #1a1a1a in the slate scheme. */\n  --muted: rgb(10.2% 10.2% 10.2%);\n  /* Secondary text: --md-default-fg-color--light as served is #6b6b6b in the default scheme; #a0a0a0 in the slate scheme. */\n  --muted-foreground: rgb(62.75% 62.75% 62.75%);\n  /* A floating surface: MkDocs menus and tooltips sit on --md-default-bg-color, #ffffff in the default scheme; #0f0f0f in the slate scheme. */\n  --popover: rgb(5.88% 5.88% 5.88%);\n  /* The site's primary surface: --md-primary-fg-color as served is a near-white grey #f5f5f5 in the default scheme; the dark grey #1a1a1a in the slate scheme. */\n  --primary: rgb(10.2% 10.2% 10.2%);\n  /* Text on the primary surface: --md-primary-bg-color as served is #1a1a1a in the default scheme; #e5e5e5 in the slate scheme. */\n  --primary-foreground: rgb(89.8% 89.8% 89.8%);\n  /* A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in the default scheme; #1a1a1a in the slate scheme. */\n  --secondary: rgb(10.2% 10.2% 10.2%);\n}\n",
+    css: '/* -------------------------------------------\n *  Autogenerated by ⛋ Terrazzo. DO NOT EDIT!\n * ------------------------------------------- */\n\n.brand-mthds-pipelex-method--claude-4-8-opus {\n  /* A hover fill: --md-accent-bg-color--light is #f5f5f5 in light, the quiet fill under the pointer. */\n  --accent: rgb(96.08% 96.08% 96.08%);\n  /* Text on a hover fill: --md-accent-fg-color as served is #525252 in light. */\n  --accent-foreground: rgb(32.16% 32.16% 32.16%);\n  /* The page canvas: --md-default-bg-color is #fff in the default (light) scheme. */\n  --background: rgb(100% 100% 100%);\n  /* The hairline: --md-default-fg-color--lightest is black at 12% in light. */\n  --border: rgb(0% 0% 0% / 0.12);\n  /* The site has no distinct card surface in light mode; a raised surface is the canvas. */\n  --card: var(--background);\n  /* Text on a card is the page ink, in both modes. */\n  --card-foreground: var(--foreground);\n  /* The error colour: --md-code-hl-number-color is #d52a2a in light. */\n  --destructive: rgb(83.53% 16.47% 16.47%);\n  /* Text on the destructive colour: white, to read on the red mark. */\n  --destructive-foreground: rgb(100% 100% 100%);\n  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */\n  --foreground: rgb(32.16% 32.16% 32.16%);\n  /* The control surface: the site\'s #f5f5f5 code/field fill, a step off the white canvas. */\n  --input: rgb(96.08% 96.08% 96.08%);\n  /* A subdued fill: --md-default-bg-color--lighter is #fafafa in light. */\n  --muted: rgb(98.04% 98.04% 98.04%);\n  /* Secondary text: --md-default-fg-color--light is #6b6b6b in light. */\n  --muted-foreground: rgb(41.96% 41.96% 41.96%);\n  /* A floating surface is the opaque canvas; derived from --md-default-bg-color #fff in light. */\n  --popover: rgb(100% 100% 100%);\n  /* Text on a popover is the page ink, in both modes. */\n  --popover-foreground: var(--foreground);\n  /* The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces. */\n  --primary: rgb(10.19% 10.19% 10.19%);\n  /* Text on the accent: --md-primary-bg-color is #e5e5e5 against the near-black primary in the slate scheme. */\n  --primary-foreground: rgb(89.8% 89.8% 89.8%);\n  /* The focus ring follows the accent, the site\'s near-black primary, in both modes. */\n  --ring: var(--primary);\n  /* A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in light. */\n  --secondary: rgb(96.08% 96.08% 96.08%);\n  /* Text on a secondary surface is the page ink, in both modes. */\n  --secondary-foreground: var(--foreground);\n  /* Tags, numbers and code: Roboto Mono, the site\'s monospace face, with the system stack behind it. */\n  --font-mono: "Roboto Mono", "SFMono-Regular", "Menlo", monospace;\n  /* The site\'s typeface: Roboto, the most frequent family, with a system stack behind it. */\n  --font-sans: "Roboto", "Helvetica Neue", "Arial", sans-serif;\n  /* The control corner radius: the site\'s most frequent radius is .1rem. */\n  --radius: 0.1rem;\n}\n\n.dark .brand-mthds-pipelex-method--claude-4-8-opus {\n  /* A hover fill: --md-accent-bg-color--light is #f5f5f5 in light, the quiet fill under the pointer. */\n  --accent: rgb(20% 20% 20%);\n  /* Text on a hover fill: --md-accent-fg-color as served is #525252 in light. */\n  --accent-foreground: rgb(83.14% 83.14% 83.14%);\n  /* The page canvas: --md-default-bg-color is #fff in the default (light) scheme. */\n  --background: rgb(5.88% 5.88% 5.88%);\n  /* The page canvas: --md-default-bg-color is #fff in the default (light) scheme. */\n  --card: rgb(14.9% 14.9% 14.9%);\n  /* The hairline: --md-default-fg-color--lightest is black at 12% in light. */\n  --border: rgb(83.14% 83.14% 83.14% / 0.12);\n  /* Text on a card is the page ink, in both modes. */\n  --card-foreground: var(--foreground);\n  /* The error colour: --md-code-hl-number-color is #d52a2a in light. */\n  --destructive: rgb(90.2% 41.18% 35.69%);\n  /* Text on the destructive colour: white, to read on the red mark. */\n  --destructive-foreground: rgb(5.88% 5.88% 5.88%);\n  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */\n  --foreground: rgb(83.14% 83.14% 83.14%);\n  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */\n  --popover-foreground: var(--foreground);\n  /* Text on the canvas: --md-default-fg-color / --md-typeset-color as served is #525252 in light. */\n  --secondary-foreground: var(--foreground);\n  /* The control surface: the site\'s #f5f5f5 code/field fill, a step off the white canvas. */\n  --input: rgb(10.19% 10.19% 10.19%);\n  /* A subdued fill: --md-default-bg-color--lighter is #fafafa in light. */\n  --muted: rgb(14.9% 14.9% 14.9%);\n  /* Secondary text: --md-default-fg-color--light is #6b6b6b in light. */\n  --muted-foreground: rgb(62.75% 62.75% 62.75%);\n  /* A floating surface is the opaque canvas; derived from --md-default-bg-color #fff in light. */\n  --popover: rgb(14.9% 14.9% 14.9%);\n  /* The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces. */\n  --primary: rgb(10.19% 10.19% 10.19%);\n  /* The stated accent: #1a1a1a, the near-black the site shows on its primary surfaces. */\n  --ring: var(--primary);\n  /* Text on the accent: --md-primary-bg-color is #e5e5e5 against the near-black primary in the slate scheme. */\n  --primary-foreground: rgb(89.8% 89.8% 89.8%);\n  /* A quiet filled surface: --md-code-bg-color / --md-default-bg-color--light is #f5f5f5 in light. */\n  --secondary: rgb(10.19% 10.19% 10.19%);\n}\n',
     warnings: [
+      'core/duplicate-values: color.card declared a duplicate value',
       'core/duplicate-values: color.card-foreground declared a duplicate value',
       'core/duplicate-values: color.destructive-foreground declared a duplicate value',
       'core/duplicate-values: color.foreground declared a duplicate value',
       'core/duplicate-values: color.input declared a duplicate value',
-      'core/duplicate-values: color.muted declared a duplicate value',
       'core/duplicate-values: color.popover declared a duplicate value',
       'core/duplicate-values: color.popover-foreground declared a duplicate value',
-      'core/duplicate-values: color.primary declared a duplicate value',
       'core/duplicate-values: color.ring declared a duplicate value',
       'core/duplicate-values: color.secondary declared a duplicate value',
       'core/duplicate-values: color.secondary-foreground declared a duplicate value',
-      'lint: 11 warnings',
+      'lint: 10 warnings',
     ],
   },
   {
@@ -416,7 +388,7 @@ export const BRANDS: BrandFixture[] = [
     model: 'claude-fable-5-1',
     date: '2026-09-03',
     brief: 'wip/generative-ui/briefs/brand-contract.md',
-    contractHash: '639319fbd5f6',
+    contractHash: '27d1d3c2bc39',
     siteFacts:
       'read by hand on 2026-09-03 from pipelex.com; see wip/generative-ui/pipelex-design-system.md',
     brand: 'pipelex',
@@ -786,16 +758,21 @@ export const BRANDS: BrandFixture[] = [
     model: 'claude-4.8-opus',
     date: '2026-09-03',
     brief: 'wip/generative-ui/briefs/brand-contract.md',
-    contractHash: '639319fbd5f6',
+    contractHash: '27d1d3c2bc39',
+    stated: {
+      logo: {
+        onLight: 'https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png',
+      },
+    },
     siteFacts: 'data/brands/pipelex/site-facts.json',
-    rounds: 1,
+    rounds: 0,
     brand: 'pipelex',
     producerId: 'pipelex-method--claude-4.8-opus',
     manifest: {
       name: 'Pipelex',
       website: 'https://pipelex.com/',
       logo: {
-        onLight: 'https://pipelex.com/logo.png',
+        onLight: 'https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png',
         onDark: 'https://pipelex.com/logo.png',
       },
       webfont: {
@@ -809,12 +786,12 @@ export const BRANDS: BrandFixture[] = [
         background: {
           $value: {
             colorSpace: 'srgb',
-            components: [0.9569, 0.9569, 0.9647],
+            components: [1, 1, 1],
             alpha: 1,
-            hex: '#f4f4f6',
+            hex: '#ffffff',
           },
           $description:
-            'The page canvas: the site is dark (body bg-[#0a0a0b]), so light mode is the inverted canvas.',
+            'The site is dark-only; its page background is #0a0a0b, so the light canvas here is the derived inversion: white.',
           $extensions: {
             mode: {
               dark: {
@@ -833,7 +810,8 @@ export const BRANDS: BrandFixture[] = [
             alpha: 1,
             hex: '#0a0a0b',
           },
-          $description: "Text on the canvas: the site's text-white ink, inverted for light mode.",
+          $description:
+            "The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas.",
           $extensions: {
             mode: {
               dark: {
@@ -849,39 +827,23 @@ export const BRANDS: BrandFixture[] = [
           $value: {
             colorSpace: 'srgb',
             components: [0, 0, 0],
-            alpha: 0.04,
+            alpha: 0.05,
           },
           $description:
-            "A raised surface: the site's bg-white/5 panels, a translucent step off the canvas; inverted to a black wash on the light canvas.",
+            'A raised surface is bg-white/5 over the canvas; in light mode a step off white is the same faint fill inverted to black.',
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
                 components: [1, 1, 1],
                 alpha: 0.05,
-                hex: '#ffffff',
               },
             },
           },
         },
         'card-foreground': {
-          $value: {
-            colorSpace: 'srgb',
-            components: [0.0392, 0.0392, 0.0431],
-            alpha: 1,
-            hex: '#0a0a0b',
-          },
-          $description: 'Text on a card: the same ink as the canvas text.',
-          $extensions: {
-            mode: {
-              dark: {
-                colorSpace: 'srgb',
-                components: [1, 1, 1],
-                alpha: 1,
-                hex: '#ffffff',
-              },
-            },
-          },
+          $value: '{color.foreground}',
+          $description: 'Text on a card is the page ink, in both modes.',
         },
         popover: {
           $value: {
@@ -891,12 +853,12 @@ export const BRANDS: BrandFixture[] = [
             hex: '#ffffff',
           },
           $description:
-            "A floating surface, opaque: derived a step off the light canvas, inverted from the site's dark bg-bg-darker menus.",
+            "A floating surface is opaque; the site's overlays sit on the near-black bg-bg-darker (#0d0b14), inverted to white for light mode.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.051, 0.0431, 0.0784],
+                components: [0.051, 0.043, 0.078],
                 alpha: 1,
                 hex: '#0d0b14',
               },
@@ -904,23 +866,8 @@ export const BRANDS: BrandFixture[] = [
           },
         },
         'popover-foreground': {
-          $value: {
-            colorSpace: 'srgb',
-            components: [0.0392, 0.0392, 0.0431],
-            alpha: 1,
-            hex: '#0a0a0b',
-          },
-          $description: 'Text on a popover: the ink.',
-          $extensions: {
-            mode: {
-              dark: {
-                colorSpace: 'srgb',
-                components: [1, 1, 1],
-                alpha: 1,
-                hex: '#ffffff',
-              },
-            },
-          },
+          $value: '{color.foreground}',
+          $description: 'Text on a popover is the page ink, in both modes.',
         },
         primary: {
           $value: {
@@ -930,7 +877,7 @@ export const BRANDS: BrandFixture[] = [
             hex: '#00bb95',
           },
           $description:
-            "The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes.",
+            'The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes.',
           $extensions: {
             mode: {
               dark: {
@@ -950,7 +897,7 @@ export const BRANDS: BrandFixture[] = [
             hex: '#ffffff',
           },
           $description:
-            'Text on the accent: white, as the site sets on its bg-accent-teal buttons.',
+            "Text on the teal accent is white, matching the site's filled teal buttons.",
           $extensions: {
             mode: {
               dark: {
@@ -969,36 +916,20 @@ export const BRANDS: BrandFixture[] = [
             alpha: 0.06,
           },
           $description:
-            "A quiet filled surface: the site's bg-white/[0.06] fills, inverted to a black wash on the light canvas.",
+            "A quiet filled surface is the site's bg-white/[0.06]; in light mode the same faint fill inverted to black.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
                 components: [1, 1, 1],
                 alpha: 0.06,
-                hex: '#ffffff',
               },
             },
           },
         },
         'secondary-foreground': {
-          $value: {
-            colorSpace: 'srgb',
-            components: [0.0392, 0.0392, 0.0431],
-            alpha: 1,
-            hex: '#0a0a0b',
-          },
-          $description: 'Text on a secondary surface: the ink.',
-          $extensions: {
-            mode: {
-              dark: {
-                colorSpace: 'srgb',
-                components: [1, 1, 1],
-                alpha: 1,
-                hex: '#ffffff',
-              },
-            },
-          },
+          $value: '{color.foreground}',
+          $description: 'Text on a secondary surface is the page ink, in both modes.',
         },
         muted: {
           $value: {
@@ -1007,14 +938,13 @@ export const BRANDS: BrandFixture[] = [
             alpha: 0.03,
           },
           $description:
-            "A subdued fill: the site's faintest bg-white/[0.03] band, inverted for the light canvas.",
+            "A subdued fill is the site's faintest bg-white/[0.03] band; inverted to black over the light canvas.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
                 components: [1, 1, 1],
                 alpha: 0.03,
-                hex: '#ffffff',
               },
             },
           },
@@ -1022,12 +952,12 @@ export const BRANDS: BrandFixture[] = [
         'muted-foreground': {
           $value: {
             colorSpace: 'srgb',
-            components: [0.3373, 0.3608, 0.4],
+            components: [0.4196, 0.4471, 0.502],
             alpha: 1,
-            hex: '#565c66',
+            hex: '#6b7280',
           },
           $description:
-            "Secondary text: the site's text-gray-400 (#9ca3af) hints, darkened for contrast on the light canvas.",
+            "Secondary text is the site's text-gray-400 (#9ca3af); darkened to gray-500 for the light canvas to hold the 4.5 contrast bar.",
           $extensions: {
             mode: {
               dark: {
@@ -1042,40 +972,24 @@ export const BRANDS: BrandFixture[] = [
         accent: {
           $value: {
             colorSpace: 'srgb',
-            components: [0, 0.7333, 0.5843],
+            components: [0, 0, 0],
             alpha: 0.1,
           },
           $description:
-            "A hover fill: the site's bg-accent-teal/10, a teal wash under the pointer.",
+            "A hover fill is the site's bg-white/10; inverted to a faint black over the light canvas.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0, 0.7333, 0.5843],
+                components: [1, 1, 1],
                 alpha: 0.1,
               },
             },
           },
         },
         'accent-foreground': {
-          $value: {
-            colorSpace: 'srgb',
-            components: [0, 0.7333, 0.5843],
-            alpha: 1,
-            hex: '#00bb95',
-          },
-          $description:
-            'Text on an accent fill: the teal accent, as text-accent-teal reads on its own wash.',
-          $extensions: {
-            mode: {
-              dark: {
-                colorSpace: 'srgb',
-                components: [0, 0.7333, 0.5843],
-                alpha: 1,
-                hex: '#00bb95',
-              },
-            },
-          },
+          $value: '{color.foreground}',
+          $description: 'Text on a hover fill is the page ink, in both modes.',
         },
         destructive: {
           $value: {
@@ -1085,14 +999,14 @@ export const BRANDS: BrandFixture[] = [
             hex: '#f43f5e',
           },
           $description:
-            "The error colour: the site's bg-rose-500 (#f43f5e) remove and invalid marks.",
+            "The error colour is the site's bg-rose-500 / text-rose-400, used for remove and invalid marks.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
-                components: [0.9569, 0.2471, 0.3686],
+                components: [0.9843, 0.4431, 0.5216],
                 alpha: 1,
-                hex: '#f43f5e',
+                hex: '#fb7185',
               },
             },
           },
@@ -1104,7 +1018,8 @@ export const BRANDS: BrandFixture[] = [
             alpha: 1,
             hex: '#ffffff',
           },
-          $description: 'Text on the destructive colour: white.',
+          $description:
+            "Text on the destructive colour is white, matching the site's filled rose buttons.",
           $extensions: {
             mode: {
               dark: {
@@ -1123,14 +1038,13 @@ export const BRANDS: BrandFixture[] = [
             alpha: 0.1,
           },
           $description:
-            "The hairline: the site's border-white/10, inverted to a black hairline on the light canvas.",
+            "The hairline is the site's border-white/10; inverted to black over the light canvas.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
                 components: [1, 1, 1],
                 alpha: 0.1,
-                hex: '#ffffff',
               },
             },
           },
@@ -1142,26 +1056,21 @@ export const BRANDS: BrandFixture[] = [
             alpha: 0.06,
           },
           $description:
-            "The control surface: a step off the canvas matching the site's bg-white/10 fields, inverted for light mode.",
+            "The control surface is a step off the canvas, taken from the site's white/[0.06] field fill; inverted to black for light mode.",
           $extensions: {
             mode: {
               dark: {
                 colorSpace: 'srgb',
                 components: [1, 1, 1],
-                alpha: 0.1,
-                hex: '#ffffff',
+                alpha: 0.06,
               },
             },
           },
         },
         ring: {
           $value: '{color.primary}',
-          $description: "The focus ring: the site's ring-accent-teal, the teal accent.",
-          $extensions: {
-            mode: {
-              dark: '{color.primary}',
-            },
-          },
+          $description:
+            "The focus ring is the teal accent, matching the site's ring-accent-teal/30.",
         },
       },
       radius: {
@@ -1172,7 +1081,7 @@ export const BRANDS: BrandFixture[] = [
             unit: 'rem',
           },
           $description:
-            "The site's controls and cards are rounded-xl (.75rem), its most frequent bounded corner.",
+            "The site's controls are rounded-xl (0.75rem), its most frequent square-cornered radius after pills.",
         },
       },
       font: {
@@ -1180,27 +1089,29 @@ export const BRANDS: BrandFixture[] = [
         sans: {
           $value: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
           $description:
-            "The site's one typeface, Inter, loaded as a web font, with the system stack behind it.",
+            "The site's one typeface is Inter, loaded as a web font, with the system stack behind it.",
         },
         mono: {
           $value: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
           $description:
-            "The site's font-mono stack for tags and numbers: ui-monospace and the system stack.",
+            "The site's font-mono utility resolves to the system monospace stack it declares.",
         },
       },
     },
     scope: 'brand-pipelex-pipelex-method--claude-4-8-opus',
-    css: "/* -------------------------------------------\n *  Autogenerated by ⛋ Terrazzo. DO NOT EDIT!\n * ------------------------------------------- */\n\n.brand-pipelex-pipelex-method--claude-4-8-opus {\n  /* A hover fill: the site's bg-accent-teal/10, a teal wash under the pointer. */\n  --accent: rgb(0% 73.33% 58.43% / 0.1);\n  /* Text on an accent fill: the teal accent, as text-accent-teal reads on its own wash. */\n  --accent-foreground: rgb(0% 73.33% 58.43%);\n  /* The page canvas: the site is dark (body bg-[#0a0a0b]), so light mode is the inverted canvas. */\n  --background: rgb(95.69% 95.69% 96.47%);\n  /* The hairline: the site's border-white/10, inverted to a black hairline on the light canvas. */\n  --border: rgb(0% 0% 0% / 0.1);\n  /* A raised surface: the site's bg-white/5 panels, a translucent step off the canvas; inverted to a black wash on the light canvas. */\n  --card: rgb(0% 0% 0% / 0.04);\n  /* Text on a card: the same ink as the canvas text. */\n  --card-foreground: rgb(3.92% 3.92% 4.31%);\n  /* The error colour: the site's bg-rose-500 (#f43f5e) remove and invalid marks. */\n  --destructive: rgb(95.69% 24.71% 36.86%);\n  /* Text on the destructive colour: white. */\n  --destructive-foreground: rgb(100% 100% 100%);\n  /* Text on the canvas: the site's text-white ink, inverted for light mode. */\n  --foreground: rgb(3.92% 3.92% 4.31%);\n  /* The control surface: a step off the canvas matching the site's bg-white/10 fields, inverted for light mode. */\n  --input: rgb(0% 0% 0% / 0.06);\n  /* A subdued fill: the site's faintest bg-white/[0.03] band, inverted for the light canvas. */\n  --muted: rgb(0% 0% 0% / 0.03);\n  /* Secondary text: the site's text-gray-400 (#9ca3af) hints, darkened for contrast on the light canvas. */\n  --muted-foreground: rgb(33.73% 36.08% 40%);\n  /* A floating surface, opaque: derived a step off the light canvas, inverted from the site's dark bg-bg-darker menus. */\n  --popover: rgb(100% 100% 100%);\n  /* Text on a popover: the ink. */\n  --popover-foreground: rgb(3.92% 3.92% 4.31%);\n  /* The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes. */\n  --primary: rgb(0% 73.33% 58.43%);\n  /* Text on the accent: white, as the site sets on its bg-accent-teal buttons. */\n  --primary-foreground: rgb(100% 100% 100%);\n  /* The focus ring: the site's ring-accent-teal, the teal accent. */\n  --ring: var(--primary);\n  /* A quiet filled surface: the site's bg-white/[0.06] fills, inverted to a black wash on the light canvas. */\n  --secondary: rgb(0% 0% 0% / 0.06);\n  /* Text on a secondary surface: the ink. */\n  --secondary-foreground: rgb(3.92% 3.92% 4.31%);\n  /* The site's font-mono stack for tags and numbers: ui-monospace and the system stack. */\n  --font-mono: ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", monospace;\n  /* The site's one typeface, Inter, loaded as a web font, with the system stack behind it. */\n  --font-sans: \"Inter\", ui-sans-serif, system-ui, sans-serif;\n  /* The site's controls and cards are rounded-xl (.75rem), its most frequent bounded corner. */\n  --radius: 0.75rem;\n}\n\n.dark .brand-pipelex-pipelex-method--claude-4-8-opus {\n  /* A hover fill: the site's bg-accent-teal/10, a teal wash under the pointer. */\n  --accent: rgb(0% 73.33% 58.43% / 0.1);\n  /* Text on an accent fill: the teal accent, as text-accent-teal reads on its own wash. */\n  --accent-foreground: rgb(0% 73.33% 58.43%);\n  /* The page canvas: the site is dark (body bg-[#0a0a0b]), so light mode is the inverted canvas. */\n  --background: rgb(3.92% 3.92% 4.31%);\n  /* The hairline: the site's border-white/10, inverted to a black hairline on the light canvas. */\n  --border: rgb(100% 100% 100% / 0.1);\n  /* A raised surface: the site's bg-white/5 panels, a translucent step off the canvas; inverted to a black wash on the light canvas. */\n  --card: rgb(100% 100% 100% / 0.05);\n  /* Text on a card: the same ink as the canvas text. */\n  --card-foreground: rgb(100% 100% 100%);\n  /* The error colour: the site's bg-rose-500 (#f43f5e) remove and invalid marks. */\n  --destructive: rgb(95.69% 24.71% 36.86%);\n  /* Text on the destructive colour: white. */\n  --destructive-foreground: rgb(100% 100% 100%);\n  /* Text on the canvas: the site's text-white ink, inverted for light mode. */\n  --foreground: rgb(100% 100% 100%);\n  /* The control surface: a step off the canvas matching the site's bg-white/10 fields, inverted for light mode. */\n  --input: rgb(100% 100% 100% / 0.1);\n  /* A subdued fill: the site's faintest bg-white/[0.03] band, inverted for the light canvas. */\n  --muted: rgb(100% 100% 100% / 0.03);\n  /* Secondary text: the site's text-gray-400 (#9ca3af) hints, darkened for contrast on the light canvas. */\n  --muted-foreground: rgb(61.57% 63.92% 68.63%);\n  /* A floating surface, opaque: derived a step off the light canvas, inverted from the site's dark bg-bg-darker menus. */\n  --popover: rgb(5.1% 4.31% 7.84%);\n  /* Text on a popover: the ink. */\n  --popover-foreground: rgb(100% 100% 100%);\n  /* The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes. */\n  --primary: rgb(0% 73.33% 58.43%);\n  /* The accent: the site's --accent-teal (#00bb95), its run buttons and highlights; kept across modes. */\n  --ring: var(--primary);\n  /* Text on the accent: white, as the site sets on its bg-accent-teal buttons. */\n  --primary-foreground: rgb(100% 100% 100%);\n  /* A quiet filled surface: the site's bg-white/[0.06] fills, inverted to a black wash on the light canvas. */\n  --secondary: rgb(100% 100% 100% / 0.06);\n  /* Text on a secondary surface: the ink. */\n  --secondary-foreground: rgb(100% 100% 100%);\n}\n",
+    css: "/* -------------------------------------------\n *  Autogenerated by ⛋ Terrazzo. DO NOT EDIT!\n * ------------------------------------------- */\n\n.brand-pipelex-pipelex-method--claude-4-8-opus {\n  /* A hover fill is the site's bg-white/10; inverted to a faint black over the light canvas. */\n  --accent: rgb(0% 0% 0% / 0.1);\n  /* Text on a hover fill is the page ink, in both modes. */\n  --accent-foreground: var(--foreground);\n  /* The site is dark-only; its page background is #0a0a0b, so the light canvas here is the derived inversion: white. */\n  --background: rgb(100% 100% 100%);\n  /* The hairline is the site's border-white/10; inverted to black over the light canvas. */\n  --border: rgb(0% 0% 0% / 0.1);\n  /* A raised surface is bg-white/5 over the canvas; in light mode a step off white is the same faint fill inverted to black. */\n  --card: rgb(0% 0% 0% / 0.05);\n  /* Text on a card is the page ink, in both modes. */\n  --card-foreground: var(--foreground);\n  /* The error colour is the site's bg-rose-500 / text-rose-400, used for remove and invalid marks. */\n  --destructive: rgb(95.69% 24.71% 36.86%);\n  /* Text on the destructive colour is white, matching the site's filled rose buttons. */\n  --destructive-foreground: rgb(100% 100% 100%);\n  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */\n  --foreground: rgb(3.92% 3.92% 4.31%);\n  /* The control surface is a step off the canvas, taken from the site's white/[0.06] field fill; inverted to black for light mode. */\n  --input: rgb(0% 0% 0% / 0.06);\n  /* A subdued fill is the site's faintest bg-white/[0.03] band; inverted to black over the light canvas. */\n  --muted: rgb(0% 0% 0% / 0.03);\n  /* Secondary text is the site's text-gray-400 (#9ca3af); darkened to gray-500 for the light canvas to hold the 4.5 contrast bar. */\n  --muted-foreground: rgb(41.96% 44.71% 50.2%);\n  /* A floating surface is opaque; the site's overlays sit on the near-black bg-bg-darker (#0d0b14), inverted to white for light mode. */\n  --popover: rgb(100% 100% 100%);\n  /* Text on a popover is the page ink, in both modes. */\n  --popover-foreground: var(--foreground);\n  /* The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes. */\n  --primary: rgb(0% 73.33% 58.43%);\n  /* Text on the teal accent is white, matching the site's filled teal buttons. */\n  --primary-foreground: rgb(100% 100% 100%);\n  /* The focus ring is the teal accent, matching the site's ring-accent-teal/30. */\n  --ring: var(--primary);\n  /* A quiet filled surface is the site's bg-white/[0.06]; in light mode the same faint fill inverted to black. */\n  --secondary: rgb(0% 0% 0% / 0.06);\n  /* Text on a secondary surface is the page ink, in both modes. */\n  --secondary-foreground: var(--foreground);\n  /* The site's font-mono utility resolves to the system monospace stack it declares. */\n  --font-mono: ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", monospace;\n  /* The site's one typeface is Inter, loaded as a web font, with the system stack behind it. */\n  --font-sans: \"Inter\", ui-sans-serif, system-ui, sans-serif;\n  /* The site's controls are rounded-xl (0.75rem), its most frequent square-cornered radius after pills. */\n  --radius: 0.75rem;\n}\n\n.dark .brand-pipelex-pipelex-method--claude-4-8-opus {\n  /* A hover fill is the site's bg-white/10; inverted to a faint black over the light canvas. */\n  --accent: rgb(100% 100% 100% / 0.1);\n  /* Text on a hover fill is the page ink, in both modes. */\n  --accent-foreground: var(--foreground);\n  /* The site is dark-only; its page background is #0a0a0b, so the light canvas here is the derived inversion: white. */\n  --background: rgb(3.92% 3.92% 4.31%);\n  /* The hairline is the site's border-white/10; inverted to black over the light canvas. */\n  --border: rgb(100% 100% 100% / 0.1);\n  /* A raised surface is bg-white/5 over the canvas; in light mode a step off white is the same faint fill inverted to black. */\n  --card: rgb(100% 100% 100% / 0.05);\n  /* Text on a card is the page ink, in both modes. */\n  --card-foreground: var(--foreground);\n  /* The error colour is the site's bg-rose-500 / text-rose-400, used for remove and invalid marks. */\n  --destructive: rgb(98.43% 44.31% 52.16%);\n  /* Text on the destructive colour is white, matching the site's filled rose buttons. */\n  --destructive-foreground: rgb(100% 100% 100%);\n  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */\n  --foreground: rgb(100% 100% 100%);\n  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */\n  --popover-foreground: var(--foreground);\n  /* The site's body text is text-white on the dark canvas; the light ink here is the derived inversion of that canvas. */\n  --secondary-foreground: var(--foreground);\n  /* The control surface is a step off the canvas, taken from the site's white/[0.06] field fill; inverted to black for light mode. */\n  --input: rgb(100% 100% 100% / 0.06);\n  /* A subdued fill is the site's faintest bg-white/[0.03] band; inverted to black over the light canvas. */\n  --muted: rgb(100% 100% 100% / 0.03);\n  /* Secondary text is the site's text-gray-400 (#9ca3af); darkened to gray-500 for the light canvas to hold the 4.5 contrast bar. */\n  --muted-foreground: rgb(61.57% 63.92% 68.63%);\n  /* A floating surface is opaque; the site's overlays sit on the near-black bg-bg-darker (#0d0b14), inverted to white for light mode. */\n  --popover: rgb(5.1% 4.3% 7.8%);\n  /* The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes. */\n  --primary: rgb(0% 73.33% 58.43%);\n  /* The accent is --accent-teal #00bb95, shown on text-accent-teal, bg-accent-teal buttons and borders across the page; the accent is kept in both modes. */\n  --ring: var(--primary);\n  /* Text on the teal accent is white, matching the site's filled teal buttons. */\n  --primary-foreground: rgb(100% 100% 100%);\n  /* A quiet filled surface is the site's bg-white/[0.06]; in light mode the same faint fill inverted to black. */\n  --secondary: rgb(100% 100% 100% / 0.06);\n}\n",
     warnings: [
+      'core/duplicate-values: color.border declared a duplicate value',
+      'core/duplicate-values: color.card-foreground declared a duplicate value',
+      'core/duplicate-values: color.destructive-foreground declared a duplicate value',
       'core/duplicate-values: color.foreground declared a duplicate value',
       'core/duplicate-values: color.popover declared a duplicate value',
       'core/duplicate-values: color.popover-foreground declared a duplicate value',
-      'core/duplicate-values: color.primary declared a duplicate value',
       'core/duplicate-values: color.primary-foreground declared a duplicate value',
       'core/duplicate-values: color.ring declared a duplicate value',
       'core/duplicate-values: color.secondary declared a duplicate value',
       'core/duplicate-values: color.secondary-foreground declared a duplicate value',
-      'lint: 8 warnings',
+      'lint: 10 warnings',
     ],
   },
 ];

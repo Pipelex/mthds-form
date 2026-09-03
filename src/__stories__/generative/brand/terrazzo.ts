@@ -1,7 +1,7 @@
 import { build, defineConfig, type LogEntry, Logger, parse } from '@terrazzo/parser';
 import cssPlugin from '@terrazzo/plugin-css';
 import { contractVariable } from './contract';
-import type { BrandTokens } from './tokens-schema';
+import { type BrandTokens, withDarkModes } from './tokens-schema';
 
 /**
  * The token pipeline: a validated `tokens.json` in, the brand's stylesheet
@@ -91,7 +91,7 @@ export async function compileBrandTokens(
   );
   try {
     const parsed = await parse(
-      [{ filename: new URL('file:///tokens.json'), src: JSON.stringify(tokens) }],
+      [{ filename: new URL('file:///tokens.json'), src: JSON.stringify(withDarkModes(tokens)) }],
       {
         config,
         logger,

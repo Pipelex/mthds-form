@@ -149,6 +149,10 @@ const TOKENS_SKELETON = `{
           "dark": { "colorSpace": "srgb", "components": [1, 1, 1], "alpha": 0.04 }
         }
       }
+    },
+    "card-foreground": {
+      "$value": "{color.foreground}",
+      "$description": "Text on a card is the page ink, in both modes."
     }
   },
   "radius": {
@@ -211,7 +215,7 @@ export function renderBrandContract(): string {
     '',
     'A colour is an object, never a string: `{ "colorSpace": "srgb", "components": [r, g, b], "alpha": a }` with each component and the alpha in 0..1, and an optional `"hex": "#rrggbb"` that must agree with the components. The colour space is always `srgb`. A token that IS another token is an alias, written as the string `"{color.<name>}"` naming a colour token of this contract - `"{color.background}"` for a card that is the canvas, `"{color.primary}"` for a ring that is the accent. An alias may not form a cycle.',
     '',
-    'Every colour token carries two values and no more: `$value` is the LIGHT mode and `$extensions.mode.dark` is the DARK mode. There is no `light` key. When the site has one mode only, its values go in the mode it has and the other mode is derived: invert the canvas and the ink, keep the accent, and keep the surfaces a step off the canvas in the same direction.',
+    "A colour token whose `$value` is a colour object carries two values and no more: `$value` is the LIGHT mode and `$extensions.mode.dark` is the DARK mode; there is no `light` key. An alias token may carry `$value` alone, and then it is the same alias in both modes and follows its target's dark value; it may also state a different `$extensions.mode.dark`, an alias or a colour object. When the site has one mode only, its values go in the mode it has and the other mode is derived: invert the canvas and the ink, keep the accent, and keep the surfaces a step off the canvas in the same direction.",
     '',
     `These pairs must reach a contrast ratio of ${MIN_CONTRAST} (WCAG 2 AA for normal text) in BOTH modes, computed on the opaque colours: ${pairs.join(', ')}. No other pair is checked: text on the accent may fall short if the site's own does, and a card may be translucent.`,
     '',

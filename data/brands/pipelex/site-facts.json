@@ -8,6 +8,11 @@
     "description": "MTHDS is the open standard for executable AI methods — the shared artifact between business, agents, and engineering. Pipelex is the reference runtime.",
     "lang": "en"
   },
+  "stated": {
+    "logo": {
+      "onLight": "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png"
+    }
+  },
   "scheme": {
     "htmlClass": "dark",
     "htmlDataAttributes": {

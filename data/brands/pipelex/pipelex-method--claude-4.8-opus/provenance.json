@@ -3,7 +3,12 @@
   "model": "claude-4.8-opus",
   "date": "2026-09-03",
   "brief": "wip/generative-ui/briefs/brand-contract.md",
-  "contractHash": "639319fbd5f6",
+  "contractHash": "27d1d3c2bc39",
+  "stated": {
+    "logo": {
+      "onLight": "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png"
+    }
+  },
   "siteFacts": "data/brands/pipelex/site-facts.json",
-  "rounds": 1
+  "rounds": 0
 }

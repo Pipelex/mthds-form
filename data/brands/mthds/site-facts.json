@@ -8,6 +8,12 @@
     "description": "MTHDS is an open standard for defining, packaging, and sharing AI methods — giving agents the ability to discover and execute structured, composable AI workflows.",
     "lang": "en"
   },
+  "stated": {
+    "accent": "#1a1a1a",
+    "logo": {
+      "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png"
+    }
+  },
   "scheme": {
     "htmlClass": "no-js",
     "htmlDataAttributes": {},

@@ -18,8 +18,9 @@ import {
  * Each of those is a way for a model's file to be wrong and the page to be
  * painted anyway. So this checks the contract's own rules first - exactly its
  * tokens, object colours in sRGB, aliases only to contract tokens and never in
- * a cycle, a description on every token, `dark` the only mode, the two
- * contrast pairs in both modes - and hands Terrazzo a file it can only accept.
+ * a cycle, a description on every token, `dark` the only mode and stated on
+ * every colour object (an alias may stand for both modes), the two contrast
+ * pairs in both modes - and hands Terrazzo a file it can only accept.
  */
 
 const component = z.number().min(0).max(1);
@@ -46,13 +47,20 @@ export type ColorValue = z.infer<typeof colorValueSchema>;
 
 const description = z.string().min(1, 'every token carries a $description');
 
-const colorTokenSchema = z.strictObject({
-  $value: colorValueSchema,
-  $description: description,
-  $extensions: z.strictObject({
-    mode: z.strictObject({ dark: colorValueSchema }),
-  }),
-});
+const colorTokenSchema = z
+  .strictObject({
+    $value: colorValueSchema,
+    $description: description,
+    $extensions: z
+      .strictObject({
+        mode: z.strictObject({ dark: colorValueSchema }),
+      })
+      .optional(),
+  })
+  .refine((token) => token.$extensions !== undefined || typeof token.$value === 'string', {
+    message: 'a colour carries $extensions.mode.dark; only an alias may stand for both modes',
+    path: ['$extensions'],
+  });
 
 export type ColorToken = z.infer<typeof colorTokenSchema>;
 
@@ -96,6 +104,46 @@ export type TokensValidation =
 /** The name an alias points at, or null for a colour object. */
 export function aliasTarget(value: ColorValue): string | null {
   return typeof value === 'string' ? value.slice('{color.'.length, -1) : null;
+}
+
+/** A token's dark value: what it states, or - for an alias that states none - the same alias. */
+export function darkValue(token: ColorToken): ColorValue {
+  return token.$extensions?.mode.dark ?? token.$value;
+}
+
+/**
+ * The tokens with every colour token's dark mode stated - an alias that stood
+ * for both modes filled with itself. What Terrazzo is handed, so that the
+ * stylesheet sets every variable of the contract in both of its blocks.
+ */
+export function withDarkModes(tokens: BrandTokens): BrandTokens {
+  const color = { ...tokens.color };
+  for (const name of COLOR_TOKEN_NAMES) {
+    const token = tokens.color[name];
+    if (!token.$extensions) {
+      color[name] = { ...token, $extensions: { mode: { dark: token.$value } } };
+    }
+  }
+  return { ...tokens, color };
+}
+
+/** `#rrggbb` for a colour, its alpha dropped. */
+export function colorHex(color: SrgbColor): string {
+  return `#${color.components
+    .map((channel) =>
+      Math.round(channel * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}
+
+/** Whether a colour is the hex, to the rounding a hex can carry. */
+export function colorIsHex(color: SrgbColor, hex: string): boolean {
+  const fromHex = hexChannels(hex);
+  return color.components.every(
+    (channel, index) => Math.abs(channel - fromHex[index]!) <= 1.5 / 255,
+  );
 }
 
 function hexChannels(hex: string): [number, number, number] {
@@ -159,7 +207,7 @@ export function resolveColor(
     if (seen.has(current)) return null;
     seen.add(current);
     const token = tokens.color[current];
-    const value = mode === 'light' ? token.$value : token.$extensions.mode.dark;
+    const value = mode === 'light' ? token.$value : darkValue(token);
     const target = aliasTarget(value);
     if (target === null) return value as SrgbColor;
     if (!isColorTokenName(target)) return null;
@@ -213,10 +261,10 @@ export function validateBrandTokens(doc: unknown): TokensValidation {
   for (const name of COLOR_TOKEN_NAMES) {
     const token = tokens.color[name];
     checkHexAgreement(name, 'light', token.$value, problems);
-    checkHexAgreement(name, 'dark', token.$extensions.mode.dark, problems);
+    checkHexAgreement(name, 'dark', darkValue(token), problems);
   }
   checkAliases(tokens, 'light', (token) => token.$value, problems);
-  checkAliases(tokens, 'dark', (token) => token.$extensions.mode.dark, problems);
+  checkAliases(tokens, 'dark', darkValue, problems);
   if (problems.length === 0) {
     checkContrast(tokens, 'light', problems);
     checkContrast(tokens, 'dark', problems);

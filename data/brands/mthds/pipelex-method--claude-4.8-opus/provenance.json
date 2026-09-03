@@ -3,7 +3,13 @@
   "model": "claude-4.8-opus",
   "date": "2026-09-03",
   "brief": "wip/generative-ui/briefs/brand-contract.md",
-  "contractHash": "639319fbd5f6",
+  "contractHash": "27d1d3c2bc39",
+  "stated": {
+    "accent": "#1a1a1a",
+    "logo": {
+      "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png"
+    }
+  },
   "siteFacts": "data/brands/mthds/site-facts.json",
   "rounds": 0
 }

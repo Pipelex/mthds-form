@@ -19,6 +19,30 @@ import type { BrandTokens } from './tokens-schema';
 
 export const PRODUCERS = ['pipelex-method', 'claude-code-subagent', 'claude-code-session'] as const;
 
+/**
+ * What a person stated beside the site's URL - the things a site does not
+ * show and no reading can supply: the accent of a site with no button, the
+ * logo for a canvas the site draws none for. A stated fact enters the site
+ * facts as `stated`, outranks any reading, and the build checks the brand
+ * honours it.
+ */
+export const statedFactsSchema = z.strictObject({
+  /** The accent, `#rrggbb`: `color.primary` in both modes. */
+  accent: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i, 'a stated accent is #rrggbb')
+    .optional(),
+  /** The logo for a canvas, an absolute URL: `logo.onLight` / `logo.onDark` in the manifest. */
+  logo: z
+    .strictObject({
+      onLight: z.url().optional(),
+      onDark: z.url().optional(),
+    })
+    .optional(),
+});
+
+export type StatedFacts = z.infer<typeof statedFactsSchema>;
+
 /** `provenance.json`, as a producer writes it. */
 export const brandProvenanceSchema = z.strictObject({
   producer: z.enum(PRODUCERS),
@@ -32,6 +56,8 @@ export const brandProvenanceSchema = z.strictObject({
   contractHash: z.string().regex(/^[0-9a-f]{12}$/, 'twelve hex digits'),
   /** The creative seed handed over with the brief, verbatim, when one was. */
   seed: z.string().min(1).optional(),
+  /** What the person stated beside the URL, when they did. */
+  stated: statedFactsSchema.optional(),
   /** Where the site facts came from: a file, or a sentence for a brand read by hand. */
   siteFacts: z.string().min(1).optional(),
   /** How many repair rounds the producer ran before the file validated. */
