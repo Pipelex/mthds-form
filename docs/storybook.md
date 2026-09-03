@@ -10,13 +10,14 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 ## The sections
 
-Three, mirroring what the package is:
+Four — three mirroring what the package is, and one that is a study over it:
 
 | Section       | What is in it                                                                                                                                                                                              |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Inputs**    | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
 | **Outputs**   | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
 | **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
+| **Generative** | A study, shipping nothing: three heroes rendered four ways each — the kernel's own view, a deterministic projection into a json-render catalog, a spec authored by hand, and one a model produced — plus a streamed replay. See [generative-ui.md](generative-ui.md).                    |
 
 Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
 
@@ -154,11 +155,12 @@ A pipe may also carry `output` (the concept its carrier resolves to, `Text` by d
 
 `presence` is `plain` | `optional` | `force`; `multiplicity` is `single` | `variable` | `fixed`. The generator rejects the pairings the standard forbids **at authoring time**, because the alternative is a parser error against a file the author never wrote: a marker may not ride a plural slot (`PipeInputContract` says a plural slot is always `plain`), and a fixed count is always at least two, since `Concept[1]` is a way of writing `Concept`.
 
-### Two passes, and only one of them costs anything
+### Three passes, and only two of them cost anything
 
 ```
-make fixtures        the DESCRIPTORS - what each pipe DECLARES   (offline, free)
-make fixtures-runs   the PAYLOADS    - what running it produced  (real runs, billed)
+make fixtures        the DESCRIPTORS - what each pipe DECLARES     (offline, free)
+make fixtures-runs   the PAYLOADS    - what running it produced    (real runs, billed)
+make fixtures-specs  the SPECS       - what a model laid out for it (real runs, billed)
 ```
 
 They are separate targets and neither implies the other, because asking for descriptors must never silently spend inference budget and asking for payloads must never silently re-derive anything else.
@@ -169,13 +171,21 @@ The payload pass needs the **CLI**, addressed through `PIPELEX_BIN`, plus workin
 
 A pipe is run only if its slot spec gives it a `run` block naming its input values (or, for a slotless operator like `PipeImgGen`, its own `prompt`). The one edit the generator makes to what came back is dropping a machine-local `file://` `public_url`: a run writes generated files under the working directory and reports the absolute path back, which names somebody's home directory, in an open-source repo, and resolves on no other machine. What remains is the durable `pipelex-storage://` reference — which is exactly what a host with no storage resolver sees.
 
-Both passes are dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node.
+The specs pass is the generative study's, and it is documented with the study in [generative-ui.md](generative-ui.md): for each hero it renders a brief from the committed descriptors and payloads (`make briefs` writes the same briefs under `wip/generative-ui/briefs/`, prompt and hash included, as the record of what the model was handed), runs the designer method through the CLI, validates what came back against the catalog and writes `src/__stories__/_generated/<case>.specs.ts` with the model, the date and the prompt hash. `ONLY=<pipe code>` narrows it to one hero and `MODEL=<id>` overrides the method's pin. A spec that does not validate is kept beside its brief and fails the pass; the fix is to the method or the brief, never to the fixture.
+
+All three passes are dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node.
 
 ### The guard
 
 `src/__stories__/__tests__/corpus.test.ts` (the `corpus` vitest project, node) asserts the corpus and the generated tree describe the same set. It cannot assert the _content_ is current — only a regeneration can — but a case added, renamed or removed without regenerating is the shape this actually fails as, and nothing else would notice.
 
 It carries three more that are about the output half specifically: every generated module exports an `OUTPUT_FORM`; every output contract states a `json_schema`, and it is an object rather than a bare array whatever the multiplicity; and no payload module carries a machine-local path. The **plural wrap** — a plural output described as a `list` — is pinned upstream now, in both client mirrors and in the engine that produces it, which is where a producer obligation belongs; it shipped wrong once here while the artifact was still simulated, describing a `LineItem[]` output as an `object`.
+
+### The generative heroes, and the provenance an authored spec carries
+
+A hero is a group of four adjacent stories over one fixture — `Kernel`, `Projected`, `Authored`, `Generated`, in that order — so the sidebar shows the kernel's rendering, the floor, the ceiling and the model's output one click apart. The `Generated` spec is a fixture like a payload: produced by the pass, committed, never edited. The `Authored` one is written by hand under `src/__stories__/generative/authored/`, typed against the catalog per component so a misnamed prop fails `tsc`, and its module header names who wrote it, when, from which brief and against which prompt hash — and records the choices, because the checkpoint reads them against the model's. The corpus test validates both sources exactly the same way and compares each hash with the current prompt: a catalog change regenerates the captured spec and re-reads the authored one.
+
+The input hero's stories show, under the page, a receipt a host never would — the `/inputs` tree and the kernel's readiness over it — and their play functions type into a catalog input and read the value back off the receipt, which is the assertion that a bound input writes through to the tree the run receives.
 
 ## Where story code lives, and why it matters
 

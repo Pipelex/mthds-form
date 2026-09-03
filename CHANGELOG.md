@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A generative-UI study in Storybook, shipping nothing.** A `Generative` section renders three heroes — an invoice result, a company described down to its people, and an invoice form with its source document — four ways each over the very same fixture: the kernel's own view, a deterministic projection into a json-render catalog, a spec authored by hand, and one a model produced; plus a streamed replay of a captured spec. The layer under `src/__stories__/generative/` is a catalog with two escape hatches that hand a path back to the kernel's own controls, a prompt and rules of its own, a validator, a brief per hero, and a designer method run through the CLI by a third fixture pass, `make fixtures-specs`, which captures what the model laid out with the model, the date and the hash of the prompt it saw. The json-render packages and `zod` are devDependencies importable only from the story tree. See [docs/generative-ui.md](docs/generative-ui.md).
+
 ### Changed
 
 - **Tailwind v4 (breaking for a Tailwind host).** The controls are now written in Tailwind v4's vocabulary and the prebuilt `styles.css` is built by v4. A host that compiles this package's classes with its own Tailwind build must be on v4: it adds `@source "../node_modules/@pipelex/mthds-form/dist"` to its stylesheet, imports `tw-animate-css` in place of the `tailwindcss-animate` plugin, and maps the same token names through its theme — the `@theme inline` block in `src/styles/tailwind-entry.css` is the reference. A v3 build compiles the renamed utilities (`outline-hidden`, `aria-invalid:`, `data-placeholder:`, `wrap-break-word`, the `(--radix-…)` value form) to nothing, which loses the focus, invalid and placeholder states rather than failing loudly. `tailwind-merge` moves to v3 with it, so `cn` keeps resolving conflicts between v4 names. A host with no Tailwind build is unaffected beyond the file it already loads. **This release waits on the consumers**: it is cut once the hosts that compile the package themselves have made the move.
