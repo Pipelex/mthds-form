@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs brands assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs brands brand-from-site assert-bundle clean pack
 
 install:
 	npm install
@@ -85,6 +85,15 @@ fixtures-specs:
 # same reason `briefs` is.
 brands:
 	npx tsx scripts/build-brands.mjs
+
+# A BRAND FROM A SITE: the producer's loop - extract the site's facts, run the
+# method brand.tokens_from_site through the real CLI, validate against the
+# contract with bounded repair rounds, write data/brands/BRAND/<producer>/ and
+# rebuild. Costs inference and needs credentials, like `fixtures-specs`.
+# MODEL=<id> overrides the pin; ROUNDS=<n> bounds the repair (2 by default).
+brand-from-site:
+	@test -n "$(BRAND)" -a -n "$(URL)" || (echo "usage: make brand-from-site BRAND=<slug> URL=<url>" && exit 2)
+	MODEL="$(MODEL)" npx tsx scripts/generate-brand.mjs --brand $(BRAND) --url $(URL)
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -
