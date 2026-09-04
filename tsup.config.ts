@@ -1,10 +1,11 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
 /**
- * Two PUBLIC entry points, mirroring the package's two layers:
- *   `.`       -> dist/core/index.js   (headless, no React)
- *   `./react` -> dist/react/index.js  (the control set)
+ * Three PUBLIC entry points, mirroring the package's three layers:
+ *   `.`            -> dist/core/index.js        (headless, no React)
+ *   `./react`      -> dist/react/index.js       (the control set)
+ *   `./generative` -> dist/generative/index.js  (the layer over a produced layout)
  *
  * The source tree is laid out the same way (`src/core/`, `src/react/`), so
  * every intra-package import is relative and nothing is rewritten at build
@@ -33,7 +34,7 @@ import { defineConfig } from "tsup";
  */
 export default defineConfig({
   // The glob is deliberate - see the note above before narrowing it.
-  entry: ["src/core/*.ts", "src/react/index.ts"],
+  entry: ["src/core/*.ts", "src/react/index.ts", "src/generative/index.ts"],
   format: ["esm"],
   dts: true,
   sourcemap: true,
@@ -44,14 +45,23 @@ export default defineConfig({
   onSuccess: async () => {
     // esbuild drops directive prologues when it bundles, so the `'use client'`
     // that every control file carries in source does NOT survive into the
-    // bundle. Re-assert it on the React entry: a consumer bundler treats that
-    // module as the client boundary, which pulls the shared chunks it imports
-    // into the client graph with it. The core entry deliberately does NOT get
-    // one - it must stay usable from a server component.
-    const entry = "dist/react/index.js";
-    const code = readFileSync(entry, "utf8");
-    if (!/^\s*["']use client["'];?/.test(code)) {
-      writeFileSync(entry, `"use client";\n${code}`);
+    // bundle. Re-assert it on the two entries that render: a consumer bundler
+    // treats each as a client boundary, which pulls the shared chunks it
+    // imports into the client graph with it. The core entry deliberately does
+    // NOT get one - it must stay usable from a server component.
+    for (const entry of ["dist/react/index.js", "dist/generative/index.js"]) {
+      const code = readFileSync(entry, "utf8");
+      if (!/^\s*["']use client["'];?/.test(code)) {
+        writeFileSync(entry, `"use client";\n${code}`);
+      }
     }
+
+    // The designer method ships as DATA, not as a string baked into a module:
+    // it is a `.mthds` bundle a host hands to a runner, and it is still being
+    // iterated on. Shipping the file means a host reads it off disk through
+    // the `./ui-designer.mthds` export and passes it along unchanged, so a
+    // newer method is a package upgrade rather than a code change. Nothing in
+    // the entry reads it - the entry must stay importable from a browser.
+    copyFileSync("data/generative/ui-designer.mthds", "dist/ui-designer.mthds");
   },
 });

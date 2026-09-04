@@ -75,13 +75,24 @@ const BANNED = [
     match: /^react($|\/)|^react-dom($|\/)/,
     why: 'The `.` entry is headless and must stay importable from a server component.',
   },
-  {
-    entry: `${DIST}/react/index.js`,
+  ...['react', 'generative'].map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
     match: /^ajv($|-|\/)/,
-    why: 'The `./react` entry must not drag the run gate\'s validator into a client bundle.',
-  },
-  // The standard's TypeScript client is a TYPES-ONLY peer, banned from BOTH
-  // entries. The wire types it declares are erased at build, so a `mthds`
+    why: `The \`./${entry}\` entry must not drag the run gate's validator into a client bundle.`,
+  })),
+  // json-render and zod are the generative layer's own, and a host that only
+  // renders a form must not pay for them. Neither entry below imports either in
+  // source; what this catches is the shared chunk - `./generative` reaches the
+  // control set for its escape hatches, so the three entries genuinely share
+  // chunks, and a chunk that carried a layout compiler back the other way would
+  // be invisible to lint.
+  ...['core', 'react'].map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
+    match: /^@json-render($|\/)|^zod($|\/)/,
+    why: `The \`${entry === 'core' ? '.' : './react'}\` entry must not carry the generative layer's dependencies. See docs/dependency-budget.md.`,
+  })),
+  // The standard's TypeScript client is a TYPES-ONLY peer, banned from EVERY
+  // entry. The wire types it declares are erased at build, so a `mthds`
   // specifier surviving into either graph means a value import slipped in -
   // `FIELD_KINDS` is the one runtime value `mthds/protocol` exports, and it is
   // the one that would do it. The cost is not the specifier: it is the
@@ -89,7 +100,7 @@ const BANNED = [
   // consumer's bundle for types that were supposed to disappear. Lint holds the
   // same line on source imports; this holds it on the built graph, which is
   // where a shared chunk would deliver it silently.
-  ...['core', 'react'].map((entry) => ({
+  ...['core', 'react', 'generative'].map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^mthds($|\/)/,
     why: 'The standard client is a types-only peer - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
@@ -221,12 +232,38 @@ if (inlineCode.length === 0) {
 }
 
 // esbuild drops directive prologues when it bundles, so `tsup.config.ts`
-// re-asserts this one on the React entry. Verify it rather than assume it.
-const reactEntry = readFileSync(`${DIST}/react/index.js`, 'utf8');
-if (/^\s*["']use client["'];?/.test(reactEntry)) {
-  console.log("ok  react/index.js keeps its 'use client' directive");
+// re-asserts them on the two entries that render. Verify rather than assume.
+for (const entry of ['react', 'generative']) {
+  const code = readFileSync(`${DIST}/${entry}/index.js`, 'utf8');
+  if (/^\s*["']use client["'];?/.test(code)) {
+    console.log(`ok  ${entry}/index.js keeps its 'use client' directive`);
+  } else {
+    failures.push(
+      `${entry}/index.js lost its 'use client' directive - see tsup.config.ts onSuccess.`,
+    );
+  }
+}
+
+// The core entry is the one that must NOT carry the directive: a directive
+// prologue makes a module a client boundary, and the headless entry has to
+// stay importable from a server component.
+if (/^\s*["']use client["'];?/.test(coreBarrel)) {
+  failures.push(
+    "core/index.js carries a 'use client' directive - the headless entry must stay importable from a server component.",
+  );
 } else {
-  failures.push("react/index.js lost its 'use client' directive - see tsup.config.ts onSuccess.");
+  console.log("ok  core/index.js carries no 'use client' directive");
+}
+
+// The designer method ships as data beside the entries, reachable through the
+// `./ui-designer.mthds` export. A missing file is a broken export a consumer
+// only discovers at run time.
+if (existsSync(`${DIST}/ui-designer.mthds`)) {
+  console.log('ok  ui-designer.mthds ships beside the entries');
+} else {
+  failures.push(
+    'dist/ui-designer.mthds is missing - the `./ui-designer.mthds` export resolves to nothing. See tsup.config.ts onSuccess.',
+  );
 }
 
 if (failures.length > 0) {

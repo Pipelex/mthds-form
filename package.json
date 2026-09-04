@@ -28,8 +28,13 @@
       "import": "./dist/react/index.js",
       "types": "./dist/react/index.d.ts"
     },
+    "./generative": {
+      "import": "./dist/generative/index.js",
+      "types": "./dist/generative/index.d.ts"
+    },
     "./styles.css": "./dist/styles.css",
-    "./theme.css": "./dist/theme.css"
+    "./theme.css": "./dist/theme.css",
+    "./ui-designer.mthds": "./dist/ui-designer.mthds"
   },
   "files": [
     "dist"

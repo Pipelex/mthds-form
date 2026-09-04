@@ -5,7 +5,7 @@ import {
   isNativeDateNode,
   isNativeHtmlNode,
   readDateContent,
-} from '../core';
+} from '../core/native-content';
 
 /**
  * The two state loaders - what fills the trees a spec binds to.

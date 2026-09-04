@@ -41,6 +41,23 @@ const BUDGET_PATTERNS = [
   },
 ];
 
+/**
+ * The generative layer's own dependencies, banned from the other two trees.
+ *
+ * json-render is what a produced layout is written against and zod is what
+ * validates a brand manifest; neither has any business in the kernel or in the
+ * control set, and the entry split alone would not stop one arriving there -
+ * a single import from `src/react/` would put both in the chunk the controls
+ * ship. `scripts/assert-bundle.mjs` holds the same line on the built graph.
+ */
+const GENERATIVE_PATTERNS = [
+  {
+    group: ['@json-render/*', 'zod', 'zod/*'],
+    message:
+      'json-render and zod belong to the generative layer - src/generative/. See docs/dependency-budget.md.',
+  },
+];
+
 const REACT_PATTERNS = [
   {
     group: ['react', 'react-dom', 'react/*', 'react-dom/*'],
@@ -107,12 +124,28 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS] },
+        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS, ...GENERATIVE_PATTERNS] },
       ],
     },
   },
   {
     files: ['src/react/**/*.ts', 'src/react/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...BUDGET_PATTERNS, ...GENERATIVE_PATTERNS, CORE_BARREL_PATTERN] },
+      ],
+    },
+  },
+  {
+    /**
+     * The generative layer renders, so React is allowed - but the barrel rule
+     * holds for the same reason it holds in `src/react/`: a value import of
+     * `../core` puts ajv in the chunk this entry shares with the controls, and
+     * a host that renders a produced layout ships the validator it never asked
+     * for. The specific module is the fix (`../core/native-content`).
+     */
+    files: ['src/generative/**/*.ts', 'src/generative/**/*.tsx'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

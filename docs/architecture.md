@@ -61,6 +61,14 @@ These seams keep the controls host-agnostic:
 
 The vendored `ui/` primitives (`switch`, `select`, `toggle`, `toggle-group`) and the `cn` helper are copies rather than imports, which is how shadcn/ui is meant to be consumed. They are internal: only what `src/react/index.ts` exports is public API.
 
+### `./generative` — a produced layout (`src/generative/`)
+
+The third entry renders a **layout**: a data file, written once per method version by a model, that says which path goes where on the page and restates nothing about what a field is. It is the descriptor rule again, one level out — the layout names paths, the kernel still owns every fact about them — and it is what lets a stored layout be safe to keep: it cannot go out of date about something it never said.
+
+It is a separate entry point rather than part of `./react` because compiling and validating a layout costs json-render and zod, and a host rendering an ordinary form must not carry either. It reaches back into the control set for its two escape hatches (`MthdsField`, `MthdsResult`), which is why the three entries genuinely share chunks and why the [budget](dependency-budget.md) is enforced on the built graph rather than on imports.
+
+Before rendering, a host asks three questions and falls back to the kernel's plain form on any no: does the layout's prompt hash match the one this entry ships, does it validate against the catalog, and does it still fit the descriptor — both that every path it mentions still exists and that every required path is offered somewhere. [generative-ui.md](generative-ui.md) is the whole of it.
+
 ## The gate
 
 **`gateRunInputs(contract, data)` is the whole gate as one call, and it is what a server should use.** Underneath, validation is a four-step contract, and the order matters:
@@ -98,9 +106,9 @@ The gate validates through the package's own ajv instance, configured for pydant
 
 ## Public API and internal code
 
-`src/core/index.ts` and `src/react/index.ts` are the two entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
+`src/core/index.ts`, `src/react/index.ts` and `src/generative/index.ts` are the three entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
 
-`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only `.` and `./react`, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
+`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only the three JavaScript entries, the two stylesheets and the designer method, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
 
 ## Local development against a consumer
 

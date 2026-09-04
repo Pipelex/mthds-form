@@ -1,5 +1,5 @@
 import type { RunField } from '../core';
-import { isNativeCompositeNode, isNativeDateNode, isNativeHtmlNode } from '../core';
+import { isNativeCompositeNode, isNativeDateNode, isNativeHtmlNode } from '../core/native-content';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
 
 /**

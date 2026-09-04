@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added - `./generative`, a third entry point
+
+A layout — a data file, written once per method version by a model, that says which path goes where on the page — now has somewhere to be rendered. `@pipelex/mthds-form/generative` compiles one, checks it, and renders it over the same descriptor the plain form is built from.
+
+The line the entry is built on is the package's first rule, one level out: **a layout names a path and nothing more.** It never restates a field's kind, requiredness, choices or bounds, so a stored layout cannot go out of date about a fact it never stated. Two escape hatches, `MthdsField` and `MthdsResult`, hand a path back to the kernel's own control for everything a catalog should not approximate — a file, a date, a document, prose, markup.
+
+Nothing in the entry calls a model. The two things that do, producing a layout and running the method, are the host's, on either side of the seam.
+
+A host runs three checks and falls back to the kernel's plain form on any no: the layout's prompt hash matches the one this entry ships, it validates against the catalog, and `layoutFits` says it still fits the descriptor — both that every path it mentions still exists **and** that every required path is offered somewhere, since a layout that simply omits a required input validates perfectly and renders a page nobody can complete.
+
+The designer method ships as data at `@pipelex/mthds-form/ui-designer.mthds`, so a newer method is a package upgrade rather than a code change.
+
+It is a separate entry rather than a feature of `./react` because compiling and validating a layout costs `@json-render/core`, `@json-render/react` and `zod`, and a host rendering an ordinary form must not carry any of them. Lint and `make assert-bundle` both hold that line, the second on the built chunk graph — the three entries genuinely share chunks, so the entry split alone would not.
+
+See [docs/generative-ui.md](docs/generative-ui.md).
+
 ## [v0.8.0] - 2026-09-04
 
 ### Changed
