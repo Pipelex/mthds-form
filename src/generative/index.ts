@@ -45,6 +45,12 @@ export {
 } from './validate';
 export { layoutFits, layoutProblems, type LayoutDescriptor } from './layout-fits';
 
+// The wire format a produced layout arrives in: json-render's JSON patch lines,
+// one per line, root first and parents before children, so a renderer can paint
+// a partial tree at every line. A stored layout is the JSONL exactly as the
+// model emitted it, and a host compiles it before it validates it.
+export { jsonlLines, specFromJsonl, specToJsonl } from './stream';
+
 // The page, and what it resolves paths against.
 export {
   GenerativePage,

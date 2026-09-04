@@ -64,6 +64,16 @@ export default defineConfig({
         },
       },
       {
+        // The generative layer: node, because what it asserts is a hash over a
+        // string the prompt renderer produces, and the package data the
+        // designer method ships as. It reaches no DOM.
+        test: {
+          name: 'generative',
+          environment: 'node',
+          include: ['src/generative/**/*.test.ts'],
+        },
+      },
+      {
         // Not a test of the package at all: a test that the generated fixture
         // tree still matches the corpus it was generated from. Node, because it
         // reads directories. See src/__stories__/__tests__/corpus.test.ts.
