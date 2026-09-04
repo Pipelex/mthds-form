@@ -1,9 +1,12 @@
 ---
-status: draft
+status: superseded
+superseded_by: wip/generative-layer/design.md
 item: L-260903-35eb46
 ---
 
 # Integration — the layer ships, the layout is stored per method version, the host renders it over the form
+
+**Superseded on 2026-09-04** by the workspace program `wip/generative-layer/` (`design.md` and `plan.md`, epic `L-260904-611e88`), which reverses one decision here and amends another: the study branch is a spike and does not merge, so the layer is ported into a clean worktree off `dev` against the acceptance suite the study captured; and the stored layout is served as a `views` token on the hosted validate of a registered method rather than on a product route. The text below stays as written, as the record of what was proposed first.
 
 **Written 2026-09-04, for Louis's ratification, to be read after [`plan-the-whole-chain.md`](plan-the-whole-chain.md) has run.** This is the plan for taking the generative layer out of the study and into the product: the package's official method form, the hosted plane that stores what the designer method produces, and the host app that renders it. It is written before the whole-chain experiment so that the decisions it asks for are on the table while that experiment is read, and it is the campaign's last document in this repo's `wip/`: the integration spans repos, so when it starts it gets an epic in the ledger with one child per repo and a program directory of its own, and this plan stays as the record of what was decided and why.
 
