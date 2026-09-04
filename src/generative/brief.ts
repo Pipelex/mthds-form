@@ -18,6 +18,14 @@ import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
  * renders.
  */
 
+/**
+ * The component that runs the page, named in the Run section so the brief and
+ * the catalog agree on which one it is. A rename in the catalog does not have
+ * to be caught here: a brief asking for a component the catalog no longer has
+ * produces a layout the validator refuses, loudly, on the pass that made it.
+ */
+const RUN_COMPONENT = 'Cta';
+
 export interface BriefSubject {
   /** `results.nested_result`. */
   pipeRef: string;
@@ -31,12 +39,6 @@ export interface BriefSubject {
    * and a brief that gives none gets one invented.
    */
   name?: string;
-  /**
-   * The component that runs the page: this catalog's `Cta` unless the brief
-   * is for a catalog that runs it from something else. Only the Run section
-   * names it.
-   */
-  callToAction?: string;
 }
 
 /** On the input side, the kinds the catalog's inputs cannot enter. */
@@ -286,9 +288,9 @@ export function renderInputBrief(subject: BriefSubject, fields: readonly RunFiel
     '## Run',
     '',
     gating.length > 0
-      ? `The run waits for ${gating.join(', ')}; say so near the ${subject.callToAction ?? 'Run button'}, briefly.`
+      ? `The run waits for ${gating.join(', ')}; say so near the ${RUN_COMPONENT}, briefly.`
       : 'Nothing gates the run.',
-    `The page has exactly one \`${subject.callToAction ?? 'Button'}\`, \`on.press\` bound to \`validateForm\` then \`run\`; label it with what the method does, in a person's words.`,
+    `The page has exactly one \`${RUN_COMPONENT}\`, \`on.press\` bound to \`validateForm\` then \`run\`; label it with what the method does, in a person's words.`,
     '',
   ].join('\n');
 }

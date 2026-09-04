@@ -154,14 +154,18 @@ A pipe may also carry `output` (the concept its carrier resolves to, `Text` by d
 
 `presence` is `plain` | `optional` | `force`; `multiplicity` is `single` | `variable` | `fixed`. The generator rejects the pairings the standard forbids **at authoring time**, because the alternative is a parser error against a file the author never wrote: a marker may not ride a plural slot (`PipeInputContract` says a plural slot is always `plain`), and a fixed count is always at least two, since `Concept[1]` is a way of writing `Concept`.
 
-### Two passes, and only one of them costs anything
+### The passes, and which of them cost anything
 
 ```
 make fixtures        the DESCRIPTORS - what each pipe DECLARES   (offline, free)
 make fixtures-runs   the PAYLOADS    - what running it produced  (real runs, billed)
+make briefs          the BRIEFS      - what a producer is handed  (offline, free)
+make fixtures-specs  the SPECS       - what the designer laid out (real runs, billed)
+--capture            a spec another producer wrote, validated the same way
+--reemit             every committed specs module, written again from itself
 ```
 
-They are separate targets and neither implies the other, because asking for descriptors must never silently spend inference budget and asking for payloads must never silently re-derive anything else.
+They are separate targets and none implies another, because asking for a free artifact must never silently spend inference budget and asking for a billed one must never silently re-derive anything else.
 
 The descriptor pass needs the sibling `../pipelex` checkout's venv **interpreter**, addressed through `PIPELEX_PYTHON` — `dump-validate-views.py` imports pipelex as a **library**, because no CLI surfaces these views yet. A near-identical copy of that script lives in the graph-rendering sibling package; both retire when the agent CLI can emit the views itself.
 
@@ -169,7 +173,11 @@ The payload pass needs the **CLI**, addressed through `PIPELEX_BIN`, plus workin
 
 A pipe is run only if its slot spec gives it a `run` block naming its input values (or, for a slotless operator like `PipeImgGen`, its own `prompt`). The one edit the generator makes to what came back is dropping a machine-local `file://` `public_url`: a run writes generated files under the working directory and reports the absolute path back, which names somebody's home directory, in an open-source repo, and resolves on no other machine. What remains is the durable `pipelex-storage://` reference — which is exactly what a host with no storage resolver sees.
 
-Both passes are dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node.
+The last four are about the [generative layer](../src/generative/) rather than the descriptors. `make briefs` renders each hero's brief from what the first two passes committed and writes it under `wip/generative-ui/briefs/` beside the full catalog prompt and its hash — that file is the record of exactly what a producer was handed, and it is what a spec fixture's `brief` field points at. `make fixtures-specs` hands the brief and the prompt to `data/generative/ui-designer.mthds` through the real CLI and validates what came back against the catalog, refusing anything that does not compile rather than repairing it; `--capture` takes in a spec some other producer wrote under the same discipline. Both stamp the fixture with the prompt hash, and the pass refuses to run at all if the prompt no longer hashes to the pin the entry ships — a fixture stamped with a hash no host recognises is one no host will render.
+
+`--reemit` rewrites every committed specs module from its own fixtures. A specs module is a projection of its fixture list, so the parts around that list — the header, the derived `brief` path, the ordering — move when the generator does; without it, refreshing them would mean paying inference to reproduce text no model wrote.
+
+Every pass is dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node. The three that read this repo's TypeScript straight from `src/` run under tsx, because node cannot resolve extensionless imports on its own.
 
 ### The guard
 

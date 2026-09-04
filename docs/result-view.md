@@ -181,4 +181,4 @@ Same reason `file-formats.ts` does: a host that renders a result its own way nee
 
 ## Fixtures
 
-The stories that exercise all of this are real runs against the real artifacts, not mock-ups. See [storybook.md](storybook.md) § "Two passes, and only one of them costs anything": `make fixtures` reads `pipe_io_contracts`, `input_form` and `output_form` off the engine's own builders, and `make fixtures-runs` executes the pipes through the real `pipelex run bundle` CLI and commits what came back.
+The stories that exercise all of this are real runs against the real artifacts, not mock-ups. See [storybook.md](storybook.md) § "The passes, and which of them cost anything": `make fixtures` reads `pipe_io_contracts`, `input_form` and `output_form` off the engine's own builders, and `make fixtures-runs` executes the pipes through the real `pipelex run bundle` CLI and commits what came back.

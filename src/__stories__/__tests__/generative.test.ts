@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { Spec } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import type { InputForm, OutputForm, PipeIOContracts } from '../../core';
@@ -24,9 +26,9 @@ import { payloadToState, seedInputs } from '../../generative/state';
 import { specFromJsonl } from '../../generative/stream';
 import { formatProblems, validateAgainstCatalog } from '../../generative/validate';
 import * as designSlides from '../_generated/design_slides';
-import { SPECS as SLIDES_SPECS } from '../_generated/design_slides.brand.specs';
+import { SPECS as SLIDES_SPECS } from '../_generated/design_slides.specs';
 import * as extractInvoice from '../_generated/extract_invoice';
-import { SPECS as INVOICE_SPECS } from '../_generated/extract_invoice.brand.specs';
+import { SPECS as INVOICE_SPECS } from '../_generated/extract_invoice.specs';
 import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
 import * as results from '../_generated/results';
@@ -35,9 +37,9 @@ import * as scalars from '../_generated/scalars';
 import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
 import * as summarizePeople from '../_generated/summarize_people';
-import { SPECS as PEOPLE_SPECS } from '../_generated/summarize_people.brand.specs';
+import { SPECS as PEOPLE_SPECS } from '../_generated/summarize_people.specs';
 import * as trips from '../_generated/trips';
-import { SPECS as TRIP_SPECS } from '../_generated/trips.brand.specs';
+import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
 import { HEROES, pipeRefOf } from '../heroes';
 
 /**
@@ -52,6 +54,10 @@ import { HEROES, pipeRefOf } from '../heroes';
  *
  * It never touches React - the stories are where a layout is rendered.
  */
+
+const REPO = path.resolve(__dirname, '../../..');
+/** Where `make briefs` writes what a producer was handed - a fixture's `brief` points here. */
+const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
 
 interface CaseModule {
   PIPE_REFS: readonly string[];
@@ -136,6 +142,14 @@ describe('the result loader', () => {
 });
 
 describe('the briefs', () => {
+  it('are on disk for every hero, against the prompt the package ships', () => {
+    for (const hero of HEROES) {
+      const briefPath = path.join(BRIEFS_DIR, `${pipeRefOf(hero)}.md`);
+      expect(existsSync(briefPath), pipeRefOf(hero)).toBe(true);
+      expect(readFileSync(briefPath, 'utf8').split('\n')[0]).toContain(PROMPT_HASH);
+    }
+  });
+
   it('name every hero pipe in the corpus', () => {
     for (const hero of HEROES) {
       const mod = CASES[hero.caseName]!;
@@ -264,6 +278,14 @@ describe('the captured layouts', () => {
 
       it('was produced against the prompt the package ships', () => {
         expect(fixture.promptHash).toBe(PROMPT_HASH);
+      });
+
+      it('names a brief that is on disk, carrying the same prompt', () => {
+        const briefPath = path.join(REPO, fixture.brief);
+        expect(existsSync(briefPath), fixture.brief).toBe(true);
+        // The brief opens with the hash of the prompt it was written beside, so
+        // the fixture and the record it points at cannot drift apart silently.
+        expect(readFileSync(briefPath, 'utf8').split('\n')[0]).toContain(fixture.promptHash);
       });
 
       it('compiles from its own JSONL to its spec', () => {

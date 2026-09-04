@@ -1,11 +1,6 @@
 /**
  * Specs captured for the heroes of data/methods/extract_invoice/bundle.mthds - DO NOT EDIT.
  *
- * Written against the BRAND catalog - the brand study's product-page
- * vocabulary over the layer's own - with `CATALOG=brand` on the pass; the hash
- * each entry carries is that catalog's prompt's, and the corpus test compares it with
- * that prompt, not the layer's.
- *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
  * `data/generative/ui-designer.mthds` through the real `pipelex run bundle` CLI over
  * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates
@@ -14,8 +9,8 @@
  * way. Both cost inference budget, which is why neither is implied by `make fixtures`.
  *
  * **A spec is a payload's twin: the one artifact no projection can produce.** Each
- * entry records WHO produced it (the method through the CLI, a Claude Code subagent in
- * a fresh context, or the Claude Code session by hand), on which model, with which
+ * entry records WHO produced it (the method through the CLI, a coding agent in a fresh
+ * context, or the session working in this repo, by hand), on which model, with which
  * seed and critic loop when there was one, and the hash of the catalog prompt it was
  * produced against; the corpus test compares that hash with the current prompt, so a
  * prompt change that invalidates a spec is a failing test rather than a stale page.
@@ -32,7 +27,7 @@ export const SPECS: SpecFixture[] = [
     model: 'claude-4.8-opus',
     promptHash: '4dcf6d57cb71',
     date: '2026-09-04',
-    brief: 'wip/generative-ui/briefs/invoice_extraction.process_invoice.brand.md',
+    brief: 'wip/generative-ui/briefs/invoice_extraction.process_invoice.md',
     jsonl:
       '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Invoice extraction","links":["The invoice"],"tag":"process_invoice"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","section-document"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"Read the paper","headline":"Pull the numbers off your invoice","lede":"Drop a document in and we\'ll lift out what matters."},"children":[]}}\n{"op":"add","path":"/elements/section-document","value":{"type":"Section","props":{"number":"01","title":"The invoice","lede":"One document — PDF or image works."},"children":["document-field"]}}\n{"op":"add","path":"/elements/document-field","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Ready to read"},"children":["summary-document","cta"]}}\n{"op":"add","path":"/elements/summary-document","value":{"type":"SummaryRow","props":{"label":"Document","value":{"$state":"/inputs/document"},"placeholder":"No file yet"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Extract the details","hint":"Add a document to begin."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"Invoice extraction","tag":"process_invoice"},"children":[]}}',
     spec: {
