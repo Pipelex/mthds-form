@@ -150,7 +150,7 @@ export function JsonView({ value }: { value: unknown }) {
             });
           }}
           aria-label={s.copyJson}
-          className="absolute right-2 top-2 rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+          className="absolute right-2 top-2 rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
         >
           {copied ? (
             <Check aria-hidden className="size-3.5" />
@@ -216,7 +216,7 @@ export function StuffViewer({
               onClick={() => void handleDownload()}
               disabled={saving}
               aria-label={s.download}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
             >
               {saving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -238,7 +238,7 @@ export function StuffViewer({
                 onClick={() => setView(id)}
                 aria-pressed={view === id}
                 className={cn(
-                  'rounded px-2 py-0.5 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1',
+                  'rounded px-2 py-0.5 text-[12px] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1',
                   view === id
                     ? 'bg-card font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
