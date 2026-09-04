@@ -14,6 +14,13 @@ import { dirname, resolve, relative } from 'node:path';
 const DIST = resolve('dist');
 
 /**
+ * The entries that RENDER, as opposed to the headless core. Two things follow
+ * from being one: the entry carries a `'use client'` prologue, and the
+ * prebuilt stylesheet's scan reaches the tree it was built from.
+ */
+const RENDERING_ENTRIES = ['react', 'generative'];
+
+/**
  * Import and re-export specifiers of a bundled module.
  *
  * Anchored to a statement boundary (line start or a preceding `;`) so a
@@ -233,7 +240,7 @@ if (inlineCode.length === 0) {
 
 // esbuild drops directive prologues when it bundles, so `tsup.config.ts`
 // re-asserts them on the two entries that render. Verify rather than assume.
-for (const entry of ['react', 'generative']) {
+for (const entry of RENDERING_ENTRIES) {
   const code = readFileSync(`${DIST}/${entry}/index.js`, 'utf8');
   if (/^\s*["']use client["'];?/.test(code)) {
     console.log(`ok  ${entry}/index.js keeps its 'use client' directive`);
@@ -263,6 +270,37 @@ if (existsSync(`${DIST}/ui-designer.mthds`)) {
 } else {
   failures.push(
     'dist/ui-designer.mthds is missing - the `./ui-designer.mthds` export resolves to nothing. See tsup.config.ts onSuccess.',
+  );
+}
+
+/**
+ * The prebuilt stylesheet has to scan every rendering entry's tree.
+ *
+ * This is the one invariant here that reads SOURCE rather than `dist/`, and it
+ * is here rather than in lint because it is a fact about the relationship
+ * between two files that no linter pairs up: the entries `tsup` builds and the
+ * trees Tailwind scans. It earns its place by how quietly the failure arrives.
+ * An unscanned tree does not throw, does not warn, and does not render blank -
+ * its components keep every utility that some OTHER scanned tree also uses, so
+ * the page comes out recognisable and merely wrong: no type scale, no page
+ * width, no responsive columns. Storybook shows it, the story tests pass, and
+ * the only reader who can tell is a person who remembers what it used to look
+ * like.
+ *
+ * Checking the emitted CSS instead would mean deciding which utilities MUST be
+ * present, which is a moving target and a brittle test. The `@source` lines are
+ * the actual contract, and they are exact.
+ */
+const tailwindEntry = readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8');
+const scanned = [...tailwindEntry.matchAll(/@source\s+['"]\.\.\/([^'"]+)['"]/g)].map(
+  (match) => match[1],
+);
+const unscanned = RENDERING_ENTRIES.filter((entry) => !scanned.includes(entry));
+if (unscanned.length === 0) {
+  console.log('ok  styles.css scans every rendering entry');
+} else {
+  failures.push(
+    `src/styles/tailwind-entry.css does not scan ${unscanned.map((entry) => `src/${entry}`).join(', ')}, so dist/styles.css carries none of the utilities used only there. Add \`@source '../${unscanned[0]}';\` beside the others.`,
   );
 }
 

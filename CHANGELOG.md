@@ -16,6 +16,8 @@ The designer method ships as data at `@pipelex/mthds-form/ui-designer.mthds`, so
 
 It is a separate entry rather than a feature of `./react` because compiling and validating a layout costs `@json-render/core`, `@json-render/react` and `zod`, and a host rendering an ordinary form must not carry any of them. Lint and `make assert-bundle` both hold that line, the second on the built chunk graph — the three entries genuinely share chunks, so the entry split alone would not.
 
+The prebuilt `styles.css` now covers both rendering entries: it is compiled from the utilities `src/react` and `src/generative` actually use, so a host with no Tailwind build loads the same one file for either. A Tailwind host is unaffected — it already scans the package's `dist`, which its own build compiles against its own theme. `make assert-bundle` refuses a build whose rendering entries and the sheet's `@source` lines disagree, because a tree left out of the scan loses only the utilities no other entry shares, which shows up as a page that renders and merely looks wrong.
+
 The Storybook gains a **Generative** section: every captured layout rendered over the descriptor it was written for, and the pinned one again under each of two brands' tokens. Each story is titled by what produced the page — the producer and the model, and where the tokens are somebody's brand, what produced those too — never by a role like "generated".
 
 See [docs/generative-ui.md](docs/generative-ui.md).

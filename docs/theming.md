@@ -47,6 +47,8 @@ import '@pipelex/mthds-form/theme.css'; // token values — omit if you define y
 import '@pipelex/mthds-form/styles.css'; // the compiled utilities
 ```
 
+One sheet covers both rendering entries: it is compiled from the utilities `src/react` and `src/generative` actually use, so a host that renders produced layouts loads the same file and nothing extra. `scripts/assert-bundle.mjs` refuses a build whose entries and the sheet's `@source` lines disagree, because an entry left out of the scan does not fail loudly — its components keep whatever utilities the other entry happens to share and lose the rest.
+
 `styles.css` includes Tailwind's preflight (a CSS reset), which is what makes the controls render correctly with no framework underneath — and also what makes it unsuitable for a host that already has its own reset or Tailwind build.
 
 `theme.css` is the stock shadcn/ui neutral palette, deliberately un-branded: this package renders MTHDS input specs and the surrounding product supplies the brand. Override any token in your own stylesheet after importing it, or skip it entirely and define all of them yourself — as whole colours. The prebuilt sheet reads each token with a bare `var()`, so a triplet written in the old form resolves to no colour at all rather than to a wrong one.
