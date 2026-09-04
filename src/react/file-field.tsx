@@ -377,7 +377,7 @@ function FileField({
           type="button"
           disabled={busy}
           onClick={() => setShowUrl(true)}
-          className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
         >
           <Link2 className="h-3 w-3" />
           {s.pasteUrlInstead}

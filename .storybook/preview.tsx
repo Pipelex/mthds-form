@@ -5,10 +5,11 @@ import { ThemePair } from './theme-pair';
  * The two stylesheets, in the order a Tailwind host loads them: token VALUES
  * first, then the utilities that reference them. Both are read from SOURCE -
  * see the note in `main.ts` for why this Storybook must not load the prebuilt
- * `dist/styles.css`.
+ * `dist/styles.css`. The Tailwind entry is this directory's own superset of
+ * the package's, so the scan reaches the stories without widening what ships.
  */
 import '../src/styles/theme.css';
-import '../src/styles/tailwind-entry.css';
+import './tailwind.css';
 
 const preview: Preview = {
   parameters: {

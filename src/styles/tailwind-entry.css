@@ -2,11 +2,94 @@
  * Source for `dist/styles.css` - the prebuilt stylesheet for hosts that do NOT
  * run Tailwind themselves. It carries Tailwind's preflight, so a host that has
  * its own Tailwind build must NOT load it (see `docs/theming.md`): add the
- * package to that build's content globs instead.
+ * package's `dist` to that build's `@source` directives instead.
  *
  * Token VALUES are not baked in here - they come from `theme.css` (or from the
  * host's own definitions), which is what makes the controls themeable.
+ *
+ * This file is used for TWO things, and only these two:
+ *
+ *  1. building `dist/styles.css`;
+ *  2. documenting, in executable form, the token mapping a Tailwind host has to
+ *     provide for the controls to render correctly - the `@theme` block below.
+ *
+ * A Tailwind host does NOT import this file. It adds the package's `dist` to
+ * its own `@source` directives and defines the same tokens.
  */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+/*
+ * `source(none)` turns off automatic source detection, and the one `@source`
+ * that follows scans the controls and nothing else. The shipped stylesheet
+ * therefore carries only the utilities a control uses. Story chrome and the
+ * Storybook's own scan live in `.storybook/tailwind.css`, which imports this
+ * file and widens the scan there, never here.
+ */
+@import 'tailwindcss' source(none);
+@source '../react';
+
+/* The select popover's and tooltip's enter and exit transitions. */
+@import 'tw-animate-css';
+
+/* Dark mode is the `.dark` class convention, matching `theme.css`. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * `inline`, and it is load-bearing: a plain `@theme` would define
+ * `--color-border: var(--border)` once on `:root`, where `var(--border)`
+ * resolves against the ROOT's value and is then frozen. A `.dark` wrapper that
+ * redefines `--border` lower in the tree would never reach it. `inline` makes
+ * each utility carry `var(--border)` itself, so it resolves where it is used -
+ * which is what lets two themes render side by side on one page, and what
+ * lets a brand scope redefine the tokens for the subtree it wraps.
+ *
+ * The token is the whole colour (`theme.css`), so the mapping is a bare
+ * `var()`: Tailwind v4 composes an opacity modifier with `color-mix()` over
+ * it, which is why the `var(--x)` wrapper of the triplet era is gone.
+ */
+@theme inline {
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/*
+ * The one piece of v3's preflight the controls still rely on. v4's preflight
+ * gives buttons `cursor: default`; the controls' buttons (copy, download, the
+ * list row toggles, the optional-slot toggle) carry no cursor class because a
+ * button used to be a pointer by default. The default border colour, the other
+ * preflight change that mattered, is NOT reproduced: every border in the
+ * controls names `border-border` explicitly instead.
+ */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}

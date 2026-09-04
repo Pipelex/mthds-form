@@ -24,7 +24,7 @@ export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: Op
     <button
       type="button"
       onClick={onToggle}
-      className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+      className="flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
     >
       {expanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
       {expanded

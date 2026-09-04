@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The theme tokens are whole colours (breaking for a host that loads the prebuilt stylesheet and sets the tokens itself).** `theme.css` states `--primary: hsl(240 5.9% 10%)` where it stated `240 5.9% 10%`, and the `@theme inline` mapping in `tailwind-entry.css` is `--color-primary: var(--primary)` where it was `hsl(var(--primary))` — modern shadcn/ui's own convention under Tailwind v4, where an opacity modifier is composed with `color-mix()` over the whole colour and the wrapper the triplet form existed for is no longer needed. A Tailwind host is unaffected: its utilities compile against its own theme, in whatever token format it keeps. A host that loads the prebuilt `styles.css` and defines the tokens itself writes them as colours from now on, in any syntax a browser accepts; a bare triplet resolves to no colour. The move is what lets a design-token pipeline emit the contract directly, since no token tool writes triplets. Pixel-identical on every story: the stock palette is the same values, wrapped. See [docs/theming.md](docs/theming.md).
+
+- **Tailwind v4 (breaking for a Tailwind host).** The controls are now written in Tailwind v4's vocabulary and the prebuilt `styles.css` is built by v4. A host that compiles this package's classes with its own Tailwind build must be on v4: it adds `@source "../node_modules/@pipelex/mthds-form/dist"` to its stylesheet, imports `tw-animate-css` in place of the `tailwindcss-animate` plugin, and maps the same token names through its theme — the `@theme inline` block in `src/styles/tailwind-entry.css` is the reference. A v3 build compiles the renamed utilities (`outline-hidden`, `aria-invalid:`, `data-placeholder:`, `wrap-break-word`, the `(--radix-…)` value form) to nothing, which loses the focus, invalid and placeholder states rather than failing loudly. `tailwind-merge` moves to v3 with it, so `cn` keeps resolving conflicts between v4 names. A host with no Tailwind build is unaffected beyond the file it already loads. **This release waits on the consumers**: it is cut once the hosts that compile the package themselves have made the move.
+
+  The migration is pixel-faithful on every story, with three deliberate exceptions that v4's `space-y` semantics exposed — each one a v3 accident, now rendering as written: a markdown heading's `mt-3` was overridden by `space-y` and now applies, the gap above an absent-value dash was lost on an inline element and is now present, and the optional-fields and paste-a-URL rows are block-level and no longer carry a phantom line of the parent's leading beneath them. See [docs/theming.md](docs/theming.md).
+
 ## [v0.7.0] - 2026-09-03
 
 ### Changed - the result view reads like a record again
