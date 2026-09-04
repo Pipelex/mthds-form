@@ -10,6 +10,9 @@ import { userEvent, within } from 'storybook/test';
  *
  * The id fallback is what lets a producer label the budget "For the whole
  * trip": a label is the producer's choice, the field's name is the brief's.
+ * The ids it knows are the ones the two catalogs mint - `<prefix>-<control>-<name>`
+ * for a catalog control bound by name, `<parent>.<name>` for a member of a
+ * structure the kernel's own controls render behind `MthdsField`.
  */
 export async function revealInput(
   canvasElement: HTMLElement,
@@ -18,7 +21,16 @@ export async function revealInput(
 ): Promise<HTMLElement> {
   const canvas = within(canvasElement);
   const byName = fieldName
-    ? `[id$="-number-${fieldName}"], [id$="-select-${fieldName}"], input#${fieldName}, textarea#${fieldName}`
+    ? [
+        `[id$="-number-${fieldName}"]`,
+        `[id$="-select-${fieldName}"]`,
+        `[id$="-input-${fieldName}"]`,
+        `[id$="-textarea-${fieldName}"]`,
+        `input[id$=".${fieldName}"]`,
+        `textarea[id$=".${fieldName}"]`,
+        `input#${fieldName}`,
+        `textarea#${fieldName}`,
+      ].join(', ')
     : null;
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const found = canvas.queryAllByLabelText(label);

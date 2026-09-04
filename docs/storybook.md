@@ -12,11 +12,11 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 Four — three mirroring what the package is, and one that is a study over it:
 
-| Section       | What is in it                                                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Inputs**    | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
-| **Outputs**   | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
-| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
+| Section        | What is in it                                                                                                                                                                                                                                                                                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**     | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`).                                                                                                                                                                   |
+| **Outputs**    | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                                                                                                                                                                                                |
+| **Toolchain**  | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                                                                                                                                                                                  |
 | **Generative** | A study, shipping nothing: four heroes, each rendered by the kernel's own view, by a deterministic projection into a json-render catalog, and by every producer of a spec — the designer method on named models, Claude Code subagents, the session writing by hand — each story titled with what made it; plus a streamed replay. See [generative-ui.md](generative-ui.md). |
 
 Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
@@ -120,6 +120,22 @@ Two files per case, in `data/structures/`:
 
 `make fixtures` (or `make fixtures ONLY=<case>`) turns them into `src/__stories__/_generated/<case>.ts`, exporting a `CONTRACTS` and an `INPUT_FORM` typed against `mthds/protocol`. They are **annotated, not cast** — a fixture that drifts out of the standard's shape is a compile error rather than a silent lie.
 
+### The other kind of case: an authored method
+
+A structures case exists to vary the axes of a slot, which is why its carriers are synthesized. The other thing a story has to be read on is a method somebody actually wrote, whose pipes are not ours to synthesize — and that is a different kind of case, in `data/methods/<case>/`:
+
+```
+bundle.mthds        the author's bundle, VERBATIM past a header naming the origin and the licence
+case.json           the origin URL, the licence, a title, the hero pipes, the example's inputs file
+inputs.json         the example's own inputs, with its files beside it
+```
+
+The generator discovers a case by its `case.json`, checks that the header carries the origin and that every hero is a pipe of the bundle, loads the bundle as it is, and projects it through the same builders into the same module shape, plus two exports no validate artifact carries: `PIPE_DESCRIPTIONS`, each pipe's `description` as the author wrote it, and `DOMAIN_DESCRIPTION`. Those are what the generative study's brief opens with for such a case, because a host has them too and nothing of ours should stand in for an author's words. The committed cases are examples from the public Pipelex cookbook (MIT), each chosen for the shape of its inputs and its result; nothing about them is synthesized, and the corpus test checks the provenance of each.
+
+A bundle that imports a method package by address (`github.com/Pipelex/methods/documents`) needs the package on disk: pipelex finds one by walking up from the bundle's path to a `.mthds/methods/` directory, which is how the cookbook satisfies its own imports. Such packages are vendored under `data/methods/.mthds/methods/`, copied as the cookbook carries them, so a case loads here exactly as it loads there, on any machine, with nothing fetched and nothing read from a global install. That directory is not a case: a directory under `data/methods/` is a case only when it carries a `case.json`.
+
+The projection script boots pipelex with the model specs loaded and inference off. Inference off leaves only the local extractors in the deck, and the loader checks a pipe's pinned model handle at load time, so an authored method that pins an image model would fail to load before any builder ran; the specs come from the cached remote config, and nothing is called.
+
 ### Why the pipes are synthesized
 
 `input_form` is keyed by `pipe_ref` and projected from a **pipe's declared input slots**. A structure on its own has no slots, so there is nothing to project. But every axis the catalog has to vary — presence marker, multiplicity, whether the slot gates the run — is a property of a _slot_, not of a structure, which is why `<case>.slots.json` exists and why it is not inferable from the bundle.
@@ -193,7 +209,9 @@ The method's specs are fixtures like a payload: produced by the pass, committed,
 
 A brand story is the same arrangement one level up: `brandStories` names the producer ids a brand's story file shows, titles each by the brand's provenance through the same `fixtureLabel`, and renders a notice for a producer the build has not produced yet. Its `of` stories render the hand-written brand spec under each producer's tokens; its `join` stories render a captured layout under a producer's tokens, titled by what produced each half (`layout Pipelex method · claude-4.8-opus · brand catalog · tokens Pipelex method · claude-4.8-opus`), with a notice for a layout no pass has captured yet. The components are the same in every brand story; only the data differs.
 
-The input heroes' stories show, under the page, a receipt a host never would — the `/inputs` tree and the kernel's readiness over it — and their play functions type into whichever control the producer chose, opening the step, tab or section that hides it, and read the value back off the receipt, which is the assertion that a bound input writes through to the tree the run receives.
+An authored method has its own story file under `Generative/Methods/<title>` (`brand/method-*.stories.tsx`, sharing `method-page.tsx`): the same page, the same brand build, only the method differs. There is no hand-written layout for a method — nobody tuned one — so its stories are the joined ones alone, each a layout the designer method captured under tokens the brand method wrote. A hero of that kind states no summary; its brief opens with the pipe's description off `PIPE_DESCRIPTIONS`.
+
+The input heroes' stories show, under the page, a receipt a host never would — the `/inputs` tree and the kernel's readiness over it — and their play functions type into whichever control the producer chose, opening the step, tab or section that hides it, and read the value back off the receipt, which is the assertion that a bound input writes through to the tree the run receives. The brand plays share one core (`brand-plays.ts`) that takes the spec and a text target: the trip planner's target is its budget, chosen because it must arrive as a number; a method's is the first `text` or `prose` input its descriptor declares outside a list, found by `firstTextTarget`, and a method that declares none types nothing and has its receipt read as seeded, which is a fact about the method rather than a case the play invents around.
 
 ## Where story code lives, and why it matters
 

@@ -22,6 +22,30 @@ import { HAND_LAYOUT } from './trip-layouts';
  * still going.
  */
 
+/**
+ * The parameters every brand story file states. The page has a banner, a
+ * complementary rail and a contentinfo, as a product page should - and the
+ * pair view renders it twice on one document, so axe sees two of each
+ * landmark with the same name. That is the decorator's doing, not the page's:
+ * a host renders one. The rules that count landmarks per document are
+ * therefore off for the brand stories only, and every other rule still fails
+ * the build; the preview's `color-contrast` exclusion is restated because a
+ * parameter array replaces rather than merges.
+ */
+export const BRAND_STORY_PARAMETERS = {
+  themePairPadding: 0,
+  a11y: {
+    config: {
+      rules: [
+        { id: 'color-contrast', enabled: false },
+        { id: 'landmark-unique', enabled: false },
+        { id: 'landmark-no-duplicate-banner', enabled: false },
+        { id: 'landmark-no-duplicate-contentinfo', enabled: false },
+      ],
+    },
+  },
+};
+
 export interface BrandStoryArgs {
   producerId: string;
   /** A trip layout id (`fixtureId` of a captured spec), or `hand`. */

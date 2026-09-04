@@ -30,6 +30,24 @@
  * None of that is interesting to a story, and all of it is easy to get wrong.
  * So `synthesizeCarrier` owns it, and the author's file stays about structures.
  *
+ * ## The other kind of case: an AUTHORED method
+ *
+ * A structures case exists to vary the axes of a slot. An authored case is the
+ * opposite: a method somebody actually wrote, taken in as it is so that the
+ * chain is read on a bundle nobody tuned a brief for. It is a directory:
+ *
+ *   data/methods/<name>/bundle.mthds   the bundle, verbatim, under a header
+ *                                      comment naming where it came from
+ *   data/methods/<name>/case.json      { origin, license, title, heroes }
+ *
+ * Nothing is synthesized: the pipes are the author's, the bundle is loaded as
+ * it is, and the same builders project it. `heroes` names the pipe codes the
+ * stories are about (normally the main pipe alone), and each is listed in
+ * `heroes.ts` with no summary of its own - the brief opens with the pipe's own
+ * description, which the projection prints beside the artifacts because that
+ * is what the author wrote and what a host would have. An authored case has no
+ * `run` block: its runs leave the page, not this script.
+ *
  * ## Two passes, and only one of them costs anything
  *
  *   make fixtures        the DESCRIPTORS - what each pipe DECLARES
@@ -82,6 +100,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STRUCTURES_DIR = path.join(REPO, 'data/structures');
+const METHODS_DIR = path.join(REPO, 'data/methods');
 const OUT_DIR = path.join(REPO, 'src/__stories__/_generated');
 
 /**
@@ -144,6 +163,97 @@ function discoverCases() {
     .filter((f) => f.endsWith('.slots.json'))
     .map((f) => f.slice(0, -'.slots.json'.length))
     .sort();
+}
+
+/** Every `data/methods/<name>/case.json`, as case names, sorted. */
+function discoverMethodCases() {
+  if (!existsSync(METHODS_DIR)) return [];
+  return readdirSync(METHODS_DIR)
+    .filter((name) => existsSync(path.join(METHODS_DIR, name, 'case.json')))
+    .sort();
+}
+
+/**
+ * The repo-relative path of a case's authored source - what every emitted
+ * module names in its header, so a reader can go from a fixture to the file
+ * it was projected from. The two kinds of case live in two directories, and a
+ * name is one or the other, never both (the corpus test says so).
+ */
+function sourcePathOf(caseName) {
+  if (existsSync(path.join(METHODS_DIR, caseName, 'case.json'))) {
+    return `data/methods/${caseName}/bundle.mthds`;
+  }
+  return `data/structures/${caseName}.mthds`;
+}
+
+/**
+ * An authored method, read as it is.
+ *
+ * The bundle is taken verbatim; the only thing checked about its text is that
+ * it declares a domain, since the projection is keyed by `<domain>.<code>` and
+ * the heroes are named by code alone. `case.json` is validated the way a slot
+ * spec is: a slip is reported against the file the author wrote.
+ */
+function readMethodCase(caseName) {
+  const dir = path.join(METHODS_DIR, caseName);
+  const bundlePath = path.join(dir, 'bundle.mthds');
+  const casePath = path.join(dir, 'case.json');
+  if (!existsSync(bundlePath)) die(`${caseName}: no bundle.mthds beside case.json.`);
+
+  let spec;
+  try {
+    spec = JSON.parse(readFileSync(casePath, 'utf8'));
+  } catch (error) {
+    die(`${caseName}/case.json is not valid JSON: ${error.message}`);
+  }
+  const where = `data/methods/${caseName}/case.json`;
+  if (typeof spec.origin !== 'string' || !/^https?:\/\//.test(spec.origin)) {
+    die(`${where}: 'origin' must be the URL the bundle was copied from.`);
+  }
+  if (typeof spec.license !== 'string' || spec.license.length === 0) {
+    die(`${where}: 'license' must name the licence the bundle is copied under.`);
+  }
+  if (typeof spec.title !== 'string' || spec.title.length === 0) {
+    die(`${where}: 'title' must be the sidebar name of the method.`);
+  }
+  if (!Array.isArray(spec.heroes) || spec.heroes.length === 0) {
+    die(`${where}: 'heroes' must name at least one pipe code.`);
+  }
+  for (const code of spec.heroes) {
+    if (typeof code !== 'string' || !/^[a-z][a-z0-9_]*$/.test(code)) {
+      die(`${where}: hero '${code}' is not a snake_case pipe code.`);
+    }
+  }
+
+  const bundle = readFileSync(bundlePath, 'utf8');
+  if (!bundle.includes(spec.origin)) {
+    die(`${caseName}/bundle.mthds does not name its origin (${spec.origin}) in its header.`);
+  }
+  const domain = /^\s*domain\s*=\s*"([^"]+)"/m.exec(bundle)?.[1];
+  if (!domain) die(`${caseName}/bundle.mthds declares no domain.`);
+  for (const code of spec.heroes) {
+    if (!new RegExp(`^\\s*\\[pipe\\.${code}\\]`, 'm').test(bundle)) {
+      die(`${where}: hero '${code}' is not a pipe of the bundle.`);
+    }
+  }
+
+  return {
+    caseName,
+    source: 'methods',
+    domain,
+    bundlePath,
+    description: `${spec.title}, an authored method. Copied verbatim from ${spec.origin} (${spec.license}).`,
+    heroes: spec.heroes,
+    // No carriers and nothing to run through the CLI: the payload pass skips it.
+    pipes: [],
+  };
+}
+
+/** Either kind of case by name. */
+function readAnyCase(caseName) {
+  return existsSync(path.join(METHODS_DIR, caseName, 'case.json'))
+    ? readMethodCase(caseName)
+    : readCase(caseName);
 }
 
 /**
@@ -327,7 +437,7 @@ function readCase(caseName) {
   const domain = /^\s*domain\s*=\s*"([^"]+)"/m.exec(structures)?.[1];
   if (!domain) die(`${caseName}.mthds declares no domain.`);
 
-  return { caseName, domain, structures, description: spec.description, pipes };
+  return { caseName, source: 'structures', domain, structures, description: spec.description, pipes };
 }
 
 /** Structures as authored, plus one synthesized carrier per slot group. */
@@ -336,25 +446,32 @@ function composeBundle(entry) {
   return `${entry.structures.trimEnd()}\n\n${carriers}`;
 }
 
-function dumpViews(entry, bundleText) {
+/**
+ * Project one bundle through the builders. A structures case is composed into
+ * a scratch file first; an authored method is projected from its own file,
+ * exactly as committed, which is the whole point of that kind of case.
+ */
+function dumpViews(entry) {
+  const authored = entry.source === 'methods';
   const scratch = path.join(OUT_DIR, `.${entry.caseName}.composed.mthds`);
-  writeFileSync(scratch, bundleText);
+  const bundlePath = authored ? entry.bundlePath : scratch;
+  if (!authored) writeFileSync(scratch, composeBundle(entry));
   try {
     const stdout = execFileSync(
       PIPELEX_PYTHON,
-      [path.join(REPO, 'scripts/dump-validate-views.py'), scratch],
+      [path.join(REPO, 'scripts/dump-validate-views.py'), bundlePath],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     return JSON.parse(stdout);
   } catch (error) {
     const detail = error.stderr ? `\n${error.stderr}` : '';
     die(
-      `${entry.caseName}: dump-validate-views.py failed on the composed bundle.${detail}\n` +
-        `  The composed bundle was left at ${path.relative(REPO, scratch)} for inspection.`,
+      `${entry.caseName}: dump-validate-views.py failed on ${path.relative(REPO, bundlePath)}.${detail}` +
+        (authored ? '' : `\n  The composed bundle was left there for inspection.`),
     );
   } finally {
     // Kept only on the failure path above, which exits before this runs.
-    if (existsSync(scratch)) {
+    if (!authored && existsSync(scratch)) {
       try {
         execFileSync('rm', ['-f', scratch]);
       } catch {
@@ -378,14 +495,23 @@ function dumpViews(entry, bundleText) {
  */
 function emitModule(entry, views) {
   const pipeRefs = Object.keys(views.input_form).sort();
+  const authored = entry.source === 'methods';
   const header = [
     '/**',
-    ` * Generated from data/structures/${entry.caseName}.mthds - DO NOT EDIT.`,
+    ` * Generated from ${sourcePathOf(entry.caseName)} - DO NOT EDIT.`,
     ' *',
     entry.description ? ` * ${entry.description}` : null,
     entry.description ? ' *' : null,
-    ' * Regenerate with `make fixtures`. The pipes below are synthesized carriers:',
-    ' * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.',
+    ...(authored
+      ? [
+          " * Regenerate with `make fixtures`. The pipes below are the author's own,",
+          ' * projected from the bundle exactly as committed: nothing is synthesized.',
+          ' * See scripts/generate-fixtures.mjs.',
+        ]
+      : [
+          ' * Regenerate with `make fixtures`. The pipes below are synthesized carriers:',
+          ' * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.',
+        ]),
     ' */',
   ]
     .filter((line) => line !== null)
@@ -409,6 +535,16 @@ function emitModule(entry, views) {
     ' * standard puts it, beside the input schemas.',
     ' */',
     `export const OUTPUT_FORM: OutputForm = ${JSON.stringify(views.output_form, null, 2)};`,
+    '',
+    '/**',
+    " * What the author wrote about each pipe - its `description` - and about the",
+    ' * bundle. No validate artifact carries either, and an authored method\'s brief',
+    ' * opens with the pipe\'s: it is what a host would have. On a structures case',
+    ' * every entry is the synthesized carrier\'s line, and the hero states its own.',
+    ' */',
+    `export const PIPE_DESCRIPTIONS: Record<string, string> = ${JSON.stringify(views.pipe_descriptions, null, 2)};`,
+    '',
+    `export const DOMAIN_DESCRIPTION: string | null = ${JSON.stringify(views.domain_description ?? null)};`,
     '',
   ].join('\n');
 
@@ -526,7 +662,7 @@ function emitPayloads(entry, payloads) {
   const pipeRefs = Object.keys(payloads).sort();
   return [
     '/**',
-    ` * Real payloads from real runs of data/structures/${entry.caseName}.mthds - DO NOT EDIT.`,
+    ` * Real payloads from real runs of ${sourcePathOf(entry.caseName)} - DO NOT EDIT.`,
     ' *',
     ' * Regenerate with `make fixtures-runs`, which runs each pipe through the real',
     ' * `pipelex run bundle` CLI and copies back the `main_stuff.json` it wrote. This',
@@ -560,7 +696,9 @@ function generatePayloads(cases) {
   const workRoot = mkdtempSync(path.join(os.tmpdir(), 'mthds-form-runs-'));
   try {
     for (const caseName of cases) {
-      const entry = readCase(caseName);
+      // An authored method has no carriers and no `run` block - its runs leave
+      // the page, through the hosted API - so it falls out here on its own.
+      const entry = readAnyCase(caseName);
       const runnable = entry.pipes.filter((pipe) => pipe.run !== undefined || pipe.prompt);
       if (runnable.length === 0) continue;
 
@@ -679,12 +817,18 @@ async function renderHeroBrief(hero, g, chosen = catalogOf(g)) {
   const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
   if (!contract)
     die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
+  // The hero's own summary, or - on an authored method - the pipe's description
+  // as the author wrote it, off the generated module.
+  const description = g.heroSummary(hero, fixtures);
   if (hero.side === 'input') {
     const descriptor = g.core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
     if (!descriptor) die(`${pipeRef}: no input descriptor.`);
     const fields = g.core.buildRunFields(descriptor, contract.inputs);
+    // An authored method has a name a host would list it by - the case's
+    // title; a synthesized carrier has none, and its brief names no product.
+    const name = hero.source === 'methods' ? hero.title : undefined;
     return g.renderInputBrief(
-      { pipeRef, description: hero.summary, callToAction: chosen.callToAction },
+      { pipeRef, description, name, callToAction: chosen.callToAction },
       fields,
     );
   }
@@ -694,7 +838,7 @@ async function renderHeroBrief(hero, g, chosen = catalogOf(g)) {
   const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
   if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
   return g.renderResultBrief(
-    { pipeRef, description: hero.summary },
+    { pipeRef, description },
     field,
     g.payloadToState(field, PAYLOADS[pipeRef]),
   );
@@ -1097,7 +1241,7 @@ function emitSpecs(caseName, specs, chosen) {
     : [];
   return [
     '/**',
-    ` * Specs captured for the heroes of data/structures/${caseName}.mthds - DO NOT EDIT.`,
+    ` * Specs captured for the heroes of ${sourcePathOf(caseName)} - DO NOT EDIT.`,
     ' *',
     ...against,
     " * Regenerate the designer method's entries with `make fixtures-specs`, which runs",
@@ -1140,10 +1284,21 @@ function main() {
     captureSpec(args).catch((error) => die(error?.stack ?? String(error)));
     return;
   }
-  const cases = discoverCases().filter((name) => !only || name === only);
-  if (only && cases.length === 0) die(`no case named '${only}' in data/structures/.`);
+  const structures = discoverCases();
+  const methods = discoverMethodCases();
+  const shared = structures.filter((name) => methods.includes(name));
+  if (shared.length > 0) {
+    die(
+      `a case is one kind or the other, never both - ${shared.join(', ')} is in both ` +
+        `data/structures/ and data/methods/, and the two would write the same module.`,
+    );
+  }
+  const cases = [...structures, ...methods].filter((name) => !only || name === only);
+  if (only && cases.length === 0) {
+    die(`no case named '${only}' in data/structures/ or data/methods/.`);
+  }
   if (cases.length === 0) {
-    process.stdout.write('generate-fixtures: no cases in data/structures/, nothing to do.\n');
+    process.stdout.write('generate-fixtures: no cases in data/, nothing to do.\n');
     return;
   }
 
@@ -1161,10 +1316,13 @@ function main() {
   requirePython();
 
   for (const caseName of cases) {
-    const entry = readCase(caseName);
-    const views = dumpViews(entry, composeBundle(entry));
+    const entry = readAnyCase(caseName);
+    const views = dumpViews(entry);
     const outPath = path.join(OUT_DIR, `${caseName}.ts`);
     writeFileSync(outPath, emitModule(entry, views));
+    // Formatted on the way out, like every other emitted module: the format
+    // gate reads these files and the emitter writes JSON, not prettier's TS.
+    execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
     const pipeCount = Object.keys(views.input_form).length;
     process.stdout.write(
       `  ${caseName}: ${pipeCount} pipe${pipeCount === 1 ? '' : 's'} -> ${path.relative(REPO, outPath)}\n`,

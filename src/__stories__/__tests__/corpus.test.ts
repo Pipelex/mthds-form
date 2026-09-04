@@ -1,10 +1,11 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { OUTPUT_FORM as LIST_OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
+import { HEROES, pipeRefOf } from '../generative/heroes';
 
 /**
  * The corpus guard.
@@ -23,13 +24,41 @@ import { PAYLOADS } from '../_generated/results.payloads';
 
 const REPO = path.resolve(__dirname, '../../..');
 const STRUCTURES_DIR = path.join(REPO, 'data/structures');
+const METHODS_DIR = path.join(REPO, 'data/methods');
 const GENERATED_DIR = path.join(REPO, 'src/__stories__/_generated');
 
+/** The structures cases - `<case>.slots.json`, one per authored slot spec. */
 function authoredCases(): string[] {
   return readdirSync(STRUCTURES_DIR)
     .filter((file) => file.endsWith('.slots.json'))
     .map((file) => file.slice(0, -'.slots.json'.length))
     .sort();
+}
+
+/**
+ * The authored methods - `data/methods/<case>/case.json`, one per verbatim
+ * bundle. A directory with no case is not a case: `data/methods/.mthds/` is
+ * where the packages the bundles import are vendored, found by the loader's
+ * own walk up from a bundle's path.
+ */
+function methodCases(): string[] {
+  return readdirSync(METHODS_DIR, { withFileTypes: true })
+    .filter(
+      (entry) => entry.isDirectory() && existsSync(path.join(METHODS_DIR, entry.name, 'case.json')),
+    )
+    .map((entry) => entry.name)
+    .sort();
+}
+
+interface MethodCase {
+  origin: string;
+  license: string;
+  title: string;
+  heroes: string[];
+}
+
+function readMethodCase(name: string): MethodCase {
+  return JSON.parse(readFileSync(path.join(METHODS_DIR, name, 'case.json'), 'utf8'));
 }
 
 /** The descriptor modules - `<case>.ts`, one per authored case. */
@@ -56,8 +85,13 @@ describe('the structures corpus', () => {
     expect(authoredCases().length).toBeGreaterThan(0);
   });
 
-  it('pairs every slot spec with a generated module, and vice versa', () => {
-    expect(generatedCases()).toEqual(authoredCases());
+  it('pairs every case with a generated module, and vice versa', () => {
+    expect(generatedCases()).toEqual([...authoredCases(), ...methodCases()].sort());
+  });
+
+  it('keeps the two kinds of case apart', () => {
+    // One name, one kind: both would write the same module.
+    for (const name of methodCases()) expect(authoredCases()).not.toContain(name);
   });
 
   it('pairs every slot spec with the bundle it describes', () => {
@@ -94,10 +128,68 @@ describe('the structures corpus', () => {
   });
 
   it('emits modules that name their source', () => {
-    for (const name of generatedCases()) {
+    for (const name of authoredCases()) {
       const source = readFileSync(path.join(GENERATED_DIR, `${name}.ts`), 'utf8');
       expect(source).toContain(`data/structures/${name}.mthds`);
       expect(source).toContain('DO NOT EDIT');
+    }
+    for (const name of methodCases()) {
+      const source = readFileSync(path.join(GENERATED_DIR, `${name}.ts`), 'utf8');
+      expect(source).toContain(`data/methods/${name}/bundle.mthds`);
+      expect(source).toContain('DO NOT EDIT');
+    }
+  });
+});
+
+describe('the authored methods', () => {
+  /**
+   * An authored method is a bundle somebody wrote, copied verbatim and
+   * projected as it is - so what can go wrong is the copy losing its
+   * provenance, a hero the case names that the heroes list does not (or the
+   * reverse), and a pipe the case names that the bundle has not got. The
+   * bundle itself is checked by the projection: a bundle the builders reject
+   * has no module, and the pairing test above says so.
+   */
+  it('has at least one method', () => {
+    expect(methodCases().length).toBeGreaterThan(0);
+  });
+
+  it('carries its bundle, its case and the origin in the header', () => {
+    for (const name of methodCases()) {
+      const spec = readMethodCase(name);
+      expect(spec.origin, `${name}: origin`).toMatch(/^https:\/\//);
+      expect(spec.license, `${name}: license`).toBeTruthy();
+      expect(spec.title, `${name}: title`).toBeTruthy();
+      expect(spec.heroes.length, `${name}: heroes`).toBeGreaterThan(0);
+      const bundle = readFileSync(path.join(METHODS_DIR, name, 'bundle.mthds'), 'utf8');
+      expect(bundle, `${name}: the header names the origin`).toContain(spec.origin);
+      for (const code of spec.heroes) {
+        expect(bundle, `${name}: hero ${code} is a pipe of the bundle`).toMatch(
+          new RegExp(`^\\s*\\[pipe\\.${code}\\]`, 'm'),
+        );
+      }
+    }
+  });
+
+  it('names every hero in the heroes list, and no other', () => {
+    const listed = HEROES.filter((hero) => hero.source === 'methods');
+    const named = methodCases().flatMap((name) => {
+      const spec = readMethodCase(name);
+      const bundle = readFileSync(path.join(METHODS_DIR, name, 'bundle.mthds'), 'utf8');
+      const domain = /^\s*domain\s*=\s*"([^"]+)"/m.exec(bundle)?.[1];
+      return spec.heroes.map((code) => `${name}:${domain}.${code}`);
+    });
+    expect(listed.map((hero) => `${hero.caseName}:${pipeRefOf(hero)}`).sort()).toEqual(
+      named.sort(),
+    );
+    // No summary of ours: the author's description is the brief's opening line.
+    for (const hero of listed) expect(hero.summary, pipeRefOf(hero)).toBeUndefined();
+  });
+
+  it("projects the author's descriptions beside the artifacts", () => {
+    for (const name of methodCases()) {
+      const source = readFileSync(path.join(GENERATED_DIR, `${name}.ts`), 'utf8');
+      expect(source, `${name}.ts`).toContain('export const PIPE_DESCRIPTIONS');
     }
   });
 });

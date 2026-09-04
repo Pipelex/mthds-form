@@ -24,6 +24,14 @@ export interface BriefSubject {
   /** The pipe's description, when the wire carries one. */
   description?: string;
   /**
+   * The method's name as a host lists it - an authored method's, since a host
+   * has one for every method it lists; absent on a synthesized carrier, which
+   * no host lists. The brief hands it to the layout as the one product name
+   * the page may carry, because the brand catalog's AppBar asks for a name
+   * and a brief that gives none gets one invented.
+   */
+  name?: string;
+  /**
    * The component that runs the page: the layer's `Button` unless the brief
    * is for a catalog that runs it from something else (the brand catalog's
    * `Cta`). Only the Run section names it.
@@ -249,6 +257,14 @@ export function renderInputBrief(subject: BriefSubject, fields: readonly RunFiel
     '',
     subject.description ?? 'A method with the inputs below.',
     '',
+    ...(subject.name
+      ? [
+          '## Name',
+          '',
+          `The method is called «${subject.name}», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.`,
+          '',
+        ]
+      : []),
     '## State',
     '',
     `The form's values live under \`${INPUTS_ROOT}\`, one member per input, exactly as listed. Bind each input with \`$bindState\` at its path; a structure's members bind at their own paths beneath it.`,

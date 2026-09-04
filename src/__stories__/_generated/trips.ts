@@ -537,3 +537,16 @@ export const OUTPUT_FORM: OutputForm = {
     },
   },
 };
+
+/**
+ * What the author wrote about each pipe - its `description` - and about the
+ * bundle. No validate artifact carries either, and an authored method's brief
+ * opens with the pipe's: it is what a host would have. On a structures case
+ * every entry is the synthesized carrier's line, and the hero states its own.
+ */
+export const PIPE_DESCRIPTIONS: Record<string, string> = {
+  'trips.plan_trip': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+};
+
+export const DOMAIN_DESCRIPTION: string | null =
+  'A trip request - who is going, where and when, with what budget and in what spirit. The input side of an itinerary planner: the richest form in the corpus, and the one a person expects to look designed.';

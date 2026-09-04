@@ -8,6 +8,10 @@ import {
   getPipeInputForm,
   getPipeOutputForm,
 } from '../../core';
+import * as designSlides from '../_generated/design_slides';
+import { SPECS as BRAND_SLIDES_SPECS } from '../_generated/design_slides.brand.specs';
+import * as extractInvoice from '../_generated/extract_invoice';
+import { SPECS as BRAND_INVOICE_SPECS } from '../_generated/extract_invoice.brand.specs';
 import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
 import * as results from '../_generated/results';
@@ -17,6 +21,8 @@ import * as scalars from '../_generated/scalars';
 import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
 import { SPECS as INPUT_SPECS } from '../_generated/structured.specs';
+import * as summarizePeople from '../_generated/summarize_people';
+import { SPECS as BRAND_PEOPLE_SPECS } from '../_generated/summarize_people.brand.specs';
 import * as trips from '../_generated/trips';
 import { SPECS as BRAND_TRIP_SPECS } from '../_generated/trips.brand.specs';
 import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
@@ -69,6 +75,11 @@ const CASES: Record<string, CaseModule> = {
   states,
   structured,
   trips,
+  // The authored methods: every pipe of each bundle, not only the hero, so
+  // the projection is read on slots nobody wrote for a story.
+  extract_invoice: extractInvoice,
+  design_slides: designSlides,
+  summarize_people: summarizePeople,
 };
 
 function splitRef(pipeRef: string): [string, string] {
@@ -515,8 +526,10 @@ describe('the spec fixtures', () => {
     return { result: buildResultField(descriptor, contract.output.json_schema) };
   }
 
-  it('has, for every hero, a spec by the designer method and one written by hand', () => {
-    for (const hero of HEROES) {
+  it('has, for every structures hero, a spec by the designer method and one written by hand', () => {
+    // The base catalog's pairing is the structures heroes': an authored
+    // method's hero has the brand catalog's layout alone, asserted below.
+    for (const hero of HEROES.filter((candidate) => candidate.source === 'structures')) {
       const ref = pipeRefOf(hero);
       const producers = fixtures
         .filter((fixture) => fixture.pipeRef === ref)
@@ -638,7 +651,13 @@ describe('the spec fixtures', () => {
 });
 
 describe('the brand-catalog spec fixtures', () => {
-  const fixtures = [...BRAND_TRIP_SPECS];
+  const fixtures = [
+    ...BRAND_TRIP_SPECS,
+    ...BRAND_INVOICE_SPECS,
+    ...BRAND_SLIDES_SPECS,
+    ...BRAND_PEOPLE_SPECS,
+  ];
+  const PINNED = 'pipelex-method--claude-4.8-opus--brand';
 
   /** The one element that runs: exactly one Cta, no Button, firing validateForm then run. */
   function runner(spec: Spec) {
@@ -648,7 +667,14 @@ describe('the brand-catalog spec fixtures', () => {
   }
 
   it('has at least the run that answered the question', () => {
-    expect(fixtures.map(fixtureId)).toContain('pipelex-method--claude-4.8-opus--brand');
+    expect(fixtures.map(fixtureId)).toContain(PINNED);
+  });
+
+  it("has, for every authored method's hero, the designer method's layout on the pinned model", () => {
+    for (const hero of HEROES.filter((candidate) => candidate.source === 'methods')) {
+      const ids = fixtures.filter((fixture) => fixture.pipeRef === pipeRefOf(hero)).map(fixtureId);
+      expect(ids, pipeRefOf(hero)).toContain(PINNED);
+    }
   });
 
   for (const fixture of fixtures) {
@@ -733,13 +759,20 @@ describe('the brand-catalog spec fixtures', () => {
         }
       });
 
-      it('writes the budget as a number', () => {
-        const budget = Object.values(fixture.spec.elements).find(
-          (element) =>
-            (element.props as { value?: { $bindState?: string } }).value?.$bindState ===
-            '/inputs/request/budget',
+      it('binds every number path through a NumberInput', () => {
+        // The rules ask for NumberInput on a number path, so the value arrives
+        // as a NUMBER; the trip planner's budget is the path that proved it.
+        const bound = Object.values(fixture.spec.elements).flatMap((element) => {
+          const path = (element.props as { value?: { $bindState?: unknown } }).value?.$bindState;
+          return typeof path === 'string' ? [{ element, path }] : [];
+        });
+        const numbers = bound.filter(
+          ({ path }) => inputFieldAtPath(inputs, path)?.kind === 'number',
         );
-        expect(budget?.type).toBe('NumberInput');
+        for (const { element, path } of numbers) expect(element.type, path).toBe('NumberInput');
+        if (fixture.pipeRef === 'trips.plan_trip') {
+          expect(numbers.map(({ path }) => path)).toContain('/inputs/request/budget');
+        }
       });
     });
   }

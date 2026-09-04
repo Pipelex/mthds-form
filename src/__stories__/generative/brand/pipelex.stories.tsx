@@ -5,7 +5,7 @@ import { CONTRACTS, INPUT_FORM } from '../../_generated/trips';
 import { HEROES } from '../heroes';
 import { loadInputHero } from '../hero-page';
 import { BrandPage } from './brand-page';
-import { type BrandStoryArgs, brandStories } from './brand-stories';
+import { BRAND_STORY_PARAMETERS, type BrandStoryArgs, brandStories } from './brand-stories';
 import {
   HAND_LAYOUT,
   TRIP_LAYOUTS,
@@ -57,29 +57,7 @@ function PipelexTripPlanner({ producerId, layout }: BrandStoryArgs) {
 const meta = {
   title: 'Generative/Brand/Pipelex · trip planner',
   component: PipelexTripPlanner,
-  parameters: {
-    themePairPadding: 0,
-    /**
-     * The page has a banner, a complementary rail and a contentinfo, as a
-     * product page should - and the pair view renders it twice on one
-     * document, so axe sees two of each landmark with the same name. That is
-     * the decorator's doing, not the page's: a host renders one. The rules
-     * that count landmarks per document are therefore off for the brand
-     * stories only, and every other rule still fails the build; the
-     * preview's `color-contrast` exclusion is restated because a parameter
-     * array replaces rather than merges.
-     */
-    a11y: {
-      config: {
-        rules: [
-          { id: 'color-contrast', enabled: false },
-          { id: 'landmark-unique', enabled: false },
-          { id: 'landmark-no-duplicate-banner', enabled: false },
-          { id: 'landmark-no-duplicate-contentinfo', enabled: false },
-        ],
-      },
-    },
-  },
+  parameters: BRAND_STORY_PARAMETERS,
 } satisfies Meta<typeof PipelexTripPlanner>;
 
 export default meta;
