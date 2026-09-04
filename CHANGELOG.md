@@ -16,6 +16,8 @@ The designer method ships as data at `@pipelex/mthds-form/ui-designer.mthds`, so
 
 It is a separate entry rather than a feature of `./react` because compiling and validating a layout costs `@json-render/core`, `@json-render/react` and `zod`, and a host rendering an ordinary form must not carry any of them. Lint and `make assert-bundle` both hold that line, the second on the built chunk graph — the three entries genuinely share chunks, so the entry split alone would not.
 
+The Storybook gains a **Generative** section: every captured layout rendered over the descriptor it was written for, and the pinned one again under each of two brands' tokens. Each story is titled by what produced the page — the producer and the model, and where the tokens are somebody's brand, what produced those too — never by a role like "generated".
+
 See [docs/generative-ui.md](docs/generative-ui.md).
 
 ## [v0.8.0] - 2026-09-04

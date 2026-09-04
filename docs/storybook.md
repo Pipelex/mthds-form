@@ -10,13 +10,14 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 ## The sections
 
-Three, mirroring what the package is:
+Four, mirroring what the package is:
 
-| Section       | What is in it                                                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Inputs**    | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
-| **Outputs**   | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
-| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
+| Section        | What is in it                                                                                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**     | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
+| **Outputs**    | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
+| **Generative** | Every captured layout, rendered through `./generative` over the descriptor it was written for — and the pinned one again under each brand's tokens.                                                        |
+| **Toolchain**  | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
 
 Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
 
@@ -65,6 +66,18 @@ Sourced differently, and all three generated:
 - **The payloads** are what the pipes actually returned, written by `make fixtures-runs` from real `pipelex run bundle` executions into `src/__stories__/_generated/<case>.payloads.ts`. A payload is the one artifact no projection can produce, and that is not ceremony: two shapes in these are invisible from every descriptor — a `date` arrives in the serializer's typed envelope `{date, __class__, __module__}`, and a plural payload is `{items: [...]}` rather than a bare array. Both were written wrong by hand before a real run corrected them.
 
 The story assertions read their expected values **out of the payload they render** rather than naming them. A live model does not answer the same way twice — the sentiment case came back `neutral` on one sweep and `positive` on the next, both defensible — so a hard-coded string asserts the model's mood instead of the renderer, and fails on the next sweep for a reason nobody should have to investigate.
+
+## Generative
+
+The `Generative` section renders **captured layouts**: what a model actually laid out for one of these methods, compiled from its own JSONL and rendered through `./generative` over the same descriptor the plain form is built from. Nothing here calls a model — a layout is a data file, and these stories render one. See [generative-ui.md](generative-ui.md).
+
+Each story is titled by **what produced the page**, never by a role: the producer, the model, and — where the tokens are somebody's brand rather than the stock palette — what produced those too. "Pipelex method · claude-4.8-opus", not "generated"; the point of the section is comparison, and a label that says which side of a comparison you are meant to prefer has already answered the question.
+
+The trip planner is the case with three layouts, because it is the widest input surface in the corpus and therefore has the most room to differ: the three pages differ in section order, in what goes in the rail and in how much copy they write, and all three bind exactly the same paths. That is the section's real claim — the paths belong to the descriptor and not to the layout, so a page can be as different as a model likes without any of them moving.
+
+Before rendering, the harness runs the two checks a host runs (`validateAgainstCatalog`, `layoutFits`) and throws on either. A story showing a layout a host would refuse would be showing a page nobody sees. And under every page, folded away, is the `/inputs` tree with the readiness the kernel computes from it — because what the story is really asserting is that what a person types through somebody else's layout arrives where the gate reads it.
+
+**Brands.** The same layout, painted from tokens that are not this package's, is what says whether the page reads on its own. Two of them live in `src/__stories__/generative/brands/` as story fixtures — carried over verbatim from the study branch, reproducible by no pass here, and shipped in nothing. See [theming.md](theming.md) § "Someone else's tokens".
 
 ## What a file slot accepts
 

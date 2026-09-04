@@ -51,6 +51,14 @@ import '@pipelex/mthds-form/styles.css'; // the compiled utilities
 
 `theme.css` is the stock shadcn/ui neutral palette, deliberately un-branded: this package renders MTHDS input specs and the surrounding product supplies the brand. Override any token in your own stylesheet after importing it, or skip it entirely and define all of them yourself — as whole colours. The prebuilt sheet reads each token with a bare `var()`, so a triplet written in the old form resolves to no colour at all rather than to a wrong one.
 
+## Someone else's tokens, and how a story wears them
+
+The token contract is a contract in both directions: everything above defines it for a host, and a **brand** is what happens when something else fills it in. A brand stylesheet sets the same custom properties on a scope class — its dark values under `.dark`, exactly as `theme.css` does — and everything below that class reads the tokens it always reads. That is the entire mechanism; nothing in the package knows a brand exists.
+
+`src/__stories__/generative/brands/` holds two of them, compiled from real sites' tokens. They are **story fixtures**: outside both entry trees, shipped in nothing, and not reproducible here — the pipeline that read a site and wrote them stayed on the study branch. They are kept for the one question a single palette cannot answer, which is whether a page reads because of how it is laid out or because of the colours it was laid out against. See [storybook.md](storybook.md) § "Generative".
+
+The generative layer's app bar additionally reads a **manifest** — a name, a logo pair, an optional web font — which is a different artifact from the tokens and is validated by `brandManifestSchema`. Tokens are the palette; the manifest is what the page says it is.
+
 ## Why Tailwind and not plain CSS
 
 Considered and rejected for this package: rewriting the controls onto plain CSS over custom properties, which is the pattern `@pipelex/mthds-ui` follows. It is cleaner for a host with no Tailwind, but it would have concentrated real visual-parity risk into the extraction for no consumer that needed it, and the prebuilt stylesheet covers that host adequately. The two packages therefore speak different theming regimes on purpose; a consumer using both configures each once and they do not interact.
