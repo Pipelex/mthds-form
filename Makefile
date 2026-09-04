@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs brands brand-from-site assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st storybook-run str build-storybook fixtures fixtures-runs briefs fixtures-specs brands brand-from-site assert-bundle clean pack
 
 install:
 	npm install
@@ -43,6 +43,19 @@ storybook:
 	npm run storybook
 
 st: storybook
+
+# The stories, with the method pages able to RUN: the same server, handed the
+# hosted API key from your shell. `PIPELEX_API_KEY` is required and refused
+# when empty; `PIPELEX_BASE_URL` names the API, and defaults to the hosted
+# production URL when unset, so point it at the dev environment for a dev key.
+# `.storybook/main.ts` deletes the key from the environment before Storybook
+# exposes anything to the browser and injects it into a proxy instead.
+storybook-run:
+	@test -n "$(PIPELEX_API_KEY)" || { echo "PIPELEX_API_KEY is not set: export the hosted API key, then run this again." >&2; exit 1; }
+	@echo "serving Storybook with the hosted API key, against $(or $(PIPELEX_BASE_URL),https://api.pipelex.com)"
+	@STORYBOOK_PIPELEX_API_KEY="$(PIPELEX_API_KEY)" STORYBOOK_PIPELEX_BASE_URL="$(or $(PIPELEX_BASE_URL),https://api.pipelex.com)" npm run storybook
+
+str: storybook-run
 
 build-storybook:
 	npm run build-storybook
