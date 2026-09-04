@@ -888,6 +888,19 @@ function isInlineColumn(field: RunField): boolean {
 const CELL_LENGTH_LIMIT = 80;
 
 /**
+ * The chevron column's width, stated ONCE because two places need to agree on
+ * it: the header cell that reserves it, and the pinned width of an open row's
+ * detail panel, which begins after it and must therefore be that much narrower.
+ *
+ * They did not agree, and the failure was invisible until the detail's values
+ * moved to the right edge. The panel spanned every column EXCEPT this one while
+ * being pinned to the full visible width, so it overhung the scroller by exactly
+ * this much - harmless while its content started at the left, and a clean cut
+ * through the last characters of every value once they ended at the right.
+ */
+const EXPAND_COLUMN = '2rem';
+
+/**
  * Whether a column is GUARANTEED to fit its cell — a stronger question than
  * `isInlineColumn`, and the one the expand toggle is keyed on.
  *
@@ -1040,7 +1053,7 @@ function ObjectTable({
                 name is visually hidden because the chevron below it is the whole
                 affordance a sighted reader needs. */}
             {canExpand && (
-              <th scope="col" className="w-8 px-1">
+              <th scope="col" style={{ width: EXPAND_COLUMN }} className="px-1">
                 <span className="sr-only">{s.rowDetailsColumn}</span>
               </th>
             )}
@@ -1099,7 +1112,19 @@ function ObjectTable({
                     <td colSpan={columns.length} className="bg-card/40 p-0">
                       <div
                         className="sticky left-0 px-3.5 py-3"
-                        {...(viewportWidth ? { style: { width: viewportWidth } } : {})}
+                        {...(viewportWidth
+                          ? {
+                              style: {
+                                // Minus the chevron column: this cell starts
+                                // after it, so pinning it to the FULL visible
+                                // width pushes its right edge that far past the
+                                // scroller. See `EXPAND_COLUMN`.
+                                width: canExpand
+                                  ? `calc(${viewportWidth}px - ${EXPAND_COLUMN})`
+                                  : viewportWidth,
+                              },
+                            }
+                          : {})}
                       >
                         <ResultField field={element} value={item} hideLabel />
                       </div>
