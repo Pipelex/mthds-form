@@ -1,12 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import '../../_generated/brands/index.css';
 import { BRANDS } from '../../_generated/brands/brands';
-import { CONTRACTS, INPUT_FORM } from '../../_generated/summarize_people';
+import bundle from '../../../../data/methods/summarize_people/bundle.mthds?raw';
+import { CONTRACTS, INPUT_FORM, OUTPUT_FORM } from '../../_generated/summarize_people';
 import { SPECS } from '../../_generated/summarize_people.brand.specs';
 import { loadInputHero } from '../hero-page';
 import { methodPlays } from './brand-plays';
 import { BRAND_STORY_PARAMETERS, brandStories } from './brand-stories';
 import { makeMethodPage, methodHero, methodLayouts } from './method-page';
+import { methodRunTarget } from './method-run';
 
 /**
  * People summaries: a list of records in, a list of rows out. The list is delegated whole to the kernel, rows and all, under the brand tokens.
@@ -21,7 +23,8 @@ const BRAND = 'pipelex';
 const hero = methodHero('summarize_people.summarize_people');
 const fields = loadInputHero(hero, CONTRACTS, INPUT_FORM);
 const layouts = methodLayouts(hero, SPECS);
-const Page = makeMethodPage({ brand: BRAND, hero, fields, layouts });
+const run = methodRunTarget(hero, CONTRACTS, OUTPUT_FORM, { 'bundle.mthds': bundle });
+const Page = makeMethodPage({ brand: BRAND, hero, fields, layouts, run });
 
 const meta = {
   title: 'Generative/Methods/People summaries',

@@ -1,12 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import '../../_generated/brands/index.css';
 import { BRANDS } from '../../_generated/brands/brands';
-import { CONTRACTS, INPUT_FORM } from '../../_generated/extract_invoice';
+import bundle from '../../../../data/methods/extract_invoice/bundle.mthds?raw';
+import documentsPackage from '../../../../data/methods/.mthds/methods/documents/documents.mthds?raw';
+import documentsManifest from '../../../../data/methods/.mthds/methods/documents/METHODS.toml?raw';
+import { CONTRACTS, INPUT_FORM, OUTPUT_FORM } from '../../_generated/extract_invoice';
 import { SPECS } from '../../_generated/extract_invoice.brand.specs';
 import { loadInputHero } from '../hero-page';
 import { methodPlays } from './brand-plays';
 import { BRAND_STORY_PARAMETERS, brandStories } from './brand-stories';
 import { makeMethodPage, methodHero, methodLayouts } from './method-page';
+import { methodRunTarget } from './method-run';
 
 /**
  * Invoice extraction: one document in, a list of invoices out. The page has one input, and it is delegated - the whole of what a person does here is drop a file.
@@ -21,7 +25,15 @@ const BRAND = 'pipelex';
 const hero = methodHero('invoice_extraction.process_invoice');
 const fields = loadInputHero(hero, CONTRACTS, INPUT_FORM);
 const layouts = methodLayouts(hero, SPECS);
-const Page = makeMethodPage({ brand: BRAND, hero, fields, layouts });
+const run = methodRunTarget(hero, CONTRACTS, OUTPUT_FORM, {
+  'bundle.mthds': bundle,
+  // The package the bundle imports by address, vendored under the case's
+  // `.mthds/methods/` exactly as it sits on disk: the runner resolves no
+  // package by address yet, so it rides along in the run's files.
+  '.mthds/methods/documents/documents.mthds': documentsPackage,
+  '.mthds/methods/documents/METHODS.toml': documentsManifest,
+});
+const Page = makeMethodPage({ brand: BRAND, hero, fields, layouts, run });
 
 const meta = {
   title: 'Generative/Methods/Invoice extraction',

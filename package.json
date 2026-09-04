@@ -82,6 +82,7 @@
     "@json-render/core": "^0.20.0",
     "@json-render/react": "^0.20.0",
     "@json-render/shadcn": "^0.20.0",
+    "@pipelex/sdk": "^0.17.0",
     "@storybook/addon-a11y": "^10.5.10",
     "@storybook/addon-docs": "^10.5.10",
     "@storybook/addon-vitest": "^10.5.10",

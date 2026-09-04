@@ -4,6 +4,7 @@ import { type Hero, HEROES, pipeRefOf } from '../heroes';
 import { fixtureId, type SpecFixture } from '../spec-fixture';
 import { BrandPage } from './brand-page';
 import { type BrandStoryArgs, brandStories } from './brand-stories';
+import type { MethodRunTarget } from './method-run';
 
 /**
  * An authored method as a product page - what the three method story files
@@ -15,6 +16,11 @@ import { type BrandStoryArgs, brandStories } from './brand-stories';
  * hand-written layout for a method - nobody tuned one - so the layouts are
  * the captured specs alone, and a layout no pass has captured renders the
  * notice the brand stories render.
+ *
+ * A method page can RUN: the story hands it the run target - the bundle and
+ * what rides beside it, the hero's contract, the result field - and the page
+ * closes the call to action through the hosted API when the served Storybook
+ * has a key (`method-run.ts`). A page given none is the page as it was.
  */
 
 /** The hero of an authored method, by its pipe ref. */
@@ -36,10 +42,18 @@ export interface MethodPageOptions {
   hero: Hero;
   fields: RunField[];
   layouts: readonly SpecFixture[];
+  /** What the call to action runs, when the Storybook can run it. */
+  run?: MethodRunTarget;
 }
 
 /** The story component of one authored method: a brand page over one of its captured layouts. */
-export function makeMethodPage({ brand: brandName, hero, fields, layouts }: MethodPageOptions) {
+export function makeMethodPage({
+  brand: brandName,
+  hero,
+  fields,
+  layouts,
+  run,
+}: MethodPageOptions) {
   function MethodPage({ producerId, layout }: BrandStoryArgs) {
     const brand = BRANDS.find(
       (candidate) => candidate.brand === brandName && candidate.producerId === producerId,
@@ -55,6 +69,7 @@ export function makeMethodPage({ brand: brandName, hero, fields, layouts }: Meth
         idPrefix={`${hero.caseName}-${producerId}-${layout}`}
         // A layout from the layer's own catalog brings no chrome and no container.
         contained={fixture.catalog !== 'brand'}
+        run={run}
       />
     );
   }

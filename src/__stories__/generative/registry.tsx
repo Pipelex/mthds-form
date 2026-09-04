@@ -162,6 +162,23 @@ function domIdFor(prefix: string | undefined, path: string): string {
 }
 
 /**
+ * The inverse of `domIdFor`, for a host's upload seam: the kernel reports a
+ * drop by the DOM id of the field it landed on, which for a nested one is the
+ * hatch's id with the child's name or index joined by `.` (the kernel's own
+ * composition, `FieldRenderer` through `ObjectField` and `ListField`), and
+ * the host writes the file at the store path that id was minted from. Kept
+ * beside `domIdFor` so the two cannot drift; exact because a field's name is
+ * an identifier and carries no `-`.
+ */
+export function pathFromDomId(prefix: string | undefined, id: string): string | undefined {
+  const head = prefix ?? 'gen';
+  if (!id.startsWith(head)) return undefined;
+  const [own = '', ...children] = id.slice(head.length).split('.');
+  if (!own.startsWith('-')) return undefined;
+  return `${own.replace(/-/g, '/')}${children.map((child) => `/${child}`).join('')}`;
+}
+
+/**
  * The path a hatch resolves: absolute as written, or, inside a repeat, the
  * item's field name joined onto the current item's base path. A relative path
  * outside any repeat resolves to nothing, and the hatch says so.

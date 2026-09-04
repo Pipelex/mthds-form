@@ -25,7 +25,50 @@ const config: StorybookConfig = {
   staticDirs: ['../data/inputs'],
   addons: ['@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-vitest'],
   framework: '@storybook/react-vite',
-  viteFinal: async (viteConfig) => {
+  viteFinal: async (viteConfig, { configType }) => {
+    /**
+     * The hosted API, reachable from a served Storybook and from nowhere else.
+     *
+     * The generative study's method pages can RUN the method they lay out,
+     * through the hosted API over `@pipelex/sdk` - but the API sends no CORS
+     * headers, so the browser cannot call it, and a key must never reach a
+     * client bundle. Both are answered by the dev server: it proxies `/v1` to
+     * the API and injects the `Authorization` header itself, so the page calls
+     * its own origin with a placeholder key and the real one lives only in this
+     * process. The key is read once and DELETED from the environment before
+     * Storybook copies `STORYBOOK_*` variables into the client's
+     * `import.meta.env` (which it does when the Vite server is created, after
+     * this hook returns); what the client learns is the one flag below.
+     *
+     *   STORYBOOK_PIPELEX_API_KEY=... STORYBOOK_PIPELEX_BASE_URL=... make storybook
+     *
+     * A static build has no dev server and therefore no proxy, so the flag is
+     * only ever set for the served one: a built Storybook renders every method
+     * page and runs nothing, whatever the environment said. Without a key the
+     * served one does the same, and the pages say so.
+     */
+    const apiKey = process.env.STORYBOOK_PIPELEX_API_KEY;
+    delete process.env.STORYBOOK_PIPELEX_API_KEY;
+    const apiBaseUrl = (
+      process.env.STORYBOOK_PIPELEX_BASE_URL ?? 'https://api.pipelex.com'
+    ).replace(/\/+$/, '');
+    if (apiKey && configType === 'DEVELOPMENT') {
+      process.env.STORYBOOK_PIPELEX_RUN = '1';
+      viteConfig.server = {
+        ...(viteConfig.server ?? {}),
+        proxy: {
+          ...(viteConfig.server?.proxy ?? {}),
+          '/v1': {
+            target: apiBaseUrl,
+            changeOrigin: true,
+            headers: { Authorization: `Bearer ${apiKey}` },
+          },
+        },
+      };
+    } else {
+      delete process.env.STORYBOOK_PIPELEX_RUN;
+    }
+
     /**
      * Tailwind runs from the SOURCE entry here, not from the prebuilt
      * `dist/styles.css`.

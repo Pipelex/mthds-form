@@ -5,11 +5,13 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
+import { ResultEnvProvider, StuffViewer } from '../../../react';
 import { fieldControlClass } from '../../../react/field-styles';
 import { cn } from '../../../react/utils';
 import { generativeRenderers, useDescriptorScope } from '../registry';
 import { brandCatalog } from './brand-catalog';
 import { useBrand } from './brand-context';
+import { useMethodRun } from './run-context';
 
 /**
  * What the brand catalog's components RENDER as - the product page's chrome,
@@ -53,7 +55,9 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
         <img src={brand.logo.onDark} alt={brand.name} className="hidden h-7 w-auto dark:block" />
         <span aria-hidden="true" className="h-5 w-px bg-border" />
         <span className="text-sm font-medium text-foreground/80">{props.app}</span>
-        <div className="ml-auto flex items-center gap-6">
+        {/* `min-w-0` down to the pill: a pipe's code is one long word, and
+            at phone width an unshrinkable pill pushed the row past the viewport. */}
+        <div className="ml-auto flex min-w-0 items-center gap-6">
           {props.links && props.links.length > 0 ? (
             <nav aria-label="Site" className="hidden items-center gap-6 sm:flex">
               {props.links.map((link) => (
@@ -69,7 +73,7 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
             </nav>
           ) : null}
           {props.tag ? (
-            <span className="rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] text-primary">
+            <span className="min-w-0 truncate rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] text-primary">
               {props.tag}
             </span>
           ) : null}
@@ -116,7 +120,10 @@ function Workspace({ props, children }: BaseComponentProps<{ rail?: 'right' | 'l
         railLeft ? 'lg:grid-cols-[360px_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_360px]',
       )}
     >
-      <div className={cn('min-w-0', railLeft && 'lg:order-2')}>{work}</div>
+      <div className={cn('min-w-0', railLeft && 'lg:order-2')}>
+        {work}
+        <RunResult />
+      </div>
       <aside
         className={cn(
           'lg:sticky lg:top-6 lg:self-start lg:pt-12 sm:lg:pt-14',
@@ -126,6 +133,49 @@ function Workspace({ props, children }: BaseComponentProps<{ rail?: 'right' | 'l
         {rail}
       </aside>
     </div>
+  );
+}
+
+/**
+ * What the run says, under the work column: nothing until the call to action
+ * is pressed, then a line while it runs or when it cannot, then the kernel's
+ * viewer over the result field the descriptor states, with the stuff as the
+ * API delivered it. No spec names this - no layout was written for a result
+ * - so the brand's Workspace paints it in the brand's own grammar, in the
+ * container it gives everything else.
+ */
+function RunResult() {
+  const run = useMethodRun();
+  const resolvedUrls = run?.resolvedUrls;
+  const resolveUrl = React.useCallback(
+    (url: string) =>
+      resolvedUrls?.[url] ?? (url.startsWith('pipelex-storage://') ? undefined : url),
+    [resolvedUrls],
+  );
+  if (!run || run.phase.kind === 'idle') return null;
+  const { phase } = run;
+  return (
+    <section
+      className="border-t border-border py-9"
+      data-testid="run-result"
+      data-phase={phase.kind}
+      aria-live="polite"
+    >
+      <h2 className="mb-6 text-xl font-semibold tracking-tight text-foreground">Result</h2>
+      {phase.kind === 'done' ? (
+        <ResultEnvProvider resolveUrl={resolveUrl}>
+          <StuffViewer field={run.result} value={phase.stuff} />
+        </ResultEnvProvider>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {phase.kind === 'running'
+            ? `Running - ${(phase.elapsedMs / 1000).toFixed(0)}s`
+            : phase.kind === 'failed'
+              ? `Not delivered - ${phase.message}`
+              : phase.reason}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -223,12 +273,15 @@ function Footer({ props }: BaseComponentProps<{ text: string; tag?: string | nul
       <div
         className={cn(
           CONTAINER,
-          'flex items-center justify-between py-6 text-[12px] text-muted-foreground',
+          // Wraps, and the tag may break anywhere: a pipe's code is one long
+          // word, and at phone width an unbreakable one widened the document
+          // past the viewport.
+          'flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-6 text-[12px] text-muted-foreground',
         )}
       >
         <span>{props.text}</span>
         {props.tag ? (
-          <span className="font-mono text-[11px] tracking-wider text-muted-foreground/70 uppercase">
+          <span className="min-w-0 font-mono text-[11px] tracking-wider break-all text-muted-foreground/70 uppercase">
             {props.tag}
           </span>
         ) : null}

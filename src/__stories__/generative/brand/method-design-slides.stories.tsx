@@ -1,12 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import '../../_generated/brands/index.css';
 import { BRANDS } from '../../_generated/brands/brands';
-import { CONTRACTS, INPUT_FORM } from '../../_generated/design_slides';
+import bundle from '../../../../data/methods/design_slides/bundle.mthds?raw';
+import { CONTRACTS, INPUT_FORM, OUTPUT_FORM } from '../../_generated/design_slides';
 import { SPECS } from '../../_generated/design_slides.brand.specs';
 import { loadInputHero } from '../hero-page';
 import { methodPlays } from './brand-plays';
 import { BRAND_STORY_PARAMETERS, brandStories } from './brand-stories';
 import { makeMethodPage, methodHero, methodLayouts } from './method-page';
+import { methodRunTarget } from './method-run';
 
 /**
  * The slide designer: one structure of texts and choices in, an HTML report out. The one method of the three whose every input the brand catalog can render itself.
@@ -21,7 +23,8 @@ const BRAND = 'pipelex';
 const hero = methodHero('slide_designer.generate_design_proposals_from_rough_brief');
 const fields = loadInputHero(hero, CONTRACTS, INPUT_FORM);
 const layouts = methodLayouts(hero, SPECS);
-const Page = makeMethodPage({ brand: BRAND, hero, fields, layouts });
+const run = methodRunTarget(hero, CONTRACTS, OUTPUT_FORM, { 'bundle.mthds': bundle });
+const Page = makeMethodPage({ brand: BRAND, hero, fields, layouts, run });
 
 const meta = {
   title: 'Generative/Methods/Slide designer',

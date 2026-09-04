@@ -211,10 +211,18 @@ A brand story is the same arrangement one level up: `brandStories` names the pro
 
 An authored method has its own story file under `Generative/Methods/<title>` (`brand/method-*.stories.tsx`, sharing `method-page.tsx`): the same page, the same brand build, only the method differs. There is no hand-written layout for a method — nobody tuned one — so its stories are the joined ones alone, each a layout the designer method captured under tokens the brand method wrote. A hero of that kind states no summary; its brief opens with the pipe's description off `PIPE_DESCRIPTIONS`.
 
+A method page can also RUN, from a served Storybook given a key:
+
+```
+STORYBOOK_PIPELEX_API_KEY=... STORYBOOK_PIPELEX_BASE_URL=https://api.pipelex.com make storybook
+```
+
+The key never reaches the client: `.storybook/main.ts` reads it, deletes it from the environment before Storybook copies `STORYBOOK_*` variables into `import.meta.env`, and adds a dev-server proxy from `/v1` to the API that injects the `Authorization` header itself, so the page calls its own origin. The one flag the client learns is `STORYBOOK_PIPELEX_RUN`, set for a served Storybook with a key and for nothing else — a static build has no proxy, and `make build-storybook` renders every method page and runs nothing, whatever the environment said; the test run, likewise. Each method story file reads its case's bundle (and any package it vendors under `.mthds/methods/`) as text through Vite's `?raw` import and hands the page a run target; the call to action starts the method through the runtime's SDK from `brand/method-run.ts`, the one file lint lets import it, and the brand `Workspace` paints the result under the work column through the kernel's viewer. Pressing run with no key says so on the receipt, whose run line otherwise carries the run id, the polls and the elapsed time, or the failure as the API stated it. The play never presses run.
+
 The input heroes' stories show, under the page, a receipt a host never would — the `/inputs` tree and the kernel's readiness over it — and their play functions type into whichever control the producer chose, opening the step, tab or section that hides it, and read the value back off the receipt, which is the assertion that a bound input writes through to the tree the run receives. The brand plays share one core (`brand-plays.ts`) that takes the spec and a text target: the trip planner's target is its budget, chosen because it must arrive as a number; a method's is the first `text` or `prose` input its descriptor declares outside a list, found by `firstTextTarget`, and a method that declares none types nothing and has its receipt read as seeded, which is a fact about the method rather than a case the play invents around.
 
 ## Where story code lives, and why it matters
 
 Stories live in `src/__stories__/`, **outside both entry trees**. `tsup.config.ts` globs `src/core/*.ts` and `src/react/index.ts`, and `scripts/assert-bundle.mjs` walks what those entries reach — so a story helper placed inside either tree would enter a shipped chunk and count against the [dependency budget](dependency-budget.md). Keeping story code in its own directory is what keeps the bundle invariants meaningful.
 
-Lint restates the two budget rules that must still hold for story code (`eslint.config.mjs`): the framework bans, and `mthds` staying types-only. The core-barrel rule deliberately does not apply — a story is a consumer, and a consumer imports from the entry point as published.
+Lint restates the two budget rules that must still hold for story code (`eslint.config.mjs`): the framework bans, and `mthds` staying types-only. The core-barrel rule deliberately does not apply — a story is a consumer, and a consumer imports from the entry point as published. The runtime's SDK is admitted in exactly one named file, the generative study's run helper, so that a second import site is a lint error rather than a precedent.

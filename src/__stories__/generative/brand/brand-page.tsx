@@ -2,14 +2,25 @@ import * as React from 'react';
 import { createStateStore, type Spec, type StateModel } from '@json-render/core';
 import type { Readiness, RunField } from '../../../core';
 import { computeReadiness } from '../../../core';
-import { FieldPresentationProvider } from '../../../react';
+import { type FieldEnv, FieldPresentationProvider } from '../../../react';
 import { cn } from '../../../react/utils';
-import { GenerativePage, useStoreSnapshot } from '../registry';
+import { GenerativePage, pathFromDomId, useStoreSnapshot } from '../registry';
 import { fixtureLabel } from '../spec-fixture';
 import { seedInputs } from '../state';
 import type { BrandFixture } from './brand-fixture';
 import { BrandProvider } from './brand-context';
 import { brandRegistry } from './brand-registry';
+import {
+  type MethodRunTarget,
+  RUN_DISABLED_REASON,
+  RUN_ENABLED,
+  type RunPhase,
+  resolveStoredUrl,
+  resolveStuffUrls,
+  runMethod,
+  uploadInputFile,
+} from './method-run';
+import { type MethodRun, RunProvider } from './run-context';
 
 /**
  * A brand page: the app the spec lays out, painted from ONE brand's tokens.
@@ -29,8 +40,19 @@ import { brandRegistry } from './brand-registry';
  *
  * Under the page, the chrome a person would never see, folded away: the
  * `/inputs` tree exactly as the run would receive it with the readiness the
- * kernel computes from it, and the stylesheet the brand was painted from,
- * titled by what produced it.
+ * kernel computes from it, where the run stands, and the stylesheet the brand
+ * was painted from, titled by what produced it.
+ *
+ * Given a run target, the page RUNS. The call to action starts the method on
+ * the `/inputs` tree through the hosted API and follows it to its end; the
+ * phase goes to the receipt and, through `RunProvider`, to the brand's
+ * `Workspace`, which paints the result under the work column. A dropped file
+ * goes up through the kernel's own seam - `FieldEnv.onDropFile` reports the
+ * DOM id, the page turns it back into the store path the id was minted from,
+ * uploads, and writes the stored reference at that path - and a stored
+ * reference in an input previews through the same resolver. All of it waits
+ * on `RUN_ENABLED`: a static build, the test run and a served Storybook with
+ * no key get the page as it always was, and pressing run says why.
  */
 
 export interface BrandPageProps {
@@ -40,12 +62,72 @@ export interface BrandPageProps {
   idPrefix?: string;
   /** Wrap the page in the brand's container - for a layout that brings none. */
   contained?: boolean;
+  /** What the call to action runs; absent on a page that only lays out. */
+  run?: MethodRunTarget;
 }
 
-export function BrandPage({ brand, fields, spec, idPrefix, contained }: BrandPageProps) {
+export function BrandPage({ brand, fields, spec, idPrefix, contained, run }: BrandPageProps) {
+  const prefix = idPrefix ?? brand.brand;
   const store = React.useMemo(() => createStateStore({ inputs: seedInputs(fields) }), [fields]);
   const [lastRun, setLastRun] = React.useState<StateModel | null>(null);
-  return (
+  const [phase, setPhase] = React.useState<RunPhase>({ kind: 'idle' });
+  const [resolvedUrls, setResolvedUrls] = React.useState<Record<string, string>>({});
+  const [uploadingIds, setUploadingIds] = React.useState<ReadonlySet<string>>(() => new Set());
+
+  const onRun = React.useCallback(
+    (snapshot: StateModel) => {
+      setLastRun(snapshot);
+      if (!run) return;
+      if (!RUN_ENABLED) {
+        setPhase({ kind: 'disabled', reason: RUN_DISABLED_REASON });
+        return;
+      }
+      setResolvedUrls({});
+      const inputs = (snapshot.inputs ?? {}) as Record<string, unknown>;
+      void runMethod(run, inputs, fields, (next) => {
+        setPhase(next);
+        if (next.kind === 'done') {
+          void resolveStuffUrls(run.result, next.stuff).then(setResolvedUrls, () => undefined);
+        }
+      });
+    },
+    [run, fields],
+  );
+
+  const running = phase.kind === 'running';
+  const env = React.useMemo<FieldEnv | undefined>(() => {
+    if (!run || !RUN_ENABLED) return undefined;
+    return {
+      disabled: running,
+      uploadingIds,
+      onDropFile: (id, file) => {
+        const path = pathFromDomId(prefix, id);
+        if (!path) return;
+        setUploadingIds((ids) => new Set(ids).add(id));
+        uploadInputFile(file)
+          .then((value) => store.set(path, value))
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            setPhase({ kind: 'failed', message: `the upload failed: ${message}` });
+          })
+          .finally(() =>
+            setUploadingIds((ids) => {
+              const next = new Set(ids);
+              next.delete(id);
+              return next;
+            }),
+          );
+      },
+      resolveUrl: resolveStoredUrl,
+    };
+  }, [run, running, uploadingIds, prefix, store]);
+
+  const methodRun = React.useMemo<MethodRun | null>(
+    () => (run ? { phase, result: run.result, resolvedUrls } : null),
+    [run, phase, resolvedUrls],
+  );
+
+  const page = (
     <div
       className={cn(
         brand.scope,
@@ -61,17 +143,18 @@ export function BrandPage({ brand, fields, spec, idPrefix, contained }: BrandPag
             <GenerativePage
               spec={spec}
               store={store}
-              scope={{ inputs: fields, idPrefix: idPrefix ?? brand.brand }}
-              onRun={setLastRun}
+              scope={{ inputs: fields, idPrefix: prefix, env }}
+              onRun={onRun}
               registry={brandRegistry}
             />
           </div>
         </FieldPresentationProvider>
-        <Receipt store={store} fields={fields} ran={lastRun !== null} />
+        <Receipt store={store} fields={fields} ran={lastRun !== null} phase={phase} />
         <Stylesheet brand={brand} />
       </BrandProvider>
     </div>
   );
+  return methodRun ? <RunProvider run={methodRun}>{page}</RunProvider> : page;
 }
 
 /** The width the brand components give themselves. */
@@ -79,14 +162,34 @@ const CONTAINER = 'mx-auto w-full max-w-6xl px-6 sm:px-8';
 
 const CHROME = cn(CONTAINER, 'pb-8 font-mono text-[11px] text-muted-foreground/70');
 
+/** The receipt's run line: where the run stands, after the call to action was pressed. */
+function runLine(phase: RunPhase): string {
+  switch (phase.kind) {
+    case 'idle':
+      return '';
+    case 'disabled':
+      return ` · ${phase.reason}`;
+    case 'running':
+      return ` · running ${phase.runId} · ${phase.polls} polls · ${(phase.elapsedMs / 1000).toFixed(0)}s`;
+    case 'done':
+      return ` · done ${phase.runId} in ${(phase.elapsedMs / 1000).toFixed(0)}s`;
+    case 'failed':
+      return ` · failed${phase.runId ? ` ${phase.runId}` : ''}: ${phase.message}`;
+    default:
+      return phase satisfies never;
+  }
+}
+
 function Receipt({
   store,
   fields,
   ran,
+  phase,
 }: {
   store: ReturnType<typeof createStateStore>;
   fields: RunField[];
   ran: boolean;
+  phase: RunPhase;
 }) {
   const snapshot = useStoreSnapshot(store);
   const inputs = (snapshot.inputs ?? {}) as Record<string, unknown>;
@@ -100,7 +203,7 @@ function Receipt({
             ? ` · waiting for ${readiness.missing.join(', ')}`
             : ' · ready'}
         </span>
-        {ran ? <span data-testid="run-receipt"> · run pressed</span> : null}
+        {ran ? <span data-testid="run-receipt"> · run pressed{runLine(phase)}</span> : null}
         <span> · the /inputs tree the run receives</span>
       </summary>
       <pre className="mt-3 whitespace-pre-wrap" data-testid="inputs-receipt">

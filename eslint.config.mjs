@@ -12,6 +12,11 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
  * Enforcing it here is what stops the budget from eroding one convenient import
  * at a time. See `docs/dependency-budget.md`.
  */
+const SDK_PATTERN = {
+  group: ['@pipelex/sdk', '@pipelex/sdk/*'],
+  message: 'Outside the dependency budget (docs/dependency-budget.md).',
+};
+
 const BUDGET_PATTERNS = [
   {
     group: ['next', 'next/*', 'next-intl', 'next-intl/*'],
@@ -22,9 +27,10 @@ const BUDGET_PATTERNS = [
     message: 'The kernel is RJSF-free: the gate validates through its own ajv instance.',
   },
   {
-    group: ['zustand', 'zustand/*', '@pipelex/sdk', '@pipelex/sdk/*'],
+    group: ['zustand', 'zustand/*'],
     message: 'Outside the dependency budget (docs/dependency-budget.md).',
   },
+  SDK_PATTERN,
   {
     // The standard's TypeScript client is a TYPES-ONLY peer. `import type` is
     // erased before bundling, so the wire types cost a consumer nothing at run
@@ -151,6 +157,23 @@ export default tseslint.config(
     files: ['src/__stories__/**/*.{ts,tsx}', '.storybook/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: BUDGET_PATTERNS }],
+    },
+  },
+  {
+    /**
+     * The one file that may import the runtime's SDK: the generative study's
+     * run helper, which closes a method page's run through the hosted API
+     * from the served Storybook. It is a story helper - a devDependency,
+     * outside both entry trees, never in a shipped chunk - and it is named
+     * here file by file so that a second import site is a lint error rather
+     * than a precedent. The rest of the budget still applies to it.
+     */
+    files: ['src/__stories__/generative/brand/method-run.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: BUDGET_PATTERNS.filter((pattern) => pattern !== SDK_PATTERN) },
+      ],
     },
   },
 );
