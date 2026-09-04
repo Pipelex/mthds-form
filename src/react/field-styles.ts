@@ -9,7 +9,7 @@ import { cn } from './utils';
 export const fieldControlClass = cn(
   'w-full rounded-md border border-border bg-input text-sm text-foreground',
   'placeholder:text-muted-foreground/70 transition-colors',
-  'focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/40',
+  'focus-visible:outline-hidden focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/40',
   'disabled:cursor-not-allowed disabled:opacity-50',
-  'aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/30',
+  'aria-invalid:border-destructive aria-invalid:ring-destructive/30',
 );

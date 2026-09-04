@@ -159,7 +159,7 @@ function Block({ token }: { token: Token }) {
         // for no gain — the lines are prose, and prose wraps. Real code loses
         // its column alignment and keeps every character, which is the better
         // half of that trade at this width.
-        <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-card/40 p-2.5 text-[12px]">
+        <pre className="whitespace-pre-wrap wrap-break-word rounded-md border border-border bg-card/40 p-2.5 text-[12px]">
           <code>{code.text}</code>
         </pre>
       );

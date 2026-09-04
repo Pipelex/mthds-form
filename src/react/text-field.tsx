@@ -83,7 +83,7 @@ export function ProseField({ field, value, onChange, id, error, disabled }: Pros
         onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
         className={cn(
           fieldControlClass,
-          'min-h-[88px] resize-y px-3 py-2.5 leading-relaxed [field-sizing:content]',
+          'min-h-[88px] resize-y px-3 py-2.5 leading-relaxed field-sizing-content',
         )}
       />
     </FieldShell>

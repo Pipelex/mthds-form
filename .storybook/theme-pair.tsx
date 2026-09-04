@@ -5,17 +5,19 @@ import type { Decorator } from '@storybook/react-vite';
  * Every story renders in BOTH themes, side by side.
  *
  * The controls are themed entirely through CSS custom properties, and dark mode
- * is the `.dark` class convention (`src/styles/theme.css`, Tailwind
- * `darkMode: 'class'`). A toolbar toggle would technically cover both, but it
- * hides half the answer behind a click - and the point of this Storybook is to
- * see the possibilities at a glance. So the default view is two panes; the
- * toolbar is there for anyone who wants one of them full width.
+ * is the `.dark` class convention (`src/styles/theme.css`, and the
+ * `@custom-variant dark` in `src/styles/tailwind-entry.css`). A toolbar toggle
+ * would technically cover both, but it hides half the answer behind a click -
+ * and the point of this Storybook is to see the possibilities at a glance. So
+ * the default view is two panes; the toolbar is there for anyone who wants one
+ * of them full width.
  *
  * This decorator's own chrome uses INLINE STYLES over the theme tokens, never
- * Tailwind utilities. `tailwind.config.cjs` scans `src/react/**` only, and it
- * is documented as serving exactly two purposes - building the prebuilt sheet
- * and stating the token contract. Widening its content globs to cover story
- * chrome would put utilities in a consumer's stylesheet that no control uses.
+ * Tailwind utilities. The package's entry scans `src/react` only, and the
+ * Storybook's own entry (`.storybook/tailwind.css`) is the one that reaches
+ * `src/__stories__` - so a utility used here would compile, but it would be
+ * scanned by a file that ships nowhere, and the chrome stays framework-free so
+ * it cannot be mistaken for a control.
  */
 
 export type ThemeView = 'pair' | 'light' | 'dark';
@@ -35,7 +37,7 @@ const CAPTION: React.CSSProperties = {
   font: '600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: 'hsl(var(--muted-foreground))',
+  color: 'var(--muted-foreground)',
   padding: '10px 16px 0',
 };
 
@@ -44,8 +46,8 @@ const PANE: React.CSSProperties = {
   minWidth: 0,
   display: 'flex',
   flexDirection: 'column',
-  background: 'hsl(var(--background))',
-  color: 'hsl(var(--foreground))',
+  background: 'var(--background)',
+  color: 'var(--foreground)',
 };
 
 const BODY: React.CSSProperties = { padding: 16, flex: '1 1 auto' };
@@ -86,7 +88,7 @@ export const ThemePair: Decorator = (Story, context) => {
       <Pane theme="light" captioned>
         {story}
       </Pane>
-      <div style={{ width: 1, background: 'hsl(var(--border))', flex: '0 0 auto' }} />
+      <div style={{ width: 1, background: 'var(--border)', flex: '0 0 auto' }} />
       <Pane theme="dark" captioned>
         {story}
       </Pane>

@@ -123,7 +123,7 @@ function Described({ description, children }: { description?: string; children: 
         <TooltipTrigger asChild>
           <span
             tabIndex={0}
-            className="-mx-1 cursor-help rounded px-1 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="-mx-1 cursor-help rounded px-1 outline-hidden transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
             {children}
           </span>
@@ -230,7 +230,7 @@ function RawValue({ value, compact }: { value: object; compact: boolean }) {
       {text}
     </span>
   ) : (
-    <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border bg-card/40 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-foreground">
+    <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border bg-card/40 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-foreground">
       {text}
     </pre>
   );
@@ -365,7 +365,7 @@ function CopyButton({
       }}
       {...(title ? { title } : {})}
       aria-label={label}
-      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
     >
       {copied ? (
         <Check aria-hidden className="size-3.5" />
@@ -526,7 +526,7 @@ function DocumentPreview({ url, name }: { url: string; name: string }) {
       title={name}
       loading="lazy"
       referrerPolicy="no-referrer"
-      className="h-[28rem] w-full rounded-lg border border-border bg-card/40"
+      className="h-112 w-full rounded-lg border border-border bg-card/40"
     />
   );
 }
@@ -565,7 +565,7 @@ function DocumentValue({ value }: { value: unknown }) {
             type="button"
             onClick={() => setOpen((current) => !current)}
             aria-expanded={open}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
           >
             {open ? (
               <EyeOff aria-hidden className="size-3.5" />
@@ -636,7 +636,7 @@ function ImageValue({
               // `object-contain` keeps the aspect ratio when the cap bites.
               !inGallery &&
                 !compact &&
-                'max-h-[44rem] w-full rounded-lg border border-border object-contain',
+                'max-h-176 w-full rounded-lg border border-border object-contain',
             )}
           />
         </a>
@@ -1082,13 +1082,13 @@ function ObjectTable({
               <Fragment key={index}>
                 <tr className="border-b border-border/60 last:border-b-0">
                   {canExpand && (
-                    <td className="px-1 align-top">
+                    <td className="px-1 pt-px align-top">
                       <button
                         type="button"
                         onClick={() => toggle(index)}
                         aria-expanded={isOpen}
                         aria-label={s.toggleRowDetails(index + 1)}
-                        className="mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                        className="mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
                       >
                         {isOpen ? (
                           <ChevronDown aria-hidden className="size-3.5" />
@@ -1512,7 +1512,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
                       into a chip row through `justify-end`, so a list of tags
                       ends where the numbers above it do rather than starting
                       under the label. */}
-                  <div className="min-w-0 text-right [&_[data-chips]]:justify-end">
+                  <div className="min-w-0 text-right **:data-chips:justify-end">
                     <LeafValue field={child} value={memberValue(child)} />
                   </div>
                 </Fragment>
