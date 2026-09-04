@@ -1,8 +1,12 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { catalogPrompt } from '../catalog';
+import { PRODUCT_COMPONENTS, catalog, catalogPrompt } from '../catalog';
+import { CUSTOM_COMPONENTS, PICKED_SHADCN } from '../components';
+import { APP_DIRECTION, SEED_PROCEDURE } from '../direction';
+import { PRODUCT_PAGE_RULES, PRODUCT_RULES, RUN_CTA_RULE } from '../product-rules';
 import { PROMPT_HASH } from '../prompt-hash';
+import { CUSTOM_RULES, RUN_BUTTON_RULE } from '../rules';
 
 /**
  * The pair at the centre of the layer: the PROMPT a model is handed, and the
@@ -25,8 +29,67 @@ function promptHashOf(prompt: string): string {
 }
 
 describe('the catalog prompt', () => {
+  const prompt = catalogPrompt();
+  const components = catalog.data.components as Record<
+    string,
+    { description: string; props: { shape: object } }
+  >;
+
   it('hashes to the pin every stored layout is compared against', () => {
-    expect(promptHashOf(catalogPrompt())).toBe(PROMPT_HASH);
+    expect(promptHashOf(prompt)).toBe(PROMPT_HASH);
+  });
+
+  it('lists every component of the catalog, and describes the ones we wrote', () => {
+    for (const name of PICKED_SHADCN) expect(prompt).toContain(`- ${name}:`);
+    for (const name of [...CUSTOM_COMPONENTS, ...PRODUCT_COMPONENTS]) {
+      expect(prompt).toContain(`- ${name}:`);
+      expect(prompt).toContain(components[name]!.description);
+    }
+  });
+
+  it('strips className from every picked definition', () => {
+    for (const name of PICKED_SHADCN) {
+      expect(Object.keys(components[name]!.props.shape), name).not.toContain('className');
+    }
+  });
+
+  it('carries our rules, in the order they are written', () => {
+    let cursor = -1;
+    for (const rule of PRODUCT_RULES) {
+      const at = prompt.indexOf(rule);
+      expect(at, rule).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+    for (const rule of PRODUCT_PAGE_RULES) expect(PRODUCT_RULES).toContain(rule);
+  });
+
+  /**
+   * The product page runs from a `Cta`, not from a bare `Button`, so the rule
+   * that names the run is restated - and restated IN PLACE, at the index the
+   * button rule holds in the vocabulary underneath, because a rule that moves
+   * changes what the model reads before it.
+   */
+  it('restates the run rule for the Cta, in the place the Button rule holds', () => {
+    expect(prompt).not.toContain(RUN_BUTTON_RULE);
+    expect(PRODUCT_RULES.indexOf(RUN_CTA_RULE)).toBe(CUSTOM_RULES.indexOf(RUN_BUTTON_RULE));
+  });
+
+  it('carries the design direction and the seed procedure, so the hash covers both', () => {
+    expect(prompt).toContain('DESIGN DIRECTION:');
+    for (const paragraph of APP_DIRECTION) expect(prompt).toContain(paragraph);
+    expect(prompt).toContain('CREATIVE SEED:');
+    for (const paragraph of SEED_PROCEDURE) expect(prompt).toContain(paragraph);
+    expect(prompt).toContain('never as a form');
+  });
+
+  /**
+   * The prompt asks for a LAYOUT, never for content: a model that invents
+   * sample data writes a page that looks right and shows figures the run never
+   * produced.
+   */
+  it('never asks for sample data', () => {
+    expect(prompt.toLowerCase()).not.toContain('sample data');
+    expect(prompt).not.toContain('INITIAL STATE');
   });
 });
 
