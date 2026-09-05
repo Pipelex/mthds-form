@@ -4,16 +4,19 @@ The input form for MTHDS methods, as a library: a headless kernel that maps the 
 
 It exists because "the form" is one problem that keeps being solved separately. A method declares its inputs; something has to decide what widget each input deserves, whether the Run button may light up, what shape the values take on the wire, and what a validation failure says to a person. That logic belongs in one place with tests around it, not copied into each surface that happens to need a form.
 
-## Two entry points
+## Three entry points
 
 ```ts
 import { buildRunFields, computeReadiness } from '@pipelex/mthds-form'; // headless
 import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
+import { GenerativePage } from '@pipelex/mthds-form/generative'; // a produced layout
 ```
 
 `.` is the kernel: no React, no design system, no framework. Its only runtime dependency is `ajv`, which the gate validates through. It runs in a browser, in Node, in a worker.
 
 `./react` is the control set — one control per field kind behind a single dispatch point, styled with Tailwind classes over standard shadcn/ui tokens. `react` and `react-dom` are optional peer dependencies, so a consumer that only wants the kernel never installs them.
+
+`./generative` renders a **layout** — a data file a model wrote once for a method, naming paths in the same descriptor and restating nothing about what a field is. It is the only entry that carries json-render and zod, so a host that renders an ordinary form pays for neither. When there is no layout, or the one on file no longer fits the method, the page falls back to the kernel's own form. See [docs/generative-ui.md](docs/generative-ui.md).
 
 `mthds` is a peer dependency too, and a required one, but it is **types only**: the wire types of `pipe_io_contracts` belong to the MTHDS standard, so this package re-exports the standard's declarations instead of restating them. Every import of it is an `import type` and is erased at build, so it costs an install entry and no shipped bytes. See [docs/dependency-budget.md](docs/dependency-budget.md).
 
@@ -73,7 +76,7 @@ The controls carry Tailwind classes over the standard shadcn/ui semantic tokens 
 make install
 make check   # lint + format + typecheck
 make test
-make build   # both entry points, plus the prebuilt stylesheet
+make build   # every entry point, plus the prebuilt stylesheet
 ```
 
 MIT licensed.

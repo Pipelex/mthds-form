@@ -14,6 +14,13 @@ import { dirname, resolve, relative } from 'node:path';
 const DIST = resolve('dist');
 
 /**
+ * The entries that RENDER, as opposed to the headless core. Two things follow
+ * from being one: the entry carries a `'use client'` prologue, and the
+ * prebuilt stylesheet's scan reaches the tree it was built from.
+ */
+const RENDERING_ENTRIES = ['react', 'generative'];
+
+/**
  * Import and re-export specifiers of a bundled module.
  *
  * Anchored to a statement boundary (line start or a preceding `;`) so a
@@ -75,13 +82,24 @@ const BANNED = [
     match: /^react($|\/)|^react-dom($|\/)/,
     why: 'The `.` entry is headless and must stay importable from a server component.',
   },
-  {
-    entry: `${DIST}/react/index.js`,
+  ...['react', 'generative'].map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
     match: /^ajv($|-|\/)/,
-    why: 'The `./react` entry must not drag the run gate\'s validator into a client bundle.',
-  },
-  // The standard's TypeScript client is a TYPES-ONLY peer, banned from BOTH
-  // entries. The wire types it declares are erased at build, so a `mthds`
+    why: `The \`./${entry}\` entry must not drag the run gate's validator into a client bundle.`,
+  })),
+  // json-render and zod are the generative layer's own, and a host that only
+  // renders a form must not pay for them. Neither entry below imports either in
+  // source; what this catches is the shared chunk - `./generative` reaches the
+  // control set for its escape hatches, so the three entries genuinely share
+  // chunks, and a chunk that carried a layout compiler back the other way would
+  // be invisible to lint.
+  ...['core', 'react'].map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
+    match: /^@json-render($|\/)|^zod($|\/)/,
+    why: `The \`${entry === 'core' ? '.' : './react'}\` entry must not carry the generative layer's dependencies. See docs/dependency-budget.md.`,
+  })),
+  // The standard's TypeScript client is a TYPES-ONLY peer, banned from EVERY
+  // entry. The wire types it declares are erased at build, so a `mthds`
   // specifier surviving into either graph means a value import slipped in -
   // `FIELD_KINDS` is the one runtime value `mthds/protocol` exports, and it is
   // the one that would do it. The cost is not the specifier: it is the
@@ -89,7 +107,7 @@ const BANNED = [
   // consumer's bundle for types that were supposed to disappear. Lint holds the
   // same line on source imports; this holds it on the built graph, which is
   // where a shared chunk would deliver it silently.
-  ...['core', 'react'].map((entry) => ({
+  ...['core', 'react', 'generative'].map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^mthds($|\/)/,
     why: 'The standard client is a types-only peer - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
@@ -221,12 +239,69 @@ if (inlineCode.length === 0) {
 }
 
 // esbuild drops directive prologues when it bundles, so `tsup.config.ts`
-// re-asserts this one on the React entry. Verify it rather than assume it.
-const reactEntry = readFileSync(`${DIST}/react/index.js`, 'utf8');
-if (/^\s*["']use client["'];?/.test(reactEntry)) {
-  console.log("ok  react/index.js keeps its 'use client' directive");
+// re-asserts them on the two entries that render. Verify rather than assume.
+for (const entry of RENDERING_ENTRIES) {
+  const code = readFileSync(`${DIST}/${entry}/index.js`, 'utf8');
+  if (/^\s*["']use client["'];?/.test(code)) {
+    console.log(`ok  ${entry}/index.js keeps its 'use client' directive`);
+  } else {
+    failures.push(
+      `${entry}/index.js lost its 'use client' directive - see tsup.config.ts onSuccess.`,
+    );
+  }
+}
+
+// The core entry is the one that must NOT carry the directive: a directive
+// prologue makes a module a client boundary, and the headless entry has to
+// stay importable from a server component.
+if (/^\s*["']use client["'];?/.test(coreBarrel)) {
+  failures.push(
+    "core/index.js carries a 'use client' directive - the headless entry must stay importable from a server component.",
+  );
 } else {
-  failures.push("react/index.js lost its 'use client' directive - see tsup.config.ts onSuccess.");
+  console.log("ok  core/index.js carries no 'use client' directive");
+}
+
+// The designer method ships as data beside the entries, reachable through the
+// `./ui-designer.mthds` export. A missing file is a broken export a consumer
+// only discovers at run time.
+if (existsSync(`${DIST}/ui-designer.mthds`)) {
+  console.log('ok  ui-designer.mthds ships beside the entries');
+} else {
+  failures.push(
+    'dist/ui-designer.mthds is missing - the `./ui-designer.mthds` export resolves to nothing. See tsup.config.ts onSuccess.',
+  );
+}
+
+/**
+ * The prebuilt stylesheet has to scan every rendering entry's tree.
+ *
+ * This is the one invariant here that reads SOURCE rather than `dist/`, and it
+ * is here rather than in lint because it is a fact about the relationship
+ * between two files that no linter pairs up: the entries `tsup` builds and the
+ * trees Tailwind scans. It earns its place by how quietly the failure arrives.
+ * An unscanned tree does not throw, does not warn, and does not render blank -
+ * its components keep every utility that some OTHER scanned tree also uses, so
+ * the page comes out recognisable and merely wrong: no type scale, no page
+ * width, no responsive columns. Storybook shows it, the story tests pass, and
+ * the only reader who can tell is a person who remembers what it used to look
+ * like.
+ *
+ * Checking the emitted CSS instead would mean deciding which utilities MUST be
+ * present, which is a moving target and a brittle test. The `@source` lines are
+ * the actual contract, and they are exact.
+ */
+const tailwindEntry = readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8');
+const scanned = [...tailwindEntry.matchAll(/@source\s+['"]\.\.\/([^'"]+)['"]/g)].map(
+  (match) => match[1],
+);
+const unscanned = RENDERING_ENTRIES.filter((entry) => !scanned.includes(entry));
+if (unscanned.length === 0) {
+  console.log('ok  styles.css scans every rendering entry');
+} else {
+  failures.push(
+    `src/styles/tailwind-entry.css does not scan ${unscanned.map((entry) => `src/${entry}`).join(', ')}, so dist/styles.css carries none of the utilities used only there. Add \`@source '../${unscanned[0]}';\` beside the others.`,
+  );
 }
 
 if (failures.length > 0) {

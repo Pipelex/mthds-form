@@ -10,13 +10,14 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 ## The sections
 
-Three, mirroring what the package is:
+Four, mirroring what the package is:
 
-| Section       | What is in it                                                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Inputs**    | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
-| **Outputs**   | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
-| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
+| Section        | What is in it                                                                                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**     | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
+| **Outputs**    | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
+| **Generative** | Every captured layout, rendered through `./generative` over the descriptor it was written for — and the pinned one again under each brand's tokens.                                                        |
+| **Toolchain**  | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
 
 Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
 
@@ -66,6 +67,18 @@ Sourced differently, and all three generated:
 
 The story assertions read their expected values **out of the payload they render** rather than naming them. A live model does not answer the same way twice — the sentiment case came back `neutral` on one sweep and `positive` on the next, both defensible — so a hard-coded string asserts the model's mood instead of the renderer, and fails on the next sweep for a reason nobody should have to investigate.
 
+## Generative
+
+The `Generative` section renders **captured layouts**: what a model actually laid out for one of these methods, compiled from its own JSONL and rendered through `./generative` over the same descriptor the plain form is built from. Nothing here calls a model — a layout is a data file, and these stories render one. See [generative-ui.md](generative-ui.md).
+
+Each story is titled by **what produced the page**, never by a role: the producer, the model, and — where the tokens are somebody's brand rather than the stock palette — what produced those too. "Pipelex method · claude-4.8-opus", not "generated"; the point of the section is comparison, and a label that says which side of a comparison you are meant to prefer has already answered the question.
+
+The trip planner is the case with three layouts, because it is the widest input surface in the corpus and therefore has the most room to differ: the three pages differ in section order, in what goes in the rail and in how much copy they write, and all three bind exactly the same paths. That is the section's real claim — the paths belong to the descriptor and not to the layout, so a page can be as different as a model likes without any of them moving.
+
+Before rendering, the harness runs the two checks a host runs (`validateAgainstCatalog`, `layoutFits`) and throws on either. A story showing a layout a host would refuse would be showing a page nobody sees. And under every page, folded away, is the `/inputs` tree with the readiness the kernel computes from it — because what the story is really asserting is that what a person types through somebody else's layout arrives where the gate reads it.
+
+**Brands.** The same layout, painted from tokens that are not this package's, is what says whether the page reads on its own. Two of them live in `src/__stories__/generative/brands/` as story fixtures — carried over verbatim from the study branch, reproducible by no pass here, and shipped in nothing. See [theming.md](theming.md) § "Someone else's tokens".
+
 ## What a file slot accepts
 
 Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree.
@@ -102,7 +115,9 @@ Two consequences worth knowing before writing a story:
 
 This is deliberately **not** what a consumer's Storybook does. A consumer with no Tailwind build loads the prebuilt `dist/styles.css`; this repo has a Tailwind build, and pointing its own Storybook at the prebuilt artifact would defeat the purpose — a control styled with a utility that is not in the last built `styles.css` would render unstyled in the very Storybook meant to catch that.
 
-`.storybook/tailwind.css` is a superset entry: it imports the package's own `src/styles/tailwind-entry.css` and adds an `@source` directive for the story tree. The package's entry scans `src/react` only, through `source(none)` and one `@source`, so the shipped sheet carries nothing a control does not use; widening the scan to story code happens in this file, which ships nowhere. Story chrome still uses inline styles over the theme tokens rather than utilities, so that it cannot be mistaken for a control.
+`.storybook/tailwind.css` is a superset entry: it imports the package's own `src/styles/tailwind-entry.css` and adds an `@source` directive for the story tree. The package's entry uses `source(none)` and then names one tree per rendering entry — `src/react` and `src/generative` — so the shipped sheet carries nothing a shipped component does not use; widening the scan to story code happens in this file, which ships nowhere.
+
+The division matters in one direction in particular. Widening the scan **here** for something a rendering entry needs makes it render in Storybook and nowhere else, which is the failure this arrangement is most likely to produce and the least likely to reveal: an unscanned entry tree keeps every utility that another scanned tree also uses, so its pages come out recognisable and merely wrong — no type scale, no page width, no responsive columns — while every story still renders and every story test still passes. `scripts/assert-bundle.mjs` refuses a build whose rendering entries and `@source` lines disagree, which is the check that turns a silent regression into a failed gate. Story chrome still uses inline styles over the theme tokens rather than utilities, so that it cannot be mistaken for a control.
 
 ## Fixtures are generated, never written
 
@@ -154,14 +169,18 @@ A pipe may also carry `output` (the concept its carrier resolves to, `Text` by d
 
 `presence` is `plain` | `optional` | `force`; `multiplicity` is `single` | `variable` | `fixed`. The generator rejects the pairings the standard forbids **at authoring time**, because the alternative is a parser error against a file the author never wrote: a marker may not ride a plural slot (`PipeInputContract` says a plural slot is always `plain`), and a fixed count is always at least two, since `Concept[1]` is a way of writing `Concept`.
 
-### Two passes, and only one of them costs anything
+### The passes, and which of them cost anything
 
 ```
 make fixtures        the DESCRIPTORS - what each pipe DECLARES   (offline, free)
 make fixtures-runs   the PAYLOADS    - what running it produced  (real runs, billed)
+make briefs          the BRIEFS      - what a producer is handed  (offline, free)
+make fixtures-specs  the SPECS       - what the designer laid out (real runs, billed)
+--capture            a spec another producer wrote, validated the same way
+--reemit             every committed specs module, written again from itself
 ```
 
-They are separate targets and neither implies the other, because asking for descriptors must never silently spend inference budget and asking for payloads must never silently re-derive anything else.
+They are separate targets and none implies another, because asking for a free artifact must never silently spend inference budget and asking for a billed one must never silently re-derive anything else.
 
 The descriptor pass needs the sibling `../pipelex` checkout's venv **interpreter**, addressed through `PIPELEX_PYTHON` — `dump-validate-views.py` imports pipelex as a **library**, because no CLI surfaces these views yet. A near-identical copy of that script lives in the graph-rendering sibling package; both retire when the agent CLI can emit the views itself.
 
@@ -169,7 +188,11 @@ The payload pass needs the **CLI**, addressed through `PIPELEX_BIN`, plus workin
 
 A pipe is run only if its slot spec gives it a `run` block naming its input values (or, for a slotless operator like `PipeImgGen`, its own `prompt`). The one edit the generator makes to what came back is dropping a machine-local `file://` `public_url`: a run writes generated files under the working directory and reports the absolute path back, which names somebody's home directory, in an open-source repo, and resolves on no other machine. What remains is the durable `pipelex-storage://` reference — which is exactly what a host with no storage resolver sees.
 
-Both passes are dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node.
+The last four are about the [generative layer](../src/generative/) rather than the descriptors. `make briefs` renders each hero's brief from what the first two passes committed and writes it under `wip/generative-ui/briefs/` beside the full catalog prompt and its hash — that file is the record of exactly what a producer was handed, and it is what a spec fixture's `brief` field points at. `make fixtures-specs` hands the brief and the prompt to `data/generative/ui-designer.mthds` through the real CLI and validates what came back against the catalog, refusing anything that does not compile rather than repairing it; `--capture` takes in a spec some other producer wrote under the same discipline. Both stamp the fixture with the prompt hash, and the pass refuses to run at all if the prompt no longer hashes to the pin the entry ships — a fixture stamped with a hash no host recognises is one no host will render.
+
+`--reemit` rewrites every committed specs module from its own fixtures. A specs module is a projection of its fixture list, so the parts around that list — the header, the derived `brief` path, the ordering — move when the generator does; without it, refreshing them would mean paying inference to reproduce text no model wrote.
+
+Every pass is dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node. The three that read this repo's TypeScript straight from `src/` run under tsx, because node cannot resolve extensionless imports on its own.
 
 ### The guard
 

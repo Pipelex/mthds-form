@@ -18,14 +18,25 @@
  */
 
 /*
- * `source(none)` turns off automatic source detection, and the one `@source`
- * that follows scans the controls and nothing else. The shipped stylesheet
- * therefore carries only the utilities a control uses. Story chrome and the
- * Storybook's own scan live in `.storybook/tailwind.css`, which imports this
- * file and widens the scan there, never here.
+ * `source(none)` turns off automatic source detection, and the `@source` lines
+ * that follow name the trees the shipped stylesheet is FOR: one per rendering
+ * entry, and nothing else. The sheet therefore carries the utilities the
+ * controls and the produced-layout components use, and no others. Story chrome
+ * and the Storybook's own scan live in `.storybook/tailwind.css`, which imports
+ * this file and widens the scan there, never here.
+ *
+ * A rendering entry that is not listed here fails SILENTLY and almost
+ * invisibly: its components still render, still carry their class attributes,
+ * and still pick up every utility that some other tree happens to use too - so
+ * what is left is a page with the common utilities and none of the distinctive
+ * ones. No test notices, because nothing here asserts a computed style. That is
+ * exactly what happened when `./generative` was added as an entry and this file
+ * still scanned `../react` alone; `scripts/assert-bundle.mjs` now refuses a
+ * build whose rendering entries and `@source` lines disagree.
  */
 @import 'tailwindcss' source(none);
 @source '../react';
+@source '../generative';
 
 /* The select popover's and tooltip's enter and exit transitions. */
 @import 'tw-animate-css';

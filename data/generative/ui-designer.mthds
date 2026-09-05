@@ -1,0 +1,52 @@
+domain      = "generative"
+description = "Lays out one page for a method - its inputs, or its result - as a json-render spec over a fixed catalog, bound to the state the host provides."
+
+# The designer method. It is coupled to NO catalog: the catalog's rules and the
+# page's brief both arrive as inputs, so the same method can serve a different
+# vocabulary, and could later be registered on a hosted platform and called from
+# a Deploy or an MCP tool without being rewritten.
+#
+# Its output is Text carrying JSONL patches - the format the catalog rules ask
+# for - rather than a typed structure: a spec is a map of heterogeneous elements
+# whose props are typed per component, which a structure cannot state and which
+# the renderer already validates per component. The harness that runs this pipe
+# (scripts/generate-fixtures.mjs --specs) compiles and validates the text, and
+# fails loudly on any issue, so a repair is a change HERE, never to the fixture.
+#
+# The model is pinned. The specs pass takes MODEL=<id> to override the pin for a
+# comparative run (and TEMPERATURE=<n> for a model that fixes its own), and
+# records which model produced each fixture.
+#
+# The optional `seed` is the creative seed of the catalog rules' last section:
+# a random string the harness generates, handed over as one line the prompt
+# labels, so two runs of the same brief diverge. Absent, the model designs from
+# the brief alone, and the guarded reference below prints nothing.
+
+[pipe.ui_designer]
+type = "PipeLLM"
+description = "Design one page from the catalog rules and the brief: emit the JSONL patches of a spec bound to the host's state."
+inputs = { catalog_rules = "Text", brief = "Text", seed = "Text?" }
+output = "Text"
+# The object form, because the default output cap (4096 tokens on this model)
+# is not enough for a page over a deeply nested result: the Company hero's
+# first run spent exactly 4096 tokens and came back empty. The object form
+# requires a temperature; this is the runtime's own default, so the setting
+# the earlier captures ran under is unchanged.
+model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 16384 }
+prompt = """
+@catalog_rules
+
+---
+
+Below is the brief for the page you are designing. It is the ONLY source of paths: every value you show or bind must be at a path the brief lists, spelled exactly as written.
+
+@brief
+
+---
+
+@?seed
+
+---
+
+Design this page. Lay out what you understand and delegate what you do not, by naming the path. Bind every value; inline nothing the state carries. Output only the JSONL patch lines - no prose before or after, no code fence.
+"""

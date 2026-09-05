@@ -2,11 +2,13 @@
  * The Storybook's Tailwind entry: the package's SOURCE entry, plus a wider
  * scan.
  *
- * `src/styles/tailwind-entry.css` scans `src/react` only, so the shipped sheet
- * carries nothing a control does not use. The stories are outside that tree
- * on purpose (see `main.ts`), and story-only utilities must not leak into a
- * consumer's stylesheet - so the widening happens here, in a file nothing
- * ships, rather than in the source entry.
+ * `src/styles/tailwind-entry.css` scans the two rendering entry trees and
+ * nothing else, so the shipped sheet carries nothing a shipped component does
+ * not use. The stories are outside both trees on purpose (see `main.ts`), and
+ * story-only utilities must not leak into a consumer's stylesheet - so the
+ * widening happens here, in a file nothing ships, rather than in the source
+ * entry. Widening it for a rendering entry belongs THERE, not here: a utility
+ * that only this file's scan reaches renders in Storybook and nowhere else.
  */
 @import '../src/styles/tailwind-entry.css';
 @source '../src/__stories__';

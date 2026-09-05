@@ -15,14 +15,14 @@ const preview: Preview = {
   parameters: {
     layout: 'fullscreen',
     /**
-     * Three sections, in reading order, mirroring what the package actually is:
-     * the inputs a method declares, the results it resolves to, and the
-     * scaffolding underneath. Alphabetical order would open the sidebar on
-     * whatever happened to sort first.
+     * Four sections, in reading order, mirroring what the package actually is:
+     * the inputs a method declares, the results it resolves to, the produced
+     * layouts over both, and the scaffolding underneath. Alphabetical order
+     * would open the sidebar on whatever happened to sort first.
      */
     options: {
       storySort: {
-        order: ['Inputs', 'Outputs', 'Toolchain'],
+        order: ['Inputs', 'Outputs', 'Generative', 'Toolchain'],
       },
     },
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },

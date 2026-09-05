@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { hasOwnProp } from '../core/own-property';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -23,5 +24,5 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
   const aKeys = Object.keys(aObj);
   const bKeys = Object.keys(bObj);
   if (aKeys.length !== bKeys.length) return false;
-  return aKeys.every((k) => Object.hasOwn(bObj, k) && isDeepEqual(aObj[k], bObj[k]));
+  return aKeys.every((k) => hasOwnProp(bObj, k) && isDeepEqual(aObj[k], bObj[k]));
 }

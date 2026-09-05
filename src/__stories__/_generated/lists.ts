@@ -1298,3 +1298,24 @@ export const OUTPUT_FORM: OutputForm = {
     },
   },
 };
+
+/**
+ * What the author wrote about each pipe - its `description` - and about the
+ * bundle. No validate artifact carries either, and an authored method's brief
+ * opens with the pipe's: it is what a host would have. On a structures case
+ * every entry is the synthesized carrier's line, and the hero states its own.
+ */
+export const PIPE_DESCRIPTIONS: Record<string, string> = {
+  'lists.chapters': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.dates': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.findings': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.gallery': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.numbers': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.readings': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.sources': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.steps': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'lists.texts': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+};
+
+export const DOMAIN_DESCRIPTION: string | null =
+  'Concepts that exist to be produced as LISTS — every element shape a result list can hold, so the layout rules are exercised rather than argued about.';
