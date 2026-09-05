@@ -158,6 +158,35 @@ The entry is unreleased, so the `## [Unreleased]` section already describes what
 
 Nothing. Every finding was either confirmed as written or corrected in its remedy (item 12's fix moves upstream of the renderer; item 8's is a doc edit rather than a manifest change; item 13's type-error claim is narrowed). The reviewer's finding on the review itself — that `mthds`-style install-weight reasoning should apply to the four new dependencies — is answered by the existing chunk-graph section, and the doc edit in item 8 is what makes that answer findable.
 
+## Round 2 — the review that replaced the bots
+
+The bots do not review this repo (Pause 2, below), so the second round was a Codex review run locally against `dev` through the `codex` plugin's reviewer, on 2026-09-05 with the branch at `946065c`. It reported nine findings; every one was confirmed by reading the code and json-render 0.20.0's `dist` before anything was accepted, and the reviewer's own caveat — it could not run vitest in its sandbox — mattered to none of them, since each is visible in the source.
+
+The second-round bar admits only what is severe. Three findings were: the prototype guard the first round wrote has a bypass, the core Run flow submits the state it mounted with, and the write ban the first round added has three holes. Two more were taken with them because the shipped docs already promise what the code did not do — `docs/generative-ui.md` and the changelog both say the staleness half of `layoutFits` "reads every form the prompt teaches", and the prompt teaches `$item` and `$bindItem`; and an event-name check is the same dead-button class as the action-name check the first round added, with a hole beside it. The other four defer, with a trace.
+
+### Accepted, and landed in commit 5
+
+| # | Finding | Where | What was true |
+|---|---|---|---|
+| R1 | `copy`/`move` `from` bypasses the prototype guard | `src/generative/stream.ts` | `reachesPrototype` read `path` only; json-render's applier reads `from` with the same walk and parks a REFERENCE to `Object.prototype` at the target, so the next ordinary `add` landed on every object. Both pointers checked; a `copy`/`move` test each. |
+| R2 | Run handler frozen at mount | `src/generative/page.tsx` | `ActionProvider` is `useState(initialHandlers)`; the only `setHandlers` is `registerHandler`. The `useMemo` rebuilt a handler for nobody. One stable handler reading the latest `onRun`/`store` through a ref; a jsdom test that is red on the old file. |
+| R3 | Writes into `/inputs` past the ban | `src/generative/validate.ts` § 7 | `validateForm` writes its verdict at `statePath`; `pushState` clears `clearStatePath`; `parseJsonPointer` treats `inputs/city` as `/inputs/city`. A table of every destination per action, normalized before the prefix check, a computed destination refused; five tests. |
+| R8 | `on.click` accepted on a `Cta` that emits `press` | `src/generative/validate.ts` § 7 | No event was ever checked against the definition's `events`. Checked now for every catalog; a component declaring none refuses every binding. Every event a renderer emits is declared, and the corpus binds only `press`, so no captured layout moved. |
+| R5 | `$item`/`$bindItem` escape staleness | `src/generative/layout-fits.ts` | The walks collected `$state`, `$template`, `$bindState` only. `mentionedPaths` resolves both item forms through `repeatBasePathOf`, at the first index, into `read` and `bound`; one outside any repeat is refused as adrift. Six tests. |
+
+### Deferred to L-260905-0420af
+
+| # | Finding | Why deferred |
+|---|---|---|
+| R4 | A scalar result's brief names `/result`; the state holds the `contentKey` wrapper (`brief.ts:320`, `state.ts:45-47` claims otherwise) | A design choice — unwrap in `payloadToState`, or have the brief and `resultFieldAtPath` agree on `/result/<contentKey>` — on a path only object results exercise in the corpus. Real, and the `state.ts` comment is wrong either way. |
+| R6 | A repeat counts as coverage for an unseeded fixed-count list (`layout-fits.ts` `isOffered`) | Narrow: the brief delegates every input list, and only a `[N]` list gates. |
+| R7 | A required all-optional structure passes coverage with no control (`layout-fits.ts` `uncoveredUnder`) | Narrow: the kernel's own documented "vacuously satisfied" trap, reintroduced; needs a model that omits every member. |
+| R9 | A `.` in a DOM-id segment breaks `pathFromDomId` (`registry.tsx:206`) | Hypothetical for MTHDS names; the same argument that escaped `-` applies, so it is the cheapest of the four. |
+
+### Declined
+
+Nothing. Every finding was confirmed as written.
+
 ## Record
 
 Fill in at the checkpoints: the SHA of each commit, whether `PROMPT_HASH` moved under item 12 and what followed if it did, and the bot rounds after the push.
@@ -172,6 +201,7 @@ Fill in at the checkpoints: the SHA of each commit, whether `PROMPT_HASH` moved 
 | 2. The page carries the brand, and the registry states what it does not do | `d322868` | 2, 7, 13, plus the `generative-dom` vitest project and item 9's header rewrite |
 | 3. The catalog controls mint unique ids | `21a174c` | 4 |
 | 4. The escape is spelled once, and every closed map is read one way | `45b1332` | 8, 10, 11 |
+| 5. The gates close the doors a second review found open | `b791a9f` | Round 2: R1, R2, R3, R5, R8 |
 
 **Checkpoint A.** Seventeen assertions were red before commit 1: three of the five malformed shapes threw inside `layoutProblems` (`children: 5`, a null element, no `elements` map) and the two that the walk survives (`repeat: null`, `props: 5`) were already refused, by coverage, which is why the table's descriptor carries a required input. The repeat, bound-path, `Workspace`, empty-option and brief assertions were all red. `PROMPT_HASH` **did not move**: `.min(1)` on the option definitions changes no rendered prompt text, so no fixture pass followed. The corpus test accepts every captured layout after items 3, 5 and 12.
 
@@ -195,3 +225,11 @@ Fill in at the checkpoints: the SHA of each commit, whether `PROMPT_HASH` moved 
 - **Items 8 and 10 landed as written.** No changelog fold for commit 4: nothing in it changes what goes over the wire or what the docs promise.
 
 **The second round did not happen, and cannot on this repo.** Fifteen minutes after the two trigger comments, neither bot had posted, and neither ever has here: every pull request in the repo's recent history (#16 through #21) has zero reviews and zero bot comments, while `greptile-apps[bot]` reviewed a pipelex PR on 2026-09-03 and an mthds-ui PR on 2026-09-04. The bots are not installed on `mthds-form`, which is a GitHub settings call for a person and is filed as L-260905-be5b08 (owner `workspace`, type decision, discovered from this campaign's item). So the review that gated this PR is the one this document opens with, and the merge is Louis's call on that basis; nothing here waits on a bot.
+
+### Pause 3 — 2026-09-05, after commit 5 and Checkpoint C
+
+**State.** Five commits are on `feature/Generative-entry`; the table above names them. Commit 5 left the full gate green in the order the checkpoint asks: `make check`, then `make all` — every vitest project including the `storybook` browser project, then the build and `make assert-bundle` — with no fixture, prompt hash or captured layout moving: the corpus test proves the tightened gates still accept every layout on file.
+
+**What the round settled.** The second round is the section above, "Round 2 — the review that replaced the bots": five findings landed, four deferred to L-260905-0420af with their remedies sketched, none declined. Two things in it worth a reader's attention beyond the table. First, the handler fix (R2) rests on a fact about json-render 0.20.0 — `ActionProvider` reads `handlers` once, into a `useState` — that a future json-render may change; the jsdom test pins the behaviour a host sees rather than the mechanism, so a json-render that starts honouring the prop keeps the test green and the ref becomes redundant rather than wrong. Second, the event check (R8) refuses any `on` binding on a component whose definition declares no `events`; that is the right verdict for this catalog, where every renderer that emits declares what it emits, and a host catalog that emits undeclared events will see its layouts refused until it declares them — which is the check working, not a bug in it.
+
+**What the merge now rests on.** The first-round review this document opens with, and the second round above, both run by hand because the bots are not installed here (L-260905-be5b08 carries that call). Nothing waits on a bot.
