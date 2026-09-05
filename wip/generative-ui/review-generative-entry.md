@@ -187,6 +187,31 @@ The second-round bar admits only what is severe. Three findings were: the protot
 
 Nothing. Every finding was confirmed as written.
 
+## Round 3 — the cubic pass
+
+The third round was a cubic review run locally against `dev` through the `cubic-review` skill, on 2026-09-05 with the branch at `629c71f`. It reported eight findings; each was read against the source, and against json-render 0.20.0's runtime where it made a claim about one, before a verdict. By the third-round bar nothing would land, and one thing did, because it is the write ban with a hole in it — the same class as R3, and a promise `docs/generative-ui.md` makes in so many words. Two defer with a remedy sketched; the rest are declined, with the reason.
+
+### Accepted, and landed in commit 6
+
+| # | Finding | Where | What was true |
+|---|---|---|---|
+| C3 | `watch` bindings and `onSuccess`/`onError` callbacks bypass the write ban and the name check | `src/generative/validate.ts` § 7 | The walk read `element.on` alone. json-render's React renderer fires a `watch`'s bindings when the state at its key changes, with no event and no person in between, and its action runner applies `onSuccess.set` and `onError.set` as direct pointer writes and chains an `onSuccess.action` or `onError.action` through the same executor. None was checked for name or destination, so a `set` into `/inputs/request/city` reached the run payload past both gates. One `checkBinding` now, applied under `on`, under `watch` and to each callback as far as the chain goes; the refusals are red on the old file, and no captured layout binds either, so nothing on file moved. |
+
+### Deferred to L-260905-0420af
+
+| # | Finding | Why deferred |
+|---|---|---|
+| C6 | An undeclared named slot passes both gates and renders nothing (`src/generative/paths.ts` `parentMapOf`, `validate.ts`) | Cubic's premise — that json-render renders a named slot's children inside the repeat above it, so `parentMapOf` reading `children` alone reports them adrift — is wrong for this catalog: no definition declares a named slot and no renderer reads a `slots` prop, so the renderer hands those children to a component that never paints them. The real gap is narrower: neither gate refuses a slot the definition does not declare, so its children pass reachability, count as coverage in `layoutFits`, and paint nothing. **Remedy:** refuse an undeclared slot name in the validator, on the principle the event check already applies; and have `parentMapOf` read `slots` beside `children`, for a host catalog that declares real ones. |
+| C8 | The validator keys its panel and child-count checks on product component names (`validate.ts` § 4 and § 6: `Tabs`, `Steps`, `Button`, `Split`, `Workspace`) | The module's header says the checks are the same whichever catalog is passed, and those two are not: a host catalog reusing the names with other semantics gets a wrong verdict, and a host component with the same constraint cannot declare it. Hypothetical as a defect, since it needs a host to reuse the names, and a design change as a remedy. **Remedy:** move the panel prop and the fixed child count onto the definition, so the validator reads metadata rather than names. |
+
+### Declined
+
+| # | Finding | Why |
+|---|---|---|
+| C1 | A required all-optional structure passes coverage with no control | Real, and already R7 above, deferred to L-260905-0420af. |
+| C2 | A field named `__proto__` reparents the seed | The MTHDS format forbids a field name starting with an underscore, so the name cannot reach a descriptor. Both shapes were also run: the spread in `payloadToState` keeps an own property and leaves the prototype alone, and the assignment in `seedInputs` could reparent that one object and nothing else. |
+| C4, C5, C7 | The fixture generator, the spec walks and the registry should each be split | Structure opinions with no failure behind them; the one consequence C5 names is C6. A first version ships whole. |
+
 ## Record
 
 Fill in at the checkpoints: the SHA of each commit, whether `PROMPT_HASH` moved under item 12 and what followed if it did, and the bot rounds after the push.
@@ -233,3 +258,11 @@ Fill in at the checkpoints: the SHA of each commit, whether `PROMPT_HASH` moved 
 **What the round settled.** The second round is the section above, "Round 2 — the review that replaced the bots": five findings landed, four deferred to L-260905-0420af with their remedies sketched, none declined. Two things in it worth a reader's attention beyond the table. First, the handler fix (R2) rests on a fact about json-render 0.20.0 — `ActionProvider` reads `handlers` once, into a `useState` — that a future json-render may change; the jsdom test pins the behaviour a host sees rather than the mechanism, so a json-render that starts honouring the prop keeps the test green and the ref becomes redundant rather than wrong. Second, the event check (R8) refuses any `on` binding on a component whose definition declares no `events`; that is the right verdict for this catalog, where every renderer that emits declares what it emits, and a host catalog that emits undeclared events will see its layouts refused until it declares them — which is the check working, not a bug in it.
 
 **What the merge now rests on.** The first-round review this document opens with, and the second round above, both run by hand because the bots are not installed here (L-260905-be5b08 carries that call). Nothing waits on a bot.
+
+### Pause 4 — 2026-09-05, after commit 6 and the cubic pass
+
+**State.** Six commits are on `feature/Generative-entry`; commit 6 is `54693af`. It left the full gate green in the checkpoint's order: `make check`, then `make all` — every vitest project including the `storybook` browser project, then the build and `make assert-bundle` — with no fixture, prompt hash or captured layout moving, which the corpus test proves.
+
+**What the round settled.** The third round is the section above, "Round 3 — the cubic pass": one finding landed, two deferred to L-260905-0420af with their remedies sketched and a pointer in that item's log, the rest declined with the reason. Worth a reader's attention: the fix rests on json-render 0.20.0 honouring `watch` and the two callbacks, which is where the doors are. A json-render that drops either leaves the check refusing what would then be inert, which is the safe side of that change.
+
+**What the merge now rests on.** Three rounds, all run by hand because the bots are not installed here (L-260905-be5b08 carries that call): the first-round review this document opens with, the Codex round, and the cubic round. Nothing waits on a bot.
