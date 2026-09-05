@@ -232,7 +232,7 @@ const components = {
     props: z.object({
       label: z.string(),
       name: z.string(),
-      options: z.array(z.string()).min(2).max(6),
+      options: z.array(z.string().min(1)).min(2).max(6),
       value: z.string().nullable(),
     }),
     slots: [],

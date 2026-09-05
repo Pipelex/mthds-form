@@ -174,7 +174,7 @@ export const shadcnComponentDefinitions = {
     props: z.object({
       label: z.string(),
       name: z.string(),
-      options: z.array(z.string()),
+      options: z.array(z.string().min(1)),
       placeholder: z.string().nullable(),
       value: z.string().nullable(),
       checks: validationCheckSchema,
@@ -188,7 +188,7 @@ export const shadcnComponentDefinitions = {
     props: z.object({
       label: z.string(),
       name: z.string(),
-      options: z.array(z.string()),
+      options: z.array(z.string().min(1)),
       value: z.string().nullable(),
       checks: validationCheckSchema,
       validateOn: validateOnSchema,

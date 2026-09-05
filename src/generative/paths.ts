@@ -154,3 +154,24 @@ export function absoluteHatchPath(
   // already and escaping them would name one segment that does not exist.
   return base ? `${base}/${path}` : undefined;
 }
+
+/**
+ * The list a `repeat` lays out, as an absolute path: its `statePath` when that
+ * is written absolute, or, for a relative `{ $item }` one, the item's field
+ * under the repeat above it - the same chain `repeatBasePathOf` walks, stopped
+ * one level short. `undefined` when there is nothing to be relative to, or
+ * when `statePath` is neither form. It is the path a repeat READS, which is
+ * how the fit gate asks whether the descriptor still has the list.
+ */
+export function repeatListPathOf(
+  spec: Spec,
+  key: string,
+  parents: Map<string, string> = parentMapOf(spec),
+): string | undefined {
+  const statePath = spec.elements[key]?.repeat?.statePath;
+  if (typeof statePath === 'string') return statePath;
+  const item = (statePath as { $item?: unknown } | null | undefined)?.$item;
+  const parent = parents.get(key);
+  const outer = parent === undefined ? undefined : repeatBasePathOf(spec, parent, parents);
+  return outer !== undefined && typeof item === 'string' ? joinPath(outer, item) : undefined;
+}

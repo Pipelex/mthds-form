@@ -298,8 +298,12 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
           <SelectValue placeholder={props.placeholder ?? 'Select...'} />
         </SelectTrigger>
         <SelectContent>
+          {/* Written exactly as listed. The primitive throws on an empty value,
+              and the fallback that used to stand in for one wrote a value the
+              descriptor's enum never listed; the definition refuses an empty
+              option now, upstream of every renderer. */}
           {(props.options ?? []).map((option, index) => (
-            <SelectItem key={`${index}-${option}`} value={option || `option-${index}`}>
+            <SelectItem key={`${index}-${option}`} value={option}>
               {option}
             </SelectItem>
           ))}

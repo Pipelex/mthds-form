@@ -55,7 +55,7 @@ describe('the validator', () => {
     const text = formatProblems(verdict.problems);
     expect(text).toContain('Tabs declares 2 panels but has 1 child');
     expect(text).toContain('Steps has a Button as a direct child');
-    expect(text).toContain('Split takes exactly two children');
+    expect(text).toContain('Split takes exactly 2 children (left, right)');
   });
 
   it('refuses a heading that skips a level, in render order', () => {
@@ -286,5 +286,55 @@ describe('a layout nested deeper than the entry renders', () => {
 
   it('leaves a chain of an ordinary depth alone', () => {
     expect(validateAgainstCatalog(chain(40)).ok).toBe(true);
+  });
+});
+
+/**
+ * The containers that take a fixed number of children, and drop the rest in
+ * silence. `Workspace` destructures two and the product rules say two, and
+ * nothing said so where a layout is judged: a third child rendered nowhere.
+ */
+describe('a container with a fixed number of children', () => {
+  const panel = { type: 'Stack', props: {}, children: [] };
+
+  it('refuses a Workspace with a third child, as it refuses a Split', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: { type: 'Workspace', props: {}, children: ['work', 'rail', 'more'] },
+        work: panel,
+        rail: panel,
+        more: panel,
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'Workspace takes exactly 2 children (work, rail); this one has 3',
+    );
+  });
+});
+
+/**
+ * A choice with nothing in it is not one a person can make: a blank dropdown
+ * row, a blank pill. The renderer under `Select` cannot even hold one - its
+ * primitive throws on an empty value - so the fallback it carried wrote a
+ * value the descriptor's enum never listed, and the run gate then refused the
+ * run naming a value the person never saw. The refusal moves upstream, to the
+ * definition every renderer reads.
+ */
+describe('a choice with an empty option', () => {
+  it.each(['Select', 'Radio', 'Segmented'])('is refused on a %s', (type) => {
+    const verdict = validateAgainstCatalog({
+      root: 'choice',
+      elements: {
+        choice: {
+          type,
+          props: { label: 'Pace', name: 'pace', options: ['', 'slow'] },
+          children: [],
+        },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(`${type}.options`);
   });
 });

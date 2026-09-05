@@ -315,3 +315,156 @@ describe('a field name carrying a character a pointer escapes', () => {
     expect(layoutFits({ inputs: [nested('a/b')] }, pageBinding())).toBe(false);
   });
 });
+
+/**
+ * The gate's own promise, the one `validateAgainstCatalog` keeps and this one
+ * did not: it answers with problems, not exceptions. The two predicates are
+ * exported separately and a host may run them in either order, so a layout
+ * the validator would refuse can reach this gate first - and a throw here
+ * arrives instead of the `no` the fallback waits for. The descriptor carries a
+ * required input, so a shape the walk survives is still refused, by coverage,
+ * and a shape it throws on is refused by the boundary.
+ */
+describe('a spec malformed in a way the walk itself throws on', () => {
+  const descriptor = { inputs: [text('city', true)] };
+
+  it.each([
+    ['a null repeat', { root: 'a', elements: { a: { type: 'Text', props: {}, repeat: null } } }],
+    [
+      'children that are not a list',
+      { root: 'a', elements: { a: { type: 'Text', props: {}, children: 5 } } },
+    ],
+    ['props that are not an object', { root: 'a', elements: { a: { type: 'Text', props: 5 } } }],
+    ['a null element', { root: 'a', elements: { a: null } }],
+    ['no elements map at all', { root: 'a' }],
+  ])('answers no rather than throwing: %s', (_name, malformed) => {
+    const spec = malformed as unknown as Spec;
+    expect(() => layoutProblems(descriptor, spec)).not.toThrow();
+    expect(layoutProblems(descriptor, spec).length).toBeGreaterThan(0);
+    expect(layoutFits(descriptor, spec)).toBe(false);
+  });
+
+  it('names the shape it could not walk', () => {
+    const spec = { root: 'a', elements: { a: null } } as unknown as Spec;
+    expect(layoutProblems(descriptor, spec)).toEqual([
+      expect.stringContaining('the layout is not a well-formed spec'),
+    ]);
+  });
+});
+
+/**
+ * A repeat is a read: the list it lays out is a path the layout mentions, and
+ * a method that renames that list leaves the repeat rendering nothing at all,
+ * silently, with the coverage half none the wiser on a result page or over an
+ * optional list.
+ */
+describe('a repeat, which reads the list it lays out', () => {
+  const repeating = (statePath: string): Spec => ({
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['rows'] },
+      rows: { type: 'Stack', props: {}, children: [], repeat: { statePath } },
+    },
+  });
+
+  it('is refused on a result page when the list it repeats over is gone', () => {
+    const result: RunField = {
+      kind: 'object',
+      name: 'invoice',
+      required: true,
+      fields: [text('total', true)],
+    };
+    expect(layoutProblems({ result }, repeating('/result/lines'))).toEqual([
+      'rows: repeats over /result/lines, which no result has',
+    ]);
+  });
+
+  it('is refused on an input page when the optional list it repeats over is gone', () => {
+    const optional: RunField = {
+      kind: 'list',
+      name: 'lines',
+      required: false,
+      item: text('label', true),
+    };
+    expect(layoutProblems({ inputs: [optional] }, repeating('/inputs/rows'))).toEqual([
+      'rows: repeats over /inputs/rows, which no input has',
+    ]);
+  });
+
+  it('resolves a relative repeat through the one above it', () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['division'] },
+        division: {
+          type: 'Stack',
+          props: {},
+          repeat: { statePath: '/result/divisions' },
+          children: ['team'],
+        },
+        team: { type: 'Stack', props: {}, repeat: { statePath: { $item: 'teams' } }, children: [] },
+      },
+    };
+    const result: RunField = {
+      kind: 'object',
+      name: 'league',
+      required: true,
+      fields: [
+        {
+          kind: 'list',
+          name: 'divisions',
+          required: true,
+          item: { kind: 'object', name: 'division', required: true, fields: [text('name', true)] },
+        },
+      ],
+    };
+    expect(layoutProblems({ result }, spec)).toEqual([
+      'team: repeats over /result/divisions/0/teams, which no result has',
+    ]);
+  });
+
+  it("leaves a repeat over the layout's own scratch state alone", () => {
+    expect(layoutProblems({ inputs: [text('city', false)] }, repeating('/ui/rows'))).toEqual([]);
+  });
+});
+
+/**
+ * One rule for a bound path, on both pages, and it is the rule the read side
+ * and the validator already apply: `/inputs` is the person's, `/result` is
+ * the run's, and anything else is the layout's own scratch state. A `Switch`
+ * bound to `/ui/showDetails` is the natural way to drive a `visible`
+ * condition, and the write side used to refuse it on an input page with a
+ * message naming an input nobody had asked for.
+ */
+describe('a path the layout binds', () => {
+  const binding = (path: string): Spec => ({
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['toggle'] },
+      toggle: {
+        type: 'Switch',
+        props: { label: 'Show details', name: 'details', checked: { $bindState: path } },
+        children: [],
+      },
+    },
+  });
+  const inputPage = { inputs: [text('city', false)] };
+  const resultPage = { result: text('summary', true) };
+
+  it("may be the layout's own scratch state, on an input page", () => {
+    expect(layoutProblems(inputPage, binding('/ui/showDetails'))).toEqual([]);
+  });
+
+  it("may be the layout's own scratch state, on a result page", () => {
+    expect(layoutProblems(resultPage, binding('/ui/showDetails'))).toEqual([]);
+  });
+
+  it.each([
+    ['an input page', inputPage],
+    ['a result page', resultPage],
+  ])('may not be under /result, which the run fills: %s', (_name, descriptor) => {
+    expect(layoutProblems(descriptor, binding('/result/total'))).toEqual([
+      '/result/total is bound; a layout may not write into /result, which the run fills',
+    ]);
+  });
+});

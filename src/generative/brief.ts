@@ -41,14 +41,23 @@ export interface BriefSubject {
   name?: string;
 }
 
-/** On the input side, the kinds the catalog's inputs cannot enter. */
+/**
+ * On the input side, the kinds the catalog's inputs cannot enter - and one
+ * shape of a kind they otherwise can. The standard puts no floor on a choice,
+ * so an enum may carry `""`; the catalog's own choices may not, because no
+ * dropdown row or pill can offer nothing, and the validator refuses an empty
+ * option. A model told to list the brief's choices exactly would copy the
+ * empty one into a layout the validator then refuses, so the brief hands the
+ * input back to the kernel's own control instead.
+ */
 export function isDelegatedInput(field: RunField): boolean {
   return (
     field.kind === 'document' ||
     field.kind === 'image' ||
     field.kind === 'date' ||
     field.kind === 'list' ||
-    field.kind === 'unknown'
+    field.kind === 'unknown' ||
+    (field.kind === 'enum' && field.options.includes(''))
   );
 }
 
