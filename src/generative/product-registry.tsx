@@ -11,8 +11,9 @@ import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
 import { catalog } from './catalog';
-import { generativeRenderers, useDescriptorScope } from './registry';
+import { generativeRenderers } from './registry';
 import { useResultSlot } from './result-slot';
+import { useControlId } from './ui/shadcn';
 
 /**
  * What the brand catalog's components RENDER as - the product page's chrome,
@@ -289,7 +290,6 @@ function useTextField(
   props: TextFieldProps,
   bindings: BaseComponentProps<TextFieldProps>['bindings'],
 ) {
-  const scope = useDescriptorScope();
   const [boundValue, setBoundValue] = useBoundProp<string>(
     props.value ?? undefined,
     bindings?.value,
@@ -311,7 +311,7 @@ function useTextField(
   const onBlur = () => {
     if (hasValidation && validateOn === 'blur') validate();
   };
-  return { idPrefix: scope.idPrefix ?? 'gen', value, errors, onChange, onBlur };
+  return { value, errors, onChange, onBlur };
 }
 
 function BrandInput({
@@ -322,7 +322,7 @@ function BrandInput({
   TextFieldProps & { type?: 'text' | 'email' | 'password' | 'number' | null }
 >) {
   const field = useTextField(props, bindings);
-  const id = `${field.idPrefix}-input-${props.name}`;
+  const id = useControlId(props.name);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className={LABEL}>
@@ -360,7 +360,7 @@ function BrandTextarea({
   bindings,
 }: BaseComponentProps<TextFieldProps & { rows?: number | null }>) {
   const field = useTextField(props, bindings);
-  const id = `${field.idPrefix}-textarea-${props.name}`;
+  const id = useControlId(props.name);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className={LABEL}>

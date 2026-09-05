@@ -265,7 +265,6 @@ interface SelectProps {
 }
 
 function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectProps>) {
-  const scope = React.useContext(DescriptorContext);
   const [boundValue, setBoundValue] = useBoundProp<string>(
     props.value ?? undefined,
     bindings?.value,
@@ -280,7 +279,7 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
-  const id = `${scope.idPrefix ?? 'gen'}-select-${props.name}`;
+  const id = shadcn.useControlId(props.name);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className="block text-sm leading-none font-medium">
@@ -677,7 +676,6 @@ interface SegmentedProps {
  * path never holds an empty string.
  */
 function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>) {
-  const scope = React.useContext(DescriptorContext);
   const [boundValue, setBoundValue] = useBoundProp<string>(
     props.value ?? undefined,
     bindings?.value,
@@ -686,7 +684,7 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
   const isBound = Boolean(bindings?.value);
   const value = isBound ? (boundValue ?? '') : localValue;
   const setValue = isBound ? setBoundValue : setLocalValue;
-  const labelId = `${scope.idPrefix ?? 'gen'}-segmented-${props.name}`;
+  const labelId = shadcn.useControlId(props.name);
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-sm leading-none font-medium">
@@ -737,7 +735,6 @@ interface NumberInputProps {
  * absent, exactly as its own number control does.
  */
 function NumberInput({ props, bindings, emit }: BaseComponentProps<NumberInputProps>) {
-  const scope = React.useContext(DescriptorContext);
   const [boundValue, setBoundValue] = useBoundProp<number | undefined>(
     props.value ?? undefined,
     bindings?.value,
@@ -746,7 +743,7 @@ function NumberInput({ props, bindings, emit }: BaseComponentProps<NumberInputPr
   const isBound = Boolean(bindings?.value);
   const value = isBound ? boundValue : localValue;
   const setValue = isBound ? setBoundValue : setLocalValue;
-  const id = `${scope.idPrefix ?? 'gen'}-number-${props.name}`;
+  const id = shadcn.useControlId(props.name);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className="block text-sm leading-none font-medium">

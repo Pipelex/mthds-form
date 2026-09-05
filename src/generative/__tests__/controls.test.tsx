@@ -55,3 +55,62 @@ describe('the brand the product chrome reads', () => {
     }
   });
 });
+
+/**
+ * A layout lays a list out as a `repeat`, and every row of it mounts the same
+ * controls. Five of the catalog's controls minted their DOM ids from
+ * `props.name` alone, so every row minted the same id: clicking row three's
+ * label focused row one's input, and axe reported duplicate ids. `useControlId`
+ * already minted a per-instance id for every shadcn renderer; these are the
+ * controls that predated it.
+ */
+describe('the ids the catalog controls mint', () => {
+  const REPEATED: Spec = {
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['rows'] },
+      rows: {
+        type: 'Stack',
+        props: {},
+        children: ['amount', 'note', 'pace', 'memo'],
+        repeat: { statePath: '/inputs/lines' },
+      },
+      amount: { type: 'NumberInput', props: { label: 'Amount', name: 'amount' }, children: [] },
+      note: { type: 'Input', props: { label: 'Note', name: 'note' }, children: [] },
+      pace: {
+        type: 'Segmented',
+        props: { label: 'Pace', name: 'pace', options: ['slow', 'fast'] },
+        children: [],
+      },
+      memo: { type: 'Textarea', props: { label: 'Memo', name: 'memo' }, children: [] },
+    },
+  };
+
+  it('are unique across the rows of a repeat, and each label names its own control', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={REPEATED}
+        store={createStateStore({ inputs: { lines: [{}, {}] } })}
+        scope={{}}
+        brand={BRAND}
+      />,
+    );
+    const ids = [...container.querySelectorAll('[id]')].map((element) => element.id);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const label of container.querySelectorAll('label[for]')) {
+      const target = container.querySelector(`[id="${label.getAttribute('for')}"]`);
+      expect(target).not.toBeNull();
+      expect(label.parentElement?.contains(target)).toBe(true);
+    }
+    for (const group of container.querySelectorAll('[aria-labelledby]')) {
+      const name = container.querySelector(`[id="${group.getAttribute('aria-labelledby')}"]`);
+      expect(name).not.toBeNull();
+      expect(group.parentElement?.contains(name)).toBe(true);
+    }
+    expect(screen.getAllByLabelText('Amount')).toHaveLength(2);
+    expect(screen.getAllByLabelText('Note')).toHaveLength(2);
+    expect(screen.getAllByLabelText('Memo')).toHaveLength(2);
+    expect(screen.getAllByRole('radiogroup', { name: 'Pace' })).toHaveLength(2);
+  });
+});

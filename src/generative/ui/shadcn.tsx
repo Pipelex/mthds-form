@@ -366,7 +366,7 @@ export function Progress({
  * lost its accessible name, which no story test can see because none of them
  * render on a server.
  */
-function useControlId(name: string): string {
+export function useControlId(name: string): string {
   return `jr-${name}-${React.useId()}`;
 }
 
