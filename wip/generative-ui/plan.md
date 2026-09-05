@@ -301,3 +301,7 @@ Written before the checkpoint so the decision is made on a documented layer, and
 ## Out of scope for this step
 
 Recorded so nothing below is absorbed silently: a `./generative` entry or a sibling package; any release of this package; hosted generation and caching of the spec per method version; the MCP app view; code export; the agent skill for the `Authored` path; a zod mirror of `RunField` for `MthdsField`; adoption in the host webapp's method app; the starters' and the playground's Tailwind migrations; intent hints in the kernel's controls (`L-260823-d905b9`). Added on the redirect: anything the model writes that is not a validated data file, TypeScript and CSS in particular; and any brand effect the token data cannot express.
+
+## Landed — 2026-09-05
+
+The study's record — this directory as it stood on `feature/Generative-ui` — landed on `dev` through PR #21 (`21efb2b`) as Phase 1 of the workspace program `wip/generative-layer/`; the study branch itself does not merge, as decided above. L-260903-35eb46 closed on that merge. At landing the merge had not reached `main`.

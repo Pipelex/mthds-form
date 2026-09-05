@@ -142,3 +142,7 @@ The division of labour it fixes: the model decides the layout, the copy and the 
 - Which model the designer method pins: settled, `claude-5-sonnet` (see "Ratification").
 - Whether `ThemePair`'s double render trips axe on the shadcn inputs, which label by `props.name`: still open, checked on the first input story, with a story-level single-theme parameter as the fallback.
 - Whether the shadcn `Tabs` and `Collapsible` bind their open state in a way the Company hero can use: answered by reading the package. `Tabs` binds but does not switch its panels, `Accordion` holds strings only, `Collapsible` nests with `defaultOpen`. The Company hero is cards and collapsibles.
+
+## Landed — 2026-09-05
+
+The entry this design argued for shipped to `dev` as `./generative` through PR #21 (`21efb2b`), Phase 1 of `wip/generative-layer/`, and this record landed with it. What the design left as follow-ups — hosted generation and storage per method version, the agent skill — is the program's later phases.
