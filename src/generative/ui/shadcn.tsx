@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { type BaseComponentProps, useBoundProp, useFieldValidation } from '@json-render/react';
+import { hasOwnProp } from '../../core/own-property';
 import { fieldControlClass } from '../../react/field-styles';
 import { cn } from '../../react/utils';
 import { Switch as SwitchPrimitive } from '../../react/ui/switch';
@@ -73,6 +74,37 @@ function FieldError({ message }: { message?: string }) {
   return message ? <p className="text-sm text-destructive">{message}</p> : null;
 }
 
+/**
+ * The key a closed map answers to, or the fallback.
+ *
+ * Every map below is keyed by a prop the catalog declares as an enum, and a
+ * renderer must not trust that: an expression-valued prop skips the zod check,
+ * and a `$template` with nothing to interpolate resolves to a literal, so the
+ * string can be anything a layout wrote - `constructor` included, which a bare
+ * lookup answers with a function off `Object.prototype`. Both gates refuse the
+ * shape; the prop's own type stays the contract; this is what happens when a
+ * stored artifact disagrees with it. The read is `hasOwnProp`, the kernel's one
+ * spelling of an own-property read (and `Object.hasOwn` is ES2022, past the
+ * package's ES2020 target), so an inherited name is not a hit; the fallback is
+ * typed as one of the map's own keys.
+ */
+export function pickKey<K extends string>(
+  table: Record<K, unknown>,
+  key: string | null | undefined,
+  fallback: NoInfer<K>,
+): K {
+  return key != null && hasOwnProp(table, key) ? (key as K) : fallback;
+}
+
+/** The value a closed map holds for `key`, or for the fallback when `key` is not one of its own. */
+export function pick<K extends string, T>(
+  table: Record<K, T>,
+  key: string | null | undefined,
+  fallback: NoInfer<K>,
+): T {
+  return table[pickKey(table, key, fallback)];
+}
+
 // ── Layout ──────────────────────────────────────────────────────────────────
 
 export function Card({
@@ -96,7 +128,7 @@ export function Card({
   );
 }
 
-const GAP: Record<string, string> = {
+const GAP = {
   none: 'gap-0',
   sm: 'gap-2',
   md: 'gap-4',
@@ -104,14 +136,14 @@ const GAP: Record<string, string> = {
   xl: 'gap-8',
 };
 
-const ALIGN: Record<string, string> = {
+const ALIGN = {
   start: 'items-start',
   center: 'items-center',
   end: 'items-end',
   stretch: 'items-stretch',
 };
 
-const JUSTIFY: Record<string, string> = {
+const JUSTIFY = {
   start: 'justify-start',
   center: 'justify-center',
   end: 'justify-end',
@@ -134,9 +166,9 @@ export function Stack({
       className={cn(
         'flex',
         horizontal ? 'flex-row' : 'flex-col',
-        GAP[props.gap ?? 'md'],
-        props.align ? ALIGN[props.align] : horizontal ? 'items-start' : 'items-stretch',
-        props.justify ? JUSTIFY[props.justify] : undefined,
+        pick(GAP, props.gap, 'md'),
+        pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
+        props.justify ? pick(JUSTIFY, props.justify, 'start') : undefined,
       )}
     >
       {children}
@@ -160,7 +192,7 @@ export function Grid({
 }: BaseComponentProps<{ columns?: number | null; gap?: keyof typeof GAP | null }>) {
   const columns = Math.min(Math.max(Math.round(props.columns ?? 2), 1), 6);
   return (
-    <div className={cn('grid grid-cols-1', COLUMNS[columns], GAP[props.gap ?? 'md'])}>
+    <div className={cn('grid grid-cols-1', COLUMNS[columns], pick(GAP, props.gap, 'md'))}>
       {children}
     </div>
   );
@@ -204,7 +236,7 @@ export function Collapsible({
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
-const HEADING: Record<string, string> = {
+const HEADING = {
   h1: 'text-3xl font-bold tracking-tight',
   h2: 'text-2xl font-semibold tracking-tight',
   h3: 'text-lg font-semibold',
@@ -216,16 +248,13 @@ export function Heading({
 }: BaseComponentProps<{ text: string; level?: 'h1' | 'h2' | 'h3' | 'h4' | null }>) {
   // The tag is looked up in the same closed map the class comes from, never
   // taken from the prop. `const Tag = level` made an arbitrary string a DOM tag
-  // name, and a prop can carry one: an expression-valued prop skips the zod
-  // check, and a `$template` with nothing to interpolate resolves to a literal.
-  // A server-rendered host emitted `<script>` from a layout that passed both
-  // gates. The prop's own type stays the contract; this is what happens when a
-  // stored artifact disagrees with it.
-  const Tag = props.level && Object.hasOwn(HEADING, props.level) ? props.level : 'h2';
+  // name, and a prop can carry one (`pickKey` says how): a server-rendered host
+  // emitted `<script>` from a layout that passed both gates.
+  const Tag = pickKey(HEADING, props.level, 'h2');
   return <Tag className={cn('text-foreground', HEADING[Tag])}>{props.text}</Tag>;
 }
 
-const TEXT: Record<string, string> = {
+const TEXT = {
   body: 'text-sm text-foreground',
   caption: 'text-xs text-muted-foreground',
   muted: 'text-sm text-muted-foreground',
@@ -239,10 +268,10 @@ export function Text({
   text: string;
   variant?: 'body' | 'caption' | 'muted' | 'lead' | 'code' | null;
 }>) {
-  return <p className={TEXT[props.variant ?? 'body']}>{props.text}</p>;
+  return <p className={pick(TEXT, props.variant, 'body')}>{props.text}</p>;
 }
 
-const AVATAR_SIZE: Record<string, string> = {
+const AVATAR_SIZE = {
   sm: 'size-8 text-[11px]',
   md: 'size-10 text-xs',
   lg: 'size-12 text-sm',
@@ -265,7 +294,7 @@ export function Avatar({
     <span
       className={cn(
         'inline-flex shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground',
-        AVATAR_SIZE[props.size ?? 'md'],
+        pick(AVATAR_SIZE, props.size, 'md'),
       )}
       aria-label={name || undefined}
       role="img"
@@ -275,7 +304,7 @@ export function Avatar({
   );
 }
 
-const BADGE: Record<string, string> = {
+const BADGE = {
   default: 'bg-primary text-primary-foreground',
   secondary: 'bg-secondary text-secondary-foreground',
   destructive: 'bg-destructive text-white',
@@ -292,7 +321,7 @@ export function Badge({
     <span
       className={cn(
         'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-xs font-medium',
-        BADGE[props.variant ?? 'default'],
+        pick(BADGE, props.variant, 'default'),
       )}
     >
       {props.text}
@@ -300,7 +329,7 @@ export function Badge({
   );
 }
 
-const ALERT: Record<string, string> = {
+const ALERT = {
   info: 'border-border bg-muted text-foreground',
   success: 'border-border bg-muted text-foreground',
   warning: 'border-border bg-muted text-foreground',
@@ -314,7 +343,7 @@ export function Alert({
   message?: string | null;
   type?: 'info' | 'success' | 'warning' | 'error' | null;
 }>) {
-  const type = props.type ?? 'info';
+  const type = pickKey(ALERT, props.type, 'info');
   return (
     <div
       role={type === 'error' ? 'alert' : 'status'}
@@ -553,7 +582,7 @@ export function Switch({
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 
-const BUTTON: Record<string, string> = {
+const BUTTON = {
   primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
   secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
   danger: 'bg-destructive text-white hover:bg-destructive/90',
@@ -575,7 +604,7 @@ export function Button({
         'inline-flex min-h-11 w-fit items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors',
         'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         'disabled:pointer-events-none disabled:opacity-50',
-        BUTTON[props.variant ?? 'primary'],
+        pick(BUTTON, props.variant, 'primary'),
       )}
       onClick={() => emit('press')}
     >

@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { BrandManifest } from '../manifest';
 import { GenerativePage } from '../page';
+import { pick, pickKey } from '../ui/shadcn';
 
 /**
  * The generative page's controls, as DOM facts: what a label points at, what
@@ -112,5 +113,43 @@ describe('the ids the catalog controls mint', () => {
     expect(screen.getAllByLabelText('Note')).toHaveLength(2);
     expect(screen.getAllByLabelText('Memo')).toHaveLength(2);
     expect(screen.getAllByRole('radiogroup', { name: 'Pace' })).toHaveLength(2);
+  });
+});
+
+/**
+ * Every renderer that maps a prop onto a class reads a closed map, and the
+ * prop is model-written: an expression-valued prop skips the zod check and a
+ * `$template` with nothing to interpolate resolves to a literal, so the key
+ * can be any string at all. A bare lookup answers `constructor` with a
+ * function off `Object.prototype`. `Heading` guarded that alone; the guard is
+ * one function now, and every map goes through it.
+ */
+describe('the closed maps the renderers read', () => {
+  const TABLE = { body: 'text-sm', caption: 'text-xs' };
+
+  it('answer a prototype name with the fallback, never with what the map inherits', () => {
+    expect(pick(TABLE, 'constructor', 'body')).toBe('text-sm');
+    expect(pick(TABLE, 'toString', 'body')).toBe('text-sm');
+    expect(pickKey(TABLE, '__proto__', 'caption')).toBe('caption');
+    expect(pick(TABLE, null, 'caption')).toBe('text-xs');
+    expect(pick(TABLE, undefined, 'body')).toBe('text-sm');
+    expect(pick(TABLE, 'caption', 'body')).toBe('text-xs');
+  });
+
+  it('hold at the renderer: a prototype-named level is an h2, a prototype-named type is a status', () => {
+    const PROTOTYPE_KEYED: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { gap: 'constructor' }, children: ['title', 'note'] },
+        title: { type: 'Heading', props: { text: 'Trip', level: 'constructor' }, children: [] },
+        note: { type: 'Alert', props: { title: 'Saved', type: 'constructor' }, children: [] },
+      },
+    };
+    const { container } = render(
+      <GenerativePage spec={PROTOTYPE_KEYED} store={createStateStore({})} scope={{}} />,
+    );
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Trip');
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    expect(container.querySelectorAll('[class*="function"]')).toHaveLength(0);
   });
 });

@@ -450,8 +450,8 @@ function Split({
     <div
       className={cn(
         'grid grid-cols-1 items-start',
-        SPLIT_COLUMNS[props.ratio ?? '1:2'],
-        SPLIT_GAP[props.gap ?? 'lg'],
+        shadcn.pick(SPLIT_COLUMNS, props.ratio, '1:2'),
+        shadcn.pick(SPLIT_GAP, props.gap, 'lg'),
       )}
     >
       {children}

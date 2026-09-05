@@ -20,12 +20,23 @@ export function joinPath(root: string, ...segments: readonly string[]): string {
   return segments.reduce<string>((path, segment) => `${path}/${escapeSegment(segment)}`, root);
 }
 
-/** RFC 6901: `~` is `~0`, `/` is `~1`. Field names are identifiers, so this rarely fires. */
-function escapeSegment(segment: string): string {
+/**
+ * RFC 6901: `~` is `~0`, `/` is `~1`. Field names are identifiers, so this
+ * rarely fires. Exported for the stream module, which writes an element key
+ * into a patch path: the escaping is spelled once, because the second spelling
+ * was a copy and a copy drifts.
+ */
+export function escapeSegment(segment: string): string {
   return segment.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
-function unescapeSegment(segment: string): string {
+/**
+ * The inverse, in the order the RFC requires - `~1` first, then `~0`, so `~01`
+ * reads back as `~1` and not as `/`. The stream's prototype guard unescapes a
+ * patch path through this same function before it compares segments, so the
+ * order that guard relies on is decided here and nowhere else.
+ */
+export function unescapeSegment(segment: string): string {
   return segment.replace(/~1/g, '/').replace(/~0/g, '~');
 }
 

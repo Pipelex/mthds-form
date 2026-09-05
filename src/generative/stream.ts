@@ -1,5 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { compileSpecStream } from '@json-render/core';
+import { escapeSegment, unescapeSegment } from './paths';
 
 /**
  * A spec as JSONL patches, and back.
@@ -33,15 +34,15 @@ export function specToJsonl(spec: Spec): string {
     const element = spec.elements[key];
     if (!element) continue;
     emitted.add(key);
-    push('add', `/elements/${escapePointer(key)}`, element);
+    push('add', `/elements/${escapeSegment(key)}`, element);
     for (const child of element.children ?? []) queue.push(child);
     for (const slotChildren of Object.values(element.slots ?? {})) queue.push(...slotChildren);
   }
   for (const key of Object.keys(spec.elements)) {
-    if (!emitted.has(key)) push('add', `/elements/${escapePointer(key)}`, spec.elements[key]);
+    if (!emitted.has(key)) push('add', `/elements/${escapeSegment(key)}`, spec.elements[key]);
   }
   for (const [key, value] of Object.entries(spec.state ?? {})) {
-    push('add', `/state/${escapePointer(key)}`, value);
+    push('add', `/state/${escapeSegment(key)}`, value);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -73,9 +74,7 @@ function reachesPrototype(line: string): boolean {
   }
   const path = (parsed as { path?: unknown } | null)?.path;
   if (typeof path !== 'string') return false;
-  return path
-    .split('/')
-    .some((segment) => FORBIDDEN_SEGMENTS.has(segment.replace(/~1/g, '/').replace(/~0/g, '~')));
+  return path.split('/').some((segment) => FORBIDDEN_SEGMENTS.has(unescapeSegment(segment)));
 }
 
 /**
@@ -109,8 +108,4 @@ export function specFromJsonl(jsonl: string): Spec {
 /** The individual patch lines of a stream, for a replay that feeds them one at a time. */
 export function jsonlLines(jsonl: string): string[] {
   return jsonl.split('\n').filter((line) => line.trim().length > 0);
-}
-
-function escapePointer(segment: string): string {
-  return segment.replace(/~/g, '~0').replace(/\//g, '~1');
 }

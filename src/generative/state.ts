@@ -1,4 +1,5 @@
 import type { RunField } from '../core';
+import { hasOwnProp } from '../core/own-property';
 import {
   formatDateContent,
   isNativeCompositeNode,
@@ -68,7 +69,7 @@ export function payloadToState(field: RunField, payload: unknown): unknown {
       if (!isRecord(payload)) return payload;
       const out: Record<string, unknown> = { ...payload };
       for (const child of field.fields) {
-        if (Object.hasOwn(payload, child.name)) {
+        if (hasOwnProp(payload, child.name)) {
           out[child.name] = payloadToState(child, payload[child.name]);
         }
       }

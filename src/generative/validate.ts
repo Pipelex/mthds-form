@@ -3,6 +3,7 @@ import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
 import { catalog as defaultCatalog } from './catalog';
 import { INPUTS_ROOT, RESULT_ROOT } from './paths';
+import { hasOwnProp } from '../core/own-property';
 
 /**
  * Whether a spec is one this catalog can render - the check every source
@@ -380,14 +381,15 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   // 6. A container that takes a fixed number of children, and would drop the
   //    rest in silence: its renderer destructures the ones it lays out and
   //    paints nothing for a third. The product rules state the count for a
-  //    Workspace, and this is where a layout is held to it. `hasOwn`, because
-  //    the type is model-written and a prototype key would find a function.
+  //    Workspace, and this is where a layout is held to it. `hasOwnProp`,
+  //    because the type is model-written and a prototype key would find a
+  //    function.
   const CHILD_COUNTS: Record<string, { count: number; roles: string }> = {
     Split: { count: 2, roles: 'left, right' },
     Workspace: { count: 2, roles: 'work, rail' },
   };
   for (const [key, element] of Object.entries(spec.elements)) {
-    const rule = Object.hasOwn(CHILD_COUNTS, element.type) ? CHILD_COUNTS[element.type] : undefined;
+    const rule = hasOwnProp(CHILD_COUNTS, element.type) ? CHILD_COUNTS[element.type] : undefined;
     if (!rule) continue;
     const children = element.children?.length ?? 0;
     if (children !== rule.count) {
