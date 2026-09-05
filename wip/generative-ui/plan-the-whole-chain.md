@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260903-35eb46
 ---
 
@@ -153,3 +153,7 @@ A branded result catalog, which is the integration plan's. The critic loop over 
 **The answer to the step's question.** The chain, unchanged, takes a method nobody tuned a brief for from its bundle to a product page that runs it and shows what came back — proven on the people summaries and the slide designer end to end, from the author's bundle to a painted result, under the brand's tokens, with the kernel owning the inputs and the viewer owning the result. What stood in the way was never the chain: one brief iteration for the name a catalog asks for (Checkpoint 10), two renderers narrowed for a phone, and a runner that does not yet satisfy a bundle's package import, which the invoice case found and the ledger now carries. Integration can be considered on that reading, with the open items named: the runner item for the third method, the summary-row vocabulary, and a branded result page, which is the integration plan's question.
 
 **Observed and not filed.** Unchanged from Pause 1: the stale `documents` 0.1.1 under `~/.mthds/methods/` on this machine.
+
+## Landed — 2026-09-05
+
+This record landed on `dev` with the rest of the study's directory through PR #21 (`21efb2b`), as Phase 1 of `wip/generative-layer/`; the runner item the invoice case filed stays open where it was filed.
