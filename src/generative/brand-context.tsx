@@ -27,7 +27,10 @@ export function BrandProvider({
 
 export function useBrand(): BrandManifest {
   const manifest = React.useContext(BrandContext);
-  if (!manifest) throw new Error('useBrand: no BrandProvider above this component.');
+  if (!manifest)
+    throw new Error(
+      'useBrand: no brand in scope. Pass `brand` to GenerativePage, or wrap the tree in BrandProvider.',
+    );
   return manifest;
 }
 

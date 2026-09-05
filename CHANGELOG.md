@@ -18,6 +18,8 @@ Both checks read what a layout says through its **events and its conditions**, n
 
 On a generative page the upload seam runs on DOM ids the hatches mint from their store paths, and `pathFromDomId` is the inverse a host writes back through. The id escapes its own separator, so the pair is exact for any field name rather than for the names an assumption said were the only ones — the cost of that assumption being wrong was a file written to a different, plausible-looking path with no error anywhere. Pointer building elsewhere in the entry goes through the one function that escapes, so a member name carrying `/` or `~` no longer produces two spellings of one path and a coverage verdict that silently downgrades a layout offering the field perfectly well.
 
+`GenerativePage` takes the brand its chrome renders as a `brand` prop and puts it in scope itself. The entry's own `AppBar` reads one, every product page opens with an `AppBar`, and a page given none lost its bar in silence — json-render's element boundary catches the throw and renders nothing — from a requirement no host had been told about; the error the boundary reports now names the cure. A host bringing a registry with no brand components may still omit it.
+
 The designer method ships as data at `@pipelex/mthds-form/ui-designer.mthds`, so a newer method is a package upgrade rather than a code change.
 
 It is a separate entry rather than a feature of `./react` because compiling and validating a layout costs `@json-render/core`, `@json-render/react` and `zod`, and a host rendering an ordinary form must not carry any of them. Lint and `make assert-bundle` both hold that line, the second on the built chunk graph — the three entries genuinely share chunks, so the entry split alone would not.

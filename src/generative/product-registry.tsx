@@ -388,6 +388,21 @@ function BrandTextarea({
 
 // ─── The registry ────────────────────────────────────────────────────────────
 
+/** What `defineRegistry` takes for this catalog. */
+type RegistryOptions = Parameters<typeof defineRegistry<typeof catalog>>[1];
+
+/**
+ * The registry over the product catalog: components only. `run` is supplied
+ * by `GenerativePage`, which hands it to `JSONUIProvider` as a handler closing
+ * over the host's `onRun`, or by a host's own provider; json-render's type
+ * asks for an `actions` entry because the catalog declares one, but only the
+ * `handlers` factory this destructure discards would ever read it, so the
+ * entry is stated absent rather than filled with a no-op a reader would take
+ * for the handler.
+ *
+ * Its `AppBar` reads the brand, so the page it renders in needs one:
+ * `GenerativePage`'s `brand` prop, or a `BrandProvider` above the tree.
+ */
 export const { registry: generativeRegistry } = defineRegistry(catalog, {
   components: {
     ...generativeRenderers,
@@ -402,5 +417,4 @@ export const { registry: generativeRegistry } = defineRegistry(catalog, {
     Cta: (ctx) => <Cta {...ctx} />,
     Footer: (ctx) => <Footer {...ctx} />,
   },
-  actions: { run: async () => {} },
-});
+} as RegistryOptions);

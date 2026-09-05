@@ -3,6 +3,8 @@
 import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
+import { BrandProvider } from './brand-context';
+import type { BrandManifest } from './manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
 
@@ -22,6 +24,14 @@ export interface GenerativePageProps {
   loading?: boolean;
   /** A registry over a catalog that extends this entry's, when a host has one. */
   registry?: PageRegistry;
+  /**
+   * The brand the product chrome renders: the app bar's logo pair and name,
+   * the web font. Required by this entry's own registry, whose `AppBar` reads
+   * it - without one the bar throws, json-render's element boundary drops it
+   * from the page, and the console names the cure. A host registry with no
+   * brand components may omit it.
+   */
+  brand?: BrandManifest;
 }
 
 /**
@@ -39,14 +49,20 @@ export function GenerativePage({
   onRun,
   loading,
   registry = generativeRegistry,
+  brand,
 }: GenerativePageProps) {
   // The scope reaches every control through context, so a fresh object on each
   // render re-renders every field on the page - and a host naturally writes it
   // as a literal beside the store it just read. Memoised on its members, so an
-  // inline `scope={{ inputs: fields, env }}` costs a keystroke nothing.
-  const stableScope = React.useMemo(
-    () => scope,
-    [scope.inputs, scope.result, scope.env, scope.idPrefix],
+  // inline `scope={{ inputs: fields, env }}` costs a keystroke nothing. Rebuilt
+  // from the members it names rather than returning `scope` itself, so no
+  // member this list leaves out can be frozen at its first value: a required
+  // member added to `DescriptorScope` is a type error here, and an optional one
+  // is at least legible as absent from the literal.
+  const { inputs, result, env, idPrefix } = scope;
+  const stableScope = React.useMemo<DescriptorScope>(
+    () => ({ inputs, result, env, idPrefix }),
+    [inputs, result, env, idPrefix],
   );
   const handlers = React.useMemo(
     () => ({
@@ -56,13 +72,14 @@ export function GenerativePage({
     }),
     [onRun, store],
   );
-  return (
+  const page = (
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={registry} store={store} handlers={handlers}>
         <Renderer spec={spec} registry={registry} loading={loading} />
       </JSONUIProvider>
     </DescriptorProvider>
   );
+  return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;
 }
 
 /** The store's current state, re-rendering on every change. For a receipt beside a page. */

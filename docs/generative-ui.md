@@ -79,10 +79,13 @@ import { GenerativePage, seedInputs, payloadToState } from '@pipelex/mthds-form/
   spec={spec}
   store={store}
   scope={{ inputs: fields, env }}
+  brand={manifest}
   onRun={(state) => start(state)}
   loading={streaming}
 />;
 ```
+
+`brand` is the manifest the product chrome renders — the app bar's logo pair and name, the web font — and this entry's own registry needs one, because every product page opens with an `AppBar` and that component reads the brand in scope. Without one it throws, and what a host sees is quieter than a thrown render: json-render wraps each element in a boundary that catches the throw, so the bar is simply missing from the page, with the cure named in the error the console reports. The page puts the manifest in scope itself when it is given one; a host may instead wrap the tree in `BrandProvider`, and a host rendering a registry of its own with no brand components may pass nothing.
 
 The store is **controlled**: the host creates it, seeds it with `seedInputs` (which seeds only the defaults the method authored), and reads it back to start the run. So what the page writes is exactly what the kernel's readiness is computed from, and generation is nowhere in the request path. `payloadToState` loads what a run returned into the `/result` tree — a date arrives in the serializer's typed envelope and a plural result as `{items: [...]}`, and this is what turns both into what a layout binds to.
 

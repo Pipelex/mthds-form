@@ -3,7 +3,6 @@ import { createStateStore } from '@json-render/core';
 import type { InputForm, PipeIOContracts, RunField } from '../../core';
 import { buildRunFields, computeReadiness, getPipeIOContract, getPipeInputForm } from '../../core';
 import {
-  BrandProvider,
   GenerativePage,
   layoutProblems,
   seedInputs,
@@ -58,9 +57,12 @@ export function LayoutPage({ brand, fields, fixture, idPrefix }: LayoutPageProps
 
   return (
     <div className={brand.scope ? `${brand.scope} font-sans` : 'font-sans'}>
-      <BrandProvider manifest={brand.manifest}>
-        <GenerativePage spec={fixture.spec} store={store} scope={{ inputs: fields, idPrefix }} />
-      </BrandProvider>
+      <GenerativePage
+        spec={fixture.spec}
+        store={store}
+        scope={{ inputs: fields, idPrefix }}
+        brand={brand.manifest}
+      />
       <details className={RECEIPT}>
         <summary className="cursor-pointer">
           {readiness.ready}/{readiness.total} ready
