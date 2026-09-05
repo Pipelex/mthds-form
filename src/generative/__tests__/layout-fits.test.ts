@@ -148,3 +148,170 @@ describe('a result page', () => {
     ]);
   });
 });
+
+/**
+ * The result side of the delegation rule, which the input side above states
+ * twice and this one never did.
+ */
+describe('a result page that delegates', () => {
+  const result: RunField = {
+    kind: 'object',
+    name: 'invoice',
+    required: true,
+    fields: [text('total', true)],
+  };
+
+  const delegating = (path: string): Spec => ({
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['hatch'] },
+      hatch: { type: 'MthdsResult', props: { path }, children: [] },
+    },
+  });
+
+  it('is accepted when the path is one the result has', () => {
+    expect(layoutProblems({ result }, delegating('/result/total'))).toEqual([]);
+  });
+
+  it('is refused when the path is one no result has', () => {
+    expect(layoutProblems({ result }, delegating('/result/gone'))).toEqual([
+      'hatch: MthdsResult delegates /result/gone, which no result has',
+    ]);
+  });
+
+  it('is refused when there is no result descriptor at all', () => {
+    expect(layoutProblems({}, delegating('/result/total'))).toEqual([
+      'hatch: MthdsResult delegates /result/total, which no result has',
+    ]);
+  });
+});
+
+/**
+ * A path a layout READS is a path it mentions, and the prompt teaches four ways
+ * to read one beyond the binding the coverage half counts.
+ */
+describe('a path the layout reads rather than binds', () => {
+  const reading = (props: Record<string, unknown>): Spec =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['row'] },
+        row: { type: 'SummaryRow', props, children: [] },
+      },
+    }) as unknown as Spec;
+
+  it('is refused when a $state read names an input that is gone', () => {
+    const problems = layoutProblems(
+      { inputs: [text('city', false)] },
+      reading({ label: 'Town', value: { $state: '/inputs/town' } }),
+    );
+    expect(problems).toContain('/inputs/town is read, and no input has it');
+  });
+
+  it('is refused when a $template interpolates an input that is gone', () => {
+    const problems = layoutProblems(
+      { inputs: [text('city', false)] },
+      reading({ label: 'Trip', value: { $template: 'A trip to ${/inputs/town}' } }),
+    );
+    expect(problems).toContain('/inputs/town is read, and no input has it');
+  });
+
+  it("leaves the layout's own scratch state alone", () => {
+    expect(
+      layoutProblems(
+        { inputs: [text('city', false)] },
+        reading({ label: 'Tab', value: { $state: '/activeTab' } }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('says a stale path once, however many elements mention it', () => {
+    const problems = layoutProblems(
+      { inputs: [text('city', false)] },
+      reading({
+        label: 'Town',
+        value: { $state: '/inputs/town' },
+        detail: { $state: '/inputs/town' },
+      }),
+    );
+    expect(problems).toEqual(['/inputs/town is read, and no input has it']);
+  });
+
+  /**
+   * The case coverage alone cannot see. The binding is right there in the props,
+   * so the required input counts as offered - but the element carrying it is
+   * hidden by a condition that compares against a path the method no longer has,
+   * which never holds, so the person never sees the field the run then demands.
+   */
+  it('is refused when a stale visible condition hides a required input', () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['section'] },
+        section: {
+          type: 'Stack',
+          props: {},
+          children: ['field'],
+          visible: { $state: '/inputs/with_children', eq: true },
+        },
+        field: {
+          type: 'Input',
+          props: { label: 'City', value: { $bindState: '/inputs/city' } },
+          children: [],
+        },
+      },
+    };
+    expect(layoutProblems({ inputs: [text('city', true)] }, spec)).toEqual([
+      '/inputs/with_children is read, and no input has it',
+    ]);
+  });
+});
+
+/**
+ * A layout is model-produced, so the gate is asked about shapes no producer
+ * meant to emit. It has to answer rather than hang: `repeatBasePathOf` walks up
+ * the parent chain, and an element that is its own ancestor made that walk
+ * unbounded. `validateAgainstCatalog` refuses such a spec outright, but the two
+ * predicates are exported separately and neither may assume the other ran.
+ */
+describe('a layout whose elements form a cycle', () => {
+  it('terminates instead of hanging, and reports the hatch it could not place', () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['hatch'] },
+        hatch: { type: 'MthdsField', props: { path: 'amount' }, children: ['page'] },
+      },
+    };
+    expect(layoutProblems({ inputs: [text('city', false)] }, spec)).toEqual([
+      'hatch: MthdsField delegates amount, which no input has',
+    ]);
+  });
+});
+
+/**
+ * A JSON Pointer escapes `~` as `~0` and `/` as `~1`, and `joinPath` is the one
+ * place that knows it. The coverage half used to call it for a top-level input
+ * and then build every nested level by plain concatenation, so a structure whose
+ * member name carried either character produced two different pointers for one
+ * field - and the gate then reported an input the layout offers perfectly well
+ * as offered nowhere, which costs the produced page silently: the host falls
+ * back to the plain form with nothing to say why.
+ */
+describe('a field name carrying a character a pointer escapes', () => {
+  const nested = (child: string): RunField => ({
+    kind: 'object',
+    name: 'request',
+    required: true,
+    fields: [text(child, true)],
+  });
+
+  it.each(['a/b', 'a~b'])('finds it covered when the layout binds it: %s', (child) => {
+    const path = `/inputs/request/${child.replace(/~/g, '~0').replace(/\//g, '~1')}`;
+    expect(layoutProblems({ inputs: [nested(child)] }, pageBinding(path))).toEqual([]);
+  });
+
+  it('still reports it missing when the layout binds nothing', () => {
+    expect(layoutFits({ inputs: [nested('a/b')] }, pageBinding())).toBe(false);
+  });
+});

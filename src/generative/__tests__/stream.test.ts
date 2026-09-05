@@ -75,3 +75,62 @@ describe('patch lines compiled back to a spec', () => {
     expect(specFromJsonl(padded)).toEqual(spec);
   });
 });
+
+/**
+ * A stored layout is untrusted text, and compiling is where it first becomes
+ * objects - before the prompt hash, before the validator, before `layoutFits`.
+ * So the one class of harm a verdict cannot undo has to be stopped here.
+ */
+describe('a patch line that would reach a prototype', () => {
+  const withPath = (path: string) =>
+    [
+      JSON.stringify({ op: 'add', path: '/root', value: 'page' }),
+      JSON.stringify({ op: 'add', path, value: 'polluted' }),
+    ].join('\n');
+
+  it.each(['/__proto__/zzPolluted', '/constructor/prototype/zzPolluted', '/elements/~0~1/../x'])(
+    'leaves Object.prototype alone: %s',
+    (path) => {
+      specFromJsonl(withPath(path));
+      expect(({} as Record<string, unknown>).zzPolluted).toBeUndefined();
+    },
+  );
+
+  it('still compiles the lines around it', () => {
+    const spec = specFromJsonl(withPath('/__proto__/zzPolluted'));
+    expect(spec.root).toBe('page');
+  });
+});
+
+/**
+ * A host compiles before it validates, so a throw here arrives before there is
+ * a verdict to act on and the documented fallback never fires. Both shapes below
+ * are reachable from produced text and both used to be fatal to the whole
+ * layout, not just to their own line.
+ */
+describe('a patch line the compiler refuses', () => {
+  const around = (bad: string) =>
+    [
+      JSON.stringify({ op: 'add', path: '/root', value: 'page' }),
+      bad,
+      JSON.stringify({ op: 'add', path: '/elements/page', value: { type: 'Text', props: {} } }),
+    ].join('\n');
+
+  it.each([
+    [
+      'a test op whose value does not match',
+      JSON.stringify({ op: 'test', path: '/root', value: 'other' }),
+    ],
+    ['a path that is not a string', JSON.stringify({ op: 'add', path: 5, value: 'x' })],
+  ])('skips it rather than throwing: %s', (_name, bad) => {
+    expect(() => specFromJsonl(around(bad))).not.toThrow();
+  });
+
+  it('keeps every line around the one it skipped', () => {
+    const spec = specFromJsonl(
+      around(JSON.stringify({ op: 'test', path: '/root', value: 'other' })),
+    );
+    expect(spec.root).toBe('page');
+    expect(spec.elements.page?.type).toBe('Text');
+  });
+});

@@ -197,12 +197,12 @@ function describeRelative(
   });
   if (field.kind === 'object') {
     for (const child of field.fields)
-      describeRelative(child, `${relativePath}/${child.name}`, depth + 1, lines);
+      describeRelative(child, joinPath(relativePath, child.name), depth + 1, lines);
   }
   if (field.kind === 'list' && field.item.kind === 'object') {
     lines.push({ depth: depth + 1, text: `each item is a ${kindLabel(field.item)}, with:` });
     for (const child of field.item.fields) {
-      describeRelative(child, `${relativePath}/<i>/${child.name}`, depth + 2, lines);
+      describeRelative(child, joinPath(relativePath, '<i>', child.name), depth + 2, lines);
     }
   }
 }

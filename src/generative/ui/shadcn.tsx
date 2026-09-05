@@ -214,9 +214,15 @@ const HEADING: Record<string, string> = {
 export function Heading({
   props,
 }: BaseComponentProps<{ text: string; level?: 'h1' | 'h2' | 'h3' | 'h4' | null }>) {
-  const level = props.level ?? 'h2';
-  const Tag = level;
-  return <Tag className={cn('text-foreground', HEADING[level])}>{props.text}</Tag>;
+  // The tag is looked up in the same closed map the class comes from, never
+  // taken from the prop. `const Tag = level` made an arbitrary string a DOM tag
+  // name, and a prop can carry one: an expression-valued prop skips the zod
+  // check, and a `$template` with nothing to interpolate resolves to a literal.
+  // A server-rendered host emitted `<script>` from a layout that passed both
+  // gates. The prop's own type stays the contract; this is what happens when a
+  // stored artifact disagrees with it.
+  const Tag = props.level && Object.hasOwn(HEADING, props.level) ? props.level : 'h2';
+  return <Tag className={cn('text-foreground', HEADING[Tag])}>{props.text}</Tag>;
 }
 
 const TEXT: Record<string, string> = {
@@ -345,11 +351,23 @@ export function Progress({
 
 // ── Inputs ──────────────────────────────────────────────────────────────────
 
-let sequence = 0;
-
-/** A stable id per mounted control, for the label that names it. */
+/**
+ * A stable id per mounted control, for the label that names it.
+ *
+ * `useId` rather than a module-level counter, for the reason
+ * `src/react/field-dom-id.tsx` already gives: it is unique per instance within
+ * a React root AND hydration-stable. A counter is neither. It is module state
+ * that lives as long as the process, so a server module that has served earlier
+ * requests is already advanced while the freshly loaded client module starts at
+ * zero - and these controls carry `'use client'`, which means they are still
+ * server-rendered and then hydrated. `useMemo` is documented as a hint a
+ * renderer may discard, so the id was not guaranteed stable within one session
+ * either; when it changed, the label stopped naming its input and the control
+ * lost its accessible name, which no story test can see because none of them
+ * render on a server.
+ */
 function useControlId(name: string): string {
-  return React.useMemo(() => `jr-${name}-${(sequence += 1)}`, [name]);
+  return `jr-${name}-${React.useId()}`;
 }
 
 export function Input({

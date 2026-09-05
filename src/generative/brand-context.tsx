@@ -51,7 +51,10 @@ function useWebfont(webfont: BrandManifest['webfont']) {
     }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@${WEIGHTS}&display=swap`;
+    // Percent-encoded, then spaces back to the `+` Google Fonts expects: a
+    // family carrying an `&` would otherwise inject query parameters of its own.
+    const encoded = encodeURIComponent(family).replace(/%20/g, '+');
+    link.href = `https://fonts.googleapis.com/css2?family=${encoded}:wght@${WEIGHTS}&display=swap`;
     link.dataset.brandWebfont = key;
     document.head.appendChild(link);
   }, [provider, family]);

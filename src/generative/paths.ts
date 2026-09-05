@@ -76,10 +76,20 @@ export function resultFieldAtPath(field: RunField, path: string): RunField | und
   return segments.length === 0 ? field : descend(field, segments);
 }
 
-/** A stable element key for a path: `/inputs/invoice/billed_to` → `inputs-invoice-billed_to`. */
-export function keyForPath(path: string, suffix?: string): string {
-  const base = path.replace(/^\//, '').replace(/\//g, '-');
-  return suffix ? `${base}-${suffix}` : base;
+/**
+ * The child-to-parent map of a spec's element tree.
+ *
+ * Built once and passed down rather than rebuilt per lookup: `layoutProblems`
+ * resolves one relative hatch path per element that carries one, and each
+ * resolution walks the chain of parents above it. Rebuilding the map inside
+ * that walk made the whole pass quadratic in element count.
+ */
+export function parentMapOf(spec: Spec): Map<string, string> {
+  const parents = new Map<string, string>();
+  for (const [parentKey, element] of Object.entries(spec.elements)) {
+    for (const child of element.children ?? []) parents.set(child, parentKey);
+  }
+  return parents;
 }
 
 /**
@@ -88,31 +98,59 @@ export function keyForPath(path: string, suffix?: string): string {
  * and a first index. `undefined` outside any repeat. Mirrors what
  * `useRepeatScope` gives the hatch at render time, for a test that never
  * renders.
+ *
+ * The walk up the parent chain STOPS on a key it has already seen. A layout is
+ * model-produced, and an element that is its own ancestor - `children: ["self"]`
+ * at its simplest - is a shape json-render's `validateSpec` accepts without a
+ * word, so without the guard this loop never terminates. Since a host calls
+ * this through `layoutFits` precisely to decide whether an untrusted layout is
+ * safe to render, the gate hanging is worse than the layout it was asked about.
  */
-export function repeatBasePathOf(spec: Spec, key: string): string | undefined {
-  const parents = new Map<string, string>();
-  for (const [parentKey, element] of Object.entries(spec.elements)) {
-    for (const child of element.children ?? []) parents.set(child, parentKey);
-  }
+export function repeatBasePathOf(
+  spec: Spec,
+  key: string,
+  parents: Map<string, string> = parentMapOf(spec),
+): string | undefined {
   const chain: string[] = [];
-  for (let current: string | undefined = key; current; current = parents.get(current)) {
+  const seen = new Set<string>();
+  let current: string | undefined = key;
+  while (current !== undefined && !seen.has(current)) {
+    seen.add(current);
     chain.unshift(current);
+    current = parents.get(current);
   }
   let base: string | undefined;
   for (const elementKey of chain) {
     const repeat = spec.elements[elementKey]?.repeat;
     if (!repeat) continue;
     const statePath = repeat.statePath;
-    if (typeof statePath === 'string') base = `${statePath}/0`;
-    else if (base) base = `${base}/${statePath.$item}/0`;
-    else return undefined;
+    if (typeof statePath === 'string') {
+      base = `${statePath}/0`;
+      continue;
+    }
+    // A relative `repeat` names the item's field, and only a string is one. A
+    // layout is model-produced, so `statePath` can be null or an object here -
+    // and reading `.$item` off either produced a throw or a path with
+    // "[object Object]" in it, reported later as an ordinary staleness problem
+    // that named the wrong cause.
+    const item = (statePath as { $item?: unknown } | null)?.$item;
+    if (base === undefined || typeof item !== 'string') return undefined;
+    base = `${joinPath(base, item)}/0`;
   }
   return base;
 }
 
 /** A hatch's path as the layer resolves it: absolute as written, or relative to the repeat it sits in. */
-export function absoluteHatchPath(spec: Spec, key: string, path: string): string | undefined {
+export function absoluteHatchPath(
+  spec: Spec,
+  key: string,
+  path: string,
+  parents?: Map<string, string>,
+): string | undefined {
   if (path.startsWith('/')) return path;
-  const base = repeatBasePathOf(spec, key);
+  const base = repeatBasePathOf(spec, key, parents);
+  // Raw, not `joinPath`: a relative hatch path is written by the producer and
+  // may name several segments (`billed_to/city`), so its `/` are separators
+  // already and escaping them would name one segment that does not exist.
   return base ? `${base}/${path}` : undefined;
 }

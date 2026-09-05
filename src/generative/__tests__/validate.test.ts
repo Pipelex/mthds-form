@@ -1,3 +1,4 @@
+import type { Spec } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import { formatProblems, validateAgainstCatalog } from '../validate';
 
@@ -90,5 +91,200 @@ describe('the validator', () => {
       },
     });
     expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('refuses an element that omits a prop the component requires', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'h',
+      elements: { h: { type: 'Heading', props: {}, children: [] } },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('Heading is missing required prop "text"');
+  });
+
+  /**
+   * An element the root never reaches is a branch the model wrote and forgot to
+   * attach. `stream.ts` keeps it in the JSONL on purpose so this can say so.
+   */
+  it('refuses an element the root does not reach', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: [] },
+        stranded: { type: 'Heading', props: { text: 'Nobody sees me' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('not reachable');
+  });
+
+  /**
+   * The renderer walks children to paint the page, so a cycle is a stack
+   * overflow in the host rather than an odd-looking page. json-render's own
+   * `validateSpec` accepts one without a word.
+   */
+  it('refuses an element that is its own descendant', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: { page: { type: 'Stack', props: { direction: 'vertical' }, children: ['page'] } },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('is its own descendant');
+  });
+});
+
+/**
+ * The `on` field, which the prop checks above never reach.
+ *
+ * A layout says as much through its event bindings as through its props, and
+ * both directions of getting them wrong are silent: an action nothing handles
+ * renders a button that does nothing, and a state write into a tree the host
+ * owns puts a value in the run payload that the person never entered.
+ */
+describe('the actions a layout binds', () => {
+  // Cast, because half of these are shapes the type forbids and the runtime
+  // still receives: a stored layout is JSON a model wrote, not a value this
+  // package constructed.
+  const withPress = (press: unknown): Spec =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['cta'] },
+        cta: { type: 'Cta', props: { label: 'Plan my trip' }, children: [], on: { press } },
+      },
+    }) as unknown as Spec;
+
+  it('accepts the pair an input page ends on', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([{ action: 'validateForm' }, { action: 'run' }]),
+    );
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('refuses an action no catalog and no runtime has', () => {
+    const verdict = validateAgainstCatalog(withPress([{ action: 'runMethod' }]));
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('unknown action "runMethod"');
+  });
+
+  it('refuses a write into the inputs the person fills', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([
+        { action: 'setState', params: { statePath: '/inputs/request/currency', value: 'EUR' } },
+        { action: 'run' },
+      ]),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('a layout may not write into /inputs');
+  });
+
+  it('refuses a write into the result the run fills', () => {
+    const verdict = validateAgainstCatalog(
+      withPress({ action: 'pushState', params: { statePath: '/result/lines', value: {} } }),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('a layout may not write into /result');
+  });
+
+  it("leaves the layout's own scratch state alone", () => {
+    const verdict = validateAgainstCatalog(
+      withPress([{ action: 'setState', params: { statePath: '/activeTab', value: 'stay' } }]),
+    );
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+});
+
+/**
+ * An expression on a prop whose values are a fixed set.
+ *
+ * `{ "$template": "script" }` carries no interpolation, so json-render resolves
+ * it to the literal string `script` - and the expression arm skipped the prop's
+ * own schema entirely, so the string never met the union that declared it. A
+ * renderer that trusted the declared union turned that into a DOM tag name, and
+ * a server-rendered host emitted `<script>` from a layout both gates accepted.
+ */
+describe('an expression where a name belongs', () => {
+  const heading = (level: unknown): Spec =>
+    ({
+      root: 'h',
+      elements: { h: { type: 'Heading', props: { text: 'Plan the trip', level }, children: [] } },
+    }) as unknown as Spec;
+
+  it('refuses a $template standing in for a heading level', () => {
+    const verdict = validateAgainstCatalog(heading({ $template: 'script' }));
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('must be written as a literal');
+  });
+
+  it('refuses a $state standing in for a heading level', () => {
+    expect(validateAgainstCatalog(heading({ $state: '/result/tag' })).ok).toBe(false);
+  });
+
+  it('still accepts the literal names, and an expression where a value belongs', () => {
+    expect(validateAgainstCatalog(heading('h3')).ok).toBe(true);
+    const bound = validateAgainstCatalog({
+      root: 'h',
+      elements: {
+        h: { type: 'Heading', props: { text: { $state: '/result/name' } }, children: [] },
+      },
+    });
+    expect(bound.ok, formatProblems(bound.problems)).toBe(true);
+  });
+});
+
+/**
+ * The gate's own promise, which docs/generative-ui.md states in as many words:
+ * it answers with problems, not exceptions. A host calls it to decide whether
+ * rendering is safe, so a throw is the one answer it cannot use - it arrives
+ * instead of the `no` that would have triggered the fallback.
+ */
+describe('a spec malformed in a way json-render itself throws on', () => {
+  it.each([
+    ['a null repeat', { root: 'a', elements: { a: { type: 'Text', props: {}, repeat: null } } }],
+    [
+      'children that are not a list',
+      { root: 'a', elements: { a: { type: 'Text', props: {}, children: 5 } } },
+    ],
+    ['props that are not an object', { root: 'a', elements: { a: { type: 'Text', props: 5 } } }],
+    ['a null element', { root: 'a', elements: { a: null } }],
+    ['no elements map at all', { root: 'a' }],
+  ])('answers no rather than throwing: %s', (_name, spec) => {
+    const verdict = validateAgainstCatalog(spec as unknown as Spec);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.problems.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Every walk in the gate recurses, so a deep enough chain overflowed the stack
+ * inside the check that exists to keep a layout from reaching the renderer. The
+ * cap is what makes the verdict the layout's own rather than the engine's: the
+ * same bytes answer the same way under node and in a browser.
+ */
+describe('a layout nested deeper than the entry renders', () => {
+  const chain = (length: number): Spec => {
+    const elements: Record<string, unknown> = {};
+    for (let index = 0; index < length; index += 1) {
+      elements[`e${index}`] = {
+        type: 'Text',
+        props: { text: 'x' },
+        children: index + 1 < length ? [`e${index + 1}`] : [],
+      };
+    }
+    return { root: 'e0', elements } as unknown as Spec;
+  };
+
+  it('refuses it, and says so in the layout’s own terms', () => {
+    const verdict = validateAgainstCatalog(chain(9000));
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('deep');
+  });
+
+  it('does not throw where it used to overflow', () => {
+    expect(() => validateAgainstCatalog(chain(9000))).not.toThrow();
+  });
+
+  it('leaves a chain of an ordinary depth alone', () => {
+    expect(validateAgainstCatalog(chain(40)).ok).toBe(true);
   });
 });

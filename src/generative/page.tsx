@@ -40,6 +40,14 @@ export function GenerativePage({
   loading,
   registry = generativeRegistry,
 }: GenerativePageProps) {
+  // The scope reaches every control through context, so a fresh object on each
+  // render re-renders every field on the page - and a host naturally writes it
+  // as a literal beside the store it just read. Memoised on its members, so an
+  // inline `scope={{ inputs: fields, env }}` costs a keystroke nothing.
+  const stableScope = React.useMemo(
+    () => scope,
+    [scope.inputs, scope.result, scope.env, scope.idPrefix],
+  );
   const handlers = React.useMemo(
     () => ({
       run: () => {
@@ -49,7 +57,7 @@ export function GenerativePage({
     [onRun, store],
   );
   return (
-    <DescriptorProvider scope={scope}>
+    <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={registry} store={store} handlers={handlers}>
         <Renderer spec={spec} registry={registry} loading={loading} />
       </JSONUIProvider>

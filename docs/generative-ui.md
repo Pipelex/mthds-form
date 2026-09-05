@@ -20,6 +20,8 @@ Nothing here calls a model. The two things that do — producing a layout, and r
 
 A layout arrives as **JSONL**: one RFC-6902 JSON patch per line, root first and parents before children, so a renderer can paint a partial tree at every line while a model is still streaming. A stored layout is that text exactly as it was emitted; a host compiles it before it validates it.
 
+Compiling is the first thing that touches untrusted text, and it happens before either gate can return a verdict, so it defends itself rather than relying on one. `specFromJsonl` applies the patches a line at a time: a line whose path would walk onto a prototype is dropped, and so is a line the patch applier refuses. What survives is a partial spec the two gates then judge on its merits — which is a verdict a host can act on, where a throw would have arrived instead of one.
+
 ```ts
 import { specFromJsonl, specToJsonl, jsonlLines } from '@pipelex/mthds-form/generative';
 
@@ -42,11 +44,15 @@ import {
 } from '@pipelex/mthds-form/generative';
 ```
 
-**`validateAgainstCatalog(spec, catalog)`** asks whether the layout is written in the vocabulary this entry renders: every element type known, every prop declared and correctly typed, one panel per tab or step, no heading level skipped. It answers with problems, not exceptions — `formatProblems` renders them for a log.
+**`validateAgainstCatalog(spec, catalog)`** asks whether the layout is written in the vocabulary this entry renders: every element type known, every prop declared and correctly typed, one panel per tab or step, no heading level skipped, every element reachable from the root, no element its own descendant, and the element tree no deeper than this entry renders. It answers with problems, not exceptions — `formatProblems` renders them for a log — and that holds for a spec malformed in ways json-render's own walk throws on, because a host calling this to decide whether rendering is safe has no use for an exception.
+
+The depth cap is there for the same reason and is worth knowing about: every walk in the gate recurses, so without it a deep enough chain overflows the stack inside the check, and whether it does depends on the engine rather than on the layout. A stored artifact should get one verdict wherever it is checked, so the limit is the entry's rather than the stack's.
+
+It also reads the `on` field, which says as much about a page as its props do. Every action a layout binds must be one the catalog or the runtime has — an action nothing handles renders a button that does nothing, and a page whose only call to action is dead validates perfectly otherwise, so nothing else would catch it. And a layout may **not write into `/inputs` or `/result`**: `setState`, `pushState` and `removeState` are refused on both, because those two trees are the host's — `/inputs` filled by the person through the controls and by `seedInputs`, `/result` by the run. A layout that could write a value into the run payload would be stating a value rather than naming a path, which is rule 1 inverted. Scratch state of the layout's own, at any other path, is its business.
 
 **`layoutFits(descriptor, spec)`** asks whether the layout still fits the method, in two directions:
 
-- _Staleness_ — every path the layout **mentions** is a path the descriptor still has. A method renames an input and a delegated path resolves to nothing while a bound path writes into a corner of the state the run never reads. Neither fails loudly on its own.
+- _Staleness_ — every path the layout **mentions** is a path the descriptor still has. A method renames an input and a delegated path resolves to nothing while a bound path writes into a corner of the state the run never reads. Neither fails loudly on its own. Mentioning covers every form the prompt teaches, not just the binding: the `path` of a hatch, `{ "$bindState": … }`, `{ "$state": … }`, the condition inside a `$cond`, the interpolations in a `$template`, and the element's own top-level `visible` condition. That last one is why the list matters — a `visible` comparing against a path the method no longer has never holds, so it hides its element for good, and a required input bound inside it still counts as offered while nobody can see it. Only paths under the tree the descriptor owns are asked about; a layout's own scratch state is its business.
 - _Coverage_ — every path the descriptor **requires** is one the layout offers somewhere: bound to a control, laid out as a repeat, or delegated at that path or an ancestor of it. A layout that simply omits a required input is not stale and validates perfectly; it renders a page the person cannot complete, and the run gate then refuses the run for an input with no box on screen. A structure counts as covered when what it _requires_ is covered, so a layout may still leave out an optional member.
 
 The **prompt hash** is the third condition and the cheapest. `PROMPT_HASH` is the first twelve hex digits of the SHA-256 of the catalog prompt this entry ships; every stored layout records the hash it was produced against. A layout whose hash is not this one is not rendered, because the vocabulary it was written in is no longer the vocabulary this entry renders. It is a pinned constant rather than a computation, so the entry stays importable from a browser and a host can compare it synchronously.
@@ -79,6 +85,23 @@ import { GenerativePage, seedInputs, payloadToState } from '@pipelex/mthds-form/
 The store is **controlled**: the host creates it, seeds it with `seedInputs` (which seeds only the defaults the method authored), and reads it back to start the run. So what the page writes is exactly what the kernel's readiness is computed from, and generation is nowhere in the request path. `payloadToState` loads what a run returned into the `/result` tree — a date arrives in the serializer's typed envelope and a plural result as `{items: [...]}`, and this is what turns both into what a layout binds to.
 
 `scope` is what the escape hatches resolve against: `inputs` for an input page, `result` for a result page, plus the `env` the controls need (upload, disabled, a storage resolver) and an `idPrefix` when two pages share a screen.
+
+### Uploads, which arrive by a different id here
+
+`env.onDropFile` is handed the DOM id of the field the file landed on, and on a generative page that id is not the dotted value path [the upload seam](upload-seam.md) describes for a plain form. `MthdsField` mints it from the store path it was given — `/inputs/request/city` becomes `gen-inputs-request-city`, with the `idPrefix` in front of it and the kernel's own `.`-joined suffix for a field nested inside the delegated one. `pathFromDomId` is the inverse, and it is what a host writes back through:
+
+```ts
+import { pathFromDomId } from '@pipelex/mthds-form/generative';
+
+env = {
+  onDropFile: (id, file) => {
+    const path = pathFromDomId(idPrefix, id);
+    if (path) upload(file).then((value) => store.set(path, value));
+  },
+};
+```
+
+Kept beside `domIdFor` in the same module so the two cannot drift, and exact for any name: the id escapes its own separator, so `/inputs/a-b` and `/inputs/a/b` do not mint the same one. That used to rest on an assumption about MTHDS names, which nothing in this package can enforce — a name reaches the descriptor from a JSON Schema property — and the cost of it being wrong was an upload written to a different, plausible-looking path with no error anywhere.
 
 ## Producing a layout
 

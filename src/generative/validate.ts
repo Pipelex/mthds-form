@@ -2,6 +2,7 @@ import type { Spec } from '@json-render/core';
 import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
 import { catalog as defaultCatalog } from './catalog';
+import { INPUTS_ROOT, RESULT_ROOT } from './paths';
 
 /**
  * Whether a spec is one this catalog can render - the check every source
@@ -26,7 +27,11 @@ import { catalog as defaultCatalog } from './catalog';
 /** What the validator reads off a catalog: its names and its definitions. */
 export interface ValidationCatalog {
   componentNames: readonly string[];
+  /** The catalog's own action names. A `defineCatalog` result carries this already. */
+  actionNames?: readonly string[];
   data: unknown;
+  /** The schema the catalog was defined against, for the actions its runtime handles without a handler. */
+  schema?: { builtInActions?: readonly { name: string }[] };
 }
 
 export interface SpecProblem {
@@ -62,6 +67,30 @@ function isExpression(value: unknown): boolean {
   );
 }
 
+/**
+ * The closed vocabularies a prop can be declared with, unwrapped through the
+ * `.optional()` / `.nullable()` most of them carry.
+ *
+ * An expression-valued prop skips the literal check below, which is right for a
+ * value the host supplies at render - but not for a prop whose whole meaning is
+ * that it is one of a fixed set. A `{ "$template": "script" }` carries no
+ * interpolation, so json-render resolves it to the literal string `script`,
+ * and a renderer that trusted the prop's declared union turned that into a DOM
+ * tag name. A closed vocabulary has no dynamic form: if the value is not one of
+ * the names, no expression can make it one.
+ */
+function isClosedVocabulary(schema: z.ZodType): boolean {
+  let current: unknown = schema;
+  for (let depth = 0; depth < 8; depth += 1) {
+    const def = (current as { def?: { type?: string; innerType?: unknown } }).def;
+    if (!def) return false;
+    if (def.type === 'enum' || def.type === 'literal') return true;
+    if (def.innerType === undefined) return false;
+    current = def.innerType;
+  }
+  return false;
+}
+
 /** The zod object each component's props are declared with, by component name. */
 function propsSchemaOf(catalog: ValidationCatalog, type: string): z.ZodObject | undefined {
   const components = (catalog.data as { components: Record<string, { props: unknown }> })
@@ -72,18 +101,159 @@ function propsSchemaOf(catalog: ValidationCatalog, type: string): z.ZodObject | 
     : undefined;
 }
 
+/**
+ * The deepest element chain this entry judges.
+ *
+ * Every walk below recurses, json-render's `validateSpec` included, so a deep
+ * enough chain overflows the stack inside the gate: a chain of a thousand
+ * elements validates in about no time, six thousand throws. The stack limit is
+ * a property of the engine and not of the layout, so without a cap the same
+ * stored bytes can pass under node and fail in a browser - and a stored artifact
+ * deserves one verdict wherever it is checked. The number is far past any page
+ * a person reads and far short of where any engine's stack gives out.
+ */
+const MAX_ELEMENT_DEPTH = 512;
+
+function childKeysOf(spec: Spec, key: string): string[] {
+  const element = spec.elements[key] as { children?: unknown; slots?: unknown } | null | undefined;
+  if (!element) return [];
+  const children = Array.isArray(element.children) ? (element.children as string[]) : [];
+  const slots =
+    typeof element.slots === 'object' && element.slots !== null
+      ? Object.values(element.slots as Record<string, unknown>).flatMap((slot) =>
+          Array.isArray(slot) ? (slot as string[]) : [],
+        )
+      : [];
+  return [...children, ...slots].filter((child) => typeof child === 'string');
+}
+
+/**
+ * The longest chain of elements in the spec, measured without recursing.
+ *
+ * Iterative on purpose: a check whose whole job is to catch a walk that
+ * overflows must not be able to overflow itself. Post-order with a memo, so it
+ * is linear in the tree rather than in its paths, and a back edge is ignored
+ * for depth - a cycle is section 1b's to report, not this one's.
+ */
+function deepestChain(spec: Spec): number {
+  const below = new Map<string, number>();
+  const onPath = new Set<string>();
+  let deepest = 0;
+  for (const start of Object.keys(spec.elements)) {
+    if (below.has(start)) continue;
+    const stack: string[] = [start];
+    while (stack.length > 0) {
+      const key = stack[stack.length - 1] as string;
+      if (below.has(key)) {
+        onPath.delete(key);
+        stack.pop();
+        continue;
+      }
+      const children = childKeysOf(spec, key).filter((child) => !onPath.has(child));
+      const pending = children.filter((child) => !below.has(child));
+      if (pending.length > 0) {
+        onPath.add(key);
+        stack.push(...pending);
+        continue;
+      }
+      below.set(
+        key,
+        children.reduce((tallest, child) => Math.max(tallest, below.get(child) ?? 0), 0) + 1,
+      );
+      onPath.delete(key);
+      stack.pop();
+    }
+    deepest = Math.max(deepest, below.get(start) ?? 0);
+  }
+  return deepest;
+}
+
+/**
+ * Whether a spec is one this catalog can render.
+ *
+ * The checks live in `checkAgainstCatalog`; this is the boundary that keeps the
+ * documented promise around them - it answers with problems, not exceptions.
+ * That promise was not kept: `validateSpec` throws on `repeat: null`, on
+ * `children: 5`, on `props: 5`, on a null element and on a missing `elements`
+ * map, all of which a model can emit. A host calls this to decide whether it is
+ * safe to render, so a throw leaves it with no verdict at the one moment it
+ * needs one, and the fallback to the plain form never fires.
+ */
 export function validateAgainstCatalog(
   spec: Spec,
   catalog: ValidationCatalog = defaultCatalog,
 ): SpecVerdict {
+  try {
+    return checkAgainstCatalog(spec, catalog);
+  } catch (error) {
+    return {
+      ok: false,
+      problems: [{ message: `the layout is not a well-formed spec: ${String(error)}` }],
+    };
+  }
+}
+
+function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdict {
   const problems: SpecProblem[] = [];
 
-  // 1. Structure: root, children, misplaced fields.
+  // 0. Depth, before anything that recurses - including json-render's own walk.
+  const depth = deepestChain(spec);
+  if (depth > MAX_ELEMENT_DEPTH) {
+    return {
+      ok: false,
+      problems: [
+        {
+          message: `the element tree is ${depth} deep; this entry renders at most ${MAX_ELEMENT_DEPTH}.`,
+        },
+      ],
+    };
+  }
+
+  // 1. Structure: root, children, misplaced fields, and the elements the root
+  //    never reaches. json-render reports an orphan at `warning` severity, so
+  //    forwarding errors alone made `checkOrphans` a flag with no effect on the
+  //    verdict - while `stream.ts` deliberately keeps an unreachable element in
+  //    the JSONL "so a validator can report it". An orphan is a branch of the
+  //    page the model wrote and never attached: it renders as nothing at all,
+  //    which is exactly the silent half-page the fallback exists for.
   const structure = validateSpec(spec, { checkOrphans: true });
   for (const issue of structure.issues) {
-    if (issue.severity === 'error') {
+    if (issue.severity === 'error' || issue.code === 'orphaned_element') {
       problems.push({ elementKey: issue.elementKey, message: issue.message });
     }
+  }
+
+  // 1b. No element is its own ancestor.
+  //
+  //     json-render's `validateSpec` guards its OWN walks against a cycle but
+  //     reports nothing about one, so `children: ["self"]` passes it in silence.
+  //     What follows is not silent: the renderer walks children to paint the
+  //     page and recurses until the stack goes. Catching it here is what makes
+  //     the fallback fire instead, and it is the reason `repeatBasePathOf` also
+  //     carries a `seen` guard of its own - the two predicates are exported
+  //     separately, so neither may assume the other ran first.
+  const cyclic = new Set<string>();
+  const state = new Map<string, 'open' | 'done'>();
+  const descend = (key: string): void => {
+    const mark = state.get(key);
+    if (mark === 'done') return;
+    if (mark === 'open') {
+      cyclic.add(key);
+      return;
+    }
+    state.set(key, 'open');
+    const element = spec.elements[key];
+    for (const child of element?.children ?? []) descend(child);
+    for (const slot of Object.values(element?.slots ?? {}))
+      for (const child of slot) descend(child);
+    state.set(key, 'done');
+  };
+  for (const key of Object.keys(spec.elements)) descend(key);
+  for (const key of cyclic) {
+    problems.push({
+      elementKey: key,
+      message: `"${key}" is its own descendant: an element tree may not contain a cycle.`,
+    });
   }
 
   // 2. Every type is in the catalog.
@@ -114,6 +284,11 @@ export function validateAgainstCatalog(
           problems.push({
             elementKey: key,
             message: `${element.type}.path must be a literal string - absolute, or the item's field name inside a repeat - never an expression.`,
+          });
+        } else if (isClosedVocabulary(propSchema)) {
+          problems.push({
+            elementKey: key,
+            message: `${element.type}.${name} is one of a fixed set of names, so it must be written as a literal, never as an expression.`,
           });
         }
         continue;
@@ -210,6 +385,82 @@ export function validateAgainstCatalog(
         elementKey: key,
         message: `Split takes exactly two children (left, right); this one has ${children}.`,
       });
+    }
+  }
+
+  // 7. The `on` field, which nothing looked at before.
+  //
+  //    `props` was checked exhaustively while the other half of what a layout
+  //    can say went unread, and the two failures that hid there are opposite
+  //    ends of the same gap. An action name the catalog does not have is
+  //    accepted, so a `Cta` bound to a misspelt `run` renders a page that
+  //    validates, fits, and whose only button does nothing - with no fallback,
+  //    because both checks said yes. And json-render's runtime applies
+  //    `setState` to whatever `statePath` it is handed, so a layout could write
+  //    a value the person never saw into `/inputs` and have it leave in the run
+  //    payload. That is rule 1 inverted: a layout names a path, and the two
+  //    trees the descriptor owns are the host's to fill - `/inputs` from the
+  //    person through the controls and `seedInputs`, `/result` from the run.
+  //    Scratch state of the layout's own, at any other path, stays its business.
+  //    The name check needs a catalog that declares its actions. Both fields are
+  //    optional on `ValidationCatalog` and a `defineCatalog` result carries
+  //    both, so this entry's catalog is always checked - but a host that hands
+  //    in a vocabulary of its own without them gets the write ban and no
+  //    unknown-action verdict, rather than every action refused for want of a
+  //    list to check against.
+  const declared = [
+    ...(catalog.actionNames ?? []),
+    ...(catalog.schema?.builtInActions ?? []).map((action) => action.name),
+  ];
+  const knownActions = declared.length > 0 ? new Set(declared) : undefined;
+  const STATE_WRITERS = new Set(['setState', 'pushState', 'removeState']);
+  const OWNED_ROOTS = [INPUTS_ROOT, RESULT_ROOT];
+  for (const [key, element] of Object.entries(spec.elements)) {
+    const on = (element as { on?: unknown }).on;
+    if (on === undefined || on === null) continue;
+    if (typeof on !== 'object' || Array.isArray(on)) {
+      problems.push({
+        elementKey: key,
+        message: '"on" must be an object mapping an event name to its actions.',
+      });
+      continue;
+    }
+    for (const [event, binding] of Object.entries(on as Record<string, unknown>)) {
+      for (const entry of Array.isArray(binding) ? binding : [binding]) {
+        const action = (entry as { action?: unknown } | null)?.action;
+        if (typeof action !== 'string') {
+          problems.push({
+            elementKey: key,
+            message: `on.${event} has an entry with no "action" name.`,
+          });
+          continue;
+        }
+        if (knownActions && !knownActions.has(action)) {
+          problems.push({
+            elementKey: key,
+            message: `on.${event} names the unknown action "${action}" (known: ${[...knownActions].join(', ')}); nothing would handle it.`,
+          });
+          continue;
+        }
+        if (!STATE_WRITERS.has(action)) continue;
+        const statePath = (entry as { params?: { statePath?: unknown } }).params?.statePath;
+        if (typeof statePath !== 'string') {
+          problems.push({
+            elementKey: key,
+            message: `on.${event} calls ${action} without a literal "statePath".`,
+          });
+          continue;
+        }
+        const owned = OWNED_ROOTS.find(
+          (root) => statePath === root || statePath.startsWith(`${root}/`),
+        );
+        if (owned) {
+          problems.push({
+            elementKey: key,
+            message: `on.${event} calls ${action} on "${statePath}": a layout may not write into ${owned}, which the host fills. Bind the value with { "$bindState": "${statePath}" } or delegate it with MthdsField instead.`,
+          });
+        }
+      }
     }
   }
 

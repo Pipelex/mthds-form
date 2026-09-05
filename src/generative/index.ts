@@ -78,7 +78,6 @@ export {
   fieldAtSegments,
   inputFieldAtPath,
   joinPath,
-  keyForPath,
   repeatBasePathOf,
   resultFieldAtPath,
   segmentsUnder,

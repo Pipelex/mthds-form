@@ -21,6 +21,8 @@ The package never uploads anything. A file control takes a file from the user an
 
 `onDropFile` is handed the field's **ID**, and a host writes the result back at that path: `setValueAtPath(values, id.split('.'), uploaded)`. A row inside a list is `cvs.1`; a file inside a structure inside a list is `cvs.1.resume`.
 
+**One page mints its ids differently, and a host rendering one must not use the line above.** A produced layout binds to a JSON Pointer in a state store rather than to a value tree, so `MthdsField` mints `gen-inputs-request-city` from `/inputs/request/city` and the write-back address is recovered with `pathFromDomId`, not with `id.split('.')`. Everything else on this page holds unchanged — the same three `FieldEnv` fields, the same rule that the id is derived from the address and not equal to it. See [the generative layer](generative-ui.md) § "Uploads, which arrive by a different id here".
+
 Keeping the ID a path is a deliberate choice, because the alternative is worse. An opaque token would have to be resolved to a position at write-back time, which means the kernel keeping a live token-to-position registry for `setValueAtPath` to consult — turning a pure function of the value tree into a stateful one, in a core whose whole claim is that it has no hidden state.
 
 The cost of that choice is that a path can go stale, and the package pays it where the staleness is created rather than asking the host to.

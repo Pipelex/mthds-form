@@ -2,9 +2,11 @@ import type { Spec } from '@json-render/core';
 import type { RunField } from '../core';
 import {
   INPUTS_ROOT,
+  RESULT_ROOT,
   absoluteHatchPath,
   inputFieldAtPath,
   joinPath,
+  parentMapOf,
   resultFieldAtPath,
 } from './paths';
 
@@ -57,6 +59,62 @@ function boundPaths(spec: Spec): string[] {
   return found;
 }
 
+/**
+ * Every state path the layout READS, as opposed to writes.
+ *
+ * A binding is not the only way a layout names a path. The prompt teaches four
+ * more: `{ "$state": "/path" }` for a read-only value, `$cond` for a condition
+ * (whose own condition object is a `$state`, so the same walk finds it),
+ * `{ "$template": "Total ${/result/amount}" }` for an interpolation, and a
+ * top-level `visible` condition on the ELEMENT rather than in its props - which
+ * is why `element.visible` is walked here beside `element.props`.
+ *
+ * Missing these was not cosmetic. A read that has gone stale renders a
+ * placeholder where a value belongs; a stale `visible` condition compares
+ * against nothing, never holds, and hides its element for good - so a section
+ * carrying a required input silently never appears, while the coverage half
+ * below still counts that input as offered because the binding is right there
+ * in the props of an element nobody can see.
+ */
+function readPaths(spec: Spec): string[] {
+  const found: string[] = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (typeof value !== 'object' || value === null) return;
+    const record = value as Record<string, unknown>;
+    if (typeof record.$state === 'string') found.push(record.$state);
+    if (typeof record.$template === 'string') {
+      for (const match of record.$template.matchAll(/\$\{([^}]*)\}/g)) {
+        if (match[1] !== undefined) found.push(match[1]);
+      }
+    }
+    Object.values(record).forEach(walk);
+  };
+  for (const element of Object.values(spec.elements)) {
+    walk(element.props);
+    walk(element.visible);
+  }
+  return found;
+}
+
+/**
+ * The read paths this descriptor answers for, deduplicated.
+ *
+ * Only paths under the root in question: a layout may hold scratch state of its
+ * own (a `$state` an element writes and reads back), and that is its business,
+ * not the descriptor's. What the descriptor owns is `/inputs` on an input page
+ * and `/result` on a result one, and a path under either that no longer
+ * resolves is the staleness this predicate exists to catch. One line per path,
+ * however many elements mention it.
+ */
+function staleReads(spec: Spec, root: string, resolves: (path: string) => boolean): string[] {
+  const under = readPaths(spec).filter((path) => path === root || path.startsWith(`${root}/`));
+  return [...new Set(under)].filter((path) => !resolves(path));
+}
+
 /** The list path of every `repeat` in the spec: how a layout lays a list out. */
 function repeatPaths(spec: Spec): string[] {
   const found: string[] = [];
@@ -96,7 +154,7 @@ function uncoveredUnder(field: RunField, path: string, offered: Offered): string
   if (field.kind === 'object') {
     return field.fields
       .filter((child) => child.required)
-      .flatMap((child) => uncoveredUnder(child, `${path}/${child.name}`, offered));
+      .flatMap((child) => uncoveredUnder(child, joinPath(path, child.name), offered));
   }
   return [path];
 }
@@ -108,10 +166,12 @@ function uncoveredUnder(field: RunField, path: string, offered: Offered): string
 export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string[] {
   const problems: string[] = [];
   const delegated: string[] = [];
+  const parents = parentMapOf(spec);
 
   for (const [key, element] of Object.entries(spec.elements)) {
     const written = (element.props as { path?: unknown } | undefined)?.path;
-    const path = typeof written === 'string' ? absoluteHatchPath(spec, key, written) : undefined;
+    const path =
+      typeof written === 'string' ? absoluteHatchPath(spec, key, written, parents) : undefined;
     if (element.type === 'MthdsField') {
       if (!path || !inputFieldAtPath(descriptor.inputs ?? [], path)) {
         problems.push(`${key}: MthdsField delegates ${String(written)}, which no input has`);
@@ -131,13 +191,28 @@ export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     if (bound.length > 0) {
       problems.push(`a result page binds ${bound.join(', ')}; a result page writes nothing`);
     }
+    const result = descriptor.result;
+    for (const path of staleReads(spec, RESULT_ROOT, (read) =>
+      result ? resultFieldAtPath(result, read) !== undefined : false,
+    )) {
+      problems.push(`${path} is read, and no result has it`);
+    }
     return problems;
   }
 
+  const inputs = descriptor.inputs;
   for (const path of bound) {
-    if (!inputFieldAtPath(descriptor.inputs, path)) {
+    if (!inputFieldAtPath(inputs, path)) {
       problems.push(`${path} is bound, and no input has it`);
     }
+  }
+
+  for (const path of staleReads(
+    spec,
+    INPUTS_ROOT,
+    (read) => inputFieldAtPath(inputs, read) !== undefined,
+  )) {
+    problems.push(`${path} is read, and no input has it`);
   }
 
   const offered: Offered = {
@@ -145,7 +220,7 @@ export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     repeated: new Set(repeatPaths(spec)),
     delegated,
   };
-  for (const field of descriptor.inputs) {
+  for (const field of inputs) {
     if (!field.required) continue;
     for (const path of uncoveredUnder(field, joinPath(INPUTS_ROOT, field.name), offered)) {
       problems.push(`${path} is required, and the layout offers nowhere to enter it`);

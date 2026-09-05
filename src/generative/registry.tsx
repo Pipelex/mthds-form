@@ -155,8 +155,40 @@ function Unresolved({ path, side }: { path: string; side: 'input' | 'result' }) 
   );
 }
 
-function domIdFor(prefix: string | undefined, path: string): string {
-  return `${prefix ?? 'gen'}${path.replace(/\//g, '-')}`;
+/**
+ * A pointer segment as one piece of a DOM id, and back.
+ *
+ * The id is built by joining the pointer's segments with `-`, so a segment that
+ * contains a `-` of its own would make the join ambiguous: `/inputs/a-b` and
+ * `/inputs/a/b` mint the same id, and the inverse below then hands a host the
+ * wrong path to write an uploaded file to - plausible-looking, silent, and
+ * wrong. This used to rest on a comment asserting that a field's name carries
+ * no `-`; nothing here can enforce that, because a name reaches the descriptor
+ * from a JSON Schema property. So the separator is escaped instead.
+ *
+ * `_` goes first, which is what makes the pass unambiguous: every `_` in the
+ * output that is not one this function wrote has already been doubled, so the
+ * single left-to-right decode below cannot mistake one for the other. Names
+ * without `_`, `-` or `~` - which is every name in practice - pass through
+ * untouched, so the ids this mints are the ids it always minted.
+ */
+function encodeSegment(segment: string): string {
+  return segment.replace(/_/g, '_u').replace(/-/g, '_d').replace(/~/g, '_t');
+}
+
+function decodeSegment(segment: string): string {
+  return segment.replace(/_([udt])/g, (_match, code: string) =>
+    code === 'u' ? '_' : code === 'd' ? '-' : '~',
+  );
+}
+
+/**
+ * Exported for the round-trip test only, not from the entry's index: the pair
+ * is only correct together, so a test that could see just one half of it would
+ * be no guard at all.
+ */
+export function domIdFor(prefix: string | undefined, path: string): string {
+  return `${prefix ?? 'gen'}${path.split('/').map(encodeSegment).join('-')}`;
 }
 
 /**
@@ -165,15 +197,16 @@ function domIdFor(prefix: string | undefined, path: string): string {
  * hatch's id with the child's name or index joined by `.` (the kernel's own
  * composition, `FieldRenderer` through `ObjectField` and `ListField`), and
  * the host writes the file at the store path that id was minted from. Kept
- * beside `domIdFor` so the two cannot drift; exact because a field's name is
- * an identifier and carries no `-`.
+ * beside `domIdFor` so the two cannot drift, and exact for any name by
+ * construction rather than by assumption.
  */
 export function pathFromDomId(prefix: string | undefined, id: string): string | undefined {
   const head = prefix ?? 'gen';
   if (!id.startsWith(head)) return undefined;
   const [own = '', ...children] = id.slice(head.length).split('.');
   if (!own.startsWith('-')) return undefined;
-  return `${own.replace(/-/g, '/')}${children.map((child) => `/${child}`).join('')}`;
+  const path = own.split('-').map(decodeSegment).join('/');
+  return `${path}${children.map((child) => `/${child}`).join('')}`;
 }
 
 /**
@@ -184,6 +217,8 @@ export function pathFromDomId(prefix: string | undefined, id: string): string | 
 function useAbsolutePath(path: string): string | undefined {
   const repeat = useRepeatScope();
   if (path.startsWith('/')) return path;
+  // Raw, not `joinPath`: the same reason `absoluteHatchPath` gives - a relative
+  // hatch path may name several segments, so its `/` are separators already.
   return repeat ? `${repeat.basePath}/${path}` : undefined;
 }
 
