@@ -255,6 +255,150 @@ describe('the actions a layout binds', () => {
 });
 
 /**
+ * The doors the walk over `on` never saw. json-render fires a `watch`'s
+ * bindings when the state at its key changes, with no event and no person in
+ * between, and applies any binding's `onSuccess` and `onError` after the
+ * handler returns or throws - a `set` there writes each key straight into the
+ * state with no handler between, and an `action` there is a binding of its
+ * own, run through the same executor. Each of these reached `/inputs` past a
+ * ban that read `on` alone.
+ */
+describe('a binding that sits off the event path', () => {
+  const page = (cta: Record<string, unknown>): Spec =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['cta'] },
+        cta: { type: 'Cta', props: { label: 'Plan my trip' }, children: [], ...cta },
+      },
+    }) as unknown as Spec;
+  const withPress = (press: unknown): Spec => page({ on: { press } });
+  const withWatch = (watch: unknown): Spec => page({ watch });
+
+  it('refuses a watch that writes into the inputs', () => {
+    const verdict = validateAgainstCatalog(
+      withWatch({
+        '/inputs/request/country': {
+          action: 'setState',
+          params: { statePath: '/inputs/request/city', value: '' },
+        },
+      }),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'watch./inputs/request/country calls setState on "/inputs/request/city": a layout may not write into /inputs',
+    );
+  });
+
+  it('refuses a watch bound to an action nothing handles', () => {
+    const verdict = validateAgainstCatalog(
+      withWatch({ '/inputs/request/country': [{ action: 'loadCities' }] }),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'watch./inputs/request/country names the unknown action "loadCities"',
+    );
+  });
+
+  it("lets a watch keep the layout's own scratch state", () => {
+    const verdict = validateAgainstCatalog(
+      withWatch({
+        '/inputs/request/country': {
+          action: 'setState',
+          params: { statePath: '/ui/cityOptions', value: [] },
+        },
+      }),
+    );
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('refuses an onSuccess that sets an input', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([
+        { action: 'validateForm', onSuccess: { set: { '/inputs/request/city': 'Lyon' } } },
+      ]),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'on.press.onSuccess sets "/inputs/request/city": a layout may not write into /inputs',
+    );
+  });
+
+  it('refuses an onError that sets the result, with the slash the runtime supplies', () => {
+    const verdict = validateAgainstCatalog(
+      withPress({ action: 'run', onError: { set: { 'result/error': '$error.message' } } }),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'on.press.onError sets "result/error": a layout may not write into /result',
+    );
+  });
+
+  it('holds a chained action to the name check and the ban', () => {
+    const unknown = validateAgainstCatalog(
+      withPress({ action: 'validateForm', onSuccess: { action: 'runMethod' } }),
+    );
+    expect(unknown.ok).toBe(false);
+    expect(formatProblems(unknown.problems)).toContain(
+      'on.press.onSuccess names the unknown action "runMethod"',
+    );
+
+    const write = validateAgainstCatalog(
+      withPress({
+        action: 'validateForm',
+        onSuccess: {
+          action: 'setState',
+          params: { statePath: '/inputs/request/city', value: 'Lyon' },
+        },
+      }),
+    );
+    expect(write.ok).toBe(false);
+    expect(formatProblems(write.problems)).toContain(
+      'on.press.onSuccess calls setState on "/inputs/request/city": a layout may not write into /inputs',
+    );
+  });
+
+  it('follows a chain as far as it goes', () => {
+    const verdict = validateAgainstCatalog(
+      withPress({
+        action: 'validateForm',
+        onSuccess: { action: 'run', onError: { set: { '/inputs/request/city': '' } } },
+      }),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'on.press.onSuccess.onError sets "/inputs/request/city": a layout may not write into /inputs',
+    );
+  });
+
+  it('accepts callbacks that stay out of the trees the host fills', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([
+        { action: 'validateForm', onSuccess: { set: { '/ui/validated': true } } },
+        {
+          action: 'run',
+          onError: {
+            action: 'setState',
+            params: { statePath: '/ui/error', value: '$error.message' },
+          },
+        },
+      ]),
+    );
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('names a callback or a watch that is not the shape the runtime reads', () => {
+    const callback = validateAgainstCatalog(withPress({ action: 'run', onSuccess: 'done' }));
+    expect(callback.ok).toBe(false);
+    expect(formatProblems(callback.problems)).toContain('on.press.onSuccess must be an object');
+
+    const watch = validateAgainstCatalog(withWatch([{ action: 'run' }]));
+    expect(watch.ok).toBe(false);
+    expect(formatProblems(watch.problems)).toContain('"watch" must be an object');
+  });
+});
+
+/**
  * The other door to a dead button. A `Cta` emits `press` and nothing else, so
  * `on.click` bound to a perfectly good `run` never fires - and the action check
  * alone, which reads the name and not the event, accepted the page. The

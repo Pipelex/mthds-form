@@ -457,6 +457,16 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   //    in a vocabulary of its own without them gets the write ban and no
   //    unknown-action verdict, rather than every action refused for want of a
   //    list to check against.
+  //
+  //    And a binding does not only sit under `on`. A `watch` fires its
+  //    bindings when the state at its key changes, with no event and no
+  //    person in between; and any binding may carry an `onSuccess` and an
+  //    `onError`, which the runtime applies after the handler returns or
+  //    throws: a `set` there writes each key straight into the state with
+  //    no handler between, and an `action` there is a binding of its own,
+  //    run through the same executor. Every one of those is a door into
+  //    `/inputs` that the walk over `on` never saw, so a binding is checked
+  //    wherever it sits, and a chain is followed as far as it goes.
   const declared = [
     ...(catalog.actionNames ?? []),
     ...(catalog.schema?.builtInActions ?? []).map((action) => action.name),
@@ -473,80 +483,147 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
     validateForm: [{ param: 'statePath', optional: true }],
   };
   const OWNED_ROOTS = [INPUTS_ROOT, RESULT_ROOT];
-  for (const [key, element] of Object.entries(spec.elements)) {
-    const on = (element as { on?: unknown }).on;
-    if (on === undefined || on === null) continue;
-    if (typeof on !== 'object' || Array.isArray(on)) {
+  /** The owned root a destination lands in, judged with the leading slash the runtime supplies. */
+  const ownedRootOf = (written: string): string | undefined => {
+    const statePath = written.startsWith('/') ? written : `/${written}`;
+    return OWNED_ROOTS.find((root) => statePath === root || statePath.startsWith(`${root}/`));
+  };
+  const bindingsOf = (binding: unknown): unknown[] =>
+    Array.isArray(binding) ? binding : [binding];
+  const refusal = (owned: string, statePath: string): string =>
+    `a layout may not write into ${owned}, which the host fills. Bind the value with { "$bindState": "${statePath}" } or delegate it with MthdsField instead.`;
+
+  /**
+   * One binding, wherever it sits - under `on.<event>`, under `watch.<path>`,
+   * or as the `onSuccess` or `onError` of another - held to the name check,
+   * the write ban, and then to its own callbacks. `site` is the spelling a
+   * problem names the binding by.
+   */
+  const checkBinding = (key: string, site: string, entry: unknown): void => {
+    const action = (entry as { action?: unknown } | null)?.action;
+    if (typeof action !== 'string') {
+      problems.push({ elementKey: key, message: `${site} has an entry with no "action" name.` });
+      return;
+    }
+    if (knownActions && !knownActions.has(action)) {
       problems.push({
         elementKey: key,
-        message: '"on" must be an object mapping an event name to its actions.',
+        message: `${site} names the unknown action "${action}" (known: ${[...knownActions].join(', ')}); nothing would handle it.`,
       });
-      continue;
+      return;
     }
-    const emitted = eventsOf(catalog, element.type);
-    for (const [event, binding] of Object.entries(on as Record<string, unknown>)) {
-      if (emitted && !emitted.includes(event)) {
+    // `hasOwnProp`: the action is model-written, and `constructor` would
+    // find a function where a list of destinations belongs.
+    const writes = hasOwnProp(STATE_WRITES, action) ? STATE_WRITES[action] : undefined;
+    if (writes) {
+      const params = (entry as { params?: unknown }).params;
+      for (const { param, optional } of writes) {
+        const written =
+          typeof params === 'object' && params !== null
+            ? (params as Record<string, unknown>)[param]
+            : undefined;
+        if (written === undefined || written === null) {
+          if (!optional) {
+            problems.push({
+              elementKey: key,
+              message: `${site} calls ${action} without a literal "${param}".`,
+            });
+          }
+          continue;
+        }
+        if (typeof written !== 'string') {
+          problems.push({
+            elementKey: key,
+            message: `${site} calls ${action} with a "${param}" that is not a literal string; where an action writes must be named, never computed.`,
+          });
+          continue;
+        }
+        const owned = ownedRootOf(written);
+        if (owned) {
+          const where = param === 'statePath' ? `on "${written}"` : `with ${param} "${written}"`;
+          problems.push({
+            elementKey: key,
+            message: `${site} calls ${action} ${where}: ${refusal(owned, written.startsWith('/') ? written : `/${written}`)}`,
+          });
+        }
+      }
+    }
+    // What the runtime does once the handler has returned or thrown. A `set`
+    // writes each of its keys straight into the state, with no handler in
+    // between; an `action` is a binding of its own, run through the same
+    // executor, so it is checked as one - callbacks included.
+    for (const hook of ['onSuccess', 'onError'] as const) {
+      const follow = (entry as Record<string, unknown>)[hook];
+      if (follow === undefined || follow === null) continue;
+      const hookSite = `${site}.${hook}`;
+      if (typeof follow !== 'object' || Array.isArray(follow)) {
+        problems.push({
+          elementKey: key,
+          message: `${hookSite} must be an object: a { "set" } of state paths to values, or an { "action" } binding.`,
+        });
+        continue;
+      }
+      const record = follow as Record<string, unknown>;
+      if (record.set !== undefined && record.set !== null) {
+        if (typeof record.set !== 'object' || Array.isArray(record.set)) {
+          problems.push({
+            elementKey: key,
+            message: `${hookSite}.set must be an object mapping a state path to its value.`,
+          });
+        } else {
+          for (const written of Object.keys(record.set as Record<string, unknown>)) {
+            const owned = ownedRootOf(written);
+            if (owned) {
+              problems.push({
+                elementKey: key,
+                message: `${hookSite} sets "${written}": ${refusal(owned, written.startsWith('/') ? written : `/${written}`)}`,
+              });
+            }
+          }
+        }
+      }
+      if (record.action !== undefined) checkBinding(key, hookSite, record);
+    }
+  };
+
+  for (const [key, element] of Object.entries(spec.elements)) {
+    const on = (element as { on?: unknown }).on;
+    if (on !== undefined && on !== null) {
+      if (typeof on !== 'object' || Array.isArray(on)) {
+        problems.push({
+          elementKey: key,
+          message: '"on" must be an object mapping an event name to its actions.',
+        });
+      } else {
+        const emitted = eventsOf(catalog, element.type);
+        for (const [event, binding] of Object.entries(on as Record<string, unknown>)) {
+          if (emitted && !emitted.includes(event)) {
+            problems.push({
+              elementKey: key,
+              message:
+                emitted.length > 0
+                  ? `on.${event}: ${element.type} never emits "${event}" (it emits: ${emitted.join(', ')}), so nothing bound there would ever fire.`
+                  : `on.${event}: ${element.type} emits no events, so nothing bound there would ever fire.`,
+            });
+          }
+          for (const entry of bindingsOf(binding)) checkBinding(key, `on.${event}`, entry);
+        }
+      }
+    }
+    // A watch has no event to check against a definition: its key is the
+    // state path whose change fires it. Its bindings are held to everything
+    // else.
+    const watch = (element as { watch?: unknown }).watch;
+    if (watch !== undefined && watch !== null) {
+      if (typeof watch !== 'object' || Array.isArray(watch)) {
         problems.push({
           elementKey: key,
           message:
-            emitted.length > 0
-              ? `on.${event}: ${element.type} never emits "${event}" (it emits: ${emitted.join(', ')}), so nothing bound there would ever fire.`
-              : `on.${event}: ${element.type} emits no events, so nothing bound there would ever fire.`,
+            '"watch" must be an object mapping a state path to the actions its change fires.',
         });
-      }
-      for (const entry of Array.isArray(binding) ? binding : [binding]) {
-        const action = (entry as { action?: unknown } | null)?.action;
-        if (typeof action !== 'string') {
-          problems.push({
-            elementKey: key,
-            message: `on.${event} has an entry with no "action" name.`,
-          });
-          continue;
-        }
-        if (knownActions && !knownActions.has(action)) {
-          problems.push({
-            elementKey: key,
-            message: `on.${event} names the unknown action "${action}" (known: ${[...knownActions].join(', ')}); nothing would handle it.`,
-          });
-          continue;
-        }
-        // `hasOwnProp`: the action is model-written, and `constructor` would
-        // find a function where a list of destinations belongs.
-        const writes = hasOwnProp(STATE_WRITES, action) ? STATE_WRITES[action] : undefined;
-        if (!writes) continue;
-        const params = (entry as { params?: unknown }).params;
-        for (const { param, optional } of writes) {
-          const written =
-            typeof params === 'object' && params !== null
-              ? (params as Record<string, unknown>)[param]
-              : undefined;
-          if (written === undefined || written === null) {
-            if (!optional) {
-              problems.push({
-                elementKey: key,
-                message: `on.${event} calls ${action} without a literal "${param}".`,
-              });
-            }
-            continue;
-          }
-          if (typeof written !== 'string') {
-            problems.push({
-              elementKey: key,
-              message: `on.${event} calls ${action} with a "${param}" that is not a literal string; where an action writes must be named, never computed.`,
-            });
-            continue;
-          }
-          const statePath = written.startsWith('/') ? written : `/${written}`;
-          const owned = OWNED_ROOTS.find(
-            (root) => statePath === root || statePath.startsWith(`${root}/`),
-          );
-          if (owned) {
-            const where = param === 'statePath' ? `on "${written}"` : `with ${param} "${written}"`;
-            problems.push({
-              elementKey: key,
-              message: `on.${event} calls ${action} ${where}: a layout may not write into ${owned}, which the host fills. Bind the value with { "$bindState": "${statePath}" } or delegate it with MthdsField instead.`,
-            });
-          }
+      } else {
+        for (const [path, binding] of Object.entries(watch as Record<string, unknown>)) {
+          for (const entry of bindingsOf(binding)) checkBinding(key, `watch.${path}`, entry);
         }
       }
     }
