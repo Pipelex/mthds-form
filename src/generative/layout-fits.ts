@@ -7,6 +7,7 @@ import {
   inputFieldAtPath,
   joinPath,
   parentMapOf,
+  repeatBasePathOf,
   repeatListPathOf,
   resultFieldAtPath,
 } from './paths';
@@ -56,61 +57,90 @@ function isUnder(root: string, path: string): boolean {
   return path === root || path.startsWith(`${root}/`);
 }
 
-/** Every `{ $bindState: path }` anywhere in an element's props. */
-function boundPaths(spec: Spec): string[] {
-  const found: string[] = [];
-  const walk = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      value.forEach(walk);
-      return;
-    }
-    if (typeof value !== 'object' || value === null) return;
-    const record = value as Record<string, unknown>;
-    if (typeof record.$bindState === 'string') found.push(record.$bindState);
-    Object.values(record).forEach(walk);
-  };
-  for (const element of Object.values(spec.elements)) walk(element.props);
-  return found;
-}
-
 /**
- * Every state path the layout READS, as opposed to writes.
+ * Every state path the layout mentions, sorted by what it does with it.
  *
- * A binding is not the only way a layout names a path. The prompt teaches four
- * more: `{ "$state": "/path" }` for a read-only value, `$cond` for a condition
- * (whose own condition object is a `$state`, so the same walk finds it),
- * `{ "$template": "Total ${/result/amount}" }` for an interpolation, and a
+ * `bound` is what it WRITES: `{ "$bindState": "/path" }`, and inside a repeat
+ * `{ "$bindItem": "field" }`, which binds a member of the current item. `read`
+ * is the rest. A binding is not the only way a layout names a path: the prompt
+ * teaches `{ "$state": "/path" }` for a read-only value, `$cond` for a
+ * condition (whose own condition object is a `$state`, so the same walk finds
+ * it), `{ "$template": "Total ${/result/amount}" }` for an interpolation, a
  * top-level `visible` condition on the ELEMENT rather than in its props - which
- * is why `element.visible` is walked here beside `element.props`.
+ * is why `element.visible` is walked here beside `element.props` - and, inside
+ * a repeat, `{ "$item": "field" }` for a member of the current item.
  *
- * Missing these was not cosmetic. A read that has gone stale renders a
+ * Missing any of these was not cosmetic. A read that has gone stale renders a
  * placeholder where a value belongs; a stale `visible` condition compares
  * against nothing, never holds, and hides its element for good - so a section
  * carrying a required input silently never appears, while the coverage half
  * below still counts that input as offered because the binding is right there
  * in the props of an element nobody can see.
  *
+ * The two item forms are RELATIVE, and json-render resolves them against the
+ * item of the nearest repeat above the element: `$item: "name"` inside a
+ * repeat over `/result/lines` reads `/result/lines/<i>/name`. They are resolved
+ * here the way a relative hatch path is - through `repeatBasePathOf`, at the
+ * first index, since every index resolves to the same descriptor node - so a
+ * renamed member of a repeated item is the same stale path as a renamed input,
+ * and a `$bindItem` under `/result` is the same forbidden write as a
+ * `$bindState` there. One outside any repeat resolves to nothing at all; the
+ * runtime warns and renders nothing, and `adrift` names the element so the
+ * gate can say so.
+ *
  * A `repeat` is a read too, and it is resolved separately (`staleRepeats`)
  * because a relative one names its list through the repeat above it.
  */
-function readPaths(spec: Spec): string[] {
-  const found: string[] = [];
-  const walk = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      value.forEach(walk);
-      return;
-    }
-    if (typeof value !== 'object' || value === null) return;
-    const record = value as Record<string, unknown>;
-    if (typeof record.$state === 'string') found.push(record.$state);
-    if (typeof record.$template === 'string') {
-      for (const match of record.$template.matchAll(/\$\{([^}]*)\}/g)) {
-        if (match[1] !== undefined) found.push(match[1]);
+interface Mentioned {
+  bound: string[];
+  read: string[];
+  /** The elements that read or bind the current item with no repeat above them. */
+  adrift: string[];
+}
+
+function mentionedPaths(spec: Spec, parents: Map<string, string>): Mentioned {
+  const found: Mentioned = { bound: [], read: [], adrift: [] };
+  for (const [key, element] of Object.entries(spec.elements)) {
+    // Resolved lazily: most elements sit in no repeat and mention no item.
+    let base: string | undefined;
+    let resolvedBase = false;
+    const itemPath = (field: string): string | undefined => {
+      if (!resolvedBase) {
+        base = repeatBasePathOf(spec, key, parents);
+        resolvedBase = true;
       }
-    }
-    Object.values(record).forEach(walk);
-  };
-  for (const element of Object.values(spec.elements)) {
+      if (base === undefined) return undefined;
+      // The runtime joins the field under the item's own path, and reads
+      // `""` (or `"/"`) as the item itself.
+      const under = field.startsWith('/') ? field.slice(1) : field;
+      return under === '' ? base : `${base}/${under}`;
+    };
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach(walk);
+        return;
+      }
+      if (typeof value !== 'object' || value === null) return;
+      const record = value as Record<string, unknown>;
+      if (typeof record.$bindState === 'string') found.bound.push(record.$bindState);
+      if (typeof record.$state === 'string') found.read.push(record.$state);
+      if (typeof record.$template === 'string') {
+        for (const match of record.$template.matchAll(/\$\{([^}]*)\}/g)) {
+          if (match[1] !== undefined) found.read.push(match[1]);
+        }
+      }
+      if (typeof record.$bindItem === 'string') {
+        const path = itemPath(record.$bindItem);
+        if (path === undefined) found.adrift.push(key);
+        else found.bound.push(path);
+      }
+      if (typeof record.$item === 'string') {
+        const path = itemPath(record.$item);
+        if (path === undefined) found.adrift.push(key);
+        else found.read.push(path);
+      }
+      Object.values(record).forEach(walk);
+    };
     walk(element.props);
     walk(element.visible);
   }
@@ -127,8 +157,12 @@ function readPaths(spec: Spec): string[] {
  * resolves is the staleness this predicate exists to catch. One line per path,
  * however many elements mention it.
  */
-function staleReads(spec: Spec, root: string, resolves: (path: string) => boolean): string[] {
-  const under = readPaths(spec).filter((path) => isUnder(root, path));
+function staleReads(
+  read: readonly string[],
+  root: string,
+  resolves: (path: string) => boolean,
+): string[] {
+  const under = read.filter((path) => isUnder(root, path));
   return [...new Set(under)].filter((path) => !resolves(path));
 }
 
@@ -284,7 +318,10 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     }
   }
 
-  const bound = boundPaths(spec);
+  const { bound, read, adrift } = mentionedPaths(spec, parents);
+  for (const key of new Set(adrift)) {
+    problems.push(`${key}: reads the current item, and no repeat above it has one`);
+  }
   problems.push(...boundProblems(bound, descriptor.inputs));
 
   if (!descriptor.inputs) {
@@ -292,7 +329,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     const resolves = (path: string): boolean =>
       result ? resultFieldAtPath(result, path) !== undefined : false;
     problems.push(...staleRepeats(spec, parents, RESULT_ROOT, resolves, 'result'));
-    for (const path of staleReads(spec, RESULT_ROOT, resolves)) {
+    for (const path of staleReads(read, RESULT_ROOT, resolves)) {
       problems.push(`${path} is read, and no result has it`);
     }
     return problems;
@@ -301,7 +338,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
   const inputs = descriptor.inputs;
   const resolves = (path: string): boolean => inputFieldAtPath(inputs, path) !== undefined;
   problems.push(...staleRepeats(spec, parents, INPUTS_ROOT, resolves, 'input'));
-  for (const path of staleReads(spec, INPUTS_ROOT, resolves)) {
+  for (const path of staleReads(read, INPUTS_ROOT, resolves)) {
     problems.push(`${path} is read, and no input has it`);
   }
 

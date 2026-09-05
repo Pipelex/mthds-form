@@ -1,6 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { BrandManifest } from '../manifest';
 import { GenerativePage } from '../page';
@@ -54,6 +54,47 @@ describe('the brand the product chrome reads', () => {
     } finally {
       reported.mockRestore();
     }
+  });
+});
+
+/**
+ * The one handler the page registers, and what it reads when it fires.
+ *
+ * json-render's `ActionProvider` takes `handlers` into a `useState` at mount
+ * and never reads the prop again, so a handler object rebuilt on a new
+ * `onRun` or `store` was rebuilt for nobody: Run kept calling the first
+ * render's callback over the first render's store. A host writes `onRun` as
+ * an inline closure over its own state - the natural spelling - and every
+ * closure after the first went unused.
+ */
+describe('the run handler', () => {
+  const CTA: Spec = {
+    root: 'cta',
+    elements: {
+      cta: {
+        type: 'Cta',
+        props: { label: 'Plan my trip' },
+        children: [],
+        on: { press: [{ action: 'run' }] },
+      },
+    },
+  };
+
+  it('calls the latest onRun over the latest store, not the ones it mounted with', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const before = createStateStore({ inputs: { city: 'Lyon' } });
+    const after = createStateStore({ inputs: { city: 'Nantes' } });
+    const { rerender } = render(
+      <GenerativePage spec={CTA} store={before} scope={{}} onRun={first} brand={BRAND} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Plan my trip' }));
+    expect(first).toHaveBeenCalledWith({ inputs: { city: 'Lyon' } });
+
+    rerender(<GenerativePage spec={CTA} store={after} scope={{}} onRun={second} brand={BRAND} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan my trip' }));
+    expect(second).toHaveBeenCalledWith({ inputs: { city: 'Nantes' } });
+    expect(first).toHaveBeenCalledTimes(1);
   });
 });
 

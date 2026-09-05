@@ -192,6 +192,103 @@ describe('the actions a layout binds', () => {
     );
     expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
   });
+
+  /**
+   * The ban covers every destination an action writes, not the one parameter
+   * named `statePath` on the three obvious writers. `validateForm` writes its
+   * verdict at its own `statePath`; `pushState` clears a second path after it
+   * appends; and the runtime supplies a missing leading slash rather than
+   * refusing the path, so `inputs/city` is `/inputs/city` by the time it is
+   * written. Each of these reached `/inputs` past a check that read only
+   * `setState`'s, `pushState`'s and `removeState`'s `statePath`.
+   */
+  it('refuses a validateForm whose verdict would land in the inputs', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([{ action: 'validateForm', params: { statePath: '/inputs/city' } }]),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'calls validateForm on "/inputs/city": a layout may not write into /inputs',
+    );
+  });
+
+  it('refuses a pushState that clears an input on the way', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([
+        {
+          action: 'pushState',
+          params: { statePath: '/draft/tags', value: 'x', clearStatePath: '/inputs/city' },
+        },
+      ]),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      'calls pushState with clearStatePath "/inputs/city": a layout may not write into /inputs',
+    );
+  });
+
+  it('judges a destination with the leading slash the runtime will give it', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([{ action: 'setState', params: { statePath: 'inputs/city', value: 'Lyon' } }]),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('a layout may not write into /inputs');
+  });
+
+  it('refuses a destination that is computed rather than named', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([{ action: 'setState', params: { statePath: { $state: '/target' }, value: 1 } }]),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('not a literal string');
+  });
+
+  it('lets validateForm write its verdict where the runtime puts it by default', () => {
+    const verdict = validateAgainstCatalog(
+      withPress([
+        { action: 'validateForm', params: { statePath: '/formValidation' } },
+        { action: 'run' },
+      ]),
+    );
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+});
+
+/**
+ * The other door to a dead button. A `Cta` emits `press` and nothing else, so
+ * `on.click` bound to a perfectly good `run` never fires - and the action check
+ * alone, which reads the name and not the event, accepted the page. The
+ * events a component emits are what its definition declares, so the check is
+ * the same for every catalog.
+ */
+describe('the event a layout binds', () => {
+  const bound = (type: string, event: string, props: Record<string, unknown>): Spec =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['el'] },
+        el: { type, props, children: [], on: { [event]: [{ action: 'run' }] } },
+      },
+    }) as unknown as Spec;
+
+  it('must be one the component emits', () => {
+    const verdict = validateAgainstCatalog(bound('Cta', 'click', { label: 'Plan my trip' }));
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      '[el] on.click: Cta never emits "click" (it emits: press)',
+    );
+  });
+
+  it('is refused on a component that emits nothing', () => {
+    const verdict = validateAgainstCatalog(bound('Stack', 'press', {}));
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('[el] on.press: Stack emits no events');
+  });
+
+  it('is accepted when the component declares it', () => {
+    const verdict = validateAgainstCatalog(bound('Cta', 'press', { label: 'Plan my trip' }));
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
 });
 
 /**

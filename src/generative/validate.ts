@@ -92,14 +92,37 @@ function isClosedVocabulary(schema: z.ZodType): boolean {
   return false;
 }
 
+/** The catalog's definition of one component, or nothing for a type it does not have. */
+function definitionOf(
+  catalog: ValidationCatalog,
+  type: string,
+): { props?: unknown; events?: unknown } | undefined {
+  const components = (catalog.data as { components: Record<string, { props?: unknown }> })
+    .components;
+  // `hasOwnProp`, because the type is model-written and a prototype key would
+  // find a function where a definition belongs.
+  return hasOwnProp(components, type) ? components[type] : undefined;
+}
+
 /** The zod object each component's props are declared with, by component name. */
 function propsSchemaOf(catalog: ValidationCatalog, type: string): z.ZodObject | undefined {
-  const components = (catalog.data as { components: Record<string, { props: unknown }> })
-    .components;
-  const props = components[type]?.props;
+  const props = definitionOf(catalog, type)?.props;
   return props && typeof props === 'object' && 'shape' in props
     ? (props as z.ZodObject)
     : undefined;
+}
+
+/**
+ * The events a component's renderer emits, as its definition declares them -
+ * an empty list for a component that emits nothing. `undefined` only for a
+ * type the catalog does not have, which section 2 reports on its own.
+ */
+function eventsOf(catalog: ValidationCatalog, type: string): readonly string[] | undefined {
+  const definition = definitionOf(catalog, type);
+  if (!definition) return undefined;
+  return Array.isArray(definition.events)
+    ? definition.events.filter((event): event is string => typeof event === 'string')
+    : [];
 }
 
 /**
@@ -403,17 +426,31 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   // 7. The `on` field, which nothing looked at before.
   //
   //    `props` was checked exhaustively while the other half of what a layout
-  //    can say went unread, and the two failures that hid there are opposite
-  //    ends of the same gap. An action name the catalog does not have is
-  //    accepted, so a `Cta` bound to a misspelt `run` renders a page that
-  //    validates, fits, and whose only button does nothing - with no fallback,
-  //    because both checks said yes. And json-render's runtime applies
+  //    can say went unread, and the failures that hid there are ends of the
+  //    same gap. An action name the catalog does not have is accepted, so a
+  //    `Cta` bound to a misspelt `run` renders a page that validates, fits,
+  //    and whose only button does nothing - with no fallback, because both
+  //    checks said yes. An EVENT name the component never emits is the same
+  //    dead button by the other door: a `Cta` emits `press` and nothing else,
+  //    so `on.click` bound to a perfectly good `run` fires never, and the
+  //    action check alone waved it through. And json-render's runtime applies
   //    `setState` to whatever `statePath` it is handed, so a layout could write
   //    a value the person never saw into `/inputs` and have it leave in the run
   //    payload. That is rule 1 inverted: a layout names a path, and the two
   //    trees the descriptor owns are the host's to fill - `/inputs` from the
   //    person through the controls and `seedInputs`, `/result` from the run.
   //    Scratch state of the layout's own, at any other path, stays its business.
+  //
+  //    The write ban covers EVERY destination an action writes, not the one
+  //    parameter that happens to be named `statePath` on the obvious three:
+  //    `validateForm` writes its verdict at its own `statePath`, and
+  //    `pushState` clears a second path, `clearStatePath`, after it appends.
+  //    Both went unread, and either put a value into `/inputs` through an
+  //    action the ban never looked at. And the runtime's pointer parser treats
+  //    `inputs/city` exactly as `/inputs/city` - a missing leading slash is
+  //    supplied, never refused - so a destination is judged with the slash the
+  //    runtime will give it, not the one the model wrote.
+  //
   //    The name check needs a catalog that declares its actions. Both fields are
   //    optional on `ValidationCatalog` and a `defineCatalog` result carries
   //    both, so this entry's catalog is always checked - but a host that hands
@@ -425,7 +462,16 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
     ...(catalog.schema?.builtInActions ?? []).map((action) => action.name),
   ];
   const knownActions = declared.length > 0 ? new Set(declared) : undefined;
-  const STATE_WRITERS = new Set(['setState', 'pushState', 'removeState']);
+  // Every parameter each state-writing action writes to. A destination the
+  // runtime falls back on when the parameter is absent (`validateForm` writes
+  // `/formValidation`; `pushState` clears nothing) is not the layout's to name,
+  // so those are `optional`; the others are refused when they are not a literal.
+  const STATE_WRITES: Record<string, readonly { param: string; optional?: boolean }[]> = {
+    setState: [{ param: 'statePath' }],
+    pushState: [{ param: 'statePath' }, { param: 'clearStatePath', optional: true }],
+    removeState: [{ param: 'statePath' }],
+    validateForm: [{ param: 'statePath', optional: true }],
+  };
   const OWNED_ROOTS = [INPUTS_ROOT, RESULT_ROOT];
   for (const [key, element] of Object.entries(spec.elements)) {
     const on = (element as { on?: unknown }).on;
@@ -437,7 +483,17 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
       });
       continue;
     }
+    const emitted = eventsOf(catalog, element.type);
     for (const [event, binding] of Object.entries(on as Record<string, unknown>)) {
+      if (emitted && !emitted.includes(event)) {
+        problems.push({
+          elementKey: key,
+          message:
+            emitted.length > 0
+              ? `on.${event}: ${element.type} never emits "${event}" (it emits: ${emitted.join(', ')}), so nothing bound there would ever fire.`
+              : `on.${event}: ${element.type} emits no events, so nothing bound there would ever fire.`,
+        });
+      }
       for (const entry of Array.isArray(binding) ? binding : [binding]) {
         const action = (entry as { action?: unknown } | null)?.action;
         if (typeof action !== 'string') {
@@ -454,23 +510,43 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
           });
           continue;
         }
-        if (!STATE_WRITERS.has(action)) continue;
-        const statePath = (entry as { params?: { statePath?: unknown } }).params?.statePath;
-        if (typeof statePath !== 'string') {
-          problems.push({
-            elementKey: key,
-            message: `on.${event} calls ${action} without a literal "statePath".`,
-          });
-          continue;
-        }
-        const owned = OWNED_ROOTS.find(
-          (root) => statePath === root || statePath.startsWith(`${root}/`),
-        );
-        if (owned) {
-          problems.push({
-            elementKey: key,
-            message: `on.${event} calls ${action} on "${statePath}": a layout may not write into ${owned}, which the host fills. Bind the value with { "$bindState": "${statePath}" } or delegate it with MthdsField instead.`,
-          });
+        // `hasOwnProp`: the action is model-written, and `constructor` would
+        // find a function where a list of destinations belongs.
+        const writes = hasOwnProp(STATE_WRITES, action) ? STATE_WRITES[action] : undefined;
+        if (!writes) continue;
+        const params = (entry as { params?: unknown }).params;
+        for (const { param, optional } of writes) {
+          const written =
+            typeof params === 'object' && params !== null
+              ? (params as Record<string, unknown>)[param]
+              : undefined;
+          if (written === undefined || written === null) {
+            if (!optional) {
+              problems.push({
+                elementKey: key,
+                message: `on.${event} calls ${action} without a literal "${param}".`,
+              });
+            }
+            continue;
+          }
+          if (typeof written !== 'string') {
+            problems.push({
+              elementKey: key,
+              message: `on.${event} calls ${action} with a "${param}" that is not a literal string; where an action writes must be named, never computed.`,
+            });
+            continue;
+          }
+          const statePath = written.startsWith('/') ? written : `/${written}`;
+          const owned = OWNED_ROOTS.find(
+            (root) => statePath === root || statePath.startsWith(`${root}/`),
+          );
+          if (owned) {
+            const where = param === 'statePath' ? `on "${written}"` : `with ${param} "${written}"`;
+            problems.push({
+              elementKey: key,
+              message: `on.${event} calls ${action} ${where}: a layout may not write into ${owned}, which the host fills. Bind the value with { "$bindState": "${statePath}" } or delegate it with MthdsField instead.`,
+            });
+          }
         }
       }
     }

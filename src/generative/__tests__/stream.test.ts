@@ -1,5 +1,5 @@
 import type { Spec } from '@json-render/core';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { jsonlLines, specFromJsonl, specToJsonl } from '../stream';
 
 /**
@@ -82,6 +82,12 @@ describe('patch lines compiled back to a spec', () => {
  * So the one class of harm a verdict cannot undo has to be stopped here.
  */
 describe('a patch line that would reach a prototype', () => {
+  // A failure here is a polluted realm for every test after it. Undo the one
+  // key these lines write, so a red assertion stays one red assertion.
+  afterEach(() => {
+    delete (Object.prototype as unknown as Record<string, unknown>).zzPolluted;
+  });
+
   const withPath = (path: string) =>
     [
       JSON.stringify({ op: 'add', path: '/root', value: 'page' }),
@@ -99,6 +105,24 @@ describe('a patch line that would reach a prototype', () => {
   it('still compiles the lines around it', () => {
     const spec = specFromJsonl(withPath('/__proto__/zzPolluted'));
     expect(spec.root).toBe('page');
+  });
+
+  /**
+   * The second pointer. A `copy` from `/__proto__` to `/scratch` names no
+   * forbidden segment in its `path`, and what it parks at `/scratch` is a
+   * REFERENCE to `Object.prototype` - the applier does not clone - so the next
+   * `add` at `/scratch/<key>` writes onto every object in the realm through
+   * a path the `path`-only guard waved through.
+   */
+  it.each(['copy', 'move'])('leaves Object.prototype alone when a %s reads from one', (op) => {
+    specFromJsonl(
+      [
+        JSON.stringify({ op: 'add', path: '/root', value: 'page' }),
+        JSON.stringify({ op, from: '/__proto__', path: '/scratch' }),
+        JSON.stringify({ op: 'add', path: '/scratch/zzPolluted', value: 'polluted' }),
+      ].join('\n'),
+    );
+    expect(({} as Record<string, unknown>).zzPolluted).toBeUndefined();
   });
 });
 

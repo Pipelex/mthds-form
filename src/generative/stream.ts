@@ -61,10 +61,26 @@ export function specToJsonl(spec: Spec): string {
  * has a spec to judge, the damage is done and no verdict and no fallback can
  * undo it. A produced layout is untrusted text, and this is where it first
  * becomes objects.
+ *
+ * A `copy` or a `move` names a SECOND pointer, `from`, and the applier reads
+ * it with the same walk: `getByPath(spec, '/__proto__')` answers
+ * `Object.prototype` itself, and a `copy` of it to `/scratch` parks a
+ * reference to the prototype inside the spec - not a clone - so the next
+ * `add` at `/scratch/<key>` lands on every object in the realm through a path
+ * that names no forbidden segment at all. Both pointers are checked, for the
+ * same reason `path` is.
  */
 const FORBIDDEN_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
-/** Whether a patch line names a path that would walk onto a prototype. */
+/** Whether a pointer would walk onto a prototype. */
+function pointerReachesPrototype(pointer: unknown): boolean {
+  return (
+    typeof pointer === 'string' &&
+    pointer.split('/').some((segment) => FORBIDDEN_SEGMENTS.has(unescapeSegment(segment)))
+  );
+}
+
+/** Whether a patch line names a pointer - its `path`, or a copy's or move's `from` - that would walk onto a prototype. */
 function reachesPrototype(line: string): boolean {
   let parsed: unknown;
   try {
@@ -72,16 +88,16 @@ function reachesPrototype(line: string): boolean {
   } catch {
     return false; // Not JSON: the compiler skips it, and so do we.
   }
-  const path = (parsed as { path?: unknown } | null)?.path;
-  if (typeof path !== 'string') return false;
-  return path.split('/').some((segment) => FORBIDDEN_SEGMENTS.has(unescapeSegment(segment)));
+  const patch = parsed as { path?: unknown; from?: unknown } | null;
+  return pointerReachesPrototype(patch?.path) || pointerReachesPrototype(patch?.from);
 }
 
 /**
  * The spec a JSONL stream compiles to. Blank lines and non-JSON lines are
- * skipped by the compiler; a line whose path would reach a prototype is dropped
- * here, before the compiler sees it; and a line the compiler refuses is dropped
- * too, which is why the stream is applied one line at a time.
+ * skipped by the compiler; a line whose `path` or `from` would reach a
+ * prototype is dropped here, before the compiler sees it; and a line the
+ * compiler refuses is dropped too, which is why the stream is applied one line
+ * at a time.
  *
  * A batch compile made a single bad line fatal to the whole layout. Two of them
  * are reachable from produced text: a `test` op whose value does not match

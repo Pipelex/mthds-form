@@ -429,6 +429,112 @@ describe('a repeat, which reads the list it lays out', () => {
 });
 
 /**
+ * The two item-relative forms the prompt teaches for the inside of a repeat,
+ * `{ "$item": "field" }` to read a member of the current item and
+ * `{ "$bindItem": "field" }` to bind one. Neither is absolute, so a walk that
+ * collected only `$state` and `$bindState` never saw them: a renamed member of
+ * a repeated item rendered blank on a result page with both gates green, and
+ * an `Input` bound into `/result` through `$bindItem` wrote into the tree the
+ * run fills past a ban that read only `$bindState`. They resolve as a relative
+ * hatch path does - through the repeat above them, at its first index.
+ */
+describe('a path named relative to the current item', () => {
+  const lines: RunField = {
+    kind: 'list',
+    name: 'lines',
+    required: true,
+    item: { kind: 'object', name: 'line', required: true, fields: [text('label', true)] },
+  };
+  const result: RunField = { kind: 'object', name: 'invoice', required: true, fields: [lines] };
+
+  const inRepeat = (statePath: string, type: string, props: Record<string, unknown>): Spec =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['rows'] },
+        rows: { type: 'Stack', props: {}, children: ['cell'], repeat: { statePath } },
+        cell: { type, props, children: [] },
+      },
+    }) as unknown as Spec;
+
+  it('is refused when it reads a member the item no longer has', () => {
+    const spec = inRepeat('/result/lines', 'Text', { text: { $item: 'name' } });
+    expect(layoutProblems({ result }, spec)).toEqual([
+      '/result/lines/0/name is read, and no result has it',
+    ]);
+  });
+
+  it('is refused when it binds a member the item no longer has', () => {
+    const spec = inRepeat('/inputs/lines', 'Input', {
+      label: 'Quantity',
+      value: { $bindItem: 'qty' },
+    });
+    expect(layoutProblems({ inputs: [lines] }, spec)).toEqual([
+      '/inputs/lines/0/qty is bound, and no input has it',
+    ]);
+  });
+
+  it('may not bind into the result, which the run fills', () => {
+    const spec = inRepeat('/result/lines', 'Input', {
+      label: 'Label',
+      value: { $bindItem: 'label' },
+    });
+    expect(layoutProblems({ result }, spec)).toEqual([
+      '/result/lines/0/label is bound; a layout may not write into /result, which the run fills',
+    ]);
+  });
+
+  it('is accepted when the item still has the member, read or bound', () => {
+    expect(
+      layoutProblems({ result }, inRepeat('/result/lines', 'Text', { text: { $item: 'label' } })),
+    ).toEqual([]);
+    expect(
+      layoutProblems(
+        { inputs: [lines] },
+        inRepeat('/inputs/lines', 'Input', { label: 'Label', value: { $bindItem: 'label' } }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('is found in a visible condition as in a prop', () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['rows'] },
+        rows: {
+          type: 'Stack',
+          props: {},
+          children: ['cell'],
+          repeat: { statePath: '/result/lines' },
+        },
+        cell: {
+          type: 'Text',
+          props: { text: 'Paid' },
+          children: [],
+          visible: { $item: 'settled', eq: true },
+        },
+      },
+    };
+    expect(layoutProblems({ result }, spec)).toEqual([
+      '/result/lines/0/settled is read, and no result has it',
+    ]);
+  });
+
+  it('is refused outside any repeat, where it resolves to nothing at all', () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['cell'] },
+        cell: { type: 'Text', props: { text: { $item: 'label' } }, children: [] },
+      },
+    };
+    expect(layoutProblems({ result }, spec)).toEqual([
+      'cell: reads the current item, and no repeat above it has one',
+    ]);
+  });
+});
+
+/**
  * One rule for a bound path, on both pages, and it is the rule the read side
  * and the validator already apply: `/inputs` is the person's, `/result` is
  * the run's, and anything else is the layout's own scratch state. A `Switch`

@@ -64,14 +64,24 @@ export function GenerativePage({
     () => ({ inputs, result, env, idPrefix }),
     [inputs, result, env, idPrefix],
   );
-  const handlers = React.useMemo(
-    () => ({
-      run: () => {
-        onRun?.(store.getSnapshot());
-      },
-    }),
-    [onRun, store],
-  );
+  // json-render's `ActionProvider` reads `handlers` ONCE, into a `useState`,
+  // and never looks at the prop again - so a handler object rebuilt on a new
+  // `onRun` or `store` was rebuilt for nobody, and Run kept calling the
+  // callback and reading the store from the first render. A host writes
+  // `onRun` as an inline closure over its own state as naturally as it writes
+  // the scope literal above, and every one of those closures after the first
+  // went unused. So the handler is created once and reads the latest pair
+  // through a ref, which is refreshed after each commit; the handler only ever
+  // fires from a click, which is after the commit that installed the values.
+  const latest = React.useRef({ onRun, store });
+  React.useEffect(() => {
+    latest.current = { onRun, store };
+  });
+  const [handlers] = React.useState(() => ({
+    run: () => {
+      latest.current.onRun?.(latest.current.store.getSnapshot());
+    },
+  }));
   const page = (
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={registry} store={store} handlers={handlers}>
