@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260905-221cd4
 ---
 
@@ -155,6 +155,16 @@ Tests were added for each: the sentinel cases in the core suite, the resolver-pr
 
 - `/ledger-land` after the merge closes the item and flips this plan to `landed`.
 - The fix reaches consumers with the next npm release of `@pipelex/mthds-form`. The starter template carries an interim `scrubResultUrls` stopgap written against the 0.8.0 gate; a ledger item owned by that repo, blocked by this one, tracks deleting it once the release carrying this fix is on npm. It may keep an `https:`-only rule as its own policy if it wants one, but the reason the stopgap exists is gone.
+
+#### Landed, 2026-09-06
+
+PR #22 was squash-merged into `dev` as `755dab7d4cfcec2d79eac841f1e5d5c4c10267b2`, with `Quality Checks` green, and `L-260905-221cd4` closed `fixed` against it. Every claim in the item's `## What` was verified in the merged tree: the parsed gate at `src/core/native-content.ts:406` with `stripUrlWhitespace` at `:332` and the sentinel-origin path rule at `:448-452`, `src/react/download-stuff.ts:115-117` reading the gate where the download path previously consulted none, the sinks at `src/react/result-field.tsx:437`, `:490-492` and `:553`, and prose images defaulting to `link` at `src/react/result-env.tsx:129`.
+
+**The merge is on `dev` and has not reached `main`, so nothing has been published.** `@pipelex/mthds-form` on npm is still 0.8.0 with the 0.8.0 gate, and this fix rides whichever release is cut next; `mthds-form` has several open release items and none of them names this fix, so which one carries it is an open question for whoever cuts it. That matters beyond the usual delivery lag, because the two follow-ups both key on the published artifact rather than on the merge.
+
+The follow-up elsewhere that Phase 5 anticipated is `L-260906-f9f203` — deleting the starter template's `scrubResultUrls` stopgap — which the close released and which is now unblocked at the ledger level. Its own statement of what it needs is the npm release, not this merge, so it should not be picked up until one is published; whether to record that by blocking it on a release item is a call for a person, since a landing never makes a release a prerequisite of anything on its own.
+
+The loose ends the Checkpoint 3 review found but deliberately did not fix are filed as `L-260906-37ec4e`, owned by this repo: `absoluteUrl` as a second same-origin-path answer reached with a raw unjudged member, the download's recovery path that cannot run outside the user-gesture window, and three refusal states a reader cannot read.
 
 ## Deliberately out of scope
 
