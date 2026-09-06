@@ -90,6 +90,7 @@ export {
   readDocumentContent,
   readHtmlContent,
   readImageContent,
+  viewableUrl,
 } from './native-content';
 
 // Readiness - what the Run button gates on.

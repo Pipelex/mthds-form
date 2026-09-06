@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField } from '../../core';
-import { DocumentField, type FileValue } from '../file-field';
+import { DocumentField, ImageField, type FileValue } from '../file-field';
 
 const field: FileRunField = {
   kind: 'document',
@@ -397,5 +397,59 @@ describe('a file the slot cannot accept never reaches the host', () => {
     // The two that a run proves fail, and that this table used to advertise.
     expect(fileInput().accept).not.toContain('wordprocessingml');
     expect(fileInput().accept).not.toContain('presentationml');
+  });
+});
+
+describe('the input control reads the same URL gate as the result view', () => {
+  const spinner = (c: HTMLElement) => c.querySelector('.animate-spin');
+  const image = (c: HTMLElement) => c.querySelector('img');
+
+  it('paints an allow-listed data: image, with no referrer', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ImageField
+        field={{ ...field, kind: 'image', conceptRef: 'native.Image' }}
+        value={{ filename: 'chart.png', url: 'data:image/png;base64,iVBORw0KGgo=' }}
+        onDropFile={noop}
+        onChange={noop}
+        id="cv"
+      />,
+    );
+    await user.click(previewButton() as HTMLElement);
+    expect(image(container)?.getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+
+  it('names a refused data: URL instead of spinning at it forever', async () => {
+    // Tightening the gate changed this control's meaning: an SVG data URL now
+    // fails it, and routing "the gate said no" to the storage resolver turned an
+    // allow-list miss into a spinner that could never stop, because no resolver
+    // can resolve bytes a value carries inline.
+    const user = userEvent.setup();
+    const { container } = render(
+      <ImageField
+        field={{ ...field, kind: 'image', conceptRef: 'native.Image' }}
+        value={{ filename: 'chart.svg', url: 'data:image/svg+xml,<svg onload="alert(1)"/>' }}
+        onDropFile={noop}
+        onChange={noop}
+        id="cv"
+      />,
+    );
+    await user.click(previewButton() as HTMLElement);
+    expect(spinner(container)).toBeNull();
+    expect(image(container)).toBeNull();
+  });
+
+  it('judges what the host resolver answers, like every other sink', async () => {
+    // A resolver is trusted to know where a host's objects live, not to be a way
+    // past the URL policy - and this is the sink the seam's contract documents.
+    const user = userEvent.setup();
+    const { container } = renderField({
+      value: { filename: 'sample.pdf', url: 'pipelex-storage://bucket/abc' },
+      resolveUrl: async () => '//attacker.example/collect.png',
+    });
+    await user.click(previewButton() as HTMLElement);
+    await waitFor(() => expect(spinner(container)).toBeNull());
+    expect(container.querySelector('object')).toBeNull();
+    expect(image(container)).toBeNull();
   });
 });

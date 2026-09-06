@@ -280,13 +280,114 @@ export function formatDateContent(content: DateContentView): string {
 }
 
 /**
- * Whether a browser can paint this URL as-is.
+ * The media types a `data:` URL may carry and still be viewable.
  *
- * A `pipelex-storage://` reference cannot be resolved client-side — that is the
- * upload seam's job (see [../../docs/upload-seam.md]) — so a renderer with no
- * resolver must show the reference rather than a broken `<img>`. `file:` is
- * deliberately NOT viewable: a run on a developer's machine writes one, and a
- * browser refuses to load it from a page served over http.
+ * An allow-list rather than a deny-list, because the question a sink asks is
+ * "can this paint without executing", and only a closed set answers it. The
+ * raster types are the ones the preview arms already name; `application/pdf` is
+ * here because the input control previews a `data:application/pdf` value a
+ * storage-less host wrote back, through an `<object>`, and reads this same
+ * predicate to decide.
+ *
+ * `image/svg+xml` is deliberately absent: an SVG paints as a picture and
+ * EXECUTES as a document the moment it is opened in a tab, which is one click
+ * away from every image this package paints.
+ */
+const VIEWABLE_DATA_MEDIA_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'application/pdf',
+]);
+
+/**
+ * An origin no host can be, to resolve a relative reference against.
+ *
+ * `.invalid` is reserved by RFC 2606 and resolves nowhere, so nothing can be
+ * fetched from it by accident. It exists only so a path can be parsed at all;
+ * the answer taken from the parse is whether the reference STAYED on it.
+ */
+const RELATIVE_SENTINEL_ORIGIN = 'https://url-gate.invalid';
+
+/**
+ * A scheme, by RFC 3986's grammar: a letter, then letters, digits, `+`, `-`, `.`
+ *
+ * Read off the string rather than inferred from a parse, because a parse needs a
+ * base and the base is what makes the answer wrong — see {@link viewableUrl}.
+ */
+const OWN_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * What the WHATWG URL parser strips before it parses, applied before we judge.
+ *
+ * Leading and trailing C0 controls and spaces are removed, and every internal
+ * tab, line feed and carriage return. This is not tidying: a scheme test run on
+ * the raw string and a browser running on the parsed one disagree about
+ * `" https://cdn/x.png"` — `new URL()` reads it as `https:` and `/^https?:/`
+ * does not — and a host that validated a member by parsing while this gate
+ * prefix-matched would have judged a different string than the one painted.
+ */
+function stripUrlWhitespace(candidate: string): string {
+  // Written out rather than as a character-class regex: the range IS the control
+  // characters, which is exactly what a regex may not spell (`no-control-regex`).
+  let start = 0;
+  let end = candidate.length;
+  while (start < end && candidate.charCodeAt(start) <= 0x20) start += 1;
+  while (end > start && candidate.charCodeAt(end - 1) <= 0x20) end -= 1;
+  // Scan before rebuilding, and rebuild only from the first character that has
+  // to go. Almost every URL has nothing to strip inside it, and the one that
+  // does is the one that is huge: an inline `data:` image is judged three or
+  // four times per render, and a per-character rebuild of a megabyte-long
+  // payload each time is hundreds of milliseconds of frozen main thread for a
+  // string that comes back identical.
+  for (let index = start; index < end; index += 1) {
+    const code = candidate.charCodeAt(index);
+    // Tab, line feed, carriage return - removed wherever they appear, not only
+    // at the edges, which is what the parser does with them.
+    if (code === 0x09 || code === 0x0a || code === 0x0d) {
+      let stripped = candidate.slice(start, index);
+      for (let rest = index; rest < end; rest += 1) {
+        const restCode = candidate.charCodeAt(rest);
+        if (restCode !== 0x09 && restCode !== 0x0a && restCode !== 0x0d)
+          stripped += candidate[rest];
+      }
+      return stripped;
+    }
+  }
+  return start === 0 && end === candidate.length ? candidate : candidate.slice(start, end);
+}
+
+/** The media type a `data:` URL declares, lowercased; `text/plain` when it declares none. */
+function dataUrlMediaType(parsed: URL): string {
+  const declared = parsed.pathname.split(/[;,]/, 1)[0] ?? '';
+  const trimmed = declared.trim().toLowerCase();
+  return trimmed === '' ? 'text/plain' : trimmed;
+}
+
+/**
+ * The URL a browser can paint, normalised — or `undefined` when there is none.
+ *
+ * **The string this returns is the string a sink must use.** That is the whole
+ * point of returning one rather than answering yes or no: the gate judges a
+ * normalised URL, so handing the caller back the raw member would let the two
+ * diverge again on exactly the whitespace the parser strips.
+ *
+ * The gate parses rather than prefix-matches, and branches on the protocol the
+ * parser reports:
+ *
+ * - `http:` and `https:` are viewable.
+ * - `blob:` is viewable. A blob URL is bound to the origin that minted it, so a
+ *   payload cannot forge one that points anywhere else.
+ * - `data:` is viewable only for a media type in {@link VIEWABLE_DATA_MEDIA_TYPES}.
+ *   `data:text/html` is a document at the EMBEDDING page's own origin, which is
+ *   what made an unsandboxed frame over a payload URL a real hole.
+ * - Everything else is not: `javascript:`, `file:` (a run on a developer's
+ *   machine writes one, and a browser refuses to load it from an http page) and
+ *   `pipelex-storage://`, which cannot be resolved client-side at all — that is
+ *   the upload seam's job (see [../../docs/upload-seam.md]), and a renderer with
+ *   no resolver must show the reference rather than a broken `<img>`.
  *
  * **A root-relative path counts**, and leaving it out was a real bug rather
  * than an omission. A host's URL resolver naturally hands back a path on its
@@ -296,13 +397,70 @@ export function formatDateContent(content: DateContentView): string {
  * away and the arms fell back to the payload's `public_url`: a presigned URL
  * that had already expired. The image stayed broken with the fix in place.
  *
- * `//host/path` is deliberately excluded. It is protocol-relative, so it points
- * at another origin while looking like a path.
+ * A path is rejected when it is protocol-relative — `//host/x`, and the two
+ * backslash spellings the parser reads the same way (`\\host\x`, `/\host/x`) —
+ * and then checked against the sentinel as well. An accepted path is returned
+ * relative, because making it absolute against a sentinel would point it at
+ * nowhere.
+ */
+export function viewableUrl(candidate: string | undefined): string | undefined {
+  if (!candidate) return undefined;
+  const stripped = stripUrlWhitespace(candidate);
+  if (stripped === '') return undefined;
+
+  // Whether the string carries a scheme is read OFF THE STRING, before any base
+  // is applied, because the parser reads a candidate whose scheme equals the
+  // base's as relative to that base. Deciding it with a second, base-less parse
+  // let the two disagree: `https:cdn.example/x.png` was judged absolute and
+  // resolved against the sentinel, so the gate handed a sink
+  // `https://url-gate.invalid/cdn.example/x.png` — an internal placeholder, in a
+  // real `<img src>`, in place of a URL that had worked. The grammar is RFC
+  // 3986's, and it agrees with the parser on every string either accepts.
+  if (OWN_SCHEME_RE.test(stripped)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(stripped);
+    } catch {
+      return undefined;
+    }
+    switch (parsed.protocol) {
+      case 'http:':
+      case 'https:':
+      case 'blob:':
+        return parsed.href;
+      case 'data:':
+        return VIEWABLE_DATA_MEDIA_TYPES.has(dataUrlMediaType(parsed)) ? parsed.href : undefined;
+      default:
+        return undefined;
+    }
+  }
+
+  // No scheme of its own: a reference relative to wherever the page is. Only a
+  // root-relative path qualifies.
+  if (!stripped.startsWith('/')) return undefined;
+  // Protocol-relative, rejected on the SPELLING. "Did it stay on the sentinel"
+  // reads as the same rule and is blind in exactly one place — the sentinel's
+  // own host — so `//url-gate.invalid/x` passed the test written to stop it.
+  const afterSlash = stripped.charCodeAt(1);
+  if (afterSlash === 0x2f || afterSlash === 0x5c) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(stripped, RELATIVE_SENTINEL_ORIGIN);
+  } catch {
+    return undefined;
+  }
+  return parsed.origin === RELATIVE_SENTINEL_ORIGIN ? stripped : undefined;
+}
+
+/**
+ * Whether a browser can paint this URL as-is — {@link viewableUrl} as a guard.
+ *
+ * Prefer `viewableUrl` wherever the URL is then USED: this answers the question
+ * without handing back the normalised string, so a caller that acts on the raw
+ * candidate acts on a string the gate did not judge.
  */
 export function isViewableUrl(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^\/(?!\/)/.test(url)) return true;
-  return /^https?:/i.test(url) || /^data:/i.test(url) || /^blob:/i.test(url);
+  return viewableUrl(url) !== undefined;
 }
 
 /**

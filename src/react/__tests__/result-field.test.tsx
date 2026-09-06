@@ -33,6 +33,7 @@ import type {
 import { FieldPresentationProvider } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultField } from '../result-field';
+import { ResultEnvProvider } from '../result-env';
 
 const text = (name: string, contentKey?: string): TextRunField => ({
   kind: 'text',
@@ -243,6 +244,171 @@ describe('files', () => {
   it('renders a file value with no url as an absence', () => {
     render(<ResultField field={file('output', 'image')} value={{ caption: 'orphan' }} />);
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.resultAbsent)).toBeTruthy();
+  });
+});
+
+describe('the URL policy', () => {
+  it('refuses a data: document dressed as a PDF - no preview, no frame, no link', () => {
+    // The reported hole, whole: previewability was decided from the payload's
+    // OWN declared type, so a document could name itself `report.pdf` and be
+    // framed at a `data:text/html` URL - which is a document at the embedding
+    // page's origin, with the host's cookies.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{
+          url: 'data:text/html,<script>alert(1)</script>',
+          filename: 'report.pdf',
+          mime_type: 'application/pdf',
+        }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+    // Named rather than linked, which is the honest floor for a reference no
+    // sink here will act on.
+    expect(screen.queryByRole('link')).toBeNull();
+    // Twice: the document's name above, the reference below it.
+    expect(screen.getAllByText('report.pdf').length).toBeGreaterThan(0);
+  });
+
+  it('refuses a data: URL whose type is outside the allow-list', () => {
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{ url: 'data:image/svg+xml,<svg onload="alert(1)"/>', filename: 'chart.svg' }}
+      />,
+    );
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('still paints an inline raster image, which is on the allow-list', () => {
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{ url: 'data:image/png;base64,iVBORw0KGgo=', caption: 'inline' }}
+      />,
+    );
+    expect(screen.getByRole('img')).toBeTruthy();
+  });
+
+  it('frames an https PDF, with no referrer', async () => {
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    const frame = container.querySelector('iframe');
+    expect(frame).toBeTruthy();
+    expect(frame?.getAttribute('referrerpolicy')).toBe('no-referrer');
+    // Deliberately NOT sandboxed: the attribute sets the sandboxed-plugins flag
+    // unconditionally and no token unsets it, so a sandbox here deletes the PDF
+    // preview in Chrome rather than hardening it. The scheme gate above is what
+    // makes the frame safe. See DocumentPreview's comment.
+    expect(frame?.hasAttribute('sandbox')).toBe(false);
+  });
+
+  it('paints the member it VALIDATED, not a different one', () => {
+    // A leading space is stripped by the URL parser and was not stripped by the
+    // old prefix match, so a host that validated `public_url` by parsing saw the
+    // kernel skip it and fall through to `url`, which nothing had validated.
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{
+          url: 'https://attacker.example/tracked.png',
+          public_url: ' https://cdn.example/a.png',
+        }}
+      />,
+    );
+    expect(screen.getByRole('img').getAttribute('src')).toBe('https://cdn.example/a.png');
+  });
+
+  it('carries the host prose-image policy down to a prose field', () => {
+    // The seam a host actually uses: one statement on the provider, and every
+    // prose value under it follows. `ResultField` needs no prop of its own.
+    const { container } = render(
+      <ResultEnvProvider proseImages="load">
+        <ResultField field={prose('summary')} value="![a chart](https://cdn.example/a.png)" />
+      </ResultEnvProvider>,
+    );
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('https://cdn.example/a.png');
+  });
+
+  it('links rather than loads a prose image when the host said nothing', () => {
+    const { container } = render(
+      <ResultField field={prose('summary')} value="![a chart](https://attacker.example/x.png)" />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('a')?.textContent).toBe('a chart');
+  });
+
+  it('gives every image it paints a no-referrer policy', () => {
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{ url: 'https://cdn.example/a.png', caption: 'A sign' }}
+      />,
+    );
+    expect(screen.getByRole('img').getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+});
+
+describe('a frame takes a same-origin path only from the resolver', () => {
+  const pdfPath = { url: '/api/assets/report.pdf', mime_type: 'application/pdf' };
+
+  it('refuses to frame a path the PAYLOAD named', () => {
+    // A root-relative path is the embedding page's own origin, so a document
+    // framed at one runs on the host's origin - which is what the whole `data:`
+    // ban is about. It is the resolver case the arm exists for, and a payload
+    // must not be able to name it: `{url: "/api/assets/x.svg"}` was a DOM on the
+    // host's origin, and the type gate below admits `image/`, SVG included.
+    const { container } = render(
+      <ResultField field={file('output', 'document')} value={pdfPath} />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('frames the same path when the host RESOLVER produced it', async () => {
+    // A host resolving onto its own origin is choosing its own origin, which is
+    // exactly what the seam is for.
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={() => '/api/assets/report.pdf'}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'pipelex-storage://org/report.pdf', mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe('/api/assets/report.pdf');
+  });
+
+  it('still frames an https document the payload named', () => {
+    render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeTruthy();
+  });
+
+  it('never frames a blob: URL, which the paint gate does accept', () => {
+    // `blob:` is viewable and deliberately not frameable - a payload cannot mint
+    // one, so admitting it to the frame would widen the sink for nothing.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'blob:https://app.example/8f0e', mime_type: 'application/pdf' }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
   });
 });
 

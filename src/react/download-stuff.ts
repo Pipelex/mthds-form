@@ -1,5 +1,6 @@
 import { collectStuffFiles, type StuffFile } from '../core/stuff-files';
 import type { RunField } from '../core/descriptor';
+import { viewableUrl } from '../core/native-content';
 
 /** How a host turns a stored reference into something fetchable. */
 export type ResolveForDownload = (url: string) => string | undefined;
@@ -90,6 +91,10 @@ export async function downloadStuff({
   // most does not announce itself there — a `native.Html` node's kind is
   // `object`, and the whole stuff is still the page.
   const isBareFile = files.length === 1 && files[0]?.path === field.name;
+  // Whether anything was actually handed over. The bare-file rule below turns on
+  // it, because "the file IS the whole download" only justifies dropping the
+  // receipt when the file was in fact delivered.
+  let deliveredAFile = false;
 
   for (const file of files) {
     const name = fileNameFor(file, baseName);
@@ -97,10 +102,22 @@ export async function downloadStuff({
     // Inline content: nothing to fetch, so nothing that can fail.
     if (file.text !== undefined) {
       saveBlob(new Blob([file.text], { type: mimeForExtension(file.extension) }), name);
+      deliveredAFile = true;
       continue;
     }
 
-    const href = resolveUrl?.(file.url ?? '') ?? file.publicUrl ?? file.url;
+    // Judged by the same gate the result view paints through, and for the same
+    // reason: this path both FETCHES a URL and, when the fetch fails, hands it
+    // to `window.open` - which is a navigation, and the one sink that would
+    // have run a `javascript:` reference. It used to consult no gate at all.
+    // What the gate returns is what is used, never the raw member.
+    const href =
+      viewableUrl(resolveUrl?.(file.url ?? '')) ??
+      viewableUrl(file.publicUrl) ??
+      viewableUrl(file.url);
+    // A file whose reference nothing accepts is skipped rather than guessed at.
+    // The JSON receipt below carries it either way, so the reader keeps the
+    // reference even when they cannot be handed the bytes.
     if (!href) continue;
     try {
       const response = await fetch(href);
@@ -112,9 +129,15 @@ export async function downloadStuff({
       // is one recovery and it does not depend on which of them happened.
       window.open(href, '_blank', 'noopener');
     }
+    deliveredAFile = true;
   }
 
-  if (isBareFile) return;
+  // The receipt is dropped only when the one file this stuff amounts to actually
+  // went out. A bare file whose reference the gate refuses used to fall through
+  // both halves of this - `continue` above, then this early return - and the
+  // download produced nothing at all: no bytes, no receipt, no error, and a
+  // promise that resolved clean.
+  if (isBareFile && deliveredAFile) return;
   saveBlob(
     new Blob([JSON.stringify(value, null, 2)], { type: 'application/json;charset=utf-8' }),
     `${baseName}.json`,

