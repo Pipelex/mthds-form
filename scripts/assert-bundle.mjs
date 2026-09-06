@@ -8,7 +8,7 @@
  *
  * Run against a fresh `dist/` (see `make assert-bundle`).
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 
 const DIST = resolve('dist');
@@ -304,6 +304,7 @@ if (unscanned.length === 0) {
   );
 }
 
+
 /**
  * The token contract: what the sheet READS, what `theme.css` DEFINES, and the
  * fallback that stands between them.
@@ -317,20 +318,34 @@ if (unscanned.length === 0) {
  * it. Nothing anywhere else in this repo can notice, which is why the check is
  * here: the whole failure mode is a declaration that was never applied.
  *
- * Three claims, and they are checked where each is actually legible.
+ * The claims are checked where each is actually legible.
  *
- * The first two read SOURCE, because `dist/styles.css` is minified and
+ * The source-side ones read SOURCE, because `dist/styles.css` is minified and
  * lightningcss rewrites a fallback's value - `hsl(240 5.9% 10%)` arrives as
  * `#18181b`, `0.5rem` as `.5rem` - so a value comparison against `theme.css`
- * can only be made before the build. The third reads `dist/`, because whether
- * a token escaped WITHOUT a fallback is a fact about what ships: a control
- * that reads a token through an arbitrary value (`rounded-[calc(var(--radius)
- * *1.5)]`) never passes through the `@theme inline` mapping and inherits none
- * of its fallbacks.
+ * can only be made before the build. The last one reads `dist/`, because
+ * whether a token escaped WITHOUT a fallback is a fact about what ships: a
+ * control that reads a token through an arbitrary value
+ * (`rounded-[calc(var(--radius)*1.5)]`) never passes through the `@theme
+ * inline` mapping and inherits none of its fallbacks.
  *
- * The built sheet reads a SUBSET, not the whole set, and that is not drift:
- * Tailwind emits only the utilities the scanned trees use, so a mapped token
- * no control has needed yet reaches no declaration to be read from.
+ * TWO RULES GOVERN EVERY CHECK BELOW, and both were learned from a guard that
+ * passed while the sheet was broken.
+ *
+ * A check that compared NOTHING must fail. Every one of these reads a block out
+ * of a file and then compares what is inside it, so an empty block, an empty
+ * palette or a sheet that reads no tokens used to sail through: the `ok` line
+ * simply did not print, and a missing line is not a signal anybody reads.
+ *
+ * A COMMENT is not configuration and a nested block is not a declaration. These
+ * blocks are located by counting braces over comment-stripped CSS rather than
+ * by a lazy regex, because a regex reads a commented-out `@theme inline` block
+ * as live config - which shipped a sheet with no colour utilities at all while
+ * every check printed `ok` - and a lazy `[\s\S]*?` up to the first `}` stops
+ * inside a nested at-rule, folding `theme.css`'s DARK values into the light
+ * palette until the arm check demanded the dark value as the light fallback.
+ * A second block of the same name is refused for the same reason: it would
+ * override the first, and only the first was ever read.
  */
 const RESERVED_NAMESPACES = [
   // Tailwind's own runtime variables, set by the utilities that need them.
@@ -343,15 +358,145 @@ const RESERVED_NAMESPACES = [
 ];
 
 /**
- * Every `var()` read in a stylesheet, with its fallback when it has one.
+ * Tokens whose value is deliberately the same in every scope, so `.dark` has
+ * nothing to say about them. Geometry, not colour.
+ */
+const SCOPE_INDEPENDENT = ['--radius'];
+
+/**
+ * Tokens the package maps and themes but no control has reached for yet, so
+ * Tailwind emits no utility that reads them. Each one is a stated exception:
+ * the shipped sheet is allowed to be a subset of the mapping, but only by this
+ * list, because "the count went down" is not something a build can notice.
+ */
+const UNUSED_BY_CONTROLS = [
+  // The controls pair `bg-destructive` with `text-white` rather than with this
+  // token - see src/generative/ui/shadcn.tsx.
+  '--destructive-foreground',
+];
+
+/**
+ * CSS with its comments removed, newlines kept so error messages stay readable.
  *
- * The fallback is read with a paren counter rather than a regex, because a
- * colour fallback carries parens of its own (`var(--primary, hsl(240 5.9%
- * 10%))`) and `[^)]*` stops inside it.
+ * Quote-aware, because `content: "/*"` is a string and not the start of a
+ * comment. CSS comments do not nest.
+ */
+function withoutComments(css) {
+  let out = '';
+  let quote = null;
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    if (quote === null && (ch === '"' || ch === "'")) {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (quote !== null) {
+      if (ch === '\\') {
+        out += ch + (css[i + 1] ?? '');
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && css[i + 1] === '*') {
+      i += 2;
+      while (i < css.length && !(css[i] === '*' && css[i + 1] === '/')) {
+        if (css[i] === '\n') out += '\n';
+        i++;
+      }
+      i++;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * The bodies of every top-level block whose head matches, brace-counted.
+ *
+ * `head` must be a global regex matching up to and including the opening brace.
+ * Returns one entry per block, in source order, so a caller can refuse a second
+ * one instead of silently reading the first.
+ */
+function blocksOf(css, head) {
+  const bodies = [];
+  head.lastIndex = 0;
+  let match;
+  while ((match = head.exec(css)) !== null) {
+    let depth = 1;
+    let i = head.lastIndex;
+    const start = i;
+    let quote = null;
+    while (i < css.length && depth > 0) {
+      const ch = css[i];
+      if (quote !== null) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+      i++;
+    }
+    if (depth > 0) return { bodies, unterminated: true };
+    bodies.push(css.slice(start, i - 1));
+    head.lastIndex = i;
+  }
+  return { bodies, unterminated: false };
+}
+
+/**
+ * The one block a named rule is allowed to have, or `null` with the reason
+ * already recorded as a failure.
+ */
+function soleBlock(css, head, label, where) {
+  const { bodies, unterminated } = blocksOf(css, head);
+  if (unterminated) {
+    failures.push(`${where} has an unterminated \`${label}\` block - a brace is missing, so nothing below could be read.`);
+    return null;
+  }
+  if (bodies.length === 0) {
+    failures.push(`${where} has no \`${label}\` block. It is the executable form of this package's token contract; without it there is nothing to check against.`);
+    return null;
+  }
+  if (bodies.length > 1) {
+    failures.push(`${where} has ${bodies.length} \`${label}\` blocks. A later one overrides an earlier one and only the first is read here, so the contract this file states would not be the contract it ships. Keep one.`);
+    return null;
+  }
+  if (bodies[0].includes('{')) {
+    failures.push(`${where}'s \`${label}\` block contains a nested block. Its declarations would be folded in with the top-level ones - a nested \`@media (prefers-color-scheme: dark)\` inside \`:root\` is how the dark palette ends up being read as the light one. Move it out.`);
+    return null;
+  }
+  return bodies[0];
+}
+
+/** The custom properties a block declares, in order, last-wins. */
+function declarationsOf(body) {
+  return new Map([...body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+}
+
+/**
+ * Every `var()` read in a stylesheet, with its fallback when it has one, plus
+ * whatever the scanner could not parse.
+ *
+ * The fallback is read with a quote-aware paren counter rather than a regex,
+ * because a colour fallback carries parens of its own (`var(--primary, hsl(240
+ * 5.9% 10%))`) - which `[^)]*` stops inside - and a quoted paren
+ * (`var(--x, "(")`) unbalances a counter that does not track strings.
+ *
+ * `var(` is matched case-insensitively and the name class is deliberately wide,
+ * because CSS function names are case-insensitive and a custom property name
+ * may hold an escape or a non-ASCII letter. A read this scanner cannot parse is
+ * REPORTED, never dropped: in a gate whose whole purpose is catching a read
+ * nothing else can see, a silent skip is a false pass.
  */
 function varReadsOf(css) {
   const reads = [];
-  const opening = /var\(\s*(--[\w-]+)\s*/g;
+  const malformed = [];
+  const opening = /var\(\s*(--[^\s,)(;{}'"]+)\s*/gi;
   let match;
   while ((match = opening.exec(css)) !== null) {
     let i = opening.lastIndex;
@@ -359,41 +504,75 @@ function varReadsOf(css) {
       reads.push({ name: match[1], fallback: null });
       continue;
     }
-    if (css[i] !== ',') continue;
+    if (css[i] !== ',') {
+      malformed.push(`\`${css.slice(match.index, Math.min(match.index + 48, css.length))}\``);
+      continue;
+    }
     i += 1;
     const start = i;
     let depth = 1;
+    let quote = null;
     while (i < css.length) {
-      if (css[i] === '(') depth += 1;
-      else if (css[i] === ')') {
+      const ch = css[i];
+      if (quote !== null) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth += 1;
+      else if (ch === ')') {
         depth -= 1;
         if (depth === 0) break;
       }
       i += 1;
     }
+    if (depth !== 0) {
+      malformed.push(`\`${css.slice(match.index, Math.min(match.index + 48, css.length))}\``);
+      continue;
+    }
     reads.push({ name: match[1], fallback: css.slice(start, i).trim() });
+  }
+  return { reads, malformed };
+}
+
+/** A read whose fallback the scanner returns, guarding the empty case. */
+function readsOf(css, where) {
+  const { reads, malformed } = varReadsOf(css);
+  if (malformed.length > 0) {
+    failures.push(
+      `${where}: this script could not parse ${malformed.join(', ')} as a \`var()\` read, so it cannot say whether those tokens carry a fallback. Rewrite them plainly, or teach \`varReadsOf\` the shape.`,
+    );
   }
   return reads;
 }
 
-const themeCss = readFileSync(resolve('src/styles/theme.css'), 'utf8');
-const lightBlock = /:root\s*\{([\s\S]*?)\}/.exec(themeCss);
-if (lightBlock === null) {
-  failures.push('src/styles/theme.css has no `:root` block, so there is no light palette to check against.');
+/**
+ * An arbitrary value spells its fallback in Tailwind's escaped form, where `_`
+ * stands for a space and `\_` for a literal underscore.
+ */
+function unescapeArbitrary(value) {
+  return value.replace(/\\?_/g, (m) => (m === '\\_' ? '_' : ' '));
 }
-const lightPalette = new Map(
-  lightBlock === null
-    ? []
-    : [...lightBlock[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]),
-);
 
-const entryCss = readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8');
-const themeBlock = /@theme inline\s*\{([\s\S]*?)\n\}/.exec(entryCss);
-if (themeBlock === null) {
-  failures.push('src/styles/tailwind-entry.css has no `@theme inline` block - it is the executable list of the tokens this package reads.');
+const themeCss = withoutComments(readFileSync(resolve('src/styles/theme.css'), 'utf8'));
+const lightBody = soleBlock(themeCss, /(?:^|[}\s;])(?::root)\s*\{/g, ':root', 'src/styles/theme.css');
+const darkBody = soleBlock(themeCss, /(?:^|[}\s;])(?:\.dark)\s*\{/g, '.dark', 'src/styles/theme.css');
+const lightPalette = lightBody === null ? new Map() : declarationsOf(lightBody);
+const darkPalette = darkBody === null ? new Map() : declarationsOf(darkBody);
+if (lightBody !== null && lightPalette.size === 0) {
+  failures.push(
+    'src/styles/theme.css has a `:root` block that declares no tokens, so every value check below would compare nothing and report success. A check that finds nothing must fail.',
+  );
 }
-const arms = themeBlock === null ? [] : varReadsOf(themeBlock[1]);
+
+const entryCss = withoutComments(readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8'));
+const themeBody = soleBlock(entryCss, /@theme\s+inline\s*\{/g, '@theme inline', 'src/styles/tailwind-entry.css');
+const arms = themeBody === null ? [] : readsOf(themeBody, 'src/styles/tailwind-entry.css `@theme inline`');
 const mapped = new Set(arms.map((arm) => arm.name));
+if (themeBody !== null && arms.length === 0) {
+  failures.push(
+    'src/styles/tailwind-entry.css has an `@theme inline` block that reads no tokens - so no utility resolves a colour at all, and every check below would run on an empty set.',
+  );
+}
 
 // 1. The tokens the package reads are exactly the tokens `theme.css` defines.
 //    A token mapped but undefined leaves `theme.css` unable to theme it; a
@@ -414,6 +593,30 @@ if (unmapped.length > 0) {
   );
 }
 
+// 1b. `.dark` says the same words as `:root`. Nothing else reads that block, and
+//     a token missing from it does NOT fall back: it inherits the light value
+//     from `:root`, so dark mode renders a light colour on a dark surface with
+//     no declaration discarded and nothing to notice. The fallbacks make that
+//     worse, not better - the reader now sees a plausible colour rather than
+//     `transparent`, so it reads as deliberate.
+const darkMissing = [...lightPalette.keys()]
+  .filter((name) => !darkPalette.has(name) && !SCOPE_INDEPENDENT.includes(name))
+  .sort();
+const darkExtra = [...darkPalette.keys()].filter((name) => !lightPalette.has(name)).sort();
+if (darkBody !== null && darkMissing.length === 0 && darkExtra.length === 0 && lightPalette.size > 0) {
+  console.log(`ok  theme.css's .dark block restates every token :root defines`);
+}
+if (darkMissing.length > 0) {
+  failures.push(
+    `src/styles/theme.css's \`.dark\` block does not restate ${darkMissing.join(', ')}, so under \`.dark\` they inherit the LIGHT value from \`:root\` - a light colour on a dark surface, with no declaration discarded and nothing to notice. Add them, or list them in SCOPE_INDEPENDENT if the value is genuinely the same in every scope.`,
+  );
+}
+if (darkExtra.length > 0) {
+  failures.push(
+    `src/styles/theme.css's \`.dark\` block defines ${darkExtra.join(', ')}, which \`:root\` does not - a declaration no light-mode host can reach. Define them in \`:root\` too, or drop them.`,
+  );
+}
+
 // 2. Each arm carries a fallback, and it is theme.css's LIGHT value. The
 //    fallback is frozen into every utility, so it cannot vary by scope: a host
 //    that defines nothing renders light even under `.dark`, and theme.css stays
@@ -422,10 +625,13 @@ const armProblems = [];
 for (const { name, fallback } of arms) {
   const light = lightPalette.get(name);
   if (light === undefined) continue; // already reported above
-  if (fallback === null) armProblems.push(`${name} carries no fallback (expected \`var(${name}, ${light})\`)`);
+  // An EMPTY fallback is not a fallback: `var(--x,)` substitutes nothing, so the
+  // declaration is invalid and the browser discards it - the exact failure this
+  // whole block exists to catch. It must read as missing, not as present.
+  if (!fallback) armProblems.push(`${name} carries no fallback (expected \`var(${name}, ${light})\`)`);
   else if (fallback !== light) armProblems.push(`${name} falls back to \`${fallback}\`, but theme.css's light value is \`${light}\``);
 }
-if (armProblems.length === 0 && arms.length > 0) {
+if (armProblems.length === 0 && arms.length > 0 && lightPalette.size > 0) {
   console.log("ok  every @theme inline arm falls back to theme.css's light value");
 } else if (armProblems.length > 0) {
   failures.push(
@@ -433,23 +639,80 @@ if (armProblems.length === 0 && arms.length > 0) {
   );
 }
 
-// 3. Nothing in the SHIPPED sheet reads a design token without a fallback, and
-//    every design token it reads is one theme.css defines. This is the half
-//    that catches an arbitrary value going around the mapping.
+// 2b. So does every token read that goes AROUND the mapping. An arbitrary value
+//     (`rounded-[calc(var(--radius,0.5rem)*1.5)]`) spells its own fallback, and
+//     the shipped-sheet check below can only see WHETHER it has one - by then
+//     lightningcss has rewritten the value. Here the value is still legible, so
+//     this is the only place a drifted arbitrary fallback can be caught.
+const ARBITRARY_SOURCES = ['src/react', 'src/generative', 'src/styles'];
+const arbitraryProblems = [];
+let arbitraryReads = 0;
+for (const dir of ARBITRARY_SOURCES) {
+  for (const file of readdirSync(resolve(dir), { recursive: true, withFileTypes: true })) {
+    if (!file.isFile() || !/\.(tsx?|css)$/.test(file.name)) continue;
+    const path = `${file.parentPath ?? file.path}/${file.name}`;
+    const relative = path.slice(path.indexOf('src/'));
+    // The `@theme inline` arms are read out of this same tree, and check 2 owns
+    // them - blank the block rather than matching on the token name, so a read
+    // ELSEWHERE in the entry file is still judged here.
+    let source = withoutComments(readFileSync(path, 'utf8'));
+    if (themeBody !== null && source.includes(themeBody)) source = source.replace(themeBody, '');
+    for (const { name, fallback } of readsOf(source, relative)) {
+      const light = lightPalette.get(name);
+      if (light === undefined) continue; // not a design token
+      arbitraryReads += 1;
+      const spelled = fallback === null ? null : unescapeArbitrary(fallback);
+      if (!spelled) arbitraryProblems.push(`${relative} reads ${name} with no fallback`);
+      else if (spelled !== light) arbitraryProblems.push(`${relative} falls ${name} back to \`${spelled}\`, but theme.css's light value is \`${light}\``);
+    }
+  }
+}
+if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
+  console.log(`ok  the ${arbitraryReads} token reads outside the mapping spell theme.css's light value`);
+} else if (arbitraryProblems.length > 0) {
+  failures.push(
+    `${arbitraryProblems.join('; ')}. A token read through an arbitrary value never passes through the \`@theme inline\` mapping, so it inherits no fallback and has to spell the light value itself.`,
+  );
+}
+
+// 3. Nothing in the SHIPPED sheet reads a design token without a fallback, every
+//    design token it reads is one theme.css defines, and it reads all of them
+//    bar a stated exception. The subset used to be unrestricted, which meant a
+//    sheet that had lost every colour utility passed with the token count
+//    quietly dropping - and a count going down is not a signal.
 const stylesCss = readFileSync(`${DIST}/styles.css`, 'utf8');
 const selfDefined = new Set([
   ...[...stylesCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]),
   ...[...stylesCss.matchAll(/@property\s+(--[\w-]+)/g)].map((m) => m[1]),
 ]);
-const shipped = varReadsOf(stylesCss).filter(
+// A DESIGN TOKEN is never exempt, whatever else the sheet happens to say about
+// it. `selfDefined` is per NAME over the whole sheet, so without this a single
+// scoped override - `[--primary:...]` on a wrapper, the idiomatic Tailwind way
+// to re-theme a subtree - would put `--primary` in that set and make every
+// fallback-less read of it anywhere in the sheet invisible to this check. The
+// exemption exists for Tailwind's own machinery (`--text-*`, `--font-*`), which
+// is what it still covers.
+const shipped = readsOf(stylesCss, 'dist/styles.css').filter(
   ({ name }) =>
-    !selfDefined.has(name) && !RESERVED_NAMESPACES.some((prefix) => name.startsWith(prefix)),
+    lightPalette.has(name) ||
+    (!selfDefined.has(name) && !RESERVED_NAMESPACES.some((prefix) => name.startsWith(prefix))),
 );
-const undocumented = [...new Set(shipped.map((r) => r.name))].filter((n) => !lightPalette.has(n)).sort();
-const bare = [...new Set(shipped.filter((r) => r.fallback === null).map((r) => r.name))].sort();
-if (undocumented.length === 0 && bare.length === 0) {
+const shippedNames = new Set(shipped.map((r) => r.name));
+const undocumented = [...shippedNames].filter((n) => !lightPalette.has(n)).sort();
+// `!r.fallback` rather than `=== null`: `var(--x,)` and `var(--x, )` parse as an
+// empty fallback and fail identically to none at all.
+const bare = [...new Set(shipped.filter((r) => !r.fallback).map((r) => r.name))].sort();
+const unshipped = [...mapped].filter(
+  (name) => !shippedNames.has(name) && !UNUSED_BY_CONTROLS.includes(name),
+).sort();
+if (undocumented.length === 0 && bare.length === 0 && unshipped.length === 0 && shippedNames.size > 0) {
   console.log(
-    `ok  dist/styles.css reads ${new Set(shipped.map((r) => r.name)).size} design tokens, all defined by theme.css and all with a fallback`,
+    `ok  dist/styles.css reads ${shippedNames.size} design tokens, all defined by theme.css and all with a fallback`,
+  );
+}
+if (shippedNames.size === 0) {
+  failures.push(
+    'dist/styles.css reads no design tokens at all, so this check compared nothing. Either the utilities lost their token reads or the sheet was built from the wrong entry - see `styles.css scans every rendering entry` above.',
   );
 }
 if (undocumented.length > 0) {
@@ -460,6 +723,51 @@ if (undocumented.length > 0) {
 if (bare.length > 0) {
   failures.push(
     `dist/styles.css reads ${bare.join(', ')} with no fallback, so a host that defines no tokens loses those declarations silently. A token read through an arbitrary value (\`rounded-[calc(var(--radius)*1.5)]\`) bypasses the \`@theme inline\` mapping and has to spell its own fallback.`,
+  );
+}
+if (unshipped.length > 0) {
+  failures.push(
+    `dist/styles.css reads none of ${unshipped.join(', ')}, though the \`@theme inline\` block maps them and controls are expected to use them. Tailwind emits only the utilities the scanned trees actually reference, so this means the utilities were dropped - a commented-out mapping, a lost \`@source\` line - or the token genuinely has no consumer, in which case list it in UNUSED_BY_CONTROLS with the reason.`,
+  );
+}
+
+// The prebuilt sheet is useless to a token-less host without the palette beside
+// it, and `theme.css` reaches `dist/` through a bare `cp` that nothing checks.
+if (existsSync(`${DIST}/theme.css`)) {
+  console.log('ok  theme.css ships beside the compiled sheet');
+} else {
+  failures.push(
+    'dist/theme.css is missing, but package.json exports `./theme.css` and docs/theming.md tells a host to import it for the dark defaults. It is copied by `build:css`.',
+  );
+}
+
+// The token table in docs/theming.md is the list a host actually reads, and it
+// is the one restatement nothing used to check - which is exactly how the
+// secondary pair went missing from it. The `@theme inline` block is the
+// authority; this asserts the doc says the same words.
+const themingDoc = readFileSync(resolve('docs/theming.md'), 'utf8');
+const tableRows = /\n\| --- \| --- \|\n([\s\S]*?)\n\n/.exec(themingDoc);
+const documented = new Set(
+  tableRows === null ? [] : [...tableRows[1].matchAll(/`(--[\w-]+)`/g)].map((m) => m[1]),
+);
+if (tableRows === null) {
+  failures.push(
+    'docs/theming.md has no token table under `## The tokens` (looked for a `| --- | --- |` row followed by rows and a blank line). It is the list a host reads to know what to define.',
+  );
+}
+const undocumentedInTable = [...mapped].filter((name) => !documented.has(name)).sort();
+const staleInTable = [...documented].filter((name) => !mapped.has(name)).sort();
+if (tableRows !== null && undocumentedInTable.length === 0 && staleInTable.length === 0 && mapped.size > 0) {
+  console.log("ok  docs/theming.md's token table lists exactly the tokens the package reads");
+}
+if (undocumentedInTable.length > 0) {
+  failures.push(
+    `docs/theming.md's token table does not list ${undocumentedInTable.join(', ')}, which the \`@theme inline\` block reads - a host following the package's own documentation would define an incomplete palette, and the failure is silent.`,
+  );
+}
+if (staleInTable.length > 0) {
+  failures.push(
+    `docs/theming.md's token table lists ${staleInTable.join(', ')}, which the \`@theme inline\` block does not read - a host would define tokens that do nothing.`,
   );
 }
 

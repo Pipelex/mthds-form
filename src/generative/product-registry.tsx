@@ -56,7 +56,15 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
         {/* `no-referrer` on both, as on every image this package paints: the
             scheme is already checked where the manifest is parsed, and a brand
             asset has no more business learning where it was drawn than a
-            payload's picture does. */}
+            payload's picture does.
+
+            This pair is the one place a `dark:` variant and the token fallbacks
+            disagree. A fallback is frozen per utility and cannot vary by scope,
+            so a host that defines no tokens renders LIGHT inside `.dark` - but
+            the variant still flips, so that host gets the dark-ground asset on
+            a light surface. Documented in `docs/theming.md` rather than worked
+            around: the swap is right for every host that defines tokens, which
+            is every host that sets `.dark` deliberately. */}
         <img
           src={brand.logo.onLight}
           alt={brand.name}

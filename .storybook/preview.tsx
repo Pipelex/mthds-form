@@ -35,15 +35,21 @@ const preview: Preview = {
      *
      * `color-contrast` is the one rule turned off, and it is turned off for a
      * reason that is recorded rather than assumed: the DEFAULT palette in
-     * `src/styles/theme.css` is the stock shadcn/ui neutral set, and its
-     * `--muted-foreground` measures 4.39:1 against `--muted` - below AA, on a
-     * pairing the controls use for description text and pill labels. That is a
-     * real finding, but it is a finding about a palette this package ships as a
-     * starting point for hosts that have none, so fixing it is a deliberate
-     * change to every such host's colours and not a side effect of adding
-     * stories. Tracked in `wip/default-palette-contrast.md`; the rule goes back
-     * on with the fix. Everything axe checks that is NOT a palette question -
-     * labels, roles, accessible names, aria wiring - still fails the build.
+     * `src/styles/theme.css` is the stock shadcn/ui neutral set, and several of
+     * its pairings sit below the bar - `--muted-foreground` 4.39:1 against
+     * `--muted` (description text, pill labels), `--destructive` 3.76:1 against
+     * `--background` and white 3.76:1 on `--destructive` (every error message,
+     * the danger badge and button), and the `--border` / `--input` edges at
+     * 1.27:1 and 1.10:1, under the 3:1 that identifies a control. Every one of
+     * those is a real finding, and every one is a finding about a palette this
+     * package ships as a starting point for hosts that have none - so fixing it
+     * is a deliberate change to every such host's colours and not a side effect
+     * of adding stories. This comment names all of them on purpose: a blanket
+     * switch-off whose recorded reason covers one row is how the rest went
+     * unmeasured. Tracked in `wip/default-palette-contrast.md`, with the numbers
+     * and the pending decision; the rule goes back on with the fix. Everything
+     * axe checks that is NOT a palette question - labels, roles, accessible
+     * names, aria wiring - still fails the build.
      */
     a11y: {
       test: 'error',
