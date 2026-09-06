@@ -115,6 +115,17 @@ Files: `docs/result-view.md`, `docs/upload-seam.md`, `docs/architecture.md`, `RE
 - `CHANGELOG.md`, under `## [Unreleased]`, a `### Security` entry per D7. It names `proseImages` and says in one sentence what a consumer that inlined a `data:` value of another type will see.
 - Run `make all` (the build and `make assert-bundle` included, since `result-env.tsx` and `markdown.tsx` are in a shipped chunk). **Checkpoint 2** — the PR is open against `dev` with `Closes L-260905-221cd4` in its body; record the PR number here and anything a reviewer sent back that changed a decision above.
 
+#### Checkpoint 2, 2026-09-06 — the PR is open
+
+**PR #22**, against `dev`, carrying `Closes L-260905-221cd4`. `make check`, `make test` and `make all` (build plus `make assert-bundle`) all pass; the entry boundaries and both `'use client'` directives are intact, and the core barrel is still a pure re-export, so a consumer can still tree-shake ajv out of it.
+
+Two things landed beyond the phase lists, both flagged where they happened.
+
+- **`src/__stories__/outputs/preview.stories.tsx` carried a stale claim** and was corrected in the same change. Its comment said a root-relative path is not what `isViewableUrl` accepts — untrue since the resolver arm was added, so it was already wrong on `dev` rather than made wrong here. The absolute URL it builds is kept, for the reason that is actually true: what the story shows is the shape a payload carries, and the standard says a `native.Document`'s `url` is a storage URI, an HTTP(S) URL or a base64 data URL.
+- **`docs/upload-seam.md` gained more than the one sentence D-planned.** Beyond "a resolver's answer is judged by the same gate", it now states the two consequences a resolver author needs: return the URL you mean to be used, since the gate hands the sinks its own normalised string; and a resolved root-relative URL is FRAMED at the host's own origin, so stored objects must be served with their real content type or `Content-Disposition: attachment`. That second one is the residual risk left by dropping the sandbox, and the host is the only party that can close it.
+
+The obfuscation cases the parse-first design closes for free — `java\tscript:` and `jav\nascript:`, which a browser strips into `javascript:` and runs while a prefix test sees nothing — are pinned in the core suite and named in `docs/result-view.md`. They were not in the plan because the plan did not anticipate that normalising first would settle them structurally.
+
 ### Phase 5 — landing and the follow-up elsewhere
 
 - `/ledger-land` after the merge closes the item and flips this plan to `landed`.
