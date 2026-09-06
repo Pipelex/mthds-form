@@ -4,8 +4,10 @@
  * its own Tailwind build must NOT load it (see `docs/theming.md`): add the
  * package's `dist` to that build's `@source` directives instead.
  *
- * Token VALUES are not baked in here - they come from `theme.css` (or from the
- * host's own definitions), which is what makes the controls themeable.
+ * Token VALUES belong to `theme.css` (or to the host's own definitions), which
+ * is what makes the controls themeable. What IS baked in here is one fallback
+ * per token, so a host that defines nothing still gets legible controls - see
+ * the `@theme inline` block below for why that can never win a cascade.
  *
  * This file is used for TWO things, and only these two:
  *
@@ -56,38 +58,64 @@
  * The token is the whole colour (`theme.css`), so the mapping is a bare
  * `var()`: Tailwind v4 composes an opacity modifier with `color-mix()` over
  * it, which is why the `var(--x)` wrapper of the triplet era is gone.
+ *
+ * EVERY arm carries a FALLBACK, and the value is `theme.css`'s `:root` value
+ * for that token. It is there for the host that defines no tokens at all - a
+ * webview, an embedded panel, a plain page - which used to get a control set
+ * in undefined colours and no message saying so: a `var()` that resolves to
+ * nothing makes the whole declaration invalid, the browser DISCARDS it, and
+ * the control falls back to `transparent` or `canvastext`. The build is green,
+ * the token inspects correctly, and the reader sees a contrast bug in someone
+ * else's design system.
+ *
+ * A fallback fills a hole and can never win a cascade, so it is inert for
+ * every host that defines the token - which is what makes this the only safe
+ * route. A `:root` defaults block in this sheet would be a real declaration
+ * competing with the host's own, and the host's tokens routinely sit in
+ * `@layer base` while this sheet arrives in a later layer, so the defaults
+ * would OUTRANK the brand. Do not add one.
+ *
+ * The fallback palette is the LIGHT palette, and it is one value: a fallback
+ * is frozen into the utility and cannot vary by scope, so a host that defines
+ * nothing renders light even under `.dark`. `theme.css` is how you get the
+ * dark defaults - see `docs/theming.md`.
+ *
+ * `scripts/assert-bundle.mjs` holds all of that: the tokens read here must be
+ * exactly the tokens `theme.css` defines, each fallback must carry that file's
+ * light value, and nothing in the built sheet may read one of these tokens
+ * without a fallback.
  */
 @theme inline {
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-border: var(--border, hsl(240 5.9% 90%));
+  --color-input: var(--input, hsl(240 4.8% 95.9%));
+  --color-ring: var(--ring, hsl(240 5.9% 10%));
+  --color-background: var(--background, hsl(0 0% 100%));
+  --color-foreground: var(--foreground, hsl(240 10% 3.9%));
 
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary, hsl(240 5.9% 10%));
+  --color-primary-foreground: var(--primary-foreground, hsl(0 0% 98%));
 
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary, hsl(240 4.8% 95.9%));
+  --color-secondary-foreground: var(--secondary-foreground, hsl(240 5.9% 10%));
 
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive: var(--destructive, hsl(0 84.2% 60.2%));
+  --color-destructive-foreground: var(--destructive-foreground, hsl(0 0% 98%));
 
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted, hsl(240 4.8% 95.9%));
+  --color-muted-foreground: var(--muted-foreground, hsl(240 3.8% 46.1%));
 
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent, hsl(240 4.8% 95.9%));
+  --color-accent-foreground: var(--accent-foreground, hsl(240 5.9% 10%));
 
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover, hsl(0 0% 100%));
+  --color-popover-foreground: var(--popover-foreground, hsl(240 10% 3.9%));
 
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card, hsl(0 0% 100%));
+  --color-card-foreground: var(--card-foreground, hsl(240 10% 3.9%));
 
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius, 0.5rem);
+  --radius-md: calc(var(--radius, 0.5rem) - 2px);
+  --radius-sm: calc(var(--radius, 0.5rem) - 4px);
 }
 
 /*

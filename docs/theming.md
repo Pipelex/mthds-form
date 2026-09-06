@@ -9,7 +9,7 @@ Each is a whole CSS colour, in any syntax a browser accepts — `hsl(0 0% 100%)`
 | | |
 | --- | --- |
 | surfaces | `--background`, `--foreground`, `--card`, `--card-foreground`, `--popover`, `--popover-foreground` |
-| emphasis | `--primary`, `--primary-foreground`, `--muted`, `--muted-foreground`, `--accent`, `--accent-foreground` |
+| emphasis | `--primary`, `--primary-foreground`, `--secondary`, `--secondary-foreground`, `--muted`, `--muted-foreground`, `--accent`, `--accent-foreground` |
 | state | `--destructive`, `--destructive-foreground` |
 | form chrome | `--border`, `--input`, `--ring` |
 | geometry | `--radius` (a length, not a colour) |
@@ -17,6 +17,24 @@ Each is a whole CSS colour, in any syntax a browser accepts — `hsl(0 0% 100%)`
 `--input` is the control surface and is meaningfully distinct from `--background`: fields read as a family because they share it. Dark mode follows the `.dark` class convention.
 
 If your app is already a shadcn/ui codebase, you have all of these and there is nothing to do.
+
+The authoritative list is not this table: it is the `@theme inline` block in `src/styles/tailwind-entry.css`, which is the same list in executable form, and `scripts/assert-bundle.mjs` fails the build if it and `theme.css` ever disagree. The table restates it for reading, and the secondary pair went missing from it once.
+
+## Fallbacks, and the host that defines nothing
+
+Every token above is read with a fallback — `var(--border, hsl(240 5.9% 90%))` — so a host that owns no design system renders the same neutral palette `theme.css` would have given it, instead of no colours at all. That matters more than it sounds, because **an undefined token does not degrade, it deletes.** A `var()` that resolves to nothing makes the whole declaration invalid, the browser discards it, and the control lands on `transparent` or `canvastext`. The build is green, the stylesheet inspects correctly, and what the reader sees is a panel with no surface colour and a white label on a pale background — which reads as a contrast bug in the host's own design system and sends you looking anywhere but at a stylesheet.
+
+What follows is worth reading before relying on the fallbacks:
+
+- **The fallback palette is the light one.** A fallback is frozen into each utility and cannot vary by scope, so a host that defines nothing renders light *even inside `.dark`* — the class has no tokens to switch. `theme.css` is how you get the dark defaults. `Toolchain/Token Fallbacks` in the Storybook is that rendering, in both panes, and its assertions are what keep it true.
+- **A `dark:` variant still switches, and that is the one place the two disagree.** The frozen palette makes `.dark` inert for colour, not for the variant: a `dark:hidden` / `dark:block` pair — the generative layer swaps a brand logo that way — still flips inside `.dark`, so a token-less host wrapping its page in `.dark` gets the dark-ground asset drawn on a light surface. Define the tokens, or do not set `.dark`.
+- **A fallback can never win a cascade.** It fills a hole, so it is completely inert for a host that defines the token. That is why the defaults are fallbacks rather than a `:root` block in the sheet: host tokens routinely sit in `@layer base` while this sheet arrives in a later layer, so a defaults block here would outrank the host's brand the moment a form mounted.
+- **A malformed token is not a missing one.** The fallback fires only when the token is undefined. `--border: 240 5.9% 90%` — the wrapperless triplet Tailwind v3 needed — *is* defined, so `var()` returns it, no `hsl()` wrapper is ever applied, and the declaration is discarded exactly as it was before. Write whole colours.
+- **The default palette is a starting point, not an accessibility guarantee.** It is the stock shadcn/ui neutral set, and some pairings do not clear WCAG AA: `--muted-foreground` measures 4.39:1 against `--muted`, `--destructive` 3.76:1 against `--background`, and the `--border` / `--input` boundaries do not reach the 3:1 that identifies a control. The fallbacks change who sees that — a token-less host used to lose those declarations entirely and now renders the palette — so it is the same measurement reaching further, not a new one. `wip/default-palette-contrast.md` carries the numbers and the pending decision; brand the tokens and the question is yours rather than ours.
+
+`scripts/assert-bundle.mjs` holds all of that, and it is worth knowing exactly what it holds, because every one of these failures is invisible by construction. The tokens the `@theme inline` block reads are exactly the ones `theme.css` defines; `.dark` restates every one of them bar the scope-independent `--radius`; the table above lists the same set, so it cannot go quietly out of date again; every fallback — in the mapping and in an arbitrary value such as `rounded-[calc(var(--radius,0.5rem)*1.5)]`, which goes around the mapping and has to spell its own — carries `theme.css`'s light value; and the built sheet reads all of those tokens, each with a fallback, with an empty `var(--x,)` counted as none because it fails identically.
+
+Two rules make those checks worth trusting. A check that compared nothing fails, rather than printing no line — a `@theme inline` block that was commented out once shipped a sheet with no colour utilities at all while every check reported success. And the blocks are located by counting braces over comment-stripped CSS, never by a regex: a regex reads a commented-out block as live configuration, and a lazy match to the first `}` stops inside a nested at-rule, which folds the dark values into the light palette until the guard starts demanding the dark value as the light fallback.
 
 ## Host setup
 
@@ -32,7 +50,7 @@ Add a source directive to your stylesheet, and import `tw-animate-css` — the s
 @source "../node_modules/@pipelex/mthds-form/dist";
 ```
 
-Then make sure your theme maps the token names the controls use. In v4 the names a utility resolves are the theme's `--color-*` and `--radius-*` keys, and the mapping this package itself uses is the `@theme inline` block in `src/styles/tailwind-entry.css` — `--color-border: var(--border)` and so on, over whole colours. A shadcn/ui v4 codebase already maps the same keys onto its own tokens, and that works as well: the utilities in `dist` compile against **your** theme, so what matters is that `--color-border`, `--color-input`, `--color-ring`, `--color-background`, `--color-foreground`, the `primary`/`secondary`/`destructive`/`muted`/`accent`/`popover`/`card` pairs and `--radius-lg`/`-md`/`-sm` resolve to something. The bare `var()` mapping is only baked into the prebuilt sheet, and `inline` is what lets a wrapper lower in the tree — a `.dark` pane, a brand scope — redefine a token for its subtree.
+Then make sure your theme maps the token names the controls use. In v4 the names a utility resolves are the theme's `--color-*` and `--radius-*` keys, and the mapping this package itself uses is the `@theme inline` block in `src/styles/tailwind-entry.css` — `--color-border: var(--border, hsl(240 5.9% 90%))` and so on, over whole colours. A shadcn/ui v4 codebase already maps the same keys onto its own tokens, and that works as well: the utilities in `dist` compile against **your** theme, so what matters is that `--color-border`, `--color-input`, `--color-ring`, `--color-background`, `--color-foreground`, the `primary`/`secondary`/`destructive`/`muted`/`accent`/`popover`/`card` pairs and `--radius-lg`/`-md`/`-sm` resolve to something. That mapping is only baked into the prebuilt sheet — your own theme maps the same keys onto whatever you like, and the fallbacks are the package's business, not yours — and `inline` is what lets a wrapper lower in the tree, a `.dark` pane or a brand scope, redefine a token for its subtree.
 
 Do **not** load `styles.css` in this setup — your own build already produces those utilities, and the prebuilt sheet carries a second copy of Tailwind's preflight.
 
@@ -43,15 +61,17 @@ Two v4 preflight facts the package relies on, in case your build restricts prefl
 Load the prebuilt stylesheet, and the default tokens with it:
 
 ```ts
-import '@pipelex/mthds-form/theme.css'; // token values — omit if you define your own
+import '@pipelex/mthds-form/theme.css'; // token values — see below before omitting
 import '@pipelex/mthds-form/styles.css'; // the compiled utilities
 ```
+
+`theme.css` is genuinely optional: the utilities carry fallbacks, so `styles.css` alone renders the controls in the light neutral palette. Load `theme.css` when you want the `.dark` class to do something, or override the tokens it defines to brand them. Loading neither and defining your own is the third route and needs no fallback at all.
 
 One sheet covers both rendering entries: it is compiled from the utilities `src/react` and `src/generative` actually use, so a host that renders produced layouts loads the same file and nothing extra. `scripts/assert-bundle.mjs` refuses a build whose entries and the sheet's `@source` lines disagree, because an entry left out of the scan does not fail loudly — its components keep whatever utilities the other entry happens to share and lose the rest.
 
 `styles.css` includes Tailwind's preflight (a CSS reset), which is what makes the controls render correctly with no framework underneath — and also what makes it unsuitable for a host that already has its own reset or Tailwind build.
 
-`theme.css` is the stock shadcn/ui neutral palette, deliberately un-branded: this package renders MTHDS input specs and the surrounding product supplies the brand. Override any token in your own stylesheet after importing it, or skip it entirely and define all of them yourself — as whole colours. The prebuilt sheet reads each token with a bare `var()`, so a triplet written in the old form resolves to no colour at all rather than to a wrong one.
+`theme.css` is the stock shadcn/ui neutral palette, deliberately un-branded: this package renders MTHDS input specs and the surrounding product supplies the brand. Override any token in your own stylesheet after importing it, or skip it entirely and define all of them yourself — as whole colours. A triplet written in the old form still resolves to no colour at all rather than to a wrong one, and the fallback does not save you there: see “Fallbacks, and the host that defines nothing” above.
 
 ## Someone else's tokens, and how a story wears them
 

@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Fixed - the prebuilt stylesheet no longer needs the host to define anything
+
+`styles.css` styled every control with `var(--<token>)` and defined none of those tokens; the values live in `theme.css`, which the package deliberately does not import because the tokens belong to the host. That is right for a shadcn host and leaves a host that owns no design system — a webview, an embedded panel, a plain page — rendering in no colours at all, with nothing anywhere saying so. **An undefined token does not degrade, it deletes**: the `var()` resolves to nothing, the whole declaration is invalid, the browser discards it, and the control lands on `transparent` or `canvastext`. The build is green and what the reader sees is a contrast bug in somebody else's design system.
+
+Every token the sheet reads now carries a fallback holding `theme.css`'s light value. A fallback fills a hole and can never win a cascade, so it is inert for every host that defines the token — including one whose own tokens sit in `@layer base` while this sheet arrives in a later layer, which is why a `:root` defaults block in the sheet was refused: it would have outranked the host's brand. Controls in the generative registry that read a token through an arbitrary value go around the `@theme inline` mapping, and now spell their own fallback.
+
+The fallback palette is the light one, and it is a single value: a fallback is frozen into each utility and cannot vary by scope, so a host that defines nothing renders light even under `.dark`. `theme.css` remains the way to get the dark defaults, and is now genuinely optional rather than silently mandatory.
+
+`docs/theming.md`'s token table was also missing `--secondary` and `--secondary-foreground`, which the generative layer uses and the built sheet reads — a host following the package's own documentation defined an incomplete palette.
+
+`scripts/assert-bundle.mjs` now holds the whole contract, since every failure in it is invisible by construction. The tokens `tailwind-entry.css` reads are exactly the ones `theme.css` defines; `.dark` restates every one of them bar `--radius`, whose value is the same in any scope; the doc table lists the same set, so it cannot silently fall behind again; every fallback carries `theme.css`'s light value, in the mapping and in an arbitrary value alike, compared in source because lightningcss rewrites it during minification; and the built sheet reads all of those tokens with a fallback each. An empty `var(--x,)` is counted as no fallback, because it fails identically — the substitution yields nothing and the declaration is discarded.
+
+Two properties make that guard worth trusting, and both were added after watching it pass on a broken sheet. A check that compared nothing now fails instead of printing no line: a commented-out `@theme inline` block shipped a stylesheet with no colour utilities at all while every check reported success. And the blocks it reads are located by counting braces over comment-stripped CSS rather than by a regex, which reads commented-out CSS as live configuration and, matching lazily to the first `}`, stops inside a nested at-rule — folding the dark palette into the light one until the guard demanded the dark value as the light fallback. A design token the sheet happens to declare somewhere no longer exempts fallback-less reads of it elsewhere, which one ordinary scoped-override utility used to arrange.
+
+`Toolchain/Token Fallbacks` in the Storybook is the half no scanner can answer: a real form over a real fixture with every token set to `initial` — the guaranteed-invalid value, and therefore indistinguishable from a host that never declared them — asserting in a browser that the surfaces still paint and the geometry still rounds.
+
 ### Security - the result view's URL policy
 
 Every URL in a payload is now judged by one gate before any sink acts on it, and the sinks take the string the gate returned rather than the string it was handed. `viewableUrl` and its guard `isViewableUrl` are exported from the core entry, so a host that wants to pre-judge a payload gets the kernel's own answer instead of restating it.

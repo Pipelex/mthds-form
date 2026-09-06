@@ -56,7 +56,15 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
         {/* `no-referrer` on both, as on every image this package paints: the
             scheme is already checked where the manifest is parsed, and a brand
             asset has no more business learning where it was drawn than a
-            payload's picture does. */}
+            payload's picture does.
+
+            This pair is the one place a `dark:` variant and the token fallbacks
+            disagree. A fallback is frozen per utility and cannot vary by scope,
+            so a host that defines no tokens renders LIGHT inside `.dark` - but
+            the variant still flips, so that host gets the dark-ground asset on
+            a light surface. Documented in `docs/theming.md` rather than worked
+            around: the swap is right for every host that defines tokens, which
+            is every host that sets `.dark` deliberately. */}
         <img
           src={brand.logo.onLight}
           alt={brand.name}
@@ -199,7 +207,11 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
 
 function Rail({ props, children }: BaseComponentProps<{ title: string }>) {
   return (
-    <div className="rounded-[calc(var(--radius)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
+    // An arbitrary value reads the token directly, so it does NOT go through
+    // the `@theme inline` mapping and does not inherit its fallback - it has to
+    // carry its own, or a host that defines no tokens loses the declaration
+    // outright. See src/styles/tailwind-entry.css.
+    <div className="rounded-[calc(var(--radius,0.5rem)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
       <h2 className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {props.title}
       </h2>
@@ -245,7 +257,8 @@ function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string 
         onClick={() => emit('press')}
         className={cn(
           'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground',
-          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary)_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary)_50%,transparent)]',
+          // The fallback is not decoration here either - see Rail above.
+          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_50%,transparent)]',
           'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden',
         )}
       >
