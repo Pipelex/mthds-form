@@ -1,5 +1,6 @@
 import { collectStuffFiles, type StuffFile } from '../core/stuff-files';
 import type { RunField } from '../core/descriptor';
+import { viewableUrl } from '../core/native-content';
 
 /** How a host turns a stored reference into something fetchable. */
 export type ResolveForDownload = (url: string) => string | undefined;
@@ -100,7 +101,18 @@ export async function downloadStuff({
       continue;
     }
 
-    const href = resolveUrl?.(file.url ?? '') ?? file.publicUrl ?? file.url;
+    // Judged by the same gate the result view paints through, and for the same
+    // reason: this path both FETCHES a URL and, when the fetch fails, hands it
+    // to `window.open` - which is a navigation, and the one sink that would
+    // have run a `javascript:` reference. It used to consult no gate at all.
+    // What the gate returns is what is used, never the raw member.
+    const href =
+      viewableUrl(resolveUrl?.(file.url ?? '')) ??
+      viewableUrl(file.publicUrl) ??
+      viewableUrl(file.url);
+    // A file whose reference nothing accepts is skipped rather than guessed at.
+    // The JSON receipt below still carries it, so the reader keeps the reference
+    // even when they cannot be handed the bytes.
     if (!href) continue;
     try {
       const response = await fetch(href);

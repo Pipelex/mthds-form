@@ -9,12 +9,12 @@ import {
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
-  isViewableUrl,
   readCompositeContent,
   readDateContent,
   readDocumentContent,
   readHtmlContent,
   readImageContent,
+  viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
 import { useResolveShareUrl, useResolveUrl, type ResolveUrl } from './result-env';
@@ -430,11 +430,16 @@ function FileRef({
 }) {
   const label = fileLabel(url, filename);
   const title = mimeType ? `${url} · ${mimeType}` : url;
+  // Judged here as well as by the caller, because this component is also given
+  // the raw reference as the "nothing paintable" fallback - and the HREF is the
+  // gate's own string, never the candidate, so an accepted URL and the one
+  // opened on click cannot differ.
+  const href = viewableUrl(url);
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      {isViewableUrl(url) ? (
+      {href ? (
         <a
-          href={url}
+          href={href}
           target="_blank"
           rel="noreferrer"
           title={title}
@@ -478,10 +483,15 @@ function paintableUrl(
   content: { url: string; publicUrl?: string },
   resolve?: ResolveUrl,
 ): string | undefined {
-  const resolved = resolve?.(content.url);
-  if (isViewableUrl(resolved)) return resolved;
-  if (isViewableUrl(content.publicUrl)) return content.publicUrl;
-  return isViewableUrl(content.url) ? content.url : undefined;
+  // `viewableUrl` rather than a predicate over the raw member: what comes back
+  // is the NORMALISED string, and every sink downstream takes that. A member
+  // carrying a leading space parses as `https:` for a host that validated it and
+  // failed a prefix match here, so the two used to act on different URLs.
+  return (
+    viewableUrl(resolve?.(content.url)) ??
+    viewableUrl(content.publicUrl) ??
+    viewableUrl(content.url)
+  );
 }
 
 /** The extensions a browser renders in a frame with no plugin and no library. */
@@ -489,16 +499,48 @@ const PREVIEWABLE_EXT_RE = /\.(pdf|png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
 const PREVIEWABLE_MIME_RE = /^(application\/pdf|image\/)/i;
 
 /**
+ * The URL a document may be FRAMED at, which is stricter than the one it may be
+ * painted or linked at.
+ *
+ * A frame is the one sink that turns a URL into a document with a DOM, so the
+ * scheme has to be one that carries its own origin. `http:` and `https:` do, and
+ * a root-relative path does by construction — it is the embedding page's own
+ * origin, which is the resolver case (`/api/assets/…`) the preview exists for.
+ * `data:` does not: a `data:` document inherits the embedder's origin, which is
+ * exactly how a payload's `data:text/html` reached an unsandboxed frame with the
+ * host's cookies. `blob:` is excluded too — a payload cannot mint one, so
+ * admitting it here would widen the sink for nothing.
+ *
+ * A refused scheme costs nothing a reader wanted: a raster `data:` URL is
+ * painted by the image arm, and a run does not return an inline PDF.
+ */
+function frameableUrl(candidate: string | undefined): string | undefined {
+  const url = viewableUrl(candidate);
+  if (!url) return undefined;
+  // Safe as a prefix test only because `viewableUrl` normalised the string: an
+  // accepted path starts with exactly one slash, `//host` and `/\host` having
+  // been rejected as protocol-relative.
+  return /^https?:/.test(url) || url.startsWith('/') ? url : undefined;
+}
+
+/**
  * Whether a document can be shown here, rather than only linked to.
  *
- * Two conditions, and both are necessary: the browser must be able to FETCH the
- * URL (`isViewableUrl` — a `pipelex-storage://` reference resolves nowhere
- * without the host's resolver) and to RENDER it with nothing installed. A `.docx`
- * satisfies the first and not the second, and offering a preview that opens onto
- * a download prompt is worse than offering none.
+ * Two conditions, and both are necessary: the browser must be able to FRAME the
+ * URL (`frameableUrl` — a `pipelex-storage://` reference resolves nowhere
+ * without the host's resolver, and a `data:` document is not framed at all) and
+ * to RENDER it with nothing installed. A `.docx` satisfies the first and not the
+ * second, and offering a preview that opens onto a download prompt is worse than
+ * offering none.
+ *
+ * The declared type is what decides RENDERABILITY, and reading it from the
+ * payload is right — whether a preview is worth offering is a usability
+ * question, and the producer is the one that knows. What the declared type may
+ * no longer do is admit a URL: `{url: "data:text/html,…", filename: "report.pdf"}`
+ * used to be framed on the strength of its own filename.
  */
 function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): string | undefined {
-  const url = paintableUrl(content, resolve);
+  const url = frameableUrl(paintableUrl(content, resolve));
   if (!url) return undefined;
   const named = content.filename ?? url;
   const renderable = content.mimeType
@@ -513,11 +555,30 @@ function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): str
  * **Not the same question as `native.Html`, and the difference is the origin.**
  * Markup goes through a sandbox because injecting it into the host's document
  * would run it ON the host's origin, with the host's cookies. A URL in an
- * `<iframe>` is a separate document at its own origin by construction — the
- * browser's own boundary, not one this package has to build — so a PDF is framed
- * the way every document viewer on the web frames one. `no-referrer` is there
- * because a result view has no business telling a third party where it was
- * opened from.
+ * `<iframe>` is a separate document at its own origin — the browser's own
+ * boundary, not one this package has to build.
+ *
+ * **That argument is sound and it used to be applied to a URL nobody had
+ * checked.** A `data:` document does NOT get an origin of its own: it inherits
+ * the embedder's, so `{url: "data:text/html,<script>…", filename: "report.pdf"}`
+ * was framed with the host's cookies on the strength of its own filename. The
+ * fix is upstream of this component — `frameableUrl` admits `http:`, `https:`
+ * and a same-origin path and nothing else — because it is the SCHEME that
+ * decides whether the origin boundary exists at all.
+ *
+ * **There is deliberately no `sandbox` attribute, and the reason is a platform
+ * constraint rather than a judgement.** The `sandbox` attribute sets the
+ * sandboxed-plugins flag unconditionally, and no token unsets it — `allow-plugins`
+ * is not in the specification. Chrome's PDF viewer is plugin content, so a
+ * sandboxed frame cannot display a PDF at all. Measured on Chrome 152 against a
+ * same-origin PDF: the frame renders with no `sandbox` attribute, and shows the
+ * broken-document icon under `sandbox=""`, `allow-same-origin`, `allow-scripts`,
+ * `allow-same-origin allow-scripts` and `allow-downloads` alike. A sandbox here
+ * would not harden the preview; it would delete it. See
+ * [../../docs/result-view.md] for the whole policy.
+ *
+ * `no-referrer` stays: a result view has no business telling a third party where
+ * it was opened from.
  */
 function DocumentPreview({ url, name }: { url: string; name: string }) {
   return (
@@ -811,6 +872,11 @@ function LoadingImage({ src, alt, className }: { src: string; alt: string; class
       <img
         src={src}
         alt={alt}
+        // A result view has no business telling a third party where it was
+        // opened from, and a payload's image URL is a third party by default.
+        // The document frame has said so since it was written; every `<img>`
+        // this package paints says it now too.
+        referrerPolicy="no-referrer"
         onLoad={() => setState('done')}
         onError={() => setState('done')}
         className={cn(className, state === 'loading' && 'min-h-40 opacity-0')}
@@ -1319,7 +1385,7 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
   // layout follows what is actually showable rather than what the kind promises.
   const anyViewable = items.some((item) => {
     const content = readImageContent(item);
-    return content ? isViewableUrl(content.publicUrl) || isViewableUrl(content.url) : false;
+    return content ? !!(viewableUrl(content.publicUrl) ?? viewableUrl(content.url)) : false;
   });
   if (!anyViewable) return <FileRows items={items} kind="image" />;
   return (

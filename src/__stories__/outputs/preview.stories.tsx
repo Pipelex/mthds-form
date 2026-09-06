@@ -23,13 +23,15 @@ import { ResultView } from '../result-view';
  *
  * Markup goes through a sandbox because injecting it into the host's document
  * would run it ON the host's origin, with the host's cookies. A URL in an
- * `<iframe>` is a separate document at its own origin by construction — the
- * browser's own boundary, not one this package has to build. So a PDF is framed
- * the way every document viewer on the web frames one, with `no-referrer`
- * because a result view has no business telling a third party where it was
- * opened from.
+ * `<iframe>` is a separate document at its own origin — the browser's own
+ * boundary, not one this package has to build. That holds only for a scheme
+ * that CARRIES an origin, which is why `frameableUrl` admits `http:`, `https:`
+ * and a same-origin path and nothing else: a `data:` document inherits the
+ * embedder's origin instead of getting one of its own. So a PDF is framed the
+ * way every document viewer on the web frames one, with `no-referrer` because a
+ * result view has no business telling a third party where it was opened from.
  *
- * The button appears only when the browser can both **fetch** the URL and
+ * The button appears only when the browser can both **frame** the URL and
  * **render** it unaided. A `.docx` satisfies the first and not the second, and a
  * preview that opens onto a download prompt is worse than no preview.
  */
@@ -37,12 +39,13 @@ import { ResultView } from '../result-view';
 /**
  * The served PDF, as an ABSOLUTE url.
  *
- * `/solar_system.pdf` would be fetchable by the browser and is still not what
- * `isViewableUrl` accepts — the standard says a `native.Document`'s `url` is a
- * storage URI, an HTTP(S) URL or a base64 data URL, and a root-relative path is
- * none of those. Widening the predicate to make a story pass would be teaching
- * the kernel a shape the standard does not define; resolving it against the
- * origin here costs one line and teaches it nothing.
+ * The gate would take `/solar_system.pdf` — a root-relative path is viewable,
+ * because that is what a host's URL resolver hands back. It is written absolute
+ * here anyway, because what this story shows is the shape a payload actually
+ * carries: the standard says a `native.Document`'s `url` is a storage URI, an
+ * HTTP(S) URL or a base64 data URL, and a path is none of those. Resolving it
+ * against the origin costs one line and keeps the fixture honest about its
+ * provenance.
  */
 const PDF_URL =
   typeof window === 'undefined'

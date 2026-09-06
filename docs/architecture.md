@@ -31,7 +31,7 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 | `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the structural wire-descriptor → `RunField` mapping, and `getPipeInputForm`, the descriptor lookup; the schema co-walk for `contentKey` and nested list bounds lives behind it. `buildResultField` is the same mapping for a pipe's OUTPUT, which belongs to no slot — [docs/result-view.md](result-view.md) |
 | `output-form` | the output-form descriptor type and `getPipeOutputForm` — an artifact the standard does not have yet, simulated in the shape it would plausibly adopt |
-| `native-content` | how to READ the pinned content models (`native.Document`, `native.Image`, `native.Date`), plus `isViewableUrl` — keyed by the kind the descriptor STATES, never by inspecting a value |
+| `native-content` | how to READ the pinned content models (`native.Document`, `native.Image`, `native.Date`), plus the URL gate `viewableUrl` and its guard `isViewableUrl` — keyed by the kind the descriptor STATES, never by inspecting a value |
 | `file-formats` | what a `document` or `image` slot accepts — a measured mirror of a runtime fact, read by both the dropzone's filter and the label above it |
 | `contracts` | the standard's `pipe_io_contracts` types, re-exported from `mthds/protocol`, plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
 | `gate` | `gateRunInputs`, the whole chain as one call, over the four steps it composes — [docs/run-gate.md](run-gate.md) |

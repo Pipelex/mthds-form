@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Security - the result view's URL policy
+
+Every URL in a payload is now judged by one gate before any sink acts on it, and the sinks take the string the gate returned rather than the string it was handed. `viewableUrl` and its guard `isViewableUrl` are exported from the core entry, so a host that wants to pre-judge a payload gets the kernel's own answer instead of restating it.
+
+**The gate parses instead of prefix-matching.** It strips what the WHATWG URL parser strips — leading and trailing C0 controls and spaces, every internal tab, line feed and carriage return — then branches on the protocol. `http:`, `https:` and `blob:` are viewable; a `data:` URL is viewable only for `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/avif` and `application/pdf`; a root-relative path is viewable when resolving it against a sentinel origin stays on that origin, which rejects `//host/x` and the two backslash spellings the parser reads the same way. `javascript:`, `file:` and `pipelex-storage:` are refused as before.
+
+**A document is framed only over `http:`, `https:` or a same-origin path.** Previewability is still read from the payload's declared type — whether a preview is worth offering is a usability question — but a declared type can no longer admit a URL. `{url: "data:text/html,<script>…", filename: "report.pdf"}` was previously framed on the strength of its own filename, and a `data:` document inherits the embedding page's origin rather than getting one of its own.
+
+**A markdown image in a `prose` value no longer loads on paint.** It renders as a link carrying its alt text, or the URL when the model wrote no alt, so nothing the model produced is lost and the request waits for a click. A host that knows where its prose images come from opts in with `proseImages="load"` on `ResultEnvProvider`, or with the same prop on `Markdown`; the type `ProseImages` and the `useProseImages` hook are exported from the react entry. Only `http:` and `https:` are ever painted or linked either way. A markdown link whose href is protocol-relative (`//host/x`, or the backslash spellings) is no longer followed, and keeps its text.
+
+**The download path consults the gate.** `downloadStuff` judges each candidate before it fetches and before it falls back to `window.open`, which is a navigation and previously received an unexamined URL. A file whose reference nothing accepts is skipped; the JSON receipt is still written, so the reference is not lost.
+
+**Every image this package paints, and the document frame, carry `referrerPolicy="no-referrer"`.** The result view's images, the input control's preview and the generative layer's brand logos; the frame already did.
+
+**What a consumer may notice.** A `data:` URL of a type outside the allow-list — `image/svg+xml` most likely — is named rather than painted, where it used to render. A remote image inside a `prose` value renders as a link until the host passes `proseImages="load"`. The document frame is unchanged in one respect worth stating: it deliberately carries no `sandbox` attribute, because the attribute sets the sandboxed-plugins flag unconditionally and no token unsets it, so a sandboxed frame cannot display a PDF at all — the scheme restriction above is what makes the frame safe. See [docs/result-view.md](docs/result-view.md).
+
 ### Added - `./generative`, a third entry point
 
 A layout — a data file, written once per method version by a model, that says which path goes where on the page — now has somewhere to be rendered. `@pipelex/mthds-form/generative` compiles one, checks it, and renders it over the same descriptor the plain form is built from.

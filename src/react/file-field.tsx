@@ -415,6 +415,9 @@ function ImagePreview({ src, filename }: { src: string; filename?: string }) {
       <img
         src={src}
         alt={filename ?? s.preview}
+        // Same rule as the result view's images: nothing this package paints
+        // tells a third party which page it was painted on.
+        referrerPolicy="no-referrer"
         className="h-auto w-full max-w-full object-contain"
         onError={() => setBroken(true)}
       />

@@ -53,8 +53,22 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
   return (
     <header className="border-b border-border">
       <div className={cn(CONTAINER, 'flex h-16 items-center gap-5')}>
-        <img src={brand.logo.onLight} alt={brand.name} className="h-7 w-auto dark:hidden" />
-        <img src={brand.logo.onDark} alt={brand.name} className="hidden h-7 w-auto dark:block" />
+        {/* `no-referrer` on both, as on every image this package paints: the
+            scheme is already checked where the manifest is parsed, and a brand
+            asset has no more business learning where it was drawn than a
+            payload's picture does. */}
+        <img
+          src={brand.logo.onLight}
+          alt={brand.name}
+          referrerPolicy="no-referrer"
+          className="h-7 w-auto dark:hidden"
+        />
+        <img
+          src={brand.logo.onDark}
+          alt={brand.name}
+          referrerPolicy="no-referrer"
+          className="hidden h-7 w-auto dark:block"
+        />
         <span aria-hidden="true" className="h-5 w-px bg-border" />
         <span className="text-sm font-medium text-foreground/80">{props.app}</span>
         {/* `min-w-0` down to the pill: a pipe's code is one long word, and
