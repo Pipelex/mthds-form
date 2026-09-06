@@ -567,15 +567,23 @@ function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): str
  * decides whether the origin boundary exists at all.
  *
  * **There is deliberately no `sandbox` attribute, and the reason is a platform
- * constraint rather than a judgement.** The `sandbox` attribute sets the
- * sandboxed-plugins flag unconditionally, and no token unsets it — `allow-plugins`
- * is not in the specification. Chrome's PDF viewer is plugin content, so a
- * sandboxed frame cannot display a PDF at all. Measured on Chrome 152 against a
- * same-origin PDF: the frame renders with no `sandbox` attribute, and shows the
- * broken-document icon under `sandbox=""`, `allow-same-origin`, `allow-scripts`,
- * `allow-same-origin allow-scripts` and `allow-downloads` alike. A sandbox here
- * would not harden the preview; it would delete it. See
- * [../../docs/result-view.md] for the whole policy.
+ * constraint rather than a judgement.** Measured against a same-origin PDF on
+ * Chrome 152 and Firefox 155, no token set renders in both.
+ *
+ * Chrome renders only with the attribute ABSENT: `sandbox` sets the
+ * sandboxed-plugins flag unconditionally and no token unsets it — `allow-plugins`
+ * is not in the specification — and Chrome's PDF viewer is plugin content, so
+ * every token set fails, `allow-same-origin allow-scripts` included. Firefox
+ * fails differently: pdf.js is a JavaScript viewer rather than plugin content,
+ * so it renders exactly when `allow-scripts` is granted and paints its toolbar
+ * over a blank page otherwise. The intersection is empty.
+ *
+ * The second half is the one that survives a browser changing its mind: the
+ * token Firefox needs is `allow-scripts`, and a frame sandboxed to allow only
+ * script execution is worse than a frame with no sandbox attribute. So a
+ * sandbox here would not harden the preview; it would delete it, or cost the
+ * one token that matters to buy nothing. `frameableUrl` above is what makes the
+ * frame safe. See [../../docs/result-view.md] for the whole policy.
  *
  * `no-referrer` stays: a result view has no business telling a third party where
  * it was opened from.

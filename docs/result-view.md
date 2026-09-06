@@ -173,7 +173,20 @@ The path arm settles four spellings with one rule. `//host/x` is protocol-relati
 
 **A frame is stricter than a paint, and the reason is the origin.** `frameableUrl` admits `http:`, `https:` and a same-origin path, and nothing else. Markup goes through a sandbox because injecting it into the host's document would run it ON the host's origin with the host's cookies; a URL in an `<iframe>` is a separate document at its own origin, which is the browser's own boundary rather than one this package builds. **That argument is sound, and it used to be applied to a URL nobody had checked.** A `data:` document does not get an origin of its own — it inherits the embedder's — so `{url: "data:text/html,<script>…", filename: "report.pdf"}` was framed on the strength of its own filename, at the host's origin, with the host's cookies. Restricting the scheme restores the premise instead of compensating for its absence. A refused scheme costs a reader nothing: a raster `data:` URL is painted by the image arm, and a run does not return an inline PDF.
 
-**The frame carries no `sandbox` attribute, and that is a platform constraint rather than a preference.** The attribute sets the HTML specification's *sandboxed plugins browsing context flag* unconditionally and no token unsets it — `allow-plugins` was never adopted — and Chrome's PDF viewer is plugin content. Measured on Chrome 152 against a same-origin PDF: the frame renders with no `sandbox` attribute and shows the broken-document icon under `sandbox=""`, `allow-same-origin`, `allow-scripts`, `allow-same-origin allow-scripts` and `allow-downloads` alike. Even the maximal set fails, which is what identifies the plugins flag as the cause. A sandbox here would not harden the preview; it would delete it, for the commonest document a run returns. The scheme gate is what makes the frame safe, and it is enough. (Only Chrome was measured — but a per-browser sandbox attribute is not a thing to build, so one browser refusing settles it.)
+**The frame carries no `sandbox` attribute, and that is a platform constraint rather than a preference.** Measured against a same-origin PDF on Chrome 152 and Firefox 155:
+
+| `sandbox` | Chrome 152 | Firefox 155 |
+| --- | --- | --- |
+| attribute absent | renders | renders |
+| `""` | broken-document icon | viewer chrome, blank page |
+| `allow-same-origin` | broken-document icon | viewer chrome, blank page |
+| `allow-scripts` | broken-document icon | renders |
+| `allow-same-origin allow-scripts` | broken-document icon | renders |
+| `allow-downloads` | broken-document icon | viewer chrome, blank page |
+
+The two fail for different reasons. The attribute sets the HTML specification's *sandboxed plugins browsing context flag* unconditionally and no token unsets it — `allow-plugins` was never adopted — and Chrome's PDF viewer is plugin content, so every token set fails there, the maximal one included, which is what identifies the flag as the cause rather than a missing capability. Firefox's pdf.js is not plugin content but a JavaScript viewer, so it renders exactly when `allow-scripts` is granted. **The intersection is empty: the only column that renders in both is no `sandbox` attribute at all.**
+
+The Firefox result is the one that survives a browser changing its mind. The token it requires is `allow-scripts` — a frame sandboxed to permit only script execution is strictly worse than a frame with no sandbox attribute — so there is no version of this where a sandbox is the right tool. It would delete the preview for the commonest document a run returns, or cost the one token that matters and buy nothing. The scheme gate above is what makes the frame safe, and it is enough. (Safari was not measured: it has no headless screenshot mode. Its answer cannot widen an already-empty intersection.)
 
 **Nothing this package paints tells a third party where it was painted.** Every `<img>` and the document frame carry `referrerPolicy="no-referrer"` — the result view's images, the input control's preview, the generative layer's brand logos. A result view has no business leaking the page it was opened from, and a payload's image URL is a third party by default.
 

@@ -72,22 +72,28 @@ Files: `src/react/result-field.tsx`, `src/react/download-stuff.ts`, `src/react/f
 
 **The frame gets no `sandbox` attribute, and the reason is a platform constraint rather than a preference.** D3 assumed there was a smallest token set under which a PDF still renders, and asked the check to find it. There is none: the `sandbox` attribute sets the HTML specification's *sandboxed plugins browsing context flag* unconditionally, and no token unsets it — `allow-plugins` was never adopted. Chrome's PDF viewer is plugin content, so a sandboxed frame cannot display a PDF at all.
 
-Measured on **Chrome 152.0.7977.76**, headless, framing a same-origin PDF, one cell per token set (probe page and screenshots were scratch, not committed):
+Measured headless, framing a same-origin PDF, one cell per token set, on **Chrome 152.0.7977.76** and **Firefox 155.0** (probe page and screenshots were scratch, not committed):
 
-| `sandbox` | Result |
-| --- | --- |
-| attribute absent | the PDF viewer loads — the control that proves the probe works |
-| `""` | broken-document icon |
-| `allow-same-origin` | broken-document icon |
-| `allow-scripts` | broken-document icon |
-| `allow-same-origin allow-scripts` | broken-document icon |
-| `allow-downloads` | broken-document icon |
+| `sandbox` | Chrome 152 | Firefox 155 |
+| --- | --- | --- |
+| attribute absent | renders — the control that proves the probe works | renders |
+| `""` | broken-document icon | viewer chrome, blank page |
+| `allow-same-origin` | broken-document icon | viewer chrome, blank page |
+| `allow-scripts` | broken-document icon | **renders** |
+| `allow-same-origin allow-scripts` | broken-document icon | **renders** |
+| `allow-downloads` | broken-document icon | viewer chrome, blank page |
 
-Even the maximal set fails, which is what identifies the cause as the plugins flag rather than a missing capability. **Adding a sandbox would not harden the preview; it would delete it** — the Preview toggle would open onto a broken-document icon for every PDF a run returns, which is the common case.
+**The two browsers fail for different reasons and the intersection is empty.** In Chrome even the maximal set fails, which is what identifies the cause as the plugins flag rather than a missing capability. Firefox's pdf.js is not plugin content — it is a JavaScript viewer, so it renders exactly when `allow-scripts` is granted, and its toolbar painting over a blank page in the other cells is the viewer loading and then having no way to run. So the only column that renders in both is *no `sandbox` attribute at all*.
+
+That second result is the sharper one, because it holds even if Chrome's behaviour changes: the token Firefox requires is `allow-scripts`, which is the one token D3 said never to grant, and granting it to a frame would be strictly worse than leaving the attribute off — a sandbox whose only enabled capability is script execution. **Adding a sandbox would not harden the preview; it would delete it** in Chrome, and in Firefox it would either delete it or buy nothing at the price of the one token that matters.
+
+An image document in the same frames renders identically with and without `sandbox` in Firefox, so nothing about the image arm depends on this.
 
 So the fix for the framing hole is entirely D3's *first* half, and it is sufficient: `frameableUrl` admits `http:`, `https:` and a same-origin path, and nothing else. What made the reported bug exploitable was that a `data:` document does not get an origin of its own — it inherits the embedder's — so the "a frame is a separate origin by construction" argument the old comment made was sound for the URLs it had in mind and vacuous for the one that arrived. Restricting the scheme restores the premise instead of compensating for its absence.
 
-**The limit of this check, stated rather than papered over.** Only Chrome was measured. `screencapture` has no screen-recording permission on this machine, so headful inspection was impossible, and Firefox's headless `--screenshot` did not produce a file on this machine after several attempts; Safari has no headless screenshot at all. Firefox's pdf.js may well render inside a sandbox, since it is not plugin content in the same sense — but a per-browser sandbox attribute is not a thing to build, so a single browser refusing is enough to settle it. The claim written into `DocumentPreview`'s comment and the docs is scoped to what was measured.
+**The limit of this check, stated rather than papered over.** Chrome and Firefox were measured; **Safari was not**. It has no headless screenshot mode, `safaridriver` needs `safaridriver --enable` (an admin gesture nobody was asked for), and `screencapture` has no screen-recording permission on this machine, so headful inspection was impossible. Safari's answer cannot change the decision in any case: the intersection of token sets that render is already empty, and a third browser can only shrink it. The claim written into `DocumentPreview`'s comment and the docs is scoped to the two browsers actually measured.
+
+*(The Firefox half failed on the first attempts for an environment reason worth naming, so nobody repeats the dead end: three stuck `org.mozilla.updater` processes were hijacking every launch to apply a staged update, so Firefox never reached the page and `--screenshot` produced nothing. Killing them and running against a throwaway profile with the update prefs off — `app.update.disabledForTesting`, `app.update.auto`, `app.update.enabled`, `app.update.staging.enabled` — made it work first try. It was never a missing capability.)*
 
 **Two things the implementation added beyond the phase's list.**
 
