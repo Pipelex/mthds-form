@@ -199,7 +199,11 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
 
 function Rail({ props, children }: BaseComponentProps<{ title: string }>) {
   return (
-    <div className="rounded-[calc(var(--radius)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
+    // An arbitrary value reads the token directly, so it does NOT go through
+    // the `@theme inline` mapping and does not inherit its fallback - it has to
+    // carry its own, or a host that defines no tokens loses the declaration
+    // outright. See src/styles/tailwind-entry.css.
+    <div className="rounded-[calc(var(--radius,0.5rem)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
       <h2 className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {props.title}
       </h2>
@@ -245,7 +249,8 @@ function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string 
         onClick={() => emit('press')}
         className={cn(
           'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground',
-          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary)_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary)_50%,transparent)]',
+          // The fallback is not decoration here either - see Rail above.
+          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_50%,transparent)]',
           'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden',
         )}
       >

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed - the prebuilt stylesheet no longer needs the host to define anything
+
+`styles.css` styled every control with `var(--<token>)` and defined none of those tokens; the values live in `theme.css`, which the package deliberately does not import because the tokens belong to the host. That is right for a shadcn host and leaves a host that owns no design system — a webview, an embedded panel, a plain page — rendering in no colours at all, with nothing anywhere saying so. **An undefined token does not degrade, it deletes**: the `var()` resolves to nothing, the whole declaration is invalid, the browser discards it, and the control lands on `transparent` or `canvastext`. The build is green and what the reader sees is a contrast bug in somebody else's design system.
+
+Every token the sheet reads now carries a fallback holding `theme.css`'s light value. A fallback fills a hole and can never win a cascade, so it is inert for every host that defines the token — including one whose own tokens sit in `@layer base` while this sheet arrives in a later layer, which is why a `:root` defaults block in the sheet was refused: it would have outranked the host's brand. Two controls in the generative registry read a token through an arbitrary value, which goes around the `@theme inline` mapping, and now spell their own fallback.
+
+The fallback palette is the light one, and it is a single value: a fallback is frozen into each utility and cannot vary by scope, so a host that defines nothing renders light even under `.dark`. `theme.css` remains the way to get the dark defaults, and is now genuinely optional rather than silently mandatory.
+
+`docs/theming.md`'s token table was also missing `--secondary` and `--secondary-foreground`, which the generative layer uses and the built sheet reads — a host following the package's own documentation defined an incomplete palette. `scripts/assert-bundle.mjs` now holds the whole contract, since the failure it guards against is invisible by construction: the tokens `tailwind-entry.css` reads must be exactly the ones `theme.css` defines, each fallback must carry that file's light value, and nothing in the built sheet may read a design token without one.
+
 ### Security - the result view's URL policy
 
 Every URL in a payload is now judged by one gate before any sink acts on it, and the sinks take the string the gate returned rather than the string it was handed. `viewableUrl` and its guard `isViewableUrl` are exported from the core entry, so a host that wants to pre-judge a payload gets the kernel's own answer instead of restating it.
