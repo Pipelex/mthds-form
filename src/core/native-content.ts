@@ -312,6 +312,14 @@ const VIEWABLE_DATA_MEDIA_TYPES = new Set([
 const RELATIVE_SENTINEL_ORIGIN = 'https://url-gate.invalid';
 
 /**
+ * A scheme, by RFC 3986's grammar: a letter, then letters, digits, `+`, `-`, `.`
+ *
+ * Read off the string rather than inferred from a parse, because a parse needs a
+ * base and the base is what makes the answer wrong — see {@link viewableUrl}.
+ */
+const OWN_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
  * What the WHATWG URL parser strips before it parses, applied before we judge.
  *
  * Leading and trailing C0 controls and spaces are removed, and every internal
@@ -328,14 +336,27 @@ function stripUrlWhitespace(candidate: string): string {
   let end = candidate.length;
   while (start < end && candidate.charCodeAt(start) <= 0x20) start += 1;
   while (end > start && candidate.charCodeAt(end - 1) <= 0x20) end -= 1;
-  let stripped = '';
+  // Scan before rebuilding, and rebuild only from the first character that has
+  // to go. Almost every URL has nothing to strip inside it, and the one that
+  // does is the one that is huge: an inline `data:` image is judged three or
+  // four times per render, and a per-character rebuild of a megabyte-long
+  // payload each time is hundreds of milliseconds of frozen main thread for a
+  // string that comes back identical.
   for (let index = start; index < end; index += 1) {
     const code = candidate.charCodeAt(index);
     // Tab, line feed, carriage return - removed wherever they appear, not only
     // at the edges, which is what the parser does with them.
-    if (code !== 0x09 && code !== 0x0a && code !== 0x0d) stripped += candidate[index];
+    if (code === 0x09 || code === 0x0a || code === 0x0d) {
+      let stripped = candidate.slice(start, index);
+      for (let rest = index; rest < end; rest += 1) {
+        const restCode = candidate.charCodeAt(rest);
+        if (restCode !== 0x09 && restCode !== 0x0a && restCode !== 0x0d)
+          stripped += candidate[rest];
+      }
+      return stripped;
+    }
   }
-  return stripped;
+  return start === 0 && end === candidate.length ? candidate : candidate.slice(start, end);
 }
 
 /** The media type a `data:` URL declares, lowercased; `text/plain` when it declares none. */
@@ -376,51 +397,59 @@ function dataUrlMediaType(parsed: URL): string {
  * away and the arms fell back to the payload's `public_url`: a presigned URL
  * that had already expired. The image stayed broken with the fix in place.
  *
- * A path is accepted only when resolving it against a sentinel origin STAYS on
- * that origin, which is one rule where a regex needed one per spelling:
- * `//host/x` is protocol-relative, and the parser reads `\\host\x` and `/\host/x`
- * as the same thing. An accepted path is returned relative, because making it
- * absolute against a sentinel would point it at nowhere.
+ * A path is rejected when it is protocol-relative — `//host/x`, and the two
+ * backslash spellings the parser reads the same way (`\\host\x`, `/\host/x`) —
+ * and then checked against the sentinel as well. An accepted path is returned
+ * relative, because making it absolute against a sentinel would point it at
+ * nowhere.
  */
 export function viewableUrl(candidate: string | undefined): string | undefined {
   if (!candidate) return undefined;
   const stripped = stripUrlWhitespace(candidate);
   if (stripped === '') return undefined;
 
+  // Whether the string carries a scheme is read OFF THE STRING, before any base
+  // is applied, because the parser reads a candidate whose scheme equals the
+  // base's as relative to that base. Deciding it with a second, base-less parse
+  // let the two disagree: `https:cdn.example/x.png` was judged absolute and
+  // resolved against the sentinel, so the gate handed a sink
+  // `https://url-gate.invalid/cdn.example/x.png` — an internal placeholder, in a
+  // real `<img src>`, in place of a URL that had worked. The grammar is RFC
+  // 3986's, and it agrees with the parser on every string either accepts.
+  if (OWN_SCHEME_RE.test(stripped)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(stripped);
+    } catch {
+      return undefined;
+    }
+    switch (parsed.protocol) {
+      case 'http:':
+      case 'https:':
+      case 'blob:':
+        return parsed.href;
+      case 'data:':
+        return VIEWABLE_DATA_MEDIA_TYPES.has(dataUrlMediaType(parsed)) ? parsed.href : undefined;
+      default:
+        return undefined;
+    }
+  }
+
+  // No scheme of its own: a reference relative to wherever the page is. Only a
+  // root-relative path qualifies.
+  if (!stripped.startsWith('/')) return undefined;
+  // Protocol-relative, rejected on the SPELLING. "Did it stay on the sentinel"
+  // reads as the same rule and is blind in exactly one place — the sentinel's
+  // own host — so `//url-gate.invalid/x` passed the test written to stop it.
+  const afterSlash = stripped.charCodeAt(1);
+  if (afterSlash === 0x2f || afterSlash === 0x5c) return undefined;
   let parsed: URL;
   try {
     parsed = new URL(stripped, RELATIVE_SENTINEL_ORIGIN);
   } catch {
     return undefined;
   }
-
-  // No scheme of its own: a reference relative to wherever the page is. Only a
-  // root-relative path qualifies, and only if it stayed on the sentinel.
-  if (!hasOwnScheme(stripped)) {
-    if (!stripped.startsWith('/')) return undefined;
-    return parsed.origin === RELATIVE_SENTINEL_ORIGIN ? stripped : undefined;
-  }
-
-  switch (parsed.protocol) {
-    case 'http:':
-    case 'https:':
-    case 'blob:':
-      return parsed.href;
-    case 'data:':
-      return VIEWABLE_DATA_MEDIA_TYPES.has(dataUrlMediaType(parsed)) ? parsed.href : undefined;
-    default:
-      return undefined;
-  }
-}
-
-/** Whether the string carries a scheme of its own, rather than being relative. */
-function hasOwnScheme(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
+  return parsed.origin === RELATIVE_SENTINEL_ORIGIN ? stripped : undefined;
 }
 
 /**

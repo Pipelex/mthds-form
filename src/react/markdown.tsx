@@ -305,16 +305,20 @@ function InlineToken({ token }: { token: Token }) {
       // is a security decision.
       if (!href) return <Inline tokens={link.tokens} />;
       return (
-        <a
-          href={href}
-          target="_blank"
-          // `noreferrer` as well as `noopener`: a result view has no business
-          // telling a third party which page it was opened from.
-          rel="noreferrer noopener"
-          className="underline underline-offset-2"
-        >
-          <Inline tokens={link.tokens} />
-        </a>
+        // The flag is set for everything under the anchor, so a nested `image`
+        // token knows not to open one of its own — see {@link ProseImage}.
+        <InsideLinkContext value={true}>
+          <a
+            href={href}
+            target="_blank"
+            // `noreferrer` as well as `noopener`: a result view has no business
+            // telling a third party which page it was opened from.
+            rel="noreferrer noopener"
+            className="underline underline-offset-2"
+          >
+            <Inline tokens={link.tokens} />
+          </a>
+        </InsideLinkContext>
       );
     }
     case 'image':
@@ -337,9 +341,18 @@ function InlineToken({ token }: { token: Token }) {
  * `proseImages: 'load'`. Either way the scheme must be `http:` or `https:`: a
  * `data:` image is refused outright even for a type the file arms would paint,
  * because a model's answer is not where an inline image arrives.
+ *
+ * **Inside a link it stays text, because `[![alt](img)](href)` is a link token
+ * holding an image token** — the linked-thumbnail spelling, which models write
+ * constantly. An anchor inside an anchor is not valid HTML: the parser un-nests
+ * the pair into siblings, so a server-rendered page and the hydrated tree
+ * disagree, and the link the author wrote points at the image instead of the
+ * destination. An `<img>` nests inside an anchor perfectly well, so only the
+ * link arm has to care.
  */
 function ProseImage({ token }: { token: Tokens.Image }) {
   const mode = React.use(ProseImagesContext);
+  const insideLink = React.use(InsideLinkContext);
   const src = proseImageUrl(token.href);
   // A refused scheme keeps its TEXT, exactly as a refused link does: dropping
   // the element and dropping the words are different things.
@@ -354,6 +367,9 @@ function ProseImage({ token }: { token: Tokens.Image }) {
       />
     );
   }
+  // The enclosing anchor already carries a destination and a click; this is its
+  // label. Falling back to the URL keeps that label from being empty.
+  if (insideLink) return <>{token.text || src}</>;
   return (
     <a
       href={src}
@@ -365,6 +381,15 @@ function ProseImage({ token }: { token: Tokens.Image }) {
     </a>
   );
 }
+
+/**
+ * Whether the walker is already inside an anchor.
+ *
+ * A context for the same reason the policy above is one: `Block`, `Inline` and
+ * `InlineToken` recurse through each other, and a flag only the `image` arm
+ * reads would otherwise sit in every signature in the file.
+ */
+const InsideLinkContext = React.createContext(false);
 
 /** An image URL a prose value may reach: the two network schemes, nothing else. */
 function proseImageUrl(href: string): string | undefined {

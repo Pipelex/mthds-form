@@ -114,3 +114,39 @@ describe('the download path judges a URL before it acts on one', () => {
     expect(fetchSpy).toHaveBeenCalledWith('https://cdn.example/a.png');
   });
 });
+
+describe('a bare file the gate refuses still leaves the reader something', () => {
+  it('writes the JSON receipt when the whole stuff is one refused file', async () => {
+    // The bare-file rule drops the receipt because the file IS the download -
+    // which only holds when the file actually went out. Skipping the file and
+    // then taking that early return produced nothing at all: no bytes, no
+    // receipt, no error, and a promise that resolved clean.
+    await downloadStuff({
+      field: image('output'),
+      value: { url: 'pipelex-storage://x', public_url: 'javascript:alert(1)' },
+      baseName: 'output',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(saved).toEqual(['output.json']);
+  });
+
+  it('writes it for a storage reference no resolver can turn into a URL', async () => {
+    await downloadStuff({
+      field: image('output'),
+      value: { url: 'pipelex-storage://x' },
+      baseName: 'output',
+    });
+    expect(saved).toEqual(['output.json']);
+  });
+
+  it('still drops the receipt when the bare file was actually delivered', async () => {
+    fetchSpy.mockResolvedValue({ ok: true, blob: async () => new Blob(['x']) });
+    await downloadStuff({
+      field: image('output'),
+      value: { url: 'https://cdn.example/a.png' },
+      baseName: 'output',
+    });
+    expect(saved).toEqual(['output-output.png']);
+  });
+});

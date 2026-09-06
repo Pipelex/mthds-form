@@ -479,19 +479,40 @@ function FileRef({
  * `undefined` when nothing here can be painted — the arms then name the file
  * instead, which is the honest floor.
  */
-function paintableUrl(
+function paintable(
   content: { url: string; publicUrl?: string },
   resolve?: ResolveUrl,
-): string | undefined {
+): PaintableUrl | undefined {
   // `viewableUrl` rather than a predicate over the raw member: what comes back
   // is the NORMALISED string, and every sink downstream takes that. A member
   // carrying a leading space parses as `https:` for a host that validated it and
   // failed a prefix match here, so the two used to act on different URLs.
-  return (
-    viewableUrl(resolve?.(content.url)) ??
-    viewableUrl(content.publicUrl) ??
-    viewableUrl(content.url)
-  );
+  const resolved = viewableUrl(resolve?.(content.url));
+  if (resolved) return { url: resolved, fromResolver: true };
+  const stated = viewableUrl(content.publicUrl) ?? viewableUrl(content.url);
+  return stated ? { url: stated, fromResolver: false } : undefined;
+}
+
+/**
+ * A URL the gate accepted, and WHO produced the candidate it accepted.
+ *
+ * Provenance is not decoration: a root-relative path is the embedding page's own
+ * origin, so who chose the path decides whether it may be framed. The gate
+ * cannot tell a resolver's answer from a payload member — both are strings — but
+ * this function knows, because it asked them in order. See {@link frameableUrl}.
+ */
+interface PaintableUrl {
+  url: string;
+  /** True when the HOST's resolver produced it, rather than the payload. */
+  fromResolver: boolean;
+}
+
+/** The paintable URL alone, for the sinks that do not care where it came from. */
+function paintableUrl(
+  content: { url: string; publicUrl?: string },
+  resolve?: ResolveUrl,
+): string | undefined {
+  return paintable(content, resolve)?.url;
 }
 
 /** The extensions a browser renders in a frame with no plugin and no library. */
@@ -503,24 +524,37 @@ const PREVIEWABLE_MIME_RE = /^(application\/pdf|image\/)/i;
  * painted or linked at.
  *
  * A frame is the one sink that turns a URL into a document with a DOM, so the
- * scheme has to be one that carries its own origin. `http:` and `https:` do, and
- * a root-relative path does by construction — it is the embedding page's own
- * origin, which is the resolver case (`/api/assets/…`) the preview exists for.
+ * scheme has to be one that carries its own origin. `http:` and `https:` do.
  * `data:` does not: a `data:` document inherits the embedder's origin, which is
  * exactly how a payload's `data:text/html` reached an unsandboxed frame with the
  * host's cookies. `blob:` is excluded too — a payload cannot mint one, so
  * admitting it here would widen the sink for nothing.
  *
+ * **A root-relative path carries no origin of its own either, and that is why it
+ * is admitted only from the RESOLVER.** It is the embedding page's origin by
+ * construction, which is exactly what the resolver case (`/api/assets/…`) wants
+ * and exactly what a payload must not be handed: a payload naming
+ * `/api/assets/anything.svg` got a document with a DOM on the host's origin, and
+ * the type gate below admits `image/` — SVG included — so the scheme rule that
+ * bans a `data:` SVG was being paid around one function later. A payload member
+ * must be `http:` or `https:` to be framed; a host that resolves to a path is
+ * choosing its own origin, which it is entitled to do.
+ *
+ * That is also the residual risk the resolver contract names: a stored object
+ * served on the host's origin is a document on the host's origin, so serve it
+ * with its real content type or with `Content-Disposition: attachment`. See
+ * [../../docs/upload-seam.md].
+ *
  * A refused scheme costs nothing a reader wanted: a raster `data:` URL is
  * painted by the image arm, and a run does not return an inline PDF.
  */
-function frameableUrl(candidate: string | undefined): string | undefined {
-  const url = viewableUrl(candidate);
-  if (!url) return undefined;
+function frameableUrl(candidate: PaintableUrl | undefined): string | undefined {
+  if (!candidate) return undefined;
   // Safe as a prefix test only because `viewableUrl` normalised the string: an
   // accepted path starts with exactly one slash, `//host` and `/\host` having
   // been rejected as protocol-relative.
-  return /^https?:/.test(url) || url.startsWith('/') ? url : undefined;
+  if (/^https?:/.test(candidate.url)) return candidate.url;
+  return candidate.fromResolver && candidate.url.startsWith('/') ? candidate.url : undefined;
 }
 
 /**
@@ -540,7 +574,7 @@ function frameableUrl(candidate: string | undefined): string | undefined {
  * used to be framed on the strength of its own filename.
  */
 function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): string | undefined {
-  const url = frameableUrl(paintableUrl(content, resolve));
+  const url = frameableUrl(paintable(content, resolve));
   if (!url) return undefined;
   const named = content.filename ?? url;
   const renderable = content.mimeType
@@ -746,7 +780,10 @@ function ImageValue({
       {src && !compact && (
         <div className={inGallery ? 'px-2.5' : undefined}>
           <FileRef
-            url={paintableUrl(content, resolve) ?? content.url}
+            // `src` IS `paintableUrl(content, resolve)`, and this branch only
+            // renders when it is set — so asking the gate again here would be a
+            // second full pass over the same string for the same answer.
+            url={src}
             storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}

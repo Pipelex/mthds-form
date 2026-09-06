@@ -125,3 +125,37 @@ describe('viewableUrl hands back the string it judged', () => {
     expect(viewableUrl(undefined)).toBeUndefined();
   });
 });
+
+describe('the sentinel is scaffolding and never a destination', () => {
+  it('resolves a scheme-relative spelling against nothing but itself', () => {
+    // `https:cdn.example/x.png` is a legal URL a browser resolves against the
+    // PAGE. Deciding "has its own scheme" with a second, base-less parse while
+    // the kept parse used the sentinel as base let the two disagree, and the
+    // gate handed a real `<img src>` the internal placeholder host instead.
+    expect(viewableUrl('https:cdn.example/x.png')).toBe('https://cdn.example/x.png');
+    expect(viewableUrl('https:/cdn.example/x.png')).toBe('https://cdn.example/x.png');
+    expect(viewableUrl('HTTPS:cdn.example/x.png')).toBe('https://cdn.example/x.png');
+    // `http:` never matched the sentinel's scheme, so it was already right - it
+    // is here to show the asymmetry that identified the cause.
+    expect(viewableUrl('http:cdn.example/x.png')).toBe('http://cdn.example/x.png');
+  });
+
+  it('rejects a protocol-relative reference to the sentinel host itself', () => {
+    // "Did it stay on the sentinel origin" reads as the protocol-relative rule
+    // and is blind in exactly one place: the sentinel's own host passed it.
+    expect(isViewableUrl('//url-gate.invalid/x.png')).toBe(false);
+    expect(isViewableUrl('/\\url-gate.invalid/x.png')).toBe(false);
+    expect(isViewableUrl('//URL-GATE.INVALID/x.png')).toBe(false);
+  });
+
+  it('never leaks the sentinel origin into an accepted string', () => {
+    for (const candidate of [
+      'https:cdn.example/x.png',
+      '/api/assets/x.png',
+      'https://cdn.example/x.png',
+      '  /api/assets/x.png  ',
+    ]) {
+      expect(viewableUrl(candidate)).not.toContain('url-gate.invalid');
+    }
+  });
+});

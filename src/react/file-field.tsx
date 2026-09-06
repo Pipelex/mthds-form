@@ -8,7 +8,7 @@ import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { acceptMapForKind, isAcceptedFile } from '../core/file-formats';
-import { isViewableUrl } from '../core/native-content';
+import { viewableUrl } from '../core/native-content';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
@@ -40,20 +40,22 @@ const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)(\?|$)/i;
 const PDF_EXT_RE = /\.pdf(\?|$)/i;
 const DATA_URL_MIME_RE = /^data:([^;,]+)/i;
 
-/**
- * True when the browser can render this URL as-is - `isViewableUrl`, under the
- * name this file has always called it.
+/*
+ * This control reads the kernel's URL gate directly - `viewableUrl` from core,
+ * the same function the result view paints through.
  *
- * The predicate itself moved to core when the result side needed the same
- * answer: an input control deciding whether to fetch a preview and a result view
- * deciding whether to paint an `<img>` are the same question, and answering it
- * twice is how the two drift. `data:` is the arm that used to be missing here,
- * and its absence cost a preview rather than a fetch: any URL that is not `http`
- * was treated as a stored URI needing `resolveUrl`, so a host with no resolver
- * got a spinner that never stopped over a value the browser could have rendered
- * immediately.
+ * The gate moved to core when the result side needed the same answer: an input
+ * control deciding whether to fetch a preview and a result view deciding whether
+ * to paint an `<img>` are the same question, and answering it twice is how the
+ * two drift. `data:` is the arm that used to be missing here, and its absence
+ * cost a preview rather than a fetch: any URL that was not `http` got treated as
+ * a stored URI needing `resolveUrl`, so a host with no resolver saw a spinner
+ * that never stopped over a value the browser could have rendered immediately.
+ *
+ * It is the VALUE form and not the guard, deliberately. The guard answers the
+ * question without handing back the string it judged, so a caller that then
+ * paints the raw member paints something the gate never saw.
  */
-const isDirectlyViewable = isViewableUrl;
 
 /** The MIME type a `data:` URL declares, which is the only type it carries. */
 function dataUrlMime(url: string): string | undefined {
@@ -236,7 +238,16 @@ function FileField({
     PDF_EXT_RE.test(url);
   const canPreview = isImage || isPdf;
 
-  const storageUri = value?.url && !isDirectlyViewable(value.url) ? value.url : null;
+  // The gate's own string, not a yes-or-no over the raw member: what is judged
+  // is what is painted, here as everywhere else the package touches a URL.
+  const directSrc = viewableUrl(value?.url);
+  // A reference the browser cannot render, for the host's resolver to turn into
+  // one. Keyed on the value being a REFERENCE rather than on "the gate said no":
+  // a `data:` URL carries its own bytes, so no resolver can resolve one, and a
+  // refused one is refused rather than pending. Routing it here is what turned
+  // an allow-list miss into the spinner that never stops - the exact failure the
+  // note above the `data:` arm says was fixed.
+  const storageUri = value?.url && !directSrc && urlMime === undefined ? value.url : null;
   useEffect(() => {
     if (!previewOpen || !storageUri || localIsCurrent || !resolveUrl) return;
     let cancelled = false;
@@ -267,10 +278,22 @@ function FileField({
   // impossible rather than merely brief: clearing it from an effect would still
   // paint one frame of the old file, exactly as `localIsCurrent` above is
   // computed in render for the same reason.
-  const resolvedSrc = resolved && resolved.uri === storageUri ? resolved.src : undefined;
+  //
+  // A resolver's answer is judged by the same gate as any payload member. The
+  // resolver is trusted to know where a host's objects live, not to be a way
+  // past the URL policy - and this is the sink the seam's contract documents, so
+  // it has to be the sink that keeps it.
+  const resolvedSrc =
+    resolved && resolved.uri === storageUri ? viewableUrl(resolved.src) : undefined;
   const previewSrc =
-    (localIsCurrent ? localPreview?.objectUrl : undefined) ??
-    (isDirectlyViewable(value?.url) ? value.url : resolvedSrc);
+    (localIsCurrent ? localPreview?.objectUrl : undefined) ?? directSrc ?? resolvedSrc;
+  // Whether anything can still arrive: there is a reference to resolve and no
+  // resolution has landed FOR IT yet. Without this the "nothing to show" case
+  // and the "still waiting" case rendered the same spinner, so a refusal read as
+  // a load that never finished. Keyed by URI for the same reason `resolvedSrc`
+  // is: a resolution belonging to the previous value is not an answer about this
+  // one.
+  const previewPending = !previewSrc && !!storageUri && resolved?.uri !== storageUri;
 
   return (
     <FieldShell
@@ -301,9 +324,17 @@ function FileField({
               <ImagePreview src={previewSrc} filename={value?.filename} />
             ) : previewSrc && isPdf ? (
               <PdfPreview src={previewSrc} />
-            ) : (
+            ) : previewPending ? (
               <div className="flex h-24 items-center justify-center rounded-md border border-border bg-muted">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              // Nothing to show and nothing on its way: a reference the gate
+              // refuses, or a stored one with no resolver behind it. A spinner
+              // here said "loading" about something that was never going to
+              // load, which is the one thing a refusal must not look like.
+              <div className="flex h-24 items-center justify-center rounded-md border border-border bg-muted">
+                <ImageOff className="h-5 w-5 text-muted-foreground" />
               </div>
             ))}
         </div>

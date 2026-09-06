@@ -357,6 +357,61 @@ describe('the URL policy', () => {
   });
 });
 
+describe('a frame takes a same-origin path only from the resolver', () => {
+  const pdfPath = { url: '/api/assets/report.pdf', mime_type: 'application/pdf' };
+
+  it('refuses to frame a path the PAYLOAD named', () => {
+    // A root-relative path is the embedding page's own origin, so a document
+    // framed at one runs on the host's origin - which is what the whole `data:`
+    // ban is about. It is the resolver case the arm exists for, and a payload
+    // must not be able to name it: `{url: "/api/assets/x.svg"}` was a DOM on the
+    // host's origin, and the type gate below admits `image/`, SVG included.
+    const { container } = render(
+      <ResultField field={file('output', 'document')} value={pdfPath} />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('frames the same path when the host RESOLVER produced it', async () => {
+    // A host resolving onto its own origin is choosing its own origin, which is
+    // exactly what the seam is for.
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={() => '/api/assets/report.pdf'}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'pipelex-storage://org/report.pdf', mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe('/api/assets/report.pdf');
+  });
+
+  it('still frames an https document the payload named', () => {
+    render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeTruthy();
+  });
+
+  it('never frames a blob: URL, which the paint gate does accept', () => {
+    // `blob:` is viewable and deliberately not frameable - a payload cannot mint
+    // one, so admitting it to the frame would widen the sink for nothing.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'blob:https://app.example/8f0e', mime_type: 'application/pdf' }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+});
+
 describe('lists', () => {
   it('unwraps a plural payload by its content key and counts the items', () => {
     render(

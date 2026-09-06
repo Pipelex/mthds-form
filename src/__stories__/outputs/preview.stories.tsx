@@ -25,9 +25,10 @@ import { ResultView } from '../result-view';
  * would run it ON the host's origin, with the host's cookies. A URL in an
  * `<iframe>` is a separate document at its own origin — the browser's own
  * boundary, not one this package has to build. That holds only for a scheme
- * that CARRIES an origin, which is why `frameableUrl` admits `http:`, `https:`
- * and a same-origin path and nothing else: a `data:` document inherits the
- * embedder's origin instead of getting one of its own. So a PDF is framed the
+ * that CARRIES an origin, which is why `frameableUrl` admits `http:` and
+ * `https:` from anyone and a same-origin path only from the host's own
+ * resolver: a `data:` document inherits the embedder's origin instead of
+ * getting one of its own, and so does a path. So a PDF is framed the
  * way every document viewer on the web frames one, with `no-referrer` because a
  * result view has no business telling a third party where it was opened from.
  *
@@ -39,13 +40,14 @@ import { ResultView } from '../result-view';
 /**
  * The served PDF, as an ABSOLUTE url.
  *
- * The gate would take `/solar_system.pdf` — a root-relative path is viewable,
- * because that is what a host's URL resolver hands back. It is written absolute
- * here anyway, because what this story shows is the shape a payload actually
- * carries: the standard says a `native.Document`'s `url` is a storage URI, an
- * HTTP(S) URL or a base64 data URL, and a path is none of those. Resolving it
- * against the origin costs one line and keeps the fixture honest about its
- * provenance.
+ * The gate would PAINT `/solar_system.pdf` — a root-relative path is viewable,
+ * because that is what a host's URL resolver hands back. It would not FRAME one
+ * from a payload, though, and this story frames it: a path is the embedding
+ * page's own origin, so only a resolver may choose one. Absolute is also what
+ * the fixture should say either way — the standard says a `native.Document`'s
+ * `url` is a storage URI, an HTTP(S) URL or a base64 data URL, and a path is
+ * none of those. Resolving it against the origin costs one line and keeps the
+ * fixture honest about its provenance.
  */
 const PDF_URL =
   typeof window === 'undefined'

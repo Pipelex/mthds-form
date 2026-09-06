@@ -234,3 +234,51 @@ describe('a link that only looks same-origin', () => {
     expect(anchor.querySelector('a')?.getAttribute('href')).toBe('#top');
   });
 });
+
+describe('a linked image does not open an anchor inside an anchor', () => {
+  it('renders the linked thumbnail as the outer link text', () => {
+    // `[![alt](img)](href)` is a link token holding an image token - the
+    // linked-thumbnail spelling models write constantly. Two nested anchors are
+    // not valid HTML: the parser un-nests them into siblings, so a server
+    // rendered page and the hydrated tree disagree and the visible link points
+    // at the image instead of the destination the author wrote.
+    const { container } = render(
+      <Markdown text="[![the chart](https://cdn.example/thumb.png)](https://app.example/report)" />,
+    );
+    const anchors = container.querySelectorAll('a');
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]?.getAttribute('href')).toBe('https://app.example/report');
+    expect(anchors[0]?.textContent).toBe('the chart');
+    expect(container.querySelector('a a')).toBeNull();
+  });
+
+  it('falls back to the image URL when the model wrote no alt', () => {
+    const { container } = render(
+      <Markdown text="[![](https://cdn.example/thumb.png)](https://app.example/report)" />,
+    );
+    expect(container.querySelectorAll('a')).toHaveLength(1);
+    expect(container.querySelector('a')?.textContent).toBe('https://cdn.example/thumb.png');
+  });
+
+  it('still paints the image inside the link under the opt-in', () => {
+    // An `<img>` nests inside an anchor perfectly well, so only the link arm has
+    // to care - the opt-in keeps the thumbnail AND the destination.
+    const { container } = render(
+      <Markdown
+        text="[![the chart](https://cdn.example/thumb.png)](https://app.example/report)"
+        proseImages="load"
+      />,
+    );
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('https://app.example/report');
+    expect(container.querySelector('a img')?.getAttribute('src')).toBe(
+      'https://cdn.example/thumb.png',
+    );
+  });
+
+  it('opens its own anchor when it is not inside one', () => {
+    const { container } = render(<Markdown text="![the chart](https://cdn.example/thumb.png)" />);
+    expect(container.querySelector('a')?.getAttribute('href')).toBe(
+      'https://cdn.example/thumb.png',
+    );
+  });
+});

@@ -42,6 +42,15 @@ describe('the brand the product chrome reads', () => {
     expect(screen.getByText('Trip planner')).toBeInTheDocument();
   });
 
+  it('draws its logos with no referrer, like every image the package paints', () => {
+    // The rule is stated in docs/result-view.md as covering these too: nothing
+    // this package paints tells a third party which page it was painted on.
+    render(<GenerativePage spec={APP_BAR} store={createStateStore({})} scope={{}} brand={BRAND} />);
+    const logos = screen.getAllByAltText('Acme');
+    expect(logos.length).toBeGreaterThan(0);
+    for (const logo of logos) expect(logo.getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+
   it('is named as the cure, in the error the boundary reports, when the page is given none', () => {
     const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
