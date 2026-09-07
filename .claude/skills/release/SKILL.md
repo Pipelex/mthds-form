@@ -1,131 +1,79 @@
 ---
 name: release
 description: >
-  Automates the mthds-form release workflow: bumps the version in package.json, renames the CHANGELOG.md `[Unreleased]` section into a version heading, runs the full gate (checks, tests, build, and the bundle assertions), creates a `release/vX.Y.Z` branch, commits, pushes, and opens a PR to `main` — merging that PR is what publishes `@pipelex/mthds-form` to npm. Use whenever the user says "release", "cut a release", "bump the version", "prepare a release", "make a release", "ship it", "publish to npm", "create a release branch", or any variation of shipping a new version of this package, even if they do not name the package. The user can pass changelog content inline (e.g. "/release added a presentation seam on the controls"), which becomes the entry for this version.
+  Cut a release of mthds-form, the form kernel published to npm as
+  @pipelex/mthds-form: the release/vX.Y.Z worktree, the package.json bump and
+  the package-lock.json that follows, the changelog entry, the gate that ends in
+  the bundle assertions, one commit, and a pull request to main. Use when the
+  user says "release", "cut a release", "bump the version", "prepare a release",
+  "make a release", "ship it", "publish to npm", "create a release branch",
+  "promote dev to main", or any variation of shipping a new version of this
+  package, even when they do not name it. Changelog content passed inline
+  ("/release Added a presentation seam on the controls") becomes the entry. The
+  merge is landed by /ledger-land, never by this skill.
 ---
 
-# mthds-form Release Workflow
+# Releasing mthds-form
 
-This skill handles the full release cycle for the `@pipelex/mthds-form` npm package.
+The procedure is the workspace release play, [`docs/releasing.md`](../../../../docs/releasing.md) at the workspace root — `../docs/releasing.md` from this repo's own root, which resolves the same from the main checkout and from any worktree. Read it first, then run it with what follows. The repo key is `mthds-form`, the base is `dev`, and the pull request targets `main`. The release worktree is `_mthds-form--release`, made with `wt add mthds-form release --branch release/vX.Y.Z`. The repo declares neither `.worktree.toml` nor `.worktreeinclude`, so `wt` resolves the base from `origin/dev` and provisions with the Makefile's `install` target, which is `npm install`. That brings up `node_modules` and nothing else: the pinned `playwright` package declares no install script, so nothing in the provisioning fetches the headless browser the story suite runs in — the gates below say how to get it.
 
-**Merging the release PR into `main` is what publishes.** `.github/workflows/release.yml` runs on every push to `main`: it re-runs the gate, rebuilds, re-asserts the bundle invariants, publishes to npm with provenance, creates the `vX.Y.Z` git tag and opens the GitHub release. That job is idempotent — a push to `main` that does not move the version is a deliberate no-op — so nothing here needs to publish anything. This skill's job ends when the PR is open.
+## What ships
 
-## Files touched
+The merge to `main` publishes, through `.github/workflows/release.yml`, which fires on the push (`on: push: branches: [main]`) and so keys its run to the merge commit:
 
-- **`package.json`** — the `version` field
-- **`CHANGELOG.md`** — the `## [Unreleased]` heading becomes `## [vX.Y.Z] - YYYY-MM-DD`
-- **`package-lock.json`** — regenerated via `npm install`
+- **The `@pipelex/mthds-form` package on npm**, by the `publish` job — `npm publish --ignore-scripts --access public --provenance`, with `--ignore-scripts` skipping the `prepare` hook so the publish ships the artifacts the assertions below just validated rather than a rebuild that clobbers them. The job first asks npm whether the version in `package.json` is already there, and when it is, every gate, build and publish step is skipped: **a push to `main` that does not move the version is a deliberate green no-op**, which is what lets ordinary commits reach `main` without a bump — and it is also why a forgotten bump publishes nothing and reports success.
+- **The `vX.Y.Z` tag**, created by the same job with a plain `git tag` and pushed, so it is **lightweight**: pass `--tags` when reading tags here, because bare `git describe` finds no annotated tag in this repo. The step is guarded on `git ls-remote` rather than on the already-published check, so a run that published to npm and then failed can be re-run to backfill the tag.
+- **The GitHub Release**, by the `github-release` job — the notes are the changelog section for that version, with its blank lines dropped and every line's leading whitespace stripped. When no `## [vX.Y.Z]` heading is found the step warns, empties the notes and exits 0, so the Release ships carrying the bare line `Release vX.Y.Z` instead of failing. That is deliberate: the job also runs on the recovery path for a version npm already has, where failing would leave it permanently without a Release, and the heading is enforced before publishing instead.
 
-## Workflow
+Before it publishes, the `publish` job re-runs the whole gate against the merged tree — `make check`, chromium, `make test`, `make build`, `make assert-bundle` — and rebuilds the tarball itself, because a green pull request proves nothing about the artifact that actually reaches npm. A gate that goes red there stops the publish after the merge has already landed.
 
-### 1. Pre-flight checks
+The landing verifies the publish — the run, the registry's answer, the tag:
 
-Read the current version from `package.json`, read `CHANGELOG.md`, and run `npm view @pipelex/mthds-form version` to learn what is actually on npm. Then run `git status` and `git log origin/main..HEAD` to assess the working tree.
-
-**Check first whether a version was already bumped but never published.** Because a bump can land on `dev` in an ordinary feature commit, `package.json` may already carry a version ahead of npm's latest, with the matching `## [vX.Y.Z]` heading already written. When that is the case the release *is* that version: skip the bump entirely (steps 2, 5 and 6), name the branch after the version already in `package.json`, and go straight to the gate and the PR. Bumping again here would silently skip a version that has a changelog entry and no artifact — the one mistake in this flow that cannot be undone by editing a file, since the skipped number has already been announced to readers.
-
-Otherwise:
-
-- If there are **uncommitted changes** (staged or unstaged), warn the user and ask whether to commit them as part of the release, stash them, or abort.
-- If there are **unpushed commits** on the current branch, list them so the user is aware — these will be included in the release branch.
-
-### 2. Determine the bump type
-
-Ask the user which kind of bump they want — **patch**, **minor** or **major** — unless they already specified it. Show the current version and what the new version would be for each option so the choice is concrete. Anything visible on the wire (what the derivation emits, what a control deflates to) is a minor at minimum while the package is pre-1.0, never a patch.
-
-### 3. Run the gate
-
-Run `make all`. That is check (lint, format, typecheck), then tests, then the build, then `make assert-bundle` — the same bundle invariants the publish job runs, against the `dist/` the build just produced. Note that `make check` here does **not** include tests, which is why the target to run is `make all` rather than the pair.
-
-Those invariants are worth the local minute because none of them can fail in a way source review would catch. The first two walk each entry's built chunk graph, which is where a banned dependency actually arrives: React into the headless `.` entry, ajv into `./react`, both through a shared chunk rather than through any import statement in that entry's sources. The third checks that `dist/core/index.js` is still a pure re-export barrel, which is what lets a consumer tree-shake ajv out of the core entry and is the one a narrowed entry glob breaks silently. The fourth checks the `'use client'` prologue esbuild drops and `tsup.config.ts` then re-asserts. All of them are re-checked on `main` by the publish job, but discovering them there means a broken release commit is already merged.
-
-If anything fails, stop and report the errors. Help the user fix them rather than skipping the gate.
-
-### 4. Ensure we're on the right branch
-
-The release branch is `release/vX.Y.Z`, where X.Y.Z is the **new** version, and it is the one branch in this workspace that targets `main` instead of `dev`. All release edits happen on it. The name is not cosmetic: `.github/workflows/changelog-check.yml` parses it on the PR and fails the release if it is malformed or disagrees with `package.json`.
-
-- If already on `release/vX.Y.Z` matching the new version, stay on it.
-- If on `dev` (the usual case), `main`, or any other branch, create and switch to `release/vX.Y.Z` from the current HEAD.
-- If on a `release/` branch for a **different** version, warn the user and ask how to proceed.
-
-### 5. Finalize the changelog
-
-A `## [vX.Y.Z]` heading in this changelog is a receipt for a published npm version, so it is written exactly once, at the moment the release is cut.
-
-Two CI gates hold that discipline rather than trusting it, so a heading forgotten here stops the release rather than shipping without one: the release PR fails if `CHANGELOG.md` carries no `## [vX.Y.Z]` heading for the version in `package.json`, and the publish job re-checks before `npm publish` and refuses to ship a version that has none. The date suffix is optional to both; write it anyway.
-
-1. Rename the existing `## [Unreleased]` heading to `## [vX.Y.Z] - YYYY-MM-DD`, keeping everything under it. Do not leave an empty `[Unreleased]` behind — the next piece of work re-creates it.
-2. If there is no `[Unreleased]` section, insert the new heading **immediately above the first `## [v` heading**. Today that is directly under the `# Changelog` title, since the file carries no introductory prose; anchoring on the first version heading rather than on the title is what keeps this correct if a preamble is ever added back.
-3. If the user passed changelog content when invoking the skill, **merge** it with whatever is under `[Unreleased]` — never discard either source. Sort the combined content under the usual headings (`### Added`, `### Changed`, `### Fixed`), inferring them from the content.
-4. Changes to files under `wip/` are working notes, not release-facing — leave them out.
-5. If the release has no content at all, neither from `[Unreleased]` nor from the invocation, ask the user what to include before proceeding.
-6. Match the voice of the entries already in the file: each bullet leads with what changed in bold, then says why it changed. Never write a count ("all 12 controls") — write "every control".
-
-The result should look like:
-
-```markdown
-# Changelog
-
-<the preamble paragraphs>
-
-## [vX.Y.Z] - YYYY-MM-DD
-
-### Changed
-
-- ...
-
-## [vPREVIOUS] - PREVIOUS-DATE
-
-...
+```bash
+gh run list --workflow=release.yml --branch main --limit 3 --json conclusion,headSha,url   # the run whose headSha is the merge SHA: success
+npm view @pipelex/mthds-form version                                                       # the registry's answer: X.Y.Z
+git fetch --tags --prune origin && git tag --list vX.Y.Z                                   # the tag
 ```
 
-### 6. Bump the version in package.json
+`gh release view vX.Y.Z` confirms the Release and its notes.
 
-Edit the `version` field to the new version string. Only that field.
+## Version files and the lock
 
-### 7. Regenerate the lockfile
+- **`package.json`** — the `version` field, and nothing else in the file. It is the version that actually publishes: `release.yml` reads it with `node -p "require('./package.json').version"`, and `changelog-check.yml` requires the branch name to agree with it rather than the other way round.
+- **`package-lock.json`** — regenerated by `npm install` after the bump. The number lives twice in the lock, in the top-level `version` and in the root package entry, and the install brings both into line. Note that `package.json`'s `prepare` script is `npm run build`, so this install also runs a full build: it takes longer than a lock refresh looks like it should, and what it rewrites is `dist/`, which is gitignored.
+- **Also stamped:** nothing. No badge, no `__version__`, no version literal in the README or under `docs/`.
 
-Run `npm install` so `package-lock.json` records the new version. If it fails, stop and report the error.
+## Gates
 
-### 8. Commit and push
+Run in the worktree, before the commit:
 
-Stage the release changes — at minimum `package.json`, `CHANGELOG.md` and `package-lock.json`, plus anything the user chose to include back in step 1. Commit with:
+1. **`make all`** — the whole gate in one target, in the order the Makefile fixes: `check`, then `test`, then `build`, then `assert-bundle`. Run this rather than `make check`, which is lint, `prettier --check` and `tsc --noEmit` and deliberately does not include the tests. Beware that `npm run check` is a different thing from `make check`, and neither one contains the other: the npm script chains the tests on, but its lint step reads `src/` alone where the Makefile's reads `.storybook/` as well. `make check` is the one both workflows run, so run the Makefile target.
 
-```
-bump version to X.Y.Z
-```
+   Nothing in the gate rewrites a tracked file: eslint runs without `--fix`, the format step only checks, and the build writes the gitignored `dist/`. So a red step is fixed rather than absorbed — `make format` when `format-check` is red, the source itself when lint or the typecheck is red, and never a loosened target.
 
-**On the already-bumped path from step 1 there is no bump to describe, so that message would be false.** The commit then carries only whatever the user chose to include, and its message should say what that actually is — a plain `chore:` or `docs:` line naming the work, with a body noting that the version and the changelog entry landed earlier and giving the commit they landed in. If nothing was included, there is nothing to commit at all: the branch is its parent, and the release is the PR alone.
+   `make test` runs the story suite in a real headless Chromium alongside the node and jsdom projects, so the worktree needs Playwright's browser and the `npm install` that provisioned it did not bring one. Both workflows install it explicitly with `npx playwright install --with-deps chromium`, and `npx playwright install chromium` is the same cure here: run it when the browser project reports that the executable does not exist. The download is cached per machine rather than per worktree, so it costs nothing on a machine that already holds the pinned revision.
 
-Push with `-u` to set up tracking.
+   `make assert-bundle` reads `dist/`, so it means nothing unless the build ran immediately before it, which is exactly why `make all` is the target. It is worth the local minute because every failure in it is invisible to source review: it walks each built entry's chunk graph for the banned dependencies that arrive through a shared chunk rather than through any import statement — React out of the headless `.` entry, ajv out of `./react` and `./generative`, json-render and zod out of `.` and `./react`, and the types-only `mthds` client out of all three; it asserts that `dist/core/index.js` is still a pure re-export barrel, which is what lets a consumer tree-shake ajv out of the core entry and what a narrowed `tsup.config.ts` entry glob breaks silently; it checks the `'use client'` prologue esbuild drops and `tsup.config.ts` re-asserts on the two rendering entries, and its absence from the core entry; it checks that `dist/ui-designer.mthds` is there for the `./ui-designer.mthds` export; and it holds the whole design-token contract — the tokens `theme.css` defines against those the sheet reads, the `.dark` block against `:root`, every fallback against `theme.css`'s light value, and the token names `docs/theming.md`'s table restates against the `@theme inline` block that is their authority. A red assertion there can therefore be a documentation drift as readily as a bundling one; read what it printed before assuming which.
 
-### 9. Open a PR
+2. **`make build-storybook`, when the branch touched stories or `.storybook/`** — `quality-checks.yml` runs it on the pull request and `make all` does not, so a story that renders under vitest but breaks the static Storybook build fails there and nowhere locally. `git log $(git describe --tags --abbrev=0)..HEAD --oneline -- src/__stories__/ .storybook/` says whether it did; if nothing changed, skip it and say so.
 
-Open a pull request against **`main`** (not `dev` — release branches are the exception to the workspace rule):
+## The release commit
 
-- **Title:** `Release vX.Y.Z`
-- **Body:**
+`package.json`, `package-lock.json` and `CHANGELOG.md`, staged by name. The gates rewrite nothing tracked and the build's output is gitignored, so there is nothing else to carry. On the already-bumped path under **Particulars**, all three already hold what the release ships and there is no commit to make at all.
 
-```markdown
-## Release vX.Y.Z
+## CI on the release pull request
 
-Bumps version from `A.B.C` to `X.Y.Z`.
+- **`quality-checks.yml`** — fires on `pull_request:` with no branch filter, so it gates this pull request like every other: `make check`, the chromium install, `make test`, `make build-storybook`, `make build`, and `make assert-bundle`. Everything `make all` covers is therefore already answered locally, and `make build-storybook` is the one step that is not.
+- **`changelog-check.yml`** — fires on pull requests to `main`, and only when the head branch starts with `release/v`. It then requires the head to match `^release/v([0-9]+\.[0-9]+\.[0-9]+)$`, requires `package.json`'s version to equal the branch's version, and requires `CHANGELOG.md` to carry a `^## \[vX.Y.Z\]` heading for it, dots escaped and the date suffix optional. It asserts nothing about `[Unreleased]`; leaving none behind is the play's rule, not CI's.
 
-### Changelog
+There is no branch guard on `main` and no separate version check: `changelog-check.yml` is the only place the version file and the branch name are compared, and it is skipped outright for a head that does not start with `release/v`. `release.yml`'s own changelog assertion, which runs on the push and refuses to publish a version with no heading, is the backstop for a bump that reaches `main` some other way. `release.yml` itself never runs on the pull request.
 
-<the changelog entries for this version>
-```
+## Particulars
 
-Report the PR URL back to the user.
-
-### 10. Tell the user what merging does
-
-Close by stating plainly that merging the PR publishes to npm, tags `vX.Y.Z` and creates the GitHub release, and that **`main` should then be merged back into `dev`** — the bump and the changelog entry live only on `main` until it is, and the next release cut from `dev` would otherwise start from a stale version and re-open the "already bumped" case from step 1 in reverse.
-
-## Important details
-
-- Versions are semver, `MAJOR.MINOR.PATCH`, and the package is pre-1.0: breaking changes are noted in the changelog as "breaking", with no deprecation period.
-- Always confirm the bump type before editing anything.
-- A failing gate blocks the release. Fix the cause; do not work around the check.
-- Use today's real date, in `YYYY-MM-DD`, for the changelog heading.
+- **Check for the already-bumped path before proposing a bump.** A version can land on `dev` in an ordinary commit, so `package.json` may already be ahead of `npm view @pipelex/mthds-form version` with the matching `## [vX.Y.Z]` heading already written. When it is, the release *is* that version: skip the bump and the changelog fold, name the branch after the version already in `package.json`, and go straight to the gates and the pull request — nothing is left for the release commit to carry, so the branch stays level with its parent and the pull request is the whole release. Bumping again silently skips a number that has a changelog entry and no artifact, which is the one mistake in this flow that editing a file cannot undo — the skipped version has already been announced to readers.
+- **No pre-release form.** `changelog-check.yml` fires on any head starting with `release/v` and then demands `^release/v([0-9]+\.[0-9]+\.[0-9]+)$`, so `release/v0.9.0-rc.1` does not skip the gate the way an unrelated branch does — it fails it. Ship a plain `X.Y.Z`.
+- **A change visible on the wire is never a patch.** What the derivation emits and what a control deflates to are the package's contract, and the repo is pre-1.0, so anything moving them is a minor at minimum. `CLAUDE.md`'s versioning rule is the same one read from the other end: a `## [vX.Y.Z]` heading is a receipt for a published npm version, never a commit counter.
+- **Match the changelog's own voice.** The file opens straight onto its first heading with no preamble, and its entries run to prose paragraphs under section headings that often carry a headline of their own (`### Fixed - the prebuilt stylesheet no longer needs the host to define anything`) rather than to one-line bullets.
+- **This repo is open source, and the changelog and the pull request body are where that bites.** Never name a closed-source repo in either — say "a host" or "a consumer" instead.
+- **Nothing arms a downstream bump.** `ledger/ledger.toml` declares no `release_followups` for `mthds-form`, so a consumer that has to move onto the new version is filed by hand alongside the release item rather than materialized from the release.
+- **The back-merge is a merge commit.** `dev` carries a `Merge main into dev after the vX.Y.Z release` commit after a release rather than a fast-forward; `/ledger-land` makes it, and the changelog is the one conflict it expects.
