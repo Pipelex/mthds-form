@@ -55,22 +55,26 @@
  *   make briefs          the BRIEFS      - what a producer is handed
  *   make fixtures-specs  the SPECS       - what the designer method laid out
  *   --capture            a spec another producer wrote, validated the same way
- *   --reemit             every committed specs module, written again from itself
+ *   --reemit             every committed specs and payloads module, written
+ *                        again from itself
  *
  * The first is offline and free: `pipe_io_contracts`, `input_form` and the
  * output half are all projections of a declaration, so they need no run, no
  * model deck and no network.
  *
- * The second RUNS the pipes, through the real `pipelex run bundle` CLI, and
+ * The second RUNS the pipes, on the hosted API through `@pipelex/sdk`, and
  * writes what came back. It costs inference budget every time, which is why it
  * is a separate target you ask for rather than a step `make fixtures` drags
  * along. It exists because a payload is the one artifact no projection can
  * produce: the only way to know what a run returns is to run it. That is not
  * pedantry - two shapes in this corpus are invisible from every descriptor and
- * were both got wrong by hand before a real run corrected them: a `date` inside
- * a structure arrives in the serializer's typed envelope rather than as an ISO
- * string, and a plural result arrives as `{items: [...]}` rather than as a bare
- * array.
+ * were both got wrong by hand before a real run corrected them. Which shape
+ * arrives depends on whether the runner could HYDRATE the content - a native
+ * concept it can, a structure the bundle defines the hosted worker cannot, and
+ * renders raw instead: hydrated, a `date` inside a structure arrives in the
+ * serializer's typed envelope and a plural result in the `{items}` envelope;
+ * raw, the date is a plain ISO string and the plural a bare array. Only a run
+ * shows which, and the corpus holds both.
  *
  * The rest are about the GENERATIVE layer rather than the descriptors. Briefs
  * are free - they are rendered from what the first two passes committed - and
@@ -82,36 +86,40 @@
  *
  * ## Requirements
  *
- * The sibling `../pipelex` checkout, dev-time only - the emitted `.ts` files are
- * committed, so `make storybook` needs nothing but node. The passes that reach
- * for pipelex want different executables, and each asserts only its own, up
- * front:
+ * Dev-time only - the emitted `.ts` files are committed, so `make storybook`
+ * needs nothing but node. Each pass asserts what IT reaches for, up front,
+ * because a machine can have one and not the other and finding out halfway
+ * through a paid sweep is the wrong time:
  *
- *   descriptors  PIPELEX_PYTHON  the venv INTERPRETER - `dump-validate-views.py`
- *                                imports pipelex as a library, and no CLI
- *                                surfaces those views yet
- *   payloads     PIPELEX_BIN     the `pipelex` CLI, plus working inference
- *   specs                        credentials (a gateway key in ~/.pipelex/.env)
+ *   descriptors  PIPELEX_PYTHON  the sibling `../pipelex` checkout's venv
+ *                                INTERPRETER - `dump-validate-views.py` imports
+ *                                pipelex as a library, and no CLI surfaces
+ *                                those views yet
+ *   payloads     PIPELEX_API_KEY the HOSTED API, through `@pipelex/sdk`: no
+ *   specs                        checkout, no CLI, nothing to install beyond
+ *                                this repo's own devDependencies, and the run is
+ *                                billed to the key's organisation rather than to
+ *                                a local gateway key. PIPELEX_BASE_URL points it
+ *                                at another deployment
+ *
+ * No pass runs a pipelex CLI. The two that run pipes reach the runtime the way
+ * a host does - over the API - so a fixture records what a product receives,
+ * and there is no sibling checkout to be missing when it is time to run them.
  *
  * The briefs, the specs and the re-emit also import this repo's TypeScript
  * straight from `src/`, which node cannot resolve on its own - the imports are
  * extensionless - so their targets run under tsx.
  */
 
+// The runtime's own client, for the one pass that runs a method: a devDependency
+// that ships in nothing and is banned from `src/` by lint (docs/dependency-budget.md).
+import { ApiResponseError, PipelexApiClient, RunFailedError, RunTimeoutError } from '@pipelex/sdk';
+
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import os from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STRUCTURES_DIR = path.join(REPO, 'data/structures');
@@ -125,15 +133,6 @@ const OUT_DIR = path.join(REPO, 'src/__stories__/_generated');
  */
 const PIPELEX_PYTHON =
   process.env.PIPELEX_PYTHON ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'python');
-
-/**
- * The CLI, not the interpreter. The payload pass runs pipes the way a user does
- * - `pipelex run bundle` - rather than reaching into the library, because what a
- * story renders should be what the shipped command produces, not what an
- * in-process reimplementation of it produces.
- */
-const PIPELEX_BIN =
-  process.env.PIPELEX_BIN ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'pipelex');
 
 /** The carrier types whose declaration carries a `prompt`. See `synthesizeCarrier`. */
 const PROMPTED_PIPE_TYPES = new Set(['PipeLLM', 'PipeImgGen']);
@@ -159,16 +158,49 @@ function requirePython() {
   );
 }
 
-function requireCli() {
-  if (existsSync(PIPELEX_BIN)) return;
-  die(
-    `cannot find the pipelex CLI at ${PIPELEX_BIN}.\n` +
-      `  The payload pass runs the pipes for real, so it needs the CLI (and inference\n` +
-      `  credentials - a gateway key in ~/.pipelex/.env). Either check out the pipelex\n` +
-      `  repo beside this one and create its venv, or set PIPELEX_BIN. This is asserted\n` +
-      `  separately from PIPELEX_PYTHON because a machine can have one without the other,\n` +
-      `  and finding out halfway through a paid sweep is the wrong time.`,
-  );
+/**
+ * The client both paid passes run through: the hosted API, not a CLI.
+ *
+ * The pipes this script runs are run the way a HOST runs them - over the API,
+ * through the runtime's own SDK - so a fixture records what a product receives
+ * rather than what a command on one laptop wrote to disk. What that buys is
+ * not only that nothing has to be installed: a run started here is a run in
+ * the org's history, on the deck the product routes to, priced the way the
+ * product is priced, which is what makes a comparative pass mean something for
+ * the product rather than for one machine.
+ *
+ * The credentials are the client's own: `PIPELEX_API_KEY` for the key,
+ * `PIPELEX_BASE_URL` for the deployment. A base URL with no key is allowed
+ * because a bare runner takes none, and asking for one would refuse a local
+ * stack for no reason; the hosted default with no key cannot work, so it is
+ * refused here rather than by a 403 on the first pipe. `pass` names the caller
+ * in the refusal.
+ */
+function hostedApi(pass) {
+  if (!process.env.PIPELEX_API_KEY && !process.env.PIPELEX_BASE_URL) {
+    die(
+      `no PIPELEX_API_KEY in the environment.\n` +
+        `  The ${pass} pass runs pipes on the hosted API through @pipelex/sdk, so what it\n` +
+        `  needs is a Pipelex API key rather than a checkout: mint one in the app and export\n` +
+        `  PIPELEX_API_KEY. Set PIPELEX_BASE_URL instead to run against a deployment of your\n` +
+        `  own - a local stack, or a bare runner, which needs no key at all. Asserted up\n` +
+        `  front because halfway through a paid sweep is the wrong time to learn the\n` +
+        `  credentials are missing.`,
+    );
+  }
+  return new PipelexApiClient();
+}
+
+/** What went wrong with a run, in one line: the SDK's typed failures, then anything else. */
+function describeRunError(error) {
+  if (error instanceof RunFailedError) return `the run failed (${error.runId}): ${error.message}`;
+  if (error instanceof RunTimeoutError) {
+    return `the run timed out (${error.runId}): ${error.message}`;
+  }
+  if (error instanceof ApiResponseError) {
+    return `the API answered ${error.status}: ${error.serverMessage ?? error.message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Every `<case>.slots.json` in the corpus, as case names, sorted. */
@@ -259,7 +291,7 @@ function readMethodCase(caseName) {
     bundlePath,
     description: `${spec.title}, an authored method. Copied verbatim from ${spec.origin} (${spec.license}).`,
     heroes: spec.heroes,
-    // No carriers and nothing to run through the CLI: the payload pass skips it.
+    // No carriers and no run blocks: the payload pass skips it.
     pipes: [],
   };
 }
@@ -452,7 +484,14 @@ function readCase(caseName) {
   const domain = /^\s*domain\s*=\s*"([^"]+)"/m.exec(structures)?.[1];
   if (!domain) die(`${caseName}.mthds declares no domain.`);
 
-  return { caseName, source: 'structures', domain, structures, description: spec.description, pipes };
+  return {
+    caseName,
+    source: 'structures',
+    domain,
+    structures,
+    description: spec.description,
+    pipes,
+  };
 }
 
 /** Structures as authored, plus one synthesized carrier per slot group. */
@@ -552,10 +591,10 @@ function emitModule(entry, views) {
     `export const OUTPUT_FORM: OutputForm = ${JSON.stringify(views.output_form, null, 2)};`,
     '',
     '/**',
-    " * What the author wrote about each pipe - its `description` - and about the",
-    ' * bundle. No validate artifact carries either, and an authored method\'s brief',
-    ' * opens with the pipe\'s: it is what a host would have. On a structures case',
-    ' * every entry is the synthesized carrier\'s line, and the hero states its own.',
+    ' * What the author wrote about each pipe - its `description` - and about the',
+    " * bundle. No validate artifact carries either, and an authored method's brief",
+    " * opens with the pipe's: it is what a host would have. On a structures case",
+    " * every entry is the synthesized carrier's line, and the hero states its own.",
     ' */',
     `export const PIPE_DESCRIPTIONS: Record<string, string> = ${JSON.stringify(views.pipe_descriptions, null, 2)};`,
     '',
@@ -567,109 +606,119 @@ function emitModule(entry, views) {
 }
 
 /**
- * A machine-local `file://` URL, redacted.
+ * A resolver's URL, dropped; an address the content came in with, kept.
  *
- * A run on a laptop writes its generated files under the working directory and
- * states the absolute path back on `public_url`. That path is a fact about the
- * machine that ran the pipe, not about the run: it names somebody's home
- * directory (in an open-source repo), it resolves on no other machine, and a
- * browser refuses to load it from a served page anyway. So it is dropped, and
- * the required `url` - the storage reference, which is the durable half - is
- * kept exactly as it came back.
+ * A file-bearing result carries two URLs: `url`, the durable one, and
+ * `public_url`, which is whatever the storage behind the run answered when
+ * asked for a link to it AT THAT MOMENT. When `url` is a `pipelex-storage://`
+ * reference, that answer is a fact about one deployment on one day rather than
+ * about the run - a presigned link that expires, naming the deployment's
+ * bucket; on a laptop, an absolute path into somebody's home directory - and it
+ * resolves nowhere else, so it is dropped. What remains is the reference, which
+ * is exactly what a host with no storage resolver sees, and that is what makes
+ * the redaction honest rather than merely tidy.
  *
- * The result renders as what a host with no storage resolver genuinely sees,
- * which makes the redaction honest rather than merely tidy.
+ * When `url` is itself an `http(s)` address - a document the pipe was handed,
+ * or one a search found - `public_url` restates it, and it is kept as it came.
  */
-function redactLocalUrls(value) {
-  if (Array.isArray(value)) return value.map(redactLocalUrls);
+function redactResolvedUrls(value) {
+  if (Array.isArray(value)) return value.map(redactResolvedUrls);
   if (value === null || typeof value !== 'object') return value;
+  const addressed = typeof value.url === 'string' && /^https?:/i.test(value.url);
   const out = {};
   for (const [key, member] of Object.entries(value)) {
     out[key] =
-      key === 'public_url' && typeof member === 'string' && member.startsWith('file:')
+      key === 'public_url' && typeof member === 'string' && !addressed
         ? null
-        : redactLocalUrls(member);
+        : redactResolvedUrls(member);
   }
   return out;
 }
 
 /**
- * Resolve an authored file input against the REPO, not against the run.
+ * Refuse a file input the runtime cannot reach, at authoring time.
  *
- * A file-bearing input is authored as `{"url": "data/inputs/thing.pdf"}` — a
- * repo-relative path, because that is the only spelling that survives being
- * committed and read on another machine. The runtime resolves a relative path
- * against the BUNDLE, and the bundle is composed into a temp directory, so the
- * authored spelling has to become absolute before the inputs file is written.
- *
- * Done here rather than asked of the author for the reason `synthesizeCarrier`
- * exists: the alternative is an absolute path in a committed fixture, which
- * names one machine's home directory and resolves on no other. Only a bare
- * relative path is touched — anything carrying a scheme (`https:`,
- * `pipelex-storage:`, `data:`) is already an address and is passed through.
+ * The run happens on the hosted API, which cannot read this machine's disk,
+ * so a file-bearing input is authored as an ADDRESS the runtime can fetch -
+ * `{"url": "https://..."}` on a public host, as the corpus's own extraction
+ * PDF is. A bare relative path (`data/inputs/thing.pdf`) was the spelling when
+ * the pipes ran through a local CLI, and it would now fail on the runner with
+ * a message about a file it never had; better to say so here, before a paid
+ * sweep starts. Anything carrying a scheme (`https:`, `pipelex-storage:`,
+ * `data:`) is already an address and is passed through untouched.
  */
-function absolutizeFileUrls(value) {
-  if (Array.isArray(value)) return value.map(absolutizeFileUrls);
-  if (value === null || typeof value !== 'object') return value;
-  const out = {};
-  for (const [key, member] of Object.entries(value)) {
-    const isBareRelativePath =
-      key === 'url' &&
-      typeof member === 'string' &&
-      !/^[a-z][a-z0-9+.-]*:/i.test(member) &&
-      !path.isAbsolute(member);
-    out[key] = isBareRelativePath ? path.resolve(REPO, member) : absolutizeFileUrls(member);
+function assertAddressableInputs(pipeRef, value, at = 'inputs') {
+  if (Array.isArray(value)) {
+    value.forEach((member, index) => assertAddressableInputs(pipeRef, member, `${at}[${index}]`));
+    return;
   }
-  return out;
+  if (value === null || typeof value !== 'object') return;
+  for (const [key, member] of Object.entries(value)) {
+    if (key === 'url' && typeof member === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(member)) {
+      die(
+        `${pipeRef}: ${at}.url is '${member}', a local path. The payload pass runs on the\n` +
+          `  hosted API, which cannot read this machine's disk: author a URL the runtime can\n` +
+          `  fetch - a public https address - the way the corpus's own extraction PDF is.`,
+      );
+    }
+    assertAddressableInputs(pipeRef, member, `${at}.${key}`);
+  }
+}
+
+/**
+ * One run on the API: the bundle and the inputs out, the run's results back.
+ *
+ * `startAndWaitForResult` picks the path from the server's own `/v1/version`
+ * handshake: the durable start-and-poll against the hosted API, the blocking
+ * execute against a bare runner. The durable one is what these passes need -
+ * extracting a document or designing a page takes tens of seconds and the
+ * hosted gateway closes a synchronous request long before that - and it is
+ * the path a product takes for the same reason. A failure is fatal, named by
+ * the SDK's typed errors, because a sweep that skipped a pipe would commit a
+ * module with a hole in it.
+ */
+async function runOnApi(api, label, request) {
+  try {
+    return await api.startAndWaitForResult(request, {
+      onPoll: ({ attempt, elapsedMs }) => {
+        // The first poll says the run was accepted; the rest are a heartbeat,
+        // and a line per poll over a minute of running is a wall of them.
+        if (attempt === 1 || attempt % 5 === 0) {
+          process.stdout.write(`    running, ${Math.round(elapsedMs / 1000)}s…\n`);
+        }
+      },
+    });
+  } catch (error) {
+    die(`${label}: ${describeRunError(error)}`);
+  }
 }
 
 /**
  * Run one pipe for real and return what it produced.
  *
- * `main_stuff.json` is the run's own answer, written by the CLI - not a
- * re-serialization of it by this script. Reading the file the command writes is
+ * `main_stuff` is the run's own answer - the runner's `main_stuff.json`,
+ * relayed by the hosted results route exactly as the runtime wrote it, not a
+ * re-serialization of it by this script. Reading what the runtime wrote is
  * what keeps the fixture a record of the shipped behaviour: if the runtime
  * changes how it serializes a date, the next sweep says so.
  */
-function runPipe(bundlePath, pipe, workDir) {
-  mkdirSync(workDir, { recursive: true });
-  const outDir = path.join(workDir, pipe.code);
-  const args = ['run', 'bundle', bundlePath, '--pipe', pipe.code, '-o', outDir];
-  args.push('--no-graph', '--no-pretty-print', '--no-save-working-memory');
-  if (pipe.run && Object.keys(pipe.run).length > 0) {
-    const inputsPath = path.join(workDir, `${pipe.code}.inputs.json`);
-    writeFileSync(inputsPath, JSON.stringify(absolutizeFileUrls(pipe.run), null, 2));
-    args.push('-i', inputsPath);
+async function runPipe(api, entry, bundle, pipe) {
+  const pipeRef = `${entry.domain}.${pipe.code}`;
+  const inputs = pipe.run && Object.keys(pipe.run).length > 0 ? pipe.run : undefined;
+  if (inputs) assertAddressableInputs(pipeRef, inputs);
+  const results = await runOnApi(api, pipeRef, {
+    mthds_contents: [bundle],
+    pipe_code: pipe.code,
+    ...(inputs ? { inputs } : {}),
+  });
+  if (results.main_stuff === undefined || results.main_stuff === null) {
+    die(`${pipeRef}: the run came back with no main_stuff (run ${results.pipeline_run_id}).`);
   }
-
-  try {
-    execFileSync(PIPELEX_BIN, args, {
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PIPELEX_NO_DECK_NOTICE: '1' },
-      cwd: REPO,
-    });
-  } catch (error) {
-    const detail = error.stderr || error.stdout || '';
-    die(`${pipe.code}: pipelex run failed.\n${detail}`);
-  }
-
-  // The CLI names the run directory after the pipe and numbers it, so read back
-  // whatever it created rather than predicting the suffix.
-  const produced = readdirSync(outDir).filter((entry) =>
-    existsSync(path.join(outDir, entry, 'main_stuff.json')),
-  );
-  if (produced.length !== 1) {
-    die(
-      `${pipe.code}: expected exactly one run directory with a main_stuff.json under ${outDir}, ` +
-        `found ${produced.length}.`,
-    );
-  }
-  const mainStuff = JSON.parse(
-    readFileSync(path.join(outDir, produced[0], 'main_stuff.json'), 'utf8'),
-  );
-  return redactLocalUrls(mainStuff);
+  return {
+    payload: redactResolvedUrls(results.main_stuff),
+    runId: results.pipeline_run_id,
+    cost: runCost(results),
+  };
 }
 
 /** The payload module for one case: `pipe_ref` -> what that pipe produced. */
@@ -679,22 +728,26 @@ function emitPayloads(entry, payloads) {
     '/**',
     ` * Real payloads from real runs of ${sourcePathOf(entry.caseName)} - DO NOT EDIT.`,
     ' *',
-    ' * Regenerate with `make fixtures-runs`, which runs each pipe through the real',
-    ' * `pipelex run bundle` CLI and copies back the `main_stuff.json` it wrote. This',
+    ' * Regenerate with `make fixtures-runs`, which runs each pipe on the hosted API',
+    ' * through `@pipelex/sdk` and copies back the `main_stuff` the run returned. This',
     ' * costs inference budget, which is why it is its own target.',
     ' *',
     ' * **A payload is the one fixture no projection can produce.** Everything else',
     ' * in `_generated/` is derived from what a pipe DECLARES; this is derived from',
     ' * what running it returned, and the difference is not academic. Two shapes here',
     ' * are invisible from every descriptor and were both written wrong by hand',
-    ' * before a real run corrected them: a `date` inside a structure arrives in the',
-    " * serializer's typed envelope (`{date, __class__, __module__}`) rather than as",
-    ' * an ISO string, and a plural result arrives as `{items: [...]}` rather than as',
-    ' * a bare array.',
+    ' * before a real run corrected them. Which shape arrives depends on whether the',
+    ' * runner could HYDRATE the content - a native concept it can, a structure the',
+    ' * bundle defines the hosted worker cannot, and renders raw instead: hydrated, a',
+    " * `date` inside a structure arrives in the serializer's typed envelope",
+    ' * (`{date, __class__, __module__}`) and a plural result in the `{items}`',
+    ' * envelope; raw, the date is a plain ISO string and the plural a bare array.',
+    ' * Only a run shows which, and the corpus holds both.',
     ' *',
-    ' * The one edit the generator makes is to drop a machine-local `file://`',
-    ' * `public_url`: that names the home directory of whoever ran the sweep, and it',
-    ' * resolves nowhere else. See `redactLocalUrls` in the generator.',
+    " * The one edit the generator makes is to drop a storage reference's `public_url`:",
+    ' * that is the link one deployment answered on one day - presigned, expiring,',
+    ' * naming its bucket - and it resolves nowhere else. See `redactResolvedUrls` in',
+    ' * the generator.',
     ' */',
     '',
     `/** Every pipe_ref that was run for this case, in sorted order. */`,
@@ -705,42 +758,74 @@ function emitPayloads(entry, payloads) {
   ].join('\n');
 }
 
-/** The payload pass: run every pipe that declares a `run` block, per case. */
-function generatePayloads(cases) {
-  requireCli();
-  const workRoot = mkdtempSync(path.join(os.tmpdir(), 'mthds-form-runs-'));
-  try {
-    for (const caseName of cases) {
-      // An authored method has no carriers and no `run` block - its runs leave
-      // the page, through the hosted API - so it falls out here on its own.
-      const entry = readAnyCase(caseName);
-      const runnable = entry.pipes.filter((pipe) => pipe.run !== undefined || pipe.prompt);
-      if (runnable.length === 0) continue;
+/**
+ * The payload pass: run every pipe that declares a `run` block, per case.
+ *
+ * `--pipe <code>` narrows a case to ONE pipe and merges what came back into the
+ * case's committed module, in place of that pipe's previous payload and
+ * nothing else. It exists because a sweep is sequential and fatal on the first
+ * failure: a run that hangs on the tenth pipe of a case would otherwise cost
+ * the nine before it a second time, and a payload that came back odd can be
+ * re-bought alone. The module has to exist already - a first capture is the
+ * whole case, so the module never carries a pipe the case does not run.
+ */
+async function generatePayloads(cases, pipeCode) {
+  const api = hostedApi('payload');
+  let matched = false;
+  for (const caseName of cases) {
+    // An authored method has no carriers and no `run` block - its runs leave
+    // the page, through the hosted API - so it falls out here on its own.
+    const entry = readAnyCase(caseName);
+    const runnable = entry.pipes.filter(
+      (pipe) => (pipe.run !== undefined || pipe.prompt) && (!pipeCode || pipe.code === pipeCode),
+    );
+    if (runnable.length === 0) continue;
+    matched = true;
 
-      const bundlePath = path.join(workRoot, `${caseName}.mthds`);
-      writeFileSync(bundlePath, composeBundle(entry));
-
-      const payloads = {};
-      for (const pipe of runnable) {
-        process.stdout.write(`  ${caseName}: running ${pipe.code}…\n`);
-        payloads[`${entry.domain}.${pipe.code}`] = runPipe(
-          bundlePath,
-          pipe,
-          path.join(workRoot, caseName),
+    const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
+    let payloads = {};
+    if (pipeCode) {
+      if (!existsSync(outPath)) {
+        die(
+          `${caseName}: no ${path.relative(REPO, outPath)} to put ${pipeCode} into. A first\n` +
+            `  capture is the whole case - run it without --pipe.`,
         );
       }
-      const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
-      writeFileSync(outPath, emitPayloads(entry, payloads));
+      // Under tsx, which is what lets this pass import a committed module.
+      payloads = { ...(await import(pathToFileURL(outPath).href)).PAYLOADS };
+    }
+
+    // The bundle travels as TEXT, so nothing is written to disk on the way: no
+    // temporary directory, no inputs file, no run directory to read back.
+    const bundle = composeBundle(entry);
+    const costs = [];
+    for (const pipe of runnable) {
+      process.stdout.write(`  ${caseName}: running ${pipe.code}…\n`);
+      const { payload, runId, cost } = await runPipe(api, entry, bundle, pipe);
+      payloads[`${entry.domain}.${pipe.code}`] = payload;
+      costs.push(cost);
       process.stdout.write(
-        `  ${caseName}: ${runnable.length} run${runnable.length === 1 ? '' : 's'} -> ` +
-          `${path.relative(REPO, outPath)}\n`,
+        `    ${pipe.code}${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
       );
     }
-  } finally {
-    rmSync(workRoot, { recursive: true, force: true });
+    writeFileSync(outPath, emitPayloads(entry, payloads));
+    // Formatted on the way out, like every other emitted module: the format
+    // gate reads these files and the emitter writes JSON, not prettier's TS.
+    execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
+    // A case total only when every run was priced: an unpriced run is not a
+    // free one, and a sum that silently counted it as $0 would say it was.
+    const spent = costs.every((cost) => typeof cost === 'number')
+      ? ` - $${costs.reduce((total, cost) => total + cost, 0).toFixed(4)}`
+      : '';
+    process.stdout.write(
+      `  ${caseName}: ${runnable.length} run${runnable.length === 1 ? '' : 's'}${spent} -> ` +
+        `${path.relative(REPO, outPath)}\n`,
+    );
+  }
+  if (pipeCode && !matched) {
+    die(`no runnable pipe '${pipeCode}' in ${cases.join(', ')}.`);
   }
 }
-
 
 /**
  * ## The generative passes: briefs, specs, and taking in another producer's spec
@@ -764,7 +849,17 @@ async function loadGenerative() {
     import('../src/generative/fixture.ts'),
     import('../src/core/index.ts'),
   ]);
-  return { ...heroes, ...brief, ...catalog, ...hash, ...state, ...stream, ...validate, ...fixture, core };
+  return {
+    ...heroes,
+    ...brief,
+    ...catalog,
+    ...hash,
+    ...state,
+    ...stream,
+    ...validate,
+    ...fixture,
+    core,
+  };
 }
 
 /** The first twelve hex digits of the SHA-256 of a prompt - what a fixture is stamped with. */
@@ -821,7 +916,11 @@ async function renderHeroBrief(hero, g) {
   const field = g.core.buildResultField(descriptor, contract.output.json_schema);
   const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
   if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
-  return g.renderResultBrief({ pipeRef, description }, field, g.payloadToState(field, PAYLOADS[pipeRef]));
+  return g.renderResultBrief(
+    { pipeRef, description },
+    field,
+    g.payloadToState(field, PAYLOADS[pipeRef]),
+  );
 }
 
 const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
@@ -947,7 +1046,7 @@ function writeSpecsModule(caseName, specs) {
  * The third pass, and the second that costs anything. For each hero it renders
  * the brief exactly as the briefs pass does, hands it and the catalog prompt
  * (and, with `SEED=`, a creative seed) to `data/generative/ui-designer.mthds`
- * through the real `pipelex run bundle` CLI, compiles the text that came back
+ * on the HOSTED API through `@pipelex/sdk`, compiles the text that came back
  * as JSONL patches, validates the spec against the catalog - structure, every
  * element type, every prop, one panel per tab or step - and FAILS on any
  * issue, keeping the rejected text under `wip/generative-ui/briefs/`. A
@@ -963,7 +1062,7 @@ function writeSpecsModule(caseName, specs) {
  * `ONLY=<pipe code>` narrows the pass to one hero.
  */
 async function generateSpecs(only) {
-  requireCli();
+  const api = hostedApi('specs');
   const g = await loadGenerative();
   const { prompt, hash } = currentPrompt(g);
   const today = new Date().toISOString().slice(0, 10);
@@ -987,100 +1086,103 @@ async function generateSpecs(only) {
   );
   if (heroes.length === 0) die(`no hero named '${only}'.`);
 
-  const workRoot = mkdtempSync(path.join(os.tmpdir(), 'mthds-form-specs-'));
-  try {
-    const bundlePath = path.join(workRoot, 'ui-designer.mthds');
-    writeFileSync(bundlePath, bundle);
-
-    // One module per case, carrying over what the pass does not regenerate.
-    const byCase = new Map();
-    for (const hero of heroes) {
-      if (!byCase.has(hero.caseName)) byCase.set(hero.caseName, await loadSpecs(hero.caseName));
-    }
-
-    for (const hero of heroes) {
-      const pipeRef = g.pipeRefOf(hero);
-      const seed = seedSetting === '1' ? randomSeed() : seedSetting || undefined;
-      const provenance = { producer: 'pipelex-method', model, seed };
-      const id = g.fixtureId(provenance);
-      process.stdout.write(
-        `  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`,
-      );
-      const briefText = await renderHeroBrief(hero, g);
-      const inputsPath = path.join(workRoot, `${pipeRef}.${id}.inputs.json`);
-      writeFileSync(
-        inputsPath,
-        JSON.stringify({
-          catalog_rules: prompt,
-          brief: briefText,
-          ...(seed ? { seed: seedLine(seed) } : {}),
-        }),
-      );
-      const outDir = path.join(workRoot, `${pipeRef}.${id}`);
-      const args = [
-        'run',
-        'bundle',
-        bundlePath,
-        '--pipe',
-        DESIGNER_PIPE,
-        '-i',
-        inputsPath,
-        '-o',
-        outDir,
-        '--no-graph',
-        '--no-pretty-print',
-        '--no-save-working-memory',
-      ];
-      try {
-        execFileSync(PIPELEX_BIN, args, {
-          encoding: 'utf8',
-          maxBuffer: 64 * 1024 * 1024,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: { ...process.env, PIPELEX_NO_DECK_NOTICE: '1' },
-          cwd: REPO,
-        });
-      } catch (error) {
-        die(`${pipeRef}: the designer run failed.\n${error.stderr || error.stdout || ''}`);
-      }
-      const produced = readdirSync(outDir).filter((entry) =>
-        existsSync(path.join(outDir, entry, 'main_stuff.json')),
-      );
-      if (produced.length !== 1) die(`${pipeRef}: expected one run directory under ${outDir}.`);
-      const mainStuff = JSON.parse(
-        readFileSync(path.join(outDir, produced[0], 'main_stuff.json'), 'utf8'),
-      );
-      const jsonl = typeof mainStuff?.text === 'string' ? mainStuff.text : null;
-      if (jsonl === null) die(`${pipeRef}: the run's main_stuff carries no text.`);
-      if (jsonl.trim() === '') {
-        die(
-          `${pipeRef}: the run came back with an EMPTY text. On this runtime that is what a\n` +
-            `  completion truncated at the model's output cap looks like; raise max_tokens in the\n` +
-            `  designer's model pin, or check .pipelex/traces for the run's token counts.`,
-        );
-      }
-
-      const spec = compileOrDie(g, pipeRef, id, jsonl);
-      byCase.set(
-        hero.caseName,
-        storeFixture(g, byCase.get(hero.caseName), {
-          pipeRef,
-          ...provenance,
-          promptHash: hash,
-          date: today,
-          brief: briefRelPath(pipeRef),
-          jsonl,
-          spec,
-        }),
-      );
-      process.stdout.write(
-        `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid\n`,
-      );
-    }
-
-    for (const [caseName, specs] of byCase) writeSpecsModule(caseName, specs);
-  } finally {
-    rmSync(workRoot, { recursive: true, force: true });
+  // One module per case, carrying over what the pass does not regenerate.
+  const byCase = new Map();
+  for (const hero of heroes) {
+    if (!byCase.has(hero.caseName)) byCase.set(hero.caseName, await loadSpecs(hero.caseName));
   }
+
+  for (const hero of heroes) {
+    const pipeRef = g.pipeRefOf(hero);
+    const seed = seedSetting === '1' ? randomSeed() : seedSetting || undefined;
+    const provenance = { producer: 'pipelex-method', model, seed };
+    const id = g.fixtureId(provenance);
+    process.stdout.write(
+      `  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`,
+    );
+    const briefText = await renderHeroBrief(hero, g);
+    const { jsonl, runId, cost } = await designPage(api, pipeRef, bundle, {
+      catalog_rules: prompt,
+      brief: briefText,
+      ...(seed ? { seed: seedLine(seed) } : {}),
+    });
+
+    const spec = compileOrDie(g, pipeRef, id, jsonl);
+    byCase.set(
+      hero.caseName,
+      storeFixture(g, byCase.get(hero.caseName), {
+        pipeRef,
+        ...provenance,
+        promptHash: hash,
+        date: today,
+        brief: briefRelPath(pipeRef),
+        jsonl,
+        spec,
+      }),
+    );
+    process.stdout.write(
+      `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid` +
+        `${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
+    );
+  }
+
+  for (const [caseName, specs] of byCase) writeSpecsModule(caseName, specs);
+}
+
+/**
+ * One designer run: the bundle and the inputs out, the JSONL text back.
+ *
+ * Nothing touches the filesystem on the way. The bundle travels as TEXT
+ * (`mthds_contents`), which the designer can do because it imports nothing -
+ * there is no package to compose beside it - so the model override above stays
+ * a string edit and the pass needs no temporary directory, no inputs file and
+ * no run directory to read back.
+ *
+ * The cost comes back with the run, which is the one thing a CLI could not
+ * hand this script: the command printed a cost table to a stdout the pass
+ * swallowed. A pass that spends money should say what it spent, and comparing
+ * two models on the same brief is not a comparison until it does.
+ */
+async function designPage(api, pipeRef, bundle, inputs) {
+  const results = await runOnApi(api, pipeRef, {
+    mthds_contents: [bundle],
+    pipe_code: DESIGNER_PIPE,
+    inputs,
+  });
+
+  // The hosted API relays the runner's own `main_stuff.json` verbatim, so the
+  // text arrives in exactly the shape the CLI used to write to disk.
+  const mainStuff = results.main_stuff;
+  const jsonl = typeof mainStuff?.text === 'string' ? mainStuff.text : null;
+  if (jsonl === null) {
+    die(
+      `${pipeRef}: the run's main_stuff carries no text (run ${results.pipeline_run_id}).\n` +
+        `  It came back as: ${JSON.stringify(mainStuff)?.slice(0, 300)}`,
+    );
+  }
+  if (jsonl.trim() === '') {
+    die(
+      `${pipeRef}: the run came back with an EMPTY text (run ${results.pipeline_run_id}). On\n` +
+        `  this runtime that is what a completion truncated at the model's output cap looks\n` +
+        `  like; raise max_tokens in the designer's model pin, or read the run's token counts\n` +
+        `  off its tokens_usages.`,
+    );
+  }
+  return { jsonl, runId: results.pipeline_run_id, cost: runCost(results) };
+}
+
+/**
+ * What the run cost, in dollars, or `undefined` when nothing priced it.
+ *
+ * A `null` cost on a record and a `0` are different facts - no rate table at
+ * all, against a table that priced the call at zero - so a run whose records
+ * are all unpriced reports no figure rather than a confident $0.0000.
+ */
+function runCost(results) {
+  const priced = (results.tokens_usages ?? [])
+    .map((record) => record.cost)
+    .filter((cost) => typeof cost === 'number');
+  return priced.length === 0 ? undefined : priced.reduce((total, cost) => total + cost, 0);
 }
 
 /**
@@ -1169,23 +1271,36 @@ async function captureSpec(args) {
  * touches no fixture's spec, jsonl or provenance: what it recomputes is what
  * was derived in the first place.
  */
-async function reemitSpecs() {
-  const modules = existsSync(OUT_DIR)
-    ? readdirSync(OUT_DIR)
-        .filter((entry) => entry.endsWith('.specs.ts'))
-        .map((entry) => entry.slice(0, -'.specs.ts'.length))
-        .sort()
-    : [];
-  if (modules.length === 0) {
-    process.stdout.write('generate-fixtures: no specs modules to re-emit.\n');
+async function reemitModules() {
+  const committed = (suffix) =>
+    existsSync(OUT_DIR)
+      ? readdirSync(OUT_DIR)
+          .filter((entry) => entry.endsWith(suffix))
+          .map((entry) => entry.slice(0, -suffix.length))
+          .sort()
+      : [];
+  const specsModules = committed('.specs.ts');
+  const payloadModules = committed('.payloads.ts');
+  if (specsModules.length === 0 && payloadModules.length === 0) {
+    process.stdout.write('generate-fixtures: no specs or payloads modules to re-emit.\n');
     return;
   }
-  for (const caseName of modules) {
+  for (const caseName of specsModules) {
     const specs = (await loadSpecs(caseName)).map((fixture) => ({
       ...fixture,
       brief: briefRelPath(fixture.pipeRef),
     }));
     writeSpecsModule(caseName, specs);
+  }
+  // A payloads module is its fixtures under a header, so it re-emits the same
+  // way - which is what lets the header change without a paid sweep. The
+  // payloads themselves are copied through untouched: a re-emit never runs.
+  for (const caseName of payloadModules) {
+    const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
+    const { PAYLOADS } = await import(pathToFileURL(outPath).href);
+    writeFileSync(outPath, emitPayloads(readAnyCase(caseName), PAYLOADS));
+    execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
+    process.stdout.write(`  ${caseName}: re-emitted ${path.relative(REPO, outPath)}\n`);
   }
 }
 
@@ -1203,18 +1318,18 @@ function emitSpecs(caseName, specs) {
     ` * Specs captured for the heroes of ${sourcePathOf(caseName)} - DO NOT EDIT.`,
     ' *',
     " * Regenerate the designer method's entries with `make fixtures-specs`, which runs",
-    ' * `data/generative/ui-designer.mthds` through the real `pipelex run bundle` CLI over',
+    ' * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over',
     " * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates",
     " * what came back against the catalog. Take in another producer's JSONL with the",
     ' * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same',
     ' * way. Both cost inference budget, which is why neither is implied by `make fixtures`.',
     ' *',
     " * **A spec is a payload's twin: the one artifact no projection can produce.** Each",
-    ' * entry records WHO produced it (the method through the CLI, a coding agent in a fresh',
-    ' * context, or the session working in this repo, by hand), on which model, with which',
-    ' * seed and critic loop when there was one, and the hash of the catalog prompt it was',
-    ' * produced against; the corpus test compares that hash with the current prompt, so a',
-    ' * prompt change that invalidates a spec is a failing test rather than a stale page.',
+    ' * entry records WHO produced it (the method on the hosted API, a coding agent in a',
+    ' * fresh context, or the session working in this repo, by hand), on which model, with',
+    ' * which seed and critic loop when there was one, and the hash of the catalog prompt it',
+    ' * was produced against; the corpus test compares that hash with the current prompt, so',
+    ' * a prompt change that invalidates a spec is a failing test rather than a stale page.',
     ' */',
     "import type { SpecFixture } from '../../generative/fixture';",
     '',
@@ -1230,6 +1345,8 @@ function main() {
   const args = process.argv.slice(2);
   const onlyIndex = args.indexOf('--only');
   const only = onlyIndex === -1 ? null : args[onlyIndex + 1];
+  const pipeIndex = args.indexOf('--pipe');
+  const pipe = pipeIndex === -1 ? null : args[pipeIndex + 1];
   if (args.includes('--briefs')) {
     generateBriefs().catch((error) => die(error?.stack ?? String(error)));
     return;
@@ -1243,7 +1360,7 @@ function main() {
     return;
   }
   if (args.includes('--reemit')) {
-    reemitSpecs().catch((error) => die(error?.stack ?? String(error)));
+    reemitModules().catch((error) => die(error?.stack ?? String(error)));
     return;
   }
   const structures = discoverCases();
@@ -1271,7 +1388,7 @@ function main() {
   // also re-run (and re-cost) anything else, and re-running the free pass must
   // never silently spend.
   if (args.includes('--runs')) {
-    generatePayloads(cases);
+    generatePayloads(cases, pipe).catch((error) => die(error?.stack ?? String(error)));
     return;
   }
 

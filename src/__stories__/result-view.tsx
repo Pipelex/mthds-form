@@ -81,3 +81,26 @@ export function ResultView({
     </div>
   );
 }
+
+/**
+ * The items of a plural payload, whichever shape the wire gave them.
+ *
+ * A top-level plural arrives in the `ListContent {items}` envelope when the
+ * runner could hydrate the item's content class - a native concept - and as a
+ * bare array when it could not - a structure the bundle defines, which the
+ * hosted worker renders from the raw content instead. Both shapes are in the
+ * corpus, captured from the hosted route, and `ResultField` reads both. A
+ * story's assertions read through this so they count what the renderer was
+ * handed rather than assert which path the runner took.
+ */
+export function itemsOf(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { items?: unknown }).items)
+  ) {
+    return (payload as { items: unknown[] }).items;
+  }
+  return [];
+}

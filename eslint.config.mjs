@@ -22,8 +22,21 @@ const BUDGET_PATTERNS = [
     message: 'The kernel is RJSF-free: the gate validates through its own ajv instance.',
   },
   {
-    group: ['zustand', 'zustand/*', '@pipelex/sdk', '@pipelex/sdk/*'],
+    group: ['zustand', 'zustand/*'],
     message: 'Outside the dependency budget (docs/dependency-budget.md).',
+  },
+  {
+    // The runtime's SDK is INSTALLED here - a devDependency, because the fixture
+    // harness designs its layouts by running the designer method on the hosted
+    // API through it - so an import of it under `src/` now resolves, where it
+    // used to fail at the resolver. It carries the request vocabulary, which is
+    // a different question from the artifact shapes the entries read. The graph
+    // check in `scripts/assert-bundle.mjs` is the backstop, and it can only see
+    // this one because `tsup.config.ts` marks the SDK external: a devDependency
+    // is otherwise bundled inline, bytes and no specifier.
+    group: ['@pipelex/sdk', '@pipelex/sdk/*'],
+    message:
+      "The runtime's SDK is the fixture harness's devDependency - no entry may reach it. See docs/dependency-budget.md.",
   },
   {
     // The standard's TypeScript client is a TYPES-ONLY peer. `import type` is

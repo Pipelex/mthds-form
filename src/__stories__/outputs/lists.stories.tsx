@@ -3,7 +3,7 @@ import { expect, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS } from '../_generated/lists.payloads';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
-import { ResultView } from '../result-view';
+import { ResultView, itemsOf } from '../result-view';
 
 /**
  * Result LISTS, one story per element shape.
@@ -46,8 +46,7 @@ type Story = StoryObj<typeof meta>;
 const BOTH_THEMES = 2;
 
 function items(pipeCode: string): unknown[] {
-  const payload = PAYLOADS[`lists.${pipeCode}`] as { items?: unknown[] };
-  return payload.items ?? [];
+  return itemsOf(PAYLOADS[`lists.${pipeCode}`]);
 }
 
 function story(pipeCode: string, maxWidth?: number) {

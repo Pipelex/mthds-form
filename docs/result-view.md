@@ -32,7 +32,7 @@ The unwrap happens **once, at the top**, and is gated on the node's stated `kind
 - for every kind but `object`, the payload is a content-model wrapper, and the schema walked beneath the descriptor is the wrapper's single property. A plural output's node is a `list`, so what it must be walked against is the `items` **array**, not the `ListContent` object around it — misaligning those loses the element's schema silently.
 - an `object` output **is** its content model, so nothing is unwrapped. A structured concept that happens to declare exactly one field would otherwise be mistaken for a wrapper, which is precisely the guess this design exists to avoid: the kind comes from the descriptor, so this is a read of what the field is rather than an inference from what the value looks like.
 
-Nested values are the other half of the same rule. A `date` **field** inside a structure is not a `native.Date` value, and a `lines` array inside a structure is a bare array — only the top-level result carries a content model.
+Nested values are the other half of the same rule. A `date` **field** inside a structure is not a `native.Date` value, and a `lines` array inside a structure is a bare array — only the top-level result carries a content model. Measured off the hosted route, even that top-level wrapper is not guaranteed on the wire: a plural of a native concept arrives as `ListContent {items}`, and a plural of a structure the bundle defines arrives as a bare array, because the hosted worker hydrates the first and renders the second from raw content — and in that raw rendering a `date` field inside the structure is a plain ISO string rather than the typed envelope the hydrated rendering carries. `unwrap` passes an array through and `readDateContent` reads every date form, so the renderer reads all of it, and the corpus holds all of it, captured from real runs.
 
 ## The plural wrap
 
@@ -238,4 +238,4 @@ Same reason `file-formats.ts` does: a host that renders a result its own way nee
 
 ## Fixtures
 
-The stories that exercise all of this are real runs against the real artifacts, not mock-ups. See [storybook.md](storybook.md) § "The passes, and which of them cost anything": `make fixtures` reads `pipe_io_contracts`, `input_form` and `output_form` off the engine's own builders, and `make fixtures-runs` executes the pipes through the real `pipelex run bundle` CLI and commits what came back.
+The stories that exercise all of this are real runs against the real artifacts, not mock-ups. See [storybook.md](storybook.md) § "The passes, and which of them cost anything": `make fixtures` reads `pipe_io_contracts`, `input_form` and `output_form` off the engine's own builders, and `make fixtures-runs` runs the pipes on the hosted API through `@pipelex/sdk` and commits what came back.

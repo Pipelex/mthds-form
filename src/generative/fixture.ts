@@ -16,7 +16,7 @@ import type { Spec } from '@json-render/core';
 
 /** How a spec came to be. */
 export type Producer =
-  /** The designer method, `data/generative/ui-designer.mthds`, through the real CLI. */
+  /** The designer method, `data/generative/ui-designer.mthds`, run on the hosted API. */
   | 'pipelex-method'
   /** A Claude Code subagent in a fresh context, given the prompt and the brief and nothing else. */
   | 'claude-code-subagent'

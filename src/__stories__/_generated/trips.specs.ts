@@ -2,18 +2,18 @@
  * Specs captured for the heroes of data/structures/trips.mthds - DO NOT EDIT.
  *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
- * `data/generative/ui-designer.mthds` through the real `pipelex run bundle` CLI over
+ * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over
  * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates
  * what came back against the catalog. Take in another producer's JSONL with the
  * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same
  * way. Both cost inference budget, which is why neither is implied by `make fixtures`.
  *
  * **A spec is a payload's twin: the one artifact no projection can produce.** Each
- * entry records WHO produced it (the method through the CLI, a coding agent in a fresh
- * context, or the session working in this repo, by hand), on which model, with which
- * seed and critic loop when there was one, and the hash of the catalog prompt it was
- * produced against; the corpus test compares that hash with the current prompt, so a
- * prompt change that invalidates a spec is a failing test rather than a stale page.
+ * entry records WHO produced it (the method on the hosted API, a coding agent in a
+ * fresh context, or the session working in this repo, by hand), on which model, with
+ * which seed and critic loop when there was one, and the hash of the catalog prompt it
+ * was produced against; the corpus test compares that hash with the current prompt, so
+ * a prompt change that invalidates a spec is a failing test rather than a stale page.
  */
 import type { SpecFixture } from '../../generative/fixture';
 

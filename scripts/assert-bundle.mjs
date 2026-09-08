@@ -112,6 +112,18 @@ const BANNED = [
     match: /^mthds($|\/)/,
     why: 'The standard client is a types-only peer - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
   })),
+  // The runtime's SDK, banned from every entry for the reason the budget gives:
+  // it carries the REQUEST vocabulary, which is a different question from the
+  // artifact shapes this package reads, and a type reaching in from it would
+  // drag its release cadence into this one's. It became a devDependency when the
+  // fixture harness started designing pages on the hosted API, so an accidental
+  // import from `src/` now resolves where it used to fail - which is exactly
+  // when a graph check earns its place beside the lint rule.
+  ...['core', 'react', 'generative'].map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
+    match: /^@pipelex\/sdk($|\/)/,
+    why: "The runtime's SDK is a harness devDependency, not a dependency of any entry. See docs/dependency-budget.md.",
+  })),
 ];
 
 const failures = [];

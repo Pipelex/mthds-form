@@ -163,7 +163,7 @@
       ],
       "run": {
         "document": {
-          "url": "data/inputs/solar_system.pdf"
+          "url": "https://d2cinlfp2qnig1.cloudfront.net/tests/solar_system.pdf"
         }
       },
       "options": {
