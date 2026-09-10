@@ -9,7 +9,7 @@
  * predicates that turn a declared slot into a gating answer, and the lookup
  * that tolerates both key conventions a real payload arrives with.
  *
- * `mthds` is a TYPES-ONLY peer dependency: every import here is `import type`,
+ * `mthds` is a TYPES-ONLY dependency: every import here is `import type`,
  * so nothing survives into `dist/` and no consumer ships the standard's CLI.
  * `scripts/assert-bundle.mjs` holds that on the built graph and lint holds it
  * on the source. See docs/dependency-budget.md.
@@ -50,9 +50,9 @@ export type {
  *   which lint and graph surfaces read and a form does not.
  *
  * Kept as an alias rather than renamed because a consumer imports it by this
- * name; a host that would rather read the standard's spelling has `mthds`
- * installed through this package's peer and can import `PresenceMarker`
- * straight from `mthds/protocol`.
+ * name; a host that would rather read the standard's spelling gets `mthds`
+ * installed alongside this package and can import `PresenceMarker` straight
+ * from `mthds/protocol`.
  */
 export type InputPresence = PresenceMarker;
 
