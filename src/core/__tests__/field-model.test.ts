@@ -432,12 +432,12 @@ describe('a list bound the wire did not put there', () => {
   });
 });
 
-// ─── Version drift: a wire kind this build's peer does not define ────────────
+// ─── Version drift: a wire kind this build's `mthds` does not define ─────────
 
-describe('buildRunFields over a kind newer than the pinned peer', () => {
-  // The descriptor is a CLOSED shape the standard versions, and the peer pins
+describe('buildRunFields over a kind newer than the pinned mthds', () => {
+  // The descriptor is a CLOSED shape the standard versions, and the pin fixes
   // the vocabulary this build compiled against - so `mapNode`'s switch is
-  // exhaustive at the type level and tsc proves it. A server ahead of the peer
+  // exhaustive at the type level and tsc proves it. A server ahead of that pin
   // is the runtime case that type cannot cover, and the standard answers it
   // with its own escape hatch: an unrecognized node falls back to raw entry
   // against the contract's `json_schema`, which is `kind: 'unknown'` here.

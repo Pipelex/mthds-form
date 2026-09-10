@@ -98,7 +98,7 @@ const BANNED = [
     match: /^@json-render($|\/)|^zod($|\/)/,
     why: `The \`${entry === 'core' ? '.' : './react'}\` entry must not carry the generative layer's dependencies. See docs/dependency-budget.md.`,
   })),
-  // The standard's TypeScript client is a TYPES-ONLY peer, banned from EVERY
+  // The standard's TypeScript client is TYPES-ONLY, banned from EVERY
   // entry. The wire types it declares are erased at build, so a `mthds`
   // specifier surviving into either graph means a value import slipped in -
   // `FIELD_KINDS` is the one runtime value `mthds/protocol` exports, and it is
@@ -110,7 +110,7 @@ const BANNED = [
   ...['core', 'react', 'generative'].map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^mthds($|\/)/,
-    why: 'The standard client is a types-only peer - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
+    why: 'The standard client is a types-only dependency - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
   })),
 ];
 

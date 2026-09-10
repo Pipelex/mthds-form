@@ -199,9 +199,9 @@ export function Absent() {
  * states a `kind`, and every structured kind has an arm; so a record reaching
  * this component means the payload disagrees with the descriptor that described
  * it, or the node is `unknown` — the standard's own escape hatch for a kind
- * newer than the pinned peer, whose entire contract is that a consumer may not
- * know what it is holding. Raw JSON is the right answer to both: the reader sees
- * the value, and nobody has invented a shape for it.
+ * newer than the pinned `mthds`, whose entire contract is that a consumer may
+ * not know what it is holding. Raw JSON is the right answer to both: the reader
+ * sees the value, and nobody has invented a shape for it.
  */
 export function stringifyValue(value: object): string | undefined {
   try {
