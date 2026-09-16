@@ -18,7 +18,7 @@ import { GenerativePage } from '@pipelex/mthds-form/generative'; // a produced l
 
 `./generative` renders a **layout** — a data file a model wrote once for a method, naming paths in the same descriptor and restating nothing about what a field is. It is the only entry that carries json-render and zod, so a host that renders an ordinary form pays for neither. When there is no layout, or the one on file no longer fits the method, the page falls back to the kernel's own form. See [docs/generative-ui.md](docs/generative-ui.md).
 
-`mthds` is a peer dependency too, and a required one, but it is **types only**: the wire types of `pipe_io_contracts` belong to the MTHDS standard, so this package re-exports the standard's declarations instead of restating them. Every import of it is an `import type` and is erased at build, so it costs an install entry and no shipped bytes. See [docs/dependency-budget.md](docs/dependency-budget.md).
+`mthds` is an ordinary dependency rather than a peer, but it is **types only**: the wire types of `pipe_io_contracts` belong to the MTHDS standard, so this package re-exports the standard's declarations instead of restating them. Every import of it is an `import type` and is erased at build, so it costs an install entry and no shipped bytes. It is not a peer because pnpm does not install an unmet one, and an absent `mthds` degrades the re-exported types silently rather than failing. See [docs/dependency-budget.md](docs/dependency-budget.md).
 
 ## The shape of a form
 

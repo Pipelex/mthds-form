@@ -39,7 +39,7 @@ const BUDGET_PATTERNS = [
       "The runtime's SDK is the fixture harness's devDependency - no entry may reach it. See docs/dependency-budget.md.",
   },
   {
-    // The standard's TypeScript client is a TYPES-ONLY peer. `import type` is
+    // The standard's TypeScript client is TYPES-ONLY. `import type` is
     // erased before bundling, so the wire types cost a consumer nothing at run
     // time; a value import would put the standard's CLI - commander, ora,
     // posthog and the rest of its closure - into whichever chunk reached it.
@@ -50,7 +50,7 @@ const BUDGET_PATTERNS = [
     group: ['mthds', 'mthds/*'],
     allowTypeImports: true,
     message:
-      'The standard client is a types-only peer - `import type` only. See docs/dependency-budget.md.',
+      'The standard client is types-only - `import type` only. See docs/dependency-budget.md.',
   },
 ];
 
@@ -127,7 +127,7 @@ export default tseslint.config(
       // not by the base rule, so the base rule is off EVERYWHERE and every
       // block below restricts imports through the extension. A block that
       // reached for the base rule would quietly drop the type-import allowance
-      // the budget's types-only peer line is built on.
+      // the budget's types-only line is built on.
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: BUDGET_PATTERNS }],
     },

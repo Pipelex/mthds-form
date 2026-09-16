@@ -12,8 +12,8 @@ import { StuffViewer } from '../../react';
  * When this happens at all is narrow: a descriptor states a `kind`, and every
  * structured kind has an arm, so a record arriving here means the payload
  * disagrees with the descriptor that described it — or the node is `unknown`,
- * the standard's escape hatch for a kind newer than the pinned peer, whose whole
- * contract is that a consumer may not know what it is holding.
+ * the standard's escape hatch for a kind newer than the pinned `mthds`, whose
+ * whole contract is that a consumer may not know what it is holding.
  */
 const scalar: RunField = {
   kind: 'text',

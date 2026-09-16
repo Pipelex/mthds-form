@@ -1,5 +1,6 @@
 /**
- * The types-only peer, asserted rather than assumed.
+ * The types-only dependency on the standard's client, asserted rather than
+ * assumed.
  *
  * Two claims live here, and neither is visible in any other suite.
  *
@@ -13,9 +14,9 @@
  * **The descriptor types resolve from inside the kernel.** Since the
  * derivation swap, `buildRunFields` maps `PipeInputFormDescriptor` directly
  * (docs/derivation-swap.md), so this resolution is load-bearing in `src/`
- * itself. The suite keeps asserting it anyway: if the peer, the `exports` map,
- * or the module resolution ever stops working, it fails HERE, by name, rather
- * than as a type error in the middle of `derive.ts`.
+ * itself. The suite keeps asserting it anyway: if the dependency, the
+ * `exports` map, or the module resolution ever stops working, it fails HERE,
+ * by name, rather than as a type error in the middle of `derive.ts`.
  *
  * Types only, throughout - `import type`, which lint requires and
  * `scripts/assert-bundle.mjs` verifies on the built graph. A test file ships in
