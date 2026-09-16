@@ -216,6 +216,14 @@ describe('a path the layout reads rather than binds', () => {
     expect(problems).toContain('/inputs/town is read, and no input has it');
   });
 
+  it('reads a bare interpolation outside any repeat off the root of the state, as the runtime does', () => {
+    const problems = layoutProblems(
+      { inputs: [text('city', false)] },
+      reading({ label: 'Trip', value: { $template: 'A trip to ${inputs/town}' } }),
+    );
+    expect(problems).toEqual(['/inputs/town is read, and no input has it']);
+  });
+
   it("leaves the layout's own scratch state alone", () => {
     expect(
       layoutProblems(
@@ -298,7 +306,13 @@ describe('a path shown as a value', () => {
     required: false,
     item: text('tag', true),
   };
-  const inputs = [document, request, tags];
+  const people: RunField = {
+    kind: 'list',
+    name: 'people',
+    required: false,
+    item: { kind: 'object', name: 'person', required: true, fields: [text('name', true)] },
+  };
+  const inputs = [document, request, tags, people];
   const page = (elements: Record<string, unknown>): Spec =>
     ({
       root: 'page',
@@ -351,7 +365,7 @@ describe('a path shown as a value', () => {
     ]);
   });
 
-  it('is accepted in a prop that takes a list: the rows of a DataTable, the links of an AppBar', () => {
+  it('is accepted in a prop that takes a list, when the path is one: the rows of a DataTable, the links of an AppBar', () => {
     const spec = page({
       table: {
         type: 'DataTable',
@@ -360,6 +374,45 @@ describe('a path shown as a value', () => {
       bar: { type: 'AppBar', props: { app: 'Tags', links: { $state: '/inputs/tags' } } },
     });
     expect(layoutProblems({ inputs }, spec)).toEqual([]);
+  });
+
+  it('is refused in a prop that takes a list when the path is a file, a structure or a value', () => {
+    const bar = (path: string): Spec =>
+      page({ bar: { type: 'AppBar', props: { app: 'Tags', links: { $state: path } } } });
+    expect(layoutProblems({ inputs }, bar('/inputs/document'))).toEqual([
+      'bar: links takes a list, and /inputs/document is a file; a prop that takes a list reads a list path',
+    ]);
+    expect(layoutProblems({ inputs }, bar('/inputs/request'))).toEqual([
+      'bar: links takes a list, and /inputs/request is a structure; a prop that takes a list reads a list path',
+    ]);
+    expect(layoutProblems({ inputs }, bar('/inputs/request/city'))).toEqual([
+      'bar: links takes a list, and /inputs/request/city is a value; a prop that takes a list reads a list path',
+    ]);
+  });
+
+  it('is refused in a prop that takes values when the list is one of structures, which a DataTable takes', () => {
+    const spec = page({
+      bar: { type: 'AppBar', props: { app: 'People', links: { $state: '/inputs/people' } } },
+      table: {
+        type: 'DataTable',
+        props: { rows: { $state: '/inputs/people' }, columns: [{ path: 'name', label: 'Name' }] },
+      },
+    });
+    expect(layoutProblems({ inputs }, spec)).toEqual([
+      'bar: links takes a list of values, and /inputs/people is a list of structures; a list of structures is laid out as a repeat or a DataTable',
+    ]);
+  });
+
+  it('walks a list prop written as an array literal entry by entry, each shown as a value', () => {
+    const spec = page({
+      bar: {
+        type: 'AppBar',
+        props: { app: 'Tags', links: [{ $state: '/inputs/document' }, 'Runs'] },
+      },
+    });
+    expect(layoutProblems({ inputs }, spec)).toEqual([
+      "bar: links shows /inputs/document, which is a file and not a value; a prop that shows a value takes a scalar path, and a file is delegated to the kernel's own control",
+    ]);
   });
 
   it('is accepted in a condition, which only asks whether the value is set', () => {
@@ -411,6 +464,49 @@ describe('a path shown as a value', () => {
       'line: text shows /result/lines/0, which is a structure and not a value; a prop that shows a value takes a scalar path, and a structure is shown through its members',
     ]);
     expect(layoutProblems({ result }, shown('name'))).toEqual([]);
+  });
+
+  it('resolves a bare interpolation through the repeat above it, as the runtime does', () => {
+    const lines: RunField = {
+      kind: 'list',
+      name: 'lines',
+      required: false,
+      item: {
+        kind: 'object',
+        name: 'line',
+        required: true,
+        fields: [
+          text('name', true),
+          { kind: 'object', name: 'detail', required: false, fields: [text('note', true)] },
+        ],
+      },
+    };
+    const result: RunField = {
+      kind: 'object',
+      name: 'result',
+      required: true,
+      fields: [lines],
+    };
+    const shown = (template: string): Spec =>
+      ({
+        root: 'page',
+        elements: {
+          page: { type: 'Stack', props: {}, children: ['rows'] },
+          rows: {
+            type: 'Stack',
+            props: {},
+            repeat: { statePath: '/result/lines' },
+            children: ['line'],
+          },
+          line: { type: 'Text', props: { text: { $template: template } } },
+        },
+      }) as unknown as Spec;
+    expect(layoutProblems({ result }, shown('Detail: ${detail}'))).toEqual([
+      'line: text shows /result/lines/0/detail, which is a structure and not a value; a prop that shows a value takes a scalar path, and a structure is shown through its members',
+    ]);
+    expect(layoutProblems({ result }, shown('Line: ${name}'))).toEqual([]);
+    // An empty `${}` is the literal text the runtime renders it as.
+    expect(layoutProblems({ result }, shown('Line: ${}'))).toEqual([]);
   });
 
   it('says nothing of a path the descriptor does not have: the staleness check names it', () => {
@@ -609,6 +705,13 @@ describe('a path named relative to the current item', () => {
 
   it('is refused when it reads a member the item no longer has', () => {
     const spec = inRepeat('/result/lines', 'Text', { text: { $item: 'name' } });
+    expect(layoutProblems({ result }, spec)).toEqual([
+      '/result/lines/0/name is read, and no result has it',
+    ]);
+  });
+
+  it('is refused when a template interpolates a member the item no longer has', () => {
+    const spec = inRepeat('/result/lines', 'Text', { text: { $template: 'Line: ${name}' } });
     expect(layoutProblems({ result }, spec)).toEqual([
       '/result/lines/0/name is read, and no result has it',
     ]);

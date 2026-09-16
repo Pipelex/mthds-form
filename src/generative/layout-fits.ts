@@ -44,11 +44,14 @@ import {
  * neither may assume the other ran first.
  *
  * A third check sits between the two and is about KIND rather than presence:
- * a path a layout shows as a value must be a scalar. A `SummaryRow` whose
- * `value` reads `/inputs/document`, a structure of a url and a filename, is not
- * stale - the path exists - and it validates perfectly; it renders
- * `[object Object]`, because the renderer stringifies what it is handed and
- * nothing anywhere said the path was not a value. Only the descriptor knows
+ * a path a layout shows as a value must be a scalar, and a path it reads into
+ * a prop that takes a list must be a list. A `SummaryRow` whose `value` reads
+ * `/inputs/document`, a structure of a url and a filename, is not stale - the
+ * path exists - and it validates perfectly; it renders `[object Object]`,
+ * because the renderer stringifies what it is handed and nothing anywhere said
+ * the path was not a value. An `AppBar` whose `links` read that same structure
+ * is the mirror image: its renderer maps over what it is handed, renders
+ * nothing for a structure and throws for a text. Only the descriptor knows
  * what kind a path is, so this is where that is said.
  *
  * What is NOT checked here is whether the layout validates against the catalog
@@ -133,11 +136,28 @@ function itemPathResolver(
   };
 }
 
-/** The paths a template interpolates: `${/result/amount}`. */
-function interpolated(template: string): string[] {
-  return [...template.matchAll(/\$\{([^}]*)\}/g)].flatMap((match) =>
-    match[1] === undefined ? [] : [match[1]],
-  );
+/**
+ * The paths a template interpolates, resolved the way json-render resolves
+ * them: `${/result/amount}` is absolute and read as written; a bare
+ * `${amount}` is read off the item of the nearest repeat above the element,
+ * and outside any repeat off the root of the state, as `/amount`. Inside a
+ * repeat the runtime falls back to the root when the item has no such member,
+ * but a layout that writes `${name}` in a repeat means the item's `name`, so
+ * it is read as one here and a member the item has lost is stale rather than
+ * quietly a root path. The pattern is json-render's own - one or more
+ * characters - so an empty `${}` is the literal text it renders as, not an
+ * interpolation of nothing.
+ */
+function interpolatedPaths(
+  template: string,
+  itemPath: (field: string) => string | undefined,
+): string[] {
+  return [...template.matchAll(/\$\{([^}]+)\}/g)].flatMap((match) => {
+    const raw = match[1];
+    if (raw === undefined) return [];
+    if (raw.startsWith('/')) return [raw];
+    return [itemPath(raw) ?? `/${raw}`];
+  });
 }
 
 function mentionedPaths(spec: Spec, parents: Map<string, string>): Mentioned {
@@ -153,7 +173,9 @@ function mentionedPaths(spec: Spec, parents: Map<string, string>): Mentioned {
       const record = value as Record<string, unknown>;
       if (typeof record.$bindState === 'string') found.bound.push(record.$bindState);
       if (typeof record.$state === 'string') found.read.push(record.$state);
-      if (typeof record.$template === 'string') found.read.push(...interpolated(record.$template));
+      if (typeof record.$template === 'string') {
+        found.read.push(...interpolatedPaths(record.$template, itemPath));
+      }
       if (typeof record.$bindItem === 'string') {
         const path = itemPath(record.$bindItem);
         if (path === undefined) found.adrift.push(key);
@@ -236,45 +258,77 @@ const NOT_A_VALUE: Partial<Record<RunFieldKind, { what: string; instead: string 
 };
 
 /**
- * The props that take a list rather than a value, by component: every prop the
- * catalog declares as an array, read from the schemas so a new one is never a
- * missing entry here, plus the rows a `DataTable` lays out, declared `any`
- * because their shape is the descriptor's. A `$state` read into one of these
- * is the list it wants; into any other prop it is shown as a value.
+ * What the items of a list-taking prop may be: values alone, for a prop
+ * declared as an array of strings or numbers (an `AppBar`'s links), or
+ * anything, for one declared over structures or left open (a `DataTable`'s
+ * rows). What a list of the wrong item kind is, in the words of the refusal,
+ * is `NOT_VALUES`: a `Steps` handed a list of structures for its step names
+ * renders `[object Object]` per step, and a renderer that maps a structure
+ * into a React child throws.
  */
-let listPropsCache: Map<string, Set<string>> | undefined;
-function listProps(): Map<string, Set<string>> {
+type ListItems = 'values' | 'anything';
+const NOT_VALUES: Partial<Record<RunFieldKind, string>> = {
+  object: 'structures',
+  list: 'lists',
+  document: 'files',
+  image: 'files',
+};
+
+/**
+ * The props that take a list rather than a value, by component, and what their
+ * items may be: every prop the catalog declares as an array, read from the
+ * schemas so a new one is never a missing entry here, plus the rows a
+ * `DataTable` lays out, declared `any` because their shape is the
+ * descriptor's. A `$state` read into one of these must be the list it wants;
+ * into any other prop it is shown as a value.
+ */
+let listPropsCache: Map<string, Map<string, ListItems>> | undefined;
+function listProps(): Map<string, Map<string, ListItems>> {
   if (listPropsCache) return listPropsCache;
-  const found = new Map<string, Set<string>>([['DataTable', new Set(['rows'])]]);
+  const found = new Map<string, Map<string, ListItems>>([
+    ['DataTable', new Map([['rows', 'anything']])],
+  ]);
   const components = catalog.data.components as Record<string, { props?: unknown }>;
   for (const [type, definition] of Object.entries(components)) {
     const shape = (definition.props as { shape?: Record<string, unknown> } | undefined)?.shape;
     for (const [prop, schema] of Object.entries(shape ?? {})) {
-      if (isArraySchema(schema)) {
-        if (!found.has(type)) found.set(type, new Set());
-        found.get(type)!.add(prop);
-      }
+      const items = listItemsOf(schema);
+      if (items === undefined) continue;
+      if (!found.has(type)) found.set(type, new Map());
+      found.get(type)!.set(prop, items);
     }
   }
   listPropsCache = found;
   return found;
 }
 
-/** Whether a zod schema is an array, under the `.nullable()` / `.optional()` most props carry. */
-function isArraySchema(schema: unknown): boolean {
+/** The zod schemas whose values a list-taking prop can render as they are. */
+const VALUE_SCHEMAS = new Set(['string', 'number', 'boolean', 'enum', 'literal']);
+
+/** A zod definition, under the `.nullable()` / `.optional()` / `.default()` most props carry. */
+function unwrapped(schema: unknown): { type?: string; element?: unknown } | undefined {
   let current: unknown = schema;
   for (let depth = 0; depth < 8; depth += 1) {
-    const def = (current as { def?: { type?: string; innerType?: unknown } }).def;
-    if (!def) return false;
-    if (def.type === 'array') return true;
-    if (def.innerType === undefined) return false;
+    const def = (current as { def?: { type?: string; innerType?: unknown; element?: unknown } })
+      .def;
+    if (!def) return undefined;
+    if (def.innerType === undefined) return def;
     current = def.innerType;
   }
-  return false;
+  return undefined;
+}
+
+/** What a prop declared as an array takes as its items, or nothing for a prop that is not one. */
+function listItemsOf(schema: unknown): ListItems | undefined {
+  const def = unwrapped(schema);
+  if (def?.type !== 'array') return undefined;
+  const element = unwrapped(def.element);
+  return element?.type !== undefined && VALUE_SCHEMAS.has(element.type) ? 'values' : 'anything';
 }
 
 /**
- * The reads that show a path of the wrong kind as a value.
+ * The reads that show a path of the wrong kind as a value, or read one of the
+ * wrong kind into a prop that takes a list.
  *
  * A read sits in one of two places. In a CONDITION - the object under a
  * `$cond`, or the element's own `visible` - it asks whether a value is set,
@@ -284,9 +338,15 @@ function isArraySchema(schema: unknown): boolean {
  * `[object Object]`, a comma-joined list or a url where a name belongs. Every
  * form that shows a value is held to it - `$state`, the item-relative `$item`
  * resolved through the repeat above it, and every interpolation of a
- * `$template`, which stringifies what it interpolates - except in the props
- * that take a list. A path the descriptor does not have is not repeated here:
- * the staleness check names it.
+ * `$template`, which stringifies what it interpolates, resolved the same way.
+ *
+ * A prop that takes a list is held the other way round. Written as one
+ * expression, it reads a whole list, and the path must be one: a renderer
+ * maps over what it is handed, so a structure or a file there renders nothing
+ * and a text throws, and a list of structures where the prop takes values is
+ * `[object Object]` per item or a throw, both past every gate. Written as an
+ * array literal, each entry is a value and is walked as one. A path the
+ * descriptor does not have is not repeated here: the staleness check names it.
  */
 function nonScalarReads(
   spec: Spec,
@@ -309,6 +369,26 @@ function nonScalarReads(
         `${key}: ${prop} shows ${path}, which is ${wrong.what} and not a value; a prop that shows a value takes a scalar path, and ${wrong.instead}`,
       );
     };
+    const checkList = (prop: string, path: string, items: ListItems): void => {
+      if (!isUnder(root, path)) return;
+      const field = fieldAt(path);
+      if (!field || field.kind === 'unknown') return;
+      if (field.kind !== 'list') {
+        const what = hasOwnProp(NOT_A_VALUE, field.kind)
+          ? NOT_A_VALUE[field.kind]!.what
+          : 'a value';
+        problems.push(
+          `${key}: ${prop} takes a list, and ${path} is ${what}; a prop that takes a list reads a list path`,
+        );
+        return;
+      }
+      if (items !== 'values') return;
+      const of = hasOwnProp(NOT_VALUES, field.item.kind) ? NOT_VALUES[field.item.kind] : undefined;
+      if (!of) return;
+      problems.push(
+        `${key}: ${prop} takes a list of values, and ${path} is a list of ${of}; a list of ${of} is laid out as a repeat or a DataTable`,
+      );
+    };
     const walk = (prop: string, value: unknown): void => {
       if (Array.isArray(value)) {
         value.forEach((entry) => walk(prop, entry));
@@ -322,14 +402,25 @@ function nonScalarReads(
         if (path !== undefined) check(prop, path);
       }
       if (typeof record.$template === 'string') {
-        for (const path of interpolated(record.$template)) check(prop, path);
+        for (const path of interpolatedPaths(record.$template, itemPath)) check(prop, path);
       }
       for (const [name, entry] of Object.entries(record)) {
         if (name !== '$cond') walk(prop, entry);
       }
     };
     for (const [prop, value] of Object.entries(element.props ?? {})) {
-      if (!listy?.has(prop)) walk(prop, value);
+      const items = listy?.get(prop);
+      if (items === undefined || Array.isArray(value)) {
+        walk(prop, value);
+        continue;
+      }
+      if (typeof value !== 'object' || value === null) continue;
+      const record = value as Record<string, unknown>;
+      if (typeof record.$state === 'string') checkList(prop, record.$state, items);
+      if (typeof record.$item === 'string') {
+        const path = itemPath(record.$item);
+        if (path !== undefined) checkList(prop, path, items);
+      }
     }
   }
   return problems;
