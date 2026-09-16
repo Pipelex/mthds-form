@@ -14,10 +14,10 @@ main_pipe   = "ui_designer"
 # It runs in two stages, and `ui_designer` is the sequence of them:
 #
 # - `plan_page` reads the brief and the catalog - and the creative seed, when
-#   there is one - and writes a PagePlan: what the page is for, its headline,
-#   its composition, its sections with the elements and paths each holds, the
-#   rail, the defaults and what is delegated. The plan is a structured output,
-#   so the runtime holds it to the shape declared below.
+#   there is one - and writes a PagePlan: what the page is for, its title,
+#   its composition, its regions with the elements and paths each holds, what
+#   runs the method, the defaults and what is delegated. The plan is a
+#   structured output, so the runtime holds it to the shape declared below.
 # - `emit_page` builds exactly that page: it is handed the plan, the catalog
 #   with every props signature, and the brief, and emits the JSONL patches.
 #
@@ -26,6 +26,15 @@ main_pipe   = "ui_designer"
 # can be read; the plan can. The seed reaches the planner only, because the
 # plan is where two runs of the same brief diverge, and the builder follows
 # the plan.
+#
+# Neither prompt prescribes a composition. There is no skeleton a page must
+# have, no region it must contain, no place a control must sit, and the prose
+# names none of the catalog's chrome components: what a component is for is
+# in its own description, which travels as data. The rules that remain are the
+# ones a page is wrong without - the brief's paths, the bindings that fit,
+# delegation, who owns the state, one control that runs the method, heading
+# order, integrity of the tree. The shape of the page is the planner's
+# decision, written into the plan, and the builder's job is to build it.
 #
 # Two things to know before editing the prompts:
 #
@@ -82,66 +91,60 @@ description = { type = "text", description = "What the action does and the param
 built_in    = { type = "boolean", description = "True when the runtime handles the action without a handler from the host.", required = true }
 
 [concept.PagePlan]
-description = "The designer's plan for one page, settled before any element is written: what the page is for, how it is composed, what each section shows or collects and with which components, what the rail sums up, and what is delegated."
+description = "The designer's plan for one page, settled before any element is written: what the page is for, how it is composed - a decision the plan makes, with no shape given in advance - what each region shows or collects and with which components, what runs the method, and what is delegated."
 
 [concept.PagePlan.structure]
-purpose     = { type = "text", description = "One sentence: what this page is FOR and who is standing in front of it. It decides the order, the grouping and the tone of everything below.", required = true }
-headline    = { type = "text", description = "The Hero's headline: the page named after the job, in a person's words - \"Plan the trip\", never \"TripRequest\".", required = true }
-lede        = { type = "text", description = "The one line under the headline, when a line is needed at all; otherwise empty." }
-composition = { type = "text", description = "The composition of the work column in a few sentences: what comes first and largest, what is grouped with what and why, what sits behind a Collapsible or on a later Step or Tab, and the one bold move the page makes.", required = true }
-sections    = { type = "list", item_type = "concept", item_concept_ref = "PlannedSection", description = "The Sections of the work column in reading order, one per concern of the brief, numbered \"01\", \"02\" and so on.", required = true }
-rail        = { type = "list", item_type = "text", description = "The Rail's SummaryRows in order, one line each: the label, and the path - or the two paths that read as one line - it reads, spelled exactly as the brief lists them. On an input page they mirror what the person fills in; on a result page, the figures that sum the result up.", required = true }
-cta         = { type = "text", description = "On an input page, the words on the one Cta that runs the method - naming the job, \"Plan my trip\", never \"Submit\" - and the hint beside it, if one is needed. Empty on a result page." }
-defaults    = { type = "list", item_type = "text", description = "On an input page, the defaults the brief lists under \"Defaults\", one per line as a path and its value. Nothing else: no other /state patch is ever emitted." }
-delegated   = { type = "list", item_type = "text", description = "Every path the page delegates whole - to MthdsField on an input page, to MthdsResult on a result page - with a few words on why: the brief marks it delegated, or it is a structure the page chooses not to lay out." }
+purpose        = { type = "text", description = "One sentence: what this page is FOR and who is standing in front of it. It decides the shape, the order, the grouping and the tone of everything below.", required = true }
+title          = { type = "text", description = "The page's title, in a person's words: named after the job - \"Plan the trip\", never \"TripRequest\". Where it sits and what carries it is the composition's call.", required = true }
+composition    = { type = "text", description = "The shape of the whole page in a few sentences, decided for this page alone: how the space is divided, what comes first and largest, what stands beside what, what is grouped with what and why, what is staged or folded away, and where the method is run on an input page. No shape is given in advance; this is where it is decided.", required = true }
+regions        = { type = "list", item_type = "concept", item_concept_ref = "PlannedRegion", description = "The regions of the page in reading order, whatever the composition makes them: the parts of a column, the steps of a journey, the tabs, a panel beside the work, a band of figures. Every element the page lays out sits in one of them.", required = true }
+call_to_action = { type = "text", description = "On an input page, the words on the one control that runs the method - naming the job, \"Plan my trip\", never \"Submit\" - and the hint beside it, if one is needed. Empty on a result page." }
+defaults       = { type = "list", item_type = "text", description = "On an input page, the defaults the brief lists under \"Defaults\", one per line as a path and its value. Nothing else: no other /state patch is ever emitted." }
+delegated      = { type = "list", item_type = "text", description = "Every path the page delegates whole - to MthdsField on an input page, to MthdsResult on a result page - with a few words on why: the brief marks it delegated, or it is a structure the page chooses not to lay out." }
 
-[concept.PlannedSection]
-description = "One Section of the work column: its number and title, what it is for, and the elements inside it, each with the path it binds."
+[concept.PlannedRegion]
+description = "One region of the page: what it is titled, if it is titled, what it is for, what it is built with, and the elements inside it, each with the path it binds."
 
-[concept.PlannedSection.structure]
-number   = { type = "text", description = "\"01\", \"02\" and so on, in reading order.", required = true }
-title    = { type = "text", description = "The section's title, in a person's words.", required = true }
-purpose  = { type = "text", description = "What this section shows or collects, and why it sits where it does.", required = true }
-elements = { type = "list", item_type = "text", description = "The elements inside it in order, one line each: the component by its catalog name, the path it binds or reads spelled exactly as the brief lists it, and the choices it lists when it lists any. A container - Stack, Grid, Tabs, Steps, Collapsible - names what it holds.", required = true }
+[concept.PlannedRegion.structure]
+title     = { type = "text", description = "The words the region is titled with, in a person's words, when the composition titles it; otherwise empty." }
+purpose   = { type = "text", description = "What this region shows or collects, and why it sits where it does.", required = true }
+container = { type = "text", description = "The component the region is built with, by its catalog name, when the composition has settled it; otherwise empty, and the builder chooses one that builds what the composition describes." }
+elements  = { type = "list", item_type = "text", description = "The elements inside it in order, one line each: the component by its catalog name, the path it binds or reads spelled exactly as the brief lists it, and the choices it lists when it lists any. A container names what it holds.", required = true }
 
 [pipe.ui_designer]
-type        = "PipeSequence"
+type = "PipeSequence"
 description = "Design one page from the catalog and the brief: plan it, then build it as the JSONL patches of a spec bound to the host's state."
-inputs      = { catalog = "Catalog", brief = "Text", seed = "Text?" }
-output      = "Text"
+inputs = { catalog = "Catalog", brief = "Text", seed = "Text?" }
+output = "Text"
 steps = [
-    { pipe = "plan_page", result = "plan" },
-    { pipe = "emit_page", result = "page" },
+  { pipe = "plan_page", result = "plan" },
+  { pipe = "emit_page", result = "page" },
 ]
 
 [pipe.plan_page]
-type        = "PipeLLM"
-description = "Read the brief and plan the page: what it is for, how it is composed, what each section holds and with which components, what the rail sums up, and what is delegated."
-inputs      = { catalog = "Catalog", brief = "Text", seed = "Text?" }
-output      = "PagePlan"
+type = "PipeLLM"
+description = "Read the brief and plan the page: what it is for, how it is composed, what each region holds and with which components, what runs the method, and what is delegated."
+inputs = { catalog = "Catalog", brief = "Text", seed = "Text?" }
+output = "PagePlan"
 model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 8192 }
 system_prompt = """
-You are a product designer with taste. You plan ONE page for a method - its inputs, or its result - to be built from a fixed catalog of components and bound to state the host provides. The page must read as a small, purpose-built web app, never as a form. You write the plan and a second designer builds the page from it, so every decision you leave open is one they will make without you.
+You are a product designer with taste. You plan ONE page for a method - its inputs, or its result - to be built from a fixed catalog of components and bound to state the host provides. The page must read as a small, purpose-built web app, never as a form. Its shape is yours to decide: nothing here prescribes one. You write the plan and a second designer builds the page from it, so every decision you leave open is one they will make without you.
 """
 prompt = """
 YOUR JOB:
-Plan the page; do not build it. Decide what the page is for and name it after the job, settle its composition, list its sections with the elements each holds and the path each element binds, plan the rail, and name what is delegated. Be concrete: a component by its catalog name, a path exactly as the brief spells it, a choice list exactly as the brief lists it. Write nothing the builder would have to guess at, and nothing they do not need.
+Plan the page; do not build it. Decide what the page is for and name it after the job, decide its composition, list its regions with the elements each holds and the path each element binds, write the words on the control that runs the method, and name what is delegated. Be concrete: a component by its catalog name, a path exactly as the brief spells it, a choice list exactly as the brief lists it. Write nothing the builder would have to guess at, and nothing they do not need.
 
 STATE:
 The host owns the state. The brief lists every path in it, with its kind and meaning, and it is the ONLY source of paths: every value the page shows or binds is at a path the brief lists, spelled exactly as written. On a result page the host loads /result before the page renders and the page sets no state of its own. On an input page the form's values live under /inputs, and the only state the page sets is the defaults the brief lists.
 
 DESIGN DIRECTION:
 - You are designing a small web app, not a form. A person should open this page and feel it was built for this one job by a studio that cares - the way a product built on Lovable, or by a design-led startup, feels - and never that a schema was transcribed into fields.
-- Start from the feeling. Decide in one sentence what this page is FOR and who is standing in front of it; let that decide the order, the grouping and the tone. Name the page after the job, not the concept: "Plan the trip", not "TripRequest".
-- Compose like an app: a title that says what happens here, and one line under it at most; the inputs staged in the order a person thinks, not the order the brief lists them; the one input that matters most first and largest; the rest grouped by meaning; the optional details behind a Collapsible or on a later Step, so the first screen stays calm.
+- Start from the feeling. Decide in one sentence what this page is FOR and who is standing in front of it; let that decide the shape, the order, the grouping and the tone. Name the page after the job, not the concept: "Plan the trip", not "TripRequest".
+- The composition is yours. The catalog is the whole vocabulary and no arrangement of it is prescribed: how the space is divided, what comes first and largest, what stands beside what, what is staged or folded away, where the method is run - decide each for this page, from its purpose, and write the decision down. A component is there to be used when it serves the page and left alone when it does not.
 - Prefer the control that feels like an app: Segmented for a choice of up to five options, Radio for a choice that needs a word of explanation, Switch for a yes/no that changes the page, Checkbox for one that does not, NumberInput for a figure, Textarea for prose, Input for a short text. Use Select only when the options do not fit on one line.
-- Use structure, not decoration: Split for a summary rail beside the work, Tabs to separate two concerns of equal weight, Steps for a journey with a natural order, Grid for values that read side by side, an Icon beside a heading to give a section a face. Progress only over a value the state carries.
 - Restraint reads premium. No label that restates the obvious, no card inside a card, no paragraph that explains the form, no more than two levels of heading. Every element must earn its place; when in doubt, remove it.
-- Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The Button that runs names the job ("Plan my trip"), never "Submit".
-- Bold is allowed: an asymmetric layout, a single enormous figure, a page that is one Step at a time. Anything, as long as every value binds to a path the brief lists and the page reads clearly in both a light and a dark theme.
-
-THE PRODUCT PAGE:
-Every page has the same bones, and the plan fills them. A Hero at the top, whose headline is the page's only title. Then the work column: one Section per concern of the brief, numbered "01", "02" and so on, each flat inside - Stack and Grid, never a Card - and each holding its inputs or its values. Beside it a Rail of SummaryRows, each mirroring one thing the person fills in, ending with the one Cta that runs the method on an input page. An AppBar and a Footer frame the page; the builder writes those.
+- Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The control that runs names the job ("Plan my trip"), never "Submit".
+- Every value binds to a path the brief lists, and the page reads clearly in both a light and a dark theme.
 
 AVAILABLE COMPONENTS ({{ catalog.components | length }}):
 
@@ -157,14 +160,13 @@ PLANNING RULES:
 2. Delegate the paths the brief marks as delegated: MthdsField for an input, MthdsResult for a result, at the path and nothing else. Never plan another component over a delegated path.
 3. Lay out what you understand and delegate what you do not. A structure you choose not to lay out is delegated whole by its path; that is a valid choice, not a failure.
 4. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput takes a number path; a Switch or Checkbox a boolean path; an Input a text path; a Textarea a prose path.
-5. Every input sits in some Section of the work column, laid out with the catalog's inputs or delegated with MthdsField at its path. A Step or a Tab hides an input from the eye, never from the run: every input the run waits for sits in some panel.
+5. Every input the run waits for is on the page, in some region: laid out with the catalog's inputs, or delegated with MthdsField at its path. A Step or a Tab hides an input from the eye, never from the run: every input sits in some panel.
 6. Tabs and Steps hold exactly one panel per tab or step, in the same order, usually a Stack. Their own state - the active tab, the current step, an open Collapsible - is theirs, never the host's.
-7. An input page has exactly ONE Cta and NO Button. The Cta is the last thing in the Rail; navigation is never built out of Buttons, since Steps and Tabs carry their own.
-8. The Rail holds SummaryRows and the Cta, and nothing else: no input, no Button, no Heading. Each row reads one thing the person fills in, or two paths that read as one line.
-9. On an input page the only state the page sets is the defaults the brief lists under "Defaults"; on a result page it sets none.
+7. An input page has exactly ONE control that runs the method, wherever the composition puts it, and no other Button: a Button bound to nothing does nothing, and navigation is never built out of Buttons, since Steps and Tabs carry their own.
+8. On an input page the only state the page sets is the defaults the brief lists under "Defaults"; on a result page it sets none.
 
 CREATIVE SEED:
-When a creative seed follows the brief, it is your ONLY source of variety. Read it the way a designer reads a found object: its runs of letters, its rare characters, its numbers, its rhythm. Derive from it a creative direction - the composition (one column, a Split, Steps, Tabs), the density, the tone of the copy, which controls you favour, where the one big figure sits - and commit to it.
+When a creative seed follows the brief, it is your ONLY source of variety. Read it the way a designer reads a found object: its runs of letters, its rare characters, its numbers, its rhythm. Derive from it a creative direction - the composition, the density, the tone of the copy, which controls you favour, where the emphasis sits - and commit to it.
 Never show, quote or mention the seed. Two designers given different seeds must produce visibly different pages from the same brief; a designer given no seed designs from the brief alone.
 
 ---
@@ -220,28 +222,21 @@ DYNAMIC PROPS:
 1. Read-only value: { "$$state": "/path" }. 2. Two-way input binding: { "$$bindState": "/path" } on value/checked. 3. Conditional: { "$$cond": <condition>, "$$then": <value>, "$$else": <value> }, where a condition is { "$$state": "/path" } (truthy), with optional "eq", "neq", "gt", "gte", "lt", "lte" or "not": true. 4. Template: { "$$template": "Invoice $${/result/reference}" } interpolates state paths; inside a repeat, bare names read the item.
 
 THE PLAN:
-A designer has read the brief and planned this page. Build the page the plan describes: its sections in its order, each element it names with the component it names, bound to the path it names. Where the plan is silent - a label, a helper sentence, an eyebrow, a gap, a column count - decide as they would have, from the purpose and the composition they wrote. Do not add a section, drop an element or rebind a path; where the plan names a path the brief does not list, the brief wins.
+A designer has read the brief and planned this page: its purpose, its title, its composition, and its regions in reading order with the elements each holds. Build the page the plan describes: the composition it wrote is the shape of the page; each region holds the elements it names, with the components it names, bound to the paths it names; where a region names no container, choose the one from the catalog that builds what the composition describes. Where the plan is silent - a label, a helper sentence, a gap, a column count - decide as they would have, from the purpose and the composition they wrote. Do not add a region, drop an element or rebind a path; where the plan names a path the brief does not list, the brief wins.
 
 Purpose: {{ plan.purpose }}
-Headline: {{ plan.headline }}
-{% if plan.lede -%}
-Lede: {{ plan.lede }}
-{% endif -%}
+Title: {{ plan.title }}
 Composition: {{ plan.composition }}
 
-SECTIONS:
-{% for section in plan.sections %}
-{{ section.number }} {{ section.title }} - {{ section.purpose }}
-{% for element in section.elements -%}
+REGIONS:
+{% for region in plan.regions %}
+{{ loop.index }}. {% if region.title %}{{ region.title }} - {% endif %}{{ region.purpose }}{% if region.container %} [{{ region.container }}]{% endif %}
+{% for element in region.elements -%}
 - {{ element }}
 {% endfor -%}
-{% endfor %}
-RAIL:
-{% for row in plan.rail -%}
-- {{ row }}
 {% endfor -%}
-{% if plan.cta %}
-CTA: {{ plan.cta }}
+{% if plan.call_to_action %}
+CALL TO ACTION: {{ plan.call_to_action }}
 {% endif -%}
 {% if plan.defaults %}
 DEFAULTS (the only /state patches):
@@ -257,7 +252,7 @@ DELEGATED:
 {% endif %}
 EXECUTION:
 - Restraint reads premium. No label that restates the obvious, no card inside a card, no paragraph that explains the form, no more than two levels of heading. Every element must earn its place; when in doubt, remove it.
-- Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The Button that runs names the job ("Plan my trip"), never "Submit".
+- Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The control that runs names the job ("Plan my trip"), never "Submit".
 - Every value binds to a path the brief lists, and the page reads clearly in both a light and a dark theme.
 
 AVAILABLE COMPONENTS ({{ catalog.components | length }}):
@@ -285,23 +280,17 @@ RULES:
 1. INTEGRITY: every key in every "children" array must be emitted as its own element. A missing child makes that whole branch of the page invisible. After emitting the tree, walk it from the root and emit any element you referenced but did not define.
 2. Every element is {"type", "props", "children"}; "children" is an array of element keys, empty for a leaf. "visible", "repeat" and "on" are fields of the ELEMENT, never of "props".
 3. ONLY use component types from the AVAILABLE COMPONENTS list. Use unique, descriptive element keys ("header", "total-metric", "lines-table").
-4. Group content in containers and title sections with Heading. Use Grid for values that read side by side and Stack for a column.
-5. The brief is the ONLY source of paths. Bind every value to a path the brief lists, exactly as written, and inline no value that the state carries.
-6. On a RESULT page, emit no /state patches at all: the host loads /result before the page renders. Read with { "$$state": "/result/..." }.
-7. On an INPUT page, bind every input with { "$$bindState": "/inputs/..." }, and emit /state patches ONLY for the defaults the brief lists under "Defaults" - nothing else. The page's own UI state (the active tab, the current step, an open section) lives inside Tabs, Steps and Collapsible, never in /state.
-8. Delegate the paths the brief marks as delegated: MthdsField for an input, MthdsResult for a result, naming the path and nothing else. Never re-describe a delegated field with other components.
-9. Lay out what you understand and delegate what you do not. A structure you choose not to lay out is delegated whole by its path; that is a valid choice, not a failure.
-10. An input page has exactly ONE Cta and NO Button. The Cta fires validateForm then run, in that order, and it is the LAST child of the Rail. Never build navigation out of Buttons; Steps and Tabs carry their own.
-11. Tabs and Steps take exactly one child per tab or step, in the same order; that child is the panel, usually a Stack. A Step hides an input from the eye, never from the run: every input the run waits for must sit in some panel.
-12. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput binds a number path; a Switch or Checkbox binds a boolean path; an Input binds a text path.
-13. One root element, and it is a layout container (Stack, Split or Card).
-14. Heading levels increase by one: the page title is the only h1, its sections are h2, and their sections h3. Never skip a level.
-15. Never set a "className" prop. Colour, spacing and type come from the components as they are.
-16. This is a PRODUCT PAGE. The root is a vertical Stack with gap "none" and exactly three children, in this order: one AppBar, one Workspace, one Footer. The AppBar is the first thing on the page and the Footer the last; neither appears anywhere else.
-17. The Workspace has exactly two children, in this order: the WORK, a vertical Stack with gap "none", and the RAIL, a Rail. Nothing else goes directly in the Workspace.
-18. The work Stack starts with exactly one Hero, then one Section per concern of the brief, numbered "01", "02" and so on. The Hero's headline is the page's only h1: emit no Heading at level h1 anywhere. A Section's title is its h2, so a Heading inside a Section starts at h3.
-19. Every input sits inside a Section in the work column, laid out with the catalog's inputs or delegated with MthdsField at its path. A Section is flat: use Stack and Grid inside it, never a Card.
-20. The Rail is made of SummaryRows, each mirroring one thing the person fills in - "value", and "detail" when two paths read as one line, bound with { "$$state": "/inputs/..." } to paths the brief lists - and ends with the one Cta. No input, no Button and no Heading goes in the Rail.
+4. The brief is the ONLY source of paths. Bind every value to a path the brief lists, exactly as written, and inline no value that the state carries.
+5. On a RESULT page, emit no /state patches at all: the host loads /result before the page renders. Read with { "$$state": "/result/..." }.
+6. On an INPUT page, bind every input with { "$$bindState": "/inputs/..." }, and emit /state patches ONLY for the defaults the brief lists under "Defaults" - nothing else. The page's own UI state (the active tab, the current step, an open section) lives inside Tabs, Steps and Collapsible, never in /state.
+7. Delegate the paths the brief marks as delegated: MthdsField for an input, MthdsResult for a result, naming the path and nothing else. Never re-describe a delegated field with other components.
+8. Lay out what you understand and delegate what you do not. A structure you choose not to lay out is delegated whole by its path; that is a valid choice, not a failure.
+9. An input page has exactly ONE control that runs the method, wherever the plan puts it, and it fires validateForm then run, in that order, on press. No other Button: a Button bound to nothing does nothing, and navigation is never built out of Buttons, since Steps and Tabs carry their own.
+10. Tabs and Steps take exactly one child per tab or step, in the same order; that child is the panel, usually a Stack. A Step hides an input from the eye, never from the run: every input the run waits for must sit in some panel.
+11. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput binds a number path; a Switch or Checkbox binds a boolean path; an Input binds a text path.
+12. One root element, and it is a container that accepts children.
+13. Heading levels increase by one and never skip: exactly one h1 on the page, then h2 below it, then h3. A component whose description says it renders a heading counts at that level, so a Heading inside it starts one level down.
+14. Never set a "className" prop. Colour, spacing and type come from the components as they are.
 
 ---
 

@@ -16,10 +16,10 @@ import {
  * The synthesized carrier with the widest input surface in the corpus: text,
  * a number, enums, a boolean, a nested structure, two dates and a list, plus
  * an optional image. It is the case a layout has the most room to get wrong,
- * which is why three models were run over the same brief - the pages differ
- * in section order, in what goes in the rail and in how much copy they write,
- * and every one of them binds the same paths, because the paths are the
- * descriptor's and not theirs.
+ * which is why three models were run over the same brief - the pages are free
+ * to differ in their composition, since the method prescribes none, and every
+ * one of them binds the same paths, because the paths are the descriptor's and
+ * not theirs.
  *
  * The last two stories are the pinned layout under someone else's tokens. A
  * page that only reads in the stock palette is a page with a problem the

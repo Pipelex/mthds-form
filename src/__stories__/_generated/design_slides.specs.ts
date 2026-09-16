@@ -28,11 +28,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'slide_designer.generate_design_proposals_from_rough_brief',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: 'b92188b90c70',
+    promptHash: '4d40c8383dcf',
     date: '2026-09-16',
     brief: 'wip/generative-ui/briefs/slide_designer.generate_design_proposals_from_rough_brief.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Slide designer","links":["Topic","Character","References"],"tag":"generate_design_proposals"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","sec-topic","sec-character","sec-work-from"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"New deck","headline":"Brief the deck","lede":"Hand over a rough brief and get back themes, mockups and a report."},"children":[]}}\n{"op":"add","path":"/elements/sec-topic","value":{"type":"Section","props":{"number":"01","title":"What\'s the deck about?","lede":"The one thing the run needs. Think out loud."},"children":["topic-field"]}}\n{"op":"add","path":"/elements/topic-field","value":{"type":"Textarea","props":{"label":"Topic","name":"topic","placeholder":"A pitch for our new carbon-tracking app, aimed at climate-conscious enterprise buyers…","rows":5,"value":{"$bindState":"/inputs/brief/topic"},"checks":[{"type":"required","message":"Give the deck a topic to run on."}],"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/sec-character","value":{"type":"Section","props":{"number":"02","title":"Set the character","lede":"A few quick picks to shape the mood and framing. All optional."},"children":["character-grid"]}}\n{"op":"add","path":"/elements/character-grid","value":{"type":"Grid","props":{"columns":3,"gap":"lg"},"children":["tone-seg","goal-seg","audience-seg"]}}\n{"op":"add","path":"/elements/tone-seg","value":{"type":"Segmented","props":{"label":"Tone","name":"tone","options":["formal","playful","innovative","trustworthy","artsy"],"value":{"$bindState":"/inputs/brief/tone"}},"children":[]}}\n{"op":"add","path":"/elements/goal-seg","value":{"type":"Segmented","props":{"label":"Goal","name":"goal","options":["pitch investors","sell to clients","internal training","keynote"],"value":{"$bindState":"/inputs/brief/goal"}},"children":[]}}\n{"op":"add","path":"/elements/audience-seg","value":{"type":"Segmented","props":{"label":"Audience","name":"audience","options":["executives","technical team","general public"],"value":{"$bindState":"/inputs/brief/audience"}},"children":[]}}\n{"op":"add","path":"/elements/sec-work-from","value":{"type":"Section","props":{"number":"03","title":"Anything to work from?","lede":"Brand rules or past decks, if you have them."},"children":["work-from-collapsible"]}}\n{"op":"add","path":"/elements/work-from-collapsible","value":{"type":"Collapsible","props":{"title":"Brand & references","defaultOpen":false},"children":["work-from-stack"]}}\n{"op":"add","path":"/elements/work-from-stack","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["brand-field","refs-field"]}}\n{"op":"add","path":"/elements/brand-field","value":{"type":"Textarea","props":{"label":"Brand guidelines","name":"brand_guidelines","placeholder":"Colours, fonts, logo usage, anything the deck should hold to…","rows":4,"value":{"$bindState":"/inputs/brief/brand_guidelines"}},"children":[]}}\n{"op":"add","path":"/elements/refs-field","value":{"type":"Textarea","props":{"label":"Existing references","name":"existing_references","placeholder":"Templates or past decks to lean on — or steer clear of…","rows":4,"value":{"$bindState":"/inputs/brief/existing_references"}},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Your brief"},"children":["row-topic","row-tone","row-goal","row-audience","cta"]}}\n{"op":"add","path":"/elements/row-topic","value":{"type":"SummaryRow","props":{"label":"Topic","value":{"$state":"/inputs/brief/topic"},"placeholder":"No topic yet"},"children":[]}}\n{"op":"add","path":"/elements/row-tone","value":{"type":"SummaryRow","props":{"label":"Tone","value":{"$state":"/inputs/brief/tone"},"placeholder":"—"},"children":[]}}\n{"op":"add","path":"/elements/row-goal","value":{"type":"SummaryRow","props":{"label":"Goal","value":{"$state":"/inputs/brief/goal"},"placeholder":"—"},"children":[]}}\n{"op":"add","path":"/elements/row-audience","value":{"type":"SummaryRow","props":{"label":"Audience","value":{"$state":"/inputs/brief/audience"},"placeholder":"—"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Design the themes","hint":"Needs a topic to go on."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"Slide designer","tag":"generate_design_proposals_from_rough_brief"},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Slide designer","tag":"slide_designer.generate_design_proposals_from_rough_brief"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["topic-section","shape-section","context-collapsible"]}}\n{"op":"add","path":"/elements/topic-section","value":{"type":"Section","props":{"number":"01","title":"What\'s the deck about?","lede":"The one thing we need to get started."},"children":["topic-input"]}}\n{"op":"add","path":"/elements/topic-input","value":{"type":"Textarea","props":{"label":"Topic","name":"topic","rows":4,"placeholder":"Say a sentence or two about the subject of the deck.","value":{"$bindState":"/inputs/brief/topic"},"checks":[{"type":"required","message":"A topic gets things going."}],"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/shape-section","value":{"type":"Section","props":{"number":"02","title":"Shape the proposals","lede":"A few quick choices to steer the look."},"children":["tone-seg","goal-seg","audience-seg"]}}\n{"op":"add","path":"/elements/tone-seg","value":{"type":"Segmented","props":{"label":"Tone","name":"tone","options":["formal","playful","innovative","trustworthy","artsy"],"value":{"$bindState":"/inputs/brief/tone"}},"children":[]}}\n{"op":"add","path":"/elements/goal-seg","value":{"type":"Segmented","props":{"label":"Goal","name":"goal","options":["pitch investors","sell to clients","internal training","keynote"],"value":{"$bindState":"/inputs/brief/goal"}},"children":[]}}\n{"op":"add","path":"/elements/audience-seg","value":{"type":"Segmented","props":{"label":"Audience","name":"audience","options":["executives","technical team","general public"],"value":{"$bindState":"/inputs/brief/audience"}},"children":[]}}\n{"op":"add","path":"/elements/context-collapsible","value":{"type":"Collapsible","props":{"title":"Add context (optional)","defaultOpen":false},"children":["brand-input","refs-input"]}}\n{"op":"add","path":"/elements/brand-input","value":{"type":"Textarea","props":{"label":"Brand guidelines","name":"brand_guidelines","rows":3,"placeholder":"Colors, fonts, logo usage","value":{"$bindState":"/inputs/brief/brand_guidelines"}},"children":[]}}\n{"op":"add","path":"/elements/refs-input","value":{"type":"Textarea","props":{"label":"References","name":"existing_references","rows":3,"placeholder":"Templates or past decks to follow or avoid","value":{"$bindState":"/inputs/brief/existing_references"}},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Ready"},"children":["rail-line","cta"]}}\n{"op":"add","path":"/elements/rail-line","value":{"type":"Text","props":{"text":"Proposals come back as themes with mockups and an HTML report.","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Generate design proposals","hint":"Needs a topic to get started."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"Shape a rough idea into a design brief.","tag":"Slide designer"},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -48,8 +48,7 @@ export const SPECS: SpecFixture[] = [
           type: 'AppBar',
           props: {
             app: 'Slide designer',
-            links: ['Topic', 'Character', 'References'],
-            tag: 'generate_design_proposals',
+            tag: 'slide_designer.generate_design_proposals_from_rough_brief',
           },
           children: [],
         },
@@ -64,63 +63,45 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'none',
+            gap: 'xl',
           },
-          children: ['hero', 'sec-topic', 'sec-character', 'sec-work-from'],
+          children: ['topic-section', 'shape-section', 'context-collapsible'],
         },
-        hero: {
-          type: 'Hero',
-          props: {
-            eyebrow: 'New deck',
-            headline: 'Brief the deck',
-            lede: 'Hand over a rough brief and get back themes, mockups and a report.',
-          },
-          children: [],
-        },
-        'sec-topic': {
+        'topic-section': {
           type: 'Section',
           props: {
             number: '01',
             title: "What's the deck about?",
-            lede: 'The one thing the run needs. Think out loud.',
+            lede: 'The one thing we need to get started.',
           },
-          children: ['topic-field'],
+          children: ['topic-input'],
         },
-        'topic-field': {
+        'topic-input': {
           type: 'Textarea',
           props: {
             label: 'Topic',
             name: 'topic',
-            placeholder:
-              'A pitch for our new carbon-tracking app, aimed at climate-conscious enterprise buyers…',
-            rows: 5,
+            rows: 4,
+            placeholder: 'Say a sentence or two about the subject of the deck.',
             value: {
               $bindState: '/inputs/brief/topic',
             },
             checks: [
               {
                 type: 'required',
-                message: 'Give the deck a topic to run on.',
+                message: 'A topic gets things going.',
               },
             ],
             validateOn: 'blur',
           },
           children: [],
         },
-        'sec-character': {
+        'shape-section': {
           type: 'Section',
           props: {
             number: '02',
-            title: 'Set the character',
-            lede: 'A few quick picks to shape the mood and framing. All optional.',
-          },
-          children: ['character-grid'],
-        },
-        'character-grid': {
-          type: 'Grid',
-          props: {
-            columns: 3,
-            gap: 'lg',
+            title: 'Shape the proposals',
+            lede: 'A few quick choices to steer the look.',
           },
           children: ['tone-seg', 'goal-seg', 'audience-seg'],
         },
@@ -160,51 +141,34 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'sec-work-from': {
-          type: 'Section',
-          props: {
-            number: '03',
-            title: 'Anything to work from?',
-            lede: 'Brand rules or past decks, if you have them.',
-          },
-          children: ['work-from-collapsible'],
-        },
-        'work-from-collapsible': {
+        'context-collapsible': {
           type: 'Collapsible',
           props: {
-            title: 'Brand & references',
+            title: 'Add context (optional)',
             defaultOpen: false,
           },
-          children: ['work-from-stack'],
+          children: ['brand-input', 'refs-input'],
         },
-        'work-from-stack': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['brand-field', 'refs-field'],
-        },
-        'brand-field': {
+        'brand-input': {
           type: 'Textarea',
           props: {
             label: 'Brand guidelines',
             name: 'brand_guidelines',
-            placeholder: 'Colours, fonts, logo usage, anything the deck should hold to…',
-            rows: 4,
+            rows: 3,
+            placeholder: 'Colors, fonts, logo usage',
             value: {
               $bindState: '/inputs/brief/brand_guidelines',
             },
           },
           children: [],
         },
-        'refs-field': {
+        'refs-input': {
           type: 'Textarea',
           props: {
-            label: 'Existing references',
+            label: 'References',
             name: 'existing_references',
-            placeholder: 'Templates or past decks to lean on — or steer clear of…',
-            rows: 4,
+            rows: 3,
+            placeholder: 'Templates or past decks to follow or avoid',
             value: {
               $bindState: '/inputs/brief/existing_references',
             },
@@ -214,59 +178,23 @@ export const SPECS: SpecFixture[] = [
         rail: {
           type: 'Rail',
           props: {
-            title: 'Your brief',
+            title: 'Ready',
           },
-          children: ['row-topic', 'row-tone', 'row-goal', 'row-audience', 'cta'],
+          children: ['rail-line', 'cta'],
         },
-        'row-topic': {
-          type: 'SummaryRow',
+        'rail-line': {
+          type: 'Text',
           props: {
-            label: 'Topic',
-            value: {
-              $state: '/inputs/brief/topic',
-            },
-            placeholder: 'No topic yet',
-          },
-          children: [],
-        },
-        'row-tone': {
-          type: 'SummaryRow',
-          props: {
-            label: 'Tone',
-            value: {
-              $state: '/inputs/brief/tone',
-            },
-            placeholder: '—',
-          },
-          children: [],
-        },
-        'row-goal': {
-          type: 'SummaryRow',
-          props: {
-            label: 'Goal',
-            value: {
-              $state: '/inputs/brief/goal',
-            },
-            placeholder: '—',
-          },
-          children: [],
-        },
-        'row-audience': {
-          type: 'SummaryRow',
-          props: {
-            label: 'Audience',
-            value: {
-              $state: '/inputs/brief/audience',
-            },
-            placeholder: '—',
+            text: 'Proposals come back as themes with mockups and an HTML report.',
+            variant: 'muted',
           },
           children: [],
         },
         cta: {
           type: 'Cta',
           props: {
-            label: 'Design the themes',
-            hint: 'Needs a topic to go on.',
+            label: 'Generate design proposals',
+            hint: 'Needs a topic to get started.',
           },
           on: {
             press: [
@@ -283,8 +211,8 @@ export const SPECS: SpecFixture[] = [
         footer: {
           type: 'Footer',
           props: {
-            text: 'Slide designer',
-            tag: 'generate_design_proposals_from_rough_brief',
+            text: 'Shape a rough idea into a design brief.',
+            tag: 'Slide designer',
           },
           children: [],
         },

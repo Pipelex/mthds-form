@@ -26,11 +26,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'invoice_extraction.process_invoice',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: 'b92188b90c70',
+    promptHash: '4d40c8383dcf',
     date: '2026-09-16',
     brief: 'wip/generative-ui/briefs/invoice_extraction.process_invoice.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Invoice extraction","tag":"process_invoice"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","section-invoice"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"Read an invoice","lede":"Drop in an invoice and we\'ll pull the details out."},"children":[]}}\n{"op":"add","path":"/elements/section-invoice","value":{"type":"Section","props":{"number":"01","title":"The invoice"},"children":["document-field"]}}\n{"op":"add","path":"/elements/document-field","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Your document"},"children":["row-document","cta"]}}\n{"op":"add","path":"/elements/row-document","value":{"type":"SummaryRow","props":{"label":"Document","value":{"$state":"/inputs/document"},"placeholder":"No file yet"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Extract the details","hint":"Needs a document to start."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"Invoice extraction","tag":"process_invoice"},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["appbar","hero","card","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Invoice extraction","tag":"process_invoice"},"children":[]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"Extract an invoice","lede":"Upload an invoice and we\'ll pull out the details."},"children":[]}}\n{"op":"add","path":"/elements/card","value":{"type":"Card","props":{},"children":["document","cta"]}}\n{"op":"add","path":"/elements/document","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Extract the invoice","hint":"Add your invoice document to begin."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"Invoice extraction","tag":"process_invoice"},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -38,9 +38,9 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'none',
+            gap: 'xl',
           },
-          children: ['appbar', 'workspace', 'footer'],
+          children: ['appbar', 'hero', 'card', 'footer'],
         },
         appbar: {
           type: 'AppBar',
@@ -50,67 +50,31 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        workspace: {
-          type: 'Workspace',
-          props: {
-            rail: 'right',
-          },
-          children: ['work', 'rail'],
-        },
-        work: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'none',
-          },
-          children: ['hero', 'section-invoice'],
-        },
         hero: {
           type: 'Hero',
           props: {
-            headline: 'Read an invoice',
-            lede: "Drop in an invoice and we'll pull the details out.",
+            headline: 'Extract an invoice',
+            lede: "Upload an invoice and we'll pull out the details.",
           },
           children: [],
         },
-        'section-invoice': {
-          type: 'Section',
-          props: {
-            number: '01',
-            title: 'The invoice',
-          },
-          children: ['document-field'],
+        card: {
+          type: 'Card',
+          props: {},
+          children: ['document', 'cta'],
         },
-        'document-field': {
+        document: {
           type: 'MthdsField',
           props: {
             path: '/inputs/document',
           },
           children: [],
         },
-        rail: {
-          type: 'Rail',
-          props: {
-            title: 'Your document',
-          },
-          children: ['row-document', 'cta'],
-        },
-        'row-document': {
-          type: 'SummaryRow',
-          props: {
-            label: 'Document',
-            value: {
-              $state: '/inputs/document',
-            },
-            placeholder: 'No file yet',
-          },
-          children: [],
-        },
         cta: {
           type: 'Cta',
           props: {
-            label: 'Extract the details',
-            hint: 'Needs a document to start.',
+            label: 'Extract the invoice',
+            hint: 'Add your invoice document to begin.',
           },
           on: {
             press: [

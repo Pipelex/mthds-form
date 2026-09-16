@@ -169,7 +169,7 @@ describe('the designer method, as package data', () => {
     expect(builder).toMatch(/^output\s*=\s*"Text"$/m);
     expect(inputsOf(builder)).toContain('plan = "PagePlan"');
     expect(inputsOf(builder)).not.toContain('seed');
-    expect(builder).toContain('{% for section in plan.sections');
+    expect(builder).toContain('{% for region in plan.regions');
     expect(builder).toContain('{% for component in catalog.components');
     expect(builder).toContain('{% for action in catalog.actions');
     expect(builder).toContain('@brief');
@@ -189,17 +189,31 @@ describe('the designer method, as package data', () => {
     const catalogFields = ['name', 'props', 'description', 'accepts_children', 'slots', 'events'];
     const planFields = [
       'purpose',
-      'headline',
+      'title',
       'composition',
-      'sections',
-      'rail',
-      'cta',
+      'regions',
+      'call_to_action',
       'defaults',
+      'delegated',
     ];
-    const sectionFields = ['number', 'title', 'elements'];
-    for (const field of [...catalogFields, ...planFields, ...sectionFields]) {
+    const regionFields = ['title', 'purpose', 'container', 'elements'];
+    for (const field of [...catalogFields, ...planFields, ...regionFields]) {
       expect(METHOD).toMatch(new RegExp(`^${field}\\s*=`, 'm'));
     }
+  });
+
+  /**
+   * The composition is the model's. The method prescribes no skeleton, and
+   * the way that is held is by never naming the product chrome in its prose:
+   * what a Rail or a Hero is for travels in the catalog's own descriptions,
+   * as data, and a rule that named one would be the mandate the method gave
+   * up - every page had the same bones once, because the prompt said so.
+   */
+  it('names no product-page component, so it prescribes no composition', () => {
+    for (const name of PRODUCT_COMPONENTS) {
+      expect(METHOD, name).not.toMatch(new RegExp(`\\b${name}\\b`));
+    }
+    expect(METHOD).not.toContain('PRODUCT PAGE');
   });
 
   /**

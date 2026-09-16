@@ -118,12 +118,12 @@ export function assertRenderable(fixture: SpecFixture, fields: RunField[]): Spec
 /**
  * The parameters every generative story file states.
  *
- * `themePairPadding: 0` because a product page's bar and footer reach the
- * edges, and a gutter would render the page as a card.
+ * `themePairPadding: 0` because a page's bar and footer, when it has them,
+ * reach the edges, and a gutter would render the page as a card.
  *
- * The a11y exclusions are about the DECORATOR, not the page: a product page
- * has one banner, one complementary rail and one contentinfo, as it should,
- * and the pair view renders it twice on one document - so axe sees two of
+ * The a11y exclusions are about the DECORATOR, not the page: a page with a
+ * bar, a rail and a footer has one banner, one complementary and one
+ * contentinfo, as it should, and the pair view renders it twice on one document - so axe sees two of
  * each with the same name. A host renders one. Every other rule still fails
  * the build, and the preview's `color-contrast` exclusion is restated because
  * a parameter array replaces rather than merges.

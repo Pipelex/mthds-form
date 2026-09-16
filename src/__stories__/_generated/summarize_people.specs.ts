@@ -26,11 +26,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'summarize_people.summarize_people',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: 'b92188b90c70',
+    promptHash: '4d40c8383dcf',
     date: '2026-09-16',
     brief: 'wip/generative-ui/briefs/summarize_people.summarize_people.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"People summaries","tag":"summarize_people"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","section-people"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"People summaries","headline":"Summarize the people","lede":"Drop in your list and get a short read on everyone in it."},"children":[]}}\n{"op":"add","path":"/elements/section-people","value":{"type":"Section","props":{"number":"01","title":"The people","lede":"Your roster, read straight from the CSV rows."},"children":["people-stack"]}}\n{"op":"add","path":"/elements/people-stack","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Your roster"},"children":["rail-people","cta"]}}\n{"op":"add","path":"/elements/rail-people","value":{"type":"SummaryRow","props":{"label":"People","value":{"$state":"/inputs/people"},"placeholder":"No one yet"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"People summaries","tag":"summarize_people"},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["hero","people-section","run-cta"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"People summaries","lede":"Add the people you want summarized, then run."},"children":[]}}\n{"op":"add","path":"/elements/people-section","value":{"type":"Section","props":{"title":"The people"},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/run-cta","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -38,56 +38,23 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'none',
+            gap: 'xl',
+            align: 'stretch',
           },
-          children: ['appbar', 'workspace', 'footer'],
-        },
-        appbar: {
-          type: 'AppBar',
-          props: {
-            app: 'People summaries',
-            tag: 'summarize_people',
-          },
-          children: [],
-        },
-        workspace: {
-          type: 'Workspace',
-          props: {
-            rail: 'right',
-          },
-          children: ['work', 'rail'],
-        },
-        work: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'none',
-          },
-          children: ['hero', 'section-people'],
+          children: ['hero', 'people-section', 'run-cta'],
         },
         hero: {
           type: 'Hero',
           props: {
-            eyebrow: 'People summaries',
-            headline: 'Summarize the people',
-            lede: 'Drop in your list and get a short read on everyone in it.',
+            headline: 'People summaries',
+            lede: 'Add the people you want summarized, then run.',
           },
           children: [],
         },
-        'section-people': {
+        'people-section': {
           type: 'Section',
           props: {
-            number: '01',
             title: 'The people',
-            lede: 'Your roster, read straight from the CSV rows.',
-          },
-          children: ['people-stack'],
-        },
-        'people-stack': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'md',
           },
           children: ['people-field'],
         },
@@ -98,25 +65,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        rail: {
-          type: 'Rail',
-          props: {
-            title: 'Your roster',
-          },
-          children: ['rail-people', 'cta'],
-        },
-        'rail-people': {
-          type: 'SummaryRow',
-          props: {
-            label: 'People',
-            value: {
-              $state: '/inputs/people',
-            },
-            placeholder: 'No one yet',
-          },
-          children: [],
-        },
-        cta: {
+        'run-cta': {
           type: 'Cta',
           props: {
             label: 'Summarize everyone',
@@ -130,14 +79,6 @@ export const SPECS: SpecFixture[] = [
                 action: 'run',
               },
             ],
-          },
-          children: [],
-        },
-        footer: {
-          type: 'Footer',
-          props: {
-            text: 'People summaries',
-            tag: 'summarize_people',
           },
           children: [],
         },
