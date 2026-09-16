@@ -130,29 +130,80 @@ describe('the props signature', () => {
 });
 
 describe('the designer method, as package data', () => {
-  it('takes the catalog and the brief as inputs, and the seed optionally', () => {
-    const inputs = /^inputs\s*=\s*\{(.*)\}$/m.exec(METHOD)?.[1];
-    expect(inputs).toBeDefined();
-    expect(inputs).toContain('catalog = "Catalog"');
-    expect(inputs).toContain('brief = "Text"');
-    expect(inputs).toContain('seed = "Text?"');
+  /** The text of one pipe's table, from its header to the next pipe's. */
+  function pipe(code: string): string {
+    const start = METHOD.indexOf(`[pipe.${code}]`);
+    expect(start, code).toBeGreaterThan(-1);
+    const next = METHOD.indexOf('\n[pipe.', start + 1);
+    return METHOD.slice(start, next === -1 ? undefined : next);
+  }
+  const inputsOf = (block: string) => /^inputs\s*=\s*\{(.*)\}$/m.exec(block)?.[1] ?? '';
+
+  it('is a sequence taking the catalog and the brief, and the seed optionally, that returns text', () => {
+    const designer = pipe('ui_designer');
+    expect(designer).toMatch(/^type\s*=\s*"PipeSequence"$/m);
+    expect(inputsOf(designer)).toContain('catalog = "Catalog"');
+    expect(inputsOf(designer)).toContain('brief = "Text"');
+    expect(inputsOf(designer)).toContain('seed = "Text?"');
+    expect(designer).toMatch(/^output\s*=\s*"Text"$/m);
+    const steps = [...designer.matchAll(/\{\s*pipe\s*=\s*"(\w+)"/g)].map((step) => step[1]);
+    expect(steps).toEqual(['plan_page', 'emit_page']);
   });
 
-  it('lays the catalog out itself, and interpolates the brief and the guarded seed', () => {
-    expect(METHOD).toContain('{% for component in catalog.components');
-    expect(METHOD).toContain('{% for action in catalog.actions');
-    expect(METHOD).toContain('@brief');
-    expect(METHOD).toContain('@?seed');
+  it('plans first, from the catalog, the brief and the guarded seed, into a structure', () => {
+    const planner = pipe('plan_page');
+    expect(planner).toMatch(/^output\s*=\s*"PagePlan"$/m);
+    expect(inputsOf(planner)).toContain('seed = "Text?"');
+    expect(planner).toContain('{% for component in catalog.components');
+    expect(planner).toContain('@brief');
+    expect(planner).toContain('@?seed');
   });
 
-  it('declares the structure the catalog data is shaped as', () => {
-    for (const field of ['name', 'props', 'description', 'accepts_children', 'slots', 'events']) {
+  /**
+   * The seed is where two runs of the same brief diverge, and the plan is
+   * what carries that divergence: the builder follows the plan and never
+   * sees the seed, so it cannot second-guess the planner's reading of it.
+   */
+  it('then builds from the plan, the catalog and the brief, and never sees the seed', () => {
+    const builder = pipe('emit_page');
+    expect(builder).toMatch(/^output\s*=\s*"Text"$/m);
+    expect(inputsOf(builder)).toContain('plan = "PagePlan"');
+    expect(inputsOf(builder)).not.toContain('seed');
+    expect(builder).toContain('{% for section in plan.sections');
+    expect(builder).toContain('{% for component in catalog.components');
+    expect(builder).toContain('{% for action in catalog.actions');
+    expect(builder).toContain('@brief');
+    expect(builder).not.toContain('seed');
+  });
+
+  /** A fixture records ONE model, and the specs pass moves every pin at once. */
+  it('pins the same model on every stage', () => {
+    const pins = [...METHOD.matchAll(/^model\s*=\s*\{\s*model\s*=\s*"([^"]+)"/gm)].map(
+      (pin) => pin[1],
+    );
+    expect(pins.length).toBeGreaterThan(1);
+    expect(new Set(pins).size).toBe(1);
+  });
+
+  it('declares the structures the catalog data and the plan are shaped as', () => {
+    const catalogFields = ['name', 'props', 'description', 'accepts_children', 'slots', 'events'];
+    const planFields = [
+      'purpose',
+      'headline',
+      'composition',
+      'sections',
+      'rail',
+      'cta',
+      'defaults',
+    ];
+    const sectionFields = ['number', 'title', 'elements'];
+    for (const field of [...catalogFields, ...planFields, ...sectionFields]) {
       expect(METHOD).toMatch(new RegExp(`^${field}\\s*=`, 'm'));
     }
   });
 
   /**
-   * The prompt asks for a LAYOUT, never for content: a model that invents
+   * The prompts ask for a LAYOUT, never for content: a model that invents
    * sample data writes a page that looks right and shows figures the run never
    * produced.
    */
@@ -164,13 +215,14 @@ describe('the designer method, as package data', () => {
   /**
    * `$name` is the language's inline substitution, so a json-render
    * expression key written bare would be rendered as a variable - and refused
-   * at load, since no input is called `state`. Every one is spelled `$$`.
+   * at load, since no input is called `state`. Every one is spelled `$$`, in
+   * both stages' prompts: the slice starts at the first and runs to the end.
    */
   it('escapes every json-render expression key it names', () => {
-    const prompt = METHOD.slice(METHOD.indexOf('prompt = """'));
+    const prompts = METHOD.slice(METHOD.indexOf('prompt = """'));
     expect(
-      prompt.match(/(?<!\$)\$(?:state|bindState|item|bindItem|cond|then|else|template|or)\b/g),
+      prompts.match(/(?<!\$)\$(?:state|bindState|item|bindItem|cond|then|else|template|or)\b/g),
     ).toBeNull();
-    expect(prompt).toContain('"$$state"');
+    expect(prompts).toContain('"$$state"');
   });
 });

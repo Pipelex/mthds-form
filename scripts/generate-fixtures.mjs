@@ -845,12 +845,12 @@ async function loadGenerative() {
       import('../src/generative/catalog.ts'),
       import('../src/generative/designer-catalog.ts'),
       import('../src/generative/prompt-hash.ts'),
-    import('../src/generative/state.ts'),
-    import('../src/generative/stream.ts'),
-    import('../src/generative/validate.ts'),
-    import('../src/generative/fixture.ts'),
-    import('../src/core/index.ts'),
-  ]);
+      import('../src/generative/state.ts'),
+      import('../src/generative/stream.ts'),
+      import('../src/generative/validate.ts'),
+      import('../src/generative/fixture.ts'),
+      import('../src/core/index.ts'),
+    ]);
   return {
     ...heroes,
     ...brief,
@@ -1063,9 +1063,9 @@ function writeSpecsModule(caseName, specs) {
  * repair is a change to the method or to the prompt, committed; never a hand
  * edit of the fixture.
  *
- * `MODEL=<id>` overrides the pin in the bundle; `TEMPERATURE=<n>` overrides
- * the pin's temperature, for a model that fixes its own (gpt-5.5 must run at
- * 1); `SEED=1` generates a fresh seed per hero and `SEED=<string>` hands that
+ * `MODEL=<id>` overrides the pin of every stage in the bundle; `TEMPERATURE=<n>`
+ * overrides every pin's temperature, for a model that fixes its own (gpt-5.5
+ * must run at 1); `SEED=1` generates a fresh seed per hero and `SEED=<string>` hands that
  * one over, and the fixture records it. Every fixture records the model that
  * produced it, and a run with the same producer, model and seededness
  * REPLACES the earlier one; the other fixtures of the case are carried over.
@@ -1078,16 +1078,25 @@ async function generateSpecs(only) {
   const today = new Date().toISOString().slice(0, 10);
 
   let bundle = method;
-  // The method pins its model in the object form: `model = { model = "...", temperature = N, max_tokens = N }`.
-  const MODEL_PIN = /^(model\s*=\s*\{\s*model\s*=\s*)"([^"]+)"/m;
-  const pinned = MODEL_PIN.exec(bundle)?.[2];
-  if (!pinned) die(`${path.relative(REPO, DESIGNER_BUNDLE)} pins no model.`);
+  // Every stage of the method pins its model in the object form,
+  // `model = { model = "...", temperature = N, max_tokens = N }`, and they all
+  // pin the SAME model: a fixture records one, so an override moves every pin.
+  const MODEL_PIN = /^(model\s*=\s*\{\s*model\s*=\s*)"([^"]+)"/gm;
+  const pins = [...bundle.matchAll(MODEL_PIN)].map((match) => match[2]);
+  if (pins.length === 0) die(`${path.relative(REPO, DESIGNER_BUNDLE)} pins no model.`);
+  if (new Set(pins).size > 1) {
+    die(
+      `${path.relative(REPO, DESIGNER_BUNDLE)} pins different models (${pins.join(', ')}); a\n` +
+        `  fixture records ONE model, so every stage of the method pins the same one.`,
+    );
+  }
+  const pinned = pins[0];
   const model = process.env.MODEL || pinned;
   if (model !== pinned) bundle = bundle.replace(MODEL_PIN, `$1"${model}"`);
   if (process.env.TEMPERATURE) {
-    const TEMPERATURE_PIN = /(temperature\s*=\s*)([0-9.]+)/;
-    if (!TEMPERATURE_PIN.test(bundle)) die('the designer pins no temperature to override.');
-    bundle = bundle.replace(TEMPERATURE_PIN, `$1${process.env.TEMPERATURE}`);
+    if (!/temperature\s*=\s*[0-9.]+/.test(bundle))
+      die('the designer pins no temperature to override.');
+    bundle = bundle.replace(/(temperature\s*=\s*)([0-9.]+)/g, `$1${process.env.TEMPERATURE}`);
   }
   const seedSetting = process.env.SEED || '';
 

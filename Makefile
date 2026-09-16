@@ -79,7 +79,7 @@ briefs:
 # hosted API through `@pipelex/sdk` and validated against the catalog. Costs
 # inference budget and needs a Pipelex API key in PIPELEX_API_KEY (PIPELEX_BASE_URL
 # points it at another deployment), exactly as `fixtures-runs` does.
-# ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides the pin in
+# ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides every stage's pin in
 # data/generative/ui-designer.mthds for a comparative run; SEED=1 gives the run a
 # fresh creative seed, recorded on the fixture. A spec another producer wrote is
 # taken in the same way, with `--capture` - see scripts/generate-fixtures.mjs.
