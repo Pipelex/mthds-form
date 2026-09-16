@@ -775,7 +775,11 @@ function emitPayloads(entry, payloads) {
  * nothing else. It exists because a sweep is sequential and fatal on the first
  * failure: a run that hangs on the tenth pipe of a case would otherwise cost
  * the nine before it a second time, and a payload that came back odd can be
- * re-bought alone. The module has to exist already - a first capture is the
+ * re-bought alone. That only holds because the module is written after EVERY
+ * run rather than after the case: a failure exits the process, and a payload
+ * held in memory alone would be gone with it - which is exactly what an
+ * earlier version of this pass did, so the recovery it advertised had nothing
+ * to recover from. The module has to exist already - a first capture is the
  * whole case, so the module never carries a pipe the case does not run.
  */
 async function generatePayloads(cases, pipeCode) {
@@ -813,14 +817,16 @@ async function generatePayloads(cases, pipeCode) {
       const { payload, runId, cost } = await runPipe(api, entry, bundle, pipe);
       payloads[`${entry.domain}.${pipe.code}`] = payload;
       costs.push(cost);
+      // On disk as soon as it is paid for: the next pipe may die, and it
+      // takes the process with it. Formatted on the way out, like every other
+      // emitted module: the format gate reads these files and the emitter
+      // writes JSON, not prettier's TS.
+      writeFileSync(outPath, emitPayloads(entry, payloads));
+      execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
       process.stdout.write(
         `    ${pipe.code}${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
       );
     }
-    writeFileSync(outPath, emitPayloads(entry, payloads));
-    // Formatted on the way out, like every other emitted module: the format
-    // gate reads these files and the emitter writes JSON, not prettier's TS.
-    execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
     // A case total only when every run was priced: an unpriced run is not a
     // free one, and a sum that silently counted it as $0 would say it was.
     const spent = costs.every((cost) => typeof cost === 'number')
@@ -1186,17 +1192,19 @@ async function designPage(pipeRef, run) {
 }
 
 /**
- * What the run cost, in dollars, or `undefined` when nothing priced it.
+ * What the run cost, in dollars, or `undefined` when any of it went unpriced.
  *
  * A `null` cost on a record and a `0` are different facts - no rate table at
- * all, against a table that priced the call at zero - so a run whose records
- * are all unpriced reports no figure rather than a confident $0.0000.
+ * all, against a table that priced the call at zero - so a run with an
+ * unpriced record reports no figure rather than a confident sum of the rest:
+ * the designer is two calls, and a total that priced the planner alone would
+ * read as the run's. It is the rule the case total applies to its runs,
+ * applied one level down.
  */
 function runCost(results) {
-  const priced = (results.tokens_usages ?? [])
-    .map((record) => record.cost)
-    .filter((cost) => typeof cost === 'number');
-  return priced.length === 0 ? undefined : priced.reduce((total, cost) => total + cost, 0);
+  const costs = (results.tokens_usages ?? []).map((record) => record.cost);
+  if (costs.length === 0 || !costs.every((cost) => typeof cost === 'number')) return undefined;
+  return costs.reduce((total, cost) => total + cost, 0);
 }
 
 /**
