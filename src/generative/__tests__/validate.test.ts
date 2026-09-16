@@ -1,6 +1,9 @@
 import type { Spec } from '@json-render/core';
+import { defineCatalog } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
-import { formatProblems, validateAgainstCatalog } from '../validate';
+import { z } from 'zod';
+import { generativeSchema } from '../schema';
+import { formatProblems, validateAgainstCatalog, type ValidationCatalog } from '../validate';
 
 /**
  * The check a host runs on a layout before it renders it, beside `layoutFits`.
@@ -70,7 +73,7 @@ describe('the validator', () => {
     });
     expect(verdict.ok).toBe(false);
     const text = formatProblems(verdict.problems);
-    expect(text).toContain('[section] Heading jumps to h3 after h1');
+    expect(text).toContain('[section] h3 jumps after h1');
     expect(text).not.toContain('[sub]');
   });
 
@@ -87,7 +90,11 @@ describe('the validator', () => {
     const verdict = validateAgainstCatalog({
       root: 'h',
       elements: {
-        h: { type: 'Heading', props: { text: { $state: '/result/name' } }, children: [] },
+        h: {
+          type: 'Heading',
+          props: { text: { $state: '/result/name' }, level: 'h1' },
+          children: [],
+        },
       },
     });
     expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
@@ -149,7 +156,8 @@ describe('the actions a layout binds', () => {
     ({
       root: 'page',
       elements: {
-        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['cta'] },
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'cta'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
         cta: { type: 'Cta', props: { label: 'Plan my trip' }, children: [], on: { press } },
       },
     }) as unknown as Spec;
@@ -268,7 +276,8 @@ describe('a binding that sits off the event path', () => {
     ({
       root: 'page',
       elements: {
-        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['cta'] },
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'cta'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
         cta: { type: 'Cta', props: { label: 'Plan my trip' }, children: [], ...cta },
       },
     }) as unknown as Spec;
@@ -410,7 +419,8 @@ describe('the event a layout binds', () => {
     ({
       root: 'page',
       elements: {
-        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['el'] },
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'el'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
         el: { type, props, children: [], on: { [event]: [{ action: 'run' }] } },
       },
     }) as unknown as Spec;
@@ -462,11 +472,15 @@ describe('an expression where a name belongs', () => {
   });
 
   it('still accepts the literal names, and an expression where a value belongs', () => {
-    expect(validateAgainstCatalog(heading('h3')).ok).toBe(true);
+    expect(validateAgainstCatalog(heading('h1')).ok).toBe(true);
     const bound = validateAgainstCatalog({
       root: 'h',
       elements: {
-        h: { type: 'Heading', props: { text: { $state: '/result/name' } }, children: [] },
+        h: {
+          type: 'Heading',
+          props: { text: { $state: '/result/name' }, level: 'h1' },
+          children: [],
+        },
       },
     });
     expect(bound.ok, formatProblems(bound.problems)).toBe(true);
@@ -504,7 +518,10 @@ describe('a spec malformed in a way json-render itself throws on', () => {
  */
 describe('a layout nested deeper than the entry renders', () => {
   const chain = (length: number): Spec => {
-    const elements: Record<string, unknown> = {};
+    const elements: Record<string, unknown> = {
+      page: { type: 'Stack', props: {}, children: ['title', 'e0'] },
+      title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
+    };
     for (let index = 0; index < length; index += 1) {
       elements[`e${index}`] = {
         type: 'Text',
@@ -512,7 +529,7 @@ describe('a layout nested deeper than the entry renders', () => {
         children: index + 1 < length ? [`e${index + 1}`] : [],
       };
     }
-    return { root: 'e0', elements } as unknown as Spec;
+    return { root: 'page', elements } as unknown as Spec;
   };
 
   it('refuses it, and says so in the layout’s own terms', () => {
@@ -556,6 +573,94 @@ describe('a container with a fixed number of children', () => {
 });
 
 /**
+ * A `Heading` is not the only element that renders one. A Hero's headline is
+ * an h1, a Section's and a Rail's title an h2, a titled Card's an h3 - and the
+ * check used to count Heading elements alone, so a page with no h1 passed, as
+ * the slide designer's did, and a Hero over a titled Card was a jump from h1
+ * to h3 that nothing saw before the a11y gate. The product components count
+ * at the level their descriptions state, where they render.
+ */
+describe('the headings the product components render', () => {
+  const stack = (children: string[]) => ({ type: 'Stack', props: {}, children });
+
+  it('counts a Hero as the h1, and a Section and a Rail as h2s under it', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'work', 'rail']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        work: { type: 'Section', props: { title: 'Where' }, children: ['fine'] },
+        fine: { type: 'Heading', props: { text: 'Dates', level: 'h3' }, children: [] },
+        rail: { type: 'Rail', props: { title: 'Your trip' }, children: [] },
+      },
+    });
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('refuses a page with no h1', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['work']),
+        work: { type: 'Section', props: { title: 'Where' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('[page] the page has no h1');
+  });
+
+  it('refuses a second h1, whichever element renders it', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'title']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        title: { type: 'Heading', props: { text: 'Plan a trip', level: 'h1' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      "[title] a second h1 (h1, after Hero's h1 at [hero])",
+    );
+  });
+
+  it("refuses a titled Card straight under the h1, and accepts one under a Section's h2", () => {
+    const card = { type: 'Card', props: { title: 'Budget' }, children: [] };
+    const jumped = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'card']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        card,
+      },
+    });
+    expect(formatProblems(jumped.problems)).toContain("[card] Card's h3 jumps after Hero's h1");
+    const nested = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'work']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        work: { type: 'Section', props: { title: 'Money' }, children: ['card'] },
+        card,
+      },
+    });
+    expect(nested.ok, formatProblems(nested.problems)).toBe(true);
+  });
+
+  it('counts a Card as a heading only when it has a title', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'card']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        card: { type: 'Card', props: { description: 'No title' }, children: [] },
+      },
+    });
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+});
+
+/**
  * A choice with nothing in it is not one a person can make: a blank dropdown
  * row, a blank pill. The renderer under `Select` cannot even hold one - its
  * primitive throws on an empty value - so the fallback it carried wrote a
@@ -577,5 +682,93 @@ describe('a choice with an empty option', () => {
     });
     expect(verdict.ok).toBe(false);
     expect(formatProblems(verdict.problems)).toContain(`${type}.options`);
+  });
+});
+
+/**
+ * What a component renders is read off the catalog under validation, never
+ * off the component's name: a host may call something `Card` that renders no
+ * heading, and a vocabulary with neither a `Heading` nor a component that
+ * renders an h1 could never satisfy a demand for one.
+ */
+describe('a host catalog of its own', () => {
+  const host = defineCatalog(generativeSchema, {
+    components: {
+      Page: { props: z.object({}), slots: ['default'], description: 'A page.' },
+      PageTitle: {
+        props: z.object({ text: z.string() }),
+        slots: [],
+        description: 'The title; it renders as an h1.',
+      },
+      Card: {
+        props: z.object({ title: z.string().nullable() }),
+        slots: ['default'],
+        description: 'A box that renders no heading at all.',
+      },
+    },
+    actions: {},
+  });
+  const parts: Spec['elements'] = {
+    title: { type: 'PageTitle', props: { text: 'Plan a trip' }, children: [] },
+    card: { type: 'Card', props: { title: 'Budget' }, children: [] },
+  };
+  const spec = (children: string[]): Spec => ({
+    root: 'page',
+    elements: {
+      page: { type: 'Page', props: {}, children },
+      ...Object.fromEntries(children.map((child) => [child, parts[child]])),
+    },
+  });
+
+  it("is held to what its schemas say, and to nothing this entry's components render", () => {
+    // No h1 is asked for, since nothing in the vocabulary can render one; and
+    // a Card that shares a name with this entry's renders no h3.
+    const verdict = validateAgainstCatalog(spec(['card']), host);
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('is held to the renderings it declares', () => {
+    // Spelled out rather than spread: a `defineCatalog` result carries a
+    // `_specType` getter that throws when read.
+    const declaring: ValidationCatalog = {
+      componentNames: host.componentNames,
+      data: host.data,
+      renders: {
+        PageTitle: { heading: { level: 1 } },
+        Card: { heading: { level: 3, when: 'title' } },
+      },
+    };
+    const jumped = validateAgainstCatalog(spec(['title', 'card']), declaring);
+    expect(formatProblems(jumped.problems)).toContain(
+      "[card] Card's h3 jumps after PageTitle's h1",
+    );
+    const untitled = validateAgainstCatalog(spec(['card']), declaring);
+    expect(formatProblems(untitled.problems)).toContain(
+      '[page] the page has no h1: exactly one, as the heading a PageTitle renders.',
+    );
+  });
+});
+
+describe('a component a page has one of', () => {
+  it("refuses a second AppBar or Footer, which render the page's landmarks", () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['bar', 'hero', 'bar2', 'foot', 'foot2'] },
+        bar: { type: 'AppBar', props: { app: 'Trips' }, children: [] },
+        bar2: { type: 'AppBar', props: { app: 'Trips, again' }, children: [] },
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        foot: { type: 'Footer', props: { text: 'Runs on Pipelex.' }, children: [] },
+        foot2: { type: 'Footer', props: { text: 'Twice.' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    const text = formatProblems(verdict.problems);
+    expect(text).toContain(
+      "[bar2] a second AppBar (after [bar]): at most one on a page, since it renders as the page's banner.",
+    );
+    expect(text).toContain(
+      "[foot2] a second Footer (after [foot]): at most one on a page, since it renders as the page's contentinfo.",
+    );
   });
 });

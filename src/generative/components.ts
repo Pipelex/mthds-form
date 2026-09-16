@@ -23,11 +23,11 @@ import { shadcnComponentDefinitions } from './shadcn-definitions';
  * model invents is one the Storybook build never compiled, and a colour it
  * invents is one that ignores the theme.
  *
- * Zod only, importable from node with no DOM: `catalogPrompt()` renders these
- * definitions, and the prompt hash is computed over the result, so what is
- * written here is part of the pinned prompt. Erasable syntax only (no enums,
- * no namespaces, no parameter properties), because node strips the types
- * itself.
+ * Zod only, importable from node with no DOM: `designerCatalog()` renders
+ * these definitions into the data the designer method takes, and the prompt
+ * hash is computed over the result, so what is written here is part of the
+ * pinned prompt. Erasable syntax only (no enums, no namespaces, no parameter
+ * properties), because node strips the types itself.
  */
 
 const shadcn = shadcnComponentDefinitions;
@@ -157,6 +157,8 @@ const components = {
   Card: {
     ...shadcn.Card,
     props: shadcn.Card.props.omit({ className: true, maxWidth: true, centered: true }),
+    description:
+      'Container card for content sections. Use for forms/content boxes, NOT for page headers. Its optional "title" renders as an h3, so a titled Card sits under an h2.',
   },
   Stack: { ...shadcn.Stack, props: shadcn.Stack.props.omit({ className: true }) },
   Grid: { ...shadcn.Grid, props: shadcn.Grid.props.omit({ className: true }) },

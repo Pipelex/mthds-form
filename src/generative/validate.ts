@@ -23,9 +23,39 @@ import { hasOwnProp } from '../core/own-property';
  * catalog is a parameter, this entry's own by default, so a host that defines
  * a vocabulary of its own is validated by the same code and not by a copy of
  * it.
+ *
+ * What a component renders beyond its schema - the heading its title is, the
+ * landmark it renders as, the fixed number of children it lays out, the panel
+ * per entry of one of its props - is a fact about its renderer that no schema
+ * states, so the catalog carries it as `renders`, declared beside the
+ * definitions, and the validator reads it off the catalog it is handed rather
+ * than assuming it from a component's name, which a host's vocabulary may
+ * reuse for something that renders nothing of the kind. This entry's catalog
+ * declares its own; a host's declares what its renderers do, or nothing, and
+ * is then held only to what its schemas and its `Heading` elements say.
  */
 
-/** What the validator reads off a catalog: its names and its definitions. */
+/**
+ * What one component renders beyond what its props schema says, and what the
+ * validator holds a layout to on that account. Every member is optional: a
+ * component with none is held to its schema alone.
+ */
+export interface ComponentRendering {
+  /**
+   * The heading its renderer emits, at this level - a `Hero`'s headline is
+   * the h1 - and, when it emits one only if a prop is set, the prop: a `Card`
+   * renders its `title` as an h3 and nothing when it has none.
+   */
+  heading?: { level: 1 | 2 | 3 | 4; when?: string };
+  /** What it renders as that a page has one of - a landmark, in the words a refusal uses: "the page's banner". */
+  once?: string;
+  /** The number of children its renderer lays out, dropping the rest in silence, and what they are. */
+  children?: { count: number; roles: string };
+  /** A panelled container: the prop that lists its panels, one child per entry, and what one is called. */
+  panels?: { prop: string; noun: string };
+}
+
+/** What the validator reads off a catalog: its names, its definitions, and what its components render. */
 export interface ValidationCatalog {
   componentNames: readonly string[];
   /** The catalog's own action names. A `defineCatalog` result carries this already. */
@@ -33,6 +63,8 @@ export interface ValidationCatalog {
   data: unknown;
   /** The schema the catalog was defined against, for the actions its runtime handles without a handler. */
   schema?: { builtInActions?: readonly { name: string }[] };
+  /** What each component renders beyond its schema, by component name. Absent, no component renders a heading, a landmark or a fixed set of children. */
+  renders?: Readonly<Record<string, ComponentRendering>>;
 }
 
 export interface SpecProblem {
@@ -337,82 +369,141 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
     }
   }
 
+  // What each component renders beyond its schema, read off the catalog under
+  // validation. `hasOwnProp`, because the type is model-written and a
+  // prototype key would find a function where a rendering belongs.
+  const renders = catalog.renders ?? {};
+  const renderingOf = (type: string): ComponentRendering | undefined =>
+    hasOwnProp(renders, type) ? renders[type] : undefined;
+
   // 4. A panelled container has one child per panel, in order. The renderer
   //    would silently show fewer panels than tabs, or a step with nothing in
   //    it; the validator says so instead.
   for (const [key, element] of Object.entries(spec.elements)) {
+    const panelled = renderingOf(element.type)?.panels;
+    if (!panelled) continue;
     const props = (element.props ?? {}) as Record<string, unknown>;
-    const panels =
-      element.type === 'Tabs'
-        ? (props.tabs as unknown[] | undefined)?.length
-        : element.type === 'Steps'
-          ? (props.steps as unknown[] | undefined)?.length
-          : undefined;
-    if (panels === undefined) continue;
+    const listed = props[panelled.prop];
+    if (!Array.isArray(listed)) continue;
+    const panels = listed.length;
     const children = element.children?.length ?? 0;
     if (children !== panels) {
       problems.push({
         elementKey: key,
-        message: `${element.type} declares ${panels} panel${panels === 1 ? '' : 's'} but has ${children} child${children === 1 ? '' : 'ren'}: exactly one child per ${element.type === 'Tabs' ? 'tab' : 'step'}, in order.`,
+        message: `${element.type} declares ${panels} panel${panels === 1 ? '' : 's'} but has ${children} child${children === 1 ? '' : 'ren'}: exactly one child per ${panelled.noun}, in order.`,
       });
     }
-    if (element.type === 'Steps' || element.type === 'Tabs') {
-      const runs = (element.children ?? []).filter(
-        (child) => spec.elements[child]?.type === 'Button',
-      );
-      if (runs.length > 0) {
-        problems.push({
-          elementKey: key,
-          message: `${element.type} has a Button as a direct child; a panel is a container (a Stack), and the Button belongs inside the last one.`,
-        });
-      }
+    const runs = (element.children ?? []).filter(
+      (child) => spec.elements[child]?.type === 'Button',
+    );
+    if (runs.length > 0) {
+      problems.push({
+        elementKey: key,
+        message: `${element.type} has a Button as a direct child; a panel is a container (a Stack), and the Button belongs inside the last one.`,
+      });
     }
   }
-  // 5. Heading levels increase by one, in render order. The Storybook a11y
-  //    gate runs axe's `heading-order` at error, and a page that jumps from
-  //    h1 to h3 fails it; saying so here makes it a rejected spec with a
-  //    re-run rather than a failing story with a fixture nobody may edit.
-  const levels: { key: string; level: number }[] = [];
+  // 5. Exactly one h1, and heading levels that increase by one, in render
+  //    order. The Storybook a11y gate runs axe's `heading-order` at error, and
+  //    a page that jumps from h1 to h3 fails it; saying so here makes it a
+  //    rejected spec with a re-run rather than a failing story with a fixture
+  //    nobody may edit. A `Heading` is not the only element that renders one:
+  //    a component renders its title as a heading too, at the level its
+  //    rendering declares - which is what its description states to the
+  //    model - and the walk counts it where it renders, before its children,
+  //    since a title comes first. Counting `Heading` elements alone let a page
+  //    with no h1 through, and one with a Hero over a Section over a titled
+  //    Card was three headings the check never saw.
+  // A Card renders its title as a heading only when it has one; a bound title
+  // counts, since it renders whenever the value is set.
+  const present = (value: unknown) => value !== undefined && value !== null && value !== '';
+  const levels: { key: string; type: string; level: number }[] = [];
+  // The elements of each component a page has at most one of, in render order.
+  const onlyOnce = new Map<string, { reason: string; keys: string[] }>();
   const seen = new Set<string>();
   const walk = (key: string) => {
     if (seen.has(key)) return;
     seen.add(key);
     const element = spec.elements[key];
     if (!element) return;
+    const props = (element.props ?? {}) as Record<string, unknown>;
+    const rendering = renderingOf(element.type);
     if (element.type === 'Heading') {
-      const level = String((element.props as { level?: unknown }).level ?? 'h2');
+      const level = String(props.level ?? 'h2');
       const match = /^h([1-4])$/.exec(level);
-      if (match) levels.push({ key, level: Number(match[1]) });
+      if (match) levels.push({ key, type: 'Heading', level: Number(match[1]) });
+    } else if (rendering?.heading) {
+      const rendered = rendering.heading;
+      const has = rendered.when === undefined || present(props[rendered.when]);
+      if (has) levels.push({ key, type: element.type, level: rendered.level });
+    }
+    if (rendering?.once !== undefined) {
+      const entry = onlyOnce.get(element.type) ?? { reason: rendering.once, keys: [] };
+      entry.keys.push(key);
+      onlyOnce.set(element.type, entry);
     }
     for (const child of element.children ?? []) walk(child);
     for (const slot of Object.values(element.slots ?? {})) for (const child of slot) walk(child);
   };
   if (spec.root) walk(spec.root);
-  // The first heading sets the page's level, as axe reads it; every one after
-  // it may go deeper by one at most.
-  let previous: number | undefined;
+  const describe = (heading: { type: string; level: number }) =>
+    heading.type === 'Heading' ? `h${heading.level}` : `${heading.type}'s h${heading.level}`;
+  // Every heading after the first may go deeper than the one before it by
+  // one at most, as axe reads it.
+  let previous: { type: string; level: number } | undefined;
   for (const heading of levels) {
-    if (previous !== undefined && heading.level > previous + 1) {
+    if (previous !== undefined && heading.level > previous.level + 1) {
       problems.push({
         elementKey: heading.key,
-        message: `Heading jumps to h${heading.level} after h${previous}: levels increase by one, never by more.`,
+        message: `${describe(heading)} jumps after ${describe(previous)}: heading levels increase by one, never by more.`,
       });
     }
-    previous = heading.level;
+    previous = heading;
+  }
+  // One h1, which is the page's title: a page without one has no name for a
+  // screen reader to announce, and a page with two has two. A page is asked
+  // for one only where its catalog can express one - a `Heading` at level
+  // h1, or a component whose rendering declares one - since a vocabulary
+  // with neither could never satisfy the rule.
+  const firsts = levels.filter((heading) => heading.level === 1);
+  const h1Ways = [
+    ...(known.has('Heading') ? ['as a Heading at level h1'] : []),
+    ...Object.entries(renders)
+      .filter(([, rendering]) => rendering.heading?.level === 1)
+      .map(([type]) => `as the heading a ${type} renders`),
+  ];
+  if (firsts.length === 0 && spec.root && h1Ways.length > 0) {
+    problems.push({
+      elementKey: spec.root,
+      message: `the page has no h1: exactly one, ${h1Ways.join(' or ')}.`,
+    });
+  }
+  for (const extra of firsts.slice(1)) {
+    problems.push({
+      elementKey: extra.key,
+      message: `a second h1 (${describe(extra)}, after ${describe(firsts[0]!)} at [${firsts[0]!.key}]): exactly one on a page.`,
+    });
+  }
+  // A component that renders as one of the page's landmarks - its banner, its
+  // contentinfo - is one a page has at most one of. axe says so of the DOM
+  // (`landmark-no-duplicate-banner`), but the stories switch that rule off
+  // because their pair view renders every page twice, so this is the one
+  // place a second bar or footer is refused.
+  for (const [type, { reason, keys }] of onlyOnce) {
+    for (const extra of keys.slice(1)) {
+      problems.push({
+        elementKey: extra,
+        message: `a second ${type} (after [${keys[0]}]): at most one on a page, since it renders as ${reason}.`,
+      });
+    }
   }
 
   // 6. A container that takes a fixed number of children, and would drop the
   //    rest in silence: its renderer destructures the ones it lays out and
   //    paints nothing for a third. The product rules state the count for a
-  //    Workspace, and this is where a layout is held to it. `hasOwnProp`,
-  //    because the type is model-written and a prototype key would find a
-  //    function.
-  const CHILD_COUNTS: Record<string, { count: number; roles: string }> = {
-    Split: { count: 2, roles: 'left, right' },
-    Workspace: { count: 2, roles: 'work, rail' },
-  };
+  //    Workspace, and this is where a layout is held to it.
   for (const [key, element] of Object.entries(spec.elements)) {
-    const rule = hasOwnProp(CHILD_COUNTS, element.type) ? CHILD_COUNTS[element.type] : undefined;
+    const rule = renderingOf(element.type)?.children;
     if (!rule) continue;
     const children = element.children?.length ?? 0;
     if (children !== rule.count) {

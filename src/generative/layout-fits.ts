@@ -1,5 +1,7 @@
 import type { Spec } from '@json-render/core';
-import type { RunField } from '../core';
+import type { RunField, RunFieldKind } from '../core';
+import { hasOwnProp } from '../core/own-property';
+import { catalog } from './catalog';
 import {
   INPUTS_ROOT,
   RESULT_ROOT,
@@ -40,6 +42,17 @@ import {
  * (`children: 5`, a null element, no `elements` map at all), and the other
  * gate, which refuses those shapes outright, is exported separately - so
  * neither may assume the other ran first.
+ *
+ * A third check sits between the two and is about KIND rather than presence:
+ * a path a layout shows as a value must be a scalar, and a path it reads into
+ * a prop that takes a list must be a list. A `SummaryRow` whose `value` reads
+ * `/inputs/document`, a structure of a url and a filename, is not stale - the
+ * path exists - and it validates perfectly; it renders `[object Object]`,
+ * because the renderer stringifies what it is handed and nothing anywhere said
+ * the path was not a value. An `AppBar` whose `links` read that same structure
+ * is the mirror image: its renderer maps over what it is handed, renders
+ * nothing for a structure and throws for a text. Only the descriptor knows
+ * what kind a path is, so this is where that is said.
  *
  * What is NOT checked here is whether the layout validates against the catalog
  * - that is `validateAgainstCatalog`, and a host runs both.
@@ -98,23 +111,59 @@ interface Mentioned {
   adrift: string[];
 }
 
+/**
+ * The absolute path an item-relative field of one element resolves to, or
+ * nothing outside any repeat. Resolved lazily: most elements sit in no repeat
+ * and mention no item.
+ */
+function itemPathResolver(
+  spec: Spec,
+  key: string,
+  parents: Map<string, string>,
+): (field: string) => string | undefined {
+  let base: string | undefined;
+  let resolvedBase = false;
+  return (field) => {
+    if (!resolvedBase) {
+      base = repeatBasePathOf(spec, key, parents);
+      resolvedBase = true;
+    }
+    if (base === undefined) return undefined;
+    // The runtime joins the field under the item's own path, and reads
+    // `""` (or `"/"`) as the item itself.
+    const under = field.startsWith('/') ? field.slice(1) : field;
+    return under === '' ? base : `${base}/${under}`;
+  };
+}
+
+/**
+ * The paths a template interpolates, resolved the way json-render resolves
+ * them: `${/result/amount}` is absolute and read as written; a bare
+ * `${amount}` is read off the item of the nearest repeat above the element,
+ * and outside any repeat off the root of the state, as `/amount`. Inside a
+ * repeat the runtime falls back to the root when the item has no such member,
+ * but a layout that writes `${name}` in a repeat means the item's `name`, so
+ * it is read as one here and a member the item has lost is stale rather than
+ * quietly a root path. The pattern is json-render's own - one or more
+ * characters - so an empty `${}` is the literal text it renders as, not an
+ * interpolation of nothing.
+ */
+function interpolatedPaths(
+  template: string,
+  itemPath: (field: string) => string | undefined,
+): string[] {
+  return [...template.matchAll(/\$\{([^}]+)\}/g)].flatMap((match) => {
+    const raw = match[1];
+    if (raw === undefined) return [];
+    if (raw.startsWith('/')) return [raw];
+    return [itemPath(raw) ?? `/${raw}`];
+  });
+}
+
 function mentionedPaths(spec: Spec, parents: Map<string, string>): Mentioned {
   const found: Mentioned = { bound: [], read: [], adrift: [] };
   for (const [key, element] of Object.entries(spec.elements)) {
-    // Resolved lazily: most elements sit in no repeat and mention no item.
-    let base: string | undefined;
-    let resolvedBase = false;
-    const itemPath = (field: string): string | undefined => {
-      if (!resolvedBase) {
-        base = repeatBasePathOf(spec, key, parents);
-        resolvedBase = true;
-      }
-      if (base === undefined) return undefined;
-      // The runtime joins the field under the item's own path, and reads
-      // `""` (or `"/"`) as the item itself.
-      const under = field.startsWith('/') ? field.slice(1) : field;
-      return under === '' ? base : `${base}/${under}`;
-    };
+    const itemPath = itemPathResolver(spec, key, parents);
     const walk = (value: unknown): void => {
       if (Array.isArray(value)) {
         value.forEach(walk);
@@ -125,9 +174,7 @@ function mentionedPaths(spec: Spec, parents: Map<string, string>): Mentioned {
       if (typeof record.$bindState === 'string') found.bound.push(record.$bindState);
       if (typeof record.$state === 'string') found.read.push(record.$state);
       if (typeof record.$template === 'string') {
-        for (const match of record.$template.matchAll(/\$\{([^}]*)\}/g)) {
-          if (match[1] !== undefined) found.read.push(match[1]);
-        }
+        found.read.push(...interpolatedPaths(record.$template, itemPath));
       }
       if (typeof record.$bindItem === 'string') {
         const path = itemPath(record.$bindItem);
@@ -192,6 +239,188 @@ function staleRepeats(
     if (listPath === undefined || !isUnder(root, listPath)) continue;
     if (!resolves(listPath)) {
       problems.push(`${key}: repeats over ${listPath}, which no ${side} has`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * What a path of each kind is, in the words of the refusal, for the kinds a
+ * value cannot be. A scalar - text, prose, a date, a number, a boolean, a
+ * choice - is left out, and so is `unknown`, which the descriptor cannot
+ * speak for.
+ */
+const NOT_A_VALUE: Partial<Record<RunFieldKind, { what: string; instead: string }>> = {
+  object: { what: 'a structure', instead: 'a structure is shown through its members' },
+  list: { what: 'a list', instead: 'a list is laid out as a repeat or a DataTable' },
+  document: { what: 'a file', instead: "a file is delegated to the kernel's own control" },
+  image: { what: 'a file', instead: "a file is delegated to the kernel's own control" },
+};
+
+/**
+ * What the items of a list-taking prop may be: values alone, for a prop
+ * declared as an array of strings or numbers (an `AppBar`'s links), or
+ * anything, for one declared over structures or left open (a `DataTable`'s
+ * rows). What a list of the wrong item kind is, in the words of the refusal,
+ * is `NOT_VALUES`: a `Steps` handed a list of structures for its step names
+ * renders `[object Object]` per step, and a renderer that maps a structure
+ * into a React child throws.
+ */
+type ListItems = 'values' | 'anything';
+const NOT_VALUES: Partial<Record<RunFieldKind, string>> = {
+  object: 'structures',
+  list: 'lists',
+  document: 'files',
+  image: 'files',
+};
+
+/**
+ * The props that take a list rather than a value, by component, and what their
+ * items may be: every prop the catalog declares as an array, read from the
+ * schemas so a new one is never a missing entry here, plus the rows a
+ * `DataTable` lays out, declared `any` because their shape is the
+ * descriptor's. A `$state` read into one of these must be the list it wants;
+ * into any other prop it is shown as a value.
+ */
+let listPropsCache: Map<string, Map<string, ListItems>> | undefined;
+function listProps(): Map<string, Map<string, ListItems>> {
+  if (listPropsCache) return listPropsCache;
+  const found = new Map<string, Map<string, ListItems>>([
+    ['DataTable', new Map([['rows', 'anything']])],
+  ]);
+  const components = catalog.data.components as Record<string, { props?: unknown }>;
+  for (const [type, definition] of Object.entries(components)) {
+    const shape = (definition.props as { shape?: Record<string, unknown> } | undefined)?.shape;
+    for (const [prop, schema] of Object.entries(shape ?? {})) {
+      const items = listItemsOf(schema);
+      if (items === undefined) continue;
+      if (!found.has(type)) found.set(type, new Map());
+      found.get(type)!.set(prop, items);
+    }
+  }
+  listPropsCache = found;
+  return found;
+}
+
+/** The zod schemas whose values a list-taking prop can render as they are. */
+const VALUE_SCHEMAS = new Set(['string', 'number', 'boolean', 'enum', 'literal']);
+
+/** A zod definition, under the `.nullable()` / `.optional()` / `.default()` most props carry. */
+function unwrapped(schema: unknown): { type?: string; element?: unknown } | undefined {
+  let current: unknown = schema;
+  for (let depth = 0; depth < 8; depth += 1) {
+    const def = (current as { def?: { type?: string; innerType?: unknown; element?: unknown } })
+      .def;
+    if (!def) return undefined;
+    if (def.innerType === undefined) return def;
+    current = def.innerType;
+  }
+  return undefined;
+}
+
+/** What a prop declared as an array takes as its items, or nothing for a prop that is not one. */
+function listItemsOf(schema: unknown): ListItems | undefined {
+  const def = unwrapped(schema);
+  if (def?.type !== 'array') return undefined;
+  const element = unwrapped(def.element);
+  return element?.type !== undefined && VALUE_SCHEMAS.has(element.type) ? 'values' : 'anything';
+}
+
+/**
+ * The reads that show a path of the wrong kind as a value, or read one of the
+ * wrong kind into a prop that takes a list.
+ *
+ * A read sits in one of two places. In a CONDITION - the object under a
+ * `$cond`, or the element's own `visible` - it asks whether a value is set,
+ * and any path may be asked; the `visible` field is not walked here at all.
+ * Anywhere else in a prop it is shown: the renderer receives what the path
+ * holds and stringifies it, and for a structure, a list or a file that is
+ * `[object Object]`, a comma-joined list or a url where a name belongs. Every
+ * form that shows a value is held to it - `$state`, the item-relative `$item`
+ * resolved through the repeat above it, and every interpolation of a
+ * `$template`, which stringifies what it interpolates, resolved the same way.
+ *
+ * A prop that takes a list is held the other way round. Written as one
+ * expression, it reads a whole list, and the path must be one: a renderer
+ * maps over what it is handed, so a structure or a file there renders nothing
+ * and a text throws, and a list of structures where the prop takes values is
+ * `[object Object]` per item or a throw, both past every gate. Written as an
+ * array literal, each entry is a value and is walked as one. A path the
+ * descriptor does not have is not repeated here: the staleness check names it.
+ */
+function nonScalarReads(
+  spec: Spec,
+  parents: Map<string, string>,
+  root: string,
+  fieldAt: (path: string) => RunField | undefined,
+): string[] {
+  const problems: string[] = [];
+  const lists = listProps();
+  for (const [key, element] of Object.entries(spec.elements)) {
+    const itemPath = itemPathResolver(spec, key, parents);
+    const listy = lists.get(element.type);
+    const check = (prop: string, path: string): void => {
+      if (!isUnder(root, path)) return;
+      const field = fieldAt(path);
+      if (!field) return;
+      const wrong = hasOwnProp(NOT_A_VALUE, field.kind) ? NOT_A_VALUE[field.kind] : undefined;
+      if (!wrong) return;
+      problems.push(
+        `${key}: ${prop} shows ${path}, which is ${wrong.what} and not a value; a prop that shows a value takes a scalar path, and ${wrong.instead}`,
+      );
+    };
+    const checkList = (prop: string, path: string, items: ListItems): void => {
+      if (!isUnder(root, path)) return;
+      const field = fieldAt(path);
+      if (!field || field.kind === 'unknown') return;
+      if (field.kind !== 'list') {
+        const what = hasOwnProp(NOT_A_VALUE, field.kind)
+          ? NOT_A_VALUE[field.kind]!.what
+          : 'a value';
+        problems.push(
+          `${key}: ${prop} takes a list, and ${path} is ${what}; a prop that takes a list reads a list path`,
+        );
+        return;
+      }
+      if (items !== 'values') return;
+      const of = hasOwnProp(NOT_VALUES, field.item.kind) ? NOT_VALUES[field.item.kind] : undefined;
+      if (!of) return;
+      problems.push(
+        `${key}: ${prop} takes a list of values, and ${path} is a list of ${of}; a list of ${of} is laid out as a repeat or a DataTable`,
+      );
+    };
+    const walk = (prop: string, value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach((entry) => walk(prop, entry));
+        return;
+      }
+      if (typeof value !== 'object' || value === null) return;
+      const record = value as Record<string, unknown>;
+      if (typeof record.$state === 'string') check(prop, record.$state);
+      if (typeof record.$item === 'string') {
+        const path = itemPath(record.$item);
+        if (path !== undefined) check(prop, path);
+      }
+      if (typeof record.$template === 'string') {
+        for (const path of interpolatedPaths(record.$template, itemPath)) check(prop, path);
+      }
+      for (const [name, entry] of Object.entries(record)) {
+        if (name !== '$cond') walk(prop, entry);
+      }
+    };
+    for (const [prop, value] of Object.entries(element.props ?? {})) {
+      const items = listy?.get(prop);
+      if (items === undefined || Array.isArray(value)) {
+        walk(prop, value);
+        continue;
+      }
+      if (typeof value !== 'object' || value === null) continue;
+      const record = value as Record<string, unknown>;
+      if (typeof record.$state === 'string') checkList(prop, record.$state, items);
+      if (typeof record.$item === 'string') {
+        const path = itemPath(record.$item);
+        if (path !== undefined) checkList(prop, path, items);
+      }
     }
   }
   return problems;
@@ -326,21 +555,25 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
 
   if (!descriptor.inputs) {
     const result = descriptor.result;
-    const resolves = (path: string): boolean =>
-      result ? resultFieldAtPath(result, path) !== undefined : false;
+    const fieldAt = (path: string): RunField | undefined =>
+      result ? resultFieldAtPath(result, path) : undefined;
+    const resolves = (path: string): boolean => fieldAt(path) !== undefined;
     problems.push(...staleRepeats(spec, parents, RESULT_ROOT, resolves, 'result'));
     for (const path of staleReads(read, RESULT_ROOT, resolves)) {
       problems.push(`${path} is read, and no result has it`);
     }
+    problems.push(...nonScalarReads(spec, parents, RESULT_ROOT, fieldAt));
     return problems;
   }
 
   const inputs = descriptor.inputs;
-  const resolves = (path: string): boolean => inputFieldAtPath(inputs, path) !== undefined;
+  const fieldAt = (path: string): RunField | undefined => inputFieldAtPath(inputs, path);
+  const resolves = (path: string): boolean => fieldAt(path) !== undefined;
   problems.push(...staleRepeats(spec, parents, INPUTS_ROOT, resolves, 'input'));
   for (const path of staleReads(read, INPUTS_ROOT, resolves)) {
     problems.push(`${path} is read, and no input has it`);
   }
+  problems.push(...nonScalarReads(spec, parents, INPUTS_ROOT, fieldAt));
 
   const offered: Offered = {
     bound: new Set(bound),

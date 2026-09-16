@@ -6,8 +6,8 @@ import './brands/pipelex.css';
  * The brands a generative story can paint a page in - STORY fixtures, not
  * package data.
  *
- * A product page needs a brand whatever else is true: its app bar reads a
- * logo pair and a name off the manifest, and nothing on the page names a
+ * A page with an app bar needs a brand whatever else is true: the bar reads
+ * a logo pair and a name off the manifest, and nothing on the page names a
  * brand itself. So a story has to bring one, and the two here are the ones
  * the captured layouts were actually looked at under.
  *

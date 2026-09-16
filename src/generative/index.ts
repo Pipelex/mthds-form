@@ -11,19 +11,25 @@
  * The public API is this file. Deep paths are not exported and not stable.
  */
 
-// The catalog a layout is written against, and the prompt that asks for one.
+// The catalog a layout is written against, and the same catalog as the data
+// the designer method takes. The prompt itself is the method, shipped as
+// `@pipelex/mthds-form/ui-designer.mthds`; nothing here renders it.
 export {
   COMPONENT_NAMES,
+  COMPONENT_RENDERINGS,
   PRODUCT_COMPONENTS,
   catalog,
-  catalogPrompt,
   type GenerativeSpec,
   type ProductComponentName,
 } from './catalog';
 export { CUSTOM_COMPONENTS, ICON_NAMES, METRIC_FORMATS, PICKED_SHADCN } from './components';
-export { CUSTOM_RULES, RUN_BUTTON_RULE } from './rules';
-export { PRODUCT_PAGE_RULES, PRODUCT_RULES, RUN_CTA_RULE } from './product-rules';
-export { APP_DIRECTION, SEED_PROCEDURE } from './direction';
+export {
+  DESIGNER_CATALOG_CONCEPT,
+  designerCatalog,
+  type DesignerAction,
+  type DesignerCatalog,
+  type DesignerComponent,
+} from './designer-catalog';
 export { PROMPT_HASH } from './prompt-hash';
 
 // The brief a model is handed, rendered from the descriptor and nothing else.
@@ -39,6 +45,7 @@ export {
 export {
   formatProblems,
   validateAgainstCatalog,
+  type ComponentRendering,
   type SpecProblem,
   type SpecVerdict,
   type ValidationCatalog,

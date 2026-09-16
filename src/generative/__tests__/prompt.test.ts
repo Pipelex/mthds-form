@@ -1,121 +1,242 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { defineCatalog, defineSchema } from '@json-render/core';
+import type { z } from 'zod';
 import { describe, expect, it } from 'vitest';
-import { PRODUCT_COMPONENTS, catalog, catalogPrompt } from '../catalog';
+import { PRODUCT_COMPONENTS, catalog } from '../catalog';
 import { CUSTOM_COMPONENTS, PICKED_SHADCN } from '../components';
-import { APP_DIRECTION, SEED_PROCEDURE } from '../direction';
-import { PRODUCT_PAGE_RULES, PRODUCT_RULES, RUN_CTA_RULE } from '../product-rules';
-import { PROMPT_HASH } from '../prompt-hash';
-import { CUSTOM_RULES, RUN_BUTTON_RULE } from '../rules';
+import { designerCatalog } from '../designer-catalog';
+import { PROMPT_HASH, promptHashSubject } from '../prompt-hash';
+import { propsSignature } from '../props-signature';
 
 /**
- * The pair at the centre of the layer: the PROMPT a model is handed, and the
- * METHOD that hands it over.
+ * The pair at the centre of the layer: the METHOD a model runs as, and the
+ * CATALOG it is handed as data - together, the prompt.
  *
- * A stored layout records the hash of the prompt it was produced against, and a
- * host compares that hash with the package's before it renders. So the hash has
- * to be a fact about the shipped prompt rather than a constant somebody typed:
+ * A stored layout records the hash of the prompt it was produced against, and
+ * a host compares that hash with the package's before it renders. So the hash
+ * has to be a fact about what ships rather than a constant somebody typed:
  * `prompt-hash.ts` is a pin, because the entry has to stay importable from a
  * browser and hashing there is either `node:crypto` or an async call, and this
- * is the test that keeps the pin honest. A change anywhere the prompt is
- * rendered from - a component description, a rule, the design direction, the
+ * is the test that keeps the pin honest. A change anywhere the prompt is made
+ * from - a paragraph of the method, a component description, a prop, the
  * vendored shadcn definitions - fails here, which is the point: it means every
  * captured layout was produced against a prompt that no longer exists.
  */
 
-/** What a host computes over a prompt: the first twelve hex digits of its SHA-256. */
-function promptHashOf(prompt: string): string {
-  return createHash('sha256').update(prompt, 'utf8').digest('hex').slice(0, 12);
+const METHOD = readFileSync(
+  new URL('../../../data/generative/ui-designer.mthds', import.meta.url),
+  'utf8',
+);
+
+/** What a host computes: the first twelve hex digits of the subject's SHA-256. */
+function promptHashOf(subject: string): string {
+  return createHash('sha256').update(subject, 'utf8').digest('hex').slice(0, 12);
 }
 
-describe('the catalog prompt', () => {
-  const prompt = catalogPrompt();
-  const components = catalog.data.components as Record<
+describe('the catalog as the designer method receives it', () => {
+  const data = designerCatalog();
+  const definitions = catalog.data.components as Record<
     string,
     { description: string; props: { shape: object } }
   >;
 
-  it('hashes to the pin every stored layout is compared against', () => {
-    expect(promptHashOf(prompt)).toBe(PROMPT_HASH);
+  it('hashes, with the method, to the pin every stored layout is compared against', () => {
+    expect(promptHashOf(promptHashSubject(METHOD, data))).toBe(PROMPT_HASH);
   });
 
-  it('lists every component of the catalog, and describes the ones we wrote', () => {
-    for (const name of PICKED_SHADCN) expect(prompt).toContain(`- ${name}:`);
+  it('lists every component of the catalog, in the order the vocabulary states', () => {
+    expect(data.components.map((component) => component.name)).toEqual([
+      ...PICKED_SHADCN,
+      ...CUSTOM_COMPONENTS,
+      ...PRODUCT_COMPONENTS,
+    ]);
+  });
+
+  it('describes the ones we wrote, with the text of their definitions', () => {
     for (const name of [...CUSTOM_COMPONENTS, ...PRODUCT_COMPONENTS]) {
-      expect(prompt).toContain(`- ${name}:`);
-      expect(prompt).toContain(components[name]!.description);
+      const component = data.components.find((candidate) => candidate.name === name);
+      expect(component?.description, name).toBe(definitions[name]!.description);
     }
   });
 
   it('strips className from every picked definition', () => {
     for (const name of PICKED_SHADCN) {
-      expect(Object.keys(components[name]!.props.shape), name).not.toContain('className');
+      expect(Object.keys(definitions[name]!.props.shape), name).not.toContain('className');
+    }
+    for (const component of data.components) {
+      expect(component.props, component.name).not.toContain('className');
     }
   });
 
-  it('carries our rules, in the order they are written', () => {
-    let cursor = -1;
-    for (const rule of PRODUCT_RULES) {
-      const at = prompt.indexOf(rule);
-      expect(at, rule).toBeGreaterThan(cursor);
-      cursor = at;
+  it("lists the four built-in actions first, then the catalog's own", () => {
+    expect(data.actions.map((action) => [action.name, action.built_in])).toEqual([
+      ['setState', true],
+      ['pushState', true],
+      ['removeState', true],
+      ['validateForm', true],
+      ['run', false],
+    ]);
+  });
+
+  it('says which components accept children, and which emit events, from their definitions', () => {
+    const byName = Object.fromEntries(
+      data.components.map((component) => [component.name, component]),
+    );
+    expect(byName.Stack!.accepts_children).toBe(true);
+    expect(byName.Metric!.accepts_children).toBe(false);
+    expect(byName.Cta!.events).toEqual(['press']);
+    expect(byName.Footer!.events).toEqual([]);
+  });
+});
+
+describe('the props signature', () => {
+  /**
+   * json-render keeps its zod formatter inside the prompt context it hands a
+   * template, so the one way to read it is to be that template: a schema over
+   * the same catalog shape whose template captures the formatter and renders
+   * nothing.
+   */
+  let jsonRenderFormat: ((schema: z.ZodType) => string) | undefined;
+  const probe = defineSchema(
+    (s) => ({
+      spec: s.object({ root: s.string() }),
+      catalog: s.object({
+        components: s.map({
+          props: s.zod(),
+          slots: s.array(s.string()),
+          description: s.string(),
+          example: s.any(),
+        }),
+        actions: s.map({ params: s.zod(), description: s.string() }),
+      }),
+    }),
+    {
+      promptTemplate: (context) => {
+        jsonRenderFormat = context.formatZodType;
+        return '';
+      },
+    },
+  );
+  defineCatalog(probe, { components: catalog.data.components as never, actions: {} }).prompt();
+
+  it("renders every component's props exactly as json-render's own prompt would", () => {
+    expect(jsonRenderFormat).toBeDefined();
+    const definitions = catalog.data.components as Record<string, { props: z.ZodType }>;
+    for (const [name, definition] of Object.entries(definitions)) {
+      expect(propsSignature(definition.props), name).toBe(jsonRenderFormat!(definition.props));
     }
-    for (const rule of PRODUCT_PAGE_RULES) expect(PRODUCT_RULES).toContain(rule);
-  });
-
-  /**
-   * The product page runs from a `Cta`, not from a bare `Button`, so the rule
-   * that names the run is restated - and restated IN PLACE, at the index the
-   * button rule holds in the vocabulary underneath, because a rule that moves
-   * changes what the model reads before it.
-   */
-  it('restates the run rule for the Cta, in the place the Button rule holds', () => {
-    expect(prompt).not.toContain(RUN_BUTTON_RULE);
-    expect(PRODUCT_RULES.indexOf(RUN_CTA_RULE)).toBe(CUSTOM_RULES.indexOf(RUN_BUTTON_RULE));
-  });
-
-  it('carries the design direction and the seed procedure, so the hash covers both', () => {
-    expect(prompt).toContain('DESIGN DIRECTION:');
-    for (const paragraph of APP_DIRECTION) expect(prompt).toContain(paragraph);
-    expect(prompt).toContain('CREATIVE SEED:');
-    for (const paragraph of SEED_PROCEDURE) expect(prompt).toContain(paragraph);
-    expect(prompt).toContain('never as a form');
-  });
-
-  /**
-   * The prompt asks for a LAYOUT, never for content: a model that invents
-   * sample data writes a page that looks right and shows figures the run never
-   * produced.
-   */
-  it('never asks for sample data', () => {
-    expect(prompt.toLowerCase()).not.toContain('sample data');
-    expect(prompt).not.toContain('INITIAL STATE');
   });
 });
 
 describe('the designer method, as package data', () => {
-  const bundle = readFileSync(
-    new URL('../../../data/generative/ui-designer.mthds', import.meta.url),
-    'utf8',
-  );
+  /** The text of one pipe's table, from its header to the next pipe's. */
+  function pipe(code: string): string {
+    const start = METHOD.indexOf(`[pipe.${code}]`);
+    expect(start, code).toBeGreaterThan(-1);
+    const next = METHOD.indexOf('\n[pipe.', start + 1);
+    return METHOD.slice(start, next === -1 ? undefined : next);
+  }
+  const inputsOf = (block: string) => /^inputs\s*=\s*\{(.*)\}$/m.exec(block)?.[1] ?? '';
 
-  /**
-   * The method carries no catalog: the prompt arrives as an input, which is
-   * what lets one method serve a different vocabulary. So what pairs the
-   * shipped method with the shipped prompt is not a hash of the file - it is
-   * that the method still asks for the three things the harness feeds it.
-   */
-  it('takes the catalog rules and the brief as inputs, and the seed optionally', () => {
-    const inputs = /^inputs = \{(.*)\}$/m.exec(bundle)?.[1];
-    expect(inputs).toBeDefined();
-    expect(inputs).toContain('catalog_rules = "Text"');
-    expect(inputs).toContain('brief = "Text"');
-    expect(inputs).toContain('seed = "Text?"');
+  it('is a sequence taking the catalog and the brief, and the seed optionally, that returns text', () => {
+    const designer = pipe('ui_designer');
+    expect(designer).toMatch(/^type\s*=\s*"PipeSequence"$/m);
+    expect(inputsOf(designer)).toContain('catalog = "Catalog"');
+    expect(inputsOf(designer)).toContain('brief = "Text"');
+    expect(inputsOf(designer)).toContain('seed = "Text?"');
+    expect(designer).toMatch(/^output\s*=\s*"Text"$/m);
+    const steps = [...designer.matchAll(/\{\s*pipe\s*=\s*"(\w+)"/g)].map((step) => step[1]);
+    expect(steps).toEqual(['plan_page', 'emit_page']);
   });
 
-  it('interpolates each of them in its prompt, the seed guarded', () => {
-    expect(bundle).toContain('@catalog_rules');
-    expect(bundle).toContain('@brief');
-    expect(bundle).toContain('@?seed');
+  it('plans first, from the catalog, the brief and the guarded seed, into a structure', () => {
+    const planner = pipe('plan_page');
+    expect(planner).toMatch(/^output\s*=\s*"PagePlan"$/m);
+    expect(inputsOf(planner)).toContain('seed = "Text?"');
+    expect(planner).toContain('{% for component in catalog.components');
+    expect(planner).toContain('@brief');
+    expect(planner).toContain('@?seed');
+  });
+
+  /**
+   * The seed is where two runs of the same brief diverge, and the plan is
+   * what carries that divergence: the builder follows the plan and never
+   * sees the seed, so it cannot second-guess the planner's reading of it.
+   */
+  it('then builds from the plan, the catalog and the brief, and never sees the seed', () => {
+    const builder = pipe('emit_page');
+    expect(builder).toMatch(/^output\s*=\s*"Text"$/m);
+    expect(inputsOf(builder)).toContain('plan = "PagePlan"');
+    expect(inputsOf(builder)).not.toContain('seed');
+    expect(builder).toContain('{% for region in plan.regions');
+    expect(builder).toContain('{% for component in catalog.components');
+    expect(builder).toContain('{% for action in catalog.actions');
+    expect(builder).toContain('@brief');
+    expect(builder).not.toContain('seed');
+  });
+
+  /** A fixture records ONE model, and the specs pass moves every pin at once. */
+  it('pins the same model on every stage', () => {
+    const pins = [...METHOD.matchAll(/^model\s*=\s*\{\s*model\s*=\s*"([^"]+)"/gm)].map(
+      (pin) => pin[1],
+    );
+    expect(pins.length).toBeGreaterThan(1);
+    expect(new Set(pins).size).toBe(1);
+  });
+
+  it('declares the structures the catalog data and the plan are shaped as', () => {
+    const catalogFields = ['name', 'props', 'description', 'accepts_children', 'slots', 'events'];
+    const planFields = [
+      'purpose',
+      'title',
+      'composition',
+      'regions',
+      'call_to_action',
+      'defaults',
+      'delegated',
+    ];
+    const regionFields = ['title', 'purpose', 'container', 'elements'];
+    for (const field of [...catalogFields, ...planFields, ...regionFields]) {
+      expect(METHOD).toMatch(new RegExp(`^${field}\\s*=`, 'm'));
+    }
+  });
+
+  /**
+   * The composition is the model's. The method prescribes no skeleton, and
+   * the way that is held is by never naming the product chrome in its prose:
+   * what a Rail or a Hero is for travels in the catalog's own descriptions,
+   * as data, and a rule that named one would be the mandate the method gave
+   * up - every page had the same bones once, because the prompt said so.
+   */
+  it('names no product-page component, so it prescribes no composition', () => {
+    for (const name of PRODUCT_COMPONENTS) {
+      expect(METHOD, name).not.toMatch(new RegExp(`\\b${name}\\b`));
+    }
+    expect(METHOD).not.toContain('PRODUCT PAGE');
+  });
+
+  /**
+   * The prompts ask for a LAYOUT, never for content: a model that invents
+   * sample data writes a page that looks right and shows figures the run never
+   * produced.
+   */
+  it('never asks for sample data', () => {
+    expect(METHOD.toLowerCase()).not.toContain('sample data');
+    expect(METHOD).not.toContain('INITIAL STATE');
+  });
+
+  /**
+   * `$name` is the language's inline substitution, so a json-render
+   * expression key written bare would be rendered as a variable - and refused
+   * at load, since no input is called `state`. Every one is spelled `$$`, in
+   * both stages' prompts: the slice starts at the first and runs to the end.
+   */
+  it('escapes every json-render expression key it names', () => {
+    const prompts = METHOD.slice(METHOD.indexOf('prompt = """'));
+    expect(
+      prompts.match(/(?<!\$)\$(?:state|bindState|item|bindItem|cond|then|else|template|or)\b/g),
+    ).toBeNull();
+    expect(prompts).toContain('"$$state"');
   });
 });

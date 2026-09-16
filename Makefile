@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
 
 install:
 	npm install
@@ -10,7 +10,7 @@ build-css:
 	npm run build:css
 
 lint:
-	npx eslint src/ .storybook/
+	npx eslint src/ .storybook/ "scripts/**/*.ts"
 
 format:
 	npm run format
@@ -20,6 +20,14 @@ format-check:
 
 typecheck:
 	npx tsc --noEmit
+
+# The offline drift gate over the designer method's generated tree: every
+# stamped file in src/generated/ui-designer/ against its codegen.lock, and the
+# method's source against the hash recorded beside it. No engine, no network,
+# no key. Red means the types were not regenerated after a bundle edit - the
+# refresh is /pipelex-integrate, never a hand edit of the tree.
+codegen-check:
+	npm run codegen:check
 
 test:
 	npx vitest run
@@ -32,7 +40,7 @@ test-watch:
 test-coverage:
 	npx vitest run --coverage
 
-check: lint format-check typecheck
+check: lint format-check typecheck codegen-check
 	@echo "All checks passed."
 
 c: check
@@ -53,27 +61,33 @@ build-storybook:
 fixtures:
 	node scripts/generate-fixtures.mjs $(if $(ONLY),--only $(ONLY))
 
-# The PAYLOADS: what the pipes actually produced, from real runs through the real
-# `pipelex run bundle` CLI. Separate from `fixtures` because it COSTS inference
-# budget every time, and because it needs credentials the descriptor pass does
-# not. It is the only way to get a payload - no projection of a declaration can
-# tell you what a run returns. ONLY=<case> narrows it.
+# The PAYLOADS: what the pipes actually produced, from real runs on the hosted
+# API through `@pipelex/sdk`. Separate from `fixtures` because it COSTS inference
+# budget every time, and because it needs a Pipelex API key in PIPELEX_API_KEY
+# (PIPELEX_BASE_URL points it at another deployment) where the descriptor pass
+# needs a checkout. It is the only way to get a payload - no projection of a
+# declaration can tell you what a run returns. ONLY=<case> narrows it to one
+# case; PIPE=<code> with it re-runs ONE pipe and merges the result into the
+# case's committed module, so a sweep that died on the tenth pipe does not
+# re-buy the nine before it. Runs under tsx so that merge can import the module.
 fixtures-runs:
-	node scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY))
+	npx tsx scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY)) $(if $(PIPE),--pipe $(PIPE))
 
 # The BRIEFS: for each generative hero, the Markdown brief rendered from the
-# committed descriptors and payloads, plus the full catalog prompt and its hash.
-# Committed under wip/generative-ui/briefs/, because it is the record of exactly
-# what a producer was handed - and the file each spec fixture's `brief` field
-# points at. Free and offline. Node cannot resolve this repo's extensionless
-# TypeScript imports on its own, so the pass runs under tsx.
+# committed descriptors and payloads, plus the catalog data the designer method
+# is handed and the prompt hash (the method's text and that data, together).
+# Committed under wip/generative-ui/briefs/, because with the method file it is
+# the record of exactly what a producer was handed - and the file each spec
+# fixture's `brief` field points at. Free and offline. Node cannot resolve this
+# repo's extensionless TypeScript imports on its own, so the pass runs under tsx.
 briefs:
 	npx tsx scripts/generate-fixtures.mjs --briefs
 
-# The SPECS: what the designer method produced for each hero's brief, through the
-# real `pipelex run bundle` CLI, validated against the catalog. Costs inference
-# budget and needs credentials, like `fixtures-runs`, and is asked for the same
-# way. ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides the pin in
+# The SPECS: what the designer method produced for each hero's brief, run on the
+# hosted API through `@pipelex/sdk` and validated against the catalog. Costs
+# inference budget and needs a Pipelex API key in PIPELEX_API_KEY (PIPELEX_BASE_URL
+# points it at another deployment), exactly as `fixtures-runs` does.
+# ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides every stage's pin in
 # data/generative/ui-designer.mthds for a comparative run; SEED=1 gives the run a
 # fresh creative seed, recorded on the fixture. A spec another producer wrote is
 # taken in the same way, with `--capture` - see scripts/generate-fixtures.mjs.

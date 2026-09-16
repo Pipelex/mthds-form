@@ -41,7 +41,16 @@ export default defineConfig({
   clean: true,
   splitting: true,
   treeshake: true,
-  external: ["react", "react-dom", "react/jsx-runtime"],
+  // `react` and its runtime are peers a consumer resolves. `@pipelex/sdk` is
+  // here for the opposite reason: it is a devDependency (the fixture harness
+  // designs layouts through it) and nothing under `src/` may import it, so
+  // listing it keeps a mistaken import VISIBLE. A devDependency is bundled
+  // INLINE by default, which would put the SDK's bytes in a consumer's chunk
+  // with no specifier anywhere for `scripts/assert-bundle.mjs` to find; marked
+  // external, the same mistake leaves a bare `@pipelex/sdk` in the graph, which
+  // that check refuses. Lint refuses the import first; this is what makes the
+  // backstop able to see it at all.
+  external: ["react", "react-dom", "react/jsx-runtime", "@pipelex/sdk"],
   onSuccess: async () => {
     // esbuild drops directive prologues when it bundles, so the `'use client'`
     // that every control file carries in source does NOT survive into the

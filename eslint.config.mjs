@@ -22,8 +22,21 @@ const BUDGET_PATTERNS = [
     message: 'The kernel is RJSF-free: the gate validates through its own ajv instance.',
   },
   {
-    group: ['zustand', 'zustand/*', '@pipelex/sdk', '@pipelex/sdk/*'],
+    group: ['zustand', 'zustand/*'],
     message: 'Outside the dependency budget (docs/dependency-budget.md).',
+  },
+  {
+    // The runtime's SDK is INSTALLED here - a devDependency, because the fixture
+    // harness designs its layouts by running the designer method on the hosted
+    // API through it - so an import of it under `src/` now resolves, where it
+    // used to fail at the resolver. It carries the request vocabulary, which is
+    // a different question from the artifact shapes the entries read. The graph
+    // check in `scripts/assert-bundle.mjs` is the backstop, and it can only see
+    // this one because `tsup.config.ts` marks the SDK external: a devDependency
+    // is otherwise bundled inline, bytes and no specifier.
+    group: ['@pipelex/sdk', '@pipelex/sdk/*'],
+    message:
+      "The runtime's SDK is the fixture harness's devDependency - no entry may reach it. See docs/dependency-budget.md.",
   },
   {
     // The standard's TypeScript client is TYPES-ONLY. `import type` is
@@ -88,7 +101,18 @@ const CORE_BARREL_PATTERN = {
 };
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      // The generated tree and the drift gate are never linted or formatted:
+      // each stamped file carries a hash of its own bytes and `codegen.lock`
+      // hashes them all, so an autofix would turn `make codegen-check` red.
+      // See docs/generative-ui.md, "The typed contract".
+      'src/generated/**',
+      'scripts/codegen-check.mjs',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -157,6 +181,25 @@ export default tseslint.config(
     // Tests reach into loose shapes on purpose to assert on nested wire data.
     files: ['src/**/__tests__/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
+    /**
+     * The harness's own TypeScript under `scripts/`: the typed call site that
+     * runs the designer method on the hosted API, and the client it shares.
+     * It is the ONE place the runtime's SDK is imported as a value, by
+     * design - it ships in nothing - and the budget's other bans hold. `src/`
+     * stays closed to it: lint refuses the import there, and
+     * `make assert-bundle` refuses the specifier in every built entry's graph.
+     */
+    files: ['scripts/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: BUDGET_PATTERNS.filter((pattern) => !pattern.group.includes('@pipelex/sdk')),
+        },
+      ],
+    },
   },
   ...storybook.configs['flat/recommended'],
   {

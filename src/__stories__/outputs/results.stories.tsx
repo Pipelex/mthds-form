@@ -2,8 +2,9 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
+import { readDateContent } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
-import { ResultView } from '../result-view';
+import { ResultView, itemsOf } from '../result-view';
 
 /**
  * A pipe's RESULT, rendered from its output descriptor.
@@ -189,16 +190,21 @@ export const AppLabels: Story = {
  * One level of nesting: a structure carrying a date, a boolean and a list of
  * concepts.
  *
- * The date is the story: it arrives in the serializer's typed envelope,
- * `{date, __class__, __module__}`, not as a bare ISO string. Nothing in the
- * descriptor says so — only a real payload does.
+ * The date is the story: nothing in the descriptor says what form it arrives
+ * in, only a real payload does — and two real runs answered differently. The
+ * runtime's own serializer wraps it in a typed envelope, `{date, __class__,
+ * __module__}`, and the hosted worker, rendering a structure the bundle
+ * defines from raw content, sends a plain ISO string. The assertion reads the
+ * date through `readDateContent`, which is how the renderer reads it, so the
+ * story holds whichever form the last sweep captured.
  */
 export const NestedStructure: Story = {
   args: story('nested_result'),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const value = payload('nested_result');
-    const issuedOn = (value.issued_on as { date: string }).date;
+    const issuedOn = readDateContent(value.issued_on)?.date ?? '';
+    await expect(issuedOn).not.toBe('');
     await expect(canvas.getAllByText(String(value.reference))).toHaveLength(BOTH_THEMES);
     await expect(canvas.getAllByText(issuedOn)).toHaveLength(BOTH_THEMES);
     await expect(canvas.queryByText(/__class__/)).toBeNull();
@@ -253,15 +259,18 @@ export const EveryKind: Story = {
 /**
  * A `Concept[]` output. Two things at once: the descriptor is a `list` node
  * (plurality is carried by the descriptor, exactly as for a plural input), and
- * the payload is `ListContent {items}` rather than a bare array — which the
- * renderer unwraps by the same `contentKey` path a scalar uses, because the
- * payload schema is `ListContent[…]` and names the property.
+ * the payload schema is `ListContent[…]`, naming the `items` property the
+ * renderer unwraps by the same `contentKey` path a scalar uses. What the wire
+ * actually carries is either that envelope or a bare array — the hosted runner
+ * renders a plural of a structure the bundle defines from raw content, without
+ * the envelope — and `unwrap` passes an array through, so both render. See
+ * `itemsOf` in `result-view.tsx`.
  */
 export const PluralResult: Story = {
   args: story('plural_result'),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const items = payload('plural_result').items as { label: string }[];
+    const items = itemsOf(payload('plural_result')) as { label: string }[];
     await expect(items.length).toBeGreaterThan(1);
     for (const item of items) {
       await expect(canvas.getAllByText(item.label)).toHaveLength(BOTH_THEMES);
@@ -281,7 +290,7 @@ export const LongList: Story = {
   args: story('long_list_result', 640),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const items = payload('long_list_result').items as { label: string }[];
+    const items = itemsOf(payload('long_list_result')) as { label: string }[];
     await expect(items.length).toBeGreaterThanOrEqual(10);
     // The last entry: if the list rendered short, this is what says so.
     await expect(canvas.getAllByText(items[items.length - 1]!.label)).toHaveLength(BOTH_THEMES);
@@ -330,7 +339,7 @@ export const ExtractedPages: Story = {
   args: story('page_result', 720),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const pages = payload('page_result').items as unknown[];
+    const pages = itemsOf(payload('page_result'));
     await expect(pages.length).toBeGreaterThan(0);
     await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
   },

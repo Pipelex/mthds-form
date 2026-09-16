@@ -6,16 +6,21 @@ import {
   generativeActions,
   generativeComponents,
 } from './components';
-import { PRODUCT_RULES } from './product-rules';
 import { generativeSchema } from './schema';
+import type { ComponentRendering } from './validate';
 
 /**
- * The catalog: everything the base vocabulary has, plus the components of a
- * PRODUCT PAGE - the bar with the logo, the hero, the workspace with its rail,
- * a numbered section, the summary rows the rail is made of, the one call to
- * action, the footer line. The vocabulary names no brand: the logo is
- * whichever the manifest carries and the accent is whichever the host's theme
- * tokens set.
+ * The catalog: everything the base vocabulary has, plus the chrome of a
+ * product page - a bar with the logo, a hero, a workspace that puts a panel
+ * beside the work, a section, a raised rail, the summary rows a rail can be
+ * made of, a call to action, a footer line. They are vocabulary, not a
+ * template: the designer method prescribes no composition, and a layout uses
+ * whichever of them serve it. Each description says what the component IS and
+ * how it renders - a heading level, a landmark, a fixed child count - and never
+ * where it must go or whether a page must have it, because the descriptions
+ * travel to the model as data and would otherwise be the mandate the method
+ * gave up. The vocabulary names no brand: the logo is whichever the manifest
+ * carries and the accent is whichever the host's theme tokens set.
  *
  * Rule 1 holds here as it does everywhere in this entry: a component takes
  * copy and bound values, never a schema, and the fields the kernel owns are
@@ -44,7 +49,7 @@ const product = {
     }),
     slots: [],
     description:
-      "The top bar: the brand's logo, the name of this app beside it, a few muted links, and a small mono tag at the right (the method behind the page). Once, first on the page.",
+      "A bar across the top of the page: the brand's logo, the name of this app beside it, a few muted links, and a small mono tag at the right (the method behind the page). It renders as the page's banner, so at most one.",
     example: { app: 'Trip planner', links: ['Methods', 'Runs'], tag: 'plan_trip' },
   },
   Hero: {
@@ -55,14 +60,14 @@ const product = {
     }),
     slots: [],
     description:
-      "The opening: one bold headline that says what happens here, one muted line under it at most, and an optional small eyebrow in the accent colour above. Once, first in the work column, right under the AppBar. The headline is the page's only h1.",
+      'An opening: one bold headline that says what happens here, one muted line under it at most, and an optional small eyebrow in the accent colour above. The headline renders as an h1, so at most one on a page.',
     example: { headline: 'Plan a trip worth taking.', lede: 'Tell us where and who is coming.' },
   },
   Workspace: {
     props: z.object({ rail: z.enum(['right', 'left']).nullable() }),
     slots: ['default'],
     description:
-      'The app itself, from exactly two children: the WORK (a Stack of Sections) and the RAIL (a Rail), side by side on a wide screen with the rail sticky, stacked on a narrow one. "rail" says which side the rail takes; right by default.',
+      'Two children side by side on a wide screen and stacked on a narrow one: the work, and beside it a narrower panel that stays sticky while the work scrolls. Exactly two children; "rail" says which side the panel takes, right by default.',
     example: { rail: 'right' },
   },
   Section: {
@@ -73,14 +78,14 @@ const product = {
     }),
     slots: ['default'],
     description:
-      'A stage of the work: a small mono number in the accent colour, an h2 title, an optional muted line, then its children - flat, separated from the next Section by a hairline, never boxed. Put the inputs of one concern inside.',
+      'A titled stage of the work: an optional small mono number in the accent colour, an h2 title, an optional muted line, then its children - flat, spaced, separated from the next Section by a hairline, never boxed.',
     example: { number: '01', title: 'Where and when' },
   },
   Rail: {
     props: z.object({ title: z.string() }),
     slots: ['default'],
     description:
-      'The raised panel beside the work: an h2 title, then its children - SummaryRows that mirror what the person has filled in, and the Cta last. The one boxed thing on the page.',
+      'A raised, boxed panel: a small uppercase h2 title, then its children in a column. Made to stand beside the work as the panel of a Workspace, and the one boxed surface in this vocabulary.',
     example: { title: 'Your trip' },
   },
   SummaryRow: {
@@ -93,7 +98,7 @@ const product = {
     }),
     slots: [],
     description:
-      'One line of the Rail: a muted label at the left, a bound value at the right. "value" and the optional "detail" are read with { "$state": "/inputs/..." } and joined by "separator" (a space by default); while both are empty the row shows "placeholder", or a dash.',
+      'A line that restates a value: a muted label at the left, a bound value at the right. "value" and the optional "detail" are read with { "$state": "/inputs/..." } and joined by "separator" (a space by default); each is a scalar path - text, number, boolean, date or choice - never a structure, a list or a file. While both are empty the row shows "placeholder", or a dash.',
     example: {
       label: 'Budget',
       value: { $state: '/inputs/request/budget' },
@@ -105,39 +110,59 @@ const product = {
     slots: [],
     events: ['press'],
     description:
-      'The one call to action: a full-width button in the accent colour that runs the method, with an optional one-line hint under it. Exactly one per page, last in the Rail; bind on.press to validateForm then run.',
+      'A call to action: a full-width button in the accent colour that runs the method, with an optional one-line hint under it. Bind on.press to validateForm then run.',
     example: { label: 'Plan my trip', hint: 'Nothing runs until the request is complete.' },
   },
   Footer: {
     props: z.object({ text: z.string(), tag: z.string().nullable() }),
     slots: [],
     description:
-      'The closing line of the page, muted, with an optional mono tag at the right. Once, last.',
+      "A closing line, muted, with an optional mono tag at the right. It renders as the page's contentinfo, so at most one.",
     example: { text: 'Runs on Pipelex.', tag: 'MTHDS' },
   },
 };
 
-export const catalog = defineCatalog(generativeSchema, {
-  components: { ...generativeComponents, ...product },
-  actions: generativeActions,
-});
+/**
+ * What this entry's components render beyond their schemas - the heading a
+ * title is, the landmark a bar or a footer renders as, the two children a
+ * split lays out, the panel per tab or step - declared once here, where the
+ * descriptions above say the same in prose for the model, and carried on the
+ * catalog so the validator reads it off whichever catalog it is handed. A
+ * host validating against a vocabulary of its own declares what its
+ * renderers do, or nothing.
+ */
+export const COMPONENT_RENDERINGS: Readonly<Record<string, ComponentRendering>> = {
+  Hero: { heading: { level: 1 } },
+  Section: { heading: { level: 2 } },
+  Rail: { heading: { level: 2 } },
+  Card: { heading: { level: 3, when: 'title' } },
+  AppBar: { once: "the page's banner" },
+  Footer: { once: "the page's contentinfo" },
+  Split: { children: { count: 2, roles: 'left, right' } },
+  Workspace: { children: { count: 2, roles: 'work, rail' } },
+  Tabs: { panels: { prop: 'tabs', noun: 'tab' } },
+  Steps: { panels: { prop: 'steps', noun: 'step' } },
+};
+
+export const catalog = Object.assign(
+  defineCatalog(generativeSchema, {
+    components: { ...generativeComponents, ...product },
+    actions: generativeActions,
+  }),
+  { renders: COMPONENT_RENDERINGS },
+);
 
 /** The spec type a layout is written against. */
 export type GenerativeSpec = typeof catalog._specType;
 
-/** Every component name the catalog knows, the shadcn subset first. */
+/**
+ * Every component name the catalog knows, the shadcn subset first. This is
+ * the order the designer method lists them in, since `designerCatalog()`
+ * walks it; the rules and the direction that name them are the method's own
+ * prose, in `data/generative/ui-designer.mthds`.
+ */
 export const COMPONENT_NAMES: readonly string[] = [
   ...PICKED_SHADCN,
   ...CUSTOM_COMPONENTS,
   ...PRODUCT_COMPONENTS,
 ];
-
-/**
- * The prompt the designer method receives, exactly: the design direction, the
- * seed procedure, the vocabulary and the rules. One function so the fixture
- * pass, the briefs and the tests render one text, and the hash stamped on a
- * captured layout is computed over what was actually sent.
- */
-export function catalogPrompt(): string {
-  return catalog.prompt({ mode: 'standalone', customRules: [...PRODUCT_RULES] });
-}

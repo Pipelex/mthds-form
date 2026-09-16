@@ -10,11 +10,11 @@ import { z } from 'zod';
  * consumer of this entry should install neither. The controls vendor their
  * primitives for the same reason; see `docs/dependency-budget.md`.
  *
- * These strings ARE the prompt: `catalogPrompt()` renders them, and the prompt
- * hash is computed over the result. `docs/generative-ui.md` states the pin, and
- * `__tests__/prompt.test.ts` fails the moment a character here moves - which is
- * also what proves this copy faithful to the definitions the captured layouts
- * were produced against.
+ * These strings ARE the prompt: `designerCatalog()` hands them to the designer
+ * method as data, and the prompt hash is computed over the result.
+ * `docs/generative-ui.md` states the pin, and `__tests__/prompt.test.ts` fails
+ * the moment a character here moves - which is also what proves this copy
+ * faithful to the definitions the captured layouts were produced against.
  */
 
 const validationCheckSchema = z

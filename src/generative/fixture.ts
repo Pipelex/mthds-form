@@ -1,4 +1,5 @@
 import type { Spec } from '@json-render/core';
+import type { PagePlan } from '../generated/ui-designer/types';
 
 /**
  * A spec with its provenance - the shape every fixture takes, whoever produced
@@ -16,9 +17,9 @@ import type { Spec } from '@json-render/core';
 
 /** How a spec came to be. */
 export type Producer =
-  /** The designer method, `data/generative/ui-designer.mthds`, through the real CLI. */
+  /** The designer method, `data/generative/ui-designer.mthds`, run on the hosted API. */
   | 'pipelex-method'
-  /** A Claude Code subagent in a fresh context, given the prompt and the brief and nothing else. */
+  /** A Claude Code subagent in a fresh context, given the method, the catalog data and the brief and nothing else. */
   | 'claude-code-subagent'
   /** The Claude Code session working in this repo, writing the spec by hand in TypeScript. */
   | 'claude-code-session';
@@ -50,6 +51,14 @@ export interface SpecFixture {
   jsonl: string;
   /** The compiled spec. */
   spec: Spec;
+  /**
+   * The planner's plan, when the producer was the designer method: the
+   * intermediate the builder was handed, read from the run's working memory.
+   * It is what a person reads to see why a page has the shape it has, and it
+   * is the one stage a comparison between two runs can be made at. Absent for
+   * a producer that plans nowhere the harness can read.
+   */
+  plan?: PagePlan;
 }
 
 /**
