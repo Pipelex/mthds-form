@@ -66,11 +66,12 @@ fixtures-runs:
 	npx tsx scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY)) $(if $(PIPE),--pipe $(PIPE))
 
 # The BRIEFS: for each generative hero, the Markdown brief rendered from the
-# committed descriptors and payloads, plus the full catalog prompt and its hash.
-# Committed under wip/generative-ui/briefs/, because it is the record of exactly
-# what a producer was handed - and the file each spec fixture's `brief` field
-# points at. Free and offline. Node cannot resolve this repo's extensionless
-# TypeScript imports on its own, so the pass runs under tsx.
+# committed descriptors and payloads, plus the catalog data the designer method
+# is handed and the prompt hash (the method's text and that data, together).
+# Committed under wip/generative-ui/briefs/, because with the method file it is
+# the record of exactly what a producer was handed - and the file each spec
+# fixture's `brief` field points at. Free and offline. Node cannot resolve this
+# repo's extensionless TypeScript imports on its own, so the pass runs under tsx.
 briefs:
 	npx tsx scripts/generate-fixtures.mjs --briefs
 

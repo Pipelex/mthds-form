@@ -18,7 +18,7 @@ import type { Spec } from '@json-render/core';
 export type Producer =
   /** The designer method, `data/generative/ui-designer.mthds`, run on the hosted API. */
   | 'pipelex-method'
-  /** A Claude Code subagent in a fresh context, given the prompt and the brief and nothing else. */
+  /** A Claude Code subagent in a fresh context, given the method, the catalog data and the brief and nothing else. */
   | 'claude-code-subagent'
   /** The Claude Code session working in this repo, writing the spec by hand in TypeScript. */
   | 'claude-code-session';

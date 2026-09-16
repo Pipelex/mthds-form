@@ -23,11 +23,11 @@ import { shadcnComponentDefinitions } from './shadcn-definitions';
  * model invents is one the Storybook build never compiled, and a colour it
  * invents is one that ignores the theme.
  *
- * Zod only, importable from node with no DOM: `catalogPrompt()` renders these
- * definitions, and the prompt hash is computed over the result, so what is
- * written here is part of the pinned prompt. Erasable syntax only (no enums,
- * no namespaces, no parameter properties), because node strips the types
- * itself.
+ * Zod only, importable from node with no DOM: `designerCatalog()` renders
+ * these definitions into the data the designer method takes, and the prompt
+ * hash is computed over the result, so what is written here is part of the
+ * pinned prompt. Erasable syntax only (no enums, no namespaces, no parameter
+ * properties), because node strips the types itself.
  */
 
 const shadcn = shadcnComponentDefinitions;

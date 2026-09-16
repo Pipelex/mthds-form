@@ -57,7 +57,7 @@ It also reads the `on` field, which says as much about a page as its props do. E
 
 Like the validator, it answers with problems and never throws, whatever shape the layout arrived in: a malformed spec is one line naming what the walk tripped on. The two are exported separately and a host may run them in either order, so neither assumes the other refused the shape first.
 
-The **prompt hash** is the third condition and the cheapest. `PROMPT_HASH` is the first twelve hex digits of the SHA-256 of the catalog prompt this entry ships; every stored layout records the hash it was produced against. A layout whose hash is not this one is not rendered, because the vocabulary it was written in is no longer the vocabulary this entry renders. It is a pinned constant rather than a computation, so the entry stays importable from a browser and a host can compare it synchronously.
+The **prompt hash** is the third condition and the cheapest. `PROMPT_HASH` is the first twelve hex digits of the SHA-256 of the designer method's text and the catalog data this entry ships, taken together — the two things a run is actually given, so a reworded rule and a renamed prop each move it; every stored layout records the hash it was produced against. A layout whose hash is not this one is not rendered, because the vocabulary it was written in is no longer the vocabulary this entry renders. It is a pinned constant rather than a computation, so the entry stays importable from a browser and a host can compare it synchronously.
 
 So the fallback rule, in full: **the kernel's plain form renders when there is no layout, a stale prompt hash, an invalid layout, `layoutFits` false, or a render error.** A produced page is an enhancement over a form that always works, never a replacement for one.
 
@@ -112,13 +112,28 @@ Kept beside `domIdFor` in the same module so the two cannot drift, and exact for
 
 The producer is outside this package, but the package ships what a producer needs.
 
-The **catalog prompt** (`catalogPrompt()`) is the full system prompt: every component with its props, the rules, the design direction. The **brief** (`renderInputBrief`, `renderResultBrief`) is the per-method half — the paths, their kinds, which of them are delegated, what gates the run — rendered from the descriptor and nothing else. An input is marked delegated when the catalog's own inputs cannot enter it: a file, a date, a list, and a choice that carries an empty option, since the standard puts no floor on a choice while the catalog refuses an empty one — a model told to list the brief's choices exactly would otherwise write a layout the validator refuses.
+The **designer method** is the prompt. It ships as data at `@pipelex/mthds-form/ui-designer.mthds`: a `.mthds` bundle whose one pipe, `ui_designer`, carries every paragraph a model reads — the output format, the state contract, the design direction, the rules, the seed procedure — as authored prose, and takes three inputs: `catalog`, `brief` and an optional `seed`. It ships as a file rather than as a string baked into a module because it is still being iterated on — a newer method is then a package upgrade rather than a code change — and because nothing in the entry may read it, which is what keeps the entry importable from a browser. Improving the prompt is editing that file; nothing in TypeScript renders a prompt string. Two things to know before editing it: a literal dollar sign is written `$$`, because `$name` is the language's inline substitution, so every json-render expression key in the prose (`$$state`, `$$bindState`, `$$item`, ...) is spelled that way; and the component and action sections are Jinja2 loops over the catalog, so a heading that follows a loop sits directly under its `{% endfor %}` to render one blank line rather than two.
 
-The **designer method** ships as data at `@pipelex/mthds-form/ui-designer.mthds`: a `.mthds` bundle taking `catalog_rules`, `brief` and an optional `seed`, which a host hands to a runner. It ships as a file rather than as a string baked into a module because it is still being iterated on — a newer method is then a package upgrade rather than a code change — and because nothing in the entry may read it, which is what keeps the entry importable from a browser.
+The **catalog as data** (`designerCatalog()`) is the `catalog` input: every component with its name, its props signature rendered from its zod schema (`{ label: string, value?: string }`, the shape json-render's own prompt uses), its description, whether it accepts children, its named slots and the events it emits — then every action, the runtime's four built-in ones first. The method lays both lists out itself, so a component added to the catalog appears in the prompt with no change to the method, while the rules and the direction that name components stay the method's own prose. The value travels as the content of a structured input, under the concept `DESIGNER_CATALOG_CONCEPT` (`generative.Catalog`), whose structure the method declares.
+
+The **brief** (`renderInputBrief`, `renderResultBrief`) is the per-method half — the paths, their kinds, which of them are delegated, what gates the run — rendered from the descriptor and nothing else. An input is marked delegated when the catalog's own inputs cannot enter it: a file, a date, a list, and a choice that carries an empty option, since the standard puts no floor on a choice while the catalog refuses an empty one — a model told to list the brief's choices exactly would otherwise write a layout the validator refuses.
+
+A host hands all three to a runner, the method as text and the catalog as data:
 
 ```ts
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { DESIGNER_CATALOG_CONCEPT, designerCatalog } from '@pipelex/mthds-form/generative';
+
 const method = createRequire(import.meta.url).resolve('@pipelex/mthds-form/ui-designer.mthds');
+const request = {
+  mthds_contents: [readFileSync(method, 'utf8')],
+  pipe_code: 'ui_designer',
+  inputs: {
+    catalog: { concept: DESIGNER_CATALOG_CONCEPT, content: designerCatalog() },
+    brief,
+  },
+};
 ```
 
 A produced layout is stored with its provenance: who produced it, on which model, with which seed, against which prompt hash, from which brief. `SpecFixture` is that record's shape, and `fixtureLabel` renders it — deliberately by **what made the page**, never by a role like "authored" or "generated".

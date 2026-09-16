@@ -6,7 +6,6 @@ import {
   generativeActions,
   generativeComponents,
 } from './components';
-import { PRODUCT_RULES } from './product-rules';
 import { generativeSchema } from './schema';
 
 /**
@@ -125,19 +124,14 @@ export const catalog = defineCatalog(generativeSchema, {
 /** The spec type a layout is written against. */
 export type GenerativeSpec = typeof catalog._specType;
 
-/** Every component name the catalog knows, the shadcn subset first. */
+/**
+ * Every component name the catalog knows, the shadcn subset first. This is
+ * the order the designer method lists them in, since `designerCatalog()`
+ * walks it; the rules and the direction that name them are the method's own
+ * prose, in `data/generative/ui-designer.mthds`.
+ */
 export const COMPONENT_NAMES: readonly string[] = [
   ...PICKED_SHADCN,
   ...CUSTOM_COMPONENTS,
   ...PRODUCT_COMPONENTS,
 ];
-
-/**
- * The prompt the designer method receives, exactly: the design direction, the
- * seed procedure, the vocabulary and the rules. One function so the fixture
- * pass, the briefs and the tests render one text, and the hash stamped on a
- * captured layout is computed over what was actually sent.
- */
-export function catalogPrompt(): string {
-  return catalog.prompt({ mode: 'standalone', customRules: [...PRODUCT_RULES] });
-}

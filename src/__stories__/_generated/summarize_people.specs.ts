@@ -25,11 +25,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'summarize_people.summarize_people',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: '4dcf6d57cb71',
-    date: '2026-09-04',
+    promptHash: '2863899d7971',
+    date: '2026-09-16',
     brief: 'wip/generative-ui/briefs/summarize_people.summarize_people.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"People summaries","links":["The people"],"tag":"summarize_people"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","section-people"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"One line each","headline":"Summarize everyone on the list","lede":"Drop in the people and get a clean summary of each."},"children":[]}}\n{"op":"add","path":"/elements/section-people","value":{"type":"Section","props":{"number":"01","title":"The people","lede":"Each row is one person, read from a CSV."},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Ready to run"},"children":["row-people","cta"]}}\n{"op":"add","path":"/elements/row-people","value":{"type":"SummaryRow","props":{"label":"People","value":{"$state":"/inputs/people"},"placeholder":"None added yet"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Summarize the people","hint":"One summary per person."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"People summaries","tag":"summarize_people"},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","workspace","footer"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"People summaries","links":["The list"],"tag":"summarize_people"},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","section-people"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"One line per person","headline":"Summarize everyone on the list","lede":"Drop in the people and get a short read on each."},"children":[]}}\n{"op":"add","path":"/elements/section-people","value":{"type":"Section","props":{"number":"01","title":"The people","lede":"Each row is one person, read from a CSV."},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Ready"},"children":["rail-people","cta"]}}\n{"op":"add","path":"/elements/rail-people","value":{"type":"SummaryRow","props":{"label":"People","value":{"$state":"/inputs/people"},"placeholder":"None added yet"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Summarize the list","hint":"One summary per person."},"children":[],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"People summaries","tag":"summarize_people"},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -45,7 +45,7 @@ export const SPECS: SpecFixture[] = [
           type: 'AppBar',
           props: {
             app: 'People summaries',
-            links: ['The people'],
+            links: ['The list'],
             tag: 'summarize_people',
           },
           children: [],
@@ -68,9 +68,9 @@ export const SPECS: SpecFixture[] = [
         hero: {
           type: 'Hero',
           props: {
-            eyebrow: 'One line each',
+            eyebrow: 'One line per person',
             headline: 'Summarize everyone on the list',
-            lede: 'Drop in the people and get a clean summary of each.',
+            lede: 'Drop in the people and get a short read on each.',
           },
           children: [],
         },
@@ -93,11 +93,11 @@ export const SPECS: SpecFixture[] = [
         rail: {
           type: 'Rail',
           props: {
-            title: 'Ready to run',
+            title: 'Ready',
           },
-          children: ['row-people', 'cta'],
+          children: ['rail-people', 'cta'],
         },
-        'row-people': {
+        'rail-people': {
           type: 'SummaryRow',
           props: {
             label: 'People',
@@ -111,9 +111,10 @@ export const SPECS: SpecFixture[] = [
         cta: {
           type: 'Cta',
           props: {
-            label: 'Summarize the people',
+            label: 'Summarize the list',
             hint: 'One summary per person.',
           },
+          children: [],
           on: {
             press: [
               {
@@ -124,7 +125,6 @@ export const SPECS: SpecFixture[] = [
               },
             ],
           },
-          children: [],
         },
         footer: {
           type: 'Footer',
