@@ -101,7 +101,18 @@ const CORE_BARREL_PATTERN = {
 };
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      // The generated tree and the drift gate are never linted or formatted:
+      // each stamped file carries a hash of its own bytes and `codegen.lock`
+      // hashes them all, so an autofix would turn `make codegen-check` red.
+      // See docs/generative-ui.md, "The typed contract".
+      'src/generated/**',
+      'scripts/codegen-check.mjs',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -170,6 +181,25 @@ export default tseslint.config(
     // Tests reach into loose shapes on purpose to assert on nested wire data.
     files: ['src/**/__tests__/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
+    /**
+     * The harness's own TypeScript under `scripts/`: the typed call site that
+     * runs the designer method on the hosted API, and the client it shares.
+     * It is the ONE place the runtime's SDK is imported as a value, by
+     * design - it ships in nothing - and the budget's other bans hold. `src/`
+     * stays closed to it: lint refuses the import there, and
+     * `make assert-bundle` refuses the specifier in every built entry's graph.
+     */
+    files: ['scripts/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: BUDGET_PATTERNS.filter((pattern) => !pattern.group.includes('@pipelex/sdk')),
+        },
+      ],
+    },
   },
   ...storybook.configs['flat/recommended'],
   {

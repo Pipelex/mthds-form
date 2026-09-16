@@ -105,15 +105,21 @@
  * No pass runs a pipelex CLI. The two that run pipes reach the runtime the way
  * a host does - over the API - so a fixture records what a product receives,
  * and there is no sibling checkout to be missing when it is time to run them.
+ * The designer is reached through ONE typed call, `scripts/pipelex/ui-designer.ts`,
+ * written by /pipelex-integrate over the types codegen projected from the
+ * bundle into `src/generated/ui-designer/`; `make codegen-check` is what says
+ * those types still match the bundle.
  *
  * The briefs, the specs and the re-emit also import this repo's TypeScript
  * straight from `src/`, which node cannot resolve on its own - the imports are
  * extensionless - so their targets run under tsx.
  */
 
-// The runtime's own client, for the one pass that runs a method: a devDependency
-// that ships in nothing and is banned from `src/` by lint (docs/dependency-budget.md).
-import { ApiResponseError, PipelexApiClient, RunFailedError, RunTimeoutError } from '@pipelex/sdk';
+// The runtime's typed errors, for naming a failed run. The client itself is
+// `scripts/pipelex/client.ts`, imported by the passes that run pipes; the SDK is
+// a devDependency that ships in nothing and is banned from `src/` by lint
+// (docs/dependency-budget.md).
+import { ApiResponseError, RunFailedError, RunTimeoutError } from '@pipelex/sdk';
 
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -176,7 +182,7 @@ function requirePython() {
  * refused here rather than by a 403 on the first pipe. `pass` names the caller
  * in the refusal.
  */
-function hostedApi(pass) {
+async function hostedApi(pass) {
   if (!process.env.PIPELEX_API_KEY && !process.env.PIPELEX_BASE_URL) {
     die(
       `no PIPELEX_API_KEY in the environment.\n` +
@@ -188,7 +194,8 @@ function hostedApi(pass) {
         `  credentials are missing.`,
     );
   }
-  return new PipelexApiClient();
+  const { getPipelexClient } = await import('./pipelex/client.ts');
+  return getPipelexClient();
 }
 
 /** What went wrong with a run, in one line: the SDK's typed failures, then anything else. */
@@ -666,6 +673,16 @@ function assertAddressableInputs(pipeRef, value, at = 'inputs') {
 }
 
 /**
+ * The poll heartbeat: the first poll says the run was accepted; the rest are
+ * a heartbeat, and a line per poll over a minute of running is a wall of them.
+ */
+function heartbeat({ attempt, elapsedMs }) {
+  if (attempt === 1 || attempt % 5 === 0) {
+    process.stdout.write(`    running, ${Math.round(elapsedMs / 1000)}s…\n`);
+  }
+}
+
+/**
  * One run on the API: the bundle and the inputs out, the run's results back.
  *
  * `startAndWaitForResult` picks the path from the server's own `/v1/version`
@@ -679,15 +696,7 @@ function assertAddressableInputs(pipeRef, value, at = 'inputs') {
  */
 async function runOnApi(api, label, request) {
   try {
-    return await api.startAndWaitForResult(request, {
-      onPoll: ({ attempt, elapsedMs }) => {
-        // The first poll says the run was accepted; the rest are a heartbeat,
-        // and a line per poll over a minute of running is a wall of them.
-        if (attempt === 1 || attempt % 5 === 0) {
-          process.stdout.write(`    running, ${Math.round(elapsedMs / 1000)}s…\n`);
-        }
-      },
-    });
+    return await api.startAndWaitForResult(request, { onPoll: heartbeat });
   } catch (error) {
     die(`${label}: ${describeRunError(error)}`);
   }
@@ -770,7 +779,7 @@ function emitPayloads(entry, payloads) {
  * whole case, so the module never carries a pipe the case does not run.
  */
 async function generatePayloads(cases, pipeCode) {
-  const api = hostedApi('payload');
+  const api = await hostedApi('payload');
   let matched = false;
   for (const caseName of cases) {
     // An authored method has no carriers and no `run` block - its runs leave
@@ -987,7 +996,6 @@ async function generateBriefs() {
 }
 
 const DESIGNER_BUNDLE = path.join(REPO, 'data/generative/ui-designer.mthds');
-const DESIGNER_PIPE = 'ui_designer';
 
 /** Who may be recorded as a spec's producer. Mirrors `Producer` in src/generative/fixture.ts. */
 const PRODUCERS = new Set(['pipelex-method', 'claude-code-subagent', 'claude-code-session']);
@@ -1072,32 +1080,26 @@ function writeSpecsModule(caseName, specs) {
  * `ONLY=<pipe code>` narrows the pass to one hero.
  */
 async function generateSpecs(only) {
-  const api = hostedApi('specs');
+  await hostedApi('specs');
+  const { designerModel, uiDesigner } = await import('./pipelex/ui-designer.ts');
   const g = await loadGenerative();
-  const { method, catalog, hash } = currentPrompt(g);
+  const { catalog, hash } = currentPrompt(g);
   const today = new Date().toISOString().slice(0, 10);
 
-  let bundle = method;
-  // Every stage of the method pins its model in the object form,
-  // `model = { model = "...", temperature = N, max_tokens = N }`, and they all
-  // pin the SAME model: a fixture records one, so an override moves every pin.
-  const MODEL_PIN = /^(model\s*=\s*\{\s*model\s*=\s*)"([^"]+)"/gm;
-  const pins = [...bundle.matchAll(MODEL_PIN)].map((match) => match[2]);
-  if (pins.length === 0) die(`${path.relative(REPO, DESIGNER_BUNDLE)} pins no model.`);
-  if (new Set(pins).size > 1) {
-    die(
-      `${path.relative(REPO, DESIGNER_BUNDLE)} pins different models (${pins.join(', ')}); a\n` +
-        `  fixture records ONE model, so every stage of the method pins the same one.`,
-    );
-  }
-  const pinned = pins[0];
-  const model = process.env.MODEL || pinned;
-  if (model !== pinned) bundle = bundle.replace(MODEL_PIN, `$1"${model}"`);
+  // The typed call site (scripts/pipelex/ui-designer.ts) owns the bundle and
+  // its pins; this pass only names the overrides. The model is resolved once,
+  // up front, because it is printed before every run and recorded on every
+  // fixture - and a bundle whose stages pin different models is refused there,
+  // before the sweep spends anything.
+  const overrides = {};
+  if (process.env.MODEL) overrides.model = process.env.MODEL;
   if (process.env.TEMPERATURE) {
-    if (!/temperature\s*=\s*[0-9.]+/.test(bundle))
-      die('the designer pins no temperature to override.');
-    bundle = bundle.replace(/(temperature\s*=\s*)([0-9.]+)/g, `$1${process.env.TEMPERATURE}`);
+    overrides.temperature = Number(process.env.TEMPERATURE);
+    if (Number.isNaN(overrides.temperature)) {
+      die(`TEMPERATURE=${process.env.TEMPERATURE} is not a number.`);
+    }
   }
+  const model = await designerModel(overrides).catch((error) => die(error.message));
   const seedSetting = process.env.SEED || '';
 
   const heroes = g.HEROES.filter(
@@ -1120,11 +1122,14 @@ async function generateSpecs(only) {
       `  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`,
     );
     const briefText = await renderHeroBrief(hero, g);
-    const { jsonl, runId, cost } = await designPage(api, pipeRef, bundle, {
-      catalog: { concept: g.DESIGNER_CATALOG_CONCEPT, content: catalog },
-      brief: briefText,
-      ...(seed ? { seed: seedLine(seed) } : {}),
-    });
+    const { jsonl, results } = await designPage(pipeRef, () =>
+      uiDesigner(
+        { catalog, brief: briefText, ...(seed ? { seed: seedLine(seed) } : {}) },
+        { ...overrides, onPoll: heartbeat },
+      ),
+    );
+    const runId = results.pipeline_run_id;
+    const cost = runCost(results);
 
     const spec = compileOrDie(g, pipeRef, id, jsonl);
     byCase.set(
@@ -1149,45 +1154,34 @@ async function generateSpecs(only) {
 }
 
 /**
- * One designer run: the bundle and the inputs out, the JSONL text back.
- *
- * Nothing touches the filesystem on the way. The bundle travels as TEXT
- * (`mthds_contents`), which the designer can do because it imports nothing -
- * there is no package to compose beside it - so the model override above stays
- * a string edit and the pass needs no temporary directory, no inputs file and
- * no run directory to read back.
+ * One designer run through the typed call site - `scripts/pipelex/ui-designer.ts`,
+ * written by /pipelex-integrate over the method's signature and the types
+ * codegen projected from the bundle - with this pass's failure policy around
+ * it: a run that fails is fatal, named by the SDK's typed errors, because a
+ * sweep that skipped a hero would commit a module with a hole in it; and an
+ * EMPTY page is refused here rather than compiled into nothing.
  *
  * The cost comes back with the run, which is the one thing a CLI could not
  * hand this script: the command printed a cost table to a stdout the pass
  * swallowed. A pass that spends money should say what it spent, and comparing
  * two models on the same brief is not a comparison until it does.
  */
-async function designPage(api, pipeRef, bundle, inputs) {
-  const results = await runOnApi(api, pipeRef, {
-    mthds_contents: [bundle],
-    pipe_code: DESIGNER_PIPE,
-    inputs,
-  });
-
-  // The hosted API relays the runner's own `main_stuff.json` verbatim, so the
-  // text arrives in exactly the shape the CLI used to write to disk.
-  const mainStuff = results.main_stuff;
-  const jsonl = typeof mainStuff?.text === 'string' ? mainStuff.text : null;
-  if (jsonl === null) {
-    die(
-      `${pipeRef}: the run's main_stuff carries no text (run ${results.pipeline_run_id}).\n` +
-        `  It came back as: ${JSON.stringify(mainStuff)?.slice(0, 300)}`,
-    );
+async function designPage(pipeRef, run) {
+  let designed;
+  try {
+    designed = await run();
+  } catch (error) {
+    die(`${pipeRef}: ${describeRunError(error)}`);
   }
-  if (jsonl.trim() === '') {
+  if (designed.jsonl.trim() === '') {
     die(
-      `${pipeRef}: the run came back with an EMPTY text (run ${results.pipeline_run_id}). On\n` +
+      `${pipeRef}: the run came back with an EMPTY text (run ${designed.results.pipeline_run_id}). On\n` +
         `  this runtime that is what a completion truncated at the model's output cap looks\n` +
         `  like; raise max_tokens in the designer's model pin, or read the run's token counts\n` +
         `  off its tokens_usages.`,
     );
   }
-  return { jsonl, runId: results.pipeline_run_id, cost: runCost(results) };
+  return designed;
 }
 
 /**

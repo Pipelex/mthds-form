@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
 
 install:
 	npm install
@@ -10,7 +10,7 @@ build-css:
 	npm run build:css
 
 lint:
-	npx eslint src/ .storybook/
+	npx eslint src/ .storybook/ "scripts/**/*.ts"
 
 format:
 	npm run format
@@ -20,6 +20,14 @@ format-check:
 
 typecheck:
 	npx tsc --noEmit
+
+# The offline drift gate over the designer method's generated tree: every
+# stamped file in src/generated/ui-designer/ against its codegen.lock, and the
+# method's source against the hash recorded beside it. No engine, no network,
+# no key. Red means the types were not regenerated after a bundle edit - the
+# refresh is /pipelex-integrate, never a hand edit of the tree.
+codegen-check:
+	npm run codegen:check
 
 test:
 	npx vitest run
@@ -32,7 +40,7 @@ test-watch:
 test-coverage:
 	npx vitest run --coverage
 
-check: lint format-check typecheck
+check: lint format-check typecheck codegen-check
 	@echo "All checks passed."
 
 c: check

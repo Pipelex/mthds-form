@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { Action, Catalog, Component } from '../generated/ui-designer/types';
 import { COMPONENT_NAMES, catalog } from './catalog';
 import { propsSignature } from './props-signature';
 import { generativeSchema } from './schema';
@@ -16,37 +17,21 @@ import { generativeSchema } from './schema';
  * value, and the hash stamped on a captured layout covers what was actually
  * sent.
  *
- * The member names are the wire's - the fields of the method's `Catalog`,
- * `Component` and `Action` concepts - because the value goes over as the
- * content of a structured input, verbatim.
+ * The shapes are the method's own: codegen projects the `Catalog`,
+ * `Component` and `Action` structures the bundle declares into
+ * `src/generated/ui-designer/`, and the aliases below are those types. So a
+ * field renamed in the bundle fails the type check on the literals here
+ * rather than a run, and the value goes over as the content of a structured
+ * input, verbatim. The import is type-only: the generated zod schemas stay
+ * out of the entry, which ships no validator for this value.
  */
 
-export interface DesignerComponent {
-  /** The component's name, exactly as a spec's `type` spells it. */
-  name: string;
-  /** The props signature: `{ label: string, value?: string }`. */
-  props: string;
-  /** What the component is for, as its definition describes it. */
-  description?: string;
-  /** Whether it renders its `children`. */
-  accepts_children: boolean;
-  /** Its named slots, beyond `children`. */
-  slots: string[];
-  /** The events it emits, bound through the element's `on` field. */
-  events: string[];
-}
-
-export interface DesignerAction {
-  name: string;
-  description: string;
-  /** True for the four the runtime handles without a host handler. */
-  built_in: boolean;
-}
-
-export interface DesignerCatalog {
-  components: DesignerComponent[];
-  actions: DesignerAction[];
-}
+/** The `Catalog` structure of `data/generative/ui-designer.mthds`, as codegen projects it. */
+export type DesignerCatalog = Catalog;
+/** One component of the catalog: its name, its props signature, what it is for, what it accepts. */
+export type DesignerComponent = Component;
+/** One action a page may bind to an event. */
+export type DesignerAction = Action;
 
 /** The concept a run request names for the `catalog` input: the method's own, domain-qualified. */
 export const DESIGNER_CATALOG_CONCEPT = 'generative.Catalog';
