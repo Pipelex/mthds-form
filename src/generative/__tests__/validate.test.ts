@@ -1,6 +1,9 @@
 import type { Spec } from '@json-render/core';
+import { defineCatalog } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
-import { formatProblems, validateAgainstCatalog } from '../validate';
+import { z } from 'zod';
+import { generativeSchema } from '../schema';
+import { formatProblems, validateAgainstCatalog, type ValidationCatalog } from '../validate';
 
 /**
  * The check a host runs on a layout before it renders it, beside `layoutFits`.
@@ -679,5 +682,93 @@ describe('a choice with an empty option', () => {
     });
     expect(verdict.ok).toBe(false);
     expect(formatProblems(verdict.problems)).toContain(`${type}.options`);
+  });
+});
+
+/**
+ * What a component renders is read off the catalog under validation, never
+ * off the component's name: a host may call something `Card` that renders no
+ * heading, and a vocabulary with neither a `Heading` nor a component that
+ * renders an h1 could never satisfy a demand for one.
+ */
+describe('a host catalog of its own', () => {
+  const host = defineCatalog(generativeSchema, {
+    components: {
+      Page: { props: z.object({}), slots: ['default'], description: 'A page.' },
+      PageTitle: {
+        props: z.object({ text: z.string() }),
+        slots: [],
+        description: 'The title; it renders as an h1.',
+      },
+      Card: {
+        props: z.object({ title: z.string().nullable() }),
+        slots: ['default'],
+        description: 'A box that renders no heading at all.',
+      },
+    },
+    actions: {},
+  });
+  const parts: Spec['elements'] = {
+    title: { type: 'PageTitle', props: { text: 'Plan a trip' }, children: [] },
+    card: { type: 'Card', props: { title: 'Budget' }, children: [] },
+  };
+  const spec = (children: string[]): Spec => ({
+    root: 'page',
+    elements: {
+      page: { type: 'Page', props: {}, children },
+      ...Object.fromEntries(children.map((child) => [child, parts[child]])),
+    },
+  });
+
+  it("is held to what its schemas say, and to nothing this entry's components render", () => {
+    // No h1 is asked for, since nothing in the vocabulary can render one; and
+    // a Card that shares a name with this entry's renders no h3.
+    const verdict = validateAgainstCatalog(spec(['card']), host);
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('is held to the renderings it declares', () => {
+    // Spelled out rather than spread: a `defineCatalog` result carries a
+    // `_specType` getter that throws when read.
+    const declaring: ValidationCatalog = {
+      componentNames: host.componentNames,
+      data: host.data,
+      renders: {
+        PageTitle: { heading: { level: 1 } },
+        Card: { heading: { level: 3, when: 'title' } },
+      },
+    };
+    const jumped = validateAgainstCatalog(spec(['title', 'card']), declaring);
+    expect(formatProblems(jumped.problems)).toContain(
+      "[card] Card's h3 jumps after PageTitle's h1",
+    );
+    const untitled = validateAgainstCatalog(spec(['card']), declaring);
+    expect(formatProblems(untitled.problems)).toContain(
+      '[page] the page has no h1: exactly one, as the heading a PageTitle renders.',
+    );
+  });
+});
+
+describe('a component a page has one of', () => {
+  it("refuses a second AppBar or Footer, which render the page's landmarks", () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: ['bar', 'hero', 'bar2', 'foot', 'foot2'] },
+        bar: { type: 'AppBar', props: { app: 'Trips' }, children: [] },
+        bar2: { type: 'AppBar', props: { app: 'Trips, again' }, children: [] },
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        foot: { type: 'Footer', props: { text: 'Runs on Pipelex.' }, children: [] },
+        foot2: { type: 'Footer', props: { text: 'Twice.' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    const text = formatProblems(verdict.problems);
+    expect(text).toContain(
+      "[bar2] a second AppBar (after [bar]): at most one on a page, since it renders as the page's banner.",
+    );
+    expect(text).toContain(
+      "[foot2] a second Footer (after [foot]): at most one on a page, since it renders as the page's contentinfo.",
+    );
   });
 });

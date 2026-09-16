@@ -7,6 +7,7 @@ import {
   generativeComponents,
 } from './components';
 import { generativeSchema } from './schema';
+import type { ComponentRendering } from './validate';
 
 /**
  * The catalog: everything the base vocabulary has, plus the chrome of a
@@ -121,10 +122,35 @@ const product = {
   },
 };
 
-export const catalog = defineCatalog(generativeSchema, {
-  components: { ...generativeComponents, ...product },
-  actions: generativeActions,
-});
+/**
+ * What this entry's components render beyond their schemas - the heading a
+ * title is, the landmark a bar or a footer renders as, the two children a
+ * split lays out, the panel per tab or step - declared once here, where the
+ * descriptions above say the same in prose for the model, and carried on the
+ * catalog so the validator reads it off whichever catalog it is handed. A
+ * host validating against a vocabulary of its own declares what its
+ * renderers do, or nothing.
+ */
+export const COMPONENT_RENDERINGS: Readonly<Record<string, ComponentRendering>> = {
+  Hero: { heading: { level: 1 } },
+  Section: { heading: { level: 2 } },
+  Rail: { heading: { level: 2 } },
+  Card: { heading: { level: 3, when: 'title' } },
+  AppBar: { once: "the page's banner" },
+  Footer: { once: "the page's contentinfo" },
+  Split: { children: { count: 2, roles: 'left, right' } },
+  Workspace: { children: { count: 2, roles: 'work, rail' } },
+  Tabs: { panels: { prop: 'tabs', noun: 'tab' } },
+  Steps: { panels: { prop: 'steps', noun: 'step' } },
+};
+
+export const catalog = Object.assign(
+  defineCatalog(generativeSchema, {
+    components: { ...generativeComponents, ...product },
+    actions: generativeActions,
+  }),
+  { renders: COMPONENT_RENDERINGS },
+);
 
 /** The spec type a layout is written against. */
 export type GenerativeSpec = typeof catalog._specType;

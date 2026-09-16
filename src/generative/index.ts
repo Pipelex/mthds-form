@@ -16,6 +16,7 @@
 // `@pipelex/mthds-form/ui-designer.mthds`; nothing here renders it.
 export {
   COMPONENT_NAMES,
+  COMPONENT_RENDERINGS,
   PRODUCT_COMPONENTS,
   catalog,
   type GenerativeSpec,
@@ -44,6 +45,7 @@ export {
 export {
   formatProblems,
   validateAgainstCatalog,
+  type ComponentRendering,
   type SpecProblem,
   type SpecVerdict,
   type ValidationCatalog,
