@@ -2,11 +2,14 @@ import type { z } from 'zod';
 
 /**
  * A component's props, as the one-line signature the designer method lists it
- * under: `{ label: string, value?: string | null, format?: "plain" | "integer" }`.
+ * under: `{ text: string, tag?: string }` for a `Footer`, whose `tag` is
+ * declared `.nullable()`, or `{ label: string, value: unknown, unit?: string,
+ * format?: "plain" | "integer" | "decimal" | "compact" }` for a `Metric`.
  *
  * It renders the SAME text json-render's own prompt renders for a zod schema,
- * case for case - a prop wrapped in `nullable` or `optional` gets a `?`, an
- * enum lists its values, `z.any()` prints as `unknown` - so a model that has
+ * case for case - a prop wrapped in `nullable` or `optional` gets a `?` and
+ * never a `| null`, an enum lists its values, `z.any()` prints as `unknown` -
+ * so a model that has
  * seen json-render's prompt reads a familiar shape. json-render does not export
  * its formatter (it hands it to a prompt template as a context member), and
  * the catalog travels to the method as data rather than as a rendered prompt,
