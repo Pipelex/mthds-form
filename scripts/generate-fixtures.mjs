@@ -1122,7 +1122,7 @@ async function generateSpecs(only) {
       `  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`,
     );
     const briefText = await renderHeroBrief(hero, g);
-    const { jsonl, results } = await designPage(pipeRef, () =>
+    const { jsonl, plan, results } = await designPage(pipeRef, () =>
       uiDesigner(
         { catalog, brief: briefText, ...(seed ? { seed: seedLine(seed) } : {}) },
         { ...overrides, onPoll: heartbeat },
@@ -1142,6 +1142,7 @@ async function generateSpecs(only) {
         brief: briefRelPath(pipeRef),
         jsonl,
         spec,
+        plan,
       }),
     );
     process.stdout.write(
@@ -1343,7 +1344,9 @@ function emitSpecs(caseName, specs) {
     ' * which seed and critic loop when there was one, and the hash of the prompt it was',
     ' * produced against - the designer method and the catalog data, together; the corpus',
     ' * test compares that hash with the current one, so a prompt change that invalidates a',
-    ' * spec is a failing test rather than a stale page.',
+    ' * spec is a failing test rather than a stale page. An entry the method produced also',
+    " * carries the planner's `plan`, read from the run's working memory: the intermediate",
+    ' * the builder was handed, which is where a page got its shape.',
     ' */',
     "import type { SpecFixture } from '../../generative/fixture';",
     '',

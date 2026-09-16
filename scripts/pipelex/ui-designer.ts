@@ -1,9 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { RunResults, WaitForResultOptions } from '@pipelex/sdk';
-import { parseText, serializeCatalog } from '../../src/generated/ui-designer/binder';
-import type { Catalog } from '../../src/generated/ui-designer/types';
+import type { DictWorkingMemory, RunResults, WaitForResultOptions } from '@pipelex/sdk';
+import { parsePagePlan, parseText, serializeCatalog } from '../../src/generated/ui-designer/binder';
+import type { Catalog, PagePlan } from '../../src/generated/ui-designer/types';
 import { DESIGNER_CATALOG_CONCEPT } from '../../src/generative/designer-catalog';
 import { getPipelexClient } from './client';
 
@@ -68,8 +68,39 @@ export interface UiDesignerOptions {
 export interface UiDesignerRun {
   /** The pipe's Text output: the JSONL patch lines, exactly as the model emitted them. */
   jsonl: string;
+  /** The planner's `PagePlan`, the intermediate the builder was handed, from the run's working memory. */
+  plan: PagePlan;
   /** The run as the API returned it: its id, its token usages and what they cost. */
   results: RunResults;
+}
+
+/**
+ * The hosted results payload carries the run's whole working memory beside
+ * `main_stuff`, keyed by stuff name; the SDK's `RunResults` declares only the
+ * bare runner's `pipe_output`, so the field is read through this narrowing.
+ */
+type WithWorkingMemory = RunResults & { working_memory?: DictWorkingMemory | null };
+
+/** The stuff the method's first stage wrote, by the name the sequence gives it. */
+const PLAN_STUFF = 'plan';
+
+/**
+ * The plan out of the run: the `plan` stuff's content, narrowed through the
+ * generated binder, so a plan the bundle's `PagePlan` structure no longer
+ * describes is refused here rather than stored. A run with no plan in its
+ * working memory is a loud failure - the sequence always writes one, so its
+ * absence means the payload is not the one this was written against.
+ */
+function planOf(results: WithWorkingMemory): PagePlan {
+  const memory = results.working_memory ?? results.pipe_output?.working_memory;
+  const stuff = memory?.root[PLAN_STUFF];
+  if (!stuff) {
+    throw new Error(
+      `run ${results.pipeline_run_id} carries no '${PLAN_STUFF}' stuff in its working memory; ` +
+        'the designer method writes one before it builds the page.',
+    );
+  }
+  return parsePagePlan(stuff.content);
 }
 
 /**
@@ -132,7 +163,8 @@ function withOverrides(contents: readonly string[], options: UiDesignerOptions):
  * against the generated schema on the way out - so a value that no longer
  * matches the bundle's `Catalog` structure is refused here, before a paid
  * run, rather than by the runner. The output is narrowed through the
- * generated binder: a `native.Text` arrives as `{ text }`.
+ * generated binder: a `native.Text` arrives as `{ text }`, and the plan the
+ * first stage wrote is read out of the working memory the same way.
  */
 export async function uiDesigner(
   inputs: UiDesignerInputs,
@@ -150,5 +182,5 @@ export async function uiDesigner(
     },
     { onPoll: options.onPoll },
   );
-  return { jsonl: parseText(results.main_stuff).text, results };
+  return { jsonl: parseText(results.main_stuff).text, plan: planOf(results), results };
 }

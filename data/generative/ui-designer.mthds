@@ -95,7 +95,7 @@ description = "The designer's plan for one page, settled before any element is w
 
 [concept.PagePlan.structure]
 purpose        = { type = "text", description = "One sentence: what this page is FOR and who is standing in front of it. It decides the shape, the order, the grouping and the tone of everything below.", required = true }
-title          = { type = "text", description = "The page's title, in a person's words: named after the job - \"Plan the trip\", never \"TripRequest\". Where it sits and what carries it is the composition's call.", required = true }
+title          = { type = "text", description = "The page's title, in a person's words: named after the job - \"Plan the trip\", never \"TripRequest\". It is the page's one h1; where it sits and what carries it is the composition's call.", required = true }
 composition    = { type = "text", description = "The shape of the whole page in a few sentences, decided for this page alone: how the space is divided, what comes first and largest, what stands beside what, what is grouped with what and why, what is staged or folded away, and where the method is run on an input page. No shape is given in advance; this is where it is decided.", required = true }
 regions        = { type = "list", item_type = "concept", item_concept_ref = "PlannedRegion", description = "The regions of the page in reading order, whatever the composition makes them: the parts of a column, the steps of a journey, the tabs, a panel beside the work, a band of figures. Every element the page lays out sits in one of them.", required = true }
 call_to_action = { type = "text", description = "On an input page, the words on the one control that runs the method - naming the job, \"Plan my trip\", never \"Submit\" - and the hint beside it, if one is needed. Empty on a result page." }
@@ -159,7 +159,7 @@ PLANNING RULES:
 1. The brief is the ONLY source of paths. Every element binds a path the brief lists, exactly as written; the page shows nothing the state does not carry, and invents no data.
 2. Delegate the paths the brief marks as delegated: MthdsField for an input, MthdsResult for a result, at the path and nothing else. Never plan another component over a delegated path.
 3. Lay out what you understand and delegate what you do not. A structure you choose not to lay out is delegated whole by its path; that is a valid choice, not a failure.
-4. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput takes a number path; a Switch or Checkbox a boolean path; an Input a text path; a Textarea a prose path.
+4. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput takes a number path; a Switch or Checkbox a boolean path; an Input a text path; a Textarea a prose path. A component that shows a value - a Metric, a Text, a Heading, a line that restates one - reads a scalar path: text, prose, number, boolean, date or choice, never a structure, a list or a file. A structure is shown through its members, a list through a repeat or a DataTable, a file through the delegated control.
 5. Every input the run waits for is on the page, in some region: laid out with the catalog's inputs, or delegated with MthdsField at its path. A Step or a Tab hides an input from the eye, never from the run: every input sits in some panel.
 6. Tabs and Steps hold exactly one panel per tab or step, in the same order, usually a Stack. Their own state - the active tab, the current step, an open Collapsible - is theirs, never the host's.
 7. An input page has exactly ONE control that runs the method, wherever the composition puts it, and no other Button: a Button bound to nothing does nothing, and navigation is never built out of Buttons, since Steps and Tabs carry their own.
@@ -225,7 +225,7 @@ THE PLAN:
 A designer has read the brief and planned this page: its purpose, its title, its composition, and its regions in reading order with the elements each holds. Build the page the plan describes: the composition it wrote is the shape of the page; each region holds the elements it names, with the components it names, bound to the paths it names; where a region names no container, choose the one from the catalog that builds what the composition describes. Where the plan is silent - a label, a helper sentence, a gap, a column count - decide as they would have, from the purpose and the composition they wrote. Do not add a region, drop an element or rebind a path; where the plan names a path the brief does not list, the brief wins.
 
 Purpose: {{ plan.purpose }}
-Title: {{ plan.title }}
+Title (the page's one h1): {{ plan.title }}
 Composition: {{ plan.composition }}
 
 REGIONS:
@@ -287,9 +287,9 @@ RULES:
 8. Lay out what you understand and delegate what you do not. A structure you choose not to lay out is delegated whole by its path; that is a valid choice, not a failure.
 9. An input page has exactly ONE control that runs the method, wherever the plan puts it, and it fires validateForm then run, in that order, on press. No other Button: a Button bound to nothing does nothing, and navigation is never built out of Buttons, since Steps and Tabs carry their own.
 10. Tabs and Steps take exactly one child per tab or step, in the same order; that child is the panel, usually a Stack. A Step hides an input from the eye, never from the run: every input the run waits for must sit in some panel.
-11. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput binds a number path; a Switch or Checkbox binds a boolean path; an Input binds a text path.
+11. Bind only what fits: a Segmented, Radio or Select lists exactly the brief's choices, spelled exactly; a NumberInput binds a number path; a Switch or Checkbox binds a boolean path; an Input binds a text path; a Textarea a prose path. A prop that shows a value - a Metric's value, a Text's text, a Heading's text, the value of a line that restates one, an interpolation in a $$template - reads a scalar path: text, prose, number, boolean, date or choice, never a structure, a list or a file. A structure is shown through its members, a list through a repeat or a DataTable, a file through MthdsField or MthdsResult.
 12. One root element, and it is a container that accepts children.
-13. Heading levels increase by one and never skip: exactly one h1 on the page, then h2 below it, then h3. A component whose description says it renders a heading counts at that level, so a Heading inside it starts one level down.
+13. The plan's title is on the page as its one h1 - a Heading at level h1, or the headline of a component whose description says it renders an h1 - and no other h1. Below it, heading levels increase by one and never skip: h2, then h3. A component whose description says it renders a heading counts at that level, so a Heading inside it starts one level down.
 14. Never set a "className" prop. Colour, spacing and type come from the components as they are.
 
 ---

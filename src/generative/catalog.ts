@@ -97,7 +97,7 @@ const product = {
     }),
     slots: [],
     description:
-      'A line that restates a value: a muted label at the left, a bound value at the right. "value" and the optional "detail" are read with { "$state": "/inputs/..." } and joined by "separator" (a space by default); while both are empty the row shows "placeholder", or a dash.',
+      'A line that restates a value: a muted label at the left, a bound value at the right. "value" and the optional "detail" are read with { "$state": "/inputs/..." } and joined by "separator" (a space by default); each is a scalar path - text, number, boolean, date or choice - never a structure, a list or a file. While both are empty the row shows "placeholder", or a dash.',
     example: {
       label: 'Budget',
       value: { $state: '/inputs/request/budget' },

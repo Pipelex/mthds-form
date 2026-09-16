@@ -329,32 +329,37 @@ describe('the captured layouts', () => {
 
       /**
        * The method asks for exactly one h1, and a Hero's headline is one. The
-       * validator checks that heading levels never skip but not that the h1
-       * is there - it counts Heading elements only, and knows nothing of what
-       * the product components render - so a page may come back without one,
-       * as the slide designer's did, and this test does not refuse what the
-       * harness accepted. Two would be a page with two titles, which nothing
-       * downstream excuses.
+       * validator holds a layout to it, counting what the product components
+       * render; this is the same fact read off the corpus, so a capture with
+       * no title, as the slide designer's once was, is refused twice over.
        */
-      it('never has two h1s, counting a Hero as one', () => {
+      it('has exactly one h1, counting a Hero as one', () => {
         const elements = Object.values(fixture.spec.elements);
         const heroes = elements.filter((element) => element.type === 'Hero').length;
         const headings = elements.filter(
           (element) => element.type === 'Heading' && element.props.level === 'h1',
         ).length;
-        expect(heroes + headings).toBeLessThanOrEqual(1);
+        expect(heroes + headings).toBe(1);
       });
 
-      it('binds a SummaryRow only to paths the descriptor has', () => {
+      /**
+       * A SummaryRow restates a VALUE. One bound to `/inputs/document`, a
+       * structure of a url and a filename, rendered `[object Object]`: the
+       * path existed, the spec validated, and the renderer stringified what
+       * it was handed. The fit gate now refuses it; this reads the same fact
+       * off the corpus, in the terms the defect was filed in.
+       */
+      it('binds a SummaryRow only to scalar paths the descriptor has', () => {
         for (const [key, element] of Object.entries(fixture.spec.elements)) {
           if (element.type !== 'SummaryRow') continue;
           for (const prop of ['value', 'detail'] as const) {
             const bound = (element.props as Record<string, { $state?: unknown }>)[prop]?.$state;
             if (bound === undefined) continue;
-            expect(
-              typeof bound === 'string' && inputFieldAtPath(inputs, bound),
-              `${key}.${prop}`,
-            ).toBeTruthy();
+            const field = typeof bound === 'string' ? inputFieldAtPath(inputs, bound) : undefined;
+            expect(field, `${key}.${prop}`).toBeDefined();
+            expect(field!.kind, `${key}.${prop} shows ${String(bound)}`).not.toMatch(
+              /^(object|list|document|image)$/,
+            );
           }
         }
       });

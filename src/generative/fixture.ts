@@ -1,4 +1,5 @@
 import type { Spec } from '@json-render/core';
+import type { PagePlan } from '../generated/ui-designer/types';
 
 /**
  * A spec with its provenance - the shape every fixture takes, whoever produced
@@ -50,6 +51,14 @@ export interface SpecFixture {
   jsonl: string;
   /** The compiled spec. */
   spec: Spec;
+  /**
+   * The planner's plan, when the producer was the designer method: the
+   * intermediate the builder was handed, read from the run's working memory.
+   * It is what a person reads to see why a page has the shape it has, and it
+   * is the one stage a comparison between two runs can be made at. Absent for
+   * a producer that plans nowhere the harness can read.
+   */
+  plan?: PagePlan;
 }
 
 /**

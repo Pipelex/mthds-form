@@ -70,7 +70,7 @@ describe('the validator', () => {
     });
     expect(verdict.ok).toBe(false);
     const text = formatProblems(verdict.problems);
-    expect(text).toContain('[section] Heading jumps to h3 after h1');
+    expect(text).toContain('[section] h3 jumps after h1');
     expect(text).not.toContain('[sub]');
   });
 
@@ -87,7 +87,11 @@ describe('the validator', () => {
     const verdict = validateAgainstCatalog({
       root: 'h',
       elements: {
-        h: { type: 'Heading', props: { text: { $state: '/result/name' } }, children: [] },
+        h: {
+          type: 'Heading',
+          props: { text: { $state: '/result/name' }, level: 'h1' },
+          children: [],
+        },
       },
     });
     expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
@@ -149,7 +153,8 @@ describe('the actions a layout binds', () => {
     ({
       root: 'page',
       elements: {
-        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['cta'] },
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'cta'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
         cta: { type: 'Cta', props: { label: 'Plan my trip' }, children: [], on: { press } },
       },
     }) as unknown as Spec;
@@ -268,7 +273,8 @@ describe('a binding that sits off the event path', () => {
     ({
       root: 'page',
       elements: {
-        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['cta'] },
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'cta'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
         cta: { type: 'Cta', props: { label: 'Plan my trip' }, children: [], ...cta },
       },
     }) as unknown as Spec;
@@ -410,7 +416,8 @@ describe('the event a layout binds', () => {
     ({
       root: 'page',
       elements: {
-        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['el'] },
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'el'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
         el: { type, props, children: [], on: { [event]: [{ action: 'run' }] } },
       },
     }) as unknown as Spec;
@@ -462,11 +469,15 @@ describe('an expression where a name belongs', () => {
   });
 
   it('still accepts the literal names, and an expression where a value belongs', () => {
-    expect(validateAgainstCatalog(heading('h3')).ok).toBe(true);
+    expect(validateAgainstCatalog(heading('h1')).ok).toBe(true);
     const bound = validateAgainstCatalog({
       root: 'h',
       elements: {
-        h: { type: 'Heading', props: { text: { $state: '/result/name' } }, children: [] },
+        h: {
+          type: 'Heading',
+          props: { text: { $state: '/result/name' }, level: 'h1' },
+          children: [],
+        },
       },
     });
     expect(bound.ok, formatProblems(bound.problems)).toBe(true);
@@ -504,7 +515,10 @@ describe('a spec malformed in a way json-render itself throws on', () => {
  */
 describe('a layout nested deeper than the entry renders', () => {
   const chain = (length: number): Spec => {
-    const elements: Record<string, unknown> = {};
+    const elements: Record<string, unknown> = {
+      page: { type: 'Stack', props: {}, children: ['title', 'e0'] },
+      title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
+    };
     for (let index = 0; index < length; index += 1) {
       elements[`e${index}`] = {
         type: 'Text',
@@ -512,7 +526,7 @@ describe('a layout nested deeper than the entry renders', () => {
         children: index + 1 < length ? [`e${index + 1}`] : [],
       };
     }
-    return { root: 'e0', elements } as unknown as Spec;
+    return { root: 'page', elements } as unknown as Spec;
   };
 
   it('refuses it, and says so in the layout’s own terms', () => {
@@ -552,6 +566,94 @@ describe('a container with a fixed number of children', () => {
     expect(formatProblems(verdict.problems)).toContain(
       'Workspace takes exactly 2 children (work, rail); this one has 3',
     );
+  });
+});
+
+/**
+ * A `Heading` is not the only element that renders one. A Hero's headline is
+ * an h1, a Section's and a Rail's title an h2, a titled Card's an h3 - and the
+ * check used to count Heading elements alone, so a page with no h1 passed, as
+ * the slide designer's did, and a Hero over a titled Card was a jump from h1
+ * to h3 that nothing saw before the a11y gate. The product components count
+ * at the level their descriptions state, where they render.
+ */
+describe('the headings the product components render', () => {
+  const stack = (children: string[]) => ({ type: 'Stack', props: {}, children });
+
+  it('counts a Hero as the h1, and a Section and a Rail as h2s under it', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'work', 'rail']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        work: { type: 'Section', props: { title: 'Where' }, children: ['fine'] },
+        fine: { type: 'Heading', props: { text: 'Dates', level: 'h3' }, children: [] },
+        rail: { type: 'Rail', props: { title: 'Your trip' }, children: [] },
+      },
+    });
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
+  });
+
+  it('refuses a page with no h1', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['work']),
+        work: { type: 'Section', props: { title: 'Where' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain('[page] the page has no h1');
+  });
+
+  it('refuses a second h1, whichever element renders it', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'title']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        title: { type: 'Heading', props: { text: 'Plan a trip', level: 'h1' }, children: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      "[title] a second h1 (h1, after Hero's h1 at [hero])",
+    );
+  });
+
+  it("refuses a titled Card straight under the h1, and accepts one under a Section's h2", () => {
+    const card = { type: 'Card', props: { title: 'Budget' }, children: [] };
+    const jumped = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'card']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        card,
+      },
+    });
+    expect(formatProblems(jumped.problems)).toContain("[card] Card's h3 jumps after Hero's h1");
+    const nested = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'work']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        work: { type: 'Section', props: { title: 'Money' }, children: ['card'] },
+        card,
+      },
+    });
+    expect(nested.ok, formatProblems(nested.problems)).toBe(true);
+  });
+
+  it('counts a Card as a heading only when it has a title', () => {
+    const verdict = validateAgainstCatalog({
+      root: 'page',
+      elements: {
+        page: stack(['hero', 'card']),
+        hero: { type: 'Hero', props: { headline: 'Plan a trip' }, children: [] },
+        card: { type: 'Card', props: { description: 'No title' }, children: [] },
+      },
+    });
+    expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
   });
 });
 

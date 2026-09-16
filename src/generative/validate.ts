@@ -368,37 +368,76 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
       }
     }
   }
-  // 5. Heading levels increase by one, in render order. The Storybook a11y
-  //    gate runs axe's `heading-order` at error, and a page that jumps from
-  //    h1 to h3 fails it; saying so here makes it a rejected spec with a
-  //    re-run rather than a failing story with a fixture nobody may edit.
-  const levels: { key: string; level: number }[] = [];
+  // 5. Exactly one h1, and heading levels that increase by one, in render
+  //    order. The Storybook a11y gate runs axe's `heading-order` at error, and
+  //    a page that jumps from h1 to h3 fails it; saying so here makes it a
+  //    rejected spec with a re-run rather than a failing story with a fixture
+  //    nobody may edit. A `Heading` is not the only element that renders one:
+  //    the product components render their titles as headings too, at the
+  //    level their descriptions state, and the walk counts them where they
+  //    render - before their children, since a title comes first. Counting
+  //    `Heading` elements alone let a page with no h1 through, and one with a
+  //    Hero over a Section over a titled Card was three headings the check
+  //    never saw. `hasOwnProp`, because the type is model-written.
+  // A Card renders its title as a heading only when it has one; a bound title
+  // counts, since it renders whenever the value is set.
+  const present = (value: unknown) => value !== undefined && value !== null && value !== '';
+  const HEADING_LEVELS: Record<string, { level: number; when?: string }> = {
+    Hero: { level: 1 },
+    Section: { level: 2 },
+    Rail: { level: 2 },
+    Card: { level: 3, when: 'title' },
+  };
+  const levels: { key: string; type: string; level: number }[] = [];
   const seen = new Set<string>();
   const walk = (key: string) => {
     if (seen.has(key)) return;
     seen.add(key);
     const element = spec.elements[key];
     if (!element) return;
+    const props = (element.props ?? {}) as Record<string, unknown>;
     if (element.type === 'Heading') {
-      const level = String((element.props as { level?: unknown }).level ?? 'h2');
+      const level = String(props.level ?? 'h2');
       const match = /^h([1-4])$/.exec(level);
-      if (match) levels.push({ key, level: Number(match[1]) });
+      if (match) levels.push({ key, type: 'Heading', level: Number(match[1]) });
+    } else if (hasOwnProp(HEADING_LEVELS, element.type)) {
+      const rendered = HEADING_LEVELS[element.type]!;
+      const has = rendered.when === undefined || present(props[rendered.when]);
+      if (has) levels.push({ key, type: element.type, level: rendered.level });
     }
     for (const child of element.children ?? []) walk(child);
     for (const slot of Object.values(element.slots ?? {})) for (const child of slot) walk(child);
   };
   if (spec.root) walk(spec.root);
-  // The first heading sets the page's level, as axe reads it; every one after
-  // it may go deeper by one at most.
-  let previous: number | undefined;
+  const describe = (heading: { type: string; level: number }) =>
+    heading.type === 'Heading' ? `h${heading.level}` : `${heading.type}'s h${heading.level}`;
+  // Every heading after the first may go deeper than the one before it by
+  // one at most, as axe reads it.
+  let previous: { type: string; level: number } | undefined;
   for (const heading of levels) {
-    if (previous !== undefined && heading.level > previous + 1) {
+    if (previous !== undefined && heading.level > previous.level + 1) {
       problems.push({
         elementKey: heading.key,
-        message: `Heading jumps to h${heading.level} after h${previous}: levels increase by one, never by more.`,
+        message: `${describe(heading)} jumps after ${describe(previous)}: heading levels increase by one, never by more.`,
       });
     }
-    previous = heading.level;
+    previous = heading;
+  }
+  // One h1, which is the page's title: a page without one has no name for a
+  // screen reader to announce, and a page with two has two.
+  const firsts = levels.filter((heading) => heading.level === 1);
+  if (firsts.length === 0 && spec.root) {
+    problems.push({
+      elementKey: spec.root,
+      message:
+        'the page has no h1: exactly one, as a Heading at level h1 or as the headline of a Hero.',
+    });
+  }
+  for (const extra of firsts.slice(1)) {
+    problems.push({
+      elementKey: extra.key,
+      message: `a second h1 (${describe(extra)}, after ${describe(firsts[0]!)} at [${firsts[0]!.key}]): exactly one on a page.`,
+    });
   }
 
   // 6. A container that takes a fixed number of children, and would drop the

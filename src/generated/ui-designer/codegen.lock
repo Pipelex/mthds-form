@@ -1,7 +1,7 @@
 # codegen.lock — generated artifact set (Pipelex codegen). Do not edit by hand.
 
 lock_version = 1
-crate_fingerprint = "e4999e9bdfa4d12c3a547e28c6ed2f2ba521f83846e95041df509d0d9546d104"
+crate_fingerprint = "92004f8c6ff810c748c6ad511ad7aa0c42d2d3a0d9091c525c02756b117cd764"
 engine_version = "0.59.0"
 
 [[artifacts]]
@@ -10,4 +10,4 @@ content_hash = "829d66055150bebf22eb1de930a765f3339ac5ec941561bd1251b3061c803e1c
 
 [[artifacts]]
 path = "types.ts"
-content_hash = "e313d7853fd31ff2d0f8a3014eb68004f3c47718f29e2fc88c582f95e9f96561"
+content_hash = "0b7ea87fda21b79a726413f58b84a7ceddae6f99745269587b8e1115acf23185"

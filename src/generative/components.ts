@@ -157,6 +157,8 @@ const components = {
   Card: {
     ...shadcn.Card,
     props: shadcn.Card.props.omit({ className: true, maxWidth: true, centered: true }),
+    description:
+      'Container card for content sections. Use for forms/content boxes, NOT for page headers. Its optional "title" renders as an h3, so a titled Card sits under an h2.',
   },
   Stack: { ...shadcn.Stack, props: shadcn.Stack.props.omit({ className: true }) },
   Grid: { ...shadcn.Grid, props: shadcn.Grid.props.omit({ className: true }) },

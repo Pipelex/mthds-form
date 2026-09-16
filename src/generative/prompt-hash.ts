@@ -26,7 +26,7 @@ import type { DesignerCatalog } from './designer-catalog';
  * back to the kernel's own form - because the vocabulary it was written in is
  * no longer the vocabulary this entry renders.
  */
-export const PROMPT_HASH = '4d40c8383dcf';
+export const PROMPT_HASH = '15d195df65f3';
 
 /**
  * What the hash is computed over: the method's text as shipped, then the

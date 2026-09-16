@@ -274,6 +274,156 @@ describe('a path the layout reads rather than binds', () => {
  * unbounded. `validateAgainstCatalog` refuses such a spec outright, but the two
  * predicates are exported separately and neither may assume the other ran.
  */
+/**
+ * The defect that named this check: a SummaryRow bound to `/inputs/document`,
+ * a structure of a url and a filename, rendered `[object Object]`. The path
+ * existed, so nothing was stale; the spec validated; the renderer stringified
+ * what it was handed. Only the descriptor knows the path is not a value.
+ */
+describe('a path shown as a value', () => {
+  // Optional throughout, so the coverage half has nothing to say.
+  const document: RunField = { kind: 'document', name: 'document', required: false };
+  const request: RunField = {
+    kind: 'object',
+    name: 'request',
+    required: false,
+    fields: [
+      text('city', true),
+      { kind: 'number', name: 'budget', required: false, integer: false },
+    ],
+  };
+  const tags: RunField = {
+    kind: 'list',
+    name: 'tags',
+    required: false,
+    item: text('tag', true),
+  };
+  const inputs = [document, request, tags];
+  const page = (elements: Record<string, unknown>): Spec =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: {}, children: Object.keys(elements) },
+        ...elements,
+      },
+    }) as unknown as Spec;
+
+  it('is refused when a SummaryRow shows a file', () => {
+    const problems = layoutProblems(
+      { inputs },
+      page({
+        row: {
+          type: 'SummaryRow',
+          props: { label: 'File', value: { $state: '/inputs/document' } },
+        },
+      }),
+    );
+    expect(problems).toEqual([
+      "row: value shows /inputs/document, which is a file and not a value; a prop that shows a value takes a scalar path, and a file is delegated to the kernel's own control",
+    ]);
+  });
+
+  it('is refused when a Metric shows a structure, and accepted when it shows a member', () => {
+    const whole = page({
+      m: { type: 'Metric', props: { label: 'Request', value: { $state: '/inputs/request' } } },
+    });
+    expect(layoutProblems({ inputs }, whole)).toEqual([
+      'm: value shows /inputs/request, which is a structure and not a value; a prop that shows a value takes a scalar path, and a structure is shown through its members',
+    ]);
+    const member = page({
+      m: {
+        type: 'Metric',
+        props: { label: 'Budget', value: { $state: '/inputs/request/budget' } },
+      },
+    });
+    expect(layoutProblems({ inputs }, member)).toEqual([]);
+  });
+
+  it('is refused when a template interpolates a list, which stringifies comma-joined', () => {
+    const problems = layoutProblems(
+      { inputs },
+      page({
+        t: { type: 'Text', props: { text: { $template: 'Tagged ${/inputs/tags}' } } },
+      }),
+    );
+    expect(problems).toEqual([
+      't: text shows /inputs/tags, which is a list and not a value; a prop that shows a value takes a scalar path, and a list is laid out as a repeat or a DataTable',
+    ]);
+  });
+
+  it('is accepted in a prop that takes a list: the rows of a DataTable, the links of an AppBar', () => {
+    const spec = page({
+      table: {
+        type: 'DataTable',
+        props: { rows: { $state: '/inputs/tags' }, columns: [{ path: 'tag', label: 'Tag' }] },
+      },
+      bar: { type: 'AppBar', props: { app: 'Tags', links: { $state: '/inputs/tags' } } },
+    });
+    expect(layoutProblems({ inputs }, spec)).toEqual([]);
+  });
+
+  it('is accepted in a condition, which only asks whether the value is set', () => {
+    const spec = page({
+      row: {
+        type: 'SummaryRow',
+        props: {
+          label: 'File',
+          value: {
+            $cond: { $state: '/inputs/document' },
+            $then: { $state: '/inputs/request/city' },
+            $else: 'none yet',
+          },
+        },
+        visible: { $state: '/inputs/document' },
+      },
+    });
+    expect(layoutProblems({ inputs }, spec)).toEqual([]);
+  });
+
+  it('is refused for the item itself inside a repeat over structures, and accepted for a member', () => {
+    const lines: RunField = {
+      kind: 'list',
+      name: 'lines',
+      required: false,
+      item: { kind: 'object', name: 'line', required: true, fields: [text('name', true)] },
+    };
+    const result: RunField = {
+      kind: 'object',
+      name: 'result',
+      required: true,
+      fields: [lines],
+    };
+    const shown = (item: string): Spec =>
+      ({
+        root: 'page',
+        elements: {
+          page: { type: 'Stack', props: {}, children: ['rows'] },
+          rows: {
+            type: 'Stack',
+            props: {},
+            repeat: { statePath: '/result/lines' },
+            children: ['line'],
+          },
+          line: { type: 'Text', props: { text: { $item: item } } },
+        },
+      }) as unknown as Spec;
+    expect(layoutProblems({ result }, shown(''))).toEqual([
+      'line: text shows /result/lines/0, which is a structure and not a value; a prop that shows a value takes a scalar path, and a structure is shown through its members',
+    ]);
+    expect(layoutProblems({ result }, shown('name'))).toEqual([]);
+  });
+
+  it('says nothing of a path the descriptor does not have: the staleness check names it', () => {
+    const problems = layoutProblems(
+      { inputs },
+      page({
+        row: { type: 'SummaryRow', props: { label: 'Gone', value: { $state: '/inputs/gone' } } },
+      }),
+    );
+    expect(problems).toEqual(['/inputs/gone is read, and no input has it']);
+  });
+});
+
 describe('a layout whose elements form a cycle', () => {
   it('terminates instead of hanging, and reports the hatch it could not place', () => {
     const spec: Spec = {
