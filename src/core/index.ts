@@ -69,6 +69,7 @@ export {
 // copies of an answer is two places for it to drift. See ./native-content.
 export type {
   CompositeMember,
+  DataUrlView,
   DateContentView,
   DocumentContentView,
   HtmlContentView,
@@ -86,6 +87,7 @@ export {
   isNativeHtmlNode,
   isViewableUrl,
   readCompositeContent,
+  readDataUrl,
   readDateContent,
   readDocumentContent,
   readHtmlContent,

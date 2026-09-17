@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import type { RunField } from '../core';
+import type { ObjectRunField, RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import type { CompositeMember, DocumentContentView } from '../core/native-content';
 import {
@@ -34,7 +34,8 @@ import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
 import { Markdown } from './markdown';
-import { useFieldStrings } from './field-strings';
+import { encodedFileSummary } from './encoded-file';
+import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldLabel, humanizeFieldName, useFieldPresentation } from './field-presentation';
 import { cn } from './utils';
 
@@ -280,9 +281,15 @@ function DateValue({ value }: { value: unknown }) {
  * printing it whole is five wrapped lines that say one thing — this is a file.
  * The last path segment is the part a person reads; the whole reference stays on
  * the `title`, because it is the part they occasionally need to copy.
+ *
+ * A `data:` URL has no path to take a segment from: it IS the file, and its
+ * "last segment" was whatever base64 followed the final `/`. It is named by its
+ * format and size instead.
  */
-function fileLabel(url: string, filename?: string): string {
+function fileLabel(url: string, filename: string | undefined, strings: FieldStrings): string {
   if (filename) return filename;
+  const encoded = encodedFileSummary(url, strings);
+  if (encoded !== undefined) return encoded;
   const path = url.split(/[?#]/)[0] ?? url;
   const segment = path.split('/').filter(Boolean).pop();
   return segment && segment.length > 0 ? segment : url;
@@ -428,8 +435,12 @@ function FileRef({
   mimeType?: string;
   filename?: string;
 }) {
-  const label = fileLabel(url, filename);
-  const title = mimeType ? `${url} · ${mimeType}` : url;
+  const s = useFieldStrings();
+  const label = fileLabel(url, filename, s);
+  // A `data:` URL on the `title` is the whole file in a tooltip; its summary is
+  // what there is to say, and the copy control still carries the URL.
+  const reference = encodedFileSummary(url, s) ?? url;
+  const title = mimeType ? `${reference} · ${mimeType}` : reference;
   // Judged here as well as by the caller, because this component is also given
   // the raw reference as the "nothing paintable" fallback - and the HREF is the
   // gate's own string, never the candidate, so an accepted URL and the one
@@ -643,7 +654,7 @@ function DocumentValue({ value }: { value: unknown }) {
   const [open, setOpen] = useState(false);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
-  const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename);
+  const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename, s);
   const preview = previewableUrl(content, resolve);
   return (
     <div className="space-y-2">
@@ -767,7 +778,7 @@ function ImageValue({
             title={content.url}
             className="w-full truncate font-mono text-[10.5px] text-muted-foreground"
           >
-            {fileLabel(content.url, content.filename)}
+            {fileLabel(content.url, content.filename, s)}
           </span>
         </div>
       ) : (
@@ -876,9 +887,52 @@ function LeafValue({
       return <DocumentValue value={value} />;
     case 'image':
       return <ImageValue value={value} compact={compact} />;
+    case 'object':
+      // In a cell, a record is NAMED rather than printed. Anywhere else it never
+      // reaches here - `ResultField` lays a record out as its own grid - so the
+      // non-compact arm is only the payload-disagrees floor every kind has.
+      return compact ? <RecordSummary field={field} value={value} /> : <Scalar value={value} />;
     default:
       return <Scalar value={value} compact={compact} />;
   }
+}
+
+/**
+ * A record in a table cell, as the one line that names it.
+ *
+ * A structure is not a cell at any width, and the row expands to the whole of
+ * it. What the cell showed until then was the default `Scalar`, which for an
+ * object is its JSON: the collapsed table - what a person reads FIRST - said
+ * `{ "candidate_name": "Amara Okafor", "criterion_s…` down one column and
+ * `{ "subje…` down the next.
+ *
+ * What names a record is the descriptor's to say, not the value's: its first
+ * `text` field in authored order (`candidate_name`, `subject`), else its first
+ * `prose` field, shown as that field's own cell would show it. The pick is made
+ * on the field list alone, so every row of a column is named by the same field
+ * and an empty one reads as that field's absence. A record with neither says how
+ * many fields it holds, as a nested list says how many entries.
+ *
+ * Two concepts are not records to a reader. A `native.Date` is a date, read by
+ * the arm that reads one. `native.Html`'s first text field is its markup source,
+ * which is exactly what a result view must not print, so it takes the count.
+ */
+function RecordSummary({ field, value }: { field: ObjectRunField; value: unknown }) {
+  const s = useFieldStrings();
+  if (isNativeDateNode(field)) return <DateValue value={value} />;
+  if (!isRecord(value) || Object.keys(value).length === 0) return <Absent />;
+  const naming = isNativeHtmlNode(field)
+    ? undefined
+    : (field.fields.find((member) => member.kind === 'text') ??
+      field.fields.find((member) => member.kind === 'prose'));
+  if (naming === undefined) {
+    return (
+      <span className="whitespace-nowrap text-[12.5px] text-muted-foreground">
+        {s.fieldsCount(field.fields.length)}
+      </span>
+    );
+  }
+  return <LeafValue field={naming} value={ownProp(value, naming.name)} compact />;
 }
 
 /**
@@ -941,9 +995,9 @@ function LoadingImage({ src, alt, className }: { src: string; alt: string; class
 function ScalarChips({ field, items }: { field: RunField; items: readonly unknown[] }) {
   return (
     // `data-chips` is the hook the definition grid's value cell reaches through:
-    // `text-right` has no effect on flex children, so a row of tags would keep
-    // starting under its label while every value beside it ended at the right
-    // edge. The attribute keeps that one selector out of this component's own
+    // the cell ends its VALUE at the right edge, and a row of tags long enough
+    // to wrap fills the column, so without the hook each line of tags would
+    // start at the left while every value beside it ended at the right. The attribute keeps that one selector out of this component's own
     // class list - chips are laid out the same way everywhere, and only the
     // caller knows which edge they should end on.
     <div data-chips className="flex flex-wrap gap-1.5">
@@ -1619,12 +1673,23 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
                       `col-span-2` branch (prose, a table, a gallery, a frame)
                       owns its full width and reads left-to-right like the
                       paragraph or grid it is; right-aligning those would be
-                      aligning a block, not an answer. `text-right` also travels
-                      into a chip row through `justify-end`, so a list of tags
-                      ends where the numbers above it do rather than starting
-                      under the label. */}
-                  <div className="min-w-0 text-right **:data-chips:justify-end">
-                    <LeafValue field={child} value={memberValue(child)} />
+                      aligning a block, not an answer. A chip row takes the same
+                      edge through `justify-end` on its `data-chips` hook, so a
+                      list of tags ends where the numbers above it do rather than
+                      starting under the label. */}
+                  {/* A value that WRAPS aligns left. The flex row ends a
+                      one-line value at the right edge, as above; one that
+                      needs more than a line is shrunk to the column's width
+                      and reads left to right inside it, because a paragraph
+                      flushed right has a ragged left edge on every line. The
+                      descriptor cannot say which a value will be - an
+                      unbounded `text` holds a company name in one record and
+                      ninety words in the next - and this needs no telling:
+                      the value's own width decides, without being measured. */}
+                  <div className="flex min-w-0 justify-end **:data-chips:justify-end">
+                    <div className="min-w-0 text-left wrap-break-word">
+                      <LeafValue field={child} value={memberValue(child)} />
+                    </div>
                   </div>
                 </Fragment>
               ) : (

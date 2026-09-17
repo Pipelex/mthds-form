@@ -32,6 +32,13 @@ Two properties make that guard worth trusting, and both were added after watchin
 
 `Toolchain/Token Fallbacks` in the Storybook is the half no scanner can answer: a real form over a real fixture with every token set to `initial` — the guaranteed-invalid value, and therefore indistinguishable from a host that never declared them — asserting in a browser that the surfaces still paint and the geometry still rounds.
 
+### Fixed - a result reads as what it holds
+
+- **A nested record in a result table cell**: the cell names the record by its first `text` field (else its first `prose` field) instead of printing its JSON, a record with neither shows how many fields it holds, and a `native.Date` cell shows its date.
+- **A wrapping value in a record's label and value rows**: a value longer than a line now fills its column and aligns left, while a one-line value still ends at the right edge.
+- **A file carried in a `data:` URL**: the file control's subtitle and the result view's file label show the format and the decoded size (`PDF · 36 KB`) instead of the base64 string; `readDataUrl` and its `DataUrlView` are exported from the core entry.
+- **`FieldStrings` gains `encodedFileSummary` and `fieldsCount` (Breaking)**: a host that supplies a complete `FieldStrings` rather than a partial override adds both.
+
 ### Security - the result view's URL policy
 
 Every URL in a payload is now judged by one gate before any sink acts on it, and the sinks take the string the gate returned rather than the string it was handed. `viewableUrl` and its guard `isViewableUrl` are exported from the core entry, so a host that wants to pre-judge a payload gets the kernel's own answer instead of restating it.

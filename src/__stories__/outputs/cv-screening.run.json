@@ -1,0 +1,894 @@
+{
+  "run_id": "run_b70801fd-de05-4d24-8e60-d9c76f115dfb",
+  "output_form": {
+    "cv_screening.screen_candidates": {
+      "field": {
+        "kind": "object",
+        "name": "output",
+        "concept_ref": "cv_screening.ScreeningReport",
+        "description": "The full screening report for a job offer and a batch of CVs",
+        "required": true,
+        "fields": [
+          {
+            "kind": "object",
+            "name": "scorecard",
+            "concept_ref": "cv_screening.Scorecard",
+            "description": "The scorecard built from the job offer",
+            "required": true,
+            "fields": [
+              {
+                "kind": "text",
+                "name": "role_title",
+                "description": "Title of the position",
+                "required": true
+              },
+              {
+                "kind": "text",
+                "name": "company_name",
+                "description": "Name of the hiring company, if stated in the job offer",
+                "required": false
+              },
+              {
+                "kind": "text",
+                "name": "role_summary",
+                "description": "Brief summary of the role and its main responsibilities",
+                "required": true
+              },
+              {
+                "kind": "list",
+                "name": "criteria",
+                "concept_ref": "cv_screening.ScorecardCriterion",
+                "description": "Weighted evaluation criteria",
+                "required": true,
+                "item": {
+                  "kind": "object",
+                  "concept_ref": "cv_screening.ScorecardCriterion",
+                  "description": "One weighted criterion of a hiring scorecard",
+                  "required": true,
+                  "fields": [
+                    {
+                      "kind": "text",
+                      "name": "name",
+                      "description": "Short name of the criterion",
+                      "required": true
+                    },
+                    {
+                      "kind": "text",
+                      "name": "description",
+                      "description": "What this criterion assesses for the role",
+                      "required": true
+                    },
+                    {
+                      "kind": "number",
+                      "name": "weight",
+                      "description": "Relative weight in percent; all criteria weights of a scorecard sum to 100",
+                      "required": true,
+                      "integer": true
+                    },
+                    {
+                      "kind": "boolean",
+                      "name": "is_must_have",
+                      "description": "Whether the criterion is a hard requirement of the role",
+                      "required": true
+                    },
+                    {
+                      "kind": "text",
+                      "name": "evidence",
+                      "description": "Concrete signals in a CV that demonstrate this criterion",
+                      "required": true
+                    }
+                  ]
+                }
+              },
+              {
+                "kind": "number",
+                "name": "fit_threshold",
+                "description": "Minimum overall score (0-100) for a candidate to be considered a fit",
+                "required": true,
+                "integer": true
+              }
+            ]
+          },
+          {
+            "kind": "list",
+            "name": "candidates",
+            "concept_ref": "cv_screening.CandidateScreening",
+            "description": "The screening outcome of each CV, in input order",
+            "required": true,
+            "item": {
+              "kind": "object",
+              "concept_ref": "cv_screening.CandidateScreening",
+              "description": "The screening outcome for one candidate: their evaluation plus the follow-up for the verdict",
+              "required": true,
+              "fields": [
+                {
+                  "kind": "object",
+                  "name": "evaluation",
+                  "concept_ref": "cv_screening.CvEvaluation",
+                  "description": "The CV evaluation against the scorecard",
+                  "required": true,
+                  "fields": [
+                    {
+                      "kind": "text",
+                      "name": "candidate_name",
+                      "description": "Candidate's name as written on the CV",
+                      "required": true
+                    },
+                    {
+                      "kind": "list",
+                      "name": "criterion_scores",
+                      "concept_ref": "cv_screening.CriterionScore",
+                      "description": "Score for each scorecard criterion",
+                      "required": true,
+                      "item": {
+                        "kind": "object",
+                        "concept_ref": "cv_screening.CriterionScore",
+                        "description": "A candidate's score on one scorecard criterion",
+                        "required": true,
+                        "fields": [
+                          {
+                            "kind": "text",
+                            "name": "criterion_name",
+                            "description": "Name of the scorecard criterion",
+                            "required": true
+                          },
+                          {
+                            "kind": "number",
+                            "name": "score",
+                            "description": "Score from 0 (no evidence) to 10 (outstanding evidence)",
+                            "required": true,
+                            "integer": true
+                          },
+                          {
+                            "kind": "text",
+                            "name": "justification",
+                            "description": "Evidence from the CV supporting the score",
+                            "required": true
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "kind": "number",
+                      "name": "overall_score",
+                      "description": "Weighted overall score from 0 to 100",
+                      "required": true,
+                      "integer": false
+                    },
+                    {
+                      "kind": "list",
+                      "name": "strengths",
+                      "description": "Main strengths relative to the role",
+                      "required": true,
+                      "item": {
+                        "kind": "text",
+                        "required": true
+                      }
+                    },
+                    {
+                      "kind": "list",
+                      "name": "gaps",
+                      "description": "Main gaps or unverified areas relative to the role",
+                      "required": true,
+                      "item": {
+                        "kind": "text",
+                        "required": true
+                      }
+                    },
+                    {
+                      "kind": "enum",
+                      "name": "verdict",
+                      "description": "Whether the candidate fits the role",
+                      "required": true,
+                      "choices": ["fit", "no_fit"]
+                    },
+                    {
+                      "kind": "text",
+                      "name": "rationale",
+                      "description": "Short explanation of the verdict",
+                      "required": true
+                    }
+                  ]
+                },
+                {
+                  "kind": "list",
+                  "name": "interview_questions",
+                  "concept_ref": "cv_screening.InterviewQuestion",
+                  "description": "The 5 interview questions, when the candidate fits",
+                  "required": false,
+                  "item": {
+                    "kind": "object",
+                    "concept_ref": "cv_screening.InterviewQuestion",
+                    "description": "An interview question tailored to a candidate",
+                    "required": true,
+                    "fields": [
+                      {
+                        "kind": "text",
+                        "name": "question",
+                        "description": "The question to ask",
+                        "required": true
+                      },
+                      {
+                        "kind": "text",
+                        "name": "purpose",
+                        "description": "What the question probes and which criterion, strength or gap it relates to",
+                        "required": true
+                      }
+                    ]
+                  }
+                },
+                {
+                  "kind": "object",
+                  "name": "rejection_email",
+                  "concept_ref": "cv_screening.RejectionEmail",
+                  "description": "The rejection email, when the candidate does not fit",
+                  "required": false,
+                  "fields": [
+                    {
+                      "kind": "text",
+                      "name": "subject",
+                      "description": "Email subject line",
+                      "required": true
+                    },
+                    {
+                      "kind": "text",
+                      "name": "body",
+                      "description": "Email body",
+                      "required": true
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "pipe_io_contracts": {
+    "cv_screening.screen_candidates": {
+      "inputs": {
+        "job_offer": {
+          "concept_ref": "cv_screening.JobOffer",
+          "presence": "plain",
+          "multiplicity": "single",
+          "item_count": null,
+          "json_schema": {
+            "description": "A job offer or job description document for an open position",
+            "properties": {
+              "url": {
+                "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+                "title": "Url",
+                "type": "string"
+              },
+              "public_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "The public HTTPS URL of the document",
+                "title": "Public Url"
+              },
+              "mime_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "The MIME type of the document",
+                "title": "Mime Type"
+              },
+              "filename": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "The original filename of the document",
+                "title": "Filename"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "The title of the document or source",
+                "title": "Title"
+              },
+              "snippet": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "A text snippet or excerpt from the document",
+                "title": "Snippet"
+              }
+            },
+            "required": ["url"],
+            "title": "cv_screening.JobOffer",
+            "type": "object"
+          }
+        },
+        "cvs": {
+          "concept_ref": "cv_screening.Cv",
+          "presence": "plain",
+          "multiplicity": "variable",
+          "item_count": null,
+          "json_schema": {
+            "type": "array",
+            "items": {
+              "description": "A candidate's curriculum vitae (resume) document",
+              "properties": {
+                "url": {
+                  "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+                  "title": "Url",
+                  "type": "string"
+                },
+                "public_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The public HTTPS URL of the document",
+                  "title": "Public Url"
+                },
+                "mime_type": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The MIME type of the document",
+                  "title": "Mime Type"
+                },
+                "filename": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The original filename of the document",
+                  "title": "Filename"
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The title of the document or source",
+                  "title": "Title"
+                },
+                "snippet": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "A text snippet or excerpt from the document",
+                  "title": "Snippet"
+                }
+              },
+              "required": ["url"],
+              "title": "cv_screening.Cv",
+              "type": "object"
+            }
+          }
+        }
+      },
+      "output": {
+        "concept_ref": "cv_screening.ScreeningReport",
+        "multiplicity": "single",
+        "item_count": null,
+        "optional": false,
+        "json_schema": {
+          "$defs": {
+            "cv_screening__CandidateScreening": {
+              "description": "The screening outcome for one candidate: their evaluation plus the follow-up for the verdict",
+              "properties": {
+                "evaluation": {
+                  "$ref": "#/$defs/cv_screening__CvEvaluation",
+                  "description": "The CV evaluation against the scorecard"
+                },
+                "interview_questions": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/cv_screening__InterviewQuestion"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The 5 interview questions, when the candidate fits",
+                  "title": "Interview Questions"
+                },
+                "rejection_email": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/cv_screening__RejectionEmail"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The rejection email, when the candidate does not fit"
+                }
+              },
+              "required": ["evaluation"],
+              "title": "cv_screening__CandidateScreening",
+              "type": "object"
+            },
+            "cv_screening__CriterionScore": {
+              "description": "A candidate's score on one scorecard criterion",
+              "properties": {
+                "criterion_name": {
+                  "description": "Name of the scorecard criterion",
+                  "title": "Criterion Name",
+                  "type": "string"
+                },
+                "score": {
+                  "description": "Score from 0 (no evidence) to 10 (outstanding evidence)",
+                  "title": "Score",
+                  "type": "integer"
+                },
+                "justification": {
+                  "description": "Evidence from the CV supporting the score",
+                  "title": "Justification",
+                  "type": "string"
+                }
+              },
+              "required": ["criterion_name", "score", "justification"],
+              "title": "cv_screening__CriterionScore",
+              "type": "object"
+            },
+            "cv_screening__CvEvaluation": {
+              "description": "The evaluation of one CV against a scorecard",
+              "properties": {
+                "candidate_name": {
+                  "description": "Candidate's name as written on the CV",
+                  "title": "Candidate Name",
+                  "type": "string"
+                },
+                "criterion_scores": {
+                  "description": "Score for each scorecard criterion",
+                  "items": {
+                    "$ref": "#/$defs/cv_screening__CriterionScore"
+                  },
+                  "title": "Criterion Scores",
+                  "type": "array"
+                },
+                "overall_score": {
+                  "description": "Weighted overall score from 0 to 100",
+                  "title": "Overall Score",
+                  "type": "number"
+                },
+                "strengths": {
+                  "description": "Main strengths relative to the role",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Strengths",
+                  "type": "array"
+                },
+                "gaps": {
+                  "description": "Main gaps or unverified areas relative to the role",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Gaps",
+                  "type": "array"
+                },
+                "verdict": {
+                  "description": "Whether the candidate fits the role",
+                  "enum": ["fit", "no_fit"],
+                  "title": "Verdict",
+                  "type": "string"
+                },
+                "rationale": {
+                  "description": "Short explanation of the verdict",
+                  "title": "Rationale",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "candidate_name",
+                "criterion_scores",
+                "overall_score",
+                "strengths",
+                "gaps",
+                "verdict",
+                "rationale"
+              ],
+              "title": "cv_screening__CvEvaluation",
+              "type": "object"
+            },
+            "cv_screening__InterviewQuestion": {
+              "description": "An interview question tailored to a candidate",
+              "properties": {
+                "question": {
+                  "description": "The question to ask",
+                  "title": "Question",
+                  "type": "string"
+                },
+                "purpose": {
+                  "description": "What the question probes and which criterion, strength or gap it relates to",
+                  "title": "Purpose",
+                  "type": "string"
+                }
+              },
+              "required": ["question", "purpose"],
+              "title": "cv_screening__InterviewQuestion",
+              "type": "object"
+            },
+            "cv_screening__RejectionEmail": {
+              "description": "A courteous rejection email to a candidate",
+              "properties": {
+                "subject": {
+                  "description": "Email subject line",
+                  "title": "Subject",
+                  "type": "string"
+                },
+                "body": {
+                  "description": "Email body",
+                  "title": "Body",
+                  "type": "string"
+                }
+              },
+              "required": ["subject", "body"],
+              "title": "cv_screening__RejectionEmail",
+              "type": "object"
+            },
+            "cv_screening__Scorecard": {
+              "description": "A hiring scorecard derived from a job offer, used to score candidates consistently",
+              "properties": {
+                "role_title": {
+                  "description": "Title of the position",
+                  "title": "Role Title",
+                  "type": "string"
+                },
+                "company_name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Name of the hiring company, if stated in the job offer",
+                  "title": "Company Name"
+                },
+                "role_summary": {
+                  "description": "Brief summary of the role and its main responsibilities",
+                  "title": "Role Summary",
+                  "type": "string"
+                },
+                "criteria": {
+                  "description": "Weighted evaluation criteria",
+                  "items": {
+                    "$ref": "#/$defs/cv_screening__ScorecardCriterion"
+                  },
+                  "title": "Criteria",
+                  "type": "array"
+                },
+                "fit_threshold": {
+                  "description": "Minimum overall score (0-100) for a candidate to be considered a fit",
+                  "title": "Fit Threshold",
+                  "type": "integer"
+                }
+              },
+              "required": ["role_title", "role_summary", "criteria", "fit_threshold"],
+              "title": "cv_screening__Scorecard",
+              "type": "object"
+            },
+            "cv_screening__ScorecardCriterion": {
+              "description": "One weighted criterion of a hiring scorecard",
+              "properties": {
+                "name": {
+                  "description": "Short name of the criterion",
+                  "title": "Name",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "What this criterion assesses for the role",
+                  "title": "Description",
+                  "type": "string"
+                },
+                "weight": {
+                  "description": "Relative weight in percent; all criteria weights of a scorecard sum to 100",
+                  "title": "Weight",
+                  "type": "integer"
+                },
+                "is_must_have": {
+                  "description": "Whether the criterion is a hard requirement of the role",
+                  "title": "Is Must Have",
+                  "type": "boolean"
+                },
+                "evidence": {
+                  "description": "Concrete signals in a CV that demonstrate this criterion",
+                  "title": "Evidence",
+                  "type": "string"
+                }
+              },
+              "required": ["name", "description", "weight", "is_must_have", "evidence"],
+              "title": "cv_screening__ScorecardCriterion",
+              "type": "object"
+            }
+          },
+          "description": "The full screening report for a job offer and a batch of CVs",
+          "properties": {
+            "scorecard": {
+              "$ref": "#/$defs/cv_screening__Scorecard",
+              "description": "The scorecard built from the job offer"
+            },
+            "candidates": {
+              "description": "The screening outcome of each CV, in input order",
+              "items": {
+                "$ref": "#/$defs/cv_screening__CandidateScreening"
+              },
+              "title": "Candidates",
+              "type": "array"
+            }
+          },
+          "required": ["scorecard", "candidates"],
+          "title": "cv_screening.ScreeningReport",
+          "type": "object"
+        }
+      }
+    }
+  },
+  "value": {
+    "scorecard": {
+      "role_title": "Senior Backend Engineer (Python)",
+      "company_name": "Northwind Freight",
+      "role_summary": "Northwind Freight is seeking a Senior Backend Engineer to join their Platform team (6 engineers) in Lyon. The role involves designing, building, and operating backend Python services (FastAPI) and PostgreSQL data models powering a route-planning and shipment-tracking platform used by 400 European carriers. Key responsibilities include ingesting 20 million tracking events per day via event-driven Kafka pipelines, exposing data through public REST APIs, owning services in production on AWS (deployment, monitoring, on-call), and mentoring two mid-level engineers.",
+      "criteria": [
+        {
+          "name": "Python Backend Development",
+          "description": "Assesses depth and seniority of professional Python backend development experience, with a focus on building production-grade services (e.g., FastAPI or comparable frameworks).",
+          "weight": 30,
+          "is_must_have": true,
+          "evidence": "CV lists 5+ years of professional Python backend development; mentions FastAPI, Flask, Django, or similar frameworks; describes ownership of backend services or APIs built in Python."
+        },
+        {
+          "name": "PostgreSQL & Data Modeling",
+          "description": "Assesses hands-on PostgreSQL skills including schema design, query tuning, and database migrations relevant to high-volume data workloads.",
+          "weight": 20,
+          "is_must_have": true,
+          "evidence": "CV explicitly references PostgreSQL; mentions schema design, query optimisation/tuning, index strategies, or migration tooling (e.g., Alembic, Flyway); experience with large datasets or performance-critical databases."
+        },
+        {
+          "name": "Cloud Production Operations (AWS)",
+          "description": "Assesses hands-on experience deploying, monitoring, and operating backend services in production on a public cloud, with AWS being the preferred platform.",
+          "weight": 20,
+          "is_must_have": true,
+          "evidence": "CV mentions AWS services (ECS, Lambda, RDS, CloudWatch, etc.) or other public clouds (GCP, Azure) in a production context; references on-call rotations, incident management, observability tooling (Datadog, Prometheus, etc.), or CI/CD pipelines for cloud deployments."
+        },
+        {
+          "name": "Event Streaming (Kafka or Similar)",
+          "description": "Assesses experience designing and operating event-driven or streaming pipelines suitable for high-volume data ingestion.",
+          "weight": 15,
+          "is_must_have": false,
+          "evidence": "CV mentions Kafka, RabbitMQ, AWS Kinesis, Google Pub/Sub, or similar message-streaming technologies; describes event-driven architecture design or pipelines processing high volumes of messages/events."
+        },
+        {
+          "name": "Technical Mentoring & Leadership",
+          "description": "Assesses experience guiding junior or mid-level engineers, leading technical projects, or producing technical documentation (design docs, RFCs, ADRs).",
+          "weight": 8,
+          "is_must_have": false,
+          "evidence": "CV references mentoring, coaching, or onboarding engineers; led a technical workstream or project; authored design documents, RFCs, or architecture decision records; held a tech lead or staff-adjacent role."
+        },
+        {
+          "name": "REST API Design",
+          "description": "Assesses ability to design and build well-structured, public-facing REST APIs, a core output of this role.",
+          "weight": 5,
+          "is_must_have": false,
+          "evidence": "CV describes design or ownership of REST (or RESTful) APIs; mentions API versioning, OpenAPI/Swagger documentation, rate limiting, or authentication schemes (OAuth2, JWT); experience exposing services to external consumers."
+        },
+        {
+          "name": "Professional English Communication",
+          "description": "Assesses professional-level English proficiency required for code reviews, design documents, and collaboration in an international engineering team.",
+          "weight": 2,
+          "is_must_have": true,
+          "evidence": "CV is written in fluent English; candidate lists English as professional/working proficiency; prior employment in English-speaking or international environments."
+        }
+      ],
+      "fit_threshold": 70
+    },
+    "candidates": [
+      {
+        "evaluation": {
+          "candidate_name": "Amara Okafor",
+          "criterion_scores": [
+            {
+              "criterion_name": "Python Backend Development",
+              "score": 10,
+              "justification": "CV states 8 years of Python experience. Currently a Tech Lead at Parcelio building FastAPI services (2022–present), and previously built Django/Celery services at Tripwise (2018–2022). Demonstrates clear ownership of production-grade backend services across multiple roles."
+            },
+            {
+              "criterion_name": "PostgreSQL & Data Modeling",
+              "score": 10,
+              "justification": "Explicitly mentions PostgreSQL in multiple contexts: designed partitioned tables and tuned indexes that reduced p95 query latency from 1.8s to 120ms (high-volume, performance-critical workload); led a zero-downtime migration of a 300 GB MySQL database to PostgreSQL. Strong evidence of schema design and query optimisation."
+            },
+            {
+              "criterion_name": "Cloud Production Operations (AWS)",
+              "score": 10,
+              "justification": "Directly references AWS services (ECS, RDS, Lambda, SQS) in production. Runs the on-call rotation, writes incident postmortems, and brought monthly downtime under 10 minutes. Uses Datadog for observability. Deploys with Terraform and Docker. Outstanding evidence of end-to-end production ownership on AWS."
+            },
+            {
+              "criterion_name": "Event Streaming (Kafka or Similar)",
+              "score": 9,
+              "justification": "Designed a Kafka pipeline ingesting 15 million delivery events per day into PostgreSQL — very close to the 20M/day scale of this role. Kafka is also listed in the Skills section. Highly relevant experience, stopping just short of 10 due to no explicit mention of consumer group management, schema registry, or other advanced Kafka operations."
+            },
+            {
+              "criterion_name": "Technical Mentoring & Leadership",
+              "score": 9,
+              "justification": "Has been Tech Lead of a 4-person team for 2 years, directly mentoring two junior developers. Writes incident postmortems (technical documentation). Mirrors the role's requirement to mentor two mid-level engineers. Minor gap: no explicit mention of design docs, RFCs, or ADRs."
+            },
+            {
+              "criterion_name": "REST API Design",
+              "score": 7,
+              "justification": "Builds FastAPI services (a REST/OpenAPI-first framework) at Parcelio and built Django services at Tripwise, both implying REST API work. However, the CV does not explicitly describe API versioning, OpenAPI documentation, rate limiting, or exposure to external consumers, so a top score is not warranted."
+            },
+            {
+              "criterion_name": "Professional English Communication",
+              "score": 10,
+              "justification": "CV is written in fluent, articulate English. Candidate explicitly lists 'English (fluent)' under languages. Has worked in an international tech environment in France, consistent with professional English usage."
+            }
+          ],
+          "overall_score": 96.5,
+          "strengths": [
+            "8 years of professional Python backend experience with FastAPI, Django, and Celery — directly matching the role's primary technology stack.",
+            "Hands-on Kafka pipeline design at 15M events/day scale, closely mirroring the role's 20M/day ingestion requirement.",
+            "Deep PostgreSQL expertise including partitioned tables, index tuning, and a large-scale zero-downtime migration — strong evidence for the data modeling criterion.",
+            "Full production ownership on AWS (ECS, RDS, Lambda, SQS) with on-call rotation, incident postmortems, and Datadog observability.",
+            "Active Tech Lead already mentoring two junior engineers — directly matching the mentoring responsibility in the role.",
+            "Fluent English in an international engineering environment."
+          ],
+          "gaps": [
+            "REST API design specifics (versioning, OpenAPI/Swagger documentation, rate limiting, external consumer exposure) are not explicitly described.",
+            "No mention of advanced Kafka operations such as schema registry, consumer group tuning, or exactly-once semantics.",
+            "No explicit reference to design documents, RFCs, or Architecture Decision Records (ADRs), though postmortems are mentioned.",
+            "AWS Lambda is listed in Skills but not elaborated with production use cases."
+          ],
+          "verdict": "fit",
+          "rationale": "Amara Okafor scores 96.5/100, well above the 70-point fit threshold. All four must-have criteria (Python Backend Development, PostgreSQL & Data Modeling, Cloud Production Operations, Professional English Communication) score 10/10. The non-must-have criteria are also very strong, particularly Kafka event streaming (9/10) and Technical Mentoring (9/10). The candidate's current role at Parcelio is an almost exact match for this position in terms of technology (FastAPI, Kafka, PostgreSQL, AWS), scale (15M events/day), and team leadership (mentoring two engineers, on-call, incident management). The minor gaps identified (REST API documentation specifics, advanced Kafka internals) are not disqualifying. Verdict: fit."
+        },
+        "interview_questions": [
+          {
+            "question": "You designed a Kafka pipeline at Parcelio ingesting 15 million delivery events per day into PostgreSQL. Can you walk us through the end-to-end architecture of that pipeline — how you structured producers and consumers, handled failures or message redelivery, and ensured data consistency at that scale?",
+            "purpose": "Verifies the depth of the candidate's Kafka expertise claimed on the CV. Probes the 'Event Streaming (Kafka or Similar)' criterion (weight: 15) and directly addresses the identified gap around advanced Kafka operations such as consumer group management, error handling, and exactly-once or at-least-once semantics — all critical at the role's 20M events/day target."
+          },
+          {
+            "question": "Your CV highlights cutting p95 query latency from 1.8s to 120ms on PostgreSQL using partitioned tables and tuned indexes. Can you describe the specific problem you diagnosed, the schema design decisions you made, and how you validated the performance improvement in production?",
+            "purpose": "Verifies the strongest PostgreSQL & Data Modeling claim on the CV (weight: 20, must-have). Probes schema design reasoning, index strategy, and use of query analysis tooling (e.g. EXPLAIN ANALYZE). Ensures the candidate can articulate the engineering decisions behind the result rather than just the outcome."
+          },
+          {
+            "question": "At Parcelio you own the on-call rotation and write incident postmortems. Can you walk us through a significant production incident you handled on AWS — what broke, how you diagnosed it, what actions you took in the moment, and what systemic changes came out of the postmortem?",
+            "purpose": "Verifies the 'Cloud Production Operations (AWS)' criterion (weight: 20, must-have). Assesses real-world incident management skills, AWS observability tooling (e.g. Datadog, CloudWatch), and the candidate's ability to drive systemic improvements — all core responsibilities in this role's on-call requirement."
+          },
+          {
+            "question": "The role involves exposing shipment-tracking data through public REST APIs consumed by 400 European carriers. Can you describe a REST API you have designed for external consumers — how you approached versioning, authentication, and documentation, and how you balanced the needs of different API consumers?",
+            "purpose": "Probes the identified gap in 'REST API Design' (weight: 5). The CV implies REST API work through FastAPI and Django but lacks explicit evidence of versioning strategies, OpenAPI/Swagger documentation, rate limiting, or external consumer management. This question assesses whether the candidate has the depth required for a public-facing API role."
+          },
+          {
+            "question": "You have been Tech Lead for a team of four and are currently mentoring two junior engineers. Can you tell us about a situation where a mentee was struggling with a technical challenge — how you identified the issue, the approach you took to support their growth, and what the outcome was?",
+            "purpose": "Verifies the 'Technical Mentoring & Leadership' criterion (weight: 8) and the specific CV claim of mentoring two junior developers. Also surfaces the identified gap around structured knowledge-sharing artefacts (design docs, RFCs, ADRs) by exploring whether the candidate uses documentation as a mentoring tool — directly mirroring the role's requirement to mentor two mid-level engineers."
+          }
+        ],
+        "rejection_email": null
+      },
+      {
+        "evaluation": {
+          "candidate_name": "Lucas Bernard",
+          "criterion_scores": [
+            {
+              "criterion_name": "Python Backend Development",
+              "score": 0,
+              "justification": "The CV contains no mention of Python, backend development, FastAPI, Flask, Django, or any related framework. The candidate is a graphic designer with only basic HTML and CSS listed as technical web skills."
+            },
+            {
+              "criterion_name": "PostgreSQL & Data Modeling",
+              "score": 0,
+              "justification": "There is no mention of PostgreSQL, any other relational database, schema design, query tuning, or migration tooling anywhere in the CV."
+            },
+            {
+              "criterion_name": "Cloud Production Operations (AWS)",
+              "score": 0,
+              "justification": "No reference to AWS, GCP, Azure, or any public cloud platform. No mention of CI/CD, on-call rotations, observability tooling, or production operations of any kind."
+            },
+            {
+              "criterion_name": "Event Streaming (Kafka or Similar)",
+              "score": 0,
+              "justification": "No mention of Kafka, RabbitMQ, Kinesis, Pub/Sub, event-driven architecture, or any streaming/messaging technology."
+            },
+            {
+              "criterion_name": "Technical Mentoring & Leadership",
+              "score": 0,
+              "justification": "No evidence of mentoring engineers, leading technical projects, or authoring design documents. The candidate has 3 years of experience as a graphic designer with no leadership indicators."
+            },
+            {
+              "criterion_name": "REST API Design",
+              "score": 0,
+              "justification": "No mention of REST APIs, OpenAPI/Swagger, API versioning, authentication schemes, or any API-related work. Skills are limited to graphic design tools and basic HTML/CSS."
+            },
+            {
+              "criterion_name": "Professional English Communication",
+              "score": 3,
+              "justification": "The candidate lists English as 'intermediate' proficiency. The CV is partially written in English but the role requires professional/working-level English. Intermediate is below the professional standard expected for code reviews, design docs, and international collaboration."
+            }
+          ],
+          "overall_score": 0.6,
+          "strengths": [],
+          "gaps": [
+            "No Python backend development experience whatsoever — must-have criterion completely unmet",
+            "No PostgreSQL or any database experience — must-have criterion completely unmet",
+            "No cloud (AWS or otherwise) or production operations experience — must-have criterion completely unmet",
+            "No event streaming or messaging technology experience (Kafka, RabbitMQ, etc.)",
+            "No REST API design or development experience",
+            "No technical mentoring or engineering leadership experience",
+            "English proficiency listed as only intermediate, below the professional level required — must-have criterion not met",
+            "Candidate's background is entirely in graphic design, with no overlap with backend software engineering"
+          ],
+          "verdict": "no_fit",
+          "rationale": "Lucas Bernard is a graphic designer with 3 years of experience in brand identity and visual design. His CV contains no evidence of Python development, PostgreSQL, cloud infrastructure, event streaming, REST APIs, or technical leadership — all of which are core requirements for this Senior Backend Engineer role. Four must-have criteria (Python Backend Development, PostgreSQL & Data Modeling, Cloud Production Operations, and Professional English Communication at professional level) score 0 or below the minimum threshold of 5. The weighted overall score of 0.6 is far below the fit threshold of 70. The candidate is clearly not a fit for this role."
+        },
+        "interview_questions": null,
+        "rejection_email": {
+          "subject": "Your Application for Senior Backend Engineer (Python) at Northwind Freight",
+          "body": "Dear Lucas,\n\nThank you sincerely for your interest in the Senior Backend Engineer (Python) role at Northwind Freight and for the time you invested in applying.\n\nAfter careful consideration, we regret to inform you that we will not be moving forward with your application at this time. Following our review, other candidates' profiles more closely matched the specific technical requirements we have for this role.\n\nWe genuinely appreciate you thinking of Northwind Freight as a place to grow your career. We encourage you to keep an eye on our future openings and apply for any roles that align with your skills and experience.\n\nWe wish you all the best in your job search and future endeavors.\n\nWarm regards,\n[Hiring Manager Name]\nNorthwind Freight"
+        }
+      }
+    ]
+  }
+}

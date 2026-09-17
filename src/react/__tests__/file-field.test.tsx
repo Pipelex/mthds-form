@@ -125,6 +125,29 @@ describe('what the control decides it can preview', () => {
   });
 });
 
+describe('what the chip prints under the file name', () => {
+  it('names a file carried in a data: URL by its format and size, never its base64', () => {
+    // A host that encodes a picked file in the browser writes the whole file
+    // into the value's URL, and the chip used to print it: the subtitle of a
+    // CV was `data:application/pdf;base64,JVBERi0xLjQK…`.
+    const { container } = renderField({
+      value: { filename: 'cv.pdf', url: 'data:application/pdf;base64,QUFBQUFB' },
+    });
+    expect(screen.getByText('PDF · 6 bytes')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('base64');
+  });
+
+  it('names an unlisted media type by the type itself', () => {
+    renderField({ value: { filename: 'notes.txt', url: 'data:text/plain,hello' } });
+    expect(screen.getByText('text/plain · 5 bytes')).toBeInTheDocument();
+  });
+
+  it('still prints a reference that points somewhere, which is worth copying', () => {
+    renderField({ value: { filename: 'cv.pdf', url: 'pipelex-storage://bucket/abc123' } });
+    expect(screen.getByText('pipelex-storage://bucket/abc123')).toBeInTheDocument();
+  });
+});
+
 describe('a preview that needs no resolver does not wait for one', () => {
   const spinner = (container: HTMLElement) => container.querySelector('.animate-spin');
 
