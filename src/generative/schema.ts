@@ -10,7 +10,7 @@ import { defineSchema } from '@json-render/core';
  * realistic sample data. This layer's posture is the opposite: every value is
  * bound to a path the HOST loads. So the schema here declares no rules and no
  * prompt template at all. The prompt is the designer method's own
- * (`data/generative/ui-designer.mthds`), which receives the catalog as data
+ * (`methods/layout-design.mthds`), which receives the catalog as data
  * (`designerCatalog()`) and lays it out in its own prose; `catalog.prompt()`
  * on a catalog over this schema renders json-render's stock text and is not
  * what any model is handed.

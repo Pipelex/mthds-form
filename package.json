@@ -34,7 +34,7 @@
     },
     "./styles.css": "./dist/styles.css",
     "./theme.css": "./dist/theme.css",
-    "./ui-designer.mthds": "./dist/ui-designer.mthds"
+    "./layout-design.mthds": "./dist/layout-design.mthds"
   },
   "files": [
     "dist"
@@ -47,7 +47,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \".storybook/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \".storybook/**/*.{ts,tsx,css}\"",
     "typecheck": "tsc --noEmit",
-    "codegen:check": "node scripts/codegen-check.mjs src/generated/ui-designer",
+    "codegen:check": "node scripts/codegen-check.mjs src/generated/layout-design",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest run",

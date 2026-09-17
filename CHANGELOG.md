@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`./layout-design.mthds` replaces `./ui-designer.mthds` (Breaking)**: the method that designs a page ships under its own name — the bundle is `methods/layout-design.mthds` in the repo, `layout-design.mthds` in the package, and its main pipe is `design_layout`, so a host resolves the file through the `./layout-design.mthds` export and names that pipe when it runs it. `PROMPT_HASH` moves with the method's text, so a layout captured against the older prompt is no longer rendered and falls back to the kernel's own form.
+
 ## [v0.9.0] - 2026-09-17
 
 ### Changed - the fixture harness runs pipes on the hosted API, not through a local CLI

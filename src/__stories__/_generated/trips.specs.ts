@@ -2,7 +2,7 @@
  * Specs captured for the heroes of data/structures/trips.mthds - DO NOT EDIT.
  *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
- * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over
+ * `methods/layout-design.mthds` on the hosted API through `@pipelex/sdk` over
  * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates
  * what came back against the catalog. Take in another producer's JSONL with the
  * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same
@@ -28,11 +28,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'trips.plan_trip',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: '15d195df65f3',
-    date: '2026-09-16',
+    promptHash: 'a4e2e53582b1',
+    date: '2026-09-17',
     brief: 'wip/generative-ui/briefs/trips.plan_trip.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","hero","workspace"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Trip Planner","tag":"trips.plan_trip"},"children":[]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"New trip","headline":"Plan the trip","lede":"Tell us the shape of it and we\'ll draft an itinerary."},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["sec-trip","sec-who","sec-budget","sec-spirit","sec-else"]}}\n{"op":"add","path":"/elements/sec-trip","value":{"type":"Section","props":{"number":"01","title":"The trip","lede":"Name it, and say where and when."},"children":["trip-title","trip-city","trip-country","trip-arriving","trip-leaving","trip-mustsee"]}}\n{"op":"add","path":"/elements/trip-title","value":{"type":"Input","props":{"label":"Trip name","name":"title","placeholder":"A long weekend in Lisbon","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Give the trip a name."}]},"children":[]}}\n{"op":"add","path":"/elements/trip-city","value":{"type":"Input","props":{"label":"City","name":"city","placeholder":"Lisbon","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Which city?"}]},"children":[]}}\n{"op":"add","path":"/elements/trip-country","value":{"type":"Segmented","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"}},"children":[]}}\n{"op":"add","path":"/elements/trip-arriving","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/trip-leaving","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/trip-mustsee","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/sec-who","value":{"type":"Section","props":{"number":"02","title":"Who is going"},"children":["who-travellers","who-children"]}}\n{"op":"add","path":"/elements/who-travellers","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/who-children","value":{"type":"Switch","props":{"label":"Children are travelling","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/sec-budget","value":{"type":"Section","props":{"number":"03","title":"The budget"},"children":["budget-grid"]}}\n{"op":"add","path":"/elements/budget-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["budget-amount","budget-currency"]}}\n{"op":"add","path":"/elements/budget-amount","value":{"type":"NumberInput","props":{"label":"Total budget","name":"budget","placeholder":"2000","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/budget-currency","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/sec-spirit","value":{"type":"Section","props":{"number":"04","title":"The spirit of it","lede":"How full the days are, and what it\'s mostly about."},"children":["spirit-pace","spirit-style"]}}\n{"op":"add","path":"/elements/spirit-pace","value":{"type":"Radio","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/spirit-style","value":{"type":"Segmented","props":{"label":"Mostly about","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/sec-else","value":{"type":"Section","props":{"number":"05","title":"Anything else","lede":"The quiet extras — needs to respect, notes, and a mood image."},"children":["else-access","else-notes","else-inspiration"]}}\n{"op":"add","path":"/elements/else-access","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","placeholder":"Step-free routes, quiet spaces…","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/else-notes","value":{"type":"Textarea","props":{"label":"Notes","name":"notes","rows":4,"placeholder":"Anything else we should know?","value":{"$bindState":"/inputs/request/notes"}},"children":[]}}\n{"op":"add","path":"/elements/else-inspiration","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Your trip"},"children":["rail-trip","rail-city","rail-budget","rail-style","rail-cta"]}}\n{"op":"add","path":"/elements/rail-trip","value":{"type":"SummaryRow","props":{"label":"Trip","value":{"$state":"/inputs/request/title"},"placeholder":"Unnamed"},"children":[]}}\n{"op":"add","path":"/elements/rail-city","value":{"type":"SummaryRow","props":{"label":"City","value":{"$state":"/inputs/request/stay/city"},"detail":{"$state":"/inputs/request/stay/country"},"separator":", "},"children":[]}}\n{"op":"add","path":"/elements/rail-budget","value":{"type":"SummaryRow","props":{"label":"Budget","value":{"$state":"/inputs/request/budget"},"detail":{"$state":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/rail-style","value":{"type":"SummaryRow","props":{"label":"Style","value":{"$state":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/rail-cta","value":{"type":"Cta","props":{"label":"Plan my trip","hint":"We\'ll draft an itinerary once the trip\'s details are filled in."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["appbar","hero","workspace"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Wander","tag":"trips.plan_trip"},"children":[]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"New trip","headline":"Plan the trip","lede":"Tell us who\'s going, where and when, and the spirit of it."},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["sec-trip","sec-who","sec-days","sec-else"]}}\n{"op":"add","path":"/elements/sec-trip","value":{"type":"Section","props":{"number":"01","title":"The trip","lede":"What it\'s called, and where and when it happens."},"children":["title","city","country","arriving","leaving","mustsee"]}}\n{"op":"add","path":"/elements/title","value":{"type":"Input","props":{"label":"Trip name","name":"title","placeholder":"A summer in Lisbon","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Give the trip a name."}]},"children":[]}}\n{"op":"add","path":"/elements/city","value":{"type":"Input","props":{"label":"City","name":"city","placeholder":"Lisbon","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Which city?"}]},"children":[]}}\n{"op":"add","path":"/elements/country","value":{"type":"Segmented","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"}},"children":[]}}\n{"op":"add","path":"/elements/arriving","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/leaving","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/mustsee","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/sec-who","value":{"type":"Section","props":{"number":"02","title":"Who\'s going","lede":"Everyone on the trip."},"children":["travellers"]}}\n{"op":"add","path":"/elements/travellers","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/sec-days","value":{"type":"Section","props":{"number":"03","title":"The shape of the days","lede":"The money, the pace, and what it\'s mostly about."},"children":["budget","currency","pace","style"]}}\n{"op":"add","path":"/elements/budget","value":{"type":"NumberInput","props":{"label":"Budget","name":"budget","placeholder":"3000","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/currency","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/pace","value":{"type":"Radio","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/style","value":{"type":"Segmented","props":{"label":"Mostly about","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/sec-else","value":{"type":"Section","props":{"number":"04","title":"Anything else","lede":"The softer things, if they matter."},"children":["else-collapsible"]}}\n{"op":"add","path":"/elements/else-collapsible","value":{"type":"Collapsible","props":{"title":"Add the softer details","defaultOpen":false},"children":["with-children","accessibility","notes"]}}\n{"op":"add","path":"/elements/with-children","value":{"type":"Switch","props":{"label":"Children are travelling","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","placeholder":"Step-free access, slow walking pace…","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/notes","value":{"type":"Textarea","props":{"label":"Notes","name":"notes","rows":4,"placeholder":"Anything else the planner should know.","value":{"$bindState":"/inputs/request/notes"}},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"This trip"},"children":["inspiration","row-title","row-place","row-budget","row-pace","cta"]}}\n{"op":"add","path":"/elements/inspiration","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}\n{"op":"add","path":"/elements/row-title","value":{"type":"SummaryRow","props":{"label":"Trip","value":{"$state":"/inputs/request/title"},"placeholder":"Untitled trip"},"children":[]}}\n{"op":"add","path":"/elements/row-place","value":{"type":"SummaryRow","props":{"label":"Where","value":{"$state":"/inputs/request/stay/city"},"detail":{"$state":"/inputs/request/stay/country"},"separator":", "},"children":[]}}\n{"op":"add","path":"/elements/row-budget","value":{"type":"SummaryRow","props":{"label":"Budget","value":{"$state":"/inputs/request/budget"},"detail":{"$state":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/row-pace","value":{"type":"SummaryRow","props":{"label":"Pace","value":{"$state":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Draft my itinerary","hint":"We\'ll draft a plan once the trip is complete."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -47,7 +47,7 @@ export const SPECS: SpecFixture[] = [
         appbar: {
           type: 'AppBar',
           props: {
-            app: 'Trip Planner',
+            app: 'Wander',
             tag: 'trips.plan_trip',
           },
           children: [],
@@ -57,7 +57,7 @@ export const SPECS: SpecFixture[] = [
           props: {
             eyebrow: 'New trip',
             headline: 'Plan the trip',
-            lede: "Tell us the shape of it and we'll draft an itinerary.",
+            lede: "Tell us who's going, where and when, and the spirit of it.",
           },
           children: [],
         },
@@ -72,32 +72,25 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'xl',
+            gap: 'lg',
           },
-          children: ['sec-trip', 'sec-who', 'sec-budget', 'sec-spirit', 'sec-else'],
+          children: ['sec-trip', 'sec-who', 'sec-days', 'sec-else'],
         },
         'sec-trip': {
           type: 'Section',
           props: {
             number: '01',
             title: 'The trip',
-            lede: 'Name it, and say where and when.',
+            lede: "What it's called, and where and when it happens.",
           },
-          children: [
-            'trip-title',
-            'trip-city',
-            'trip-country',
-            'trip-arriving',
-            'trip-leaving',
-            'trip-mustsee',
-          ],
+          children: ['title', 'city', 'country', 'arriving', 'leaving', 'mustsee'],
         },
-        'trip-title': {
+        title: {
           type: 'Input',
           props: {
             label: 'Trip name',
             name: 'title',
-            placeholder: 'A long weekend in Lisbon',
+            placeholder: 'A summer in Lisbon',
             value: {
               $bindState: '/inputs/request/title',
             },
@@ -110,7 +103,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'trip-city': {
+        city: {
           type: 'Input',
           props: {
             label: 'City',
@@ -128,7 +121,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'trip-country': {
+        country: {
           type: 'Segmented',
           props: {
             label: 'Country',
@@ -140,21 +133,21 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'trip-arriving': {
+        arriving: {
           type: 'MthdsField',
           props: {
             path: '/inputs/request/stay/arriving_on',
           },
           children: [],
         },
-        'trip-leaving': {
+        leaving: {
           type: 'MthdsField',
           props: {
             path: '/inputs/request/stay/leaving_on',
           },
           children: [],
         },
-        'trip-mustsee': {
+        mustsee: {
           type: 'MthdsField',
           props: {
             path: '/inputs/request/stay/must_see',
@@ -165,57 +158,40 @@ export const SPECS: SpecFixture[] = [
           type: 'Section',
           props: {
             number: '02',
-            title: 'Who is going',
+            title: "Who's going",
+            lede: 'Everyone on the trip.',
           },
-          children: ['who-travellers', 'who-children'],
+          children: ['travellers'],
         },
-        'who-travellers': {
+        travellers: {
           type: 'MthdsField',
           props: {
             path: '/inputs/request/travellers',
           },
           children: [],
         },
-        'who-children': {
-          type: 'Switch',
-          props: {
-            label: 'Children are travelling',
-            name: 'with_children',
-            checked: {
-              $bindState: '/inputs/request/with_children',
-            },
-          },
-          children: [],
-        },
-        'sec-budget': {
+        'sec-days': {
           type: 'Section',
           props: {
             number: '03',
-            title: 'The budget',
+            title: 'The shape of the days',
+            lede: "The money, the pace, and what it's mostly about.",
           },
-          children: ['budget-grid'],
+          children: ['budget', 'currency', 'pace', 'style'],
         },
-        'budget-grid': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'md',
-          },
-          children: ['budget-amount', 'budget-currency'],
-        },
-        'budget-amount': {
+        budget: {
           type: 'NumberInput',
           props: {
-            label: 'Total budget',
+            label: 'Budget',
             name: 'budget',
-            placeholder: '2000',
+            placeholder: '3000',
             value: {
               $bindState: '/inputs/request/budget',
             },
           },
           children: [],
         },
-        'budget-currency': {
+        currency: {
           type: 'Segmented',
           props: {
             label: 'Currency',
@@ -227,16 +203,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'sec-spirit': {
-          type: 'Section',
-          props: {
-            number: '04',
-            title: 'The spirit of it',
-            lede: "How full the days are, and what it's mostly about.",
-          },
-          children: ['spirit-pace', 'spirit-style'],
-        },
-        'spirit-pace': {
+        pace: {
           type: 'Radio',
           props: {
             label: 'Pace',
@@ -248,7 +215,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'spirit-style': {
+        style: {
           type: 'Segmented',
           props: {
             label: 'Mostly about',
@@ -263,66 +230,85 @@ export const SPECS: SpecFixture[] = [
         'sec-else': {
           type: 'Section',
           props: {
-            number: '05',
+            number: '04',
             title: 'Anything else',
-            lede: 'The quiet extras — needs to respect, notes, and a mood image.',
+            lede: 'The softer things, if they matter.',
           },
-          children: ['else-access', 'else-notes', 'else-inspiration'],
+          children: ['else-collapsible'],
         },
-        'else-access': {
+        'else-collapsible': {
+          type: 'Collapsible',
+          props: {
+            title: 'Add the softer details',
+            defaultOpen: false,
+          },
+          children: ['with-children', 'accessibility', 'notes'],
+        },
+        'with-children': {
+          type: 'Switch',
+          props: {
+            label: 'Children are travelling',
+            name: 'with_children',
+            checked: {
+              $bindState: '/inputs/request/with_children',
+            },
+          },
+          children: [],
+        },
+        accessibility: {
           type: 'Input',
           props: {
             label: 'Accessibility needs',
             name: 'accessibility',
-            placeholder: 'Step-free routes, quiet spaces…',
+            placeholder: 'Step-free access, slow walking pace…',
             value: {
               $bindState: '/inputs/request/accessibility',
             },
           },
           children: [],
         },
-        'else-notes': {
+        notes: {
           type: 'Textarea',
           props: {
             label: 'Notes',
             name: 'notes',
             rows: 4,
-            placeholder: 'Anything else we should know?',
+            placeholder: 'Anything else the planner should know.',
             value: {
               $bindState: '/inputs/request/notes',
             },
           },
           children: [],
         },
-        'else-inspiration': {
+        rail: {
+          type: 'Rail',
+          props: {
+            title: 'This trip',
+          },
+          children: ['inspiration', 'row-title', 'row-place', 'row-budget', 'row-pace', 'cta'],
+        },
+        inspiration: {
           type: 'MthdsField',
           props: {
             path: '/inputs/inspiration',
           },
           children: [],
         },
-        rail: {
-          type: 'Rail',
-          props: {
-            title: 'Your trip',
-          },
-          children: ['rail-trip', 'rail-city', 'rail-budget', 'rail-style', 'rail-cta'],
-        },
-        'rail-trip': {
+        'row-title': {
           type: 'SummaryRow',
           props: {
             label: 'Trip',
             value: {
               $state: '/inputs/request/title',
             },
-            placeholder: 'Unnamed',
+            placeholder: 'Untitled trip',
           },
           children: [],
         },
-        'rail-city': {
+        'row-place': {
           type: 'SummaryRow',
           props: {
-            label: 'City',
+            label: 'Where',
             value: {
               $state: '/inputs/request/stay/city',
             },
@@ -333,7 +319,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'rail-budget': {
+        'row-budget': {
           type: 'SummaryRow',
           props: {
             label: 'Budget',
@@ -346,21 +332,21 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'rail-style': {
+        'row-pace': {
           type: 'SummaryRow',
           props: {
-            label: 'Style',
+            label: 'Pace',
             value: {
-              $state: '/inputs/request/style',
+              $state: '/inputs/request/pace',
             },
           },
           children: [],
         },
-        'rail-cta': {
+        cta: {
           type: 'Cta',
           props: {
-            label: 'Plan my trip',
-            hint: "We'll draft an itinerary once the trip's details are filled in.",
+            label: 'Draft my itinerary',
+            hint: "We'll draft a plan once the trip is complete.",
           },
           on: {
             press: [
@@ -378,101 +364,93 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'A page for someone about to plan a real trip — to say who is going, where and when, what it costs and what it is about — and feel a studio built this one tool for that.',
+        'A single, calm page where a traveller lays out the whole shape of a trip and hands it to a planner to draft.',
       title: 'Plan the trip',
       composition:
-        'A workspace built for the doing: the work scrolls on the left through titled stages, and a slim summary rail stays sticky on the right, restating the trip as it takes shape and carrying the one control that runs. It opens with a hero that names the job in a single line, above a mono AppBar carrying the method tag. The work is ordered the way a person tells the story of a trip: first its name and where and when (the stay, with its dates and must-sees delegated inside), then who is going (delegated whole), then the money, then the spirit of it as a row of pills and a radio, then the quiet extras — accessibility, notes, and a mood image — folded into their own gentle stage at the end. The rail restates title, city, budget and style, and holds the Cta with its one-line wait note beneath.',
+        "A workspace, not a form: the work scrolls on the left, and a slim rail stays sticky on the right carrying the essence of the trip and the one control that runs it. An AppBar sits across the top with the app's name and the method tag. Below it a Hero opens with a single bold line naming the job. The work is laid out as flat, spaced Sections separated by hairlines, in the order a person tells the story of a trip: first what it is and where and when it happens, then who is going, then the shape of the days — budget, pace, style — then the softer things, folded into a Collapsible so they never crowd the essentials. The mood image lives at the top of the rail so it colours the whole plan. The rail restates the trip's spine — title, city, dates, budget — as SummaryRows, and ends in the Cta with a short line saying the plan waits for the whole request. Delegated paths (both dates, must-see list, travellers, inspiration image) are each an MthdsField at their exact path, nothing over them.",
       regions: [
         {
           title: null,
-          purpose: "The page's banner, carrying the app name and the method tag at the right.",
+          purpose:
+            "The page's banner: app name and the method behind it, so the person knows where they are.",
           container: 'AppBar',
-          elements: ["AppBar: app name 'Trip Planner', mono tag 'trips.plan_trip'"],
+          elements: ['AppBar: app name "Wander", mono tag "trips.plan_trip"'],
         },
         {
           title: null,
-          purpose: 'The opening line that says what happens here, above the work.',
+          purpose: 'The opening line that names the job and sets the tone, sitting above the work.',
           container: 'Hero',
           elements: [
-            "Hero: eyebrow 'New trip', headline 'Plan the trip', muted line 'Tell us the shape of it and we'll draft an itinerary.'",
+            'Hero: eyebrow "New trip", headline "Plan the trip", muted line "Tell us who\'s going, where and when, and the spirit of it."',
           ],
         },
         {
           title: 'The trip',
           purpose:
-            'Name the trip and set where and when — the first thing a planner needs; dates and must-sees are delegated inside.',
+            'The first and most essential facts: what the trip is called and where and when it happens. It comes first because everything else hangs on it.',
           container: 'Section',
           elements: [
             'Input: /inputs/request/title',
             'Input: /inputs/request/stay/city',
-            "Segmented: /inputs/request/stay/country, options 'France' | 'Italy' | 'Japan' | 'Portugal' | 'Spain' | 'United States'",
+            'Segmented: /inputs/request/stay/country, options "France" | "Italy" | "Japan" | "Portugal" | "Spain" | "United States"',
             'MthdsField: /inputs/request/stay/arriving_on',
             'MthdsField: /inputs/request/stay/leaving_on',
             'MthdsField: /inputs/request/stay/must_see',
           ],
         },
         {
-          title: 'Who is going',
-          purpose: 'The travellers, delegated whole, and the one switch that changes the plan.',
+          title: "Who's going",
+          purpose:
+            'The travellers on the trip, delegated whole as a list structure the planner needs.',
           container: 'Section',
-          elements: [
-            'MthdsField: /inputs/request/travellers',
-            'Switch: /inputs/request/with_children',
-          ],
+          elements: ['MthdsField: /inputs/request/travellers'],
         },
         {
-          title: 'The budget',
-          purpose: "The total budget and the currency it's in, side by side.",
+          title: 'The shape of the days',
+          purpose:
+            "The budget and the spirit of the trip — the money, the pace, and what it's mostly about — grouped because together they decide how the days feel.",
           container: 'Section',
           elements: [
             'NumberInput: /inputs/request/budget',
-            "Segmented: /inputs/request/currency, options 'EUR' | 'USD' | 'GBP' | 'JPY'",
-          ],
-        },
-        {
-          title: 'The spirit of it',
-          purpose:
-            'How full the days are and what the trip is mostly about — the controls that set its tone.',
-          container: 'Section',
-          elements: [
-            "Radio: /inputs/request/pace, options 'slow' | 'balanced' | 'packed'",
-            "Segmented: /inputs/request/style, options 'culture' | 'food' | 'nature' | 'nightlife' | 'family'",
+            'Segmented: /inputs/request/currency, options "EUR" | "USD" | "GBP" | "JPY"',
+            'Radio: /inputs/request/pace, options "slow" | "balanced" | "packed"',
+            'Segmented: /inputs/request/style, options "culture" | "food" | "nature" | "nightlife" | "family"',
           ],
         },
         {
           title: 'Anything else',
           purpose:
-            'The quiet extras folded at the end: needs the plan must respect, free notes, and a mood image.',
-          container: 'Section',
+            "The softer, optional things the planner should respect — children, accessibility, and free notes — folded into a Collapsible so they don't crowd the essentials but are there when needed.",
+          container: 'Collapsible',
           elements: [
+            'Switch: /inputs/request/with_children',
             'Input: /inputs/request/accessibility',
             'Textarea: /inputs/request/notes',
-            'MthdsField: /inputs/inspiration',
           ],
         },
         {
-          title: 'Your trip',
+          title: 'This trip',
           purpose:
-            'A sticky rail that restates the trip as it takes shape and carries the control that runs the method.',
+            'The sticky rail beside the work: the mood image at the top, then the spine of the trip restated, ending in the one control that runs the plan.',
           container: 'Rail',
           elements: [
-            "SummaryRow: label 'Trip', value /inputs/request/title",
-            "SummaryRow: label 'City', value /inputs/request/stay/city, detail /inputs/request/stay/country",
-            "SummaryRow: label 'Budget', value /inputs/request/budget, detail /inputs/request/currency",
-            "SummaryRow: label 'Style', value /inputs/request/style",
-            "Cta: label 'Plan my trip', hint 'We'll draft an itinerary once the trip's details are filled in.', on.press validateForm then run",
+            'MthdsField: /inputs/inspiration',
+            'SummaryRow: value /inputs/request/title, placeholder "Untitled trip"',
+            'SummaryRow: value /inputs/request/stay/city, detail /inputs/request/stay/country, separator ", "',
+            'SummaryRow: value /inputs/request/budget, detail /inputs/request/currency',
+            'SummaryRow: value /inputs/request/pace',
+            'Cta: on.press validateForm then run, label "Draft my itinerary", hint "We\'ll draft a plan once the trip is complete."',
           ],
         },
       ],
-      call_to_action:
-        "Plan my trip — hint: We'll draft an itinerary once the trip's details are filled in.",
+      call_to_action: 'Draft my itinerary — hint: "We\'ll draft a plan once the trip is complete."',
       defaults: null,
       delegated: [
-        '/inputs/request/stay/arriving_on — date, brief marks it delegated',
-        '/inputs/request/stay/leaving_on — date, brief marks it delegated',
-        '/inputs/request/stay/must_see — list of text, brief marks it delegated',
-        '/inputs/request/travellers — list of structure, brief marks it delegated',
-        '/inputs/inspiration — image file, brief marks it delegated',
+        '/inputs/request/stay/arriving_on — brief marks it delegated (date)',
+        '/inputs/request/stay/leaving_on — brief marks it delegated (date)',
+        '/inputs/request/stay/must_see — brief marks it delegated (list of text)',
+        '/inputs/request/travellers — brief marks it delegated (list of structures)',
+        '/inputs/inspiration — brief marks it delegated (image file)',
       ],
     },
   },
@@ -480,14 +458,30 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'trips.plan_trip',
     producer: 'pipelex-method',
     model: 'claude-5-sonnet',
-    promptHash: '15d195df65f3',
-    date: '2026-09-16',
+    promptHash: 'a4e2e53582b1',
+    date: '2026-09-17',
     brief: 'wip/generative-ui/briefs/trips.plan_trip.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"workspace"}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["heading","section-trip","section-when","section-who","section-budget","section-notes"]}}\n{"op":"add","path":"/elements/heading","value":{"type":"Heading","props":{"text":"Plan the trip","level":"h1"},"children":[]}}\n{"op":"add","path":"/elements/section-trip","value":{"type":"Section","props":{"number":"01","title":"The trip"},"children":["title-input","city-input","country-segmented"]}}\n{"op":"add","path":"/elements/title-input","value":{"type":"Input","props":{"label":"Name the trip","name":"title","type":"text","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Give the trip a name"}]},"children":[]}}\n{"op":"add","path":"/elements/city-input","value":{"type":"Input","props":{"label":"City","name":"city","type":"text","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Where are you going?"}]},"children":[]}}\n{"op":"add","path":"/elements/country-segmented","value":{"type":"Segmented","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"}},"children":[]}}\n{"op":"add","path":"/elements/section-when","value":{"type":"Section","props":{"number":"02","title":"When"},"children":["arriving-field","leaving-field","must-see-field"]}}\n{"op":"add","path":"/elements/arriving-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/leaving-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/must-see-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/section-who","value":{"type":"Section","props":{"number":"03","title":"Who\'s going"},"children":["travellers-field","with-children-switch","inspiration-field"]}}\n{"op":"add","path":"/elements/travellers-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/with-children-switch","value":{"type":"Switch","props":{"label":"Travelling with children","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/inspiration-field","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}\n{"op":"add","path":"/elements/section-budget","value":{"type":"Section","props":{"number":"04","title":"Budget & shape"},"children":["budget-number","currency-segmented","pace-radio","style-segmented"]}}\n{"op":"add","path":"/elements/budget-number","value":{"type":"NumberInput","props":{"label":"Budget","name":"budget","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/currency-segmented","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/pace-radio","value":{"type":"Radio","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/style-segmented","value":{"type":"Segmented","props":{"label":"Style","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/section-notes","value":{"type":"Section","props":{"number":"05","title":"Anything else"},"children":["accessibility-input","notes-textarea"]}}\n{"op":"add","path":"/elements/accessibility-input","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","type":"text","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/notes-textarea","value":{"type":"Textarea","props":{"label":"Notes","name":"notes","value":{"$bindState":"/inputs/request/notes"},"rows":4},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"Your trip so far"},"children":["summary-title","summary-city","summary-budget","summary-pace","summary-style","summary-separator","summary-hint","cta"]}}\n{"op":"add","path":"/elements/summary-title","value":{"type":"SummaryRow","props":{"label":"Trip","value":{"$state":"/inputs/request/title"},"placeholder":"Not named yet"},"children":[]}}\n{"op":"add","path":"/elements/summary-city","value":{"type":"SummaryRow","props":{"label":"Where","value":{"$state":"/inputs/request/stay/city"},"detail":{"$state":"/inputs/request/stay/country"},"placeholder":"Not set"},"children":[]}}\n{"op":"add","path":"/elements/summary-budget","value":{"type":"SummaryRow","props":{"label":"Budget","value":{"$state":"/inputs/request/budget"},"detail":{"$state":"/inputs/request/currency"},"placeholder":"Not set"},"children":[]}}\n{"op":"add","path":"/elements/summary-pace","value":{"type":"SummaryRow","props":{"label":"Pace","value":{"$state":"/inputs/request/pace"},"placeholder":"Not set"},"children":[]}}\n{"op":"add","path":"/elements/summary-style","value":{"type":"SummaryRow","props":{"label":"Style","value":{"$state":"/inputs/request/style"},"placeholder":"Not set"},"children":[]}}\n{"op":"add","path":"/elements/summary-separator","value":{"type":"Separator","props":{},"children":[]}}\n{"op":"add","path":"/elements/summary-hint","value":{"type":"Text","props":{"text":"The run waits for the full request before it drafts anything","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Plan my trip","hint":"The planner drafts a full itinerary from what you\'ve told it above."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["hero","workspace"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"Plan a trip that feels like yours","lede":"Tell us who\'s going, where, and what kind of trip this is - we\'ll take it from there."},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["section-trip","section-stay","section-travellers","section-budget","section-mood"]}}\n{"op":"add","path":"/elements/section-trip","value":{"type":"Section","props":{"number":"01","title":"Trip"},"children":["title-input"]}}\n{"op":"add","path":"/elements/title-input","value":{"type":"Input","props":{"label":"Name","name":"title","placeholder":"What should we call this trip?","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Give the trip a name"}]},"children":[]}}\n{"op":"add","path":"/elements/section-stay","value":{"type":"Section","props":{"number":"02","title":"Stay","lede":"Where and when the trip happens."},"children":["city-input","country-segmented","arriving-field","leaving-field","mustsee-field"]}}\n{"op":"add","path":"/elements/city-input","value":{"type":"Input","props":{"label":"City","name":"city","placeholder":"Which city?","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"City is required"}]},"children":[]}}\n{"op":"add","path":"/elements/country-segmented","value":{"type":"Segmented","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"}},"children":[]}}\n{"op":"add","path":"/elements/arriving-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/leaving-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/mustsee-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/section-travellers","value":{"type":"Section","props":{"number":"03","title":"Travellers","lede":"Who is going."},"children":["travellers-field"]}}\n{"op":"add","path":"/elements/travellers-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/section-budget","value":{"type":"Section","props":{"number":"04","title":"Budget & style","lede":"The money and the shape of the days."},"children":["budget-number","currency-segmented","pace-segmented","style-segmented","children-switch","accessibility-input","notes-textarea"]}}\n{"op":"add","path":"/elements/budget-number","value":{"type":"NumberInput","props":{"label":"Budget","name":"budget","value":{"$bindState":"/inputs/request/budget"},"placeholder":"Total for the whole trip"},"children":[]}}\n{"op":"add","path":"/elements/currency-segmented","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/pace-segmented","value":{"type":"Segmented","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/style-segmented","value":{"type":"Segmented","props":{"label":"Style","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/children-switch","value":{"type":"Switch","props":{"label":"Travelling with children","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility-input","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","placeholder":"Anything the plan must accommodate","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/notes-textarea","value":{"type":"Textarea","props":{"label":"Notes","name":"notes","placeholder":"Anything else the planner should know","value":{"$bindState":"/inputs/request/notes"}},"children":[]}}\n{"op":"add","path":"/elements/section-mood","value":{"type":"Section","props":{"number":"05","title":"Mood","lede":"An optional image to carry the feeling of the trip."},"children":["inspiration-field"]}}\n{"op":"add","path":"/elements/inspiration-field","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}\n{"op":"add","path":"/elements/rail","value":{"type":"Rail","props":{"title":"This trip"},"children":["summary-title","summary-city","summary-budget","waiting-text","cta"]}}\n{"op":"add","path":"/elements/summary-title","value":{"type":"SummaryRow","props":{"label":"Trip","value":{"$state":"/inputs/request/title"},"placeholder":"Untitled trip"},"children":[]}}\n{"op":"add","path":"/elements/summary-city","value":{"type":"SummaryRow","props":{"label":"Where","value":{"$state":"/inputs/request/stay/city"},"detail":{"$state":"/inputs/request/stay/country"}},"children":[]}}\n{"op":"add","path":"/elements/summary-budget","value":{"type":"SummaryRow","props":{"label":"Budget","value":{"$state":"/inputs/request/budget"},"detail":{"$state":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/waiting-text","value":{"type":"Text","props":{"text":"Waiting on the trip details to draft your itinerary.","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/cta","value":{"type":"Cta","props":{"label":"Plan my trip","hint":"We\'ll draft an itinerary once everything above is filled in."},"children":[],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}',
     spec: {
-      root: 'workspace',
+      root: 'page',
       elements: {
+        page: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'none',
+          },
+          children: ['hero', 'workspace'],
+        },
+        hero: {
+          type: 'Hero',
+          props: {
+            headline: 'Plan a trip that feels like yours',
+            lede: "Tell us who's going, where, and what kind of trip this is - we'll take it from there.",
+          },
+          children: [],
+        },
         workspace: {
           type: 'Workspace',
           props: {
@@ -502,36 +496,27 @@ export const SPECS: SpecFixture[] = [
             gap: 'none',
           },
           children: [
-            'heading',
             'section-trip',
-            'section-when',
-            'section-who',
+            'section-stay',
+            'section-travellers',
             'section-budget',
-            'section-notes',
+            'section-mood',
           ],
-        },
-        heading: {
-          type: 'Heading',
-          props: {
-            text: 'Plan the trip',
-            level: 'h1',
-          },
-          children: [],
         },
         'section-trip': {
           type: 'Section',
           props: {
             number: '01',
-            title: 'The trip',
+            title: 'Trip',
           },
-          children: ['title-input', 'city-input', 'country-segmented'],
+          children: ['title-input'],
         },
         'title-input': {
           type: 'Input',
           props: {
-            label: 'Name the trip',
+            label: 'Name',
             name: 'title',
-            type: 'text',
+            placeholder: 'What should we call this trip?',
             value: {
               $bindState: '/inputs/request/title',
             },
@@ -544,19 +529,34 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
+        'section-stay': {
+          type: 'Section',
+          props: {
+            number: '02',
+            title: 'Stay',
+            lede: 'Where and when the trip happens.',
+          },
+          children: [
+            'city-input',
+            'country-segmented',
+            'arriving-field',
+            'leaving-field',
+            'mustsee-field',
+          ],
+        },
         'city-input': {
           type: 'Input',
           props: {
             label: 'City',
             name: 'city',
-            type: 'text',
+            placeholder: 'Which city?',
             value: {
               $bindState: '/inputs/request/stay/city',
             },
             checks: [
               {
                 type: 'required',
-                message: 'Where are you going?',
+                message: 'City is required',
               },
             ],
           },
@@ -574,14 +574,6 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'section-when': {
-          type: 'Section',
-          props: {
-            number: '02',
-            title: 'When',
-          },
-          children: ['arriving-field', 'leaving-field', 'must-see-field'],
-        },
         'arriving-field': {
           type: 'MthdsField',
           props: {
@@ -596,20 +588,21 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'must-see-field': {
+        'mustsee-field': {
           type: 'MthdsField',
           props: {
             path: '/inputs/request/stay/must_see',
           },
           children: [],
         },
-        'section-who': {
+        'section-travellers': {
           type: 'Section',
           props: {
             number: '03',
-            title: "Who's going",
+            title: 'Travellers',
+            lede: 'Who is going.',
           },
-          children: ['travellers-field', 'with-children-switch', 'inspiration-field'],
+          children: ['travellers-field'],
         },
         'travellers-field': {
           type: 'MthdsField',
@@ -618,31 +611,22 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'with-children-switch': {
-          type: 'Switch',
-          props: {
-            label: 'Travelling with children',
-            name: 'with_children',
-            checked: {
-              $bindState: '/inputs/request/with_children',
-            },
-          },
-          children: [],
-        },
-        'inspiration-field': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/inspiration',
-          },
-          children: [],
-        },
         'section-budget': {
           type: 'Section',
           props: {
             number: '04',
-            title: 'Budget & shape',
+            title: 'Budget & style',
+            lede: 'The money and the shape of the days.',
           },
-          children: ['budget-number', 'currency-segmented', 'pace-radio', 'style-segmented'],
+          children: [
+            'budget-number',
+            'currency-segmented',
+            'pace-segmented',
+            'style-segmented',
+            'children-switch',
+            'accessibility-input',
+            'notes-textarea',
+          ],
         },
         'budget-number': {
           type: 'NumberInput',
@@ -652,6 +636,7 @@ export const SPECS: SpecFixture[] = [
             value: {
               $bindState: '/inputs/request/budget',
             },
+            placeholder: 'Total for the whole trip',
           },
           children: [],
         },
@@ -667,8 +652,8 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'pace-radio': {
-          type: 'Radio',
+        'pace-segmented': {
+          type: 'Segmented',
           props: {
             label: 'Pace',
             name: 'pace',
@@ -691,20 +676,23 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'section-notes': {
-          type: 'Section',
+        'children-switch': {
+          type: 'Switch',
           props: {
-            number: '05',
-            title: 'Anything else',
+            label: 'Travelling with children',
+            name: 'with_children',
+            checked: {
+              $bindState: '/inputs/request/with_children',
+            },
           },
-          children: ['accessibility-input', 'notes-textarea'],
+          children: [],
         },
         'accessibility-input': {
           type: 'Input',
           props: {
             label: 'Accessibility needs',
             name: 'accessibility',
-            type: 'text',
+            placeholder: 'Anything the plan must accommodate',
             value: {
               $bindState: '/inputs/request/accessibility',
             },
@@ -716,28 +704,35 @@ export const SPECS: SpecFixture[] = [
           props: {
             label: 'Notes',
             name: 'notes',
+            placeholder: 'Anything else the planner should know',
             value: {
               $bindState: '/inputs/request/notes',
             },
-            rows: 4,
+          },
+          children: [],
+        },
+        'section-mood': {
+          type: 'Section',
+          props: {
+            number: '05',
+            title: 'Mood',
+            lede: 'An optional image to carry the feeling of the trip.',
+          },
+          children: ['inspiration-field'],
+        },
+        'inspiration-field': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/inspiration',
           },
           children: [],
         },
         rail: {
           type: 'Rail',
           props: {
-            title: 'Your trip so far',
+            title: 'This trip',
           },
-          children: [
-            'summary-title',
-            'summary-city',
-            'summary-budget',
-            'summary-pace',
-            'summary-style',
-            'summary-separator',
-            'summary-hint',
-            'cta',
-          ],
+          children: ['summary-title', 'summary-city', 'summary-budget', 'waiting-text', 'cta'],
         },
         'summary-title': {
           type: 'SummaryRow',
@@ -746,7 +741,7 @@ export const SPECS: SpecFixture[] = [
             value: {
               $state: '/inputs/request/title',
             },
-            placeholder: 'Not named yet',
+            placeholder: 'Untitled trip',
           },
           children: [],
         },
@@ -760,7 +755,6 @@ export const SPECS: SpecFixture[] = [
             detail: {
               $state: '/inputs/request/stay/country',
             },
-            placeholder: 'Not set',
           },
           children: [],
         },
@@ -774,41 +768,13 @@ export const SPECS: SpecFixture[] = [
             detail: {
               $state: '/inputs/request/currency',
             },
-            placeholder: 'Not set',
           },
           children: [],
         },
-        'summary-pace': {
-          type: 'SummaryRow',
-          props: {
-            label: 'Pace',
-            value: {
-              $state: '/inputs/request/pace',
-            },
-            placeholder: 'Not set',
-          },
-          children: [],
-        },
-        'summary-style': {
-          type: 'SummaryRow',
-          props: {
-            label: 'Style',
-            value: {
-              $state: '/inputs/request/style',
-            },
-            placeholder: 'Not set',
-          },
-          children: [],
-        },
-        'summary-separator': {
-          type: 'Separator',
-          props: {},
-          children: [],
-        },
-        'summary-hint': {
+        'waiting-text': {
           type: 'Text',
           props: {
-            text: 'The run waits for the full request before it drafts anything',
+            text: 'Waiting on the trip details to draft your itinerary.',
             variant: 'muted',
           },
           children: [],
@@ -817,8 +783,9 @@ export const SPECS: SpecFixture[] = [
           type: 'Cta',
           props: {
             label: 'Plan my trip',
-            hint: "The planner drafts a full itinerary from what you've told it above.",
+            hint: "We'll draft an itinerary once everything above is filled in.",
           },
+          children: [],
           on: {
             press: [
               {
@@ -829,95 +796,91 @@ export const SPECS: SpecFixture[] = [
               },
             ],
           },
-          children: [],
         },
       },
     },
     plan: {
       purpose:
-        "Someone about to take a trip sits down to hand a planner everything it needs in one unhurried pass - who's going, where, when, how much to spend, and the mood of the thing - and then set it running.",
+        "A person dreaming up a trip sits down to hand a planner everything it needs - who's coming, where, when, budget, and the mood - in one unhurried pass, so it can draft an itinerary that actually fits them.",
       title: 'Plan the trip',
       composition:
-        "A Workspace splits the page in two: the left, wider column carries the work as a sequence of flat, hairline-separated Sections (title, stay & dates, travellers & mood, the shape of the trip, extra notes); the right rail stays sticky with a running summary of the trip and the Cta that runs the method, so the person always sees what they've committed to and can launch the plan from anywhere as they scroll. Nothing is staged behind tabs or steps - this is a short brief, not a wizard - but the finer structures (dates, must-see list, travellers, the mood photo) are folded into MthdsField so the eye stays on the handful of real decisions: title, place, people, money, pace, style.",
+        "A Hero opens with the headline and a one-line promise of what happens next, setting the tone before any field appears. Below it, a Workspace carries the weight: the left column (the work) runs as a sequence of Sections - Trip, Stay, Travellers, Budget & style, Mood - each a titled stage separated by hairlines, never boxed, so the page reads like a considered flow rather than a form. The right rail is a sticky Rail that holds the trip's essentials as they're typed (title, city, dates via a short restatement, budget) and, at its foot, the Cta that runs the method - so the person always sees what they've committed to and can act the moment it's ready. The image upload sits in its own Section near the end, low-stakes and last, since it's optional and about mood rather than logistics.",
       regions: [
         {
-          title: 'The trip',
-          purpose:
-            'Name the trip and set the place - the two things that anchor everything else - right at the top of the work.',
-          container: 'Section',
+          title: null,
+          purpose: 'Sets the tone: names the job plainly before anything is asked.',
+          container: 'Hero',
           elements: [
-            'Input — /inputs/request/title',
-            'Input — /inputs/request/stay/city',
-            'Segmented — /inputs/request/stay/country — options: France, Italy, Japan, Portugal, Spain, United States',
+            'Hero — headline "Plan a trip that feels like yours", muted line "Tell us who\'s going, where, and what kind of trip this is - we\'ll take it from there."',
           ],
         },
         {
-          title: 'When',
-          purpose:
-            "The dates and any places not to miss, handled by the kernel's own controls since they're structured lists and dates.",
+          title: 'Trip',
+          purpose: 'The name of the trip - the first thing to settle, small and personal.',
+          container: 'Section',
+          elements: ['Input — /inputs/request/title'],
+        },
+        {
+          title: 'Stay',
+          purpose: 'Where and when the trip happens.',
           container: 'Section',
           elements: [
+            'Input — /inputs/request/stay/city',
+            'Segmented — /inputs/request/stay/country, options: "France", "Italy", "Japan", "Portugal", "Spain", "United States"',
             'MthdsField — /inputs/request/stay/arriving_on',
             'MthdsField — /inputs/request/stay/leaving_on',
             'MthdsField — /inputs/request/stay/must_see',
           ],
         },
         {
-          title: "Who's going",
-          purpose:
-            'The travellers and the mood photo for the trip, both delegated structures sitting together as the human, personal part of the brief.',
+          title: 'Travellers',
+          purpose: "Who is going - a structured list handed to the kernel's own control.",
           container: 'Section',
-          elements: [
-            'MthdsField — /inputs/request/travellers',
-            'Switch — /inputs/request/with_children',
-            'MthdsField — /inputs/inspiration',
-          ],
+          elements: ['MthdsField — /inputs/request/travellers'],
         },
         {
-          title: 'Budget & shape',
-          purpose:
-            "The money and the rhythm of the days - the decisions that shape the itinerary's texture.",
+          title: 'Budget & style',
+          purpose: 'The money and the shape of the days - the choices that steer the draft.',
           container: 'Section',
           elements: [
             'NumberInput — /inputs/request/budget',
-            'Segmented — /inputs/request/currency — options: EUR, USD, GBP, JPY',
-            'Radio — /inputs/request/pace — options: slow, balanced, packed',
-            'Segmented — /inputs/request/style — options: culture, food, nature, nightlife, family',
+            'Segmented — /inputs/request/currency, options: "EUR", "USD", "GBP", "JPY"',
+            'Segmented — /inputs/request/pace, options: "slow", "balanced", "packed"',
+            'Segmented — /inputs/request/style, options: "culture", "food", "nature", "nightlife", "family"',
+            'Switch — /inputs/request/with_children',
+            'Input — /inputs/request/accessibility',
+            'Textarea — /inputs/request/notes',
           ],
         },
         {
-          title: 'Anything else',
-          purpose:
-            "Room for the needs and texture a form field can't capture: accessibility and free notes, kept last and optional.",
+          title: 'Mood',
+          purpose: 'An optional image to carry the feeling of the trip, kept last and light.',
           container: 'Section',
-          elements: ['Input — /inputs/request/accessibility', 'Textarea — /inputs/request/notes'],
+          elements: ['MthdsField — /inputs/inspiration'],
         },
         {
-          title: 'Your trip so far',
+          title: 'This trip',
           purpose:
-            'A sticky rail beside the work that restates the essentials at a glance and carries the one control that runs the method, always in reach.',
+            "A sticky summary of what's been entered so far, staying in view while the form scrolls, ending in the one control that runs the method.",
           container: 'Rail',
           elements: [
-            'SummaryRow — /inputs/request/title',
-            'SummaryRow — /inputs/request/stay/city — detail: /inputs/request/stay/country',
-            'SummaryRow — /inputs/request/budget — detail: /inputs/request/currency',
-            'SummaryRow — /inputs/request/pace',
-            'SummaryRow — /inputs/request/style',
-            'Separator',
-            'Text — the run waits for the full request before it drafts anything',
+            'SummaryRow — /inputs/request/title, placeholder "Untitled trip"',
+            'SummaryRow — /inputs/request/stay/city, detail /inputs/request/stay/country',
+            'SummaryRow — /inputs/request/budget, detail /inputs/request/currency',
+            'Text — "Waiting on the trip details to draft your itinerary."',
             'Cta — runs trips.plan_trip',
           ],
         },
       ],
       call_to_action:
-        "Plan my trip — the planner drafts a full itinerary from what you've told it above.",
+        '"Plan my trip" - hint: "We\'ll draft an itinerary once everything above is filled in."',
       defaults: null,
       delegated: [
-        '/inputs/request/stay/arriving_on — date, delegated per brief',
-        '/inputs/request/stay/leaving_on — date, delegated per brief',
-        '/inputs/request/stay/must_see — list of text, delegated per brief',
-        '/inputs/request/travellers — list of structure trips.Traveller, delegated per brief',
-        '/inputs/inspiration — image file, delegated per brief',
+        '/inputs/request/stay/arriving_on — marked delegated in the brief; a date best left to MthdsField',
+        '/inputs/request/stay/leaving_on — marked delegated in the brief; a date best left to MthdsField',
+        '/inputs/request/stay/must_see — marked delegated in the brief; a free list of text the page chooses not to lay out',
+        '/inputs/request/travellers — marked delegated in the brief; a list of structures handed whole to MthdsField',
+        '/inputs/inspiration — marked delegated in the brief; a file, rendered by MthdsField',
       ],
     },
   },
@@ -925,11 +888,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'trips.plan_trip',
     producer: 'pipelex-method',
     model: 'gpt-5.5',
-    promptHash: '15d195df65f3',
-    date: '2026-09-16',
+    promptHash: 'a4e2e53582b1',
+    date: '2026-09-17',
     brief: 'wip/generative-ui/briefs/trips.plan_trip.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["trip-hero","trip-workspace"]}}\n{"op":"add","path":"/elements/trip-hero","value":{"type":"Hero","props":{"headline":"Plan the trip","lede":"Give the planner the essentials, the constraints, and the mood; it will turn them into an itinerary."},"children":[]}}\n{"op":"add","path":"/elements/trip-workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work-column","ready-rail"]}}\n{"op":"add","path":"/elements/work-column","value":{"type":"Stack","props":{"direction":"vertical","gap":"none","align":"stretch"},"children":["trip-frame-section","dates-people-section","budget-mood-section"]}}\n{"op":"add","path":"/elements/trip-frame-section","value":{"type":"Section","props":{"number":"01","title":"Trip frame"},"children":["trip-title-input","destination-grid"]}}\n{"op":"add","path":"/elements/trip-title-input","value":{"type":"Input","props":{"label":"Trip name","name":"title","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Name the trip."}],"validateOn":"submit"},"children":[]}}\n{"op":"add","path":"/elements/destination-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["city-input","country-select"]}}\n{"op":"add","path":"/elements/city-input","value":{"type":"Input","props":{"label":"City","name":"city","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Add a city."}],"validateOn":"submit"},"children":[]}}\n{"op":"add","path":"/elements/country-select","value":{"type":"Select","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"placeholder":"Choose","value":{"$bindState":"/inputs/request/stay/country"},"checks":[{"type":"required","message":"Choose a country."}],"validateOn":"submit"},"children":[]}}\n{"op":"add","path":"/elements/dates-people-section","value":{"type":"Section","props":{"number":"02","title":"Dates and people"},"children":["dates-grid","travellers-field","must-see-field"]}}\n{"op":"add","path":"/elements/dates-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["arriving-on-field","leaving-on-field"]}}\n{"op":"add","path":"/elements/arriving-on-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/leaving-on-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/travellers-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/must-see-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/budget-mood-section","value":{"type":"Section","props":{"number":"03","title":"Budget and mood"},"children":["budget-currency-grid","mood-choices-grid","children-switch","accessibility-input","notes-textarea","inspiration-field"]}}\n{"op":"add","path":"/elements/budget-currency-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["budget-input","currency-segmented"]}}\n{"op":"add","path":"/elements/budget-input","value":{"type":"NumberInput","props":{"label":"Total budget","name":"budget","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/currency-segmented","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/mood-choices-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["pace-segmented","style-segmented"]}}\n{"op":"add","path":"/elements/pace-segmented","value":{"type":"Segmented","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/style-segmented","value":{"type":"Segmented","props":{"label":"Mostly about","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/children-switch","value":{"type":"Switch","props":{"label":"Children are travelling","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility-input","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/notes-textarea","value":{"type":"Textarea","props":{"label":"Notes for the planner","name":"notes","rows":4,"value":{"$bindState":"/inputs/request/notes"}},"children":[]}}\n{"op":"add","path":"/elements/inspiration-field","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}\n{"op":"add","path":"/elements/ready-rail","value":{"type":"Rail","props":{"title":"Ready to draft"},"children":["summary-trip","summary-destination","summary-budget","summary-pace","summary-style","plan-trip-cta"]}}\n{"op":"add","path":"/elements/summary-trip","value":{"type":"SummaryRow","props":{"label":"Trip","value":{"$state":"/inputs/request/title"},"placeholder":"Name it"},"children":[]}}\n{"op":"add","path":"/elements/summary-destination","value":{"type":"SummaryRow","props":{"label":"Destination","value":{"$state":"/inputs/request/stay/city"},"detail":{"$state":"/inputs/request/stay/country"},"separator":", ","placeholder":"City and country"},"children":[]}}\n{"op":"add","path":"/elements/summary-budget","value":{"type":"SummaryRow","props":{"label":"Budget","value":{"$state":"/inputs/request/budget"},"detail":{"$state":"/inputs/request/currency"},"placeholder":"Budget"},"children":[]}}\n{"op":"add","path":"/elements/summary-pace","value":{"type":"SummaryRow","props":{"label":"Pace","value":{"$state":"/inputs/request/pace"},"placeholder":"Choose a pace"},"children":[]}}\n{"op":"add","path":"/elements/summary-style","value":{"type":"SummaryRow","props":{"label":"Style","value":{"$state":"/inputs/request/style"},"placeholder":"Choose a style"},"children":[]}}\n{"op":"add","path":"/elements/plan-trip-cta","value":{"type":"Cta","props":{"label":"Plan my trip","hint":"The planner needs the trip request before it can draft the itinerary."},"children":[],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["hero","workspace"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"Plan the trip","lede":"Set the place, people, budget, and mood so the planner can draft the itinerary."},"children":[]}}\n{"op":"add","path":"/elements/workspace","value":{"type":"Workspace","props":{"rail":"right"},"children":["work","trip-brief-rail"]}}\n{"op":"add","path":"/elements/work","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["place-dates-section","people-budget-section","mood-needs-section"]}}\n{"op":"add","path":"/elements/place-dates-section","value":{"type":"Section","props":{"number":"01","title":"Place and dates","lede":"Name the trip, set the destination, and mark the dates that frame the itinerary."},"children":["trip-name-input","destination-grid","dates-grid","must-see-field"]}}\n{"op":"add","path":"/elements/trip-name-input","value":{"type":"Input","props":{"label":"Trip name","name":"trip-title","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Add a trip name."}],"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/destination-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["city-input","country-segmented"]}}\n{"op":"add","path":"/elements/city-input","value":{"type":"Input","props":{"label":"City","name":"city","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Add a city."}],"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/country-segmented","value":{"type":"Segmented","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"}},"children":[]}}\n{"op":"add","path":"/elements/dates-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["arriving-on-field","leaving-on-field"]}}\n{"op":"add","path":"/elements/arriving-on-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/leaving-on-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/must-see-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/people-budget-section","value":{"type":"Section","props":{"number":"02","title":"People and budget","lede":"Add the travellers and the total spend so recommendations scale correctly."},"children":["travellers-field","budget-grid","children-switch"]}}\n{"op":"add","path":"/elements/travellers-field","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/budget-grid","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["budget-input","currency-segmented"]}}\n{"op":"add","path":"/elements/budget-input","value":{"type":"NumberInput","props":{"label":"Total budget","name":"budget","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/currency-segmented","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/children-switch","value":{"type":"Switch","props":{"label":"Children are travelling","name":"with-children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/mood-needs-section","value":{"type":"Section","props":{"number":"03","title":"Mood and needs","lede":"Shape the pace, style, and practical constraints after the essentials are set."},"children":["pace-segmented","style-segmented","accessibility-input","notes-textarea","inspiration-field"]}}\n{"op":"add","path":"/elements/pace-segmented","value":{"type":"Segmented","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/style-segmented","value":{"type":"Segmented","props":{"label":"Style","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility-input","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","value":{"$bindState":"/inputs/request/accessibility"},"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/notes-textarea","value":{"type":"Textarea","props":{"label":"Anything else","name":"notes","rows":4,"value":{"$bindState":"/inputs/request/notes"},"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/inspiration-field","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}\n{"op":"add","path":"/elements/trip-brief-rail","value":{"type":"Rail","props":{"title":"Trip brief"},"children":["summary-trip","summary-destination","summary-budget","summary-pace","summary-style","plan-trip-cta"]}}\n{"op":"add","path":"/elements/summary-trip","value":{"type":"SummaryRow","props":{"label":"Trip","value":{"$state":"/inputs/request/title"},"placeholder":"Untitled"},"children":[]}}\n{"op":"add","path":"/elements/summary-destination","value":{"type":"SummaryRow","props":{"label":"Destination","value":{"$state":"/inputs/request/stay/city"},"detail":{"$state":"/inputs/request/stay/country"},"separator":", ","placeholder":"Choose a place"},"children":[]}}\n{"op":"add","path":"/elements/summary-budget","value":{"type":"SummaryRow","props":{"label":"Budget","value":{"$state":"/inputs/request/budget"},"detail":{"$state":"/inputs/request/currency"},"placeholder":"Add budget"},"children":[]}}\n{"op":"add","path":"/elements/summary-pace","value":{"type":"SummaryRow","props":{"label":"Pace","value":{"$state":"/inputs/request/pace"},"placeholder":"Choose pace"},"children":[]}}\n{"op":"add","path":"/elements/summary-style","value":{"type":"SummaryRow","props":{"label":"Style","value":{"$state":"/inputs/request/style"},"placeholder":"Choose style"},"children":[]}}\n{"op":"add","path":"/elements/plan-trip-cta","value":{"type":"Cta","props":{"label":"Plan my trip","hint":"The planner needs the trip request before it can draft the itinerary."},"children":[],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}',
     spec: {
       root: 'page',
       elements: {
@@ -940,55 +903,56 @@ export const SPECS: SpecFixture[] = [
             gap: 'xl',
             align: 'stretch',
           },
-          children: ['trip-hero', 'trip-workspace'],
+          children: ['hero', 'workspace'],
         },
-        'trip-hero': {
+        hero: {
           type: 'Hero',
           props: {
             headline: 'Plan the trip',
-            lede: 'Give the planner the essentials, the constraints, and the mood; it will turn them into an itinerary.',
+            lede: 'Set the place, people, budget, and mood so the planner can draft the itinerary.',
           },
           children: [],
         },
-        'trip-workspace': {
+        workspace: {
           type: 'Workspace',
           props: {
             rail: 'right',
           },
-          children: ['work-column', 'ready-rail'],
+          children: ['work', 'trip-brief-rail'],
         },
-        'work-column': {
+        work: {
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'none',
+            gap: 'xl',
             align: 'stretch',
           },
-          children: ['trip-frame-section', 'dates-people-section', 'budget-mood-section'],
+          children: ['place-dates-section', 'people-budget-section', 'mood-needs-section'],
         },
-        'trip-frame-section': {
+        'place-dates-section': {
           type: 'Section',
           props: {
             number: '01',
-            title: 'Trip frame',
+            title: 'Place and dates',
+            lede: 'Name the trip, set the destination, and mark the dates that frame the itinerary.',
           },
-          children: ['trip-title-input', 'destination-grid'],
+          children: ['trip-name-input', 'destination-grid', 'dates-grid', 'must-see-field'],
         },
-        'trip-title-input': {
+        'trip-name-input': {
           type: 'Input',
           props: {
             label: 'Trip name',
-            name: 'title',
+            name: 'trip-title',
             value: {
               $bindState: '/inputs/request/title',
             },
             checks: [
               {
                 type: 'required',
-                message: 'Name the trip.',
+                message: 'Add a trip name.',
               },
             ],
-            validateOn: 'submit',
+            validateOn: 'blur',
           },
           children: [],
         },
@@ -998,7 +962,7 @@ export const SPECS: SpecFixture[] = [
             columns: 2,
             gap: 'md',
           },
-          children: ['city-input', 'country-select'],
+          children: ['city-input', 'country-segmented'],
         },
         'city-input': {
           type: 'Input',
@@ -1014,37 +978,21 @@ export const SPECS: SpecFixture[] = [
                 message: 'Add a city.',
               },
             ],
-            validateOn: 'submit',
+            validateOn: 'blur',
           },
           children: [],
         },
-        'country-select': {
-          type: 'Select',
+        'country-segmented': {
+          type: 'Segmented',
           props: {
             label: 'Country',
             name: 'country',
             options: ['France', 'Italy', 'Japan', 'Portugal', 'Spain', 'United States'],
-            placeholder: 'Choose',
             value: {
               $bindState: '/inputs/request/stay/country',
             },
-            checks: [
-              {
-                type: 'required',
-                message: 'Choose a country.',
-              },
-            ],
-            validateOn: 'submit',
           },
           children: [],
-        },
-        'dates-people-section': {
-          type: 'Section',
-          props: {
-            number: '02',
-            title: 'Dates and people',
-          },
-          children: ['dates-grid', 'travellers-field', 'must-see-field'],
         },
         'dates-grid': {
           type: 'Grid',
@@ -1068,13 +1016,6 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'travellers-field': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/request/travellers',
-          },
-          children: [],
-        },
         'must-see-field': {
           type: 'MthdsField',
           props: {
@@ -1082,22 +1023,23 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'budget-mood-section': {
+        'people-budget-section': {
           type: 'Section',
           props: {
-            number: '03',
-            title: 'Budget and mood',
+            number: '02',
+            title: 'People and budget',
+            lede: 'Add the travellers and the total spend so recommendations scale correctly.',
           },
-          children: [
-            'budget-currency-grid',
-            'mood-choices-grid',
-            'children-switch',
-            'accessibility-input',
-            'notes-textarea',
-            'inspiration-field',
-          ],
+          children: ['travellers-field', 'budget-grid', 'children-switch'],
         },
-        'budget-currency-grid': {
+        'travellers-field': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/request/travellers',
+          },
+          children: [],
+        },
+        'budget-grid': {
           type: 'Grid',
           props: {
             columns: 2,
@@ -1128,13 +1070,31 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'mood-choices-grid': {
-          type: 'Grid',
+        'children-switch': {
+          type: 'Switch',
           props: {
-            columns: 2,
-            gap: 'md',
+            label: 'Children are travelling',
+            name: 'with-children',
+            checked: {
+              $bindState: '/inputs/request/with_children',
+            },
           },
-          children: ['pace-segmented', 'style-segmented'],
+          children: [],
+        },
+        'mood-needs-section': {
+          type: 'Section',
+          props: {
+            number: '03',
+            title: 'Mood and needs',
+            lede: 'Shape the pace, style, and practical constraints after the essentials are set.',
+          },
+          children: [
+            'pace-segmented',
+            'style-segmented',
+            'accessibility-input',
+            'notes-textarea',
+            'inspiration-field',
+          ],
         },
         'pace-segmented': {
           type: 'Segmented',
@@ -1151,22 +1111,11 @@ export const SPECS: SpecFixture[] = [
         'style-segmented': {
           type: 'Segmented',
           props: {
-            label: 'Mostly about',
+            label: 'Style',
             name: 'style',
             options: ['culture', 'food', 'nature', 'nightlife', 'family'],
             value: {
               $bindState: '/inputs/request/style',
-            },
-          },
-          children: [],
-        },
-        'children-switch': {
-          type: 'Switch',
-          props: {
-            label: 'Children are travelling',
-            name: 'with_children',
-            checked: {
-              $bindState: '/inputs/request/with_children',
             },
           },
           children: [],
@@ -1179,18 +1128,20 @@ export const SPECS: SpecFixture[] = [
             value: {
               $bindState: '/inputs/request/accessibility',
             },
+            validateOn: 'blur',
           },
           children: [],
         },
         'notes-textarea': {
           type: 'Textarea',
           props: {
-            label: 'Notes for the planner',
+            label: 'Anything else',
             name: 'notes',
             rows: 4,
             value: {
               $bindState: '/inputs/request/notes',
             },
+            validateOn: 'blur',
           },
           children: [],
         },
@@ -1201,10 +1152,10 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'ready-rail': {
+        'trip-brief-rail': {
           type: 'Rail',
           props: {
-            title: 'Ready to draft',
+            title: 'Trip brief',
           },
           children: [
             'summary-trip',
@@ -1222,7 +1173,7 @@ export const SPECS: SpecFixture[] = [
             value: {
               $state: '/inputs/request/title',
             },
-            placeholder: 'Name it',
+            placeholder: 'Untitled',
           },
           children: [],
         },
@@ -1237,7 +1188,7 @@ export const SPECS: SpecFixture[] = [
               $state: '/inputs/request/stay/country',
             },
             separator: ', ',
-            placeholder: 'City and country',
+            placeholder: 'Choose a place',
           },
           children: [],
         },
@@ -1251,7 +1202,7 @@ export const SPECS: SpecFixture[] = [
             detail: {
               $state: '/inputs/request/currency',
             },
-            placeholder: 'Budget',
+            placeholder: 'Add budget',
           },
           children: [],
         },
@@ -1262,7 +1213,7 @@ export const SPECS: SpecFixture[] = [
             value: {
               $state: '/inputs/request/pace',
             },
-            placeholder: 'Choose a pace',
+            placeholder: 'Choose pace',
           },
           children: [],
         },
@@ -1273,7 +1224,7 @@ export const SPECS: SpecFixture[] = [
             value: {
               $state: '/inputs/request/style',
             },
-            placeholder: 'Choose a style',
+            placeholder: 'Choose style',
           },
           children: [],
         },
@@ -1299,75 +1250,73 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'For a traveller or trip organiser who has the destination in mind and needs to give an itinerary planner the essentials, the constraints, and the mood without feeling like they are filling out paperwork.',
+        'For a trip organiser who has the destination in mind but needs to gather the essentials into one crisp brief the planner can turn into an itinerary.',
       title: 'Plan the trip',
       composition:
-        'Open with a single Hero that sets the page as a trip-planning studio. The main body is a Workspace: a generous left column holds the work in three flat Sections that move from identity, to place and people, to money and travel feel; a sticky Rail on the right keeps the run control and a compact live summary in view. Delegated date, traveller, must-see, and image inputs stay exactly where they belong in the story, while the Cta sits in the rail as the single action that validates and runs the planner.',
+        'Use a single-page workspace: the left side is the work, arranged as three airy Sections that move from place and dates, to people and money, to the feel of the trip; the right side is a sticky Rail that acts like a live trip brief and holds the only run control. The Hero carries the h1 and sets a polished travel-planning tone without adding another form label. Delegated date, traveller, must-see, and inspiration controls stay exactly where a person expects them in the flow, while the rail restates only simple scalar choices so the page feels like an app with a brief forming beside the work.',
       regions: [
         {
           title: null,
-          purpose:
-            'Introduce the job with confidence and give the page its one h1 before the work begins.',
+          purpose: 'Open the page with the job and a short promise before the workspace begins.',
           container: 'Hero',
           elements: [
-            'Hero headline: "Plan the trip"',
-            'Hero muted line: "Give the planner the essentials, the constraints, and the mood; it will turn them into an itinerary."',
+            'Hero with headline "Plan the trip" and one muted line "Set the place, people, budget, and mood so the planner can draft the itinerary."',
           ],
         },
         {
-          title: 'Trip frame',
+          title: 'Place and dates',
           purpose:
-            'Collect the name of the trip and the basic destination first, so the rest of the page feels anchored to a real journey.',
+            'Collect the trip name, destination, travel dates, and must-see places first because they define the itinerary frame.',
           container: 'Section',
           elements: [
-            'Input value { $bindState: "/inputs/request/title" } with label "Trip name"; required',
-            'Grid holding destination fields',
-            'Input value { $bindState: "/inputs/request/stay/city" } with label "City"; required',
-            'Select value { $bindState: "/inputs/request/stay/country" } with label "Country"; options "France" | "Italy" | "Japan" | "Portugal" | "Spain" | "United States"; required',
-          ],
-        },
-        {
-          title: 'Dates and people',
-          purpose:
-            'Gather the parts that are variable or list-like with the kernel controls, keeping dates, travellers, and must-see places reliable without custom layout guesswork.',
-          container: 'Section',
-          elements: [
-            'Grid holding delegated date fields',
+            'Input value bound with { "$bindState": "/inputs/request/title" }; label "Trip name"; required',
+            'Grid containing destination controls',
+            'Input value bound with { "$bindState": "/inputs/request/stay/city" }; label "City"; required',
+            'Segmented value bound with { "$bindState": "/inputs/request/stay/country" }; options "France" | "Italy" | "Japan" | "Portugal" | "Spain" | "United States"; required',
+            'Grid containing date controls',
             'MthdsField path "/inputs/request/stay/arriving_on"',
             'MthdsField path "/inputs/request/stay/leaving_on"',
-            'MthdsField path "/inputs/request/travellers"',
             'MthdsField path "/inputs/request/stay/must_see"',
           ],
         },
         {
-          title: 'Budget and mood',
+          title: 'People and budget',
           purpose:
-            'Shape the itinerary by cost, pace, style, family needs, accessibility needs, notes, and an optional visual cue.',
+            'Collect who is travelling and the total spend so the plan can scale recommendations correctly.',
           container: 'Section',
           elements: [
-            'Grid holding budget and currency',
-            'NumberInput value { $bindState: "/inputs/request/budget" } with label "Total budget"; required',
-            'Segmented value { $bindState: "/inputs/request/currency" } with label "Currency"; options "EUR" | "USD" | "GBP" | "JPY"; required',
-            'Segmented value { $bindState: "/inputs/request/pace" } with label "Pace"; options "slow" | "balanced" | "packed"; required',
-            'Segmented value { $bindState: "/inputs/request/style" } with label "Mostly about"; options "culture" | "food" | "nature" | "nightlife" | "family"; required',
-            'Switch checked { $bindState: "/inputs/request/with_children" } with label "Children are travelling"',
-            'Input value { $bindState: "/inputs/request/accessibility" } with label "Accessibility needs"',
-            'Textarea value { $bindState: "/inputs/request/notes" } with label "Notes for the planner"',
+            'MthdsField path "/inputs/request/travellers"',
+            'Grid containing budget controls',
+            'NumberInput value bound with { "$bindState": "/inputs/request/budget" }; label "Total budget"; required',
+            'Segmented value bound with { "$bindState": "/inputs/request/currency" }; options "EUR" | "USD" | "GBP" | "JPY"; required',
+            'Switch checked bound with { "$bindState": "/inputs/request/with_children" }; label "Children are travelling"',
+          ],
+        },
+        {
+          title: 'Mood and needs',
+          purpose:
+            'Shape the spirit and practical constraints of the itinerary after the essentials are set.',
+          container: 'Section',
+          elements: [
+            'Segmented value bound with { "$bindState": "/inputs/request/pace" }; options "slow" | "balanced" | "packed"; required',
+            'Segmented value bound with { "$bindState": "/inputs/request/style" }; options "culture" | "food" | "nature" | "nightlife" | "family"; required',
+            'Input value bound with { "$bindState": "/inputs/request/accessibility" }; label "Accessibility needs"',
+            'Textarea value bound with { "$bindState": "/inputs/request/notes" }; label "Anything else"',
             'MthdsField path "/inputs/inspiration"',
           ],
         },
         {
-          title: 'Ready to draft',
+          title: 'Trip brief',
           purpose:
-            'Keep the essential summary and the one run control visible beside the work, so the person can review and launch without scrolling back.',
+            'Keep a compact live summary and the run control visible beside the work, so the organiser can review the essentials before planning.',
           container: 'Rail',
           elements: [
-            'SummaryRow label "Trip" value { $state: "/inputs/request/title" } placeholder "Name it"',
-            'SummaryRow label "Destination" value { $state: "/inputs/request/stay/city" } detail { $state: "/inputs/request/stay/country" } separator ", " placeholder "City and country"',
-            'SummaryRow label "Budget" value { $state: "/inputs/request/budget" } detail { $state: "/inputs/request/currency" } placeholder "Budget"',
-            'SummaryRow label "Pace" value { $state: "/inputs/request/pace" } placeholder "Choose a pace"',
-            'SummaryRow label "Style" value { $state: "/inputs/request/style" } placeholder "Choose a style"',
-            'Cta label "Plan my trip"; on.press validateForm then run; hint "The planner needs the trip request before it can draft the itinerary."',
+            'SummaryRow value { "$state": "/inputs/request/title" }; label "Trip"; placeholder "Untitled"',
+            'SummaryRow value { "$state": "/inputs/request/stay/city" } detail { "$state": "/inputs/request/stay/country" }; label "Destination"; separator ", "; placeholder "Choose a place"',
+            'SummaryRow value { "$state": "/inputs/request/budget" } detail { "$state": "/inputs/request/currency" }; label "Budget"; placeholder "Add budget"',
+            'SummaryRow value { "$state": "/inputs/request/pace" }; label "Pace"; placeholder "Choose pace"',
+            'SummaryRow value { "$state": "/inputs/request/style" }; label "Style"; placeholder "Choose style"',
+            'Cta on.press bound to validateForm then run; label "Plan my trip"; hint "The planner needs the trip request before it can draft the itinerary."',
           ],
         },
       ],
@@ -1375,11 +1324,11 @@ export const SPECS: SpecFixture[] = [
         'Plan my trip — The planner needs the trip request before it can draft the itinerary.',
       defaults: null,
       delegated: [
-        '/inputs/request/stay/arriving_on — delegated by the brief; date input rendered with MthdsField.',
-        '/inputs/request/stay/leaving_on — delegated by the brief; date input rendered with MthdsField.',
-        '/inputs/request/stay/must_see — delegated by the brief; list of text rendered with MthdsField.',
-        '/inputs/request/travellers — delegated by the brief; traveller list structure rendered with MthdsField.',
-        '/inputs/inspiration — delegated by the brief; image file input rendered with MthdsField.',
+        '/inputs/request/stay/arriving_on — brief marks this date input delegated to MthdsField',
+        '/inputs/request/stay/leaving_on — brief marks this date input delegated to MthdsField',
+        '/inputs/request/stay/must_see — brief marks this list of text delegated to MthdsField',
+        '/inputs/request/travellers — brief marks this list of traveller structures delegated to MthdsField',
+        '/inputs/inspiration — brief marks this image file delegated to MthdsField',
       ],
     },
   },

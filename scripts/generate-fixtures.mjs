@@ -54,6 +54,7 @@
  *   make fixtures-runs   the PAYLOADS    - what running it actually produced
  *   make briefs          the BRIEFS      - what a producer is handed
  *   make fixtures-specs  the SPECS       - what the designer method laid out
+ *   make prompt-hash     the PROMPT PIN  - moved to the method as it is now
  *   --capture            a spec another producer wrote, validated the same way
  *   --reemit             every committed specs and payloads module, written
  *                        again from itself
@@ -105,9 +106,9 @@
  * No pass runs a pipelex CLI. The two that run pipes reach the runtime the way
  * a host does - over the API - so a fixture records what a product receives,
  * and there is no sibling checkout to be missing when it is time to run them.
- * The designer is reached through ONE typed call, `scripts/pipelex/ui-designer.ts`,
+ * The designer is reached through ONE typed call, `scripts/pipelex/layout-design.ts`,
  * written by /pipelex-integrate over the types codegen projected from the
- * bundle into `src/generated/ui-designer/`; `make codegen-check` is what says
+ * bundle into `src/generated/layout-design/`; `make codegen-check` is what says
  * those types still match the bundle.
  *
  * The briefs, the specs and the re-emit also import this repo's TypeScript
@@ -912,6 +913,44 @@ function currentPrompt(g) {
   return { method, catalog, hash };
 }
 
+/**
+ * The PROMPT PIN pass: move `PROMPT_HASH` to what the method and the catalog
+ * hash to now.
+ *
+ * The pin is a derived fact the entry has to carry as a constant - it stays
+ * importable from a browser, so it can hash nothing itself - and every edit to
+ * the method's text moves it. Doing that by hand between two edits of a prompt
+ * is busywork, so this pass reads the method, builds the catalog, hashes the
+ * pair and rewrites the one line. Free and offline; it runs under tsx only
+ * because the catalog is built from `src/`.
+ *
+ * It touches no fixture, so it cannot make a stale capture look current: the
+ * corpus test still holds every stamp to the pin, and `METHOD_WIP=1` is what
+ * lets that wait while the method is being worked on.
+ */
+async function pinPromptHash() {
+  const g = await loadGenerative();
+  const method = readFileSync(DESIGNER_BUNDLE, 'utf8');
+  const hash = promptHashOf(g.promptHashSubject(method, g.designerCatalog()));
+  const file = path.join(REPO, 'src/generative/prompt-hash.ts');
+  const source = readFileSync(file, 'utf8');
+  const PIN = /^export const PROMPT_HASH = '([0-9a-f]{12})';$/m;
+  const found = PIN.exec(source);
+  if (!found) {
+    die(`src/generative/prompt-hash.ts: no \`export const PROMPT_HASH = '…'\` line to move.`);
+  }
+  if (found[1] === hash) {
+    process.stdout.write(`  PROMPT_HASH is current at ${hash}\n`);
+    return;
+  }
+  writeFileSync(file, source.replace(PIN, `export const PROMPT_HASH = '${hash}';`));
+  process.stdout.write(`  PROMPT_HASH ${found[1]} -> ${hash}  (src/generative/prompt-hash.ts)\n`);
+  process.stdout.write(
+    '  The captured layouts are stamped with the older hash until `make fixtures-specs` re-runs\n' +
+      '  them. Until it does, `METHOD_WIP=1 make test` says so instead of failing on it.\n',
+  );
+}
+
 /** One hero's brief, rendered from the committed descriptors and, on the result side, the committed payload. */
 async function renderHeroBrief(hero, g) {
   const pipeRef = g.pipeRefOf(hero);
@@ -1001,7 +1040,7 @@ async function generateBriefs() {
   }
 }
 
-const DESIGNER_BUNDLE = path.join(REPO, 'data/generative/ui-designer.mthds');
+const DESIGNER_BUNDLE = path.join(REPO, 'methods/layout-design.mthds');
 
 /** Who may be recorded as a spec's producer. Mirrors `Producer` in src/generative/fixture.ts. */
 const PRODUCERS = new Set(['pipelex-method', 'claude-code-subagent', 'claude-code-session']);
@@ -1069,7 +1108,7 @@ function writeSpecsModule(caseName, specs) {
  *
  * The third pass, and the second that costs anything. For each hero it renders
  * the brief exactly as the briefs pass does, hands it and the catalog as data
- * (and, with `SEED=`, a creative seed) to `data/generative/ui-designer.mthds`
+ * (and, with `SEED=`, a creative seed) to `methods/layout-design.mthds`
  * on the HOSTED API through `@pipelex/sdk`, compiles the text that came back
  * as JSONL patches, validates the spec against the catalog - structure, every
  * element type, every prop, one panel per tab or step - and FAILS on any
@@ -1087,12 +1126,12 @@ function writeSpecsModule(caseName, specs) {
  */
 async function generateSpecs(only) {
   await hostedApi('specs');
-  const { designerModel, uiDesigner } = await import('./pipelex/ui-designer.ts');
+  const { designerModel, designLayout } = await import('./pipelex/layout-design.ts');
   const g = await loadGenerative();
   const { catalog, hash } = currentPrompt(g);
   const today = new Date().toISOString().slice(0, 10);
 
-  // The typed call site (scripts/pipelex/ui-designer.ts) owns the bundle and
+  // The typed call site (scripts/pipelex/layout-design.ts) owns the bundle and
   // its pins; this pass only names the overrides. The model is resolved once,
   // up front, because it is printed before every run and recorded on every
   // fixture - and a bundle whose stages pin different models is refused there,
@@ -1129,7 +1168,7 @@ async function generateSpecs(only) {
     );
     const briefText = await renderHeroBrief(hero, g);
     const { jsonl, plan, results } = await designPage(pipeRef, () =>
-      uiDesigner(
+      designLayout(
         { catalog, brief: briefText, ...(seed ? { seed: seedLine(seed) } : {}) },
         { ...overrides, onPoll: heartbeat },
       ),
@@ -1161,7 +1200,7 @@ async function generateSpecs(only) {
 }
 
 /**
- * One designer run through the typed call site - `scripts/pipelex/ui-designer.ts`,
+ * One designer run through the typed call site - `scripts/pipelex/layout-design.ts`,
  * written by /pipelex-integrate over the method's signature and the types
  * codegen projected from the bundle - with this pass's failure policy around
  * it: a run that fails is fatal, named by the SDK's typed errors, because a
@@ -1340,7 +1379,7 @@ function emitSpecs(caseName, specs) {
     ` * Specs captured for the heroes of ${sourcePathOf(caseName)} - DO NOT EDIT.`,
     ' *',
     " * Regenerate the designer method's entries with `make fixtures-specs`, which runs",
-    ' * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over',
+    ' * `methods/layout-design.mthds` on the hosted API through `@pipelex/sdk` over',
     " * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates",
     " * what came back against the catalog. Take in another producer's JSONL with the",
     ' * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same',
@@ -1372,6 +1411,10 @@ function main() {
   const only = onlyIndex === -1 ? null : args[onlyIndex + 1];
   const pipeIndex = args.indexOf('--pipe');
   const pipe = pipeIndex === -1 ? null : args[pipeIndex + 1];
+  if (args.includes('--prompt-hash')) {
+    pinPromptHash().catch((error) => die(error?.stack ?? String(error)));
+    return;
+  }
   if (args.includes('--briefs')) {
     generateBriefs().catch((error) => die(error?.stack ?? String(error)));
     return;

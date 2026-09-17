@@ -21,6 +21,7 @@ import {
   resultFieldAtPath,
 } from '../../generative/paths';
 import { PROMPT_HASH } from '../../generative/prompt-hash';
+import { METHOD_WIP } from './method-wip';
 import { payloadToState, seedInputs } from '../../generative/state';
 import { specFromJsonl } from '../../generative/stream';
 import { formatProblems, validateAgainstCatalog } from '../../generative/validate';
@@ -275,16 +276,22 @@ describe('the captured layouts', () => {
     describe(`${fixture.pipeRef} (${fixtureId(fixture)})`, () => {
       const inputs = inputsOf(fixture.pipeRef);
 
-      it('was produced against the prompt the package ships', () => {
+      it('names a brief that is on disk', () => {
+        expect(existsSync(path.join(REPO, fixture.brief)), fixture.brief).toBe(true);
+      });
+
+      // The two stamp assertions, and the only two `METHOD_WIP=1` stands down
+      // for - see ./method-wip.ts. Every other assertion here still holds under
+      // the hatch, because a prompt edit stales the stamp and nothing else.
+      it.skipIf(METHOD_WIP)('was produced against the prompt the package ships', () => {
         expect(fixture.promptHash).toBe(PROMPT_HASH);
       });
 
-      it('names a brief that is on disk, carrying the same prompt', () => {
-        const briefPath = path.join(REPO, fixture.brief);
-        expect(existsSync(briefPath), fixture.brief).toBe(true);
+      it.skipIf(METHOD_WIP)('names a brief carrying the prompt it was produced against', () => {
         // The brief opens with the hash of the prompt it was written beside, so
         // the fixture and the record it points at cannot drift apart silently.
-        expect(readFileSync(briefPath, 'utf8').split('\n')[0]).toContain(fixture.promptHash);
+        const brief = readFileSync(path.join(REPO, fixture.brief), 'utf8');
+        expect(brief.split('\n')[0]).toContain(fixture.promptHash);
       });
 
       it('compiles from its own JSONL to its spec', () => {

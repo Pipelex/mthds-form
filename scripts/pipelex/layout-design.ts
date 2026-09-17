@@ -2,18 +2,22 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { DictWorkingMemory, RunResults, WaitForResultOptions } from '@pipelex/sdk';
-import { parsePagePlan, parseText, serializeCatalog } from '../../src/generated/ui-designer/binder';
-import type { Catalog, PagePlan } from '../../src/generated/ui-designer/types';
+import {
+  parsePagePlan,
+  parseText,
+  serializeCatalog,
+} from '../../src/generated/layout-design/binder';
+import type { Catalog, PagePlan } from '../../src/generated/layout-design/types';
 import { DESIGNER_CATALOG_CONCEPT } from '../../src/generative/designer-catalog';
 import { getPipelexClient } from './client';
 
 /**
- * The designer method, `generative.ui_designer`, as one typed call.
+ * The designer method, `generative.design_layout`, as one typed call.
  *
  * Written by /pipelex-integrate over the signature the validate verdict
  * carries - `catalog: generative.Catalog`, `brief: native.Text`, an optional
  * `seed: native.Text`, output `native.Text` - and typed against the tree
- * codegen projected from the bundle into `src/generated/ui-designer/`. A field
+ * codegen projected from the bundle into `src/generated/layout-design/`. A field
  * renamed in the bundle's `Catalog` structure fails the type check here and
  * on `designerCatalog()`'s literals; a bundle edited without a regeneration
  * fails `make codegen-check`, which compares the method's bytes with the hash
@@ -33,10 +37,10 @@ import { getPipelexClient } from './client';
  * input is text or data, so nothing here uploads either.
  */
 
-const PIPE_CODE = 'ui_designer';
+const PIPE_CODE = 'design_layout';
 
-/** `data/generative/`: the bundle's directory, and the sidecar's `bundle_dir`. */
-const BUNDLE_DIR = fileURLToPath(new URL('../../data/generative/', import.meta.url));
+/** `methods/`: the bundle's directory, and the sidecar's `bundle_dir`. */
+const BUNDLE_DIR = fileURLToPath(new URL('../../methods/', import.meta.url));
 
 /**
  * Every stage of the method pins its model in the object form,
@@ -47,7 +51,7 @@ const BUNDLE_DIR = fileURLToPath(new URL('../../data/generative/', import.meta.u
 const MODEL_PIN = /^(model\s*=\s*\{\s*model\s*=\s*)"([^"]+)"/gm;
 const TEMPERATURE_PIN = /(temperature\s*=\s*)([0-9.]+)/g;
 
-export type UiDesignerInputs = {
+export type DesignLayoutInputs = {
   /** The vocabulary as data - `designerCatalog()`'s value - under the method's `Catalog` structure. */
   catalog: Catalog;
   /** The brief: the page's paths, their kinds and what is delegated, as `renderInputBrief` or `renderResultBrief` writes it. */
@@ -56,7 +60,7 @@ export type UiDesignerInputs = {
   seed?: string;
 };
 
-export interface UiDesignerOptions {
+export interface DesignLayoutOptions {
   /** Runs every stage on this model instead of the one the bundle pins, for a comparative run. */
   model?: string;
   /** Overrides every stage's temperature, for a model that fixes its own. */
@@ -65,7 +69,7 @@ export interface UiDesignerOptions {
   onPoll?: WaitForResultOptions['onPoll'];
 }
 
-export interface UiDesignerRun {
+export interface DesignLayoutRun {
   /** The pipe's Text output: the JSONL patch lines, exactly as the model emitted them. */
   jsonl: string;
   /** The planner's `PagePlan`, the intermediate the builder was handed, from the run's working memory. */
@@ -108,6 +112,13 @@ function planOf(results: WithWorkingMemory): PagePlan {
  * A bundle is one closure: a file that imports a sibling needs that sibling
  * submitted with it, so the whole directory goes, and the drift gate lists
  * it with this same call.
+ *
+ * `methods/` holds one method today. A second one added beside it would join
+ * this request - and would red `make codegen-check`, which lists the same
+ * directory and reports a file the types were not generated from. That red is
+ * the signal to give each method its own directory and move the sidecar's
+ * `bundle_dir` with it through /pipelex-integrate, never a filter here: a
+ * filter would quietly drop the sibling a real closure needs.
  */
 async function readBundle(): Promise<string[]> {
   const names = (await readdir(BUNDLE_DIR, { recursive: true }))
@@ -132,14 +143,14 @@ function pinnedModel(contents: readonly string[]): string {
 
 /** The model the designer runs on: the bundle's own pin, unless a comparative run names another. */
 export async function designerModel(
-  options: Pick<UiDesignerOptions, 'model'> = {},
+  options: Pick<DesignLayoutOptions, 'model'> = {},
 ): Promise<string> {
   const pinned = pinnedModel(await readBundle());
   return options.model ?? pinned;
 }
 
 /** The bundle with the overrides applied to every pin - a string edit, since the bundle travels as text. */
-function withOverrides(contents: readonly string[], options: UiDesignerOptions): string[] {
+function withOverrides(contents: readonly string[], options: DesignLayoutOptions): string[] {
   const pinned = pinnedModel(contents);
   const model = options.model ?? pinned;
   if (
@@ -166,10 +177,10 @@ function withOverrides(contents: readonly string[], options: UiDesignerOptions):
  * generated binder: a `native.Text` arrives as `{ text }`, and the plan the
  * first stage wrote is read out of the working memory the same way.
  */
-export async function uiDesigner(
-  inputs: UiDesignerInputs,
-  options: UiDesignerOptions = {},
-): Promise<UiDesignerRun> {
+export async function designLayout(
+  inputs: DesignLayoutInputs,
+  options: DesignLayoutOptions = {},
+): Promise<DesignLayoutRun> {
   const results = await getPipelexClient().startAndWaitForResult(
     {
       pipe_code: PIPE_CODE,

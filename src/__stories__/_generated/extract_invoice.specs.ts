@@ -2,7 +2,7 @@
  * Specs captured for the heroes of data/methods/extract_invoice/bundle.mthds - DO NOT EDIT.
  *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
- * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over
+ * `methods/layout-design.mthds` on the hosted API through `@pipelex/sdk` over
  * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates
  * what came back against the catalog. Take in another producer's JSONL with the
  * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same
@@ -28,11 +28,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'invoice_extraction.process_invoice',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: '15d195df65f3',
-    date: '2026-09-16',
+    promptHash: 'a4e2e53582b1',
+    date: '2026-09-17',
     brief: 'wip/generative-ui/briefs/invoice_extraction.process_invoice.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["hero","work"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"Invoice extraction","headline":"Extract from an invoice","lede":"Drop in an invoice and we\'ll pull out the details."},"children":[]}}\n{"op":"add","path":"/elements/work","value":{"type":"Section","props":{"title":"The invoice"},"children":["document","run"]}}\n{"op":"add","path":"/elements/document","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Extract the details","hint":"We\'ll need the document before we can start."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["hero","document-card","run"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"Invoice extraction","headline":"Pull the details out of your invoice","lede":"Drop a document and we read the numbers off it."},"children":[]}}\n{"op":"add","path":"/elements/document-card","value":{"type":"Card","props":{},"children":["document-field"]}}\n{"op":"add","path":"/elements/document-field","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Extract the invoice","hint":"Add a document to begin."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -40,28 +40,26 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'xl',
+            gap: 'lg',
             align: 'stretch',
           },
-          children: ['hero', 'work'],
+          children: ['hero', 'document-card', 'run'],
         },
         hero: {
           type: 'Hero',
           props: {
             eyebrow: 'Invoice extraction',
-            headline: 'Extract from an invoice',
-            lede: "Drop in an invoice and we'll pull out the details.",
+            headline: 'Pull the details out of your invoice',
+            lede: 'Drop a document and we read the numbers off it.',
           },
           children: [],
         },
-        work: {
-          type: 'Section',
-          props: {
-            title: 'The invoice',
-          },
-          children: ['document', 'run'],
+        'document-card': {
+          type: 'Card',
+          props: {},
+          children: ['document-field'],
         },
-        document: {
+        'document-field': {
           type: 'MthdsField',
           props: {
             path: '/inputs/document',
@@ -71,8 +69,8 @@ export const SPECS: SpecFixture[] = [
         run: {
           type: 'Cta',
           props: {
-            label: 'Extract the details',
-            hint: "We'll need the document before we can start.",
+            label: 'Extract the invoice',
+            hint: 'Add a document to begin.',
           },
           on: {
             press: [
@@ -90,37 +88,40 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'A page for someone with an invoice in hand who wants its details pulled out — they drop the document and run it, nothing more.',
-      title: 'Extract from an invoice',
+        'A page for someone who has an invoice in hand and wants the numbers pulled out of it — drop the document, run the extraction, done.',
+      title: 'Extract an invoice',
       composition:
-        "A single, centred, unhurried column — this page has one job, so it wastes nothing on chrome. A Hero opens it: an eyebrow with the app's name, one bold headline naming the job, one muted line under it. Below, a single Section carries the whole of the work: the delegated document control, given room to breathe as the only thing on the page that matters. The run sits at the foot of that same Section as a full-width Cta, with its one-line wait note as the Cta's hint. Nothing is boxed, nothing is folded, nothing competes: drop the file, run it.",
+        'A single centered column, quiet and deliberate — this page does one thing, so it should feel like a clean drop zone, not a form. An opening Hero states the job in one bold line with a short muted line under it. Below it, a single Card holds the one thing that matters: the document drop, delegated to MthdsField, which renders its own label and description. The run sits directly beneath that card as a full-width Cta, with a one-line hint that names what the run is waiting for. Nothing else competes; the file is the whole page.',
       regions: [
         {
           title: null,
           purpose:
-            "Opens the page: names the app, states in one line what happens here, so the person knows they're in the right place before they do anything.",
+            'Opening: names the job in one bold line so the person knows exactly what happens here before they do anything.',
           container: 'Hero',
           elements: [
-            'Hero eyebrow: Invoice extraction',
-            'Hero headline: Extract from an invoice',
-            "Hero subline: Drop in an invoice and we'll pull out the details.",
+            "Hero, eyebrow 'Invoice extraction', headline 'Pull the details out of your invoice', muted line 'Drop a document and we read the numbers off it.'",
           ],
         },
         {
-          title: 'The invoice',
+          title: null,
           purpose:
-            'The whole of the work: the document to process and the control that runs it, together in one unboxed stage since there is nothing else to group it against.',
-          container: 'Section',
+            'The one input: the document to process, delegated whole as the brief marks it, since it is a file.',
+          container: 'Card',
+          elements: ['MthdsField, path /inputs/document'],
+        },
+        {
+          title: null,
+          purpose: 'Runs the extraction and tells the person what the run is waiting for.',
+          container: 'Cta',
           elements: [
-            'MthdsField bound to /inputs/document',
-            "Cta running validateForm then run — label 'Extract the details', hint 'We'll need the document before we can start.'",
+            "Cta, label 'Extract the invoice', hint 'Add a document to begin.', on.press bound to validateForm then run",
           ],
         },
       ],
-      call_to_action: "Extract the details — hint: We'll need the document before we can start.",
+      call_to_action: 'Extract the invoice — hint: "Add a document to begin."',
       defaults: null,
       delegated: [
-        '/inputs/document — the brief marks the document file as delegated to MthdsField',
+        '/inputs/document — a file, marked delegated by the brief; rendered with MthdsField and nothing else',
       ],
     },
   },
