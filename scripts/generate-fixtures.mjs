@@ -78,7 +78,8 @@
  * shows which, and the corpus holds both.
  *
  * The rest are about the GENERATIVE layer rather than the descriptors. Briefs
- * are free - they are rendered from what the first two passes committed - and
+ * are free - built as data from what the first two passes committed and laid
+ * out by the designer method's own template, through the local runtime - and
  * so is the re-emit, which rewrites a specs module from its own fixtures. The
  * specs pass is the second that costs: it runs the designer method over each
  * brief, and a spec is a payload's twin, the other artifact no projection can
@@ -93,9 +94,12 @@
  * through a paid sweep is the wrong time:
  *
  *   descriptors  PIPELEX_PYTHON  the sibling `../pipelex` checkout's venv
- *                                INTERPRETER - `dump-validate-views.py` imports
- *                                pipelex as a library, and no CLI surfaces
- *                                those views yet
+ *   briefs                       INTERPRETER - `dump-validate-views.py` imports
+ *                                pipelex as a library, since no CLI surfaces
+ *                                those views yet, and `render-briefs.py` runs
+ *                                the method's template stage through it, so
+ *                                the brief on record is the runtime's own
+ *                                rendering and nobody's imitation of it
  *   payloads     PIPELEX_API_KEY the HOSTED API, through `@pipelex/sdk`: no
  *   specs                        checkout, no CLI, nothing to install beyond
  *                                this repo's own devDependencies, and the run is
@@ -951,8 +955,13 @@ async function pinPromptHash() {
   );
 }
 
-/** One hero's brief, rendered from the committed descriptors and, on the result side, the committed payload. */
-async function renderHeroBrief(hero, g) {
+/**
+ * One hero's brief, as DATA: the `generative.Brief` value the designer method
+ * takes, built from the committed descriptors and, on the result side, the
+ * committed payload loaded into the result tree. The method lays it out
+ * itself (its `render_brief` stage); nothing here writes a sentence of it.
+ */
+async function heroBrief(hero, g) {
   const pipeRef = g.pipeRefOf(hero);
   const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
   const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
@@ -968,18 +977,14 @@ async function renderHeroBrief(hero, g) {
     // An authored method has a name a host would list it by - the case's
     // title; a synthesized carrier has none, and its brief names no product.
     const name = hero.source === 'methods' ? hero.title : undefined;
-    return g.renderInputBrief({ pipeRef, description, name }, fields);
+    return g.inputBrief({ pipeRef, description, name }, fields);
   }
   const descriptor = g.core.getPipeOutputForm(fixtures.OUTPUT_FORM, hero.domain, hero.pipeCode);
   if (!descriptor) die(`${pipeRef}: no output descriptor.`);
   const field = g.core.buildResultField(descriptor, contract.output.json_schema);
   const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
   if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
-  return g.renderResultBrief(
-    { pipeRef, description },
-    field,
-    g.payloadToState(field, PAYLOADS[pipeRef]),
-  );
+  return g.resultBrief({ pipeRef, description }, field, g.payloadToState(field, PAYLOADS[pipeRef]));
 }
 
 const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
@@ -990,13 +995,59 @@ function briefRelPath(pipeRef) {
 }
 
 /**
- * One brief file: the hero's brief, then the catalog the designer method was
- * handed as data, and the hash of the two with the method. The method's text
- * is not copied in - it is the committed file the header names, and the prompt
- * a producer reads is that file over this data.
+ * The line that ends the laid-out brief in a brief file; the data follows it.
+ * An HTML comment and not a Markdown rule, because the text above it is the
+ * template's rendering of what the descriptor states - a description flows
+ * into its path line as written, newlines and all - so a bare `---` is a line
+ * the brief itself can hold, and the record was once cut short at the first
+ * one. The data below it is JSON, whose strings escape their newlines, so no
+ * line after the separator can spell it: the LAST such line is the separator.
  */
-function writeBrief(pipeRef, text, catalog, hash) {
+const BRIEF_DATA_SEPARATOR =
+  '<!-- The laid-out brief ends here. Below: the data it was rendered from. -->';
+
+/**
+ * The briefs laid out by the method's own `render_brief` stage, offline: one
+ * boot of pipelex as a library, the bundle loaded once, the template run once
+ * per brief. The brief a model reads is the METHOD'S rendering of the data
+ * this repo builds - the wording is in `methods/layout-design.mthds` and
+ * nowhere here - so the record on disk has to be that rendering and not an
+ * imitation of it, which is why this goes through the runtime's own
+ * preprocessor and Jinja2 environment, and why `make briefs` needs the
+ * sibling checkout's interpreter as the descriptor pass does. Keyed by pipe
+ * ref in and out; calls no model.
+ */
+function renderBriefs(briefs) {
+  requirePython();
+  try {
+    const stdout = execFileSync(
+      PIPELEX_PYTHON,
+      [path.join(REPO, 'scripts/render-briefs.py'), DESIGNER_BUNDLE_DIR],
+      {
+        input: JSON.stringify(briefs),
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, PIPELEX_NO_DECK_NOTICE: '1' },
+      },
+    );
+    return JSON.parse(stdout);
+  } catch (error) {
+    const detail = error.stderr ? `\n${error.stderr}` : '';
+    die(`render-briefs.py failed over ${path.relative(REPO, DESIGNER_BUNDLE_DIR)}.${detail}`);
+  }
+}
+
+/**
+ * One brief file: the hero's brief as the method laid it out, then the brief
+ * as data and the catalog as data - the two structured inputs the designer
+ * method was handed, verbatim - and the hash of the method with the catalog.
+ * The method's text is not copied in - it is the committed file the header
+ * names, and the prompt a producer reads is that file over this data.
+ */
+function writeBrief(pipeRef, text, brief, catalog, hash) {
   const outPath = path.join(BRIEFS_DIR, `${pipeRef}.md`);
+  const method = path.relative(REPO, DESIGNER_BUNDLE);
   writeFileSync(
     outPath,
     [
@@ -1004,11 +1055,19 @@ function writeBrief(pipeRef, text, catalog, hash) {
       '',
       text.trimEnd(),
       '',
-      '---',
+      BRIEF_DATA_SEPARATOR,
+      '',
+      `# Brief (prompt hash \`${hash}\`)`,
+      '',
+      `The \`brief\` input the designer method receives, verbatim, as \`inputBrief\` or \`resultBrief\` builds it from the descriptor. The text above is the method's own \`render_brief\` stage laid over this data - every sentence of it is in \`${method}\`, which is the prompt; the hash covers the method with the catalog.`,
+      '',
+      '```json',
+      JSON.stringify(brief, null, 2),
+      '```',
       '',
       `# Catalog (prompt hash \`${hash}\`)`,
       '',
-      `The \`catalog\` input the designer method receives, verbatim, as \`designerCatalog()\` builds it. The prompt is the method itself, \`${path.relative(REPO, DESIGNER_BUNDLE)}\`, which lays this data out; the hash covers both.`,
+      `The \`catalog\` input the designer method receives, verbatim, as \`designerCatalog()\` builds it. The method lays this data out too; the hash covers both.`,
       '',
       '```json',
       JSON.stringify(catalog, null, 2),
@@ -1020,27 +1079,59 @@ function writeBrief(pipeRef, text, catalog, hash) {
 }
 
 /**
+ * The brief on disk, as `make briefs` wrote it: the hash its header carries,
+ * and the text the method laid out, up to the separator the data follows.
+ * The specs pass reads it before a run, to refuse a sweep over a stale
+ * record, and after one, to hold the record to what the model actually saw.
+ */
+function committedBrief(pipeRef) {
+  const file = path.join(BRIEFS_DIR, `${pipeRef}.md`);
+  if (!existsSync(file)) return undefined;
+  const source = readFileSync(file, 'utf8');
+  const hash = /Prompt hash: ([0-9a-f]{12})/.exec(source.split('\n')[0])?.[1];
+  const start = source.indexOf('\n\n') + 2;
+  const end = source.lastIndexOf(`\n${BRIEF_DATA_SEPARATOR}\n`);
+  if (end < start) {
+    die(
+      `${path.relative(REPO, file)} has no line separating the brief from its data.\n` +
+        '  Run `make briefs`: the record is read up to that line, and a file without one was not written by it.',
+    );
+  }
+  return { hash, text: source.slice(start, end).trimEnd() };
+}
+
+/**
  * The BRIEFS pass: the generative layer's view of each hero, written down.
  *
- * For each hero, the Markdown brief is rendered from the committed descriptors
- * (and, on the result side, the committed payload loaded into the result tree),
- * and written beside the catalog data and the prompt hash under
- * `wip/generative-ui/briefs/`. That file, with the method it names, is the
+ * For each hero, the brief is built as data from the committed descriptors
+ * (and, on the result side, the committed payload loaded into the result
+ * tree), laid out by the method's own template through the local runtime,
+ * and written under `wip/generative-ui/briefs/` beside that data, the catalog
+ * data and the prompt hash. That file, with the method it names, is the
  * record of exactly what a producer was given - the artifacts every spec is
  * produced from - and it is what the `brief` field of a spec fixture points at.
  *
- * The pass is free: it reads committed files and calls no model.
+ * The pass is free: it reads committed files and calls no model. It needs the
+ * sibling checkout's interpreter, as the descriptor pass does, because the
+ * template is run by the runtime and imitated by nothing.
  */
 async function generateBriefs() {
   const g = await loadGenerative();
   const { catalog, hash } = currentPrompt(g);
+  const briefs = {};
+  for (const hero of g.HEROES) briefs[g.pipeRefOf(hero)] = await heroBrief(hero, g);
+  const rendered = renderBriefs(briefs);
   mkdirSync(BRIEFS_DIR, { recursive: true });
   for (const hero of g.HEROES) {
-    writeBrief(g.pipeRefOf(hero), await renderHeroBrief(hero, g), catalog, hash);
+    const pipeRef = g.pipeRefOf(hero);
+    if (typeof rendered[pipeRef] !== 'string') die(`${pipeRef}: the method laid out no brief.`);
+    writeBrief(pipeRef, rendered[pipeRef], briefs[pipeRef], catalog, hash);
   }
 }
 
 const DESIGNER_BUNDLE = path.join(REPO, 'methods/layout-design.mthds');
+/** The bundle's directory - its whole closure, which is what the call site and the renderer load. */
+const DESIGNER_BUNDLE_DIR = path.join(REPO, 'methods');
 
 /** Who may be recorded as a spec's producer. Mirrors `Producer` in src/generative/fixture.ts. */
 const PRODUCERS = new Set(['pipelex-method', 'claude-code-subagent', 'claude-code-session']);
@@ -1106,8 +1197,8 @@ function writeSpecsModule(caseName, specs) {
 /**
  * The SPECS pass: the designer method, run for real over each hero's brief.
  *
- * The third pass, and the second that costs anything. For each hero it renders
- * the brief exactly as the briefs pass does, hands it and the catalog as data
+ * The third pass, and the second that costs anything. For each hero it builds
+ * the brief as data exactly as the briefs pass does, hands it and the catalog
  * (and, with `SEED=`, a creative seed) to `methods/layout-design.mthds`
  * on the HOSTED API through `@pipelex/sdk`, compiles the text that came back
  * as JSONL patches, validates the spec against the catalog - structure, every
@@ -1123,6 +1214,15 @@ function writeSpecsModule(caseName, specs) {
  * produced it, and a run with the same producer, model and seededness
  * REPLACES the earlier one; the other fixtures of the case are carried over.
  * `ONLY=<pipe code>` narrows the pass to one hero.
+ *
+ * The record is held to the run at both ends. Before a hero runs, its brief
+ * file must be on disk and stamped with the current prompt hash - a sweep
+ * over a stale record is refused before it spends anything, and the remedy
+ * is `make briefs`. After the run, the brief the method laid out on the
+ * hosted runtime (read back from the run's working memory) must be the text
+ * that file carries: the file is the record of what the model saw, and a
+ * difference means the template rendered differently there than here, which
+ * is a fact to read, never one to store over.
  */
 async function generateSpecs(only) {
   await hostedApi('specs');
@@ -1166,15 +1266,37 @@ async function generateSpecs(only) {
     process.stdout.write(
       `  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`,
     );
-    const briefText = await renderHeroBrief(hero, g);
-    const { jsonl, plan, results } = await designPage(pipeRef, () =>
+    const brief = await heroBrief(hero, g);
+    const committed = committedBrief(pipeRef);
+    if (!committed || committed.hash !== hash) {
+      die(
+        `${pipeRef}: ${briefRelPath(pipeRef)} is ${committed ? `stamped ${committed.hash} while the prompt hashes to ${hash}` : 'missing'}.\n` +
+          '  Run `make briefs` first: the file a fixture points at must be the brief this run is given.',
+      );
+    }
+    const {
+      jsonl,
+      brief: briefText,
+      plan,
+      results,
+    } = await designPage(pipeRef, () =>
       designLayout(
-        { catalog, brief: briefText, ...(seed ? { seed: seedLine(seed) } : {}) },
+        { catalog, brief, ...(seed ? { seed: seedLine(seed) } : {}) },
         { ...overrides, onPoll: heartbeat },
       ),
     );
     const runId = results.pipeline_run_id;
     const cost = runCost(results);
+    if (briefText.trimEnd() !== committed.text) {
+      const seenPath = path.join(BRIEFS_DIR, `${pipeRef}.${id}.as-run.md`);
+      writeFileSync(seenPath, briefText);
+      die(
+        `${pipeRef} (${id}): the brief the run laid out is not the one on disk (run ${runId}).\n` +
+          `  The run's text is at ${path.relative(REPO, seenPath)}; the record is ${briefRelPath(pipeRef)}.\n` +
+          "  The method's template rendered differently on the hosted runtime than through `make briefs`;\n" +
+          '  read the diff before storing anything.',
+      );
+    }
 
     const spec = compileOrDie(g, pipeRef, id, jsonl);
     byCase.set(
@@ -1194,9 +1316,12 @@ async function generateSpecs(only) {
       `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid` +
         `${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
     );
+    // Written after every hero and not after the sweep, as the payload pass
+    // writes its case after every run: the sweep is sequential and fatal on
+    // the first failure, and the heroes a `die` on the tenth would otherwise
+    // throw away were paid for.
+    writeSpecsModule(hero.caseName, byCase.get(hero.caseName));
   }
-
-  for (const [caseName, specs] of byCase) writeSpecsModule(caseName, specs);
 }
 
 /**

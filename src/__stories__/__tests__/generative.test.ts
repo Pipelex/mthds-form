@@ -10,7 +10,7 @@ import {
   getPipeInputForm,
   getPipeOutputForm,
 } from '../../core';
-import { renderInputBrief, renderResultBrief } from '../../generative/brief';
+import { inputBrief, resultBrief } from '../../generative/brief';
 import { catalog } from '../../generative/catalog';
 import { fixtureId } from '../../generative/fixture';
 import { layoutProblems } from '../../generative/layout-fits';
@@ -163,12 +163,19 @@ describe('the briefs', () => {
       getPipeInputForm(structured.INPUT_FORM, 'structured', 'invoice_with_source')!,
       contract.inputs,
     );
-    const brief = renderInputBrief({ pipeRef: 'structured.invoice_with_source' }, fields);
-    expect(brief).toContain('`/inputs/source` — document (a file)');
-    expect(brief).toContain('`/inputs/invoice/issued_on` — date');
-    expect(brief).toMatch(/`\/inputs\/invoice\/lines` — list[^\n]*\[delegate: MthdsField\]/);
-    expect(brief).toContain('`/inputs/invoice/reference` — text, required');
-    expect(brief).not.toContain('json_schema');
+    const brief = inputBrief({ pipeRef: 'structured.invoice_with_source' }, fields);
+    const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);
+    expect(entry('/inputs/source')).toMatchObject({ kind: 'document (a file)', delegated: true });
+    expect(entry('/inputs/invoice/issued_on')).toMatchObject({ kind: 'date', delegated: true });
+    expect(entry('/inputs/invoice/lines')?.kind).toMatch(/^list of /);
+    expect(entry('/inputs/invoice/lines')?.delegated).toBe(true);
+    expect(entry('/inputs/invoice/reference')).toMatchObject({
+      kind: 'text',
+      required: true,
+      delegated: false,
+    });
+    expect(brief.run_control).toBe('Cta');
+    expect(JSON.stringify(brief)).not.toContain('json_schema');
   });
 
   it('carry one loaded run beside the result paths', () => {
@@ -177,15 +184,20 @@ describe('the briefs', () => {
       getPipeOutputForm(results.OUTPUT_FORM, 'results', 'nested_result')!,
       contract.output.json_schema,
     );
-    const brief = renderResultBrief(
+    const brief = resultBrief(
       { pipeRef: 'results.nested_result' },
       field,
       payloadToState(field, PAYLOADS['results.nested_result']),
     );
-    expect(brief).toContain('`/result/lines` — list of structure results.LineItem');
-    expect(brief).toContain('`unit_price` — number');
-    expect(brief).toContain('"issued_on": "2026-03-14"');
-    expect(brief).not.toContain('__class__');
+    const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);
+    expect(entry('/result/lines')).toMatchObject({
+      kind: 'list of structure results.LineItem',
+      item_kind: 'structure results.LineItem',
+      item_laid_out: true,
+    });
+    expect(entry('unit_price')).toMatchObject({ kind: 'number', relative: true, depth: 3 });
+    expect(brief.sample_state).toContain('"issued_on": "2026-03-14"');
+    expect(brief.sample_state).not.toContain('__class__');
   });
 });
 

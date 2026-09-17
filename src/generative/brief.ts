@@ -1,28 +1,53 @@
 import type { RunField } from '../core';
 import { isNativeCompositeNode, isNativeDateNode, isNativeHtmlNode } from '../core/native-content';
+import type { Brief, PathEntry } from '../generated/layout-design/types';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
 
 /**
- * The brief: the model's view of the descriptor, as Markdown.
+ * The brief: the model's view of the descriptor, as DATA.
  *
  * Rule 1, restated for a model. The model's input is the DESCRIPTOR, never JSON
  * Schema: it receives the kinds, the labels, the descriptions, the choices, the
- * presence and what gates the run - rendered from `RunField[]` here, and from
- * nowhere else. On the result side it also receives one real run's loaded
- * state, so it can judge magnitudes, but it never sees the wire: the state it
- * reads is what `payloadToState` produced, with the envelopes already gone.
+ * presence and what gates the run - projected from `RunField[]` here, and from
+ * nowhere else, into the `Brief` structure the designer method declares. On the
+ * result side it also receives one real run's loaded state, so it can judge
+ * magnitudes, but it never sees the wire: the state it reads is what
+ * `payloadToState` produced, with the envelopes already gone.
  *
- * Pure, no React, and the only place the descriptor is rendered for a model.
+ * Nothing here is prose. The sentences a model reads - the headings, how a
+ * path line is worded, what "delegated" says - are the method's own, in the
+ * `render_brief` stage of `methods/layout-design.mthds`: a Jinja2 template
+ * over this value, and the one place the brief's wording is edited. What this
+ * module contributes is what only code can state: every path, flattened in
+ * reading order with its depth, its kind in words, its constraints in words,
+ * and which of them the kernel keeps. The shape is the method's own: codegen
+ * projects its `Brief` and `PathEntry` structures into
+ * `src/generated/layout-design/`, and the aliases below are those types,
+ * imported type-only so the generated schemas stay out of the entry. A field
+ * renamed in the bundle fails the type check on the literals here rather than
+ * a run.
+ *
+ * Pure, no React, and the only place the descriptor is projected for a model.
  * What a path is marked as (delegated or not) is decided here too, so the
  * projection, the brief and the validator agree on which paths the kernel
  * renders.
  */
 
+/** The `Brief` structure of `methods/layout-design.mthds`, as codegen projects it. */
+export type DesignerBrief = Brief;
+/** One path of the brief: where it is, what it holds, what constrains it, whether the kernel keeps it. */
+export type DesignerPathEntry = PathEntry;
+
+/** The concept a run request names for the `brief` input: the method's own, domain-qualified. */
+export const DESIGNER_BRIEF_CONCEPT = 'generative.Brief';
+
 /**
- * The component that runs the page, named in the Run section so the brief and
- * the catalog agree on which one it is. A rename in the catalog does not have
- * to be caught here: a brief asking for a component the catalog no longer has
- * produces a layout the validator refuses, loudly, on the pass that made it.
+ * The component that runs the page, handed over as the brief's `run_control`
+ * so the brief and the catalog agree on which one it is - and so the method's
+ * own prose can go on naming none of the catalog's chrome. A rename in the
+ * catalog does not have to be caught here: a brief asking for a component the
+ * catalog no longer has produces a layout the validator refuses, loudly, on
+ * the pass that made it.
  */
 const RUN_COMPONENT = 'Cta';
 
@@ -75,6 +100,7 @@ export function isDelegatedResult(field: RunField): boolean {
   );
 }
 
+/** What a path holds, in words - the one rendering of a kind the brief carries. */
 function kindLabel(field: RunField): string {
   if (isNativeHtmlNode(field)) return 'markup (native.Html)';
   if (isNativeDateNode(field)) return 'date (native.Date)';
@@ -107,12 +133,7 @@ function kindLabel(field: RunField): string {
   }
 }
 
-function labelOf(field: RunField): string {
-  return field.title && field.title !== field.name
-    ? `${field.title} (\`${field.name}\`)`
-    : `\`${field.name}\``;
-}
-
+/** The constraints and hints of a field, each one fact in words. */
 function constraints(field: RunField): string[] {
   const notes: string[] = [];
   if (field.kind === 'number') {
@@ -142,214 +163,147 @@ function constraints(field: RunField): string[] {
   return notes;
 }
 
-interface Line {
-  depth: number;
-  text: string;
+type Side = 'input' | 'result';
+
+/**
+ * One path as the brief carries it. Presence is an input-page fact, so it is
+ * stated on that side only; `relative` marks a path spelled from one item of
+ * the list above, which is how a DataTable column or `$item` reads it.
+ * `seeded` says an ancestor already carries a default: the seed is the
+ * OUTERMOST default, exactly as `seedInputs` seeds it, so a member beneath a
+ * defaulted structure lists none of its own - two `/state` patches on one
+ * subtree would make the seed depend on the order a model emits them in -
+ * while its notes still state it, as a fact about the field rather than an
+ * instruction.
+ */
+function entryOf(
+  field: RunField,
+  path: string,
+  depth: number,
+  side: Side,
+  relative: boolean,
+  seeded: boolean,
+): DesignerPathEntry {
+  const notes = constraints(field);
+  return {
+    depth,
+    path,
+    kind: kindLabel(field),
+    name: field.name,
+    title: field.title && field.title !== field.name ? field.title : undefined,
+    description: field.description,
+    required: side === 'input' ? field.required : undefined,
+    gating: side === 'input' && field.gating ? true : undefined,
+    notes: notes.length > 0 ? notes : undefined,
+    default:
+      seeded || field.defaultValue === undefined ? undefined : JSON.stringify(field.defaultValue),
+    delegated: side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field),
+    relative: relative ? true : undefined,
+  };
 }
 
+/**
+ * A path and, beneath it, what the page can lay out: a structure's members at
+ * their own paths, and - on a result page - a list's item, whose members
+ * follow spelled relative to one item. A delegated path ends the walk: the
+ * kernel renders it whole, so its members are nobody else's to bind.
+ */
 function describe(
   field: RunField,
   path: string,
   depth: number,
-  side: 'input' | 'result',
-  lines: Line[],
+  side: Side,
+  entries: DesignerPathEntry[],
+  seeded = false,
 ): void {
-  const delegated = side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field);
-  const parts: string[] = [`\`${path}\` — ${kindLabel(field)}`];
-  if (side === 'input') {
-    parts.push(field.required ? 'required' : 'optional');
-    if (field.gating) parts.push('gates the run');
-  }
-  const head = parts.join(', ');
-  const tail = [labelOf(field), field.description ?? ''].filter(Boolean).join(': ');
-  const notes = constraints(field);
-  const delegation = delegated
-    ? ` **[delegate: ${side === 'input' ? 'MthdsField' : 'MthdsResult'}]**`
-    : '';
-  lines.push({
-    depth,
-    text: `${head} — ${tail}${notes.length > 0 ? ` (${notes.join('; ')})` : ''}${delegation}`,
-  });
-
-  if (delegated) return;
+  const entry = entryOf(field, path, depth, side, false, seeded);
+  entries.push(entry);
+  if (entry.delegated) return;
   if (field.kind === 'object') {
+    const seededBelow = seeded || field.defaultValue !== undefined;
     for (const child of field.fields) {
-      describe(child, joinPath(path, child.name), depth + 1, side, lines);
+      describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow);
     }
   }
   if (field.kind === 'list' && side === 'result') {
     const item = field.item;
+    entry.item_kind = kindLabel(item);
+    entry.item_description = item.description;
     if (item.kind === 'object' && !isDelegatedResult(item)) {
-      lines.push({
-        depth: depth + 1,
-        text: `each item is a ${kindLabel(item)}${item.description ? ` (${item.description})` : ''}, with these members (paths relative to one item, for DataTable columns or $item):`,
-      });
+      entry.item_laid_out = true;
       for (const child of item.fields) {
-        describeRelative(child, child.name, depth + 2, lines);
+        describeRelative(child, child.name, depth + 2, entries);
       }
-    } else {
-      lines.push({ depth: depth + 1, text: `each item is a ${kindLabel(item)}` });
     }
   }
 }
 
+/** A member of a list's item, spelled relative to that item; a nested list's members go through `<i>`. */
 function describeRelative(
   field: RunField,
   relativePath: string,
   depth: number,
-  lines: Line[],
+  entries: DesignerPathEntry[],
 ): void {
-  const notes = constraints(field);
-  lines.push({
-    depth,
-    text: `\`${relativePath}\` — ${kindLabel(field)} — ${[labelOf(field), field.description ?? ''].filter(Boolean).join(': ')}${notes.length > 0 ? ` (${notes.join('; ')})` : ''}${isDelegatedResult(field) ? ' (a DataTable prints it as text; delegate the whole list to MthdsResult to render it properly)' : ''}`,
-  });
+  const entry = entryOf(field, relativePath, depth, 'result', true, false);
+  entries.push(entry);
+  if (entry.delegated) return;
   if (field.kind === 'object') {
-    for (const child of field.fields)
-      describeRelative(child, joinPath(relativePath, child.name), depth + 1, lines);
-  }
-  if (field.kind === 'list' && field.item.kind === 'object') {
-    lines.push({ depth: depth + 1, text: `each item is a ${kindLabel(field.item)}, with:` });
-    for (const child of field.item.fields) {
-      describeRelative(child, joinPath(relativePath, '<i>', child.name), depth + 2, lines);
+    for (const child of field.fields) {
+      describeRelative(child, joinPath(relativePath, child.name), depth + 1, entries);
     }
   }
-}
-
-function render(lines: readonly Line[]): string {
-  return lines.map((line) => `${'  '.repeat(line.depth)}- ${line.text}`).join('\n');
-}
-
-function collectDelegated(
-  fields: readonly RunField[],
-  root: string,
-  side: 'input' | 'result',
-): string[] {
-  const out: string[] = [];
-  const walk = (field: RunField, path: string) => {
-    const delegated = side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field);
-    if (delegated) {
-      out.push(`\`${path}\` (${kindLabel(field)})`);
-      return;
+  if (field.kind === 'list') {
+    const item = field.item;
+    entry.item_kind = kindLabel(item);
+    entry.item_description = item.description;
+    if (item.kind === 'object' && !isDelegatedResult(item)) {
+      entry.item_laid_out = true;
+      for (const child of item.fields) {
+        describeRelative(child, joinPath(relativePath, '<i>', child.name), depth + 2, entries);
+      }
     }
-    if (field.kind === 'object') {
-      for (const child of field.fields) walk(child, joinPath(path, child.name));
-    }
-  };
-  for (const field of fields) walk(field, joinPath(root, field.name));
-  return out;
-}
-
-function collectDefaults(fields: readonly RunField[], root: string): string[] {
-  const out: string[] = [];
-  const walk = (field: RunField, path: string) => {
-    if (field.defaultValue !== undefined) {
-      out.push(`\`${path}\` = ${JSON.stringify(field.defaultValue)}`);
-      return;
-    }
-    if (field.kind === 'object') {
-      for (const child of field.fields) walk(child, joinPath(path, child.name));
-    }
-  };
-  for (const field of fields) walk(field, joinPath(root, field.name));
-  return out;
+  }
 }
 
 /** The brief for an INPUT page: the form a run is started from. */
-export function renderInputBrief(subject: BriefSubject, fields: readonly RunField[]): string {
-  const lines: Line[] = [];
-  for (const field of fields) describe(field, joinPath(INPUTS_ROOT, field.name), 0, 'input', lines);
-  const delegated = collectDelegated(fields, INPUTS_ROOT, 'input');
-  const defaults = collectDefaults(fields, INPUTS_ROOT);
-  const gating = fields.filter((field) => field.gating).map((field) => `\`${field.name}\``);
-
-  return [
-    `# Input page: ${subject.pipeRef}`,
-    '',
-    subject.description ?? 'A method with the inputs below.',
-    '',
-    ...(subject.name
-      ? [
-          '## Name',
-          '',
-          `The method is called «${subject.name}», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.`,
-          '',
-        ]
-      : []),
-    '## State',
-    '',
-    `The form's values live under \`${INPUTS_ROOT}\`, one member per input, exactly as listed. Bind each input with \`$bindState\` at its path; a structure's members bind at their own paths beneath it.`,
-    '',
-    render(lines),
-    '',
-    '## Delegated',
-    '',
-    delegated.length > 0
-      ? `Render these with \`MthdsField\` at the path, and nothing else:\n\n${delegated.map((entry) => `- ${entry}`).join('\n')}`
-      : "None: every input can be entered with the catalog's own inputs. `MthdsField` remains available for any you would rather not style.",
-    '',
-    '## Defaults',
-    '',
-    defaults.length > 0
-      ? `Seed these, and only these, with \`/state\` patches (\`{"op":"add","path":"/state/inputs/...","value":...}\`):\n\n${defaults.map((entry) => `- ${entry}`).join('\n')}`
-      : 'None. Emit no `/state` patches.',
-    '',
-    '## Run',
-    '',
-    gating.length > 0
-      ? `The run waits for ${gating.join(', ')}; say so near the ${RUN_COMPONENT}, briefly.`
-      : 'Nothing gates the run.',
-    `The page has exactly one \`${RUN_COMPONENT}\`, \`on.press\` bound to \`validateForm\` then \`run\`; label it with what the method does, in a person's words.`,
-    '',
-  ].join('\n');
+export function inputBrief(subject: BriefSubject, fields: readonly RunField[]): DesignerBrief {
+  const paths: DesignerPathEntry[] = [];
+  for (const field of fields) describe(field, joinPath(INPUTS_ROOT, field.name), 0, 'input', paths);
+  return {
+    side: 'input',
+    pipe_ref: subject.pipeRef,
+    description: subject.description,
+    name: subject.name,
+    paths,
+    run_control: RUN_COMPONENT,
+  };
 }
 
 /** The brief for a RESULT page: what one run produced, laid out. */
-export function renderResultBrief(subject: BriefSubject, field: RunField, state: unknown): string {
-  const lines: Line[] = [];
-  const delegatedWhole = isDelegatedResult(field);
-  if (field.kind === 'object' && !delegatedWhole) {
-    lines.push({
+export function resultBrief(subject: BriefSubject, field: RunField, state: unknown): DesignerBrief {
+  const paths: DesignerPathEntry[] = [];
+  if (field.kind === 'object' && !isDelegatedResult(field)) {
+    // The result itself is the root, and its line names no member: it IS the
+    // structure, whose members then follow one level down.
+    paths.push({
       depth: 0,
-      text: `\`${RESULT_ROOT}\` — ${kindLabel(field)}${field.description ? `: ${field.description}` : ''}`,
+      path: RESULT_ROOT,
+      kind: kindLabel(field),
+      description: field.description,
+      delegated: false,
     });
     for (const child of field.fields) {
-      describe(child, joinPath(RESULT_ROOT, child.name), 1, 'result', lines);
+      describe(child, joinPath(RESULT_ROOT, child.name), 1, 'result', paths);
     }
   } else {
-    describe(field, RESULT_ROOT, 0, 'result', lines);
+    describe(field, RESULT_ROOT, 0, 'result', paths);
   }
-  const delegated =
-    field.kind === 'object' && !delegatedWhole
-      ? collectDelegated(field.fields, RESULT_ROOT, 'result')
-      : delegatedWhole
-        ? [`\`${RESULT_ROOT}\` (${kindLabel(field)})`]
-        : [];
-
-  return [
-    `# Result page: ${subject.pipeRef}`,
-    '',
-    subject.description ?? 'The result of a method, described below.',
-    '',
-    '## State',
-    '',
-    `The host loads the run's result under \`${RESULT_ROOT}\` before the page renders. Read every value with \`$state\`; emit no \`/state\` patches. Paths:`,
-    '',
-    render(lines),
-    '',
-    '## Delegated',
-    '',
-    delegated.length > 0
-      ? `Render these with \`MthdsResult\` at the path - they are kinds the catalog cannot show properly:\n\n${delegated.map((entry) => `- ${entry}`).join('\n')}`
-      : 'None. `MthdsResult` remains available for any structure you choose not to lay out.',
-    '',
-    '## One real run, as loaded',
-    '',
-    'The state of one actual run, so you can judge magnitudes and lengths. Bind to the paths; do not copy these values into the spec.',
-    '',
-    '```json',
-    JSON.stringify(state, null, 2),
-    '```',
-    '',
-  ].join('\n');
+  return {
+    side: 'result',
+    pipe_ref: subject.pipeRef,
+    description: subject.description,
+    paths,
+    sample_state: JSON.stringify(state, null, 2),
+  };
 }

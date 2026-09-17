@@ -5,11 +5,11 @@
   "target": "ts-zod",
   "pipe": {
     "pipe_ref": "generative.design_layout",
-    "inputs": { "catalog": "generative.Catalog", "brief": "native.Text", "seed": "native.Text?" },
+    "inputs": { "catalog": "generative.Catalog", "brief": "generative.Brief", "seed": "native.Text?" },
     "output": "native.Text"
   },
   "bundle_dir": "methods",
   "sources": {
-    "methods/layout-design.mthds": "85bffa3108ff6779d2494931fabe3eae5fb61acda986961d707485897d7d89d7"
+    "methods/layout-design.mthds": "7bc8c64c6b59eedeaf1093a494245979b6d6d0f68992a955226dd733fc628a91"
   }
 }
