@@ -388,7 +388,10 @@ export function readDataUrl(candidate: string): DataUrlView | undefined {
   if (comma === -1) return undefined;
   const [declared = '', ...parameters] = url.slice('data:'.length, comma).split(';');
   const trimmed = declared.trim().toLowerCase();
-  const payload = url.slice(comma + 1);
+  // A fragment is not payload. `#page=2` on an inline PDF is the viewer's, and
+  // counting it as bytes is counting the URL rather than the file.
+  const fragment = url.indexOf('#', comma);
+  const payload = fragment === -1 ? url.slice(comma + 1) : url.slice(comma + 1, fragment);
   const base64 = parameters.some((parameter) => parameter.trim().toLowerCase() === 'base64');
   return {
     mediaType: trimmed === '' ? 'text/plain' : trimmed,
@@ -397,14 +400,25 @@ export function readDataUrl(candidate: string): DataUrlView | undefined {
 }
 
 /**
- * Three bytes for every four symbols, ignoring what is not a symbol: the `=`
+ * Three bytes for every four symbols, ignoring what is not one: the `=`
  * padding, and the line breaks a MIME encoder wraps its output at. Both
  * alphabets count, the standard one and the URL-safe one.
+ *
+ * A percent-escape is resolved to the character it stands for before it is
+ * judged, because a payload may be escaped anywhere — `YQ%3D%3D` is `YQ==`,
+ * one byte, and counting `3` and `D` as symbols made it four.
  */
 function base64Bytes(payload: string): number {
   let symbols = 0;
   for (let index = 0; index < payload.length; index += 1) {
-    const code = payload.charCodeAt(index);
+    let code = payload.charCodeAt(index);
+    if (code === 0x25) {
+      const escaped = Number.parseInt(payload.slice(index + 1, index + 3), 16);
+      if (!Number.isNaN(escaped) && index + 2 < payload.length) {
+        code = escaped;
+        index += 2;
+      }
+    }
     if (
       (code >= 0x41 && code <= 0x5a) ||
       (code >= 0x61 && code <= 0x7a) ||

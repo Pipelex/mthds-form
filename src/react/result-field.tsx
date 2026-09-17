@@ -290,6 +290,11 @@ function fileLabel(url: string, filename: string | undefined, strings: FieldStri
   if (filename) return filename;
   const encoded = encodedFileSummary(url, strings);
   if (encoded !== undefined) return encoded;
+  return pathLabel(url);
+}
+
+/** The last path segment of a URL, or the URL when it has none. */
+function pathLabel(url: string): string {
   const path = url.split(/[?#]/)[0] ?? url;
   const segment = path.split('/').filter(Boolean).pop();
   return segment && segment.length > 0 ? segment : url;
@@ -436,10 +441,13 @@ function FileRef({
   filename?: string;
 }) {
   const s = useFieldStrings();
-  const label = fileLabel(url, filename, s);
-  // A `data:` URL on the `title` is the whole file in a tooltip; its summary is
-  // what there is to say, and the copy control still carries the URL.
-  const reference = encodedFileSummary(url, s) ?? url;
+  // Read ONCE: counting a payload means walking it, and the payload is the
+  // file. This component wants the summary twice - as the label a `data:` URL
+  // has no path to give, and instead of a whole file in a `title` tooltip -
+  // and the second call was a second walk of the same megabytes per render.
+  const encoded = encodedFileSummary(url, s);
+  const label = filename ? filename : (encoded ?? pathLabel(url));
+  const reference = encoded ?? url;
   const title = mimeType ? `${reference} · ${mimeType}` : reference;
   // Judged here as well as by the caller, because this component is also given
   // the raw reference as the "nothing paintable" fallback - and the HREF is the
