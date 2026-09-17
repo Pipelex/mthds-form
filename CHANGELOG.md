@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.9.0] - 2026-09-17
 
 ### Changed - the fixture harness runs pipes on the hosted API, not through a local CLI
 
