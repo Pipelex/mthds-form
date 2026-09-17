@@ -112,6 +112,13 @@ function planOf(results: WithWorkingMemory): PagePlan {
  * A bundle is one closure: a file that imports a sibling needs that sibling
  * submitted with it, so the whole directory goes, and the drift gate lists
  * it with this same call.
+ *
+ * `methods/` holds one method today. A second one added beside it would join
+ * this request - and would red `make codegen-check`, which lists the same
+ * directory and reports a file the types were not generated from. That red is
+ * the signal to give each method its own directory and move the sidecar's
+ * `bundle_dir` with it through /pipelex-integrate, never a filter here: a
+ * filter would quietly drop the sibling a real closure needs.
  */
 async function readBundle(): Promise<string[]> {
   const names = (await readdir(BUNDLE_DIR, { recursive: true }))
