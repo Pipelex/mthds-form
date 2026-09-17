@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RunField } from '../../core';
 import { inputBrief, isDelegatedInput, resultBrief } from '../brief';
+import { seedInputs } from '../state';
 
 /**
  * The brief as data: which paths the kernel keeps, and how the descriptor's
@@ -109,6 +110,51 @@ describe('the brief of an input page', () => {
   });
 });
 
+describe('the seeds an input page lists', () => {
+  // A structure with a default of its own AND a member with one: the kernel
+  // seeds the structure whole and never descends past a default, and the
+  // brief has to say the same, or a model following it in order overwrites
+  // part of the authored structure with the member's.
+  const fields: RunField[] = [
+    {
+      kind: 'object',
+      name: 'request',
+      required: false,
+      conceptRef: 'trips.TripRequest',
+      defaultValue: { city: 'Paris', budget: 200 },
+      fields: [
+        { kind: 'text', name: 'city', required: false },
+        { kind: 'number', name: 'budget', required: false, integer: false, defaultValue: 100 },
+      ],
+    },
+    { kind: 'text', name: 'note', required: false, defaultValue: 'hello' },
+  ];
+  const brief = inputBrief({ pipeRef: 'trips.plan_trip' }, fields);
+  const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);
+
+  it("seeds the outermost default only, and keeps a member's own in its notes", () => {
+    expect(entry('/inputs/request')?.default).toBe('{"city":"Paris","budget":200}');
+    expect(entry('/inputs/request/budget')?.default).toBeUndefined();
+    expect(entry('/inputs/request/budget')).toMatchObject({ notes: ['default 100'] });
+    expect(entry('/inputs/note')?.default).toBe('"hello"');
+  });
+
+  it('lists seeds that, applied in order, are exactly what seedInputs seeds', () => {
+    const applied: Record<string, unknown> = {};
+    for (const candidate of brief.paths) {
+      if (candidate.default === undefined || candidate.default === null) continue;
+      const keys = candidate.path.replace('/inputs/', '').split('/');
+      const leaf = keys.pop() ?? '';
+      let target = applied;
+      for (const key of keys) {
+        target = (target[key] ??= {}) as Record<string, unknown>;
+      }
+      target[leaf] = JSON.parse(candidate.default);
+    }
+    expect(applied).toEqual(seedInputs(fields));
+  });
+});
+
 describe('the brief of a result page', () => {
   const invoice: RunField = {
     kind: 'object',
@@ -130,6 +176,12 @@ describe('the brief of a result page', () => {
           description: 'One billable line',
           fields: [
             { kind: 'text', name: 'label', required: true },
+            {
+              kind: 'list',
+              name: 'tags',
+              required: false,
+              item: { kind: 'text', name: 'item', required: true, description: 'One tag' },
+            },
             {
               kind: 'list',
               name: 'notes',
@@ -186,6 +238,20 @@ describe('the brief of a result page', () => {
       relative: true,
       delegated: true,
     });
+  });
+
+  it('says what each item is for a nested list too, whatever kind the item has', () => {
+    // The walk at the top of the result labels every list's item; the
+    // relative walk used to label only an item the page lays out, so the
+    // same `list of text` read as bare one level down.
+    expect(entry('tags')).toMatchObject({
+      depth: 3,
+      kind: 'list of text',
+      relative: true,
+      item_kind: 'text',
+      item_description: 'One tag',
+    });
+    expect(entry('tags')?.item_laid_out).toBeUndefined();
   });
 
   it('states no presence on a result page, where nothing is filled in', () => {

@@ -169,6 +169,12 @@ type Side = 'input' | 'result';
  * One path as the brief carries it. Presence is an input-page fact, so it is
  * stated on that side only; `relative` marks a path spelled from one item of
  * the list above, which is how a DataTable column or `$item` reads it.
+ * `seeded` says an ancestor already carries a default: the seed is the
+ * OUTERMOST default, exactly as `seedInputs` seeds it, so a member beneath a
+ * defaulted structure lists none of its own - two `/state` patches on one
+ * subtree would make the seed depend on the order a model emits them in -
+ * while its notes still state it, as a fact about the field rather than an
+ * instruction.
  */
 function entryOf(
   field: RunField,
@@ -176,6 +182,7 @@ function entryOf(
   depth: number,
   side: Side,
   relative: boolean,
+  seeded: boolean,
 ): DesignerPathEntry {
   const notes = constraints(field);
   return {
@@ -188,7 +195,8 @@ function entryOf(
     required: side === 'input' ? field.required : undefined,
     gating: side === 'input' && field.gating ? true : undefined,
     notes: notes.length > 0 ? notes : undefined,
-    default: field.defaultValue === undefined ? undefined : JSON.stringify(field.defaultValue),
+    default:
+      seeded || field.defaultValue === undefined ? undefined : JSON.stringify(field.defaultValue),
     delegated: side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field),
     relative: relative ? true : undefined,
   };
@@ -206,13 +214,15 @@ function describe(
   depth: number,
   side: Side,
   entries: DesignerPathEntry[],
+  seeded = false,
 ): void {
-  const entry = entryOf(field, path, depth, side, false);
+  const entry = entryOf(field, path, depth, side, false, seeded);
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
+    const seededBelow = seeded || field.defaultValue !== undefined;
     for (const child of field.fields) {
-      describe(child, joinPath(path, child.name), depth + 1, side, entries);
+      describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow);
     }
   }
   if (field.kind === 'list' && side === 'result') {
@@ -235,7 +245,7 @@ function describeRelative(
   depth: number,
   entries: DesignerPathEntry[],
 ): void {
-  const entry = entryOf(field, relativePath, depth, 'result', true);
+  const entry = entryOf(field, relativePath, depth, 'result', true, false);
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
@@ -245,9 +255,9 @@ function describeRelative(
   }
   if (field.kind === 'list') {
     const item = field.item;
+    entry.item_kind = kindLabel(item);
+    entry.item_description = item.description;
     if (item.kind === 'object' && !isDelegatedResult(item)) {
-      entry.item_kind = kindLabel(item);
-      entry.item_description = item.description;
       entry.item_laid_out = true;
       for (const child of item.fields) {
         describeRelative(child, joinPath(relativePath, '<i>', child.name), depth + 2, entries);
