@@ -54,6 +54,7 @@
  *   make fixtures-runs   the PAYLOADS    - what running it actually produced
  *   make briefs          the BRIEFS      - what a producer is handed
  *   make fixtures-specs  the SPECS       - what the designer method laid out
+ *   make prompt-hash     the PROMPT PIN  - moved to the method as it is now
  *   --capture            a spec another producer wrote, validated the same way
  *   --reemit             every committed specs and payloads module, written
  *                        again from itself
@@ -912,6 +913,44 @@ function currentPrompt(g) {
   return { method, catalog, hash };
 }
 
+/**
+ * The PROMPT PIN pass: move `PROMPT_HASH` to what the method and the catalog
+ * hash to now.
+ *
+ * The pin is a derived fact the entry has to carry as a constant - it stays
+ * importable from a browser, so it can hash nothing itself - and every edit to
+ * the method's text moves it. Doing that by hand between two edits of a prompt
+ * is busywork, so this pass reads the method, builds the catalog, hashes the
+ * pair and rewrites the one line. Free and offline; it runs under tsx only
+ * because the catalog is built from `src/`.
+ *
+ * It touches no fixture, so it cannot make a stale capture look current: the
+ * corpus test still holds every stamp to the pin, and `METHOD_WIP=1` is what
+ * lets that wait while the method is being worked on.
+ */
+async function pinPromptHash() {
+  const g = await loadGenerative();
+  const method = readFileSync(DESIGNER_BUNDLE, 'utf8');
+  const hash = promptHashOf(g.promptHashSubject(method, g.designerCatalog()));
+  const file = path.join(REPO, 'src/generative/prompt-hash.ts');
+  const source = readFileSync(file, 'utf8');
+  const PIN = /^export const PROMPT_HASH = '([0-9a-f]{12})';$/m;
+  const found = PIN.exec(source);
+  if (!found) {
+    die(`src/generative/prompt-hash.ts: no \`export const PROMPT_HASH = '…'\` line to move.`);
+  }
+  if (found[1] === hash) {
+    process.stdout.write(`  PROMPT_HASH is current at ${hash}\n`);
+    return;
+  }
+  writeFileSync(file, source.replace(PIN, `export const PROMPT_HASH = '${hash}';`));
+  process.stdout.write(`  PROMPT_HASH ${found[1]} -> ${hash}  (src/generative/prompt-hash.ts)\n`);
+  process.stdout.write(
+    '  The captured layouts are stamped with the older hash until `make fixtures-specs` re-runs\n' +
+      '  them. Until it does, `METHOD_WIP=1 make test` says so instead of failing on it.\n',
+  );
+}
+
 /** One hero's brief, rendered from the committed descriptors and, on the result side, the committed payload. */
 async function renderHeroBrief(hero, g) {
   const pipeRef = g.pipeRefOf(hero);
@@ -1372,6 +1411,10 @@ function main() {
   const only = onlyIndex === -1 ? null : args[onlyIndex + 1];
   const pipeIndex = args.indexOf('--pipe');
   const pipe = pipeIndex === -1 ? null : args[pipeIndex + 1];
+  if (args.includes('--prompt-hash')) {
+    pinPromptHash().catch((error) => die(error?.stack ?? String(error)));
+    return;
+  }
   if (args.includes('--briefs')) {
     generateBriefs().catch((error) => die(error?.stack ?? String(error)));
     return;
