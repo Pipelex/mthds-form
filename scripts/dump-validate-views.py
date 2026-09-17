@@ -38,6 +38,20 @@ depend on a current local model deck — a bundle referencing a model handle the
 deck has not got would produce nothing, for reasons that have nothing to do with
 its inputs.
 
+**It does load the model specs, without inference.** Booting with inference off
+leaves only the local extractors in the deck, and the loader checks a pipe's
+pinned `model` handle against the deck at LOAD time — so an authored method that
+pins an image model (`data/methods/design_slides` pins one on its `PipeImgGen`)
+failed to load at all, before any builder ran. `needs_model_specs=True` reads the
+cached remote config's model specs so a pinned handle resolves, and still needs
+no credentials: nothing is called. The structures cases pin nothing and are
+unaffected either way.
+
+Beside the three artifacts it prints what the wire does not carry and an
+authored method's brief needs: the author's own `description` of each pipe
+(`pipe_descriptions`, keyed like the artifacts) and of the bundle
+(`domain_description`), read off the loaded pipes and the parsed blueprint.
+
 Run through the sibling `../pipelex` checkout's venv, exactly like the rest of
 `scripts/generate-fixtures.mjs`:
 
@@ -117,10 +131,16 @@ async def views_for(bundle: Path) -> dict[str, object]:
         # the same `pipes` sequence, and the payload schema rides the contract where it belongs.
         output_form = {pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in build_output_form(pipes, qualified_crate=qualified_crate).items()}
 
+        # What the author WROTE about each pipe, which no validate artifact carries: the
+        # brief of an authored method opens with it, since a host would have it too.
+        pipe_descriptions = {pipe.pipe_ref: pipe.description for pipe in pipes}
+
         return {
             "pipe_io_contracts": contracts,
             "input_form": input_form,
             "output_form": output_form,
+            "pipe_descriptions": pipe_descriptions,
+            "domain_description": blueprint.description,
         }
     finally:
         if previous_library_id is not None:
@@ -141,7 +161,9 @@ def main() -> int:
         print(f"no such bundle: {bundle}", file=sys.stderr)
         return 2
 
-    make_pipelex_for_agent_cli(needs_inference=False)
+    # Model SPECS without inference: a pinned model handle must resolve at load time,
+    # and nothing is ever called. See the module docstring.
+    make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=True)
     views = asyncio.run(views_for(bundle))
     json.dump(views, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

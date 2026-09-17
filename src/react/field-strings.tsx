@@ -30,12 +30,20 @@ export interface FieldStrings {
   itemsCount: (count: number) => string;
   /** The same badge for a list the method gave an exact count (`Concept[N]`). */
   itemsCountOf: (count: number, total: number) => string;
+  /** What a record's table cell says when none of its fields can name it. */
+  fieldsCount: (count: number) => string;
   uploading: string;
   dropToUpload: string;
   dropOrBrowse: string;
   pasteUrlInstead: string;
   urlPlaceholder: string;
   uploadedFile: string;
+  /**
+   * What names a file carried INSIDE its own URL (a `data:` URL), where a
+   * reference would otherwise be printed: its format and its decoded size. The
+   * string itself is forty thousand characters of base64 and says nothing.
+   */
+  encodedFileSummary: (format: string, bytes: number) => string;
   preview: string;
   removeFileAria: string;
   previewUnavailablePdf: string;
@@ -93,6 +101,13 @@ export interface FieldStrings {
   optionalInputsCount: (count: number) => string;
 }
 
+/** `512 bytes`, `36 KB`, `1.4 MB` — binary multiples, as a file manager counts them. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes === 1 ? '1 byte' : `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   optionalBadge: 'optional',
   selectPlaceholder: 'Select…',
@@ -106,12 +121,14 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   removeItemAria: (index) => `Remove item ${index}`,
   itemsCount: (count) => (count === 1 ? '1 item' : `${count} items`),
   itemsCountOf: (count, total) => `${count} of ${total} ${total === 1 ? 'item' : 'items'}`,
+  fieldsCount: (count) => (count === 1 ? '1 field' : `${count} fields`),
   uploading: 'Uploading…',
   dropToUpload: 'Drop to upload',
   dropOrBrowse: 'Drop a file or click to browse',
   pasteUrlInstead: 'paste a URL instead',
   urlPlaceholder: 'https://… or pipelex-storage://…',
   uploadedFile: 'Uploaded file',
+  encodedFileSummary: (format, bytes) => `${format} · ${formatBytes(bytes)}`,
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',

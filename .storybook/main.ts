@@ -40,12 +40,13 @@ const config: StorybookConfig = {
      * stories - from the current source on every reload.
      */
     /**
-     * Pre-bundle the control set's runtime dependencies up front.
+     * Pre-bundle the runtime dependencies of both rendering entries up front.
      *
      * Vite discovers dependencies lazily, and the first story that renders a
-     * real control pulls in the whole radix/lucide/dropzone set at once. That
-     * triggers a mid-run re-optimization and a page reload, which the story
-     * tests observe as `Failed to fetch dynamically imported module: .../sb-vitest/deps/...`
+     * real control pulls in the whole radix/lucide/dropzone set at once - the
+     * first that renders a produced layout does the same for json-render and
+     * zod. That triggers a mid-run re-optimization and a page reload, which the
+     * story tests observe as `Failed to fetch dynamically imported module: .../sb-vitest/deps/...`
      * against a Storybook-internal chunk - a failure that names nothing to do
      * with the change that caused it. Naming them here means they are optimized
      * before any story loads.
@@ -54,8 +55,11 @@ const config: StorybookConfig = {
       ...(viteConfig.optimizeDeps ?? {}),
       include: [
         ...(viteConfig.optimizeDeps?.include ?? []),
+        '@json-render/core',
+        '@json-render/react',
         '@radix-ui/react-select',
         '@radix-ui/react-switch',
+        '@radix-ui/react-tabs',
         '@radix-ui/react-toggle',
         '@radix-ui/react-toggle-group',
         'class-variance-authority',
@@ -63,6 +67,7 @@ const config: StorybookConfig = {
         'lucide-react',
         'react-dropzone',
         'tailwind-merge',
+        'zod',
       ],
     };
 

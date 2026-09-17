@@ -31,7 +31,7 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 | `descriptor` | the `RunField` union (including `contentKey`, the scalar wrapper property), `ConceptCategory`, `conceptCategory` — the consumer-facing currency |
 | `derive` | `buildRunFields`, the structural wire-descriptor → `RunField` mapping, and `getPipeInputForm`, the descriptor lookup; the schema co-walk for `contentKey` and nested list bounds lives behind it. `buildResultField` is the same mapping for a pipe's OUTPUT, which belongs to no slot — [docs/result-view.md](result-view.md) |
 | `output-form` | the output-form descriptor type and `getPipeOutputForm` — an artifact the standard does not have yet, simulated in the shape it would plausibly adopt |
-| `native-content` | how to READ the pinned content models (`native.Document`, `native.Image`, `native.Date`), plus `isViewableUrl` — keyed by the kind the descriptor STATES, never by inspecting a value |
+| `native-content` | how to READ the pinned content models (`native.Document`, `native.Image`, `native.Date`), plus the URL gate `viewableUrl` and its guard `isViewableUrl` — keyed by the kind the descriptor STATES, never by inspecting a value |
 | `file-formats` | what a `document` or `image` slot accepts — a measured mirror of a runtime fact, read by both the dropzone's filter and the label above it |
 | `contracts` | the standard's `pipe_io_contracts` types, re-exported from `mthds/protocol`, plus `getPipeIOContract` / `buildPipeRef` and the gating predicates — [docs/contract-mirror.md](contract-mirror.md) |
 | `gate` | `gateRunInputs`, the whole chain as one call, over the four steps it composes — [docs/run-gate.md](run-gate.md) |
@@ -60,6 +60,14 @@ These seams keep the controls host-agnostic:
 `ResultField` is the read-only twin of that dispatch point, for a pipe's result rather than its inputs — the same `RunField`, a different presentation, because a result is read and not edited. Its switch is exhaustive over `RunFieldKind` with a `satisfies never` fall-through, which is what a `document` result rendering as `[object Object]` cost before it was. See [docs/result-view.md](result-view.md).
 
 The vendored `ui/` primitives (`switch`, `select`, `toggle`, `toggle-group`) and the `cn` helper are copies rather than imports, which is how shadcn/ui is meant to be consumed. They are internal: only what `src/react/index.ts` exports is public API.
+
+### `./generative` — a produced layout (`src/generative/`)
+
+The third entry renders a **layout**: a data file, written once per method version by a model, that says which path goes where on the page and restates nothing about what a field is. It is the descriptor rule again, one level out — the layout names paths, the kernel still owns every fact about them — and it is what lets a stored layout be safe to keep: it cannot go out of date about something it never said.
+
+It is a separate entry point rather than part of `./react` because compiling and validating a layout costs json-render and zod, and a host rendering an ordinary form must not carry either. It reaches back into the control set for its two escape hatches (`MthdsField`, `MthdsResult`), which is why the three entries genuinely share chunks and why the [budget](dependency-budget.md) is enforced on the built graph rather than on imports.
+
+Before rendering, a host asks three questions and falls back to the kernel's plain form on any no: does the layout's prompt hash match the one this entry ships, does it validate against the catalog, and does it still fit the descriptor — both that every path it mentions still exists and that every required path is offered somewhere. [generative-ui.md](generative-ui.md) is the whole of it.
 
 ## The gate
 
@@ -98,9 +106,11 @@ The gate validates through the package's own ajv instance, configured for pydant
 
 ## Public API and internal code
 
-`src/core/index.ts` and `src/react/index.ts` are the two entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
+`src/core/index.ts`, `src/react/index.ts` and `src/generative/index.ts` are the three entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
 
-`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only `.` and `./react`, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
+`src/generated/ui-designer/` is neither an entry nor public. It is the projection of `data/generative/ui-designer.mthds` into zod schemas and types, written by `/pipelex-integrate` and never edited by hand; the generative entry reaches it type-only, so nothing of it ships, and the fixture harness's typed call site under `scripts/pipelex/` is its value consumer. See [generative-ui.md](generative-ui.md) § "The typed contract".
+
+`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only the three JavaScript entries, the two stylesheets and the designer method, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
 
 ## Local development against a consumer
 

@@ -10,13 +10,14 @@ What nothing else in this repo can answer is whether a control **renders correct
 
 ## The sections
 
-Three, mirroring what the package is:
+Four, mirroring what the package is:
 
-| Section       | What is in it                                                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Inputs**    | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
-| **Outputs**   | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
-| **Toolchain** | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
+| Section        | What is in it                                                                                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**     | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). |
+| **Outputs**    | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one.                                                              |
+| **Generative** | Every captured layout, rendered through `./generative` over the descriptor it was written for — and the pinned one again under each brand's tokens.                                                        |
+| **Toolchain**  | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
 
 Order is set explicitly in `.storybook/preview.tsx` (`options.storySort`), not left alphabetical.
 
@@ -36,7 +37,7 @@ What differs is presentation: a result is **read, not edited**, so `ResultField`
 
 A renderer that has only ever met one shape is a renderer nobody has tested, so the result pipes span the surface rather than repeat it: every native scalar (a wrapping content model and a multi-property one), a flat structure, one and **four** levels of nesting, a list long enough to scroll, and both file-bearing kinds.
 
-Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may not resolve to a concept containing images. So the image case is a `PipeImgGen` and the page case a `PipeExtract` over a committed PDF (`data/inputs/`) — which is what makes `native.Page[]`, the richest shape the standard defines, a real capture rather than an argument. Its tree is `list → object → object → prose + list of images + image`, and it is the case that proves `native.Page` needs no renderer arm of its own: it works by recursion into the arms that exist.
+Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may not resolve to a concept containing images. So the image case is a `PipeImgGen` and the page case a `PipeExtract` over the corpus's extraction PDF, addressed by a public URL because the run happens on the hosted API, which cannot read a contributor's disk — which is what makes `native.Page[]`, the richest shape the standard defines, a real capture rather than an argument. Its tree is `list → object → object → prose + list of images + image`, and it is the case that proves `native.Page` needs no renderer arm of its own: it works by recursion into the arms that exist.
 
 ### The lists corpus
 
@@ -52,7 +53,7 @@ The gallery pins an image model explicitly (`options = { model = "$gen-image-tes
 
 A run's file-bearing results carry `pipelex-storage://` references, which resolve only through the host's own resolver. A browser looking at Storybook cannot fetch one — so a corpus payload would show grey tiles and a preview button that could not fire, which is a case the section already covers on purpose (`A storage reference → no preview`). What it could not show is the other case: what this looks like when a URL IS fetchable, which is where a host in production mostly lives.
 
-So `data/inputs/` holds the served files — the corpus's own extraction PDF, and three real generated images downscaled to a size worth committing (the originals a run wrote are around two megabytes each). `.storybook/main.ts` serves that directory.
+So `data/inputs/` holds the served files — the corpus's own extraction PDF, and three real generated images downscaled to a size worth committing (the originals a run wrote are around two megabytes each). `.storybook/main.ts` serves that directory. The payload pass does not read the PDF from there: its run happens on the hosted API, so the `PipeExtract` carrier addresses the same file by its public URL.
 
 The **descriptor is still the corpus's own**, and that is the half that matters: `results.nested_media_result` is generated from `data/structures/results.mthds` like every other, so the kinds are the engine's. That pipe carries no `run` block and cannot — the language forbids a `PipeLLM` resolving to a concept containing images, and no other operator produces a structure — which is exactly why the payload is supplied and the descriptor is not.
 
@@ -62,9 +63,21 @@ Sourced differently, and all three generated:
 
 - **The descriptor** is `output_form`, generated like every input fixture and off the same engine builders. It was a local simulation while the standard lacked the artifact; it is now a read. See [result-view.md](result-view.md).
 - **The payload schema** rides on the output contract, beside the input schemas, where the standard puts it: `CONTRACTS[ref].output.json_schema`. It is the schema of the **payload**, not of a caller's argument, and that is what makes it usable — a `native.Text` result is `TextContent {text}` and a `Concept[]` result is `ListContent {items}`, so the renderer reads the wrapping property's NAME off it and unwraps by name. `buildResultField` **requires** it.
-- **The payloads** are what the pipes actually returned, written by `make fixtures-runs` from real `pipelex run bundle` executions into `src/__stories__/_generated/<case>.payloads.ts`. A payload is the one artifact no projection can produce, and that is not ceremony: two shapes in these are invisible from every descriptor — a `date` arrives in the serializer's typed envelope `{date, __class__, __module__}`, and a plural payload is `{items: [...]}` rather than a bare array. Both were written wrong by hand before a real run corrected them.
+- **The payloads** are what the pipes actually returned, written by `make fixtures-runs` from real runs on the hosted API into `src/__stories__/_generated/<case>.payloads.ts`. A payload is the one artifact no projection can produce, and that is not ceremony: two shapes in these are invisible from every descriptor, and both turn on whether the runner could hydrate the content — a native concept it can, a structure the bundle defines the hosted worker cannot, and renders raw instead. Hydrated, a `date` inside a structure arrives in the serializer's typed envelope `{date, __class__, __module__}` and a plural payload in the `{items}` envelope; raw, the date is a plain ISO string and the plural a bare array. The corpus holds both, and all of it was written wrong by hand before a real run corrected it.
 
 The story assertions read their expected values **out of the payload they render** rather than naming them. A live model does not answer the same way twice — the sentiment case came back `neutral` on one sweep and `positive` on the next, both defensible — so a hard-coded string asserts the model's mood instead of the renderer, and fails on the next sweep for a reason nobody should have to investigate.
+
+## Generative
+
+The `Generative` section renders **captured layouts**: what a model actually laid out for one of these methods, compiled from its own JSONL and rendered through `./generative` over the same descriptor the plain form is built from. Nothing here calls a model — a layout is a data file, and these stories render one. See [generative-ui.md](generative-ui.md).
+
+Each story is titled by **what produced the page**, never by a role: the producer, the model, and — where the tokens are somebody's brand rather than the stock palette — what produced those too. "Pipelex method · claude-4.8-opus", not "generated"; the point of the section is comparison, and a label that says which side of a comparison you are meant to prefer has already answered the question.
+
+The trip planner is the case with three layouts, because it is the widest input surface in the corpus and therefore has the most room to differ: the three pages are free to differ in their composition and not only in their order and their copy, since the method prescribes none, and all three bind exactly the same paths. That is the section's real claim — the paths belong to the descriptor and not to the layout, so a page can be as different as a model likes without any of them moving.
+
+Before rendering, the harness runs the two checks a host runs (`validateAgainstCatalog`, `layoutFits`) and throws on either. A story showing a layout a host would refuse would be showing a page nobody sees. And under every page, folded away, is the `/inputs` tree with the readiness the kernel computes from it — because what the story is really asserting is that what a person types through somebody else's layout arrives where the gate reads it.
+
+**Brands.** The same layout, painted from tokens that are not this package's, is what says whether the page reads on its own. Two of them live in `src/__stories__/generative/brands/` as story fixtures — carried over verbatim from the study branch, reproducible by no pass here, and shipped in nothing. See [theming.md](theming.md) § "Someone else's tokens".
 
 ## What a file slot accepts
 
@@ -85,7 +98,7 @@ Two gaps, both structural rather than oversights, and both better stated than qu
 
 **Text and number constraints.** `minLength`, `maxLength`, `pattern` and numeric bounds are read from **pydantic metadata on a reflected Python structure class** (`MinLen`, `MaxLen`, `Gt`/`Ge`/`Lt`/`Le`), not from anything a `.mthds` structure can declare — `ConceptStructureBlueprint` has no such slots. So a structures-only corpus cannot produce a constrained `text` or a bounded `number`, and the catalog does not pretend otherwise. Covering them would mean a fixture whose concepts are backed by Python classes, which is a different corpus.
 
-**The `unknown` kind.** It is the standard's escape hatch for a field kind **newer than the pinned `mthds` peer**, so by definition no bundle authored here can produce one — the peer would have to not know a kind it does know. `unknown.stories.tsx` simulates the drift instead of inventing a fixture: it takes a real generated descriptor, rewrites one node's `kind` to a value this version does not have, and runs it through `buildRunFields` like every other story. That exercises the actual degradation path — the total mapping in `derive.ts` falling through with the field's name intact — rather than asserting against a hand-written `RunField`.
+**The `unknown` kind.** It is the standard's escape hatch for a field kind **newer than the pinned `mthds`**, so by definition no bundle authored here can produce one — the pinned version would have to not know a kind it does know. `unknown.stories.tsx` simulates the drift instead of inventing a fixture: it takes a real generated descriptor, rewrites one node's `kind` to a value this version does not have, and runs it through `buildRunFields` like every other story. That exercises the actual degradation path — the total mapping in `derive.ts` falling through with the field's name intact — rather than asserting against a hand-written `RunField`.
 
 ## Every story renders in both themes
 
@@ -102,7 +115,9 @@ Two consequences worth knowing before writing a story:
 
 This is deliberately **not** what a consumer's Storybook does. A consumer with no Tailwind build loads the prebuilt `dist/styles.css`; this repo has a Tailwind build, and pointing its own Storybook at the prebuilt artifact would defeat the purpose — a control styled with a utility that is not in the last built `styles.css` would render unstyled in the very Storybook meant to catch that.
 
-`.storybook/tailwind.css` is a superset entry: it imports the package's own `src/styles/tailwind-entry.css` and adds an `@source` directive for the story tree. The package's entry scans `src/react` only, through `source(none)` and one `@source`, so the shipped sheet carries nothing a control does not use; widening the scan to story code happens in this file, which ships nowhere. Story chrome still uses inline styles over the theme tokens rather than utilities, so that it cannot be mistaken for a control.
+`.storybook/tailwind.css` is a superset entry: it imports the package's own `src/styles/tailwind-entry.css` and adds an `@source` directive for the story tree. The package's entry uses `source(none)` and then names one tree per rendering entry — `src/react` and `src/generative` — so the shipped sheet carries nothing a shipped component does not use; widening the scan to story code happens in this file, which ships nowhere.
+
+The division matters in one direction in particular. Widening the scan **here** for something a rendering entry needs makes it render in Storybook and nowhere else, which is the failure this arrangement is most likely to produce and the least likely to reveal: an unscanned entry tree keeps every utility that another scanned tree also uses, so its pages come out recognisable and merely wrong — no type scale, no page width, no responsive columns — while every story still renders and every story test still passes. `scripts/assert-bundle.mjs` refuses a build whose rendering entries and `@source` lines disagree, which is the check that turns a silent regression into a failed gate. Story chrome still uses inline styles over the theme tokens rather than utilities, so that it cannot be mistaken for a control.
 
 ## Fixtures are generated, never written
 
@@ -154,22 +169,36 @@ A pipe may also carry `output` (the concept its carrier resolves to, `Text` by d
 
 `presence` is `plain` | `optional` | `force`; `multiplicity` is `single` | `variable` | `fixed`. The generator rejects the pairings the standard forbids **at authoring time**, because the alternative is a parser error against a file the author never wrote: a marker may not ride a plural slot (`PipeInputContract` says a plural slot is always `plain`), and a fixed count is always at least two, since `Concept[1]` is a way of writing `Concept`.
 
-### Two passes, and only one of them costs anything
+### The passes, and which of them cost anything
 
 ```
 make fixtures        the DESCRIPTORS - what each pipe DECLARES   (offline, free)
 make fixtures-runs   the PAYLOADS    - what running it produced  (real runs, billed)
+make briefs          the BRIEFS      - what a producer is handed  (offline, free)
+make fixtures-specs  the SPECS       - what the designer laid out (real runs, billed)
+--capture            a spec another producer wrote, validated the same way
+--reemit             every committed specs and payloads module, written again from itself
 ```
 
-They are separate targets and neither implies the other, because asking for descriptors must never silently spend inference budget and asking for payloads must never silently re-derive anything else.
+They are separate targets and none implies another, because asking for a free artifact must never silently spend inference budget and asking for a billed one must never silently re-derive anything else.
 
 The descriptor pass needs the sibling `../pipelex` checkout's venv **interpreter**, addressed through `PIPELEX_PYTHON` — `dump-validate-views.py` imports pipelex as a **library**, because no CLI surfaces these views yet. A near-identical copy of that script lives in the graph-rendering sibling package; both retire when the agent CLI can emit the views itself.
 
-The payload pass needs the **CLI**, addressed through `PIPELEX_BIN`, plus working inference credentials (a gateway key in `~/.pipelex/.env`). It runs each pipe the way a user does and reads back the `main_stuff.json` the command wrote, so what a story renders is what the shipped command produces rather than what an in-process reimplementation of it produces. Each pass asserts only the executable it invokes, up front — a machine can have one without the other, and finding out halfway through a paid sweep is the wrong time.
+The two passes that run pipes — the payloads and the specs — need **neither** the checkout nor a CLI: both run on the **hosted API** through `@pipelex/sdk`, so what they want is a Pipelex API key in `PIPELEX_API_KEY`, with `PIPELEX_BASE_URL` to point them at another deployment — a local stack, or a bare runner, which needs no key at all. Nothing is installed for them beyond this repo's own devDependencies, there is no sibling checkout to be missing, and no pass anywhere shells out to a `pipelex` executable. The reason is not only convenience: a host reaches the runtime through that SDK, so a fixture captured this way records what a **product** receives — a run in the org's history, on the deck the product routes to, at the price the product pays — rather than what a command on one laptop wrote to disk. The bundle travels as text and the inputs travel with it, so nothing is written to disk on the way; the durable start-and-poll is what the SDK's `startAndWaitForResult` picks against a hosted server, and it has to be, because extracting a document or designing a page takes tens of seconds and a synchronous request through the gateway is closed long before that. What comes back beside the answer is the run's cost, which both passes print per run — a CLI printed a cost table to a stdout this script swallowed, and two models are not compared on the same brief until the money is on the line beside the pages.
 
-A pipe is run only if its slot spec gives it a `run` block naming its input values (or, for a slotless operator like `PipeImgGen`, its own `prompt`). The one edit the generator makes to what came back is dropping a machine-local `file://` `public_url`: a run writes generated files under the working directory and reports the absolute path back, which names somebody's home directory, in an open-source repo, and resolves on no other machine. What remains is the durable `pipelex-storage://` reference — which is exactly what a host with no storage resolver sees.
+The specs pass reaches the designer through one typed call, `scripts/pipelex/ui-designer.ts`, written by `/pipelex-integrate` over the types codegen projected from the bundle into `src/generated/ui-designer/`: the catalog is validated against the bundle's own `Catalog` structure before the run is paid for, and the answer is narrowed through the generated binder rather than read off an untyped object — the planner's plan too, read out of the run's working memory and stored on the fixture beside the JSONL, so what the builder was handed is on record with what it built. The pass names only the overrides (`MODEL=`, `TEMPERATURE=`); the call site owns the bundle and its pins, and refuses a bundle whose stages pin different models before the sweep spends anything. `make codegen-check`, part of `make check`, is what says those types still match the bundle — see [generative-ui.md](generative-ui.md) § "The typed contract".
 
-Both passes are dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node.
+A file-bearing input is therefore authored as an **address the runner can fetch** — the corpus's extraction PDF is a public URL — never as a path: the hosted API cannot read a contributor's disk, and the generator refuses a bare path before a paid sweep starts rather than letting the runner fail on a file it never had. Uploading the file first, through the SDK's `uploadFile`, is the gesture for a file with no public home; the corpus needs none.
+
+Each pass asserts only what **it** reaches for, up front — a machine can have the interpreter and no key, or a key and no checkout — and finding out halfway through a paid sweep is the wrong time.
+
+A pipe is run only if its slot spec gives it a `run` block naming its input values (or, for a slotless operator like `PipeImgGen`, its own `prompt`). `ONLY=<case>` narrows the sweep to one case, and `PIPE=<code>` with it re-runs **one** pipe and merges what came back into the case's committed module in place of that pipe's previous payload: a sweep is sequential and fatal on the first failure, so a run that hangs on the tenth pipe of a case must not cost the nine before it a second time, and a payload that came back odd can be re-bought alone. The module is written after every run, not after the case, which is what makes that recovery real: the nine are on disk when the tenth dies. The one edit the generator makes to what came back is dropping a storage reference's `public_url`: that is the link the deployment's storage answered when asked at that moment — presigned, expiring, naming its bucket, or on a laptop an absolute path into somebody's home directory — and it resolves nowhere else. A `public_url` that restates an `https` address the content came in with is kept as it came. What remains on a stored file is the durable `pipelex-storage://` reference — which is exactly what a host with no storage resolver sees.
+
+The last four are about the [generative layer](../src/generative/) rather than the descriptors. `make briefs` renders each hero's brief from what the first two passes committed and writes it under `wip/generative-ui/briefs/` beside the catalog data the designer method is handed and the prompt hash — that file, with the method it names, is the record of exactly what a producer was handed, and it is what a spec fixture's `brief` field points at. `make fixtures-specs` hands the brief and the catalog data to `data/generative/ui-designer.mthds` on the hosted API and validates what came back against the catalog, refusing anything that does not compile rather than repairing it; `--capture` takes in a spec some other producer wrote under the same discipline. Both stamp the fixture with the prompt hash — computed over the method's text and the catalog data together — and the pass refuses to run at all if the pair no longer hashes to the pin the entry ships: a fixture stamped with a hash no host recognises is one no host will render.
+
+`--reemit` rewrites every committed specs module from its own fixtures, and every committed payloads module from its own payloads. Either module is a projection of its fixture list, so the parts around that list — the header, the derived `brief` path, the ordering — move when the generator does; without it, refreshing them would mean paying inference to reproduce text no model wrote. A re-emit never runs anything.
+
+Every pass is dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node. The three that read this repo's TypeScript straight from `src/` run under tsx, because node cannot resolve extensionless imports on its own.
 
 ### The guard
 

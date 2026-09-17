@@ -9,9 +9,9 @@ import { CONTRACTS, INPUT_FORM } from '../_generated/scalars';
  * for the reason it exists.
  *
  * `unknown` is the standard's escape hatch for a field kind NEWER than the
- * pinned `mthds` peer: a server ahead of this build, which no type can rule out.
+ * pinned `mthds`: a server ahead of this build, which no type can rule out.
  * By definition no bundle this repo can author will produce one, because the
- * peer would have to not know a kind it does know.
+ * pinned version would have to not know a kind it does know.
  *
  * So this story simulates the drift rather than inventing a fixture. It takes a
  * REAL generated descriptor and rewrites one node's `kind` to a value this

@@ -1,0 +1,9 @@
+{
+  "origin": "https://github.com/Pipelex/pipelex-cookbook/blob/4265d86a5551b788ccf1c7be5b00393e12c82aef/examples/b_basics/document_extract/extract_invoice/bundle.mthds",
+  "license": "MIT",
+  "title": "Invoice extraction",
+  "heroes": [
+    "process_invoice"
+  ],
+  "inputs": "inputs.json"
+}

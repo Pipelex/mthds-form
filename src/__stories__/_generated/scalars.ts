@@ -627,3 +627,24 @@ export const OUTPUT_FORM: OutputForm = {
     },
   },
 };
+
+/**
+ * What the author wrote about each pipe - its `description` - and about the
+ * bundle. No validate artifact carries either, and an authored method's brief
+ * opens with the pipe's: it is what a host would have. On a structures case
+ * every entry is the synthesized carrier's line, and the hero states its own.
+ */
+export const PIPE_DESCRIPTIONS: Record<string, string> = {
+  'scalars.enum_kind': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'scalars.multiplicity_axis':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'scalars.number_kinds':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'scalars.presence_axis':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'scalars.text_kinds':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+};
+
+export const DOMAIN_DESCRIPTION: string | null =
+  'One concept per scalar input kind the standard can state.';

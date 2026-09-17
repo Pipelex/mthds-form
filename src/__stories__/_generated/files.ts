@@ -1363,3 +1363,25 @@ export const OUTPUT_FORM: OutputForm = {
     },
   },
 };
+
+/**
+ * What the author wrote about each pipe - its `description` - and about the
+ * bundle. No validate artifact carries either, and an authored method's brief
+ * opens with the pipe's: it is what a host would have. On a structures case
+ * every entry is the synthesized carrier's line, and the hero states its own.
+ */
+export const PIPE_DESCRIPTIONS: Record<string, string> = {
+  'files.many_files': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'files.native_vs_refined_document':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'files.native_vs_refined_image':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'files.one_document':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'files.one_image': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'files.required_vs_optional':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+};
+
+export const DOMAIN_DESCRIPTION: string | null =
+  'The two file-bearing native concepts, plain and refined.';

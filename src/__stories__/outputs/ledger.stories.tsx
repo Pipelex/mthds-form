@@ -276,13 +276,15 @@ export const AnnualReportLedger: Story = {
     const canvas = within(canvasElement);
 
     // The value shares a ROW with its label rather than sitting beneath it, and
-    // it is flushed right inside its cell. Both are read off the computed style
+    // it ends at the right edge of its cell. Both are read off the rendering
     // rather than the markup, because the stacked layout and this one render the
     // same text in the same order - the grid template is what tells them apart.
     // The harness renders every story twice, light beside dark - one is enough.
     const value = canvas.getAllByText(/Northwind Traders Inc\./)[0] as HTMLElement;
-    const cell = value.closest('div') as HTMLElement;
-    expect(getComputedStyle(cell).textAlign).toBe('right');
+    const cell = value.parentElement?.parentElement as HTMLElement;
+    expect(
+      Math.abs(value.getBoundingClientRect().right - cell.getBoundingClientRect().right),
+    ).toBeLessThanOrEqual(1);
 
     const grid = cell.parentElement as HTMLElement;
     expect(grid.className).toMatch(/grid-cols-/);

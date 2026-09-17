@@ -33,6 +33,7 @@ import type {
 import { FieldPresentationProvider } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultField } from '../result-field';
+import { ResultEnvProvider } from '../result-env';
 
 const text = (name: string, contentKey?: string): TextRunField => ({
   kind: 'text',
@@ -246,6 +247,184 @@ describe('files', () => {
   });
 });
 
+describe('the URL policy', () => {
+  it('refuses a data: document dressed as a PDF - no preview, no frame, no link', () => {
+    // The reported hole, whole: previewability was decided from the payload's
+    // OWN declared type, so a document could name itself `report.pdf` and be
+    // framed at a `data:text/html` URL - which is a document at the embedding
+    // page's origin, with the host's cookies.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{
+          url: 'data:text/html,<script>alert(1)</script>',
+          filename: 'report.pdf',
+          mime_type: 'application/pdf',
+        }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+    // Named rather than linked, which is the honest floor for a reference no
+    // sink here will act on.
+    expect(screen.queryByRole('link')).toBeNull();
+    // Twice: the document's name above, the reference below it.
+    expect(screen.getAllByText('report.pdf').length).toBeGreaterThan(0);
+  });
+
+  it('names a data: document by its format and size, never by a slice of its base64', () => {
+    // A `data:` URL has no path, so its "last segment" was whatever base64
+    // followed the final `/`.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'data:application/pdf;base64,JVBE/Ri0x' }}
+      />,
+    );
+    expect(screen.getAllByText('PDF · 6 bytes').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('Ri0x');
+  });
+
+  it('refuses a data: URL whose type is outside the allow-list', () => {
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{ url: 'data:image/svg+xml,<svg onload="alert(1)"/>', filename: 'chart.svg' }}
+      />,
+    );
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('still paints an inline raster image, which is on the allow-list', () => {
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{ url: 'data:image/png;base64,iVBORw0KGgo=', caption: 'inline' }}
+      />,
+    );
+    expect(screen.getByRole('img')).toBeTruthy();
+  });
+
+  it('frames an https PDF, with no referrer', async () => {
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    const frame = container.querySelector('iframe');
+    expect(frame).toBeTruthy();
+    expect(frame?.getAttribute('referrerpolicy')).toBe('no-referrer');
+    // Deliberately NOT sandboxed: the attribute sets the sandboxed-plugins flag
+    // unconditionally and no token unsets it, so a sandbox here deletes the PDF
+    // preview in Chrome rather than hardening it. The scheme gate above is what
+    // makes the frame safe. See DocumentPreview's comment.
+    expect(frame?.hasAttribute('sandbox')).toBe(false);
+  });
+
+  it('paints the member it VALIDATED, not a different one', () => {
+    // A leading space is stripped by the URL parser and was not stripped by the
+    // old prefix match, so a host that validated `public_url` by parsing saw the
+    // kernel skip it and fall through to `url`, which nothing had validated.
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{
+          url: 'https://attacker.example/tracked.png',
+          public_url: ' https://cdn.example/a.png',
+        }}
+      />,
+    );
+    expect(screen.getByRole('img').getAttribute('src')).toBe('https://cdn.example/a.png');
+  });
+
+  it('carries the host prose-image policy down to a prose field', () => {
+    // The seam a host actually uses: one statement on the provider, and every
+    // prose value under it follows. `ResultField` needs no prop of its own.
+    const { container } = render(
+      <ResultEnvProvider proseImages="load">
+        <ResultField field={prose('summary')} value="![a chart](https://cdn.example/a.png)" />
+      </ResultEnvProvider>,
+    );
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('https://cdn.example/a.png');
+  });
+
+  it('links rather than loads a prose image when the host said nothing', () => {
+    const { container } = render(
+      <ResultField field={prose('summary')} value="![a chart](https://attacker.example/x.png)" />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('a')?.textContent).toBe('a chart');
+  });
+
+  it('gives every image it paints a no-referrer policy', () => {
+    render(
+      <ResultField
+        field={file('output', 'image')}
+        value={{ url: 'https://cdn.example/a.png', caption: 'A sign' }}
+      />,
+    );
+    expect(screen.getByRole('img').getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+});
+
+describe('a frame takes a same-origin path only from the resolver', () => {
+  const pdfPath = { url: '/api/assets/report.pdf', mime_type: 'application/pdf' };
+
+  it('refuses to frame a path the PAYLOAD named', () => {
+    // A root-relative path is the embedding page's own origin, so a document
+    // framed at one runs on the host's origin - which is what the whole `data:`
+    // ban is about. It is the resolver case the arm exists for, and a payload
+    // must not be able to name it: `{url: "/api/assets/x.svg"}` was a DOM on the
+    // host's origin, and the type gate below admits `image/`, SVG included.
+    const { container } = render(
+      <ResultField field={file('output', 'document')} value={pdfPath} />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('frames the same path when the host RESOLVER produced it', async () => {
+    // A host resolving onto its own origin is choosing its own origin, which is
+    // exactly what the seam is for.
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={() => '/api/assets/report.pdf'}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'pipelex-storage://org/report.pdf', mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe('/api/assets/report.pdf');
+  });
+
+  it('still frames an https document the payload named', () => {
+    render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeTruthy();
+  });
+
+  it('never frames a blob: URL, which the paint gate does accept', () => {
+    // `blob:` is viewable and deliberately not frameable - a payload cannot mint
+    // one, so admitting it to the frame would widen the sink for nothing.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'blob:https://app.example/8f0e', mime_type: 'application/pdf' }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+});
+
 describe('lists', () => {
   it('unwraps a plural payload by its content key and counts the items', () => {
     render(
@@ -342,6 +521,80 @@ describe('lists', () => {
     expect(screen.getByRole('columnheader', { name: 'name' })).toBeTruthy();
     // The cell states the fact; the expansion carries the content.
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.itemsCount(2))).toBeTruthy();
+  });
+
+  it('names a nested record in its cell by its first text field, never by its JSON', () => {
+    // The Candidates table of a CV screening: the Evaluation column's cells read
+    // `{ "candidate_name": "Amara Okafor", "criterion_s…`, and the rejection
+    // email's `{ "subje…`.
+    const evaluation = object('evaluation', [number('overall_score'), text('candidate_name')]);
+    const email = object('rejection_email', [text('subject'), prose('body')]);
+    const { container } = render(
+      <ResultField
+        field={list('candidates', object('item', [evaluation, email]))}
+        value={[
+          {
+            evaluation: { overall_score: 81, candidate_name: 'Amara Okafor' },
+            rejection_email: null,
+          },
+          {
+            evaluation: { overall_score: 42, candidate_name: 'Lucas Bernard' },
+            rejection_email: { subject: 'Your application', body: 'Thank you for applying.' },
+          },
+        ]}
+      />,
+    );
+    const cells = [...container.querySelectorAll('tbody td')].map((cell) => cell.textContent);
+    expect(cells).toContain('Amara Okafor');
+    expect(cells).toContain('Your application');
+    expect(container.querySelector('tbody')?.textContent).not.toContain('{');
+    // The absent email is that record's absence, not a blank.
+    expect(screen.getAllByText(DEFAULT_FIELD_STRINGS.resultAbsent).length).toBeGreaterThan(0);
+  });
+
+  it('names a record by its prose when it has no text field, and counts one with neither', () => {
+    const noted = object('note', [number('rank'), prose('remark')]);
+    const scored = object('score', [number('value'), flag('passed')]);
+    const { container } = render(
+      <ResultField
+        field={list('rows', object('item', [noted, scored]))}
+        value={[{ note: { rank: 1, remark: 'Strong fit' }, score: { value: 9, passed: true } }]}
+      />,
+    );
+    const cells = [...container.querySelectorAll('tbody td')].map((cell) => cell.textContent);
+    expect(cells).toContain('Strong fit');
+    expect(cells).toContain(DEFAULT_FIELD_STRINGS.fieldsCount(2));
+  });
+
+  it('reads a native.Date record in a cell as the date it is', () => {
+    const when: ObjectRunField = {
+      ...object('when', [text('date'), text('time')]),
+      conceptRef: 'native.Date',
+    };
+    const { container } = render(
+      <ResultField
+        field={list('rows', object('item', [text('label'), when]))}
+        value={[{ label: 'Kickoff', when: { date: '2026-09-25', time: '09:00' } }]}
+      />,
+    );
+    const cells = [...container.querySelectorAll('tbody td')].map((cell) => cell.textContent);
+    expect(cells.some((cell) => cell?.includes('2026-09-25'))).toBe(true);
+    expect(container.querySelector('tbody')?.textContent).not.toContain('{');
+  });
+
+  it('never names a native.Html record by its markup source', () => {
+    const page: ObjectRunField = {
+      ...object('page', [text('inner_html'), text('css_class')]),
+      conceptRef: 'native.Html',
+    };
+    const { container } = render(
+      <ResultField
+        field={list('rows', object('item', [text('label'), page]))}
+        value={[{ label: 'Cover', page: { inner_html: '<h1>Cover</h1>', css_class: 'x' } }]}
+      />,
+    );
+    expect(container.querySelector('tbody')?.textContent).not.toContain('<h1>');
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.fieldsCount(2))).toBeTruthy();
   });
 
   it('expands a row to the whole record, and only when there is more to show', async () => {

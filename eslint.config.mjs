@@ -22,11 +22,24 @@ const BUDGET_PATTERNS = [
     message: 'The kernel is RJSF-free: the gate validates through its own ajv instance.',
   },
   {
-    group: ['zustand', 'zustand/*', '@pipelex/sdk', '@pipelex/sdk/*'],
+    group: ['zustand', 'zustand/*'],
     message: 'Outside the dependency budget (docs/dependency-budget.md).',
   },
   {
-    // The standard's TypeScript client is a TYPES-ONLY peer. `import type` is
+    // The runtime's SDK is INSTALLED here - a devDependency, because the fixture
+    // harness designs its layouts by running the designer method on the hosted
+    // API through it - so an import of it under `src/` now resolves, where it
+    // used to fail at the resolver. It carries the request vocabulary, which is
+    // a different question from the artifact shapes the entries read. The graph
+    // check in `scripts/assert-bundle.mjs` is the backstop, and it can only see
+    // this one because `tsup.config.ts` marks the SDK external: a devDependency
+    // is otherwise bundled inline, bytes and no specifier.
+    group: ['@pipelex/sdk', '@pipelex/sdk/*'],
+    message:
+      "The runtime's SDK is the fixture harness's devDependency - no entry may reach it. See docs/dependency-budget.md.",
+  },
+  {
+    // The standard's TypeScript client is TYPES-ONLY. `import type` is
     // erased before bundling, so the wire types cost a consumer nothing at run
     // time; a value import would put the standard's CLI - commander, ora,
     // posthog and the rest of its closure - into whichever chunk reached it.
@@ -37,7 +50,24 @@ const BUDGET_PATTERNS = [
     group: ['mthds', 'mthds/*'],
     allowTypeImports: true,
     message:
-      'The standard client is a types-only peer - `import type` only. See docs/dependency-budget.md.',
+      'The standard client is types-only - `import type` only. See docs/dependency-budget.md.',
+  },
+];
+
+/**
+ * The generative layer's own dependencies, banned from the other two trees.
+ *
+ * json-render is what a produced layout is written against and zod is what
+ * validates a brand manifest; neither has any business in the kernel or in the
+ * control set, and the entry split alone would not stop one arriving there -
+ * a single import from `src/react/` would put both in the chunk the controls
+ * ship. `scripts/assert-bundle.mjs` holds the same line on the built graph.
+ */
+const GENERATIVE_PATTERNS = [
+  {
+    group: ['@json-render/*', 'zod', 'zod/*'],
+    message:
+      'json-render and zod belong to the generative layer - src/generative/. See docs/dependency-budget.md.',
   },
 ];
 
@@ -71,7 +101,18 @@ const CORE_BARREL_PATTERN = {
 };
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      // The generated tree and the drift gate are never linted or formatted:
+      // each stamped file carries a hash of its own bytes and `codegen.lock`
+      // hashes them all, so an autofix would turn `make codegen-check` red.
+      // See docs/generative-ui.md, "The typed contract".
+      'src/generated/**',
+      'scripts/codegen-check.mjs',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -97,7 +138,7 @@ export default tseslint.config(
       // not by the base rule, so the base rule is off EVERYWHERE and every
       // block below restricts imports through the extension. A block that
       // reached for the base rule would quietly drop the type-import allowance
-      // the budget's types-only peer line is built on.
+      // the budget's types-only line is built on.
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: BUDGET_PATTERNS }],
     },
@@ -107,12 +148,28 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS] },
+        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS, ...GENERATIVE_PATTERNS] },
       ],
     },
   },
   {
     files: ['src/react/**/*.ts', 'src/react/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...BUDGET_PATTERNS, ...GENERATIVE_PATTERNS, CORE_BARREL_PATTERN] },
+      ],
+    },
+  },
+  {
+    /**
+     * The generative layer renders, so React is allowed - but the barrel rule
+     * holds for the same reason it holds in `src/react/`: a value import of
+     * `../core` puts ajv in the chunk this entry shares with the controls, and
+     * a host that renders a produced layout ships the validator it never asked
+     * for. The specific module is the fix (`../core/native-content`).
+     */
+    files: ['src/generative/**/*.ts', 'src/generative/**/*.tsx'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -124,6 +181,25 @@ export default tseslint.config(
     // Tests reach into loose shapes on purpose to assert on nested wire data.
     files: ['src/**/__tests__/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
+    /**
+     * The harness's own TypeScript under `scripts/`: the typed call site that
+     * runs the designer method on the hosted API, and the client it shares.
+     * It is the ONE place the runtime's SDK is imported as a value, by
+     * design - it ships in nothing - and the budget's other bans hold. `src/`
+     * stays closed to it: lint refuses the import there, and
+     * `make assert-bundle` refuses the specifier in every built entry's graph.
+     */
+    files: ['scripts/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: BUDGET_PATTERNS.filter((pattern) => !pattern.group.includes('@pipelex/sdk')),
+        },
+      ],
+    },
   },
   ...storybook.configs['flat/recommended'],
   {

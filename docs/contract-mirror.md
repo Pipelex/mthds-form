@@ -8,7 +8,7 @@ What remains genuinely the kernel's, and what the rest of this document is about
 
 ## How the types arrive
 
-`mthds` is a **types-only peer dependency**. Every import of it in `src/` is an `import type`, erased before the bundle exists, so nothing named `mthds` survives into `dist/` — see [dependency-budget.md](dependency-budget.md) for the reason and for the two guards that hold it (lint on the source, `make assert-bundle` on the built chunk graph).
+`mthds` is a **types-only dependency**. Every import of it in `src/` is an `import type`, erased before the bundle exists, so nothing named `mthds` survives into `dist/` — see [dependency-budget.md](dependency-budget.md) for the reason and for the two guards that hold it (lint on the source, `make assert-bundle` on the built chunk graph).
 
 The consequence for a consumer is a `node_modules` entry, not a shipped byte. A host that installs this package installs the standard's client alongside it, and TypeScript resolves the re-exported names through it. A host that would rather read the standard's own spelling can import from `mthds/protocol` directly — it has the package.
 

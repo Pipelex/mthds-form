@@ -1,0 +1,57 @@
+domain      = "trips"
+description = "A trip request - who is going, where and when, with what budget and in what spirit. The input side of an itinerary planner: the richest form in the corpus, and the one a person expects to look designed."
+
+[concept.Traveller]
+description = "One person on the trip"
+
+[concept.Traveller.structure]
+name    = { type = "text", description = "Their name", required = true, hints = { intent = "label" } }
+age     = { type = "integer", description = "Their age", required = false, hints = { intent = "quantity" } }
+dietary = { type = "text", description = "Dietary needs, if any", required = false }
+
+[concept.Stay]
+description = "Where and when the trip takes place"
+
+[concept.Stay.structure]
+city        = { type = "text", description = "The city", required = true, hints = { intent = "label" } }
+country     = { type = "text", description = "The country", required = true, choices = [
+  "France",
+  "Italy",
+  "Japan",
+  "Portugal",
+  "Spain",
+  "United States",
+] }
+arriving_on = { type = "date", description = "The day they arrive", required = true }
+leaving_on  = { type = "date", description = "The day they leave", required = true }
+must_see    = { type = "list", item_type = "text", description = "Places they must not miss", required = false }
+
+[concept.TripRequest]
+description = "Everything the planner needs to draft an itinerary"
+
+[concept.TripRequest.structure]
+title         = { type = "text", description = "A name for the trip", required = true, hints = { intent = "label" } }
+stay          = { type = "concept", concept_ref = "Stay", description = "Where and when", required = true }
+travellers    = { type = "list", item_type = "concept", item_concept_ref = "Traveller", description = "Who is going", required = true }
+budget        = { type = "number", description = "The total budget for the whole trip", required = true, hints = { intent = "quantity" } }
+currency      = { type = "text", description = "The currency the budget is in", required = true, choices = [
+  "EUR",
+  "USD",
+  "GBP",
+  "JPY",
+] }
+pace          = { type = "text", description = "How full the days should be", required = true, choices = [
+  "slow",
+  "balanced",
+  "packed",
+] }
+style         = { type = "text", description = "What the trip is mostly about", required = true, choices = [
+  "culture",
+  "food",
+  "nature",
+  "nightlife",
+  "family",
+] }
+with_children = { type = "boolean", description = "Whether children are travelling", required = false }
+accessibility = { type = "text", description = "Mobility or accessibility needs the plan must respect", required = false }
+notes         = { type = "text", description = "Anything else the planner should know", required = false, hints = { intent = "prose" } }

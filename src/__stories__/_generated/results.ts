@@ -2461,3 +2461,43 @@ export const OUTPUT_FORM: OutputForm = {
     },
   },
 };
+
+/**
+ * What the author wrote about each pipe - its `description` - and about the
+ * bundle. No validate artifact carries either, and an authored method's brief
+ * opens with the pipe's: it is what a host would have. On a structures case
+ * every entry is the synthesized carrier's line, and the hero states its own.
+ */
+export const PIPE_DESCRIPTIONS: Record<string, string> = {
+  'results.date_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.deep_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.every_kind_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.flat_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.html_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.image_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.long_list_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.nested_media_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.nested_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.number_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.page_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.plain_text_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.plural_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.yes_no_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+};
+
+export const DOMAIN_DESCRIPTION: string | null =
+  'Concepts used as pipe OUTPUTS, so the fixtures can describe results as well as inputs — across every field kind, at depth, and at length.';

@@ -1,0 +1,9 @@
+{
+  "origin": "https://github.com/Pipelex/pipelex-cookbook/blob/4265d86a5551b788ccf1c7be5b00393e12c82aef/examples/b_basics/generate_visuals/design_slides/bundle.mthds",
+  "license": "MIT",
+  "title": "Slide designer",
+  "heroes": [
+    "generate_design_proposals_from_rough_brief"
+  ],
+  "inputs": "inputs.json"
+}
