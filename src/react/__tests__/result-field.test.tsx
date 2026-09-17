@@ -272,6 +272,19 @@ describe('the URL policy', () => {
     expect(screen.getAllByText('report.pdf').length).toBeGreaterThan(0);
   });
 
+  it('names a data: document by its format and size, never by a slice of its base64', () => {
+    // A `data:` URL has no path, so its "last segment" was whatever base64
+    // followed the final `/`.
+    const { container } = render(
+      <ResultField
+        field={file('output', 'document')}
+        value={{ url: 'data:application/pdf;base64,JVBE/Ri0x' }}
+      />,
+    );
+    expect(screen.getAllByText('PDF · 6 bytes').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('Ri0x');
+  });
+
   it('refuses a data: URL whose type is outside the allow-list', () => {
     render(
       <ResultField
@@ -508,6 +521,80 @@ describe('lists', () => {
     expect(screen.getByRole('columnheader', { name: 'name' })).toBeTruthy();
     // The cell states the fact; the expansion carries the content.
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.itemsCount(2))).toBeTruthy();
+  });
+
+  it('names a nested record in its cell by its first text field, never by its JSON', () => {
+    // The Candidates table of a CV screening: the Evaluation column's cells read
+    // `{ "candidate_name": "Amara Okafor", "criterion_s…`, and the rejection
+    // email's `{ "subje…`.
+    const evaluation = object('evaluation', [number('overall_score'), text('candidate_name')]);
+    const email = object('rejection_email', [text('subject'), prose('body')]);
+    const { container } = render(
+      <ResultField
+        field={list('candidates', object('item', [evaluation, email]))}
+        value={[
+          {
+            evaluation: { overall_score: 81, candidate_name: 'Amara Okafor' },
+            rejection_email: null,
+          },
+          {
+            evaluation: { overall_score: 42, candidate_name: 'Lucas Bernard' },
+            rejection_email: { subject: 'Your application', body: 'Thank you for applying.' },
+          },
+        ]}
+      />,
+    );
+    const cells = [...container.querySelectorAll('tbody td')].map((cell) => cell.textContent);
+    expect(cells).toContain('Amara Okafor');
+    expect(cells).toContain('Your application');
+    expect(container.querySelector('tbody')?.textContent).not.toContain('{');
+    // The absent email is that record's absence, not a blank.
+    expect(screen.getAllByText(DEFAULT_FIELD_STRINGS.resultAbsent).length).toBeGreaterThan(0);
+  });
+
+  it('names a record by its prose when it has no text field, and counts one with neither', () => {
+    const noted = object('note', [number('rank'), prose('remark')]);
+    const scored = object('score', [number('value'), flag('passed')]);
+    const { container } = render(
+      <ResultField
+        field={list('rows', object('item', [noted, scored]))}
+        value={[{ note: { rank: 1, remark: 'Strong fit' }, score: { value: 9, passed: true } }]}
+      />,
+    );
+    const cells = [...container.querySelectorAll('tbody td')].map((cell) => cell.textContent);
+    expect(cells).toContain('Strong fit');
+    expect(cells).toContain(DEFAULT_FIELD_STRINGS.fieldsCount(2));
+  });
+
+  it('reads a native.Date record in a cell as the date it is', () => {
+    const when: ObjectRunField = {
+      ...object('when', [text('date'), text('time')]),
+      conceptRef: 'native.Date',
+    };
+    const { container } = render(
+      <ResultField
+        field={list('rows', object('item', [text('label'), when]))}
+        value={[{ label: 'Kickoff', when: { date: '2026-09-25', time: '09:00' } }]}
+      />,
+    );
+    const cells = [...container.querySelectorAll('tbody td')].map((cell) => cell.textContent);
+    expect(cells.some((cell) => cell?.includes('2026-09-25'))).toBe(true);
+    expect(container.querySelector('tbody')?.textContent).not.toContain('{');
+  });
+
+  it('never names a native.Html record by its markup source', () => {
+    const page: ObjectRunField = {
+      ...object('page', [text('inner_html'), text('css_class')]),
+      conceptRef: 'native.Html',
+    };
+    const { container } = render(
+      <ResultField
+        field={list('rows', object('item', [text('label'), page]))}
+        value={[{ label: 'Cover', page: { inner_html: '<h1>Cover</h1>', css_class: 'x' } }]}
+      />,
+    );
+    expect(container.querySelector('tbody')?.textContent).not.toContain('<h1>');
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.fieldsCount(2))).toBeTruthy();
   });
 
   it('expands a row to the whole record, and only when there is more to show', async () => {

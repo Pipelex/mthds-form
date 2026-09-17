@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isViewableUrl, viewableUrl } from '../native-content';
+import { isViewableUrl, readDataUrl, viewableUrl } from '../native-content';
 
 describe('isViewableUrl and same-origin paths', () => {
   it('accepts a root-relative path, which is what a host resolver returns', () => {
@@ -157,5 +157,49 @@ describe('the sentinel is scaffolding and never a destination', () => {
     ]) {
       expect(viewableUrl(candidate)).not.toContain('url-gate.invalid');
     }
+  });
+});
+
+describe('readDataUrl', () => {
+  it('reads the media type and the decoded size of a base64 payload', () => {
+    // `QUFB` is `AAA`; the PNG signature is eight bytes, its padding counting
+    // for nothing.
+    expect(readDataUrl('data:application/pdf;base64,QUFB')).toEqual({
+      mediaType: 'application/pdf',
+      bytes: 3,
+    });
+    expect(readDataUrl('data:image/png;base64,iVBORw0KGgo=')).toEqual({
+      mediaType: 'image/png',
+      bytes: 8,
+    });
+  });
+
+  it('counts past the line breaks a MIME encoder leaves in the payload', () => {
+    expect(readDataUrl('data:application/pdf;base64,QU\nFB\r\nQUFB')?.bytes).toBe(6);
+  });
+
+  it('resolves a percent-escape inside a base64 payload before counting it', () => {
+    // `YQ%3D%3D` is `YQ==`, one byte; counting `3` and `D` as symbols made it
+    // four, and a fragment made an inline PDF four bytes longer than it is.
+    expect(readDataUrl('data:text/plain;base64,YQ%3D%3D')?.bytes).toBe(1);
+    expect(readDataUrl('data:application/pdf;base64,QQ==#page=2')?.bytes).toBe(1);
+    expect(readDataUrl('data:text/plain,a%20b#note')?.bytes).toBe(3);
+  });
+
+  it('counts a percent-escape as the one byte it stands for', () => {
+    expect(readDataUrl('data:text/plain,a%20b')?.bytes).toBe(3);
+    expect(readDataUrl('data:text/plain;charset=utf-8,caf%C3%A9')?.bytes).toBe(5);
+  });
+
+  it('drops the parameters from the media type, and defaults an absent one', () => {
+    expect(readDataUrl('DATA:Text/Plain;charset=utf-8,hi')?.mediaType).toBe('text/plain');
+    expect(readDataUrl('data:,hi')).toEqual({ mediaType: 'text/plain', bytes: 2 });
+    expect(readDataUrl('data:;base64,QUFB')).toEqual({ mediaType: 'text/plain', bytes: 3 });
+  });
+
+  it('answers nothing for any other URL, or a data: URL with no payload', () => {
+    expect(readDataUrl('pipelex-storage://org/x.pdf')).toBeUndefined();
+    expect(readDataUrl('https://example.com/data:x')).toBeUndefined();
+    expect(readDataUrl('data:application/pdf;base64')).toBeUndefined();
   });
 });

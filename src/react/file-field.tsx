@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
 import { cn } from './utils';
@@ -10,6 +10,7 @@ import type { FileRunField } from '../core';
 import { acceptMapForKind, isAcceptedFile } from '../core/file-formats';
 import { viewableUrl } from '../core/native-content';
 import { FieldShell } from './field-shell';
+import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
@@ -490,6 +491,16 @@ function FileChip({
   onTogglePreview?: () => void;
 }) {
   const s = useFieldStrings();
+  const url = value?.url;
+  // A `data:` URL is the file, not a reference to it: a host that encodes a
+  // picked file in the browser writes all of it here, so the subtitle printed
+  // base64. It names the format and the size instead. Memoised because the
+  // count walks the whole payload and the chip re-renders on every keystroke
+  // elsewhere in the form.
+  const subtitle = useMemo(
+    () => (url === undefined ? undefined : (encodedFileSummary(url, s) ?? url)),
+    [url, s],
+  );
   return (
     <div className="flex items-center gap-3 rounded-md border border-border bg-input px-3 py-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -499,7 +510,7 @@ function FileChip({
         <p className="truncate text-[13px] font-medium text-foreground">
           {value?.filename ?? s.uploadedFile}
         </p>
-        <p className="truncate font-mono text-[10.5px] text-muted-foreground">{value?.url}</p>
+        <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
       </div>
       {canPreview && (
         <button

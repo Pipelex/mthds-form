@@ -359,6 +359,86 @@ function stripUrlWhitespace(candidate: string): string {
   return start === 0 && end === candidate.length ? candidate : candidate.slice(start, end);
 }
 
+/** What a `data:` URL says about the bytes it carries. */
+export interface DataUrlView {
+  /** Lowercased, without its parameters; `text/plain` when the URL declares none. */
+  mediaType: string;
+  /** The size of the DECODED payload, in bytes. */
+  bytes: number;
+}
+
+/**
+ * A `data:` URL's media type and decoded size, or `undefined` for any other URL.
+ *
+ * A host that encodes a picked file in the browser writes the file itself into
+ * the value's `url`, so a thirty-kilobyte PDF is a forty-thousand-character
+ * string, and printed where a reference would be it tells a person nothing. Its
+ * type and its size are what they can read.
+ *
+ * The size is COUNTED rather than decoded. A base64 payload's size follows from
+ * how many symbols it holds, and decoding a megabyte to measure it would be the
+ * frozen main thread {@link stripUrlWhitespace} is written to avoid. This is a
+ * reading for display, not a gate: whether the URL may be painted is still
+ * {@link viewableUrl}'s answer alone.
+ */
+export function readDataUrl(candidate: string): DataUrlView | undefined {
+  const url = candidate.trimStart();
+  if (!/^data:/i.test(url)) return undefined;
+  const comma = url.indexOf(',');
+  if (comma === -1) return undefined;
+  const [declared = '', ...parameters] = url.slice('data:'.length, comma).split(';');
+  const trimmed = declared.trim().toLowerCase();
+  // A fragment is not payload. `#page=2` on an inline PDF is the viewer's, and
+  // counting it as bytes is counting the URL rather than the file.
+  const fragment = url.indexOf('#', comma);
+  const payload = fragment === -1 ? url.slice(comma + 1) : url.slice(comma + 1, fragment);
+  const base64 = parameters.some((parameter) => parameter.trim().toLowerCase() === 'base64');
+  return {
+    mediaType: trimmed === '' ? 'text/plain' : trimmed,
+    bytes: base64 ? base64Bytes(payload) : percentEncodedBytes(payload),
+  };
+}
+
+/**
+ * Three bytes for every four symbols, ignoring what is not one: the `=`
+ * padding, and the line breaks a MIME encoder wraps its output at. Both
+ * alphabets count, the standard one and the URL-safe one.
+ *
+ * A percent-escape is resolved to the character it stands for before it is
+ * judged, because a payload may be escaped anywhere — `YQ%3D%3D` is `YQ==`,
+ * one byte, and counting `3` and `D` as symbols made it four.
+ */
+function base64Bytes(payload: string): number {
+  let symbols = 0;
+  for (let index = 0; index < payload.length; index += 1) {
+    let code = payload.charCodeAt(index);
+    if (code === 0x25) {
+      const escaped = Number.parseInt(payload.slice(index + 1, index + 3), 16);
+      if (!Number.isNaN(escaped) && index + 2 < payload.length) {
+        code = escaped;
+        index += 2;
+      }
+    }
+    if (
+      (code >= 0x41 && code <= 0x5a) ||
+      (code >= 0x61 && code <= 0x7a) ||
+      (code >= 0x30 && code <= 0x39) ||
+      code === 0x2b ||
+      code === 0x2f ||
+      code === 0x2d ||
+      code === 0x5f
+    )
+      symbols += 1;
+  }
+  return Math.floor((symbols * 3) / 4);
+}
+
+/** A percent-escape is one byte; any other character is its UTF-8 length. */
+function percentEncodedBytes(payload: string): number {
+  const escapes = payload.match(/%[0-9a-f]{2}/gi)?.length ?? 0;
+  return new TextEncoder().encode(payload).length - escapes * 2;
+}
+
 /** The media type a `data:` URL declares, lowercased; `text/plain` when it declares none. */
 function dataUrlMediaType(parsed: URL): string {
   const declared = parsed.pathname.split(/[;,]/, 1)[0] ?? '';

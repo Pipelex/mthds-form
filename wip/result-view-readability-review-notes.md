@@ -1,0 +1,5 @@
+# Review deferrals — the result view's readability pass
+
+Findings a `/rev` pass on `feature/Result-view-readability` left for later, with where each came from. An entry goes once a landed commit fixes it.
+
+- **An image still puts its raw URL on the anchor's and the gallery tile's `title`** (`src/react/result-field.tsx`, the painted image's `<a title={content.url}>` and the unpaintable tile's `<span title={content.url}>`), where `FileRef` now shows the `data:` URL's summary instead. For an inline image that tooltip is the whole file. Raised as a note rather than a finding by the round-1 code reviewer at level `low`, and confirmed by reading those lines. Not fixed with the rest because both sites sit after an early return, so the summary cannot be memoised with a hook there, and computing it on every render walks the payload — the cost the same pass removed from `FileRef`. The fix is a scan-free predicate in core (is this a `data:` URL at all) so the `title` can be dropped without counting anything.
