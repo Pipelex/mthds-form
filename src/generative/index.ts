@@ -32,13 +32,17 @@ export {
 } from './designer-catalog';
 export { PROMPT_HASH } from './prompt-hash';
 
-// The brief a model is handed, rendered from the descriptor and nothing else.
+// The brief a model is handed: the descriptor projected into the data the
+// designer method lays out itself, and nothing else.
 export {
+  DESIGNER_BRIEF_CONCEPT,
+  inputBrief,
   isDelegatedInput,
   isDelegatedResult,
-  renderInputBrief,
-  renderResultBrief,
+  resultBrief,
   type BriefSubject,
+  type DesignerBrief,
+  type DesignerPathEntry,
 } from './brief';
 
 // The two checks a host runs before it renders a stored layout.

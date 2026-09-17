@@ -130,32 +130,51 @@ describe('the props signature', () => {
 });
 
 describe('the designer method, as package data', () => {
-  /** The text of one pipe's table, from its header to the next pipe's. */
+  /** The text of one pipe's table, its own sub-tables included, up to the next pipe's. */
   function pipe(code: string): string {
     const start = METHOD.indexOf(`[pipe.${code}]`);
     expect(start, code).toBeGreaterThan(-1);
-    const next = METHOD.indexOf('\n[pipe.', start + 1);
-    return METHOD.slice(start, next === -1 ? undefined : next);
+    const rest = METHOD.slice(start + 1);
+    const next = rest.search(new RegExp(`\\n\\[pipe\\.(?!${code}\\.)`));
+    return next === -1 ? METHOD.slice(start) : METHOD.slice(start, start + 1 + next);
   }
   const inputsOf = (block: string) => /^inputs\s*=\s*\{(.*)\}$/m.exec(block)?.[1] ?? '';
 
-  it('is a sequence taking the catalog and the brief, and the seed optionally, that returns text', () => {
+  it('is a sequence taking the catalog and the brief as data, and the seed optionally, that returns text', () => {
     const designer = pipe('design_layout');
     expect(designer).toMatch(/^type\s*=\s*"PipeSequence"$/m);
     expect(inputsOf(designer)).toContain('catalog = "Catalog"');
-    expect(inputsOf(designer)).toContain('brief = "Text"');
+    expect(inputsOf(designer)).toContain('brief = "Brief"');
     expect(inputsOf(designer)).toContain('seed = "Text?"');
     expect(designer).toMatch(/^output\s*=\s*"Text"$/m);
     const steps = [...designer.matchAll(/\{\s*pipe\s*=\s*"(\w+)"/g)].map((step) => step[1]);
-    expect(steps).toEqual(['plan_page', 'emit_page']);
+    expect(steps).toEqual(['render_brief', 'plan_page', 'emit_page']);
   });
 
-  it('plans first, from the catalog, the brief and the guarded seed, into a structure', () => {
+  /**
+   * The brief's wording is the method's own: a template over the data, with
+   * no model behind it, whose text both model stages then read. Nothing in
+   * TypeScript writes a sentence of it.
+   */
+  it('lays the brief out first, as a template over the data, with no model', () => {
+    const renderer = pipe('render_brief');
+    expect(renderer).toMatch(/^type\s*=\s*"PipeCompose"$/m);
+    expect(inputsOf(renderer).trim()).toBe('brief = "Brief"');
+    expect(renderer).toMatch(/^output\s*=\s*"Text"$/m);
+    expect(renderer).toMatch(/^category\s*=\s*"markdown"$/m);
+    expect(renderer).not.toMatch(/^model\s*=/m);
+    expect(renderer).toContain('{% for entry in brief.paths %}');
+    expect(renderer).toContain('{{ brief.sample_state }}');
+    expect(renderer).toContain('{{ brief.run_control }}');
+  });
+
+  it('plans next, from the catalog, the laid-out brief and the guarded seed, into a structure', () => {
     const planner = pipe('plan_page');
     expect(planner).toMatch(/^output\s*=\s*"PagePlan"$/m);
+    expect(inputsOf(planner)).toContain('brief_text = "Text"');
     expect(inputsOf(planner)).toContain('seed = "Text?"');
     expect(planner).toContain('{% for component in catalog.components');
-    expect(planner).toContain('@brief');
+    expect(planner).toContain('@brief_text');
     expect(planner).toContain('@?seed');
   });
 
@@ -168,11 +187,12 @@ describe('the designer method, as package data', () => {
     const builder = pipe('emit_page');
     expect(builder).toMatch(/^output\s*=\s*"Text"$/m);
     expect(inputsOf(builder)).toContain('plan = "PagePlan"');
+    expect(inputsOf(builder)).toContain('brief_text = "Text"');
     expect(inputsOf(builder)).not.toContain('seed');
     expect(builder).toContain('{% for region in plan.regions');
     expect(builder).toContain('{% for component in catalog.components');
     expect(builder).toContain('{% for action in catalog.actions');
-    expect(builder).toContain('@brief');
+    expect(builder).toContain('@brief_text');
     expect(builder).not.toContain('seed');
   });
 
@@ -185,8 +205,18 @@ describe('the designer method, as package data', () => {
     expect(new Set(pins).size).toBe(1);
   });
 
-  it('declares the structures the catalog data and the plan are shaped as', () => {
+  it('declares the structures the catalog data, the brief data and the plan are shaped as', () => {
     const catalogFields = ['name', 'props', 'description', 'accepts_children', 'slots', 'events'];
+    const briefFields = ['side', 'pipe_ref', 'paths', 'run_control', 'sample_state'];
+    const entryFields = [
+      'depth',
+      'path',
+      'kind',
+      'delegated',
+      'relative',
+      'item_kind',
+      'item_laid_out',
+    ];
     const planFields = [
       'purpose',
       'title',
@@ -197,7 +227,13 @@ describe('the designer method, as package data', () => {
       'delegated',
     ];
     const regionFields = ['title', 'purpose', 'container', 'elements'];
-    for (const field of [...catalogFields, ...planFields, ...regionFields]) {
+    for (const field of [
+      ...catalogFields,
+      ...briefFields,
+      ...entryFields,
+      ...planFields,
+      ...regionFields,
+    ]) {
       expect(METHOD).toMatch(new RegExp(`^${field}\\s*=`, 'm'));
     }
   });
@@ -230,13 +266,15 @@ describe('the designer method, as package data', () => {
    * `$name` is the language's inline substitution, so a json-render
    * expression key written bare would be rendered as a variable - and refused
    * at load, since no input is called `state`. Every one is spelled `$$`, in
-   * both stages' prompts: the slice starts at the first and runs to the end.
+   * the brief's template as in both stages' prompts: the slice starts at the
+   * template, which comes first, and runs to the end.
    */
   it('escapes every json-render expression key it names', () => {
-    const prompts = METHOD.slice(METHOD.indexOf('prompt = """'));
+    const templates = METHOD.slice(METHOD.indexOf('template = """'));
     expect(
-      prompts.match(/(?<!\$)\$(?:state|bindState|item|bindItem|cond|then|else|template|or)\b/g),
+      templates.match(/(?<!\$)\$(?:state|bindState|item|bindItem|cond|then|else|template|or)\b/g),
     ).toBeNull();
-    expect(prompts).toContain('"$$state"');
+    expect(templates).toContain('"$$state"');
+    expect(templates).toContain('`$$bindState`');
   });
 });

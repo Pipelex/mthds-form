@@ -73,13 +73,16 @@ fixtures:
 fixtures-runs:
 	npx tsx scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY)) $(if $(PIPE),--pipe $(PIPE))
 
-# The BRIEFS: for each generative hero, the Markdown brief rendered from the
-# committed descriptors and payloads, plus the catalog data the designer method
-# is handed and the prompt hash (the method's text and that data, together).
-# Committed under wip/generative-ui/briefs/, because with the method file it is
-# the record of exactly what a producer was handed - and the file each spec
-# fixture's `brief` field points at. Free and offline. Node cannot resolve this
-# repo's extensionless TypeScript imports on its own, so the pass runs under tsx.
+# The BRIEFS: for each generative hero, the brief as DATA - built from the
+# committed descriptors and payloads - laid out by the designer method's own
+# template stage through the sibling ../pipelex checkout's venv
+# (PIPELEX_PYTHON, as `fixtures` needs it), and written beside that data, the
+# catalog data the method is handed and the prompt hash (the method's text and
+# the catalog, together). Committed under wip/generative-ui/briefs/, because
+# with the method file it is the record of exactly what a producer was handed -
+# and the file each spec fixture's `brief` field points at. Free and offline: no
+# model is called. Node cannot resolve this repo's extensionless TypeScript
+# imports on its own, so the pass runs under tsx.
 briefs:
 	npx tsx scripts/generate-fixtures.mjs --briefs
 
