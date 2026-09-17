@@ -275,13 +275,13 @@ if (/^\s*["']use client["'];?/.test(coreBarrel)) {
 }
 
 // The designer method ships as data beside the entries, reachable through the
-// `./ui-designer.mthds` export. A missing file is a broken export a consumer
+// `./layout-design.mthds` export. A missing file is a broken export a consumer
 // only discovers at run time.
-if (existsSync(`${DIST}/ui-designer.mthds`)) {
-  console.log('ok  ui-designer.mthds ships beside the entries');
+if (existsSync(`${DIST}/layout-design.mthds`)) {
+  console.log('ok  layout-design.mthds ships beside the entries');
 } else {
   failures.push(
-    'dist/ui-designer.mthds is missing - the `./ui-designer.mthds` export resolves to nothing. See tsup.config.ts onSuccess.',
+    'dist/layout-design.mthds is missing - the `./layout-design.mthds` export resolves to nothing. See tsup.config.ts onSuccess.',
   );
 }
 

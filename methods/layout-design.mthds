@@ -1,6 +1,6 @@
 domain      = "generative"
 description = "Lays out one page for a method - its inputs, or its result - as a json-render spec over a catalog of components, bound to the state the host provides."
-main_pipe   = "ui_designer"
+main_pipe   = "design_layout"
 
 # The designer method. THIS FILE IS THE PROMPT: every paragraph the models
 # read - the output format, the state contract, the design direction, the
@@ -11,7 +11,7 @@ main_pipe   = "ui_designer"
 # prose that names components (the direction, the rules) is the method's own
 # reading of the vocabulary it was written for.
 #
-# It runs in two stages, and `ui_designer` is the sequence of them:
+# It runs in two stages, and `design_layout` is the sequence of them:
 #
 # - `plan_page` reads the brief and the catalog - and the creative seed, when
 #   there is one - and writes a PagePlan: what the page is for, its title,
@@ -111,7 +111,7 @@ purpose   = { type = "text", description = "What this region shows or collects, 
 container = { type = "text", description = "The component the region is built with, by its catalog name, when the composition has settled it; otherwise empty, and the builder chooses one that builds what the composition describes." }
 elements  = { type = "list", item_type = "text", description = "The elements inside it in order, one line each: the component by its catalog name, the path it binds or reads spelled exactly as the brief lists it, and the choices it lists when it lists any. A container names what it holds.", required = true }
 
-[pipe.ui_designer]
+[pipe.design_layout]
 type = "PipeSequence"
 description = "Design one page from the catalog and the brief: plan it, then build it as the JSONL patches of a spec bound to the host's state."
 inputs = { catalog = "Catalog", brief = "Text", seed = "Text?" }

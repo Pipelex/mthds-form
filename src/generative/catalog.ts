@@ -159,7 +159,7 @@ export type GenerativeSpec = typeof catalog._specType;
  * Every component name the catalog knows, the shadcn subset first. This is
  * the order the designer method lists them in, since `designerCatalog()`
  * walks it; the rules and the direction that name them are the method's own
- * prose, in `data/generative/ui-designer.mthds`.
+ * prose, in `methods/layout-design.mthds`.
  */
 export const COMPONENT_NAMES: readonly string[] = [
   ...PICKED_SHADCN,

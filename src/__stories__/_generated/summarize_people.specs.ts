@@ -2,7 +2,7 @@
  * Specs captured for the heroes of data/methods/summarize_people/bundle.mthds - DO NOT EDIT.
  *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
- * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over
+ * `methods/layout-design.mthds` on the hosted API through `@pipelex/sdk` over
  * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates
  * what came back against the catalog. Take in another producer's JSONL with the
  * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same

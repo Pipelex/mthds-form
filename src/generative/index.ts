@@ -13,7 +13,7 @@
 
 // The catalog a layout is written against, and the same catalog as the data
 // the designer method takes. The prompt itself is the method, shipped as
-// `@pipelex/mthds-form/ui-designer.mthds`; nothing here renders it.
+// `@pipelex/mthds-form/layout-design.mthds`; nothing here renders it.
 export {
   COMPONENT_NAMES,
   COMPONENT_RENDERINGS,

@@ -68,9 +68,9 @@ export default defineConfig({
     // The designer method ships as DATA, not as a string baked into a module:
     // it is a `.mthds` bundle a host hands to a runner, and it is still being
     // iterated on. Shipping the file means a host reads it off disk through
-    // the `./ui-designer.mthds` export and passes it along unchanged, so a
+    // the `./layout-design.mthds` export and passes it along unchanged, so a
     // newer method is a package upgrade rather than a code change. Nothing in
     // the entry reads it - the entry must stay importable from a browser.
-    copyFileSync("data/generative/ui-designer.mthds", "dist/ui-designer.mthds");
+    copyFileSync("methods/layout-design.mthds", "dist/layout-design.mthds");
   },
 });

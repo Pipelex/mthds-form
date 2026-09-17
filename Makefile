@@ -22,7 +22,7 @@ typecheck:
 	npx tsc --noEmit
 
 # The offline drift gate over the designer method's generated tree: every
-# stamped file in src/generated/ui-designer/ against its codegen.lock, and the
+# stamped file in src/generated/layout-design/ against its codegen.lock, and the
 # method's source against the hash recorded beside it. No engine, no network,
 # no key. Red means the types were not regenerated after a bundle edit - the
 # refresh is /pipelex-integrate, never a hand edit of the tree.
@@ -88,7 +88,7 @@ briefs:
 # inference budget and needs a Pipelex API key in PIPELEX_API_KEY (PIPELEX_BASE_URL
 # points it at another deployment), exactly as `fixtures-runs` does.
 # ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides every stage's pin in
-# data/generative/ui-designer.mthds for a comparative run; SEED=1 gives the run a
+# methods/layout-design.mthds for a comparative run; SEED=1 gives the run a
 # fresh creative seed, recorded on the fixture. A spec another producer wrote is
 # taken in the same way, with `--capture` - see scripts/generate-fixtures.mjs.
 fixtures-specs:

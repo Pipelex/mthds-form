@@ -25,7 +25,7 @@ import { propsSignature } from '../props-signature';
  */
 
 const METHOD = readFileSync(
-  new URL('../../../data/generative/ui-designer.mthds', import.meta.url),
+  new URL('../../../methods/layout-design.mthds', import.meta.url),
   'utf8',
 );
 
@@ -140,7 +140,7 @@ describe('the designer method, as package data', () => {
   const inputsOf = (block: string) => /^inputs\s*=\s*\{(.*)\}$/m.exec(block)?.[1] ?? '';
 
   it('is a sequence taking the catalog and the brief, and the seed optionally, that returns text', () => {
-    const designer = pipe('ui_designer');
+    const designer = pipe('design_layout');
     expect(designer).toMatch(/^type\s*=\s*"PipeSequence"$/m);
     expect(inputsOf(designer)).toContain('catalog = "Catalog"');
     expect(inputsOf(designer)).toContain('brief = "Text"');
