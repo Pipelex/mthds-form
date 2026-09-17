@@ -50,7 +50,7 @@ The state of one actual run, so you can judge magnitudes and lengths. Bind to th
 }
 ```
 
----
+<!-- The laid-out brief ends here. Below: the data it was rendered from. -->
 
 # Brief (prompt hash `2b2325fd1231`)
 

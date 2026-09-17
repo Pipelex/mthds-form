@@ -994,8 +994,17 @@ function briefRelPath(pipeRef) {
   return path.relative(REPO, path.join(BRIEFS_DIR, `${pipeRef}.md`));
 }
 
-/** The line that ends the laid-out brief in a brief file; the data follows it. */
-const BRIEF_DATA_SEPARATOR = '---';
+/**
+ * The line that ends the laid-out brief in a brief file; the data follows it.
+ * An HTML comment and not a Markdown rule, because the text above it is the
+ * template's rendering of what the descriptor states - a description flows
+ * into its path line as written, newlines and all - so a bare `---` is a line
+ * the brief itself can hold, and the record was once cut short at the first
+ * one. The data below it is JSON, whose strings escape their newlines, so no
+ * line after the separator can spell it: the LAST such line is the separator.
+ */
+const BRIEF_DATA_SEPARATOR =
+  '<!-- The laid-out brief ends here. Below: the data it was rendered from. -->';
 
 /**
  * The briefs laid out by the method's own `render_brief` stage, offline: one
@@ -1081,8 +1090,14 @@ function committedBrief(pipeRef) {
   const source = readFileSync(file, 'utf8');
   const hash = /Prompt hash: ([0-9a-f]{12})/.exec(source.split('\n')[0])?.[1];
   const start = source.indexOf('\n\n') + 2;
-  const end = source.indexOf(`\n${BRIEF_DATA_SEPARATOR}\n`, start);
-  return { hash, text: source.slice(start, end === -1 ? undefined : end).trimEnd() };
+  const end = source.lastIndexOf(`\n${BRIEF_DATA_SEPARATOR}\n`);
+  if (end < start) {
+    die(
+      `${path.relative(REPO, file)} has no line separating the brief from its data.\n` +
+        '  Run `make briefs`: the record is read up to that line, and a file without one was not written by it.',
+    );
+  }
+  return { hash, text: source.slice(start, end).trimEnd() };
 }
 
 /**
@@ -1278,7 +1293,7 @@ async function generateSpecs(only) {
       die(
         `${pipeRef} (${id}): the brief the run laid out is not the one on disk (run ${runId}).\n` +
           `  The run's text is at ${path.relative(REPO, seenPath)}; the record is ${briefRelPath(pipeRef)}.\n` +
-          '  The method\'s template rendered differently on the hosted runtime than through `make briefs`;\n' +
+          "  The method's template rendered differently on the hosted runtime than through `make briefs`;\n" +
           '  read the diff before storing anything.',
       );
     }
@@ -1301,9 +1316,12 @@ async function generateSpecs(only) {
       `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid` +
         `${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
     );
+    // Written after every hero and not after the sweep, as the payload pass
+    // writes its case after every run: the sweep is sequential and fatal on
+    // the first failure, and the heroes a `die` on the tenth would otherwise
+    // throw away were paid for.
+    writeSpecsModule(hero.caseName, byCase.get(hero.caseName));
   }
-
-  for (const [caseName, specs] of byCase) writeSpecsModule(caseName, specs);
 }
 
 /**

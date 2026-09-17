@@ -29,7 +29,7 @@ None. Emit no `/state` patches.
 Nothing gates the run.
 The page has exactly one `Cta`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.
 
----
+<!-- The laid-out brief ends here. Below: the data it was rendered from. -->
 
 # Brief (prompt hash `2b2325fd1231`)
 
