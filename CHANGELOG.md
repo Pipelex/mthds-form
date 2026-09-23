@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **The `mthds` range moves to `^0.27.0`**: the package rests on `mthds` 0.27 for the `mthds/protocol` types it imports. Its one breaking change is in the `mthds-agent share` command, which this package does not use, so the kernel's types are unchanged.
 - **`./layout-design.mthds` replaces `./ui-designer.mthds` (Breaking)**: the method that designs a page ships under its own name — the bundle is `methods/layout-design.mthds` in the repo, `layout-design.mthds` in the package, and its main pipe is `design_layout`, so a host resolves the file through the `./layout-design.mthds` export and names that pipe when it runs it. `PROMPT_HASH` moves with the method's text, so a layout captured against the older prompt is no longer rendered and falls back to the kernel's own form.
 - **`inputBrief` and `resultBrief` replace `renderInputBrief` and `renderResultBrief`, and the brief is data (Breaking)**: the generative entry no longer renders the brief as Markdown. It builds the `Brief` structure the designer method declares — `DesignerBrief`, one `DesignerPathEntry` per path, flattened with its depth, and `DESIGNER_BRIEF_CONCEPT` for the request — and the method's new first stage, `render_brief`, lays it out as the text both model stages read, so every sentence a model reads about a page is now in `layout-design.mthds`. A host hands `design_layout` the brief as the content of a structured input, exactly as it hands it the catalog, and `PROMPT_HASH` moves with the method.
 
