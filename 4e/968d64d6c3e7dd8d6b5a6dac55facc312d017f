@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_249569b913e311::t_adc2d84328d7de 7
+package-lock.json
+  s_249569b913e311::t_0729706b9737ef 26,2576-2622,8177-8179
+package.json
+  s_249569b913e311::t_bf4c4ceecf1b31 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4e968d64d6c3e7dd8d6b5a6dac55facc312d017f",
+  "prompts": {},
+  "sessions": {
+    "s_249569b913e311": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c96db657-dce9-4864-8d99-e33151cd32db",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
