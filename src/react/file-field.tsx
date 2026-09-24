@@ -52,8 +52,9 @@ interface FileFieldProps {
   uploading?: boolean;
   /**
    * Why the host's upload of this field's file failed. Shown in the alert slot
-   * a refused format uses, and hidden by the user's next pick, link or clear
-   * until the host sends a different message, or removes it and sends it again.
+   * a refused format uses, until the host removes it. A clear or a typed link
+   * hides it until the host sends a different message or removes it; a refused
+   * pick shows its refusal in its place.
    */
   uploadError?: string;
   /** Resolve a `pipelex-storage://` URI to a viewable URL (stored-file preview). */
@@ -197,16 +198,23 @@ function FileField({
   const [rejected, setRejected] = useState<string | null>(null);
 
   /**
-   * The host's upload failure the user has since acted past, by the message it
-   * carried.
+   * The host's upload failure the user has since moved past without uploading,
+   * by the message it carried.
    *
    * The slot shows whichever of a refusal and a failure came from the user's
    * latest action; the two never both belong to the current file, since a
-   * refused file never reaches the host. So a pick, a typed link or a clear
-   * sets this to the message on screen, which hides it, and a message the host
-   * sends that differs from it shows. The host removing its entry forgets the
-   * dismissal, so the same message sent again after the next failed attempt
-   * shows too.
+   * refused file never reaches the host. A clear or a typed link leaves the
+   * upload behind, so it sets this to the message on screen, which hides it
+   * until the host sends a different one or removes it.
+   *
+   * A file handed to the host is the opposite case: a new attempt, whose
+   * outcome only the host knows. So it forgets the dismissal and leaves the map
+   * as the truth. Hiding the message there instead, by its text, could not tell
+   * the old failure from an identical new one - a host that overwrites the
+   * entry on each failure, or whose removal on the drop and re-send on a quick
+   * failure land in one render, got a retry that failed in silence. A host
+   * removes its entry when the next file is dropped, and the slot is shut while
+   * the field is uploading anyway.
    */
   const [dismissedUploadError, setDismissedUploadError] = useState<string | null>(null);
   useEffect(() => {
@@ -241,7 +249,6 @@ function FileField({
       // file can never be taken with nowhere to go - the bug this guards is a
       // picked file handed to a callback that did nothing, in silence.
       if (!onDropFile) return;
-      dismissUploadError();
       if (!isAcceptedFile(formats, file)) {
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
@@ -250,10 +257,11 @@ function FileField({
         return;
       }
       setRejected(null);
+      setDismissedUploadError(null);
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
       onDropFile(file);
     },
-    [formats, setLocal, onDropFile, dismissUploadError],
+    [formats, setLocal, onDropFile],
   );
 
   const busy = disabled || uploading;
@@ -285,9 +293,7 @@ function FileField({
     // refused file.
     onDropRejected: (rejections) => {
       const name = rejections[0]?.file.name;
-      if (!name) return;
-      dismissUploadError();
-      setRejected(name);
+      if (name) setRejected(name);
     },
   });
 

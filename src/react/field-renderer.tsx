@@ -45,10 +45,11 @@ export interface FieldEnv {
    * message shows on the field that took the file rather than under the whole
    * form, where only its wording could say which input failed.
    *
-   * The field hides a message on the user's next pick, link or clear, until the
-   * host sends a different one or removes the entry and sends it again. The
-   * host removes an entry on its own schedule, typically on the next drop into
-   * that field.
+   * The map is the host's truth about each upload attempt: a host removes an
+   * entry when the next file is dropped at that id, and sets it again if that
+   * upload fails too. A clear or a typed link on the field hides the message
+   * until the host sends a different one or removes it, and a list holds back
+   * the entries a row removal left at a renumbered position.
    */
   uploadErrors?: ReadonlyMap<string, string>;
   /** Resolve a `pipelex-storage://` URI to a browser-viewable URL (for previews

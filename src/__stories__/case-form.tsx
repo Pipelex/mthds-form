@@ -59,7 +59,8 @@ export interface CaseFormProps {
   /**
    * Why a host's upload failed, keyed by the same `<pipeCode>-<path>` ids, as a
    * host fills `FieldEnv.uploadErrors`. The harness's own upload never fails,
-   * so a story states the failure it shows.
+   * so a story states the failure it shows, and the harness removes an entry
+   * when a file is dropped at its id, as the seam asks a host to.
    */
   uploadErrors?: Readonly<Record<string, string>>;
   /**
@@ -116,11 +117,14 @@ export function CaseForm({
     return narrowTo ? narrowFileFormats(derived, narrowTo) : derived;
   }, [contracts, inputForm, domain, pipeCode, narrowTo]);
   const [values, setValues] = React.useState<Record<string, unknown>>(initialValues ?? {});
+  const [failures, setFailures] = React.useState(() =>
+    uploadErrors ? new Map(Object.entries(uploadErrors)) : undefined,
+  );
   const env = React.useMemo<FieldEnv>(
     () => ({
       disabled,
       uploadingIds: uploadingIds ? new Set(uploadingIds) : undefined,
-      uploadErrors: uploadErrors ? new Map(Object.entries(uploadErrors)) : undefined,
+      uploadErrors: failures,
       allowUrl,
       // The id is `<pipeCode>-<path>`, and the path is what a host writes back
       // to (docs/upload-seam.md). The object URL is never revoked: a story's
@@ -129,11 +133,17 @@ export function CaseForm({
         ? (id, file) => {
             const path = id.slice(pipeCode.length + 1).split('.');
             const stored = { url: URL.createObjectURL(file), filename: file.name };
+            setFailures((previous) => {
+              if (!previous?.has(id)) return previous;
+              const next = new Map(previous);
+              next.delete(id);
+              return next;
+            });
             setValues((previous) => setValueAtPath(previous, path, stored));
           }
         : undefined,
     }),
-    [disabled, uploadingIds, uploadErrors, allowUrl, upload, pipeCode],
+    [disabled, uploadingIds, failures, allowUrl, upload, pipeCode],
   );
 
   return (

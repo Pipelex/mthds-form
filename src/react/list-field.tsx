@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from './utils';
 import type { ListRunField, RunField } from '../core';
@@ -51,6 +51,8 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const isApp = presentation === 'app';
   const items = value ?? [];
   const [rowKeys, setRowKeys] = useRowKeys(items.length);
+  // Upload failures a removal left at the wrong position; see `rowEnv` below.
+  const [staleErrors, setStaleErrors] = useState<ReadonlyMap<string, string>>(NO_ERRORS);
 
   const setItem = (index: number, itemValue: unknown) => {
     const next = items.slice();
@@ -62,6 +64,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     // reconciliation lop one off the end, or every row below this one would
     // take its neighbour's key and remount holding its neighbour's state.
     setRowKeys((prev) => prev.filter((_, i) => i !== index));
+    setStaleErrors((prev) => withRenumberedErrors(prev, id, index, env?.uploadErrors));
     onChange(items.filter((_, i) => i !== index));
   };
   const addItem = () => onChange([...items, emptyValue(field.item)]);
@@ -77,6 +80,46 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // it was, so an in-flight write-back is unaffected, and freezing it would make
   // filling a list of files needlessly serial.
   const busy = listIsBusy(id, env?.uploadingIds);
+
+  // An upload failure is keyed by position like everything else here, and it
+  // outlives its upload, so the busy rule above cannot cover it: removing a row
+  // renumbers every row after it, and the host's message for `cvs.1` would then
+  // show on whichever row moved into `cvs.1`, while the row that failed showed
+  // nothing. The host is handed only the shorter array and cannot re-key its
+  // map, so the list pays for the staleness where it creates it: each failure
+  // at a renumbered position is held back from the rows until the host removes
+  // or changes it, or a new file is dropped at that position.
+  const hostErrors = env?.uploadErrors;
+  useEffect(() => {
+    setStaleErrors((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map([...prev].filter(([key, message]) => hostErrors?.get(key) === message));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [hostErrors]);
+  const rowEnv = useMemo<FieldEnv | undefined>(() => {
+    if (!env || staleErrors.size === 0) return env;
+    const drop = env.onDropFile;
+    return {
+      ...env,
+      uploadErrors: new Map(
+        [...(env.uploadErrors ?? [])].filter(([key, message]) => staleErrors.get(key) !== message),
+      ),
+      // A new file at a position is a new attempt there, so what the host says
+      // about that position from now on is about the file that is there.
+      onDropFile: drop
+        ? (dropId, file) => {
+            setStaleErrors((prev) => {
+              if (!prev.has(dropId)) return prev;
+              const next = new Map(prev);
+              next.delete(dropId);
+              return next;
+            });
+            drop(dropId, file);
+          }
+        : undefined,
+    };
+  }, [env, staleErrors]);
   // A `Concept[N]` slot is full at N. The bound is the method's, read off the
   // same `maxItems` ajv enforces, so offering one more row would offer one the
   // gate then refuses. It is deliberately NOT `itemCount`, which is the LOWER
@@ -137,7 +180,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
                 value={item}
                 onChange={(v) => setItem(index, v)}
                 id={`${id}.${index}`}
-                env={env}
+                env={rowEnv}
               />
             </div>
             <button
@@ -187,6 +230,32 @@ function listIsBusy(id: string, uploadingIds: ReadonlySet<string> | undefined): 
   const prefix = `${id}.`;
   for (const uploading of uploadingIds) if (uploading.startsWith(prefix)) return true;
   return false;
+}
+
+const NO_ERRORS: ReadonlyMap<string, string> = new Map();
+
+/**
+ * The failures a removal at `removed` leaves at the wrong position: every entry
+ * the host holds for this list's rows at that index or after it, since each of
+ * those positions now names a different row, or none. Nested ids count by their
+ * row (`cvs.2.resume` is row 2), and the dot keeps a sibling input called
+ * `cvs_extra` out, as in `listIsBusy`.
+ */
+function withRenumberedErrors(
+  stale: ReadonlyMap<string, string>,
+  listId: string,
+  removed: number,
+  hostErrors: ReadonlyMap<string, string> | undefined,
+): ReadonlyMap<string, string> {
+  if (!hostErrors?.size) return stale;
+  const prefix = `${listId}.`;
+  const next = new Map(stale);
+  for (const [key, message] of hostErrors) {
+    if (!key.startsWith(prefix)) continue;
+    const row = key.slice(prefix.length).split('.')[0] ?? '';
+    if (/^\d+$/.test(row) && Number(row) >= removed) next.set(key, message);
+  }
+  return next.size === stale.size && [...next].every(([k, m]) => stale.get(k) === m) ? stale : next;
 }
 
 interface RowKeyState {
