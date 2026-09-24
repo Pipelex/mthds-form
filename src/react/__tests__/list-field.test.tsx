@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField, TextRunField } from '../../core';
+import { DOCUMENT_FORMATS } from '../../core/file-formats';
 import { ListField } from '../list-field';
 
 const textItem: TextRunField = {
@@ -26,7 +27,7 @@ const docItem: FileRunField = {
   name: 'cv',
   conceptRef: 'native.Document',
   required: true,
-  accept: 'PDF',
+  formats: DOCUMENT_FORMATS,
 };
 
 const listOf = (item: ListRunField['item'], extra: Partial<ListRunField> = {}): ListRunField => ({

@@ -7,11 +7,18 @@ import { cn } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
-import { acceptMapForKind, isAcceptedFile } from '../core/file-formats';
+import {
+  acceptLabel,
+  acceptMap,
+  formatOfFilename,
+  isAcceptedFile,
+  type FileFormat,
+} from '../core/file-formats';
 import { viewableUrl } from '../core/native-content';
 import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
-import { useFieldStrings } from './field-strings';
+import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
+import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 
@@ -40,6 +47,31 @@ interface FileFieldProps {
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)(\?|$)/i;
 const PDF_EXT_RE = /\.pdf(\?|$)/i;
 const DATA_URL_MIME_RE = /^data:([^;,]+)/i;
+/** `http:` or `https:` - a link the person can read, and may have pasted. */
+const WEB_URL_RE = /^\s*https?:\/\//i;
+/** Any URL scheme at the start of the value: `pipelex-storage:`, `data:`, `blob:`, `ftp:`… */
+const URL_SCHEME_RE = /^\s*[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * Whether a file value's URL may be shown to an end user as it is: a web link,
+ * or text with no scheme at all (`example.com/brief.pdf`), which is a link a
+ * person typed rather than an address a host minted. Anything else carries a
+ * scheme only the host can resolve - a `pipelex-storage://` reference above
+ * all - and is not shown in `app`.
+ *
+ * The scheme-less half matters after a remount: the control no longer knows
+ * what it typed, and a link typed without a scheme would otherwise be stored,
+ * submitted and visible nowhere - blanked in the link input, and absent from
+ * the card, whose title is only "Attached file" when there is no filename.
+ *
+ * Accepted limit: a scheme-less value with a port (`localhost:3000/x`,
+ * `example.com:8080/x`) reads as having a scheme, since `localhost:` and
+ * `example.com:` are valid scheme syntax, so it stays hidden until the person
+ * types it again or adds `https://`.
+ */
+function isReadableLink(url: string): boolean {
+  return WEB_URL_RE.test(url) || !URL_SCHEME_RE.test(url);
+}
 
 /*
  * This control reads the kernel's URL gate directly - `viewableUrl` from core,
@@ -110,8 +142,11 @@ function FileField({
   category,
 }: FileFieldProps & { category: 'document' | 'image' }) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
   const domId = useFieldDomId(id);
   const [showUrl, setShowUrl] = useState(false);
+  // The last text the link input itself wrote into the value. See `urlText`.
+  const [typedUrl, setTypedUrl] = useState<string | null>(null);
   // The preview is collapsed by default - opened on demand via a "Preview" button.
   const [previewOpen, setPreviewOpen] = useState(false);
   const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
@@ -140,9 +175,18 @@ function FileField({
    */
   const [rejected, setRejected] = useState<string | null>(null);
 
+  // The field's own list, read three times below: the hint, the OS picker's
+  // filter and the check in `handleFile`. All three used to be computed apart -
+  // the hint from a label on the field, the filter and the check from the
+  // kind's table - so a host that rewrote the label moved the hint alone, and
+  // the picker went on offering files its server would refuse.
+  const formats = field.formats;
+  const hint = acceptLabel(formats);
+  const accept = useMemo(() => acceptMap(formats), [formats]);
+
   const handleFile = useCallback(
     (file: File) => {
-      if (!isAcceptedFile(field.kind, file)) {
+      if (!isAcceptedFile(formats, file)) {
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
         // runtime cannot decode has no business reaching it.
@@ -153,7 +197,7 @@ function FileField({
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
       onDropFile(file);
     },
-    [field.kind, setLocal, onDropFile],
+    [formats, setLocal, onDropFile],
   );
 
   const busy = disabled || uploading;
@@ -167,7 +211,7 @@ function FileField({
     // entirely, and a browser reporting an empty `File.type` slips through
     // react-dropzone's own matcher. `handleFile` is where the answer is
     // decided; this is the affordance in front of it.
-    accept: acceptMapForKind(field.kind),
+    accept,
     // The tab stop belongs on the INPUT, not on this div - see the root element
     // below. Without this, react-dropzone puts `tabIndex: 0` and its own key
     // handlers on a `role="presentation"` div, and the element a keyboard or
@@ -296,6 +340,19 @@ function FileField({
   // one.
   const previewPending = !previewSrc && !!storageUri && resolved?.uri !== storageUri;
 
+  // What the link input shows. In `app` it must not print a reference only the
+  // host can resolve: the input can be open while a stored file is the value -
+  // opened after the file was attached, left open through an upload, or written
+  // into by the host - and it used to show the `pipelex-storage://` address in
+  // full. So it shows a readable link (a web link, or text with no scheme) and
+  // the text it typed itself, and nothing else. The typed-text clause is what
+  // keeps typing intact, since every keystroke IS that text - `https:` on its
+  // way to `https://…` carries a scheme and is not a web link yet. `studio`
+  // shows the value as it is, as its card does.
+  const urlValue = value?.url ?? '';
+  const urlText =
+    presentation === 'studio' || isReadableLink(urlValue) || urlValue === typedUrl ? urlValue : '';
+
   return (
     <FieldShell
       name={field.name}
@@ -314,6 +371,8 @@ function FileField({
         <div className="space-y-2">
           <FileChip
             value={value}
+            formats={formats}
+            presentation={presentation}
             disabled={disabled}
             onClear={clear}
             canPreview={canPreview}
@@ -376,9 +435,7 @@ function FileField({
                 <p className="text-[13px] text-foreground">
                   {isDragActive ? s.dropToUpload : s.dropOrBrowse}
                 </p>
-                {field.accept && (
-                  <p className="font-mono text-[10.5px] text-muted-foreground">{field.accept}</p>
-                )}
+                {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
               </div>
             </>
           )}
@@ -392,8 +449,7 @@ function FileField({
           generic complaint. */}
       {rejected && !busy && (
         <p role="alert" className="text-[12px] text-destructive">
-          <span className="font-mono">{rejected}</span> —{' '}
-          {s.unsupportedFileType(field.accept ?? '')}
+          <span className="font-mono">{rejected}</span> — {s.unsupportedFileType(hint)}
         </p>
       )}
 
@@ -418,11 +474,16 @@ function FileField({
         <input
           type="text"
           autoFocus
-          value={value?.url ?? ''}
+          value={urlText}
           disabled={busy}
+          // A name of its own. The field's label is bound to the file input, so
+          // without this the placeholder was the only thing a screen reader
+          // announced here - and the placeholder used to name a storage scheme.
+          aria-label={s.fileUrlAria(fieldLabel(field.title, field.name, presentation))}
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
             setLocal(null);
+            setTypedUrl(e.target.value);
             onChange(e.target.value ? { url: e.target.value } : undefined);
           }}
           className={cn(fieldControlClass, 'h-9 px-3 font-mono text-[12px]')}
@@ -475,8 +536,42 @@ function PdfPreview({ src }: { src: string }) {
   );
 }
 
+/**
+ * The line under an attached file's name, or `undefined` for none.
+ *
+ * What the value holds decides it, because each case means something different
+ * to the person looking at the card:
+ *
+ * - A `data:` URL IS the file, so it is named by its format and size rather
+ *   than printed as forty thousand characters of base64.
+ * - An `http` or `https` URL, or text with no scheme at all, is a link the
+ *   person can read, usually one they typed or pasted, so it is shown back to
+ *   them as it is (`isReadableLink`).
+ * - Any other reference - a `pipelex-storage://` URI above all - is an address
+ *   only the host can resolve. In `app` it is replaced by the format the
+ *   filename's extension names, when that is one of the slot's formats, and by
+ *   nothing otherwise: the person who just chose the file has no use for its
+ *   storage address, and printing it is how one reached an end user's screen.
+ * - In `studio` that reference stays printed, because a builder may need it.
+ */
+function fileChipSubtitle(
+  url: string | undefined,
+  filename: string | undefined,
+  formats: readonly FileFormat[],
+  presentation: FieldPresentation,
+  strings: FieldStrings,
+): string | undefined {
+  if (url === undefined) return undefined;
+  const summary = encodedFileSummary(url, strings);
+  if (summary !== undefined) return summary;
+  if (presentation === 'studio' || isReadableLink(url)) return url;
+  return filename ? formatOfFilename(formats, filename)?.label : undefined;
+}
+
 function FileChip({
   value,
+  formats,
+  presentation,
   disabled,
   onClear,
   canPreview,
@@ -484,6 +579,8 @@ function FileChip({
   onTogglePreview,
 }: {
   value: FileValue | undefined;
+  formats: readonly FileFormat[];
+  presentation: FieldPresentation;
   disabled?: boolean;
   onClear: () => void;
   canPreview?: boolean;
@@ -492,14 +589,12 @@ function FileChip({
 }) {
   const s = useFieldStrings();
   const url = value?.url;
-  // A `data:` URL is the file, not a reference to it: a host that encodes a
-  // picked file in the browser writes all of it here, so the subtitle printed
-  // base64. It names the format and the size instead. Memoised because the
-  // count walks the whole payload and the chip re-renders on every keystroke
-  // elsewhere in the form.
+  const filename = value?.filename;
+  // Memoised because a `data:` URL's summary counts the whole payload, and the
+  // chip re-renders on every keystroke elsewhere in the form.
   const subtitle = useMemo(
-    () => (url === undefined ? undefined : (encodedFileSummary(url, s) ?? url)),
-    [url, s],
+    () => fileChipSubtitle(url, filename, formats, presentation, s),
+    [url, filename, formats, presentation, s],
   );
   return (
     <div className="flex items-center gap-3 rounded-md border border-border bg-input px-3 py-2.5">
@@ -510,7 +605,9 @@ function FileChip({
         <p className="truncate text-[13px] font-medium text-foreground">
           {value?.filename ?? s.uploadedFile}
         </p>
-        <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
+        {subtitle && (
+          <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
+        )}
       </div>
       {canPreview && (
         <button

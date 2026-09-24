@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import { CaseForm } from '../case-form';
 import { CONTRACTS, INPUT_FORM } from '../_generated/files';
+import { PAYLOADS } from '../_generated/results.payloads';
 
 /**
  * The two file-bearing kinds.
@@ -97,13 +98,116 @@ export const Uploading: Story = {
 };
 
 /**
+ * **A slot a host narrowed**, against `Image` above: the same `native.Image`
+ * slot, passed through `narrowFileFormats` with PNG and JPEG, the list a
+ * method app's server takes. The hint reads `PNG, JPG`, the OS picker offers no
+ * WEBP, and a dropped WEBP is refused naming that list, because all three read
+ * the field's one `formats` list.
+ */
+export const NarrowedImage: Story = {
+  args: { pipeCode: 'one_image', narrowTo: ['image/png', 'image/jpeg'] },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText('PNG, JPG')).toHaveLength(2);
+    for (const input of canvasElement.querySelectorAll('input[type="file"]')) {
+      await expect(input.getAttribute('accept')).not.toContain('webp');
+    }
+  },
+};
+
+/** The one list a host's upload path takes, for the story below. */
+const HOST_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
+
+/**
+ * **One list, every slot.** A document slot and an image slot, each narrowed
+ * with the SAME list of PDF, PNG and JPEG. The list is intersected with each
+ * slot's own formats, so the document slot still takes all three and the image
+ * slot takes PNG and JPEG - a host never writes a list per slot, and narrowing
+ * never widens one. Two single-slot carriers rather than one form, because no
+ * carrier pairs a singular document with a singular image.
+ */
+export const OneListEverySlot: Story = {
+  args: { pipeCode: 'one_document', narrowTo: HOST_MIME_TYPES },
+  render: (args) => (
+    <div style={{ display: 'grid', gap: 18 }}>
+      <CaseForm {...args} pipeCode="one_document" />
+      <CaseForm {...args} pipeCode="one_image" />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText('PDF, JPG, PNG')).toHaveLength(2);
+    await expect(canvas.getAllByText('PNG, JPG')).toHaveLength(2);
+  },
+};
+
+/**
+ * The reference a stored upload carries: a real one, out of the corpus's own
+ * payloads, rather than an invented address. A host writes it back after its
+ * upload lands, beside the filename the person picked.
+ */
+const STORED_IMAGE_URL = (PAYLOADS['results.image_result'] as { url: string }).url;
+const storedImage = {
+  picture: { url: STORED_IMAGE_URL, filename: 'rhubarb-sign.png' },
+};
+
+/**
+ * **An attached stored file, in `studio`.** A builder's view: the card prints
+ * the `pipelex-storage://` reference under the filename, because a builder may
+ * need the address itself.
+ */
+export const StoredFileStudio: Story = {
+  args: { pipeCode: 'one_image', initialValues: storedImage, presentation: 'studio' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText(STORED_IMAGE_URL)).toHaveLength(2);
+  },
+};
+
+/**
+ * **The same stored file, in `app`.** The person who just chose the file has
+ * no use for its storage address, so the card names the format the filename's
+ * extension gives, among the slot's own formats, and prints no reference. A
+ * pasted `https` link would still be shown back as it is.
+ */
+export const StoredFileApp: Story = {
+  args: { pipeCode: 'one_image', initialValues: storedImage, presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText('rhubarb-sign.png')).toHaveLength(2);
+    await expect(canvas.getAllByText('PNG')).toHaveLength(2);
+    await expect(canvasElement.textContent).not.toContain('pipelex-storage');
+  },
+};
+
+/**
+ * **The link a person may paste instead**, opened. The input asks for a web
+ * link and nothing else, and it carries a name of its own: the field's label
+ * is bound to the file input, so this one used to be announced by its
+ * placeholder alone - which named a storage scheme. The accessibility check
+ * that runs after this story is what holds the name in a real browser.
+ */
+export const PasteALink: Story = {
+  args: { pipeCode: 'one_document' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const toggle of canvas.getAllByRole('button', { name: 'paste a URL instead' })) {
+      await userEvent.click(toggle);
+    }
+    const inputs = canvas.getAllByRole('textbox', { name: 'Link to the file for attachment' });
+    await expect(inputs).toHaveLength(2);
+    for (const input of inputs) await expect(input.getAttribute('placeholder')).toBe('https://…');
+  },
+};
+
+/**
  * **What a slot actually accepts, and what happens when it does not.**
  *
  * The accepted formats are not a wire fact: the descriptor says the kind is
  * `document` or `image` and stops there, because which bytes a runtime can
- * decode is a property of the runtime. `core/file-formats.ts` holds the answer,
- * and both the label under the dropzone and the filter it enforces read that
- * one table.
+ * decode is a property of the runtime. `core/file-formats.ts` holds the table,
+ * `buildRunFields` stamps it on the field as `formats`, and the label under the
+ * dropzone, the picker's filter and the check all read that one list.
  *
  * A **document** takes PDF, JPG and PNG — the extract model reads an image as a
  * single page. An **image** takes PNG, JPG and WEBP. Note the asymmetry: WEBP is

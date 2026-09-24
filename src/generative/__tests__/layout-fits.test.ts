@@ -1,6 +1,7 @@
 import type { Spec } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import type { RunField } from '../../core';
+import { DOCUMENT_FORMATS } from '../../core/file-formats';
 import { layoutFits, layoutProblems } from '../layout-fits';
 
 /**
@@ -290,7 +291,12 @@ describe('a path the layout reads rather than binds', () => {
  */
 describe('a path shown as a value', () => {
   // Optional throughout, so the coverage half has nothing to say.
-  const document: RunField = { kind: 'document', name: 'document', required: false };
+  const document: RunField = {
+    kind: 'document',
+    name: 'document',
+    required: false,
+    formats: DOCUMENT_FORMATS,
+  };
   const request: RunField = {
     kind: 'object',
     name: 'request',
