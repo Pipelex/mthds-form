@@ -242,6 +242,29 @@ describe('a file input the page delegates to the kernel', () => {
     );
   });
 
+  it('is reported through the element boundary when the scope offers neither way in', () => {
+    // json-render wraps each element in a boundary that catches a throw, logs it
+    // and renders nothing, so on a produced page the configuration error is the
+    // logged error and a missing field rather than a failed page.
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { container } = render(
+        <GenerativePage
+          spec={DELEGATED}
+          store={createStateStore({ inputs: {} })}
+          scope={{ inputs: [CV], env: { allowUrl: false } }}
+        />,
+      );
+      expect(container.querySelectorAll('input')).toHaveLength(0);
+      const errors = reported.mock.calls.flat().filter((arg) => arg instanceof Error);
+      expect(
+        errors.some((error) => /The file field at ".*" has no way in/.test(error.message)),
+      ).toBe(true);
+    } finally {
+      reported.mockRestore();
+    }
+  });
+
   it('keeps its dropzone when the scope does', () => {
     const { container } = render(
       <GenerativePage
