@@ -194,10 +194,7 @@ export function readCompositeContent(value: unknown): CompositeMember[] | undefi
  * wants the markup rendered just the same. `refines` is on the wire for exactly
  * this question.
  */
-export function isNativeHtmlNode(node: {
-  conceptRef?: string;
-  refines?: readonly string[];
-}): boolean {
+export function isNativeHtmlNode(node: NativeNode): boolean {
   return refinesNative(node, NATIVE_HTML_CONCEPT_REF);
 }
 
@@ -215,10 +212,7 @@ export function isNativeHtmlNode(node: {
  * A `date` FIELD inside a structure is a different thing and needs none of this:
  * it carries `kind: "date"` already.
  */
-export function isNativeDateNode(node: {
-  conceptRef?: string;
-  refines?: readonly string[];
-}): boolean {
+export function isNativeDateNode(node: NativeNode): boolean {
   return refinesNative(node, NATIVE_DATE_CONCEPT_REF);
 }
 
@@ -236,18 +230,47 @@ export function isNativeDateNode(node: {
  * of ordinary `StuffContent`s. Keyed by concept, a renderer can at least show
  * the members as the named things they are. See `CompositeValue`.
  */
-export function isNativeCompositeNode(node: {
-  conceptRef?: string;
-  refines?: readonly string[];
-}): boolean {
+export function isNativeCompositeNode(node: NativeNode): boolean {
   return refinesNative(node, NATIVE_COMPOSITE_CONCEPT_REF);
 }
 
-/** Its concept IS the named native, or refines it. */
-function refinesNative(
-  node: { conceptRef?: string; refines?: readonly string[] },
-  ref: string,
-): boolean {
+/**
+ * Whether a node is one of the three natives the kind vocabulary cannot name —
+ * a date, a page, a composite — which a renderer reads by CONCEPT before it
+ * reads the kind. A list of one answers no (the predicates refuse a `list`
+ * node), and its item answers yes.
+ *
+ * One answer, read twice: the result view renders a list whose item answers yes
+ * one value per line rather than as a table, and the generative layer delegates
+ * that list to the kernel, because no catalog component reads a native value.
+ * Not re-exported: a host asks the three predicates it needs.
+ */
+export function isNativeValueNode(node: NativeNode): boolean {
+  return isNativeDateNode(node) || isNativeHtmlNode(node) || isNativeCompositeNode(node);
+}
+
+/** What the native predicates read off a node: its stated kind and its concept. */
+interface NativeNode {
+  kind?: string;
+  conceptRef?: string;
+  refines?: readonly string[];
+}
+
+/**
+ * The node IS one of the named native, or of a concept refining it.
+ *
+ * **A list of them is not one of them.** Plurality is not on the concept: a
+ * plural node's `concept_ref` is its ELEMENT's, with the multiplicity stripped,
+ * so a `native.Date[]` result is a `list` node whose concept reads
+ * `native.Date`. Asking the concept alone answered yes for the whole list, and
+ * every caller then treated the list as ONE date, one page or one composite: a
+ * list of dates rendered as a single absent date, and a list of pages collected
+ * no page at all. So a node whose stated kind is `list`
+ * answers no, and its `item` answers for itself. The kind is the descriptor's
+ * own statement, so this reads a stated fact and inspects no value.
+ */
+function refinesNative(node: NativeNode, ref: string): boolean {
+  if (node.kind === 'list') return false;
   if (node.conceptRef === ref) return true;
   return node.refines?.includes(ref) ?? false;
 }

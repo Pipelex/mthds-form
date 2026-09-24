@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileRunField, ObjectRunField, TextRunField } from '../../core/descriptor';
+import { IMAGE_FORMATS } from '../../core/file-formats';
 import { downloadStuff } from '../download-stuff';
 
 const image = (name: string): FileRunField => ({
@@ -7,6 +8,7 @@ const image = (name: string): FileRunField => ({
   name,
   conceptRef: 'native.Image',
   required: true,
+  formats: IMAGE_FORMATS,
 });
 const text = (name: string): TextRunField => ({
   kind: 'text',

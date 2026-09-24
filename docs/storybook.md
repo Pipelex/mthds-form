@@ -41,7 +41,7 @@ Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may 
 
 ### The lists corpus
 
-`data/structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table that scrolls), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
+`data/structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table of its top-ranked columns, whose rows open onto the rest), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
 
 It is a separate case rather than more pipes in `results` because the branches ARE the subject: a corpus that only ever met one of them proves nothing about the others, and the layout rules are the part most likely to be got wrong by someone who has only seen a two-row table.
 
@@ -50,6 +50,10 @@ It is a separate case rather than more pipes in `results` because the branches A
 `data/structures/readability.mthds` is a third result case, and its subject is how a VALUE reads rather than how a result is laid out: one invoice checked against its purchase order, carrying coded choices in snake_case and in capitals, amounts above and below 1, a one-line `text`, and a Markdown memo held by a plain unbounded `text` field, with the same again in a list of records. The stories are `Outputs/Readability`, which render that run's enum values as codes in `studio` and as words in `app`, and which take two of the `results` payloads into `app` beside their `studio` renderings. The memo is Markdown because the run's note asked for it, which is what a method does, so the capture is a real model's answer rather than a shape written to suit a story. See [result-view.md](result-view.md) § "Labels and enum values follow the presentation".
 
 The gallery pins an image model explicitly (`options = { model = "$gen-image-testing" }`): the deck's default image backend refuses more than one image per call, so an `Image[3]` output needs one that does not.
+
+### The tables corpus
+
+`data/structures/tables.mthds` takes the table as given and holds values that press on its own rules, the ones about what a cell does with a value rather than whether a list is a table at all. Its one pipe is a link checker's report, a record named by a web address, and some of those addresses carry a single word wider than the panel the stories render in: the value the name cell has to wrap without widening the table. The stories are `Outputs/Tables`, and their assertions measure the rendered widths, because a rule about a cell is a rule about layout and jsdom lays nothing out.
 
 ### Files, and the one payload the corpus cannot produce
 
@@ -85,7 +89,7 @@ Before rendering, the harness runs the two checks a host runs (`validateAgainstC
 
 ## What a file slot accepts
 
-Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree.
+Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, `buildRunFields` stamps it on each file field as `formats`, and the hint under a dropzone, the filter it hands the picker and the check it enforces all read that one list, so they cannot disagree. A host whose upload path takes less narrows the list with `narrowFileFormats`, and the `Inputs/Files` stories show a narrowed slot beside a plain one ([upload-seam.md](upload-seam.md)).
 
 | Slot       | Accepts                                                           |
 | ---------- | ----------------------------------------------------------------- |

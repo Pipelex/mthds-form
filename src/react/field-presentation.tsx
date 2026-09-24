@@ -22,8 +22,9 @@ import { createContext, use, type ReactNode } from 'react';
  * Deliberately a context rather than a prop or a `FieldEnv` flag: only the
  * components that own label chrome or an enum value's wording read it -
  * `FieldShell`, `ObjectField`, `BooleanField`, `ListField`, `EnumField` and the
- * result view - and threading a prop would have meant editing every field
- * control and both recursive containers.
+ * result view - plus the file control, whose card hides a storage reference in
+ * `app`, and threading a prop would have meant editing every field control and
+ * both recursive containers.
  */
 export type FieldPresentation = 'studio' | 'app';
 

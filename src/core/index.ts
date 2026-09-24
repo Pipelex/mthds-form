@@ -49,22 +49,26 @@ export { collectStuffFiles } from './stuff-files';
 export type { StuffFile } from './stuff-files';
 
 // What a `document` or `image` slot accepts - a mirror of the runtime's format
-// enums, exported because a host that uploads files needs the same answer the
-// control uses. See ./file-formats.
+// table, exported because a host that uploads files needs the same answer the
+// control uses. The helpers take a format LIST (a field's `formats`), and
+// `narrowFileFormats` narrows a whole field tree to the MIME types a host's
+// server takes, so the form and the server hold one list. See ./file-formats
+// and ./narrow-file-formats.
 export type { FileFormat } from './file-formats';
 export {
   DOCUMENT_FORMATS,
   IMAGE_FORMATS,
-  acceptLabelForKind,
-  acceptMapForKind,
+  acceptLabel,
+  acceptMap,
   formatsForKind,
   isAcceptedFile,
 } from './file-formats';
+export { narrowFileFormats } from './narrow-file-formats';
 
 // ...and how to READ what one comes back as. The result side's twin of that
 // table: the pinned content models of `native.Document`, `native.Image` and
 // `native.Date`, read by the kind the descriptor STATES. It lives in core rather
-// than beside the control that renders it for the same reason the accept table
+// than beside the control that renders it for the same reason the format table
 // does - a host showing a result its own way needs the same answer, and two
 // copies of an answer is two places for it to drift. See ./native-content.
 export type {

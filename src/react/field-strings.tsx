@@ -36,7 +36,28 @@ export interface FieldStrings {
   dropToUpload: string;
   dropOrBrowse: string;
   pasteUrlInstead: string;
+  /**
+   * The placeholder in the URL a person may paste instead of uploading. It names
+   * the web's own scheme only: a host whose runner also takes its own storage
+   * references can say so by overriding it, and no default shows an end user a
+   * platform's storage scheme.
+   */
   urlPlaceholder: string;
+  /**
+   * The accessible name of that URL input, given the field's label as the form
+   * shows it. The field's label is bound to the file input, so without this the
+   * placeholder was the only thing a screen reader announced here.
+   *
+   * The label is EMPTY inside a list row: the list drops each row's label, and
+   * the row number it shows instead is a bare glyph tied to no control. So every
+   * row's input currently carries the same generic name, and giving rows
+   * distinct names is a separate piece of work on the list control.
+   */
+  fileUrlAria: (label: string) => string;
+  /**
+   * The title of an attached file's card when the value carries no filename.
+   * True of a pasted link as well as of an upload, which "Uploaded file" was not.
+   */
   uploadedFile: string;
   /**
    * What names a file carried INSIDE its own URL (a `data:` URL), where a
@@ -90,10 +111,11 @@ export interface FieldStrings {
   no: string;
   /**
    * Shown when a picked file is not a format this slot accepts. Takes the
-   * accept label so the message names what WOULD have worked - "not accepted"
-   * on its own leaves the user guessing at the list they just failed.
+   * slot's own formats as the hint names them (`PNG, JPG`), after any narrowing
+   * a host applied, so the message names what WOULD have worked - "not
+   * accepted" on its own leaves the user guessing at the list they just failed.
    */
-  unsupportedFileType: (accept: string) => string;
+  unsupportedFileType: (formats: string) => string;
   /** The optional-entries disclosure ("field" inside a concept, "input" at top level). */
   hideOptionalFields: string;
   hideOptionalInputs: string;
@@ -126,8 +148,9 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   dropToUpload: 'Drop to upload',
   dropOrBrowse: 'Drop a file or click to browse',
   pasteUrlInstead: 'paste a URL instead',
-  urlPlaceholder: 'https://… or pipelex-storage://…',
-  uploadedFile: 'Uploaded file',
+  urlPlaceholder: 'https://…',
+  fileUrlAria: (label) => (label ? `Link to the file for ${label}` : 'Link to the file'),
+  uploadedFile: 'Attached file',
   encodedFileSummary: (format, bytes) => `${format} · ${formatBytes(bytes)}`,
   preview: 'Preview',
   removeFileAria: 'Remove file',
@@ -148,7 +171,8 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   resultViewGroup: 'Result view',
   yes: 'Yes',
   no: 'No',
-  unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
+  unsupportedFileType: (formats) =>
+    `That file type is not supported. Accepted formats: ${formats}.`,
   hideOptionalFields: 'Hide optional fields',
   hideOptionalInputs: 'Hide optional inputs',
   optionalFieldsCount: (count) => (count === 1 ? '1 optional field' : `${count} optional fields`),
