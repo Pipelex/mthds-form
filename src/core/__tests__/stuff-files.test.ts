@@ -164,6 +164,25 @@ describe('collectStuffFiles — markup', () => {
     expect(collectStuffFiles(html, { css_class: 'report' })).toEqual([]);
   });
 
+  it('reads a list of native.Html as one file per page', () => {
+    // A plural node carries its element's concept, so it used to be taken for
+    // ONE page: the list has no markup of its own, and every page was missed.
+    const pages: RunField = {
+      ...html,
+      kind: 'list',
+      conceptRef: 'native.Html',
+      contentKey: 'items',
+      item: { ...html, name: 'item' },
+    };
+    const files = collectStuffFiles(pages, {
+      items: [{ inner_html: '<h1>One</h1>' }, { inner_html: '<h1>Two</h1>' }],
+    });
+    expect(files).toEqual([
+      { text: '<h1>One</h1>', extension: 'html', path: 'output.0', kind: 'markup' },
+      { text: '<h1>Two</h1>', extension: 'html', path: 'output.1', kind: 'markup' },
+    ]);
+  });
+
   it('does not walk into a native.Html node looking for files', () => {
     // Its kind is `object`, so a plain switch would recurse through its two
     // text members. Nothing there is a file, and the markup itself would be

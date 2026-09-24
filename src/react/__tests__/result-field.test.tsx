@@ -17,11 +17,12 @@
  * generated corpus is asserted in its own stories.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
   BooleanRunField,
   DateRunField,
+  EnumRunField,
   FileRunField,
   ListRunField,
   NumberRunField,
@@ -485,10 +486,10 @@ describe('lists', () => {
     );
     const table = container.querySelector('table');
     expect(table).toBeTruthy();
-    // Three headers, not two: `label` is an UNBOUNDED text column, so the rows
-    // get an expand toggle and the toggle gets its own (visually hidden) header.
-    // See `fitsACellWhole`.
-    expect(table!.querySelectorAll('thead th')).toHaveLength(3);
+    // Two headers and no toggle: `label` is unbounded text, but it is the
+    // record's NAME, which wraps whole in its cell, and `week` is a number - so
+    // an open row would show nothing the row does not. See `fitsACellWhole`.
+    expect(table!.querySelectorAll('thead th')).toHaveLength(2);
     expect(table!.querySelectorAll('tbody tr')).toHaveLength(2);
     // The header carries the label ONCE, not once per row.
     expect(screen.getAllByText('label')).toHaveLength(1);
@@ -646,11 +647,16 @@ describe('lists', () => {
     // three sentences. A table of nothing but `text` columns then truncated
     // every cell with no way to read the rest, which is the one outcome a
     // result view must not produce.
+    // `gaps` is not the record's name - `candidate` is, and a name wraps whole -
+    // so it is a cell that truncates.
     render(
       <ResultField
-        field={list('matches', object('item', [text('gaps')]))}
+        field={list('matches', object('item', [text('candidate'), text('gaps')]))}
         value={[
-          { gaps: 'The candidate is fundamentally misaligned with this role, and here is why.' },
+          {
+            candidate: 'Amara Okafor',
+            gaps: 'The candidate is fundamentally misaligned with this role, and here is why.',
+          },
         ]}
       />,
     );
@@ -688,6 +694,300 @@ describe('lists', () => {
     // deterministic half.
     screen.getByText('label').focus();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('What happens');
+  });
+});
+
+describe('a record wider than the table budget', () => {
+  // Local rather than beside the builders at the top: these are the only tests
+  // that need an enum, and a bounded text is a one-field override.
+  const choice = (name: string): EnumRunField => ({
+    kind: 'enum',
+    name,
+    conceptRef: 'native.Text',
+    required: true,
+    options: ['open', 'closed'],
+  });
+  const bounded = (name: string): TextRunField => ({ ...text(name), maxLength: 12 });
+
+  // Authored order, with the tier each field ranks in. The name is the FIRST
+  // text field, wherever it sits; ties within a tier go to authored order.
+  const discrepancy = object('item', [
+    list('sources', object('source', [text('ref')])), // 4: a list of records
+    choice('kind'), // 2: fits a cell whole
+    number('line'), // 2
+    text('item'), // 1: the record's name
+    text('remark'), // 3: unbounded text
+    number('invoiced'), // 2
+    number('reference'), // 2
+    flag('approved'), // 2, but the fifth of its tier: past the default budget
+    prose('note'), // 4
+    list('tags', text('tag')), // 3: a list of scalars
+  ]);
+  const rows = [
+    {
+      sources: [{ ref: 'PO-1' }],
+      kind: 'open',
+      line: 3,
+      item: 'Hex bolt M8 x 40 mm, zinc plated',
+      remark: 'Short by ten boxes',
+      invoiced: 2116.2,
+      reference: 1900,
+      approved: false,
+      note: 'Held for review',
+      tags: ['urgent'],
+    },
+  ];
+
+  const headers = (container: HTMLElement) =>
+    [...container.querySelectorAll('thead th')].map((header) => header.textContent);
+  /** The value cell of the first row under the header named `column`. */
+  const cellUnder = (container: HTMLElement, column: string) => {
+    const index = headers(container).indexOf(column);
+    const row = container.querySelector('tbody tr') as HTMLTableRowElement;
+    return row.cells[index]?.firstElementChild as HTMLElement;
+  };
+  const renderWith = (element: RunField, value: unknown, tableColumns?: number) =>
+    render(
+      tableColumns === undefined ? (
+        <ResultField field={list('discrepancies', element)} value={value} />
+      ) : (
+        <ResultEnvProvider tableColumns={tableColumns}>
+          <ResultField field={list('discrepancies', element)} value={value} />
+        </ResultEnvProvider>
+      ),
+    );
+
+  it('shows the top of the ranking, in the order the author wrote the fields', () => {
+    const { container } = renderWith(discrepancy, rows);
+    // Five of ten: the name, then the first four fields that fit a cell whole.
+    // The ranking SELECTS; `item` is ranked first and still sits third.
+    expect(headers(container)).toEqual([
+      DEFAULT_FIELD_STRINGS.rowDetailsColumn,
+      'kind',
+      'line',
+      'item',
+      'invoiced',
+      'reference',
+    ]);
+    // What the budget left out is not on the collapsed row at all.
+    expect(screen.queryByText('Short by ten boxes')).toBeNull();
+    expect(screen.queryByText('Held for review')).toBeNull();
+  });
+
+  it('opens a row onto the whole record, the hidden fields included', async () => {
+    const { container } = renderWith(discrepancy, rows);
+    await userEvent.click(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    );
+    const detail = container.querySelector('td[colspan]') as HTMLElement;
+    expect(detail.getAttribute('colspan')).toBe('5');
+    for (const hidden of ['sources', 'remark', 'approved', 'note', 'tags']) {
+      expect(detail.textContent).toContain(hidden);
+    }
+    expect(detail.textContent).toContain('Short by ten boxes');
+    expect(detail.textContent).toContain('Held for review');
+    expect(detail.textContent).toContain('urgent');
+    expect(detail.textContent).toContain('PO-1');
+  });
+
+  it('ranks other text above prose and nesting, and keeps authored order within a tier', () => {
+    // Seven: every field that fits whole, then `remark`, the first of the
+    // third tier in authored order - ahead of `tags`, which is authored later.
+    const seven = renderWith(discrepancy, rows, 7);
+    expect(headers(seven.container).slice(1)).toEqual([
+      'kind',
+      'line',
+      'item',
+      'remark',
+      'invoiced',
+      'reference',
+      'approved',
+    ]);
+    seven.unmount();
+    // Nine: the third tier is exhausted, so the fourth begins with `sources`,
+    // the first of it in authored order - and is shown where it was written.
+    const nine = renderWith(discrepancy, rows, 9);
+    expect(headers(nine.container).slice(1)).toEqual([
+      'sources',
+      'kind',
+      'line',
+      'item',
+      'remark',
+      'invoiced',
+      'reference',
+      'approved',
+      'tags',
+    ]);
+  });
+
+  it('lets a host show every column, or only the name', () => {
+    const every = renderWith(discrepancy, rows, Infinity);
+    expect(headers(every.container).slice(1)).toEqual(discrepancy.fields.map((f) => f.name));
+    every.unmount();
+    // Below one reads as one, and the one is the record's name.
+    const none = renderWith(discrepancy, rows, 0);
+    expect(headers(none.container)).toEqual([DEFAULT_FIELD_STRINGS.rowDetailsColumn, 'item']);
+  });
+
+  it('gives the name column a floor and lets it wrap, where every other cell is one line', () => {
+    // The name is the column a reader identifies a row by, and cutting it at
+    // the cell cap is the fault this rule was built for. It wraps instead,
+    // and the floor keeps a narrow panel from squeezing it into a ribbon -
+    // which auto table layout would do first, since it is the one column that
+    // can give width back. It wraps anywhere, not only between words, or a
+    // name that is one long token still widens the table to that token. jsdom
+    // has no layout, so this pins the classes; the story `Outputs/Lists`
+    // asserts the floor holds in a browser, and `Outputs/Tables` that a name
+    // with no space in it leaves the table inside its panel.
+    const { container } = renderWith(discrepancy, rows);
+    const name = cellUnder(container, 'item');
+    expect(name.className).toContain('min-w-[16ch]');
+    expect(name.className).toContain('wrap-anywhere');
+    expect(name.className).not.toContain('wrap-break-word');
+    expect(name.className).toContain('[&>span]:whitespace-normal');
+    expect(name.className).not.toContain('truncate');
+    expect(name.className).not.toContain('max-w-[44ch]');
+    for (const other of ['kind', 'line', 'invoiced', 'reference']) {
+      expect(cellUnder(container, other).className).toContain('truncate');
+    }
+  });
+
+  it('floors no column when the record has no text field to name it', () => {
+    const numbers = object('item', ['a', 'b', 'c', 'd', 'e', 'f'].map(number));
+    const { container } = renderWith(numbers, [{ a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 }]);
+    expect(headers(container).slice(1)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(container.querySelector('tbody .min-w-\\[16ch\\]')).toBeNull();
+  });
+
+  it('offers the toggle for a hidden column even when every shown column fits whole', () => {
+    // Six bounded fields: nothing shown can be cut, but one field is only in
+    // the detail, so the row must open. Five of the same stay chevron-free.
+    const six = object('item', [bounded('code'), ...['a', 'b', 'c', 'd', 'e'].map(number)]);
+    const value = [{ code: 'R-1', a: 1, b: 2, c: 3, d: 4, e: 5 }];
+    const wide = renderWith(six, value);
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
+    wide.unmount();
+    renderWith(object('item', six.fields.slice(0, 5)), value);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('hides and moves nothing within the budget, and still lets the name wrap', () => {
+    // Five fields, the default budget: nothing is hidden, so every field is a
+    // column in authored order. The name rule is not a budget rule - a long
+    // name cut at the cap is as wrong in a narrow table as in a wide one - so
+    // the name wraps above its floor here too. Every OTHER cell keeps exactly
+    // the classes a cell had before there was a budget, and the budget changes
+    // nothing at all: an unlimited one renders the same markup.
+    const five = object('item', [
+      number('line'),
+      text('item'),
+      text('remark'),
+      choice('kind'),
+      flag('approved'),
+    ]);
+    const value = [
+      { line: 1, item: 'Hex bolt', remark: 'Short', kind: 'open', approved: true },
+      { line: 2, item: 'Washer', remark: 'Fine', kind: 'closed', approved: false },
+    ];
+    const budgeted = renderWith(five, value);
+    expect(headers(budgeted.container).slice(1)).toEqual([
+      'line',
+      'item',
+      'remark',
+      'kind',
+      'approved',
+    ]);
+    const name = cellUnder(budgeted.container, 'item');
+    expect(name.className).toContain('min-w-[16ch]');
+    expect(name.className).toContain('[&>span]:whitespace-normal');
+    expect(name.className).not.toContain('truncate');
+    for (const other of ['line', 'remark', 'kind', 'approved']) {
+      expect(cellUnder(budgeted.container, other).className).toBe('max-w-[44ch] truncate');
+    }
+    const markup = budgeted.container.innerHTML;
+    budgeted.unmount();
+    expect(renderWith(five, value, Infinity).container.innerHTML).toBe(markup);
+  });
+
+  /** A `native.Date` member: an `object` node over `{date, time}`, keyed by concept. */
+  const nativeDate = (name: string): ObjectRunField => ({
+    ...object(name, [day('date'), text('time')]),
+    conceptRef: 'native.Date',
+  });
+
+  it('ranks a native.Date member with the values that fit a cell whole', () => {
+    // Its node is an `object`, but a cell reads it as one compact date - so it
+    // ranks with the dates, not with the nested records at the bottom.
+    const record = object('item', [
+      text('item'),
+      text('a'),
+      text('b'),
+      text('c'),
+      text('d'),
+      text('e'),
+      nativeDate('due'),
+    ]);
+    const { container } = renderWith(record, [
+      { item: 'Hex bolt', due: { date: '2026-09-25', time: null } },
+    ]);
+    expect(headers(container).slice(1)).toEqual(['item', 'a', 'b', 'c', 'due']);
+    expect(cellUnder(container, 'due').textContent).toContain('2026-09-25');
+  });
+
+  it('offers no toggle when the only field that could be long is the name', () => {
+    // The name wraps whole in its cell, so an open row would show the same
+    // values again. A second unbounded field is what earns the chevron.
+    renderWith(object('item', [text('item'), number('qty'), nativeDate('due')]), [
+      { item: 'Hex bolt', qty: 3, due: { date: '2026-09-25', time: null } },
+    ]);
+    expect(screen.queryByRole('button')).toBeNull();
+    cleanup();
+    renderWith(object('item', [text('item'), text('remark')]), [
+      { item: 'Hex bolt', remark: 'Short by ten boxes' },
+    ]);
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
+  });
+
+  it('offers a toggle for a list whose cell can only count its entries', () => {
+    // Each date is short, but a list of them is not chips: the cell says how
+    // many there are, and the dates are only in the row's detail.
+    renderWith(object('item', [text('item'), list('milestones', nativeDate('item'))]), [
+      { item: 'Retrofit', milestones: [{ date: '2026-09-25', time: null }] },
+    ]);
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
+  });
+
+  it('closes an open row when a larger budget leaves it nothing to show', async () => {
+    // Six fields, the name plus five numbers: at a budget of five one number is
+    // hidden, so the row opens. Raised past six, nothing is hidden and every
+    // shown column fits, so there is no toggle - and the row must not stay open
+    // with no way to close it.
+    const record = object('item', [text('item'), ...['a', 'b', 'c', 'd', 'e'].map(number)]);
+    const value = [{ item: 'Hex bolt', a: 1, b: 2, c: 3, d: 4, e: 5 }];
+    const field = list('rows', record);
+    const { container, rerender } = render(
+      <ResultEnvProvider tableColumns={5}>
+        <ResultField field={field} value={value} />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    );
+    expect(container.querySelector('td[colspan]')).not.toBeNull();
+    rerender(
+      <ResultEnvProvider tableColumns={10}>
+        <ResultField field={field} value={value} />
+      </ResultEnvProvider>,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(container.querySelector('td[colspan]')).toBeNull();
+    expect(headers(container)).toEqual(['item', 'a', 'b', 'c', 'd', 'e']);
   });
 });
 

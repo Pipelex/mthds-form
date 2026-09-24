@@ -1,0 +1,16 @@
+domain      = "tables"
+description = "Concepts whose lists exercise the rules of a record TABLE rather than the choice of one — what a cell does with a value that does not fit it."
+
+# A list of records renders as a table whatever the records hold; the lists case
+# covers which element shape gets a table at all. This one holds records whose
+# VALUES press on the table's own rules, starting with a record whose name is a
+# single token longer than any panel is wide.
+
+[concept.Link]
+description = "One checked link — a record whose name is a full web address, one long token with no space to wrap at"
+
+[concept.Link.structure]
+url         = { type = "text", description = "The page's full address, exactly as it would be pasted into a browser", required = true }
+status      = { type = "text", description = "What the check found", required = true, choices = ["up", "redirect", "down"] }
+checked_on  = { type = "date", description = "When it was checked", required = true }
+response_ms = { type = "integer", description = "How long the page took to answer, in milliseconds", required = true }

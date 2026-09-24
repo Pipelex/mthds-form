@@ -1,5 +1,10 @@
 import type { RunField } from '../core';
-import { isNativeCompositeNode, isNativeDateNode, isNativeHtmlNode } from '../core/native-content';
+import {
+  isNativeCompositeNode,
+  isNativeDateNode,
+  isNativeHtmlNode,
+  isNativeValueNode,
+} from '../core/native-content';
 import type { Brief, PathEntry } from '../generated/layout-design/types';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
 
@@ -86,11 +91,17 @@ export function isDelegatedInput(field: RunField): boolean {
   );
 }
 
-/** On the result side, the kinds and concepts the catalog cannot show. */
+/**
+ * On the result side, the kinds and concepts the catalog cannot show.
+ *
+ * A native value is one of them, and so is a list of one: the native
+ * predicates refuse a `list` node, because a list of dates is a list and not a
+ * date, but no catalog component reads a date's `{date, time}` either, so the
+ * kernel renders the list whole - one value per line, as the result view does.
+ */
 export function isDelegatedResult(field: RunField): boolean {
-  if (isNativeHtmlNode(field) || isNativeDateNode(field) || isNativeCompositeNode(field)) {
-    return true;
-  }
+  if (isNativeValueNode(field)) return true;
+  if (field.kind === 'list' && isNativeValueNode(field.item)) return true;
   return (
     field.kind === 'document' ||
     field.kind === 'image' ||

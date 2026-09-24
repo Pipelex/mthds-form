@@ -10,7 +10,7 @@ import {
   getPipeInputForm,
   getPipeOutputForm,
 } from '../../core';
-import { inputBrief, resultBrief } from '../../generative/brief';
+import { inputBrief, isDelegatedResult, resultBrief } from '../../generative/brief';
 import { catalog } from '../../generative/catalog';
 import { fixtureId } from '../../generative/fixture';
 import { layoutProblems } from '../../generative/layout-fits';
@@ -31,6 +31,7 @@ import * as extractInvoice from '../_generated/extract_invoice';
 import { SPECS as INVOICE_SPECS } from '../_generated/extract_invoice.specs';
 import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
+import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import * as results from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 import * as scalars from '../_generated/scalars';
@@ -121,6 +122,23 @@ describe('the result loader', () => {
     );
   });
 
+  it('loads a list of native.Date as a list, passing each date through whole', () => {
+    // A plural node carries its element's concept, so the native passthrough
+    // used to take the whole list for ONE date and hand it on unloaded. The
+    // list is a list: unwrapped to an array, and each item - which IS a date -
+    // passed through for the escape hatch to render.
+    const dates = buildResultField(
+      getPipeOutputForm(lists.OUTPUT_FORM, 'lists', 'dates')!,
+      getPipeIOContract(lists.CONTRACTS, 'lists', 'dates')!.output.json_schema,
+    );
+    const payload = LIST_PAYLOADS['lists.dates'] as { items: unknown[] };
+    expect(payloadToState(dates, payload)).toEqual(payload.items);
+    // And the brief delegates the list whole, so the escape hatch at /result
+    // is handed exactly this array - the one shape the kernel renders.
+    expect(isDelegatedResult(dates)).toBe(true);
+    expect(dates.kind === 'list' && isDelegatedResult(dates.item)).toBe(true);
+  });
+
   it('seeds only authored defaults', () => {
     const contractWithDefault = getPipeIOContract(
       structured.CONTRACTS,
@@ -198,6 +216,43 @@ describe('the briefs', () => {
     expect(entry('unit_price')).toMatchObject({ kind: 'number', relative: true, depth: 3 });
     expect(brief.sample_state).toContain('"issued_on": "2026-03-14"');
     expect(brief.sample_state).not.toContain('__class__');
+  });
+
+  describe('delegate a list of native dates whole', () => {
+    // A list of `native.Date` is a list, so the native predicates refuse it -
+    // but no catalog component reads a date's `{date, time}` either, so the
+    // brief hands the whole list to the kernel rather than offering its items
+    // to a repeat.
+    const contract = getPipeIOContract(lists.CONTRACTS, 'lists', 'dates')!;
+    const field = buildResultField(
+      getPipeOutputForm(lists.OUTPUT_FORM, 'lists', 'dates')!,
+      contract.output.json_schema,
+    );
+    const state = payloadToState(field, LIST_PAYLOADS['lists.dates']);
+    const brief = resultBrief({ pipeRef: 'lists.dates' }, field, state);
+
+    it('as one delegated entry at the root, named a list of dates', () => {
+      expect(brief.paths).toEqual([
+        expect.objectContaining({
+          depth: 0,
+          path: '/result',
+          kind: 'list of date (native.Date)',
+          delegated: true,
+        }),
+      ]);
+    });
+
+    it('with no item for a repeat to lay out', () => {
+      const [root] = brief.paths;
+      expect(root?.item_laid_out).toBeUndefined();
+      expect(root?.item_kind).toBeUndefined();
+      expect(brief.paths.some((entry) => entry.relative)).toBe(false);
+    });
+
+    it('beside the state the escape hatch then renders: every date, whole', () => {
+      expect(Array.isArray(state)).toBe(true);
+      expect(JSON.parse(brief.sample_state ?? 'null')).toEqual(state);
+    });
   });
 });
 

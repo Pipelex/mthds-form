@@ -41,11 +41,15 @@ Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may 
 
 ### The lists corpus
 
-`data/structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table that scrolls), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
+`data/structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table of its top-ranked columns, whose rows open onto the rest), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
 
 It is a separate case rather than more pipes in `results` because the branches ARE the subject: a corpus that only ever met one of them proves nothing about the others, and the layout rules are the part most likely to be got wrong by someone who has only seen a two-row table.
 
 The gallery pins an image model explicitly (`options = { model = "$gen-image-testing" }`): the deck's default image backend refuses more than one image per call, so an `Image[3]` output needs one that does not.
+
+### The tables corpus
+
+`data/structures/tables.mthds` takes the table as given and holds values that press on its own rules, the ones about what a cell does with a value rather than whether a list is a table at all. Its one pipe is a link checker's report, a record named by a web address, and some of those addresses carry a single word wider than the panel the stories render in: the value the name cell has to wrap without widening the table. The stories are `Outputs/Tables`, and their assertions measure the rendered widths, because a rule about a cell is a rule about layout and jsdom lays nothing out.
 
 ### Files, and the one payload the corpus cannot produce
 

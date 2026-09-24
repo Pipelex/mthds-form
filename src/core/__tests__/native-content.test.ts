@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { isViewableUrl, readDataUrl, viewableUrl } from '../native-content';
+import { CONTRACTS, OUTPUT_FORM } from '../../__stories__/_generated/lists';
+import { getPipeIOContract } from '../contracts';
+import type { RunField } from '../descriptor';
+import { buildResultField } from '../derive';
+import {
+  isNativeCompositeNode,
+  isNativeDateNode,
+  isNativeHtmlNode,
+  isViewableUrl,
+  readDataUrl,
+  viewableUrl,
+} from '../native-content';
+import { getPipeOutputForm } from '../output-form';
 
 describe('isViewableUrl and same-origin paths', () => {
   it('accepts a root-relative path, which is what a host resolver returns', () => {
@@ -201,5 +213,48 @@ describe('readDataUrl', () => {
     expect(readDataUrl('pipelex-storage://org/x.pdf')).toBeUndefined();
     expect(readDataUrl('https://example.com/data:x')).toBeUndefined();
     expect(readDataUrl('data:application/pdf;base64')).toBeUndefined();
+  });
+});
+
+describe('a native predicate answers for the node, never for a list of it', () => {
+  // A plural node's `concept_ref` is its ELEMENT's, multiplicity stripped, so a
+  // `native.Date[]` result is a list whose concept reads `native.Date`. Built
+  // from the committed `lists.dates` fixture, which is exactly that result.
+  const dates = buildResultField(
+    getPipeOutputForm(OUTPUT_FORM, 'lists', 'dates')!,
+    getPipeIOContract(CONTRACTS, 'lists', 'dates')!.output.json_schema,
+  );
+
+  it('reads a native.Date list as a list, and its item as the date', () => {
+    expect(dates.kind).toBe('list');
+    expect(dates.conceptRef).toBe('native.Date');
+    expect(isNativeDateNode(dates)).toBe(false);
+    expect(dates.kind === 'list' && isNativeDateNode(dates.item)).toBe(true);
+  });
+
+  it('refuses a list for the other two natives as well', () => {
+    // No committed fixture holds a list of either, so these are unit inputs:
+    // the same wrap a producer applies, over the element each concept derives to.
+    const html: RunField = {
+      kind: 'object',
+      name: 'page',
+      conceptRef: 'native.Html',
+      required: true,
+      fields: [],
+    };
+    const composite: RunField = {
+      kind: 'unknown',
+      name: 'bag',
+      conceptRef: 'native.Composite',
+      required: true,
+    };
+    for (const [element, predicate] of [
+      [html, isNativeHtmlNode],
+      [composite, isNativeCompositeNode],
+    ] as const) {
+      const plural: RunField = { ...element, kind: 'list', item: element };
+      expect(predicate(element)).toBe(true);
+      expect(predicate(plural)).toBe(false);
+    }
   });
 });
