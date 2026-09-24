@@ -45,6 +45,10 @@ Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may 
 
 It is a separate case rather than more pipes in `results` because the branches ARE the subject: a corpus that only ever met one of them proves nothing about the others, and the layout rules are the part most likely to be got wrong by someone who has only seen a two-row table.
 
+### The readability corpus
+
+`data/structures/readability.mthds` is a third result case, and its subject is how a VALUE reads rather than how a result is laid out: one invoice checked against its purchase order, carrying coded choices in snake_case and in capitals, amounts above and below 1, a one-line `text`, and a Markdown memo held by a plain unbounded `text` field, with the same again in a list of records. The stories are `Outputs/Readability`, which render that run's enum values as codes in `studio` and as words in `app`, and which take two of the `results` payloads into `app` beside their `studio` renderings. The memo is Markdown because the run's note asked for it, which is what a method does, so the capture is a real model's answer rather than a shape written to suit a story. See [result-view.md](result-view.md) § "Labels and enum values follow the presentation".
+
 The gallery pins an image model explicitly (`options = { model = "$gen-image-testing" }`): the deck's default image backend refuses more than one image per call, so an `Image[3]` output needs one that does not.
 
 ### The tables corpus

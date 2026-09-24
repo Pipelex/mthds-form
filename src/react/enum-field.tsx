@@ -7,6 +7,7 @@ import type { EnumRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { useFieldDomId } from './field-dom-id';
+import { enumLabeler, fieldLabel, useFieldPresentation } from './field-presentation';
 
 interface EnumFieldProps {
   field: EnumRunField;
@@ -29,10 +30,21 @@ const CLEAR_VALUE = '__none__';
  * Pick-one. A short option set (≤4, each label brief) renders as a segmented
  * control - every choice visible at a glance - and falls back to a select once
  * the set grows past what fits on a row.
+ *
+ * An option's LABEL follows the presentation and its value does not. In `app`
+ * a person picks "Unit price differs from po" and the form stores
+ * `unit_price_differs_from_po`, because the result that run produces shows the
+ * same field in words too, and a form and its result have to read the same
+ * way - which is why both apply one rule, including its fallback to the codes
+ * when two options would read the same. The segmented rule measures the label
+ * it shows, which is the text that has to fit on the row.
  */
 export function EnumField({ field, value, onChange, id, error, disabled }: EnumFieldProps) {
   const s = useFieldStrings();
-  const isSegmented = field.options.length <= 4 && field.options.every((o) => o.length <= 16);
+  const presentation = useFieldPresentation();
+  const labelOf = enumLabeler(field.options, presentation);
+  const isSegmented =
+    field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
   const domId = useFieldDomId(id);
 
   return (
@@ -55,7 +67,10 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
           value={value ?? ''}
           onValueChange={(next) => onChange(next === '' ? undefined : next)}
           disabled={disabled}
-          aria-label={field.title ?? field.name}
+          // The group is named with the label the field SHOWS, so a screen
+          // reader announces "Risk level" where the page reads it, not the
+          // `risk_level` identifier behind it in `app`.
+          aria-label={fieldLabel(field.title, field.name, presentation)}
           className="flex flex-wrap justify-start gap-1.5"
         >
           {field.options.map((option) => (
@@ -68,7 +83,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
               {value === option && (
                 <Check className="size-3.5 text-primary" strokeWidth={2.5} aria-hidden="true" />
               )}
-              {option}
+              {labelOf(option)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -85,7 +100,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
             <SelectItem value={CLEAR_VALUE}>{s.selectPlaceholder}</SelectItem>
             {field.options.map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {labelOf(option)}
               </SelectItem>
             ))}
           </SelectContent>

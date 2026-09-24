@@ -1,0 +1,18 @@
+{
+  "description": "A pipe whose RESULT is written for a reader rather than for a builder: an invoice checked against its purchase order, carrying coded choices in snake_case and in capitals, amounts above and below 1, a one-line text, and a Markdown memo held by a plain `text` field. It carries a 'run' block, so `make fixtures-runs` produces the real payload beside the descriptor.",
+  "pipes": [
+    {
+      "code": "invoice_check",
+      "output": "InvoiceCheck",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Check supplier invoice INV-7731 from Harbor Pumps Ltd against purchase order PO-2291.\nInvoice lines: 3 centrifugal pumps at 612.40 EUR each, where the purchase order agreed 609.84 EUR each; 1 installation kit at 279.00 EUR, exactly as ordered.\nThe invoice asks for 2116.20 EUR in total. The unit-price variance on the pumps is 0.0042 as a fraction.\nThe supplier is new and the price differs from the order, so hold the invoice for review and rate the risk as high.\nWrite the memo for the approver in Markdown: a level-two heading, one short paragraph, and a table with the columns Item, Invoiced and Ordered.\nWrite each line's note as one short Markdown sentence with its key figure in bold."
+      }
+    }
+  ]
+}

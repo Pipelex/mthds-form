@@ -17,7 +17,7 @@
  * generated corpus is asserted in its own stories.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
   BooleanRunField,
@@ -1376,6 +1376,22 @@ describe('a text value can always be copied', () => {
   it('offers none on a value that is not text', () => {
     render(<ResultField field={number('total')} value={42} />);
     expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText })).toBeNull();
+  });
+
+  it('clears the timer that reverts its check mark when it unmounts', async () => {
+    // A timer left running fires into a component that is gone - and, in a
+    // test run, into a document that has been torn down.
+    const set = vi.spyOn(window, 'setTimeout');
+    const clear = vi.spyOn(window, 'clearTimeout');
+    const { unmount } = render(<ResultField field={text('reference')} value="INV-2026-0042" />);
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText }));
+    await waitFor(() => expect(set).toHaveBeenCalledWith(expect.any(Function), 1500));
+    const index = set.mock.calls.findIndex(([, delay]) => delay === 1500);
+    const timer = set.mock.results[index]!.value;
+    unmount();
+    expect(clear).toHaveBeenCalledWith(timer);
+    set.mockRestore();
+    clear.mockRestore();
   });
 });
 

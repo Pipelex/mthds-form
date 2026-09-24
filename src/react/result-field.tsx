@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import type { ObjectRunField, RunField } from '../core';
+import type { EnumRunField, ObjectRunField, RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import type { CompositeMember, DocumentContentView } from '../core/native-content';
 import {
@@ -37,7 +37,13 @@ import { HtmlPreview } from './html-preview';
 import { Markdown } from './markdown';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
-import { fieldLabel, humanizeFieldName, useFieldPresentation } from './field-presentation';
+import {
+  enumLabeler,
+  fieldLabel,
+  humanizeFieldName,
+  useFieldPresentation,
+  type FieldPresentation,
+} from './field-presentation';
 import { cn } from './utils';
 
 /**
@@ -276,6 +282,46 @@ function DateValue({ value }: { value: unknown }) {
 }
 
 /**
+ * An enum value: its code in `studio`, its code in words in `app`.
+ *
+ * A builder's view shows `unit_price_differs_from_po`, because that is what the
+ * bundle and the JSON say and what the builder will search for next. A method
+ * app's reader has seen neither, and gets "Unit price differs from po" - in a
+ * stacked row, a table cell and a chip alike, which is why this is an arm of
+ * `LeafValue` rather than something one layout does. The wording is
+ * `enumLabeler`'s, the same rule `EnumField` offers its options under, so a
+ * result reads as the form that produced it did, codes included when two
+ * options would read the same. Only a string is worded; anything else is the
+ * payload disagreeing with its descriptor, and is shown as it is.
+ */
+function EnumValue({
+  field,
+  value,
+  compact,
+}: {
+  field: EnumRunField;
+  value: unknown;
+  compact: boolean;
+}) {
+  const presentation = useFieldPresentation();
+  const shown = typeof value === 'string' ? enumLabeler(field.options, presentation)(value) : value;
+  return <Scalar value={shown} compact={compact} />;
+}
+
+/**
+ * A table cell's tooltip: the value as the cell shows it. A cell is truncated
+ * past its width cap, and the tooltip is then the only way to read it whole,
+ * so an enum cell's tooltip carries the same `enumLabeler` label as the cell
+ * rather than the code the payload holds. Every other kind keeps the payload's
+ * text.
+ */
+function cellTitle(column: RunField, cell: string | number, presentation: FieldPresentation) {
+  return column.kind === 'enum' && typeof cell === 'string'
+    ? enumLabeler(column.options, presentation)(cell)
+    : String(cell);
+}
+
+/**
  * The name to put on a file: what it is CALLED, not where it lives.
  *
  * A `pipelex-storage://` reference is ninety characters of UUID and hash, and
@@ -343,6 +389,14 @@ function CopyButton({
   title?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  // The check mark reverts after a moment. The timer belongs to the effect, so
+  // it is cleared when the control unmounts rather than firing into a
+  // component, or a document, that is gone.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   if (typeof navigator === 'undefined' || !navigator.clipboard) return null;
   return (
     <button
@@ -355,10 +409,7 @@ function CopyButton({
         // keeps the write inside the gesture. `writeText` stays the path where
         // there is nothing to mint, and the fallback covers a browser without
         // `ClipboardItem`.
-        const done = () => {
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1500);
-        };
+        const done = () => setCopied(true);
         if (!provide) {
           void navigator.clipboard.writeText(value ?? '').then(done);
           return;
@@ -901,6 +952,8 @@ function LeafValue({
       // reaches here - `ResultField` lays a record out as its own grid - so the
       // non-compact arm is only the payload-disagrees floor every kind has.
       return compact ? <RecordSummary field={field} value={value} /> : <Scalar value={value} />;
+    case 'enum':
+      return <EnumValue field={field} value={value} compact={compact} />;
     default:
       return <Scalar value={value} compact={compact} />;
   }
@@ -1374,7 +1427,7 @@ function ObjectTable({
                                   : 'truncate',
                             )}
                             {...(typeof cell === 'string' || typeof cell === 'number'
-                              ? { title: String(cell) }
+                              ? { title: cellTitle(column, cell, presentation) }
                               : {})}
                           >
                             <LeafValue field={column} value={cell} compact />
