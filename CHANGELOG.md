@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [v0.11.0] - 2026-09-24
+
+### Highlights
+
+- **A file field offers exactly the ways in its host supports.** With no upload path it offers a link instead of a dropzone that dropped the picked file in silence, and a host can now take the link away with `allowUrl`.
+- **A failed upload is shown on the field that took the file**, through `uploadErrors`, rather than under the whole form.
 
 ### Added
 
