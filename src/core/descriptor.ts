@@ -13,6 +13,7 @@
  */
 
 import type { InputPresence } from './contracts';
+import type { FileFormat } from './file-formats';
 
 export type RunFieldKind =
   | 'text' // short single-line string
@@ -142,8 +143,18 @@ export interface EnumRunField extends RunFieldCommon {
 
 export interface FileRunField extends RunFieldCommon {
   kind: 'document' | 'image';
-  /** Accept hint shown to the user, e.g. "PDF, PNG, JPG". */
-  accept?: string;
+  /**
+   * The formats this slot accepts, in the order the hint names them. The ONE
+   * list the file control reads for all three of its answers - the hint under
+   * the dropzone, the OS picker's filter and the check a picked or dropped file
+   * must pass - so none of them can promise what another refuses.
+   *
+   * Not a wire fact: which bytes a runtime can decode is a property of the
+   * runtime, so `buildRunFields` stamps the kind's whole table here
+   * (`formatsForKind`), and a host whose own upload path takes less narrows the
+   * tree with `narrowFileFormats`.
+   */
+  formats: readonly FileFormat[];
 }
 
 export interface ObjectRunField extends RunFieldCommon {

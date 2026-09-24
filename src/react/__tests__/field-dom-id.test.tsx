@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { FileRunField, ObjectRunField, TextRunField } from '../../core';
+import { DOCUMENT_FORMATS } from '../../core/file-formats';
 import { FieldRenderer } from '../field-renderer';
 import { FieldDomIdProvider } from '../field-dom-id';
 
@@ -33,7 +34,7 @@ const doc: FileRunField = {
   name: 'cv',
   conceptRef: 'native.Document',
   required: true,
-  accept: 'PDF',
+  formats: DOCUMENT_FORMATS,
 };
 
 const brief: ObjectRunField = {

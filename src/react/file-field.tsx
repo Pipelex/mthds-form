@@ -7,7 +7,7 @@ import { cn } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
-import { acceptMapForKind, isAcceptedFile } from '../core/file-formats';
+import { acceptLabel, acceptMap, isAcceptedFile } from '../core/file-formats';
 import { viewableUrl } from '../core/native-content';
 import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
@@ -140,9 +140,18 @@ function FileField({
    */
   const [rejected, setRejected] = useState<string | null>(null);
 
+  // The field's own list, read three times below: the hint, the OS picker's
+  // filter and the check in `handleFile`. All three used to be computed apart -
+  // the hint from a label on the field, the filter and the check from the
+  // kind's table - so a host that rewrote the label moved the hint alone, and
+  // the picker went on offering files its server would refuse.
+  const formats = field.formats;
+  const hint = acceptLabel(formats);
+  const accept = useMemo(() => acceptMap(formats), [formats]);
+
   const handleFile = useCallback(
     (file: File) => {
-      if (!isAcceptedFile(field.kind, file)) {
+      if (!isAcceptedFile(formats, file)) {
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
         // runtime cannot decode has no business reaching it.
@@ -153,7 +162,7 @@ function FileField({
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
       onDropFile(file);
     },
-    [field.kind, setLocal, onDropFile],
+    [formats, setLocal, onDropFile],
   );
 
   const busy = disabled || uploading;
@@ -167,7 +176,7 @@ function FileField({
     // entirely, and a browser reporting an empty `File.type` slips through
     // react-dropzone's own matcher. `handleFile` is where the answer is
     // decided; this is the affordance in front of it.
-    accept: acceptMapForKind(field.kind),
+    accept,
     // The tab stop belongs on the INPUT, not on this div - see the root element
     // below. Without this, react-dropzone puts `tabIndex: 0` and its own key
     // handlers on a `role="presentation"` div, and the element a keyboard or
@@ -376,9 +385,7 @@ function FileField({
                 <p className="text-[13px] text-foreground">
                   {isDragActive ? s.dropToUpload : s.dropOrBrowse}
                 </p>
-                {field.accept && (
-                  <p className="font-mono text-[10.5px] text-muted-foreground">{field.accept}</p>
-                )}
+                {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
               </div>
             </>
           )}
@@ -392,8 +399,7 @@ function FileField({
           generic complaint. */}
       {rejected && !busy && (
         <p role="alert" className="text-[12px] text-destructive">
-          <span className="font-mono">{rejected}</span> —{' '}
-          {s.unsupportedFileType(field.accept ?? '')}
+          <span className="font-mono">{rejected}</span> — {s.unsupportedFileType(hint)}
         </p>
       )}
 

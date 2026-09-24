@@ -33,7 +33,7 @@ import type { PipeInputFormDescriptor } from 'mthds/protocol';
 import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
 
 import { buildPipeRef, type PipeInputContract } from './contracts';
-import { acceptLabelForKind } from './file-formats';
+import { formatsForKind } from './file-formats';
 import type { RunField, RunFieldCommon } from './descriptor';
 import { ownProp } from './own-property';
 import { collectSchemaDefs, resolveSchemaNode, type JsonSchema } from './schema-utils';
@@ -184,14 +184,17 @@ function mapNode(
       return { ...common, kind: 'enum', options: node.choices.map(String) };
     case 'document':
     case 'image':
-      // `accept` is a renderer-side affordance the wire deliberately does not
+      // `formats` is a renderer-side affordance the wire deliberately does not
       // state - which bytes a runtime can decode is a property of the runtime,
       // not of the method. The list is therefore ours, and it is one table
-      // (`./file-formats`) rather than a literal here, so the label a user reads
-      // and the filter the dropzone enforces cannot disagree. They used to: this
-      // line advertised `TXT`, which no DocumentFormat covers, and omitted PPTX,
-      // which is one.
-      return { ...common, kind: node.kind, accept: acceptLabelForKind(node.kind) };
+      // (`./file-formats`) rather than a literal here. The field carries the
+      // LIST, not a label made from it, so the hint a user reads, the filter the
+      // dropzone applies and the check it enforces all read one value and cannot
+      // disagree - and a host narrowing it (`narrowFileFormats`) moves all three.
+      // They used to disagree: this line advertised `TXT`, which no format
+      // covered, and later the hint was a label while the filter and the check
+      // went back to the kind's table, so rewriting the label moved nothing else.
+      return { ...common, kind: node.kind, formats: formatsForKind(node.kind) };
     case 'object': {
       const props = schema?.properties as Record<string, JsonSchema> | undefined;
       return {

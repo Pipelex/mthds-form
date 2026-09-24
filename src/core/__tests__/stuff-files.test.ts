@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { collectStuffFiles } from '../stuff-files';
 import type { RunField } from '../descriptor';
+import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../file-formats';
 
 const image = (name: string): RunField => ({
   kind: 'image',
   name,
   conceptRef: 'native.Image',
   required: true,
+  formats: IMAGE_FORMATS,
 });
 
 const document_ = (name: string): RunField => ({
@@ -14,6 +16,7 @@ const document_ = (name: string): RunField => ({
   name,
   conceptRef: 'native.Document',
   required: true,
+  formats: DOCUMENT_FORMATS,
 });
 
 const text = (name: string): RunField => ({

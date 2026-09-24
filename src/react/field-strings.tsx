@@ -90,10 +90,11 @@ export interface FieldStrings {
   no: string;
   /**
    * Shown when a picked file is not a format this slot accepts. Takes the
-   * accept label so the message names what WOULD have worked - "not accepted"
-   * on its own leaves the user guessing at the list they just failed.
+   * slot's own formats as the hint names them (`PNG, JPG`), after any narrowing
+   * a host applied, so the message names what WOULD have worked - "not
+   * accepted" on its own leaves the user guessing at the list they just failed.
    */
-  unsupportedFileType: (accept: string) => string;
+  unsupportedFileType: (formats: string) => string;
   /** The optional-entries disclosure ("field" inside a concept, "input" at top level). */
   hideOptionalFields: string;
   hideOptionalInputs: string;
@@ -148,7 +149,8 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   resultViewGroup: 'Result view',
   yes: 'Yes',
   no: 'No',
-  unsupportedFileType: (accept) => `That file type is not supported. Accepted formats: ${accept}.`,
+  unsupportedFileType: (formats) =>
+    `That file type is not supported. Accepted formats: ${formats}.`,
   hideOptionalFields: 'Hide optional fields',
   hideOptionalInputs: 'Hide optional inputs',
   optionalFieldsCount: (count) => (count === 1 ? '1 optional field' : `${count} optional fields`),

@@ -12,6 +12,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField } from '../../core';
+import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
+import { narrowFileFormats } from '../../core/narrow-file-formats';
 import { DocumentField, ImageField, type FileValue } from '../file-field';
 
 const field: FileRunField = {
@@ -19,7 +21,7 @@ const field: FileRunField = {
   name: 'cv',
   conceptRef: 'native.Document',
   required: true,
-  accept: 'PDF',
+  formats: DOCUMENT_FORMATS,
 };
 
 const noop = () => {};
@@ -377,7 +379,7 @@ describe('a file the slot cannot accept never reaches the host', () => {
     drop(zip());
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('archive.zip');
-    expect(alert).toHaveTextContent('PDF');
+    expect(alert).toHaveTextContent('Accepted formats: PDF, JPG, PNG.');
   });
 
   /**
@@ -413,6 +415,7 @@ describe('a file the slot cannot accept never reaches the host', () => {
   it('offers the accepted types to the OS picker', () => {
     renderField();
     // The attribute is the affordance; `isAcceptedFile` is the enforcement.
+    // Both read the field's `formats`, as the hint does.
     // Both have to be right, and only this one is visible in the DOM.
     expect(fileInput().accept).toContain('application/pdf');
     expect(fileInput().accept).toContain('image/png');
@@ -420,6 +423,85 @@ describe('a file the slot cannot accept never reaches the host', () => {
     // The two that a run proves fail, and that this table used to advertise.
     expect(fileInput().accept).not.toContain('wordprocessingml');
     expect(fileInput().accept).not.toContain('presentationml');
+  });
+});
+
+describe('a narrowed slot gives one answer in all three places', () => {
+  /**
+   * The hint, the OS picker's filter and the check a dropped file must pass
+   * used to be computed apart: the hint from a label on the field, the other
+   * two from the kind's table. A host that narrowed the label moved the hint
+   * alone, and the picker went on offering files its server would refuse. All
+   * three now read `field.formats`, so narrowing it moves all three.
+   */
+  const imageField: FileRunField = {
+    kind: 'image',
+    name: 'photo',
+    conceptRef: 'native.Image',
+    required: true,
+    formats: IMAGE_FORMATS,
+  };
+  const [narrowed] = narrowFileFormats([imageField], ['image/png', 'image/jpeg']) as [FileRunField];
+
+  const renderImage = (onDropFile: (file: File) => void = noop) =>
+    render(
+      <ImageField
+        field={narrowed}
+        value={undefined}
+        onDropFile={onDropFile}
+        onChange={noop}
+        id="photo"
+      />,
+    );
+  const photoInput = () => screen.getByLabelText('photo') as HTMLInputElement;
+  const drop = (file: File) => {
+    const root = document.querySelector('[role="presentation"]');
+    if (!root) throw new Error('no dropzone root');
+    fireEvent.drop(root, { dataTransfer: { files: [file], types: ['Files'] } });
+  };
+
+  it('names only the narrowed formats in the hint', () => {
+    renderImage();
+    expect(screen.getByText('PNG, JPG')).toBeInTheDocument();
+  });
+
+  it('offers only the narrowed formats to the OS picker', () => {
+    renderImage();
+    expect(photoInput().accept).toContain('image/png');
+    expect(photoInput().accept).toContain('image/jpeg');
+    expect(photoInput().accept).not.toContain('image/webp');
+    expect(photoInput().accept).not.toContain('.webp');
+  });
+
+  it('refuses a WEBP, though the kind takes one, and names the narrowed list', async () => {
+    const onDropFile = vi.fn();
+    renderImage(onDropFile);
+    drop(new File(['webp'], 'holiday.webp', { type: 'image/webp' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('holiday.webp');
+    expect(alert).toHaveTextContent('Accepted formats: PNG, JPG.');
+    expect(onDropFile).not.toHaveBeenCalled();
+  });
+
+  it('refuses it in the check too, where the picker filter cannot see it', async () => {
+    // A `.png` name carrying a WEBP type passes react-dropzone's matcher, which
+    // takes the extension OR the MIME type, and arrives at `handleFile`. The
+    // kind's table would take it there - WEBP is an image format - so only a
+    // check reading the narrowed list refuses it.
+    const onDropFile = vi.fn();
+    renderImage(onDropFile);
+    drop(new File(['webp'], 'holiday.png', { type: 'image/webp' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('holiday.png');
+    expect(onDropFile).not.toHaveBeenCalled();
+  });
+
+  it('still takes a format the list kept', async () => {
+    const onDropFile = vi.fn();
+    renderImage(onDropFile);
+    drop(new File(['png'], 'holiday.png', { type: 'image/png' }));
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 
