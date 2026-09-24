@@ -49,7 +49,7 @@ A field with no `contentKey` keeps its value plain, and that is equally delibera
 
 ### `./react` — the control set (`src/react/`)
 
-`FieldRenderer` is the single dispatch point: a `RunField` in, the matching control out. Object and list fields recurse back through it, so a form of any depth is one data-driven tree with no per-type branching anywhere else. `FieldEnv` threads the ambient concerns a nested field may need — disabled state, and the upload trio (`onDropFile`, `uploadingIds`, `resolveUrl`) that keeps file handling injected rather than built in. The package never uploads anything itself.
+`FieldRenderer` is the single dispatch point: a `RunField` in, the matching control out. Object and list fields recurse back through it, so a form of any depth is one data-driven tree with no per-type branching anywhere else. `FieldEnv` threads the ambient concerns a nested field may need — disabled state, and the upload seam (`onDropFile`, `uploadingIds`, `uploadErrors`, `resolveUrl`, `allowUrl`) that keeps file handling injected rather than built in, and decides which ways into a file value a field offers ([upload-seam.md](upload-seam.md)). The package never uploads anything itself.
 
 These seams keep the controls host-agnostic:
 

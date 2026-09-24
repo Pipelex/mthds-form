@@ -87,6 +87,14 @@ Before rendering, the harness runs the two checks a host runs (`validateAgainstC
 
 **Brands.** The same layout, painted from tokens that are not this package's, is what says whether the page reads on its own. Two of them live in `src/__stories__/generative/brands/` as story fixtures — carried over verbatim from the study branch, reproducible by no pass here, and shipped in nothing. See [theming.md](theming.md) § "Someone else's tokens".
 
+## The harnesses upload
+
+A file field offers a dropzone only when its host supplies `onDropFile` ([upload-seam.md](upload-seam.md) § "Which ways into a file value a host offers"), so both story harnesses supply one, as a host that uploads does. `CaseForm` writes a picked or dropped file back at its field's path, recovered from the `<pipeCode>-<path>` id, through `setValueAtPath`, and `LayoutPage` writes it at the store path `pathFromDomId` recovers. The value written is `{ url, filename }` with a `blob:` URL standing in for the stored reference, so a dropped file fills its field in a story, which no story could show before.
+
+Neither harness used to supply one. Every file story was therefore painting the silent dropzone, a control that took a file and dropped it without a word, as a file field's normal state, and nothing in the suite could have noticed.
+
+`CaseForm` also takes `uploadErrors`, keyed by the same ids, because its own upload never fails and a story has to state the failure it shows; `UploadFailed` is built on it. And it takes two switches for the stories about a host that offers less: `upload: false` supplies no `onDropFile`, and every file field turns link-only; `allowUrl: false` takes the "paste a URL instead" link away. The `Inputs/Files` stories `LinkOnlyDocument`, `LinkOnlyImage`, `LinkOnlyManyFiles`, `LinkOnlyApp` and `UploadOnly` are built on them, and their play functions assert what the rule promises: no file input and a named link input described by its line on the first four, no toggle on the last.
+
 ## What a file slot accepts
 
 Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, `buildRunFields` stamps it on each file field as `formats`, and the hint under a dropzone, the filter it hands the picker and the check it enforces all read that one list, so they cannot disagree. A host whose upload path takes less narrows the list with `narrowFileFormats`, and the `Inputs/Files` stories show a narrowed slot beside a plain one ([upload-seam.md](upload-seam.md)).
