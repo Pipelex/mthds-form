@@ -93,7 +93,7 @@ A file field offers a dropzone only when its host supplies `onDropFile` ([upload
 
 Neither harness used to supply one. Every file story was therefore painting the silent dropzone, a control that took a file and dropped it without a word, as a file field's normal state, and nothing in the suite could have noticed.
 
-`CaseForm` takes two switches for the stories about a host that offers less: `upload: false` supplies no `onDropFile`, and every file field turns link-only; `allowUrl: false` takes the "paste a URL instead" link away. The `Inputs/Files` stories `LinkOnlyDocument`, `LinkOnlyImage`, `LinkOnlyManyFiles`, `LinkOnlyApp` and `UploadOnly` are built on them, and their play functions assert what the rule promises: no file input and a named link input described by its line on the first four, no toggle on the last.
+`CaseForm` also takes `uploadErrors`, keyed by the same ids, because its own upload never fails and a story has to state the failure it shows; `UploadFailed` is built on it. And it takes two switches for the stories about a host that offers less: `upload: false` supplies no `onDropFile`, and every file field turns link-only; `allowUrl: false` takes the "paste a URL instead" link away. The `Inputs/Files` stories `LinkOnlyDocument`, `LinkOnlyImage`, `LinkOnlyManyFiles`, `LinkOnlyApp` and `UploadOnly` are built on them, and their play functions assert what the rule promises: no file input and a named link input described by its line on the first four, no toggle on the last.
 
 ## What a file slot accepts
 

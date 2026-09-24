@@ -50,6 +50,12 @@ interface FileFieldProps {
   id: string;
   /** Parent-driven async state. */
   uploading?: boolean;
+  /**
+   * Why the host's upload of this field's file failed. Shown in the alert slot
+   * a refused format uses, and hidden by the user's next pick, link or clear
+   * until the host sends a different message, or removes it and sends it again.
+   */
+  uploadError?: string;
   /** Resolve a `pipelex-storage://` URI to a viewable URL (stored-file preview). */
   resolveUrl?: (uri: string) => Promise<string | null>;
   error?: string;
@@ -149,6 +155,7 @@ function FileField({
   onChange,
   id,
   uploading,
+  uploadError,
   resolveUrl,
   error,
   disabled,
@@ -189,6 +196,31 @@ function FileField({
    */
   const [rejected, setRejected] = useState<string | null>(null);
 
+  /**
+   * The host's upload failure the user has since acted past, by the message it
+   * carried.
+   *
+   * The slot shows whichever of a refusal and a failure came from the user's
+   * latest action; the two never both belong to the current file, since a
+   * refused file never reaches the host. So a pick, a typed link or a clear
+   * sets this to the message on screen, which hides it, and a message the host
+   * sends that differs from it shows. The host removing its entry forgets the
+   * dismissal, so the same message sent again after the next failed attempt
+   * shows too.
+   */
+  const [dismissedUploadError, setDismissedUploadError] = useState<string | null>(null);
+  useEffect(() => {
+    if (uploadError === undefined) setDismissedUploadError(null);
+    // A failure arriving after a refusal is the newer answer, so it takes the
+    // slot rather than sitting behind a refusal the user has seen.
+    else setRejected(null);
+  }, [uploadError]);
+  const dismissUploadError = useCallback(() => {
+    setDismissedUploadError(uploadError ?? null);
+  }, [uploadError]);
+  const failure =
+    uploadError !== undefined && uploadError !== dismissedUploadError ? uploadError : null;
+
   // The field's own list, read three times below: the hint, the OS picker's
   // filter and the check in `handleFile`. All three used to be computed apart -
   // the hint from a label on the field, the filter and the check from the
@@ -209,6 +241,7 @@ function FileField({
       // file can never be taken with nowhere to go - the bug this guards is a
       // picked file handed to a callback that did nothing, in silence.
       if (!onDropFile) return;
+      dismissUploadError();
       if (!isAcceptedFile(formats, file)) {
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
@@ -220,7 +253,7 @@ function FileField({
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
       onDropFile(file);
     },
-    [formats, setLocal, onDropFile],
+    [formats, setLocal, onDropFile, dismissUploadError],
   );
 
   const busy = disabled || uploading;
@@ -252,7 +285,9 @@ function FileField({
     // refused file.
     onDropRejected: (rejections) => {
       const name = rejections[0]?.file.name;
-      if (name) setRejected(name);
+      if (!name) return;
+      dismissUploadError();
+      setRejected(name);
     },
   });
 
@@ -261,8 +296,9 @@ function FileField({
     setResolved(null);
     setPreviewOpen(false);
     setRejected(null);
+    dismissUploadError();
     onChange(undefined);
-  }, [setLocal, onChange]);
+  }, [setLocal, onChange, dismissUploadError]);
 
   // Whether the local preview still describes the value on screen. Computed in
   // render rather than left to the effect below, so the frame in which the host
@@ -522,16 +558,25 @@ function FileField({
         </div>
       )}
 
-      {/* The refusal. `role="alert"` because it appears in response to something
-          the user just did and is the only feedback that the action had no
-          effect - a screen-reader user who drops a .zip otherwise gets silence.
-          It names the file so the message is about the thing they picked, not a
-          generic complaint. */}
-      {rejected && !busy && (
-        <p role="alert" className="text-[12px] text-destructive">
-          <span className="font-mono">{rejected}</span> — {s.unsupportedFileType(hint)}
-        </p>
-      )}
+      {/* The refusal, or the host's upload failure: one slot, holding whichever
+          came from the user's latest action. `role="alert"` because it appears
+          in response to something the user just did and is the only feedback
+          that the action had no effect - a screen-reader user who drops a .zip
+          otherwise gets silence. A refusal names the file so the message is
+          about the thing they picked, not a generic complaint; a failure is the
+          host's own words, shown on the field that took the file. */}
+      {!busy &&
+        (rejected ? (
+          <p role="alert" className="text-[12px] text-destructive">
+            <span className="font-mono">{rejected}</span> — {s.unsupportedFileType(hint)}
+          </p>
+        ) : (
+          failure && (
+            <p role="alert" className="text-[12px] text-destructive">
+              {failure}
+            </p>
+          )
+        ))}
 
       {/* URL escape hatch - collapsed by default to keep the happy path clean.
           It reads `busy`, not `disabled`: an upload is a door into this value
@@ -563,6 +608,8 @@ function FileField({
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
             setLocal(null);
+            // A link typed after a failed upload is the user moving past it.
+            dismissUploadError();
             setTypedUrl(e.target.value);
             onChange(e.target.value ? { url: e.target.value } : undefined);
           }}

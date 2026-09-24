@@ -309,6 +309,31 @@ export const UploadOnly: Story = {
  */
 export const TryAWrongFileType: Story = { args: { pipeCode: 'one_document' } };
 
+/**
+ * **A host's upload that failed**, shown on the field that took the file rather
+ * than under the whole form, where on a form with two file inputs only the
+ * wording could say which one failed. The message is the host's own, from
+ * `FieldEnv.uploadErrors`, in the alert slot a refused format uses. Dropping
+ * another file hides it, and here fills the field, since the harness's own
+ * upload never fails.
+ */
+export const UploadFailed: Story = {
+  args: {
+    pipeCode: 'one_document',
+    uploadErrors: {
+      'one_document-attachment': 'The file could not be stored. Try again in a moment.',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const alerts = canvas.getAllByRole('alert');
+    await expect(alerts).toHaveLength(2);
+    for (const alert of alerts) {
+      await expect(alert).toHaveTextContent('The file could not be stored. Try again in a moment.');
+    }
+  },
+};
+
 /** The same busy state on an image slot, where the preview area is what waits. */
 export const UploadingImage: Story = {
   args: { pipeCode: 'one_image', uploadingIds: ['one_image-picture'] },

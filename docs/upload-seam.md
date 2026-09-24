@@ -1,6 +1,6 @@
 # The upload seam
 
-The package never uploads anything. A file control takes a file from the user and hands it to the host; the host stores it and writes the resulting value back. That seam is `FieldEnv`'s `onDropFile`, `uploadingIds`, `resolveUrl` and `allowUrl`, and one rule about identity, and everything below is what each side owes the other.
+The package never uploads anything. A file control takes a file from the user and hands it to the host; the host stores it and writes the resulting value back. That seam is `FieldEnv`'s `onDropFile`, `uploadingIds`, `uploadErrors`, `resolveUrl` and `allowUrl`, and one rule about identity, and everything below is what each side owes the other.
 
 ```ts
 <FieldRenderer
@@ -11,6 +11,7 @@ The package never uploads anything. A file control takes a file from the user an
   env={{
     onDropFile: (id, file) => upload(id, file),
     uploadingIds,          // ids currently in flight
+    uploadErrors,          // id -> why that id's upload failed
     resolveUrl,            // a stored URI -> something a browser can render
     allowUrl: true,        // the default: a link may be pasted instead
     disabled: running,
@@ -98,6 +99,15 @@ That has to mean every door into the value, and it did not always:
 `ListField` reads the set by **prefix** (`cvs.`), not by exact match, because the busy row is not always the list's own row: a list of documents uploads at `cvs.1`, a list of structures holding one uploads at `cvs.1.resume`. The dot is what keeps the test off a sibling input called `cvs_extra`.
 
 **Add stays available during an upload, on purpose.** Appending leaves every existing index where it is, so an in-flight write-back is unaffected, and freezing it would make filling a list of files needlessly serial.
+
+## A failed upload is shown on the field that took the file
+
+The package never uploads, so it never learns that an upload failed unless the host says so. `uploadErrors` is where the host says it: a message keyed by the same id `onDropFile` was handed, which the field shows in the `role="alert"` slot it already uses for a refused format. Without it a host had nowhere to put the message but under the whole form, and on a form with two file inputs only the message's wording said which one had failed.
+
+- **The slot holds whichever came from the user's latest action.** A refused format and an upload failure never both belong to the current file, since a refused file never reaches the host, so a pick, a typed link or a clear on that field hides the failure on screen, and a failure that arrives after a refusal takes the slot from it.
+- **A hidden message stays hidden until the host sends a different one**, or removes the entry and sends it again, which is what a host that clears the entry on the next drop into that field does as a matter of course. So the same message after a second failed attempt is shown again, while a message the user has already acted past does not come back on its own.
+- **The host removes an entry on its own schedule.** The field never writes to the map, which stays the host's, as `uploadingIds` does. While the field's id is in `uploadingIds`, the slot shows nothing, as it shows no refusal.
+- **The message is the host's own words**, shown as it is. It names no file, because the host knows which failure it was and the field does not.
 
 ## A row is a thing, not a slot
 

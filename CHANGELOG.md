@@ -6,6 +6,8 @@
 
 - **`FieldEnv.allowUrl` takes the link input away**: set to `false`, every file field drops its "paste a URL instead" toggle and the input behind it, so a host whose runner should only take its own uploads offers the dropzone alone. It governs that input and nothing else: a web link the host writes into the value still shows on the field's card and can still be cleared. `DocumentField` and `ImageField` take it as a prop, and a field left with no way in at all, with no `onDropFile` and `allowUrl` set to `false`, throws while rendering, naming its path. See [docs/upload-seam.md](docs/upload-seam.md).
 
+- **`FieldEnv.uploadErrors` shows a failed upload on the field that took the file**: a host passes a message keyed by the id `onDropFile` was handed, and the field shows it in the alert slot a refused format uses, so on a form with two file inputs the failure is on the one that failed rather than under the whole form. The user's next pick, typed link or clear on that field hides it until the host sends a different message or removes the entry and sends it again, and the host removes entries on its own schedule. See [docs/upload-seam.md](docs/upload-seam.md).
+
 ### Changed
 
 - **`FieldStrings` gains `uploadUnavailable` (Breaking)**: the line a link-only file field shows in place of its dropzone, defaulting to "Files cannot be uploaded here. Paste a link to the file instead." A host that supplies a complete `FieldStrings` rather than a partial override adds it.

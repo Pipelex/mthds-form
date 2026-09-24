@@ -57,6 +57,12 @@ export interface CaseFormProps {
    */
   uploadingIds?: readonly string[];
   /**
+   * Why a host's upload failed, keyed by the same `<pipeCode>-<path>` ids, as a
+   * host fills `FieldEnv.uploadErrors`. The harness's own upload never fails,
+   * so a story states the failure it shows.
+   */
+  uploadErrors?: Readonly<Record<string, string>>;
+  /**
    * The MIME types a host's upload path takes. When set, the derived fields go
    * through `narrowFileFormats` with it, exactly as a host narrows its form
    * once with the list its server checks uploads against.
@@ -99,6 +105,7 @@ export function CaseForm({
   errors,
   disabled,
   uploadingIds,
+  uploadErrors,
   narrowTo,
   presentation = 'studio',
   upload = true,
@@ -113,6 +120,7 @@ export function CaseForm({
     () => ({
       disabled,
       uploadingIds: uploadingIds ? new Set(uploadingIds) : undefined,
+      uploadErrors: uploadErrors ? new Map(Object.entries(uploadErrors)) : undefined,
       allowUrl,
       // The id is `<pipeCode>-<path>`, and the path is what a host writes back
       // to (docs/upload-seam.md). The object URL is never revoked: a story's
@@ -125,7 +133,7 @@ export function CaseForm({
           }
         : undefined,
     }),
-    [disabled, uploadingIds, allowUrl, upload, pipeCode],
+    [disabled, uploadingIds, uploadErrors, allowUrl, upload, pipeCode],
   );
 
   return (

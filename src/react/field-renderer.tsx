@@ -40,6 +40,17 @@ export interface FieldEnv {
   allowUrl?: boolean;
   /** Ids currently mid-upload. */
   uploadingIds?: ReadonlySet<string>;
+  /**
+   * Why an upload failed, keyed by the same id `onDropFile` was handed, so the
+   * message shows on the field that took the file rather than under the whole
+   * form, where only its wording could say which input failed.
+   *
+   * The field hides a message on the user's next pick, link or clear, until the
+   * host sends a different one or removes the entry and sends it again. The
+   * host removes an entry on its own schedule, typically on the next drop into
+   * that field.
+   */
+  uploadErrors?: ReadonlyMap<string, string>;
   /** Resolve a `pipelex-storage://` URI to a browser-viewable URL (for previews
    *  of already-stored files). */
   resolveUrl?: (uri: string) => Promise<string | null>;
@@ -143,6 +154,7 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           onDropFile={drop ? (file) => drop(id, file) : undefined}
           allowUrl={env?.allowUrl}
           uploading={env?.uploadingIds?.has(id)}
+          uploadError={env?.uploadErrors?.get(id)}
           resolveUrl={env?.resolveUrl}
           id={id}
           error={error}
@@ -158,6 +170,7 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           onDropFile={drop ? (file) => drop(id, file) : undefined}
           allowUrl={env?.allowUrl}
           uploading={env?.uploadingIds?.has(id)}
+          uploadError={env?.uploadErrors?.get(id)}
           resolveUrl={env?.resolveUrl}
           id={id}
           error={error}
