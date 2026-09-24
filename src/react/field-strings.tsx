@@ -37,6 +37,12 @@ export interface FieldStrings {
   dropOrBrowse: string;
   pasteUrlInstead: string;
   /**
+   * What a file field says in place of its dropzone when its host has no way to
+   * store a file, so a link is the only way in. The field's format hint follows
+   * it, because the link still has to point at a file the runtime can read.
+   */
+  uploadUnavailable: string;
+  /**
    * The placeholder in the URL a person may paste instead of uploading. It names
    * the web's own scheme only: a host whose runner also takes its own storage
    * references can say so by overriding it, and no default shows an end user a
@@ -148,6 +154,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   dropToUpload: 'Drop to upload',
   dropOrBrowse: 'Drop a file or click to browse',
   pasteUrlInstead: 'paste a URL instead',
+  uploadUnavailable: 'Files cannot be uploaded here. Paste a link to the file instead.',
   urlPlaceholder: 'https://…',
   fileUrlAria: (label) => (label ? `Link to the file for ${label}` : 'Link to the file'),
   uploadedFile: 'Attached file',

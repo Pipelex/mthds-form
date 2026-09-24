@@ -31,8 +31,20 @@ export interface FileValue {
 interface FileFieldProps {
   field: FileRunField;
   value: FileValue | undefined;
-  /** Called when a file is dropped/picked - the parent uploads and sets value. */
-  onDropFile: (file: File) => void;
+  /**
+   * Called when a file is dropped/picked - the parent uploads and sets value.
+   *
+   * Absent means the host cannot store a file, and the control then offers no
+   * dropzone and no picker: the link input is open from the start, with a line
+   * saying a file cannot be uploaded here.
+   */
+  onDropFile?: (file: File) => void;
+  /**
+   * Whether the link input is offered, `true` when absent. `false` removes the
+   * "paste a URL instead" toggle and the input behind it, and says nothing about
+   * which values are valid. With no `onDropFile` either, the control throws.
+   */
+  allowUrl?: boolean;
   /** Manual URL paste / clear flows through here too. */
   onChange: (value: FileValue | undefined) => void;
   id: string;
@@ -133,6 +145,7 @@ function FileField({
   field,
   value,
   onDropFile,
+  allowUrl = true,
   onChange,
   id,
   uploading,
@@ -185,8 +198,17 @@ function FileField({
   const hint = acceptLabel(formats);
   const accept = useMemo(() => acceptMap(formats), [formats]);
 
+  // The two ways into the value, each offered exactly when the host can honour
+  // it. The callback's presence is the upload capability; there is no second
+  // flag to keep in agreement with it.
+  const canUpload = onDropFile !== undefined;
+
   const handleFile = useCallback(
     (file: File) => {
+      // Unreachable while the dropzone is disabled below, and kept so that a
+      // file can never be taken with nowhere to go - the bug this guards is a
+      // picked file handed to a callback that did nothing, in silence.
+      if (!onDropFile) return;
       if (!isAcceptedFile(formats, file)) {
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
@@ -206,7 +228,9 @@ function FileField({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     maxFiles: 1,
     multiple: false,
-    disabled: busy,
+    // Disabled, not merely unrendered, when there is no upload path: the hook
+    // cannot be skipped, and nothing may open a picker through it.
+    disabled: busy || !canUpload,
     // Filters the OS picker so a wrong file is hard to choose in the first
     // place. It is NOT the enforcement: a drag-and-drop bypasses the picker
     // entirely, and a browser reporting an empty `File.type` slips through
@@ -367,6 +391,27 @@ function FileField({
   const urlText =
     presentation === 'studio' || isReadableLink(urlValue) || urlValue === typedUrl ? urlValue : '';
 
+  // A host that offers neither way in has made a configuration error, and it is
+  // reported the way `narrowFileFormats` reports a slot left accepting nothing:
+  // loudly, where the host can see it, naming the path it would write back to.
+  // Rendering a field that can never be filled instead would ship a developer's
+  // message to an end user and, on a required field, keep the run shut in
+  // silence - the failure this rule exists to remove. It fires per rendered
+  // file field, so a host that switches links off and never uploads can still
+  // render every method with no file input.
+  if (!canUpload && !allowUrl) {
+    throw new Error(
+      `The file field at "${id}" has no way in: the form's environment supplies no onDropFile and sets allowUrl to false. Supply onDropFile so the file can be uploaded, or leave allowUrl unset so a link can be pasted.`,
+    );
+  }
+
+  // Open from the start when a link is the only way in; behind the toggle when
+  // it is the second way beside an upload; never when the host switched it off.
+  const linkOpen = allowUrl && (!canUpload || showUrl);
+  // The line that stands where the dropzone would, for as long as it would.
+  const noUploadLineShown = !canUpload && !hasFile && !uploading;
+  const noUploadLineId = `${domId}-no-upload`;
+
   return (
     <FieldShell
       name={field.name}
@@ -377,8 +422,9 @@ function FileField({
       required={field.required}
       error={error}
       // Names the file input, the way every other control in the set names its
-      // own. Without it `FieldShell` renders the title as a `<div>` bound to
-      // nothing and the input's accessible name computes to the empty string.
+      // own - or the link input, when there is no upload and so no file input.
+      // Without it `FieldShell` renders the title as a `<div>` bound to nothing
+      // and the input's accessible name computes to the empty string.
       htmlFor={domId}
     >
       {hasFile && !uploading ? (
@@ -411,6 +457,26 @@ function FileField({
                 <ImageOff className="h-5 w-5 text-muted-foreground" />
               </div>
             ))}
+        </div>
+      ) : !canUpload ? (
+        // No upload path, so no dropzone and no picker: a control that takes a
+        // file with nowhere to send it drops the file without a word. The line
+        // says why the link input below is the way in, and the hint says what
+        // that link has to point at.
+        <div className="space-y-0.5">
+          {uploading ? (
+            <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {s.uploading}
+            </p>
+          ) : (
+            <>
+              <p id={noUploadLineId} className="text-[12px] text-muted-foreground">
+                {s.uploadUnavailable}
+              </p>
+              {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
+            </>
+          )}
         </div>
       ) : (
         // `role="presentation"` and no tab stop: this div is the drop TARGET and
@@ -473,27 +539,27 @@ function FileField({
           let a user paste a URL over a file that was still arriving - or, on the
           host side, abandon a started and billed run client-side. The seam
           promises the control is disabled while its id is uploading, and that
-          has to mean every way in. */}
-      {!showUrl ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setShowUrl(true)}
-          className="flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-        >
-          <Link2 className="h-3 w-3" />
-          {s.pasteUrlInstead}
-        </button>
-      ) : (
+          has to mean every way in. With no upload path it is not an escape
+          hatch but the only way in, so it is open from the start; with
+          `allowUrl` off it is not offered at all. */}
+      {linkOpen ? (
         <input
           type="text"
-          autoFocus
+          // With no file input, this is the control the field's label names.
+          id={canUpload ? undefined : domId}
+          // Focus follows the click that opened it. Rendered from the start, the
+          // same attribute would pull focus into the form on page load - and on
+          // a form with several file fields, the last one would win.
+          autoFocus={showUrl}
           value={urlText}
           disabled={busy}
-          // A name of its own. The field's label is bound to the file input, so
-          // without this the placeholder was the only thing a screen reader
-          // announced here - and the placeholder used to name a storage scheme.
+          // A name of its own. In the upload case the field's label is bound to
+          // the file input, so without this the placeholder was the only thing
+          // a screen reader announced here - and the placeholder used to name a
+          // storage scheme. With no upload, it still says what the input is for.
           aria-label={s.fileUrlAria(fieldLabel(field.title, field.name, presentation))}
+          aria-describedby={noUploadLineShown ? noUploadLineId : undefined}
+          aria-invalid={canUpload ? undefined : !!error}
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
             setLocal(null);
@@ -502,6 +568,18 @@ function FileField({
           }}
           className={cn(fieldControlClass, 'h-9 px-3 font-mono text-[12px]')}
         />
+      ) : (
+        allowUrl && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setShowUrl(true)}
+            className="flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            <Link2 className="h-3 w-3" />
+            {s.pasteUrlInstead}
+          </button>
+        )
       )}
     </FieldShell>
   );

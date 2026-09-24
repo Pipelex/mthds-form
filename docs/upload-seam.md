@@ -1,6 +1,6 @@
 # The upload seam
 
-The package never uploads anything. A file control takes a file from the user and hands it to the host; the host stores it and writes the resulting value back. That seam is three fields on `FieldEnv` and one rule about identity, and everything below is what each side owes the other.
+The package never uploads anything. A file control takes a file from the user and hands it to the host; the host stores it and writes the resulting value back. That seam is `FieldEnv`'s `onDropFile`, `uploadingIds`, `resolveUrl` and `allowUrl`, and one rule about identity, and everything below is what each side owes the other.
 
 ```ts
 <FieldRenderer
@@ -12,10 +12,42 @@ The package never uploads anything. A file control takes a file from the user an
     onDropFile: (id, file) => upload(id, file),
     uploadingIds,          // ids currently in flight
     resolveUrl,            // a stored URI -> something a browser can render
+    allowUrl: true,        // the default: a link may be pasted instead
     disabled: running,
   }}
 />
 ```
+
+## Which ways into a file value a host offers
+
+A file value has two ways in, and each is offered exactly when the host can honour it:
+
+- **An upload**, offered exactly when the host supplies `onDropFile`. The presence of the callback is the capability; there is no second flag to keep in agreement with it.
+- **A link**, offered unless the host sets `allowUrl` to `false`.
+
+| `onDropFile` | `allowUrl` | What the control renders |
+| --- | --- | --- |
+| supplied | absent or `true` | The dropzone, and the "paste a URL instead" toggle under it. |
+| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. |
+| absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. |
+| absent | `false` | **A host's configuration error.** The control throws while rendering, naming the field's id path. |
+
+The link-only row is a fix. A file field used to render an armed dropzone whatever the host supplied, so a host with no upload path got a control that opened the file picker, took the file, handed it to a callback that did nothing and stayed empty with nothing said; a required field then kept the run shut with no reason given. A disabled dropzone with a message was the other option and was rejected, because a disabled dropzone reads as "busy, try again", which is what the control shows during an upload, and it would still advertise a way in that does not exist.
+
+The details of the link-only control are where its accessibility is decided:
+
+- **The line stands where the dropzone would, for as long as it would.** It shows while the field holds no value, and the file card replaces it once a link is typed, as the card replaces the dropzone.
+- **The link input carries the field's DOM id**, so the label `FieldShell` renders binds to a control that exists. It keeps its `fileUrlAria` name, which says what the input is for, and it is described by the line while the line shows.
+- **It does not take focus on mount.** Behind the toggle it takes focus when the toggle opens it, which is right; rendered from the start, the same attribute would pull focus into the form on page load, and on a form with several file fields the last one would win.
+- **The busy rule below still holds.** While the field's id is in `uploadingIds`, the link input is shut like every other way in.
+
+**`allowUrl` governs the link input and nothing else.** A file value is a URL whichever way it arrived, so the key says nothing about which values are valid: a web link a host writes into a field whose link input is off still shows on the card and can still be cleared, because hiding a way in is no reason to hide a value.
+
+**It is form-wide, like the upload.** Both ways in are capabilities of the host rather than facts about a slot. A per-slot switch, if one is ever needed, would be a `RunField` transform in the manner of `narrowFileFormats`, and adding it later breaks nothing.
+
+**A host that offers neither way in gets a thrown error, not a rendered one**, the way `narrowFileFormats` reports a slot left accepting nothing: `The file field at "cvs.1" has no way in: …`, naming the id path the host would write back to. Rendering a field that can never be filled instead would ship a developer's message to an end user, and on a required field it would keep the run shut in silence, which is the failure this rule exists to remove. The check runs per rendered file field rather than once per form, so a host that switches links off and never uploads can still render every method that has no file input.
+
+**The rule is `FieldRenderer`'s, so it holds everywhere a file field renders**: in a record, in every row of a list, on a produced layout through `MthdsField`, and in a `DocumentField` or `ImageField` a host composes directly, which takes `onDropFile` and `allowUrl` as props with the same meaning.
 
 ## What a slot accepts is one list, and a host narrows it once
 
@@ -36,7 +68,7 @@ const fields = narrowFileFormats(buildRunFields(descriptor, contract.inputs), AL
 
 - **One list serves every slot.** It is intersected with each slot's own formats, so the list above leaves a document slot with PDF, JPG and PNG and an image slot with PNG and JPG. A host never writes a list per slot, and narrowing never widens one: a MIME type the slot's kind cannot take is not in the intersection. Each slot keeps its table's order, and MIME types are compared without parameters and case-insensitively, as the check compares them.
 - **It walks the whole tree**, into records and list items, so a file three levels down is narrowed like one at the top.
-- **It throws when a slot would be left accepting nothing**, naming the field by its path (`cvs[].portrait`). A dropzone that refuses every file is a host's configuration error, and the form should fail where the host can see it rather than render a control that cannot be used.
+- **It throws when a slot would be left accepting nothing**, naming the field by its path (`cvs[].portrait`). A dropzone that refuses every file is a host's configuration error, and the form should fail where the host can see it rather than render a control that cannot be used. A file field left with no way in at all, with no `onDropFile` and `allowUrl` set to `false`, is the other configuration error a host can make with a file field, and it is reported the same way (see above).
 - **It never mutates what it is given.** File slots, records and lists come back as copies, and every other field as the same object.
 
 It lives in the core entry rather than on `FieldEnv` so that a host's server, which renders no control, can import the list's one definition and hold the same answer as its form. A server that has the narrowed field can apply the control's exact check with `isAcceptedFile(field.formats, file)`. It reads `RunField`, the kernel's own output, and never touches JSON Schema, so the two schema walks [architecture.md](architecture.md) allows stay the only two. Nothing on the wire changes, and neither does the value a file field holds.
@@ -45,7 +77,7 @@ It lives in the core entry rather than on `FieldEnv` so that a host's server, wh
 
 `onDropFile` is handed the field's **ID**, and a host writes the result back at that path: `setValueAtPath(values, id.split('.'), uploaded)`. A row inside a list is `cvs.1`; a file inside a structure inside a list is `cvs.1.resume`.
 
-**One page mints its ids differently, and a host rendering one must not use the line above.** A produced layout binds to a JSON Pointer in a state store rather than to a value tree, so `MthdsField` mints `gen-inputs-request-city` from `/inputs/request/city` and the write-back address is recovered with `pathFromDomId`, not with `id.split('.')`. Everything else on this page holds unchanged — the same three `FieldEnv` fields, the same rule that the id is derived from the address and not equal to it. See [the generative layer](generative-ui.md) § "Uploads, which arrive by a different id here".
+**One page mints its ids differently, and a host rendering one must not use the line above.** A produced layout binds to a JSON Pointer in a state store rather than to a value tree, so `MthdsField` mints `gen-inputs-request-city` from `/inputs/request/city` and the write-back address is recovered with `pathFromDomId`, not with `id.split('.')`. Everything else on this page holds unchanged — the same `FieldEnv` fields, the same rule that the id is derived from the address and not equal to it. See [the generative layer](generative-ui.md) § "Uploads, which arrive by a different id here".
 
 Keeping the ID a path is a deliberate choice, because the alternative is worse. An opaque token would have to be resolved to a position at write-back time, which means the kernel keeping a live token-to-position registry for `setValueAtPath` to consult — turning a pure function of the value tree into a stateful one, in a core whose whole claim is that it has no hidden state.
 
@@ -122,6 +154,6 @@ The tab stop is the `<input type="file">` itself, named by the field's label thr
 
 That is the opposite of react-dropzone's default, which puts `tabIndex: 0` and its own key handlers on the presentational div and leaves the input at `tabIndex: -1` — so the element a keyboard or voice-control user lands on is a generic with no role and no name. Giving that div a `role="button"` and a label of its own was the other option and was rejected: it would put a second named control in the accessibility tree for one value, when a file input already has exactly the right role and only ever lacked a name. Because the input is clip-hidden, the focus ring is drawn on the root with `focus-within`.
 
-The URL input behind "paste a URL instead" is named too, by `fileUrlAria`, which is given the field's label as the form shows it: "Link to the file for cv" in `studio`, "Link to the file for Cover letter" in `app`, and "Link to the file" in a list row. The field's label is bound to the file input, so this input used to have no name at all, and its placeholder was the only thing a screen reader announced there.
+The URL input behind "paste a URL instead" is named too, by `fileUrlAria`, which is given the field's label as the form shows it: "Link to the file for cv" in `studio`, "Link to the file for Cover letter" in `app`, and "Link to the file" in a list row. When the host uploads, the field's label is bound to the file input, so this input used to have no name at all, and its placeholder was the only thing a screen reader announced there. When it does not, there is no file input, and the label is bound to this input instead; its `fileUrlAria` name still says what it is for.
 
 **A list row's controls do not have distinct names yet.** The list drops each row's label to avoid repeating the field's name on every row, and the row number it shows instead is a bare glyph tied to no control. So every row's link input currently carries the same generic name, and the file input inside a row carries none at all. Giving each row a name of its own is a change to the list control that is tracked separately.

@@ -17,8 +17,27 @@ import { UnknownField } from './unknown-field';
  */
 export interface FieldEnv {
   disabled?: boolean;
-  /** A file field asks its parent to upload; the parent sets the value later. */
+  /**
+   * A file field asks its parent to upload; the parent sets the value later.
+   *
+   * Its presence is the capability. A host that supplies it gets a dropzone on
+   * every file field; a host that does not gets no dropzone and no file picker,
+   * because a file taken with nowhere to go used to be dropped without a word.
+   * See docs/upload-seam.md, "Which ways into a file value a host offers".
+   */
   onDropFile?: (id: string, file: File) => void;
+  /**
+   * Whether a file field offers a link input, the way in that needs no upload.
+   * `true` when absent; `false` hides the "paste a URL instead" toggle and the
+   * input behind it on every file field.
+   *
+   * It governs that input and nothing else. A file value is a URL whichever way
+   * it arrived, so this says nothing about which values are valid: a web link
+   * the host writes is still shown on the field's card and can still be
+   * cleared. Setting it to `false` with no `onDropFile` leaves a file field no
+   * way in at all, and the field throws, naming its path, when it renders.
+   */
+  allowUrl?: boolean;
   /** Ids currently mid-upload. */
   uploadingIds?: ReadonlySet<string>;
   /** Resolve a `pipelex-storage://` URI to a browser-viewable URL (for previews
@@ -43,6 +62,11 @@ export interface FieldRendererProps {
  */
 export function FieldRenderer({ field, value, onChange, id, error, env }: FieldRendererProps) {
   const disabled = env?.disabled;
+  // Handed to a file control only when the host supplied one, so the control can
+  // tell a host that uploads from one that does not. Wrapping it unconditionally
+  // is what gave every file field an armed dropzone over a callback that did
+  // nothing.
+  const drop = env?.onDropFile;
 
   switch (field.kind) {
     case 'text':
@@ -116,7 +140,8 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           field={field}
           value={value as FileValue | undefined}
           onChange={onChange}
-          onDropFile={(file) => env?.onDropFile?.(id, file)}
+          onDropFile={drop ? (file) => drop(id, file) : undefined}
+          allowUrl={env?.allowUrl}
           uploading={env?.uploadingIds?.has(id)}
           resolveUrl={env?.resolveUrl}
           id={id}
@@ -130,7 +155,8 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           field={field}
           value={value as FileValue | undefined}
           onChange={onChange}
-          onDropFile={(file) => env?.onDropFile?.(id, file)}
+          onDropFile={drop ? (file) => drop(id, file) : undefined}
+          allowUrl={env?.allowUrl}
           uploading={env?.uploadingIds?.has(id)}
           resolveUrl={env?.resolveUrl}
           id={id}

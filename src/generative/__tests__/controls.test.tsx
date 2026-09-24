@@ -2,6 +2,9 @@ import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { FileRunField } from '../../core';
+import { DOCUMENT_FORMATS } from '../../core/file-formats';
+import { DEFAULT_FIELD_STRINGS } from '../../react';
 import type { BrandManifest } from '../manifest';
 import { GenerativePage } from '../page';
 import { pick, pickKey } from '../ui/shadcn';
@@ -201,5 +204,53 @@ describe('the closed maps the renderers read', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Trip');
     expect(screen.getByRole('status')).toHaveTextContent('Saved');
     expect(container.querySelectorAll('[class*="function"]')).toHaveLength(0);
+  });
+});
+
+/**
+ * A produced layout renders a file input through `MthdsField`, which renders
+ * through `FieldRenderer` with the scope's `env`, so the rule about which ways
+ * into a file value a host offers holds on a generative page with nothing of
+ * its own. Asserted here because the generative story harness used to pass no
+ * `env` at all, and so painted the silent dropzone as a file field's normal
+ * state.
+ */
+describe('a file input the page delegates to the kernel', () => {
+  const CV: FileRunField = {
+    kind: 'document',
+    name: 'cv',
+    conceptRef: 'native.Document',
+    required: true,
+    formats: DOCUMENT_FORMATS,
+  };
+  const DELEGATED: Spec = {
+    root: 'cv',
+    elements: { cv: { type: 'MthdsField', props: { path: '/inputs/cv' }, children: [] } },
+  };
+
+  it('is link-only when the scope offers no upload', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={DELEGATED}
+        store={createStateStore({ inputs: {} })}
+        scope={{ inputs: [CV], env: { disabled: false } }}
+      />,
+    );
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(0);
+    expect(screen.getByLabelText('cv')).toHaveAccessibleDescription(
+      DEFAULT_FIELD_STRINGS.uploadUnavailable,
+    );
+  });
+
+  it('keeps its dropzone when the scope does', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={DELEGATED}
+        store={createStateStore({ inputs: {} })}
+        scope={{ inputs: [CV], env: { onDropFile: () => {} } }}
+      />,
+    );
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
+    expect(screen.queryByText(DEFAULT_FIELD_STRINGS.uploadUnavailable)).not.toBeInTheDocument();
   });
 });
