@@ -1327,10 +1327,10 @@ function ObjectTable({
                             a 200-character column - and the full value is a click
                             or a hover away.
 
-                            The NAME of a ranked table is the one cell that wraps,
-                            and the one with no cap. It is what a reader
+                            A record's NAME is the one cell that wraps, in every
+                            table, and the one with no cap. It is what a reader
                             identifies a row by, and a name cut at the cap is the
-                            fault the ranking was built for. A cell that wraps
+                            fault this rule was built for. A cell that wraps
                             cannot push the table wider, so a cap has nothing to
                             stop there and the name takes the width the panel
                             leaves it. Wrapping also makes it the one column that
@@ -1612,7 +1612,7 @@ interface ChosenColumns {
   shown: readonly RunField[];
   /** How many of the record's fields only the row's detail shows. */
   hidden: number;
-  /** The name column, when the table had to choose. It is the one given a floor. */
+  /** The name column, in every table that has one. It is the one given a floor. */
   name?: RunField;
 }
 
@@ -1624,14 +1624,15 @@ interface ChosenColumns {
  * descriptor carries deliberately, and a table whose columns moved whenever a
  * field was added would read differently from the record its rows open into.
  *
- * **Within the budget nothing is chosen, so nothing changes.** Every field is a
- * column, no name is singled out, and the table renders exactly as it did
- * before a budget existed. The budget exists for the tables that ran off to the
- * right, and it touches only those.
+ * **Within the budget nothing is hidden and nothing moves.** Every field is a
+ * column, in authored order, and no row gains a toggle it did not have. The
+ * name is still named, because the name rule is not a budget rule: a long name
+ * cut at the cell cap is as wrong in a table of three columns as in one of
+ * twelve.
  */
 function chooseColumns(fields: readonly RunField[], budget: number): ChosenColumns {
-  if (fields.length <= budget) return { shown: fields, hidden: 0 };
   const name = recordNameField(fields);
+  if (fields.length <= budget) return { shown: fields, hidden: 0, ...(name ? { name } : {}) };
   const kept = new Set(
     fields
       .map((field, index) => ({ field, index, tier: columnTier(field, name) }))

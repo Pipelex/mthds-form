@@ -824,7 +824,7 @@ describe('a record wider than the table budget', () => {
 
   it('gives the name column a floor and lets it wrap, where every other cell is one line', () => {
     // The name is the column a reader identifies a row by, and cutting it at
-    // the cell cap is the fault the ranking was built for. It wraps instead,
+    // the cell cap is the fault this rule was built for. It wraps instead,
     // and the floor keeps a narrow panel from squeezing it into a ribbon -
     // which auto table layout would do first, since it is the one column that
     // can give width back. jsdom has no layout, so this pins the classes; the
@@ -861,11 +861,13 @@ describe('a record wider than the table budget', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('leaves a record within the budget exactly as it was', () => {
-    // Five fields, the default budget: nothing is chosen, so every field is a
-    // column in authored order and the name is a cell like any other - one
-    // line, cut at the cap. The markup must be the markup a table rendered
-    // before there was a budget, which is what an unlimited budget renders.
+  it('hides and moves nothing within the budget, and still lets the name wrap', () => {
+    // Five fields, the default budget: nothing is hidden, so every field is a
+    // column in authored order. The name rule is not a budget rule - a long
+    // name cut at the cap is as wrong in a narrow table as in a wide one - so
+    // the name wraps above its floor here too. Every OTHER cell keeps exactly
+    // the classes a cell had before there was a budget, and the budget changes
+    // nothing at all: an unlimited one renders the same markup.
     const five = object('item', [
       number('line'),
       text('item'),
@@ -886,8 +888,12 @@ describe('a record wider than the table budget', () => {
       'approved',
     ]);
     const name = cellUnder(budgeted.container, 'item');
-    expect(name.className).toContain('truncate');
-    expect(name.className).not.toContain('min-w-[16ch]');
+    expect(name.className).toContain('min-w-[16ch]');
+    expect(name.className).toContain('[&>span]:whitespace-normal');
+    expect(name.className).not.toContain('truncate');
+    for (const other of ['line', 'remark', 'kind', 'approved']) {
+      expect(cellUnder(budgeted.container, other).className).toBe('max-w-[44ch] truncate');
+    }
     const markup = budgeted.container.innerHTML;
     budgeted.unmount();
     expect(renderWith(five, value, Infinity).container.innerHTML).toBe(markup);

@@ -89,7 +89,7 @@ interface ResultEnv {
    * A record with more fields than this keeps the columns a reader decides on —
    * its name first, then the values that fit a cell whole — and the rest move
    * into the row's detail, one click away. The columns shown keep the order the
-   * method's author wrote them in. A record within the budget is untouched.
+   * method's author wrote them in. A record within the budget shows every field.
    *
    * It is a COUNT rather than a width the view measures, and that is the point:
    * a count renders the same table on a server, in a test and in a browser,
