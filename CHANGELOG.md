@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.1] - 2026-09-24
+
+### Fixed
+
+- **A file preview over a stored reference stops spinning once nothing more can arrive**: opening the preview of a document or image whose value is a stored reference (`pipelex-storage://…`) showed a spinner that never stopped when the host passed no `resolveUrl`, and again after a resolver answered `null` or rejected. Both now show the "cannot be shown" placeholder, and the spinner is reserved for a resolver that has not answered yet, including the retry that reopening the preview makes. A host that passed an identity `resolveUrl` only to reach the placeholder can drop it.
+
 ## [v0.10.0] - 2026-09-24
 
 ### Highlights
