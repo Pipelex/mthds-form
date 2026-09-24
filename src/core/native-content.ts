@@ -249,8 +249,8 @@ interface NativeNode {
  * so a `native.Date[]` result is a `list` node whose concept reads
  * `native.Date`. Asking the concept alone answered yes for the whole list, and
  * every caller then treated the list as ONE date, one page or one composite: a
- * list of dates rendered as a single absent date where a table belonged, and a
- * list of pages collected no page at all. So a node whose stated kind is `list`
+ * list of dates rendered as a single absent date, and a list of pages collected
+ * no page at all. So a node whose stated kind is `list`
  * answers no, and its `item` answers for itself. The kind is the descriptor's
  * own statement, so this reads a stated fact and inspects no value.
  */

@@ -1090,6 +1090,12 @@ const EXPAND_COLUMN = '2rem';
  * `text` is bounded when it says so. Everything else may be long, and its row
  * gets a toggle. Still descriptor-driven — no value is measured, so a table's
  * shape does not change with the data it happens to be showing.
+ *
+ * A `native.Date` member is a date too, although its node is an `object`: a
+ * cell reads it as one compact date (`RecordSummary`), whole. And a list fits
+ * only when its cell shows the entries at all, which is when they are chips; a
+ * list of anything else is a count in its cell, and its entries are in the
+ * row's detail however short each one is.
  */
 function fitsACellWhole(field: RunField): boolean {
   switch (field.kind) {
@@ -1100,8 +1106,10 @@ function fitsACellWhole(field: RunField): boolean {
       return true;
     case 'text':
       return field.maxLength !== undefined && field.maxLength <= CELL_LENGTH_LIMIT;
+    case 'object':
+      return isNativeDateNode(field);
     case 'list':
-      return fitsACellWhole(field.item);
+      return isInlineColumn(field) && fitsACellWhole(field.item);
     default:
       return false;
   }
@@ -1156,8 +1164,12 @@ function ObjectTable({
   const [viewportWidth, setViewportWidth] = useState<number>();
   const { shown, hidden, name } = chooseColumns(columns, budget);
   // A hidden column is more to show, exactly as a clipped cell is: the open row
-  // renders the whole record, so nothing the budget leaves out is lost.
-  const canExpand = hidden > 0 || shown.some((column) => !fitsACellWhole(column));
+  // renders the whole record, so nothing the budget leaves out is lost. The
+  // name is left out of the clipped-cell half, because it wraps and is never
+  // clipped: a record whose only long field is its name has nothing more to
+  // show, and a chevron opening onto the same values is chrome, not a feature.
+  const canExpand =
+    hidden > 0 || shown.some((column) => column !== name && !fitsACellWhole(column));
 
   // The width of what is VISIBLE, not of the table.
   //
@@ -1259,7 +1271,10 @@ function ObjectTable({
         </thead>
         <tbody>
           {items.map((item, index) => {
-            const isOpen = expanded.has(index);
+            // Open only while there is a toggle to close it with. The host may
+            // raise the budget while a row is open, and a row whose columns
+            // then all fit would otherwise stay open with no chevron at all.
+            const isOpen = canExpand && expanded.has(index);
             return (
               <Fragment key={index}>
                 <tr className="border-b border-border/60 last:border-b-0">
@@ -1548,6 +1563,16 @@ function FileRows({ items, kind }: { items: readonly unknown[]; kind: 'document'
       ))}
     </div>
   );
+}
+
+/**
+ * Whether a node is one of the three natives the kind vocabulary cannot name —
+ * a date, a page, a composite — which `ResultField` reads by CONCEPT before its
+ * kind switch. A list of one answers no (the predicates refuse a `list` node),
+ * and its item answers yes.
+ */
+function isNativeValueNode(field: RunField): boolean {
+  return isNativeDateNode(field) || isNativeHtmlNode(field) || isNativeCompositeNode(field);
 }
 
 /**
@@ -1841,6 +1866,20 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
           </div>
           {items.length === 0 ? (
             <p className="text-[13px] italic text-muted-foreground">{s.noItemsYet}</p>
+          ) : isNativeValueNode(field.item) ? (
+            // A list of dates, pages or composites is a list of VALUES, each read
+            // by its own arm - one per line. Their nodes are `object` (or, for a
+            // composite, `unknown`), so the branches below would tabulate a
+            // date's `date` and `time`, print a page's markup source down a
+            // column named by it, and show a composite as JSON. The arm keyed by
+            // concept is the one that knows what each entry is.
+            <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+              {items.map((item, index) => (
+                <div key={index} className="bg-card/40 px-3 py-1.5">
+                  <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                </div>
+              ))}
+            </div>
           ) : columns ? (
             // Same shape every row: the labels are column headers, not per-row
             // labels. See `ObjectTable`.

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS } from '../_generated/lists.payloads';
+import { formatDateContent, readDateContent } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
 import { ResultView, itemsOf } from '../result-view';
 
@@ -77,21 +78,26 @@ export const OfNumbers: Story = {
 };
 
 /**
- * A list of `Date`. The one scalar-looking case that is NOT a scalar:
+ * A list of `Date` — dates, one per line.
+ *
  * `native.Date`'s content model is `{date, time}`, two properties, so its node
- * is an `object` — and a list of two-column records is a table.
+ * is an `object`, and a list of objects is otherwise a table. But a date is a
+ * value, not a record: the date arm, keyed by concept, reads each entry as the
+ * date it is, and a table of `date` and `time` columns would have named every
+ * row by its empty time.
  */
 export const OfDates: Story = {
-  name: 'Dates → table',
+  name: 'Dates → lines',
   args: story('dates'),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    // A table per theme, with a row per date. The list's node carries its
-    // element's concept, `native.Date`, and the date arm used to take the whole
-    // list for one date and render it as absent.
-    await expect(canvas.getAllByRole('table')).toHaveLength(BOTH_THEMES);
-    const table = canvas.getAllByRole('table')[0] as HTMLTableElement;
-    await expect(table.tBodies[0]?.rows).toHaveLength(items('dates').length);
+    // No table, and every date once per theme, read off the payload.
+    await expect(canvas.queryAllByRole('table')).toHaveLength(0);
+    for (const item of items('dates')) {
+      const content = readDateContent(item);
+      await expect(content).toBeDefined();
+      await expect(canvas.getAllByText(formatDateContent(content!))).toHaveLength(BOTH_THEMES);
+    }
   },
 };
 

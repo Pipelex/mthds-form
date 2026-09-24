@@ -17,7 +17,7 @@
  * generated corpus is asserted in its own stories.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
   BooleanRunField,
@@ -484,10 +484,10 @@ describe('lists', () => {
     );
     const table = container.querySelector('table');
     expect(table).toBeTruthy();
-    // Three headers, not two: `label` is an UNBOUNDED text column, so the rows
-    // get an expand toggle and the toggle gets its own (visually hidden) header.
-    // See `fitsACellWhole`.
-    expect(table!.querySelectorAll('thead th')).toHaveLength(3);
+    // Two headers and no toggle: `label` is unbounded text, but it is the
+    // record's NAME, which wraps whole in its cell, and `week` is a number - so
+    // an open row would show nothing the row does not. See `fitsACellWhole`.
+    expect(table!.querySelectorAll('thead th')).toHaveLength(2);
     expect(table!.querySelectorAll('tbody tr')).toHaveLength(2);
     // The header carries the label ONCE, not once per row.
     expect(screen.getAllByText('label')).toHaveLength(1);
@@ -645,11 +645,16 @@ describe('lists', () => {
     // three sentences. A table of nothing but `text` columns then truncated
     // every cell with no way to read the rest, which is the one outcome a
     // result view must not produce.
+    // `gaps` is not the record's name - `candidate` is, and a name wraps whole -
+    // so it is a cell that truncates.
     render(
       <ResultField
-        field={list('matches', object('item', [text('gaps')]))}
+        field={list('matches', object('item', [text('candidate'), text('gaps')]))}
         value={[
-          { gaps: 'The candidate is fundamentally misaligned with this role, and here is why.' },
+          {
+            candidate: 'Amara Okafor',
+            gaps: 'The candidate is fundamentally misaligned with this role, and here is why.',
+          },
         ]}
       />,
     );
@@ -897,6 +902,85 @@ describe('a record wider than the table budget', () => {
     const markup = budgeted.container.innerHTML;
     budgeted.unmount();
     expect(renderWith(five, value, Infinity).container.innerHTML).toBe(markup);
+  });
+
+  /** A `native.Date` member: an `object` node over `{date, time}`, keyed by concept. */
+  const nativeDate = (name: string): ObjectRunField => ({
+    ...object(name, [day('date'), text('time')]),
+    conceptRef: 'native.Date',
+  });
+
+  it('ranks a native.Date member with the values that fit a cell whole', () => {
+    // Its node is an `object`, but a cell reads it as one compact date - so it
+    // ranks with the dates, not with the nested records at the bottom.
+    const record = object('item', [
+      text('item'),
+      text('a'),
+      text('b'),
+      text('c'),
+      text('d'),
+      text('e'),
+      nativeDate('due'),
+    ]);
+    const { container } = renderWith(record, [
+      { item: 'Hex bolt', due: { date: '2026-09-25', time: null } },
+    ]);
+    expect(headers(container).slice(1)).toEqual(['item', 'a', 'b', 'c', 'due']);
+    expect(cellUnder(container, 'due').textContent).toContain('2026-09-25');
+  });
+
+  it('offers no toggle when the only field that could be long is the name', () => {
+    // The name wraps whole in its cell, so an open row would show the same
+    // values again. A second unbounded field is what earns the chevron.
+    renderWith(object('item', [text('item'), number('qty'), nativeDate('due')]), [
+      { item: 'Hex bolt', qty: 3, due: { date: '2026-09-25', time: null } },
+    ]);
+    expect(screen.queryByRole('button')).toBeNull();
+    cleanup();
+    renderWith(object('item', [text('item'), text('remark')]), [
+      { item: 'Hex bolt', remark: 'Short by ten boxes' },
+    ]);
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
+  });
+
+  it('offers a toggle for a list whose cell can only count its entries', () => {
+    // Each date is short, but a list of them is not chips: the cell says how
+    // many there are, and the dates are only in the row's detail.
+    renderWith(object('item', [text('item'), list('milestones', nativeDate('item'))]), [
+      { item: 'Retrofit', milestones: [{ date: '2026-09-25', time: null }] },
+    ]);
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
+  });
+
+  it('closes an open row when a larger budget leaves it nothing to show', async () => {
+    // Six fields, the name plus five numbers: at a budget of five one number is
+    // hidden, so the row opens. Raised past six, nothing is hidden and every
+    // shown column fits, so there is no toggle - and the row must not stay open
+    // with no way to close it.
+    const record = object('item', [text('item'), ...['a', 'b', 'c', 'd', 'e'].map(number)]);
+    const value = [{ item: 'Hex bolt', a: 1, b: 2, c: 3, d: 4, e: 5 }];
+    const field = list('rows', record);
+    const { container, rerender } = render(
+      <ResultEnvProvider tableColumns={5}>
+        <ResultField field={field} value={value} />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    );
+    expect(container.querySelector('td[colspan]')).not.toBeNull();
+    rerender(
+      <ResultEnvProvider tableColumns={10}>
+        <ResultField field={field} value={value} />
+      </ResultEnvProvider>,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(container.querySelector('td[colspan]')).toBeNull();
+    expect(headers(container)).toEqual(['item', 'a', 'b', 'c', 'd', 'e']);
   });
 });
 
