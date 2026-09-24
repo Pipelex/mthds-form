@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS } from '../_generated/lists.payloads';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
@@ -22,7 +22,7 @@ import { ResultView, itemsOf } from '../result-view';
  * | --- | --- | --- |
  * | a scalar | inline chips | the entries ARE the values; an index labels nothing |
  * | a short record | a **table** | every entry has the same keys — that is a table |
- * | a wide record | a table that **scrolls** | twelve columns fit no panel; crushing them is worse than scrolling |
+ * | a wide record | a table of its **top-ranked columns**, the row expandable | twelve columns fit no panel; the name and the values that fit a cell whole stay in view, and the rest are one click away |
  * | a record with prose | a table, with the row **expandable** | a paragraph cannot be a cell, but giving up the table over one column loses it for the others |
  * | a record holding records | the same | the cell says how many; the expansion shows them |
  * | an image | a **gallery** | a picture is the whole content; a card per picture is a screenful each |
@@ -101,26 +101,84 @@ export const OfShortRecords: Story = {
 };
 
 /**
- * **A twelve-column record.** No panel is that wide, and the two ways to lose
- * are to crush the columns (a date wrapping onto four lines) or to break the
- * page's own width. So the table keeps a floor under each column and the
- * container scrolls: the panel stays its size, and the table is as wide as it
- * needs to be.
- *
- * Scroll it sideways.
+ * The columns a `Reading` table shows under the default budget, in the order
+ * they render. Named here rather than read off the payload because they come
+ * from the DESCRIPTOR, which the corpus fixes: `reference` is the record's name
+ * (its first `text` field), and `status`, `band`, `taken_on` and `wavelength`
+ * are the first four, in authored order, of the fields that fit a cell whole.
+ * `instrument`, `operator` and `site` are unbounded text, which ranks below
+ * them, and the last four values fall past the budget.
  */
-export const OfWideRecords: Story = {
-  name: 'Wide records → scrolling table',
-  args: story('readings', 640),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const headers = canvas.getAllByRole('columnheader');
-    // Twelve stated columns plus the toggle's own visually-hidden header, per
-    // theme. The toggle is there because several of the twelve are UNBOUNDED
-    // text: `text` promises "short single-line" and nothing enforces it, so a
-    // cell may truncate and the row must be openable. See `fitsACellWhole`.
-    await expect(headers.length).toBe(13 * BOTH_THEMES);
-  },
+const READING_COLUMNS = ['reference', 'status', 'band', 'taken_on', 'wavelength'];
+
+/**
+ * What both wide-record stories assert, since only the panel's width differs
+ * between them: the ranked columns in authored order, a name column that holds
+ * its floor and is never cut, and a row that opens onto the fields the budget
+ * left out.
+ */
+async function assertRankedColumns(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  // The harness renders every story twice, light beside dark - one is enough.
+  const table = canvas.getAllByRole('table')[0] as HTMLTableElement;
+  const headers = within(table).getAllByRole('columnheader');
+  // The chosen columns, plus the toggle's own visually-hidden header: a hidden
+  // column is more to show, so every row can open.
+  await expect(headers.map((header) => header.textContent)).toEqual([
+    DEFAULT_FIELD_STRINGS.rowDetailsColumn,
+    ...READING_COLUMNS,
+  ]);
+
+  // The name column is never the one cut off: its value is not truncated, and
+  // the column holds the floor it was given however narrow the panel.
+  const first = itemsOf(PAYLOADS['lists.readings'])[0] as Record<string, unknown>;
+  const name = within(table).getByText(String(first.reference));
+  const cell = name.parentElement as HTMLElement;
+  await expect(cell.scrollWidth).toBeLessThanOrEqual(cell.clientWidth + 1);
+  await expect(cell.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+    parseFloat(getComputedStyle(cell).minWidth) - 1,
+  );
+
+  // Opening a row shows the whole record, the hidden fields included.
+  await userEvent.click(
+    within(table).getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+  );
+  await waitFor(() => expect(within(table).getByText('operator')).toBeTruthy());
+  await expect(within(table).getByText(String(first.operator))).toBeTruthy();
+}
+
+/**
+ * **A twelve-column record, in a narrow panel** — a chat panel, a mobile pane.
+ *
+ * No panel is twelve columns wide, and what a reader decides on used to scroll
+ * off to the right while the columns that fit were often the least useful. So a
+ * record wider than the budget (five columns unless the host says otherwise)
+ * shows the top of a ranking: its name, then the values that fit a cell whole.
+ * The chosen columns keep the order the author wrote them in, and the rest are
+ * one click away, since a row now opens whenever a column is hidden.
+ *
+ * Five can still be wider than a pane this narrow, and then the table scrolls
+ * rather than crushing, exactly as before. The name column holds its floor
+ * either way.
+ */
+export const OfWideRecordsNarrow: Story = {
+  name: 'Wide records → ranked columns, narrow panel',
+  args: story('readings', 420),
+  play: async ({ canvasElement }) => assertRankedColumns(canvasElement),
+};
+
+/**
+ * **The same twelve-column record, in a wide panel.** The same five columns,
+ * because the budget is a count rather than a measurement: the table has the
+ * same shape on a server, in a test and in a browser at any width, and a host
+ * that knows its panel is wide raises the count on `ResultEnvProvider`.
+ *
+ * Open a row to read the fields the budget left out.
+ */
+export const OfWideRecordsWide: Story = {
+  name: 'Wide records → ranked columns, wide panel',
+  args: story('readings', 960),
+  play: async ({ canvasElement }) => assertRankedColumns(canvasElement),
 };
 
 /**
