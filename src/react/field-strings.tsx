@@ -45,9 +45,13 @@ export interface FieldStrings {
   urlPlaceholder: string;
   /**
    * The accessible name of that URL input, given the field's label as the form
-   * shows it (empty for a list row, whose index labels it). The field's label is
-   * bound to the file input, so without this the placeholder was the only thing
-   * a screen reader announced here.
+   * shows it. The field's label is bound to the file input, so without this the
+   * placeholder was the only thing a screen reader announced here.
+   *
+   * The label is EMPTY inside a list row: the list drops each row's label, and
+   * the row number it shows instead is a bare glyph tied to no control. So every
+   * row's input currently carries the same generic name, and giving rows
+   * distinct names is a separate piece of work on the list control.
    */
   fileUrlAria: (label: string) => string;
   /**
