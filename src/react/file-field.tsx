@@ -49,6 +49,29 @@ const PDF_EXT_RE = /\.pdf(\?|$)/i;
 const DATA_URL_MIME_RE = /^data:([^;,]+)/i;
 /** `http:` or `https:` - a link the person can read, and may have pasted. */
 const WEB_URL_RE = /^\s*https?:\/\//i;
+/** Any URL scheme at the start of the value: `pipelex-storage:`, `data:`, `blob:`, `ftp:`… */
+const URL_SCHEME_RE = /^\s*[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * Whether a file value's URL may be shown to an end user as it is: a web link,
+ * or text with no scheme at all (`example.com/brief.pdf`), which is a link a
+ * person typed rather than an address a host minted. Anything else carries a
+ * scheme only the host can resolve - a `pipelex-storage://` reference above
+ * all - and is not shown in `app`.
+ *
+ * The scheme-less half matters after a remount: the control no longer knows
+ * what it typed, and a link typed without a scheme would otherwise be stored,
+ * submitted and visible nowhere - blanked in the link input, and absent from
+ * the card, whose title is only "Attached file" when there is no filename.
+ *
+ * Accepted limit: a scheme-less value with a port (`localhost:3000/x`,
+ * `example.com:8080/x`) reads as having a scheme, since `localhost:` and
+ * `example.com:` are valid scheme syntax, so it stays hidden until the person
+ * types it again or adds `https://`.
+ */
+function isReadableLink(url: string): boolean {
+  return WEB_URL_RE.test(url) || !URL_SCHEME_RE.test(url);
+}
 
 /*
  * This control reads the kernel's URL gate directly - `viewableUrl` from core,
@@ -321,12 +344,14 @@ function FileField({
   // host can resolve: the input can be open while a stored file is the value -
   // opened after the file was attached, left open through an upload, or written
   // into by the host - and it used to show the `pipelex-storage://` address in
-  // full. Masking every value that is not a web link would break typing, since
-  // a URL being typed is not one yet, so only text the input did not produce
-  // itself is masked. `studio` shows the value as it is, as its card does.
+  // full. So it shows a readable link (a web link, or text with no scheme) and
+  // the text it typed itself, and nothing else. The typed-text clause is what
+  // keeps typing intact, since every keystroke IS that text - `https:` on its
+  // way to `https://…` carries a scheme and is not a web link yet. `studio`
+  // shows the value as it is, as its card does.
   const urlValue = value?.url ?? '';
   const urlText =
-    presentation === 'studio' || WEB_URL_RE.test(urlValue) || urlValue === typedUrl ? urlValue : '';
+    presentation === 'studio' || isReadableLink(urlValue) || urlValue === typedUrl ? urlValue : '';
 
   return (
     <FieldShell
@@ -519,8 +544,9 @@ function PdfPreview({ src }: { src: string }) {
  *
  * - A `data:` URL IS the file, so it is named by its format and size rather
  *   than printed as forty thousand characters of base64.
- * - An `http` or `https` URL is a link the person can read, usually one they
- *   pasted, so it is shown back to them as it is.
+ * - An `http` or `https` URL, or text with no scheme at all, is a link the
+ *   person can read, usually one they typed or pasted, so it is shown back to
+ *   them as it is (`isReadableLink`).
  * - Any other reference - a `pipelex-storage://` URI above all - is an address
  *   only the host can resolve. In `app` it is replaced by the format the
  *   filename's extension names, when that is one of the slot's formats, and by
@@ -538,7 +564,7 @@ function fileChipSubtitle(
   if (url === undefined) return undefined;
   const summary = encodedFileSummary(url, strings);
   if (summary !== undefined) return summary;
-  if (WEB_URL_RE.test(url) || presentation === 'studio') return url;
+  if (presentation === 'studio' || isReadableLink(url)) return url;
   return filename ? formatOfFilename(formats, filename)?.label : undefined;
 }
 

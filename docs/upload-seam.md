@@ -96,7 +96,7 @@ A file is previewable when the **filename** or the **URL** says so, tested separ
 Once a file is attached, the control shows a card: the filename as its title, or "Attached file" (`uploadedFile`) when the value carries none, and a subtitle under it. What the subtitle says depends on what the value holds, because each case means something different to the person looking at the card:
 
 - **A `data:` URL** is the file itself, so the subtitle names its format and decoded size (`PDF · 36 KB`) rather than printing the base64.
-- **An `http` or `https` URL** is a link the person can read, usually one they pasted, so it is shown back to them as it is.
+- **An `http` or `https` URL, or text with no scheme at all** (`example.com/brief.pdf`), is a link the person can read, usually one they typed or pasted, so it is shown back to them as it is.
 - **Any other reference in `app`**, a `pipelex-storage://` URI above all, is an address only the host can resolve. The subtitle shows the format the filename's extension names when that is one of the slot's `formats`, and nothing otherwise. The person who just chose the file has no use for its storage address, and printing it is how one reached an end user's screen under every photo they uploaded.
 - **Any other reference in `studio`** stays printed, because a builder may need the address itself.
 
@@ -104,7 +104,9 @@ The presentation comes from `FieldPresentationProvider`, the same switch the lab
 
 The two default strings on this path name no storage scheme either. The URL a person may paste instead of uploading asks for `https://…` (`urlPlaceholder`), and a host whose runner also takes its own storage references can say so by overriding it.
 
-**The link input follows the card's rule.** It can be open while a stored file is the value: opened after the file was attached, left open through an upload, or written into by the host. In `app` it therefore shows a value only when that value is a web link or is the text the input itself typed, and it is empty over any other reference, so a `pipelex-storage://` address never appears there either. Masking every value that is not yet a web link would have emptied the input on the first keystroke, since a URL being typed is not one until it is finished. In `studio` the input shows the value as it is.
+**The link input follows the card's rule.** It can be open while a stored file is the value: opened after the file was attached, left open through an upload, or written into by the host. In `app` it therefore shows a value only when that value is a web link, carries no scheme at all, or is the text the input itself typed, and it is empty over any other reference, so a `pipelex-storage://` address never appears there either. The typed-text clause is what keeps typing intact, since `https:` on its way to `https://…` carries a scheme and is not yet a web link. The scheme-less clause is what survives a remount, when the control no longer knows what it typed: without it, a link typed as `example.com/brief.pdf` would be blanked in the input and absent from the card, whose title is only "Attached file" when there is no filename, so it would be submitted while visible nowhere. In `studio` the input shows the value as it is.
+
+One limit is accepted. A scheme-less value with a port, such as `localhost:3000/x`, reads as having a scheme, because `localhost:` is valid scheme syntax, so after a remount it is hidden in `app` like a stored reference until the person types it again or adds `https://`.
 
 ## The local preview belongs to the value it was made for
 

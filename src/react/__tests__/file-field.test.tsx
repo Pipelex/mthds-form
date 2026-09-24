@@ -226,9 +226,14 @@ describe('the link input never prints a stored reference in app', () => {
     onWrite?: (value: FileValue | undefined) => void;
   }) {
     const [value, setValue] = useState<FileValue | undefined>(initial);
+    // Bumping the key unmounts the control and mounts a fresh one over the same
+    // value, which is what a host re-rendering its form, or a step away and
+    // back, does to it: everything the control held in its own state is gone.
+    const [mount, setMount] = useState(0);
     return (
       <FieldPresentationProvider presentation={presentation}>
         <DocumentField
+          key={mount}
           field={field}
           value={value}
           onDropFile={noop}
@@ -240,6 +245,9 @@ describe('the link input never prints a stored reference in app', () => {
         />
         <button type="button" onClick={() => setValue({ filename: 'scan.pdf', url: STORED })}>
           host writes a stored file
+        </button>
+        <button type="button" onClick={() => setMount((n) => n + 1)}>
+          remount the control
         </button>
       </FieldPresentationProvider>
     );
@@ -286,6 +294,53 @@ describe('the link input never prints a stored reference in app', () => {
     render(<HostOwnedIn presentation="app" initial={{ url: 'https://example.com/brief.pdf' }} />);
     await user.click(urlToggle());
     expect(linkInput().value).toBe('https://example.com/brief.pdf');
+  });
+
+  describe('after the control remounts, when it no longer knows what it typed', () => {
+    const remount = (user: ReturnType<typeof userEvent.setup>) =>
+      user.click(screen.getByRole('button', { name: 'remount the control' }));
+
+    it('still shows a link typed without a scheme, in the input and on the card', async () => {
+      // Masked, it would be stored and submitted while visible nowhere: the
+      // card's title is only "Attached file" when there is no filename.
+      const user = userEvent.setup();
+      render(<HostOwnedIn presentation="app" />);
+      await user.click(urlToggle());
+      await user.type(linkInput(), 'example.com/brief.pdf');
+
+      await remount(user);
+
+      expect(screen.getByText('Attached file')).toBeInTheDocument();
+      expect(screen.getByText('example.com/brief.pdf')).toBeInTheDocument();
+      await user.click(urlToggle());
+      expect(linkInput().value).toBe('example.com/brief.pdf');
+    });
+
+    it('still hides a stored reference, in the input and on the card', async () => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <HostOwnedIn presentation="app" initial={{ filename: 'scan.pdf', url: STORED }} />,
+      );
+
+      await remount(user);
+
+      expect(container.textContent).not.toContain('pipelex-storage');
+      await user.click(urlToggle());
+      expect(linkInput().value).toBe('');
+    });
+
+    it('hides every other scheme too, whatever the browser could make of it', async () => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <HostOwnedIn presentation="app" initial={{ url: 'ftp://files.example.com/brief.pdf' }} />,
+      );
+
+      await remount(user);
+
+      expect(container.textContent).not.toContain('ftp://');
+      await user.click(urlToggle());
+      expect(linkInput().value).toBe('');
+    });
   });
 
   it('shows the stored reference in studio, where a builder may need it', async () => {
