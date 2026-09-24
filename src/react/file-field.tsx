@@ -7,11 +7,18 @@ import { cn } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
-import { acceptLabel, acceptMap, isAcceptedFile } from '../core/file-formats';
+import {
+  acceptLabel,
+  acceptMap,
+  formatOfFilename,
+  isAcceptedFile,
+  type FileFormat,
+} from '../core/file-formats';
 import { viewableUrl } from '../core/native-content';
 import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
-import { useFieldStrings } from './field-strings';
+import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
+import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 
@@ -110,6 +117,7 @@ function FileField({
   category,
 }: FileFieldProps & { category: 'document' | 'image' }) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
   const domId = useFieldDomId(id);
   const [showUrl, setShowUrl] = useState(false);
   // The preview is collapsed by default - opened on demand via a "Preview" button.
@@ -323,6 +331,8 @@ function FileField({
         <div className="space-y-2">
           <FileChip
             value={value}
+            formats={formats}
+            presentation={presentation}
             disabled={disabled}
             onClear={clear}
             canPreview={canPreview}
@@ -426,6 +436,10 @@ function FileField({
           autoFocus
           value={value?.url ?? ''}
           disabled={busy}
+          // A name of its own. The field's label is bound to the file input, so
+          // without this the placeholder was the only thing a screen reader
+          // announced here - and the placeholder used to name a storage scheme.
+          aria-label={s.fileUrlAria(fieldLabel(field.title, field.name, presentation))}
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
             setLocal(null);
@@ -481,8 +495,44 @@ function PdfPreview({ src }: { src: string }) {
   );
 }
 
+/** `http:` or `https:` - a link the person can read, and may have pasted. */
+const WEB_URL_RE = /^\s*https?:\/\//i;
+
+/**
+ * The line under an attached file's name, or `undefined` for none.
+ *
+ * What the value holds decides it, because the four cases say different things
+ * to the person looking at the card:
+ *
+ * - A `data:` URL IS the file, so it is named by its format and size rather
+ *   than printed as forty thousand characters of base64.
+ * - An `http` or `https` URL is a link the person can read, usually one they
+ *   pasted, so it is shown back to them as it is.
+ * - Any other reference - a `pipelex-storage://` URI above all - is an address
+ *   only the host can resolve. In `app` it is replaced by the format the
+ *   filename's extension names, when that is one of the slot's formats, and by
+ *   nothing otherwise: the person who just chose the file has no use for its
+ *   storage address, and printing it is how one reached an end user's screen.
+ * - In `studio` that reference stays printed, because a builder may need it.
+ */
+function fileChipSubtitle(
+  url: string | undefined,
+  filename: string | undefined,
+  formats: readonly FileFormat[],
+  presentation: FieldPresentation,
+  strings: FieldStrings,
+): string | undefined {
+  if (url === undefined) return undefined;
+  const summary = encodedFileSummary(url, strings);
+  if (summary !== undefined) return summary;
+  if (WEB_URL_RE.test(url) || presentation === 'studio') return url;
+  return filename ? formatOfFilename(formats, filename)?.label : undefined;
+}
+
 function FileChip({
   value,
+  formats,
+  presentation,
   disabled,
   onClear,
   canPreview,
@@ -490,6 +540,8 @@ function FileChip({
   onTogglePreview,
 }: {
   value: FileValue | undefined;
+  formats: readonly FileFormat[];
+  presentation: FieldPresentation;
   disabled?: boolean;
   onClear: () => void;
   canPreview?: boolean;
@@ -498,14 +550,12 @@ function FileChip({
 }) {
   const s = useFieldStrings();
   const url = value?.url;
-  // A `data:` URL is the file, not a reference to it: a host that encodes a
-  // picked file in the browser writes all of it here, so the subtitle printed
-  // base64. It names the format and the size instead. Memoised because the
-  // count walks the whole payload and the chip re-renders on every keystroke
-  // elsewhere in the form.
+  const filename = value?.filename;
+  // Memoised because a `data:` URL's summary counts the whole payload, and the
+  // chip re-renders on every keystroke elsewhere in the form.
   const subtitle = useMemo(
-    () => (url === undefined ? undefined : (encodedFileSummary(url, s) ?? url)),
-    [url, s],
+    () => fileChipSubtitle(url, filename, formats, presentation, s),
+    [url, filename, formats, presentation, s],
   );
   return (
     <div className="flex items-center gap-3 rounded-md border border-border bg-input px-3 py-2.5">
@@ -516,7 +566,9 @@ function FileChip({
         <p className="truncate text-[13px] font-medium text-foreground">
           {value?.filename ?? s.uploadedFile}
         </p>
-        <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
+        {subtitle && (
+          <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
+        )}
       </div>
       {canPreview && (
         <button

@@ -15,6 +15,8 @@ import type { FileRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import { narrowFileFormats } from '../../core/narrow-file-formats';
 import { DocumentField, ImageField, type FileValue } from '../file-field';
+import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
+import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
 
 const field: FileRunField = {
   kind: 'document',
@@ -144,9 +146,130 @@ describe('what the chip prints under the file name', () => {
     expect(screen.getByText('text/plain · 5 bytes')).toBeInTheDocument();
   });
 
-  it('still prints a reference that points somewhere, which is worth copying', () => {
+  it('still prints a stored reference in studio, where a builder may need it', () => {
+    // `studio` is the default presentation, so a host that sets none keeps it.
     renderField({ value: { filename: 'cv.pdf', url: 'pipelex-storage://bucket/abc123' } });
     expect(screen.getByText('pipelex-storage://bucket/abc123')).toBeInTheDocument();
+  });
+});
+
+describe('a stored reference never reaches an end user', () => {
+  /**
+   * In a method app the person who just chose a file was shown its storage
+   * address under its name - every uploaded photo read `pipelex-storage://…`.
+   * The address is the host's to resolve; the person's question is only
+   * whether the right file is attached.
+   */
+  const STORED = 'pipelex-storage://org_1/runs/run_1/uploads/0116d9cc480a9d10';
+
+  function renderIn(presentation: FieldPresentation, value: FileValue) {
+    return render(
+      <FieldPresentationProvider presentation={presentation}>
+        <DocumentField field={field} value={value} onDropFile={noop} onChange={noop} id="cv" />
+      </FieldPresentationProvider>,
+    );
+  }
+
+  it("names the format instead, in app, when the filename names one of the slot's formats", () => {
+    const { container } = renderIn('app', { filename: 'contract.pdf', url: STORED });
+    expect(screen.getByText('contract.pdf')).toBeInTheDocument();
+    expect(screen.getByText('PDF')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('pipelex-storage');
+  });
+
+  it('shows nothing under the name, in app, when the filename names none of them', () => {
+    const { container } = renderIn('app', { filename: 'contract', url: STORED });
+    expect(screen.getByText('contract')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('pipelex-storage');
+    expect(container.textContent).not.toContain('PDF');
+  });
+
+  it("reads the extension against the slot's own formats, not every format there is", () => {
+    // WEBP is a format the kernel knows, but not one a document slot takes, so
+    // a `.webp` filename on this slot names no format of its.
+    const { container } = renderIn('app', { filename: 'scan.webp', url: STORED });
+    expect(container.textContent).not.toContain('WEBP');
+    expect(container.textContent).not.toContain('pipelex-storage');
+  });
+
+  it('still shows a pasted web link back to the person who pasted it, in app', () => {
+    renderIn('app', { url: 'https://example.com/contract.pdf' });
+    expect(screen.getByText('https://example.com/contract.pdf')).toBeInTheDocument();
+  });
+
+  it('prints the reference in studio, the same value and the same slot', () => {
+    renderIn('studio', { filename: 'contract.pdf', url: STORED });
+    expect(screen.getByText(STORED)).toBeInTheDocument();
+  });
+});
+
+describe('the default strings name no storage scheme', () => {
+  it('asks for a web link in the URL placeholder', async () => {
+    const user = userEvent.setup();
+    renderField();
+    await user.click(urlToggle());
+    expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument();
+    expect(DEFAULT_FIELD_STRINGS.urlPlaceholder).toBe('https://…');
+  });
+
+  it('titles a value with no filename "Attached file", which is true of a pasted link too', () => {
+    renderField({ value: { url: 'https://example.com/contract' } });
+    expect(screen.getByText('Attached file')).toBeInTheDocument();
+    expect(DEFAULT_FIELD_STRINGS.uploadedFile).toBe('Attached file');
+  });
+
+  it('holds for every default string, not only those two', () => {
+    const texts = Object.values(DEFAULT_FIELD_STRINGS).map((entry) =>
+      typeof entry === 'function'
+        ? String((entry as (...args: unknown[]) => unknown)('x', 2))
+        : entry,
+    );
+    for (const text of texts) expect(text).not.toMatch(/storage:\/\//);
+  });
+});
+
+describe('the URL input is a named control', () => {
+  /**
+   * The field's label is bound to the file input, so the URL input behind the
+   * toggle had no name at all and its placeholder was the only thing a screen
+   * reader announced - which is how the old placeholder's storage scheme became
+   * the field's whole instruction.
+   */
+  it("takes an accessible name that carries the field's label", async () => {
+    const user = userEvent.setup();
+    renderField();
+    await user.click(urlToggle());
+    expect(screen.getByRole('textbox', { name: 'Link to the file for cv' })).toBeInTheDocument();
+  });
+
+  it('follows the presentation, as the label does', async () => {
+    const user = userEvent.setup();
+    render(
+      <FieldPresentationProvider presentation="app">
+        <DocumentField
+          field={{ ...field, name: 'cover_letter' }}
+          value={undefined}
+          onDropFile={noop}
+          onChange={noop}
+          id="cover_letter"
+        />
+      </FieldPresentationProvider>,
+    );
+    await user.click(urlToggle());
+    expect(
+      screen.getByRole('textbox', { name: 'Link to the file for Cover letter' }),
+    ).toBeInTheDocument();
+  });
+
+  it('is a string a host can override', async () => {
+    const user = userEvent.setup();
+    render(
+      <FieldStringsProvider strings={{ fileUrlAria: (label) => `Lien vers ${label}` }}>
+        <DocumentField field={field} value={undefined} onDropFile={noop} onChange={noop} id="cv" />
+      </FieldStringsProvider>,
+    );
+    await user.click(urlToggle());
+    expect(screen.getByRole('textbox', { name: 'Lien vers cv' })).toBeInTheDocument();
   });
 });
 
