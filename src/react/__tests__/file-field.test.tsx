@@ -423,6 +423,7 @@ describe('the URL input is a named control', () => {
 
 describe('a preview that needs no resolver does not wait for one', () => {
   const spinner = (container: HTMLElement) => container.querySelector('.animate-spin');
+  const placeholder = (container: HTMLElement) => container.querySelector('.lucide-image-off');
 
   it('renders a data URL directly when the host supplies no resolveUrl', async () => {
     const user = userEvent.setup();
@@ -438,7 +439,11 @@ describe('a preview that needs no resolver does not wait for one', () => {
     );
   });
 
-  it('still waits for one on a URI only the host can resolve', async () => {
+  it('says a stored reference cannot be shown when the host supplies no resolveUrl', async () => {
+    // The effect that resolves a reference never starts without a resolver, so
+    // nothing is on its way - and the preview counted it pending anyway, because
+    // it asked whether an answer had landed without asking whether one could.
+    // A host had to pass an identity resolver to get the placeholder.
     const user = userEvent.setup();
     const { container } = renderField({
       value: { filename: 'sample.pdf', url: 'pipelex-storage://bucket/abc123' },
@@ -446,7 +451,21 @@ describe('a preview that needs no resolver does not wait for one', () => {
 
     await user.click(previewButton() as HTMLElement);
 
+    expect(spinner(container)).toBeNull();
+    expect(placeholder(container)).not.toBeNull();
+  });
+
+  it('still waits on a URI only the host can resolve while its resolver answers', async () => {
+    const user = userEvent.setup();
+    const { container } = renderField({
+      value: { filename: 'sample.pdf', url: 'pipelex-storage://bucket/abc123' },
+      resolveUrl: () => new Promise<string>(noop),
+    });
+
+    await user.click(previewButton() as HTMLElement);
+
     expect(spinner(container)).not.toBeNull();
+    expect(placeholder(container)).toBeNull();
   });
 });
 
@@ -521,6 +540,7 @@ const URI_B = 'pipelex-storage://bucket/b';
 
 describe('the resolved preview belongs to the URI it was resolved from', () => {
   const spinner = (container: HTMLElement) => container.querySelector('.animate-spin');
+  const placeholder = (container: HTMLElement) => container.querySelector('.lucide-image-off');
   const previewSrc = (container: HTMLElement) =>
     container.querySelector('object')?.getAttribute('data');
 
@@ -558,12 +578,14 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     await waitFor(() => expect(previewSrc(container)).toBe('https://signed/b.pdf#view=FitH'));
   });
 
-  it('leaves the spinner when the resolver answers with nothing at all', async () => {
+  it('shows the placeholder, not the expired file, when the resolver answers with nothing', async () => {
     // The twin of the rejection below, and the one that survived it: a resolver
     // that RESOLVES with `null` is saying it has no URL, and skipping the state
     // write on an empty answer left the previous one standing. Nothing here
     // even moves URI - reopening the SAME file after its signed URL expired
     // kept painting the dead URL under a resolver that had just declined it.
+    // The fix for that recorded the answer as no answer at all, which left a
+    // spinner waiting on a resolver that had already replied.
     const user = userEvent.setup();
     let call = 0;
     const resolveUrl = vi.fn(() =>
@@ -583,12 +605,13 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     await user.click(previewButton() as HTMLElement);
     await user.click(previewButton() as HTMLElement);
 
-    await waitFor(() => expect(spinner(container)).not.toBeNull());
+    await waitFor(() => expect(placeholder(container)).not.toBeNull());
+    expect(spinner(container)).toBeNull();
     expect(previewSrc(container)).toBeUndefined();
     expect(resolveUrl).toHaveBeenCalledTimes(2);
   });
 
-  it('leaves the spinner, not the wrong file, when a resolution fails', async () => {
+  it('shows the placeholder, not the wrong file, when a resolution fails', async () => {
     // A rejecting resolver is ordinary - it is a network call. Without a
     // `.catch` the rejection also escaped as an unhandled promise rejection
     // into the host's app, which is what this test fails on if one is missing.
@@ -606,8 +629,41 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
 
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
 
-    await waitFor(() => expect(spinner(container)).not.toBeNull());
+    await waitFor(() => expect(placeholder(container)).not.toBeNull());
+    expect(spinner(container)).toBeNull();
     expect(previewSrc(container)).toBeUndefined();
+  });
+
+  it('waits again when the preview is reopened after a refusal', async () => {
+    // A refusal is an answer about the attempt that produced it. Reopening asks
+    // the resolver again, and while that second answer is on its way the first
+    // one must not be shown as though it were the verdict.
+    const user = userEvent.setup();
+    let release: (src: string) => void = noop;
+    let call = 0;
+    const resolveUrl = vi.fn(() =>
+      call++ === 0
+        ? Promise.reject(new Error('offline'))
+        : new Promise<string>((resolve) => {
+            release = resolve;
+          }),
+    );
+
+    const { container } = render(
+      <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
+    );
+
+    await user.click(previewButton() as HTMLElement);
+    await waitFor(() => expect(placeholder(container)).not.toBeNull());
+
+    await user.click(previewButton() as HTMLElement);
+    await user.click(previewButton() as HTMLElement);
+
+    expect(spinner(container)).not.toBeNull();
+    expect(placeholder(container)).toBeNull();
+
+    release('https://signed/a.pdf');
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
   });
 });
 
