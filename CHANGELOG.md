@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [v0.10.0] - 2026-09-24
+
+### Highlights
+
+- **The kernel reads for a method app's end users.** Under the `app` presentation an enum value reads as words and a file card no longer shows a storage reference, while `studio` still shows a builder the payload as it is; in both, a wide record table keeps the columns a reader decides on, and no default string names a storage scheme.
+- **A host can narrow a form's file slots** with `narrowFileFormats`, so the dropzone accepts only what the host's server will take.
+- **The designer method ships as `./layout-design.mthds`, and the brief is data it lays out itself.**
 
 ### Added
 
