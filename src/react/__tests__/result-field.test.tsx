@@ -832,11 +832,16 @@ describe('a record wider than the table budget', () => {
     // the cell cap is the fault this rule was built for. It wraps instead,
     // and the floor keeps a narrow panel from squeezing it into a ribbon -
     // which auto table layout would do first, since it is the one column that
-    // can give width back. jsdom has no layout, so this pins the classes; the
-    // story `Outputs/Lists` asserts the floor holds in a browser.
+    // can give width back. It wraps anywhere, not only between words, or a
+    // name that is one long token still widens the table to that token. jsdom
+    // has no layout, so this pins the classes; the story `Outputs/Lists`
+    // asserts the floor holds in a browser, and `Outputs/Tables` that a name
+    // with no space in it leaves the table inside its panel.
     const { container } = renderWith(discrepancy, rows);
     const name = cellUnder(container, 'item');
     expect(name.className).toContain('min-w-[16ch]');
+    expect(name.className).toContain('wrap-anywhere');
+    expect(name.className).not.toContain('wrap-break-word');
     expect(name.className).toContain('[&>span]:whitespace-normal');
     expect(name.className).not.toContain('truncate');
     expect(name.className).not.toContain('max-w-[44ch]');

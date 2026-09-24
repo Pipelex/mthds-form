@@ -1346,21 +1346,29 @@ function ObjectTable({
                             A record's NAME is the one cell that wraps, in every
                             table, and the one with no cap. It is what a reader
                             identifies a row by, and a name cut at the cap is the
-                            fault this rule was built for. A cell that wraps
-                            cannot push the table wider, so a cap has nothing to
-                            stop there and the name takes the width the panel
-                            leaves it. Wrapping also makes it the one column that
-                            can give width back, so auto table layout squeezes it
-                            first when the panel is narrow - into a ribbon, but
-                            for the floor under it, which is the chip column's
-                            floor for the same reason. `[&>span]` reaches the
-                            value's own span, which is `whitespace-nowrap` in
-                            every cell: only this caller knows the name may wrap. */}
+                            fault this rule was built for. It wraps ANYWHERE, and
+                            that is what lets it wrap at all when a name is one
+                            long token - an address, an identifier. Auto table
+                            layout sizes a column by its cell's narrowest width,
+                            and only `overflow-wrap: anywhere` counts the breaks
+                            inside a word toward it: `break-word` breaks the
+                            token on screen but still measures it whole, so the
+                            table grew as wide as the name's longest word. Wrapped
+                            anywhere, the cell cannot push the table wider, so a
+                            cap has nothing to stop there and the name takes the
+                            width the panel leaves it. Wrapping also makes it the
+                            one column that can give width back, so auto table
+                            layout squeezes it first when the panel is narrow -
+                            into a ribbon, but for the floor under it, which is
+                            the chip column's floor for the same reason.
+                            `[&>span]` reaches the value's own span, which is
+                            `whitespace-nowrap` in every cell: only this caller
+                            knows the name may wrap. */}
                           <div
                             className={cn(
                               'max-w-[44ch]',
                               column === name
-                                ? 'max-w-none min-w-[16ch] wrap-break-word [&>span]:whitespace-normal'
+                                ? 'max-w-none min-w-[16ch] wrap-anywhere [&>span]:whitespace-normal'
                                 : column.kind === 'list' && isInlineColumn(column)
                                   ? 'min-w-[16ch]'
                                   : 'truncate',

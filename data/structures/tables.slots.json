@@ -1,0 +1,18 @@
+{
+  "description": "Record lists whose values press on the table's own rules rather than on the choice of a table. A link checker's report is a table whose name column holds web addresses: each one a single token, and some of them longer than any panel is wide, which is the value the name cell has to wrap without widening the table. Every pipe runs for real.",
+  "pipes": [
+    {
+      "code": "links",
+      "output": "Link[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Link check from this morning, 2026-09-20. Give me all five as records, copying each address exactly as written.\nhttps://en.wikipedia.org/wiki/Taumatawhakatangihangakoauauotamateaturipukakapikimaungahoronukupokaiwhenuakitanatahu answered in 412 ms, up.\nhttps://en.wikipedia.org/wiki/Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch answered in 388 ms, up.\nhttps://developer.mozilla.org/en-US/docs/Web/CSS/overflow-wrap answered in 97 ms, redirect.\nhttps://www.w3.org/TR/css-text-3/#overflow-wrap-property answered in 1204 ms, up.\nhttps://example.org/archive/2019/observatory-retrofit-plan-final-v2.pdf did not answer after 30000 ms, down."
+      }
+    }
+  ]
+}
