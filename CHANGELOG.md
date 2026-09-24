@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.11.0] - 2026-09-24
+
+### Highlights
+
+- **A file field offers exactly the ways in its host supports.** With no upload path it offers a link instead of a dropzone that dropped the picked file in silence, and a host can now take the link away with `allowUrl`.
+- **A failed upload is shown on the field that took the file**, through `uploadErrors`, rather than under the whole form.
+
+### Added
+
+- **`FieldEnv.allowUrl` takes the link input away**: set to `false`, every file field drops its "paste a URL instead" toggle and the input behind it, so a host whose runner should only take its own uploads offers the dropzone alone. It governs that input and nothing else: a web link the host writes into the value still shows on the field's card and can still be cleared. `DocumentField` and `ImageField` take it as a prop, and a field left with no way in at all, with no `onDropFile` and `allowUrl` set to `false`, throws while rendering, naming its path. See [docs/upload-seam.md](docs/upload-seam.md).
+
+- **`FieldEnv.uploadErrors` shows a failed upload on the field that took the file**: a host passes a message keyed by the id `onDropFile` was handed, and the field shows it in the alert slot a refused format uses, so on a form with two file inputs the failure is on the one that failed rather than under the whole form. The map is the host's truth about each attempt, so the host removes an entry when the next file is dropped at that id; a clear or a typed link hides the message until the host sends a different one, and a list holds back the entries a row removal left at a renumbered position. See [docs/upload-seam.md](docs/upload-seam.md).
+
+### Changed
+
+- **`FieldStrings` gains `uploadUnavailable` (Breaking)**: the line a link-only file field shows in place of its dropzone, defaulting to "Files cannot be uploaded here. Paste a link to the file instead." A host that supplies a complete `FieldStrings` rather than a partial override adds it.
+
+### Fixed
+
+- **A control no longer loses focus when its error clears in `app`**: the outline an `app` field in error carries came from a wrapper rendered only while the field was in error, so the control was remounted whenever the error came or went, and a host that clears an error as the user types lost the focus and the keystrokes after the first. The wrapper is always there now and only its outline toggles.
+- **A file field with no upload path offers a link instead of dropping the file**: a `document` or `image` field rendered an armed dropzone whether or not the host supplied `onDropFile`, so with none the file picker opened, the picked file was handed to a callback that did nothing, and the field stayed empty with nothing said, which on a required field kept the run shut. With no `onDropFile`, the field now renders no dropzone and no picker: its link input is open from the start and named by the field's label, above it a line says a file cannot be uploaded here, and the slot's format hint follows. The rule holds in records, in every row of a list, on a produced layout and in a `DocumentField` or `ImageField` composed directly, whose `onDropFile` prop is now optional. A host that uploads sees no change.
+
 ## [v0.10.1] - 2026-09-24
 
 ### Fixed

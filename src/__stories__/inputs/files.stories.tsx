@@ -200,6 +200,88 @@ export const PasteALink: Story = {
   },
 };
 
+/** What a link-only field says in place of its dropzone. */
+const NO_UPLOAD_LINE = 'Files cannot be uploaded here. Paste a link to the file instead.';
+
+/**
+ * The assertions every link-only story makes, in both theme panes: nothing can
+ * open a file picker, and each link input carries a name of its own and is
+ * described by the line that says why it is the way in.
+ */
+async function expectLinkOnly(canvasElement: HTMLElement, name: string, count: number) {
+  const canvas = within(canvasElement);
+  await expect(canvasElement.querySelectorAll('input[type="file"]')).toHaveLength(0);
+  await expect(canvas.queryAllByRole('button', { name: 'paste a URL instead' })).toHaveLength(0);
+  const inputs = canvas.getAllByRole('textbox', { name });
+  await expect(inputs).toHaveLength(count);
+  for (const input of inputs) await expect(input).toHaveAccessibleDescription(NO_UPLOAD_LINE);
+}
+
+/**
+ * **A host with no way to store a file**, against `Document` above: the same
+ * slot, rendered with no `onDropFile`. There is no dropzone and no picker,
+ * because a control that takes a file with nowhere to send it drops the file
+ * without a word, which is what every file field used to do here. The link
+ * input is open from the start, the field's label names it, and the line above
+ * it says why it is the way in. It does not take focus: a page does not jump
+ * into its form on load.
+ */
+export const LinkOnlyDocument: Story = {
+  args: { pipeCode: 'one_document', upload: false },
+  play: async ({ canvasElement }) => {
+    await expectLinkOnly(canvasElement, 'Link to the file for attachment', 2);
+  },
+};
+
+/** The same host on an image slot: the line is the same, the hint is the image one. */
+export const LinkOnlyImage: Story = {
+  args: { pipeCode: 'one_image', upload: false },
+  play: async ({ canvasElement }) => {
+    await expectLinkOnly(canvasElement, 'Link to the file for picture', 2);
+  },
+};
+
+/**
+ * **A list of files with no upload path.** Every row is link-only, because the
+ * list hands each row the form's environment unchanged. The rows' inputs share
+ * one generic name, since the list drops each row's label; giving rows names of
+ * their own is separate work (docs/upload-seam.md).
+ */
+export const LinkOnlyManyFiles: Story = {
+  args: {
+    pipeCode: 'many_files',
+    upload: false,
+    initialValues: { attachments: [undefined, undefined], gallery: [undefined] },
+  },
+  play: async ({ canvasElement }) => {
+    await expectLinkOnly(canvasElement, 'Link to the file', 6);
+  },
+};
+
+/** The link-only field inside a method app, where the label is the humanised question. */
+export const LinkOnlyApp: Story = {
+  args: { pipeCode: 'one_document', upload: false, presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    await expectLinkOnly(canvasElement, 'Link to the file for Attachment', 2);
+  },
+};
+
+/**
+ * **A host that takes uploads and no links**, with `allowUrl: false`. The
+ * dropzone is the only way in, so the "paste a URL instead" toggle is gone. A
+ * host that writes a web link into the value still sees it on the card, since
+ * hiding a way in is no reason to hide a value.
+ */
+export const UploadOnly: Story = {
+  args: { pipeCode: 'one_document', allowUrl: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvasElement.querySelectorAll('input[type="file"]')).toHaveLength(2);
+    await expect(canvas.queryAllByRole('button', { name: 'paste a URL instead' })).toHaveLength(0);
+    await expect(canvas.queryAllByRole('textbox')).toHaveLength(0);
+  },
+};
+
 /**
  * **What a slot actually accepts, and what happens when it does not.**
  *
@@ -226,6 +308,31 @@ export const PasteALink: Story = {
  * used by hand; the automated coverage is `src/react/__tests__/file-field.test.tsx`.
  */
 export const TryAWrongFileType: Story = { args: { pipeCode: 'one_document' } };
+
+/**
+ * **A host's upload that failed**, shown on the field that took the file rather
+ * than under the whole form, where on a form with two file inputs only the
+ * wording could say which one failed. The message is the host's own, from
+ * `FieldEnv.uploadErrors`, in the alert slot a refused format uses. Dropping
+ * another file hides it, and here fills the field, since the harness's own
+ * upload never fails.
+ */
+export const UploadFailed: Story = {
+  args: {
+    pipeCode: 'one_document',
+    uploadErrors: {
+      'one_document-attachment': 'The file could not be stored. Try again in a moment.',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const alerts = canvas.getAllByRole('alert');
+    await expect(alerts).toHaveLength(2);
+    for (const alert of alerts) {
+      await expect(alert).toHaveTextContent('The file could not be stored. Try again in a moment.');
+    }
+  },
+};
 
 /** The same busy state on an image slot, where the preview area is what waits. */
 export const UploadingImage: Story = {

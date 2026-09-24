@@ -78,14 +78,22 @@ export function FieldShell({
           red caption alone is easy to miss on a tall form, and it is the only
           signal on controls whose `aria-invalid` sits on an element the user
           cannot see (the file dropzone's hidden input, most of all). Scoped to
-          the app presentation so the studio's look is unchanged. */}
-      {isApp && error ? (
-        <div className="rounded-lg ring-1 ring-destructive/70 ring-offset-4 ring-offset-background">
-          {children}
-        </div>
-      ) : (
-        children
-      )}
+          the app presentation so the studio's look is unchanged.
+          The wrapper is ALWAYS rendered and only its ring comes and goes. It
+          used to be rendered only while the field was in error, so the element
+          at this position changed type whenever the error toggled, and React
+          remounted the control: a host that clears an error as the user types
+          took the focus and the keystroke after the first with it. */}
+      <div
+        className={cn(
+          'space-y-2',
+          isApp &&
+            error &&
+            'rounded-lg ring-1 ring-destructive/70 ring-offset-4 ring-offset-background',
+        )}
+      >
+        {children}
+      </div>
       {error && (
         <p className="flex items-center gap-1 text-[11px] text-destructive" role="alert">
           {error}

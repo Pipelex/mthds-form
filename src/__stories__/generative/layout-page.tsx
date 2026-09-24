@@ -2,9 +2,11 @@ import * as React from 'react';
 import { createStateStore } from '@json-render/core';
 import type { InputForm, PipeIOContracts, RunField } from '../../core';
 import { buildRunFields, computeReadiness, getPipeIOContract, getPipeInputForm } from '../../core';
+import type { FieldEnv } from '../../react';
 import {
   GenerativePage,
   layoutProblems,
+  pathFromDomId,
   seedInputs,
   useStoreSnapshot,
   validateAgainstCatalog,
@@ -31,6 +33,13 @@ import { BRANDS, type BrandFixture } from './brands';
  * on the root is what makes Tailwind emit `--font-sans`, without which a
  * scoped typeface token has nothing to override.
  *
+ * It uploads the way a host does, too, in the one sense a story can: a file
+ * dropped on a delegated file input is written back as a `blob:` URL at the
+ * store path `pathFromDomId` recovers from the field's id. A file field
+ * offers a dropzone only when its host supplies `onDropFile`, and this
+ * harness used to supply none, so every file input on a produced page was
+ * painted as a dropzone that silently dropped what it took.
+ *
  * Under the page, folded away, the chrome a person never sees: the `/inputs`
  * tree exactly as a run would receive it, and the readiness the kernel
  * computes from it. That is the story's real claim - not that the page looks
@@ -54,13 +63,22 @@ export function LayoutPage({ brand, fields, fixture, idPrefix }: LayoutPageProps
   const state = useStoreSnapshot(store);
   const inputs = (state.inputs ?? {}) as Record<string, unknown>;
   const readiness = computeReadiness(fields, inputs);
+  const env = React.useMemo<FieldEnv>(
+    () => ({
+      onDropFile: (id, file) => {
+        const path = pathFromDomId(idPrefix, id);
+        if (path) store.set(path, { url: URL.createObjectURL(file), filename: file.name });
+      },
+    }),
+    [idPrefix, store],
+  );
 
   return (
     <div className={brand.scope ? `${brand.scope} font-sans` : 'font-sans'}>
       <GenerativePage
         spec={fixture.spec}
         store={store}
-        scope={{ inputs: fields, idPrefix }}
+        scope={{ inputs: fields, idPrefix, env }}
         brand={brand.manifest}
       />
       <details className={RECEIPT}>

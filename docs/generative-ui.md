@@ -109,6 +109,8 @@ env = {
 
 Kept beside `domIdFor` in the same module so the two cannot drift, and exact for any name: the id escapes its own separator, so `/inputs/a-b` and `/inputs/a/b` do not mint the same one. That used to rest on an assumption about MTHDS names, which nothing in this package can enforce — a name reaches the descriptor from a JSON Schema property — and the cost of it being wrong was an upload written to a different, plausible-looking path with no error anywhere.
 
+Which ways into a file value the page offers follows the same rule as a plain form, because `MthdsField` renders through `FieldRenderer` with the scope's `env`: a scope with no `onDropFile` gets a link-only file field rather than a dropzone that drops what it takes, and `allowUrl: false` takes the link away ([the upload seam](upload-seam.md) § "Which ways into a file value a host offers"). A scope that offers neither makes the field throw as it does on a plain form, but json-render catches the throw in the boundary it wraps around every element: the error, naming the field's id, is what the boundary logs, and the field renders nothing while the rest of the page stays.
+
 ## Producing a layout
 
 The producer is outside this package, but the package ships what a producer needs.
