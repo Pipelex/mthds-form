@@ -9,6 +9,7 @@ import {
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
+  isNativeValueNode,
   readCompositeContent,
   readDateContent,
   readDocumentContent,
@@ -1563,16 +1564,6 @@ function FileRows({ items, kind }: { items: readonly unknown[]; kind: 'document'
       ))}
     </div>
   );
-}
-
-/**
- * Whether a node is one of the three natives the kind vocabulary cannot name —
- * a date, a page, a composite — which `ResultField` reads by CONCEPT before its
- * kind switch. A list of one answers no (the predicates refuse a `list` node),
- * and its item answers yes.
- */
-function isNativeValueNode(field: RunField): boolean {
-  return isNativeDateNode(field) || isNativeHtmlNode(field) || isNativeCompositeNode(field);
 }
 
 /**
