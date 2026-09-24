@@ -154,8 +154,9 @@ function FileField({
   // never fetches a presigned URL. Keyed by the URI it was resolved FROM, the
   // way `LocalPreview` is bound to the value it is the preview OF - a cached
   // source with no record of its provenance is painted under whatever name the
-  // value carries next.
-  const [resolved, setResolved] = useState<{ uri: string; src: string } | null>(null);
+  // value carries next. A `src` of `null` is the resolver's answer that it has
+  // no URL for that URI - declined or failed - which is an answer, not a wait.
+  const [resolved, setResolved] = useState<{ uri: string; src: string | null } | null>(null);
   const localUrlRef = useRef<string | null>(null);
 
   const setLocal = useCallback((next: LocalPreview | null) => {
@@ -303,14 +304,15 @@ function FileField({
         // an empty answer left the previous resolution standing, and it was not
         // even stale by URI - reopening the SAME file after its signed URL
         // expired kept painting the dead URL under a resolver that had just
-        // said it had none.
-        if (!cancelled) setResolved(src ? { uri: storageUri, src } : null);
+        // said it had none. It is recorded against the URI, like a URL, because
+        // recording it as no answer at all kept the preview pending forever.
+        if (!cancelled) setResolved({ uri: storageUri, src: src || null });
       })
       .catch(() => {
-        // A resolution that failed must leave the spinner, not the file before
-        // it - and must not escape as an unhandled rejection into the host's
-        // app. `resolveUrl` is a network call; rejecting is ordinary.
-        if (!cancelled) setResolved(null);
+        // A resolution that failed must leave the placeholder, not the file
+        // before it - and must not escape as an unhandled rejection into the
+        // host's app. `resolveUrl` is a network call; rejecting is ordinary.
+        if (!cancelled) setResolved({ uri: storageUri, src: null });
       });
     return () => {
       cancelled = true;
@@ -329,16 +331,28 @@ function FileField({
   // past the URL policy - and this is the sink the seam's contract documents, so
   // it has to be the sink that keeps it.
   const resolvedSrc =
-    resolved && resolved.uri === storageUri ? viewableUrl(resolved.src) : undefined;
+    resolved && resolved.uri === storageUri ? viewableUrl(resolved.src ?? undefined) : undefined;
   const previewSrc =
     (localIsCurrent ? localPreview?.objectUrl : undefined) ?? directSrc ?? resolvedSrc;
-  // Whether anything can still arrive: there is a reference to resolve and no
-  // resolution has landed FOR IT yet. Without this the "nothing to show" case
-  // and the "still waiting" case rendered the same spinner, so a refusal read as
-  // a load that never finished. Keyed by URI for the same reason `resolvedSrc`
-  // is: a resolution belonging to the previous value is not an answer about this
-  // one.
-  const previewPending = !previewSrc && !!storageUri && resolved?.uri !== storageUri;
+  // Whether anything can still arrive: there is a reference to resolve, a
+  // resolver to resolve it, and no answer has landed FOR IT yet. Without this
+  // the "nothing to show" case and the "still waiting" case rendered the same
+  // spinner, so a refusal read as a load that never finished. The resolver is
+  // part of the question because the effect above never starts without one, so
+  // with no resolver nothing is on its way. Keyed by URI for the same reason
+  // `resolvedSrc` is: an answer belonging to the previous value is not an answer
+  // about this one.
+  const previewPending =
+    !previewSrc && !!storageUri && !!resolveUrl && resolved?.uri !== storageUri;
+
+  const togglePreview = () => {
+    // Opening the preview asks the resolver again, so a refusal it gave last
+    // time must not stand in for the answer now on its way: forgetting it lets
+    // the retry read as pending. A URL it gave is kept and painted until the
+    // fresh one lands, as before.
+    if (!previewOpen) setResolved((r) => (r?.src === null ? null : r));
+    setPreviewOpen((v) => !v);
+  };
 
   // What the link input shows. In `app` it must not print a reference only the
   // host can resolve: the input can be open while a stored file is the value -
@@ -377,7 +391,7 @@ function FileField({
             onClear={clear}
             canPreview={canPreview}
             previewOpen={previewOpen}
-            onTogglePreview={() => setPreviewOpen((v) => !v)}
+            onTogglePreview={togglePreview}
           />
           {previewOpen &&
             (previewSrc && isImage ? (
