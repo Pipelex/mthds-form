@@ -32,7 +32,7 @@ jobs:
         id: get_version
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing version: $VERSION"
 
       # Publishing is idempotent by design: a push to `main` that does not move
@@ -44,10 +44,10 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           if npm view "@pipelex/mthds-form@$VERSION" version 2>/dev/null; then
             echo "Version $VERSION is already published to npm"
-            echo "already_published=true" >> $GITHUB_OUTPUT
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
           else
             echo "Version $VERSION is not yet published"
-            echo "already_published=false" >> $GITHUB_OUTPUT
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
           fi
 
       # The same gate `changelog-check.yml` runs on the release PR, repeated at
@@ -127,10 +127,32 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           if git ls-remote --exit-code origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
             echo "Tag v$VERSION already exists"
-          else
-            git tag "v$VERSION"
-            git push origin "v$VERSION"
+            exit 0
           fi
+
+          # Tag the commit npm ACTUALLY published, which is not always the one
+          # running this step. Backfill is reachable from any push to `main`
+          # carrying an already-published version, so when a release fails
+          # after `npm publish` and is recovered by pushing a follow-up commit,
+          # tagging this run's SHA would put the tag on the follow-up while the
+          # artifact came from the merge - and since the tag then exists, every
+          # later run takes the branch above and the wrong association is
+          # permanent.
+          #
+          # npm records the publishing commit as `gitHead`. On the normal path
+          # it equals this run's SHA. When it cannot be read at all - the
+          # registry has not propagated the publish this run just made -
+          # falling back to this run's SHA is exactly right, because that IS
+          # the publishing run.
+          PUBLISHED_SHA="$(npm view "@pipelex/mthds-form@$VERSION" gitHead 2>/dev/null || true)"
+          TARGET_SHA="$GITHUB_SHA"
+          if [ -n "$PUBLISHED_SHA" ] && [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
+            echo "::warning::npm published $VERSION from $PUBLISHED_SHA, not $GITHUB_SHA. Tagging the published commit."
+            git fetch --depth=1 origin "$PUBLISHED_SHA"
+            TARGET_SHA="$PUBLISHED_SHA"
+          fi
+          git tag "v$VERSION" "$TARGET_SHA"
+          git push origin "v$VERSION"
 
   # Not gated on already_published either, for the same recovery reason: the
   # release must be creatable on a rerun even when npm already has the version.
@@ -153,19 +175,22 @@ jobs:
           VERSION="${{ needs.publish.outputs.version }}"
           if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release v$VERSION already exists"
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract changelog notes for current version
         if: steps.check_release.outputs.exists == 'false'
         run: |
           VERSION="${{ needs.publish.outputs.version }}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Extracting changelog for version v$VERSION"
 
-          START_LINE=$(grep -n "^## \[v$VERSION\]" CHANGELOG.md | head -1 | cut -d: -f1)
+          # Anchored, dateless and with the dots escaped: the shape
+          # `changelog-check.yml` gates the release PR on, so a heading that
+          # passes that gate is always the one found here.
+          START_LINE=$(grep -n "^## \[v${VERSION//./\\.}\]" CHANGELOG.md | head -1 | cut -d: -f1)
 
           # Deliberately a warning here, where the publish job hard-fails: this
           # job also runs on the recovery path, backfilling a release for a
@@ -174,27 +199,37 @@ jobs:
           # the gate is for. The heading is enforced before publishing instead.
           if [ -z "$START_LINE" ]; then
             echo "Warning: No changelog entry found for version v$VERSION"
-            echo "CHANGELOG_NOTES=" >> $GITHUB_ENV
+            echo "CHANGELOG_NOTES=" >> "$GITHUB_ENV"
             exit 0
           fi
 
           NEXT_VERSION_LINE=$(tail -n +$((START_LINE + 1)) CHANGELOG.md | grep -n "^## \[v" | head -1 | cut -d: -f1)
 
           if [ -z "$NEXT_VERSION_LINE" ]; then
-            CHANGELOG_CONTENT=$(tail -n +$START_LINE CHANGELOG.md)
+            CHANGELOG_CONTENT=$(tail -n "+$START_LINE" CHANGELOG.md)
           else
             END_LINE=$((START_LINE + NEXT_VERSION_LINE - 1))
             CHANGELOG_CONTENT=$(sed -n "$START_LINE,${END_LINE}p" CHANGELOG.md)
           fi
 
-          HEADER_LINE=$(echo "$CHANGELOG_CONTENT" | head -1)
-          CONTENT_LINES=$(echo "$CHANGELOG_CONTENT" | tail -n +2 | sed '/^$/d' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
-
-          CHANGELOG_CONTENT=$(printf "%s\n\n%s" "$HEADER_LINE" "$CONTENT_LINES")
-
-          echo "CHANGELOG_NOTES<<EOF" >> $GITHUB_ENV
-          echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          # The entry reaches the release page exactly as it was written. This
+          # step used to drop every blank line and strip every line's leading
+          # whitespace, which is fatal to Markdown: blank lines are what
+          # separate paragraphs and close lists, and indentation is what keeps a
+          # continuation paragraph inside its list item, so a structured entry
+          # rendered as one run-on block. Command substitution has already
+          # dropped the trailing blank lines before the next heading.
+          #
+          # Random delimiter, per GitHub's own guidance: the entry reaches this
+          # heredoc verbatim, so a fixed marker is one line of CHANGELOG.md away
+          # from closing the block early and having the remainder parsed as
+          # further environment assignments.
+          DELIM="CHANGELOG_EOF_$(openssl rand -hex 16)"
+          {
+            echo "CHANGELOG_NOTES<<$DELIM"
+            echo "$CHANGELOG_CONTENT"
+            echo "$DELIM"
+          } >> "$GITHUB_ENV"
 
       - name: Create GitHub Release
         if: steps.check_release.outputs.exists == 'false'

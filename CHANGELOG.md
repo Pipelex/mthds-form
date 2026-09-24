@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The GitHub release page carries the changelog entry as it was written**: the notes used to lose every blank line and every line's indentation on the way to the release page, so an entry's paragraphs, lists and sub-headings ran together into one block. They now arrive verbatim.
+
 ## [v0.11.0] - 2026-09-24
 
 ### Highlights
