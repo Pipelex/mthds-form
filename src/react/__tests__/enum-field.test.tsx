@@ -179,3 +179,26 @@ describe('options that would read the same are shown as codes', () => {
     expect(screen.getByRole('radio', { name: 'Low risk' })).toBeTruthy();
   });
 });
+
+describe('the segmented control is named by the label the field shows', () => {
+  // A screen reader announces the radiogroup by its accessible name, and that
+  // name has to be the label a sighted reader sees above it - the identifier
+  // in `studio`, the words in `app`, an authored title in both.
+  const field: EnumRunField = { ...choice(['low', 'high']), name: 'risk_level' };
+
+  it('names it by the identifier in studio', () => {
+    render(<Harness field={field} presentation="studio" />);
+    expect(screen.getByRole('radiogroup', { name: 'risk_level' })).toBeTruthy();
+  });
+
+  it('names it in words in app', () => {
+    render(<Harness field={field} presentation="app" />);
+    expect(screen.getByRole('radiogroup', { name: 'Risk level' })).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: 'risk_level' })).toBeNull();
+  });
+
+  it.each(['studio', 'app'] as const)('names it by an authored title in %s', (presentation) => {
+    render(<Harness field={{ ...field, title: 'How risky' }} presentation={presentation} />);
+    expect(screen.getByRole('radiogroup', { name: 'How risky' })).toBeTruthy();
+  });
+});

@@ -41,6 +41,7 @@ import {
   fieldLabel,
   humanizeFieldName,
   useFieldPresentation,
+  type FieldPresentation,
 } from './field-presentation';
 import { cn } from './utils';
 
@@ -304,6 +305,19 @@ function EnumValue({
   const presentation = useFieldPresentation();
   const shown = typeof value === 'string' ? enumLabeler(field.options, presentation)(value) : value;
   return <Scalar value={shown} compact={compact} />;
+}
+
+/**
+ * A table cell's tooltip: the value as the cell shows it. A cell is truncated
+ * past its width cap, and the tooltip is then the only way to read it whole,
+ * so an enum cell's tooltip carries the same `enumLabeler` label as the cell
+ * rather than the code the payload holds. Every other kind keeps the payload's
+ * text.
+ */
+function cellTitle(column: RunField, cell: string | number, presentation: FieldPresentation) {
+  return column.kind === 'enum' && typeof cell === 'string'
+    ? enumLabeler(column.options, presentation)(cell)
+    : String(cell);
 }
 
 /**
@@ -1364,7 +1378,7 @@ function ObjectTable({
                                 : 'truncate',
                             )}
                             {...(typeof cell === 'string' || typeof cell === 'number'
-                              ? { title: String(cell) }
+                              ? { title: cellTitle(column, cell, presentation) }
                               : {})}
                           >
                             <LeafValue field={column} value={cell} compact />

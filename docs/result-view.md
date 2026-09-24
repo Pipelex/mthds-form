@@ -81,20 +81,20 @@ This is worth stating because the result side got it wrong once: it humanised un
 
 **An enum value follows it too, for the reason labels do.** `studio` is a builder's view, where a value has to match the bundle and the JSON the builder will read next. `app` is for a person who has seen neither. So an enum value is its code in `studio` (`unit_price_differs_from_po`, `HIGH_RISK`) and its code in words in `app` ("Unit price differs from po", "High risk"). It is the only value the two presentations show differently: a number, a text, a date and every other value render the same in both.
 
-`humanizeEnumValue` words one code, and its rules are few on purpose:
+A code is put into words by a short list of rules, kept short on purpose:
 
-- **A code is worded as a field name is.** It is `humanizeFieldName`: the `_` and `-` separators become spaces and only the first word is capitalised.
+- **A code is worded as a field name is.** The `_` and `-` separators become spaces and only the first word is capitalised, exactly as an identifier becomes a label in `app`.
 - **An all-caps code of several words is lowercased first.** The capitals of `HIGH_RISK` are a convention of the code rather than an emphasis its author meant, and "HIGH RISK" on a sentence-case page reads as an alarm.
 - **A single all-caps token is left exactly as written.** `USD`, `EUR`, `OK` and `HIGH` hold no separator, and a lone capitalised word is far more often an acronym, a unit or a currency than a shouted word, so lowercasing it would misspell it.
 - **Only a code is worded.** A value holding a space, a slash or a symbol, or one that does not start with a letter (`Very satisfied`, `N/A`, `18-24`), is authored words already and is shown verbatim.
 - **Acronyms inside a longer code are not guessed.** `po` stays `po` where a reader expects `PO`, exactly as a field name does, and the cure for both is a label the method's author writes, which is a change to the standard's descriptor rather than a guess in the kernel.
 
-What a person reads is then decided per enum, by `enumLabeler` in `field-presentation.tsx`, and two cases show the code as written even in `app`:
+What a person reads is then decided per enum rather than per value, and two cases show the code as written even in `app`:
 
 - **Every option, when two of them would read the same.** `high_risk` and `HIGH_RISK`, or `foo-bar` and `foo_bar`, are distinct codes that word to one label, and a person offered the same words twice is choosing blind. Wording the other options while those two stay codes would make one enum read in two registers, so the whole enum falls back to its codes. Another enum on the same record is unaffected.
 - **A value the enum does not declare.** It is the payload disagreeing with its descriptor, and worded it could pass for an option it is not.
 
-`LeafValue` owns the rule through its `enum` arm, so a stacked row, a table cell and a chip cannot disagree. The enum input control goes through the same `enumLabeler`, fallback included: in `app` it offers the words and still stores the code, because a result and the form that produced it show the same fields. Its segmented control measures the label it shows, not the code.
+The rule is internal to the package and lives in one place in `field-presentation.tsx`, which the result view and the enum input control both go through. In the result view, `LeafValue` applies it through its `enum` arm, so a stacked row, a table cell and a chip cannot disagree, and a table cell's tooltip carries the same label as the cell: a cell is truncated past its width cap, and the tooltip is then the only way to read it whole. The enum input control applies the same rule, fallback included: in `app` it offers the words and still stores the code, because a result and the form that produced it show the same fields. Its segmented control measures the label it shows, not the code.
 
 **Only the rendering changes.** The JSON view, the copy control and the download carry the payload as it came, byte for byte, which is why none of this could be done by a host rewriting values before rendering them. `Outputs/Readability` shows one real run in both presentations, and `result-values.test.tsx` and `enum-field.test.tsx` pin every rule, cells and chips included.
 

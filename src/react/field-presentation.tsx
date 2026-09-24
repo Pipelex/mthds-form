@@ -14,7 +14,7 @@ import { createContext, use, type ReactNode } from 'react';
  * - `app`: the field's name as a human question in sans, no concept pill. Inside
  *   a method app, `full_name` and `native.Text` are implementation detail; the
  *   person filling the form has never seen the method's source. An enum value
- *   follows the label and reads as words (`enumLabeler`).
+ *   follows the label and reads as words.
  *
  * An enum value is the only value the two presentations show differently. A
  * number, a text, a date and every other value render the same in both.

@@ -186,6 +186,55 @@ describe('an enum whose options would read the same shows its codes', () => {
   });
 });
 
+describe("a table cell's tooltip reads as its cell", () => {
+  // A cell is truncated past its width cap, and its tooltip is then the only
+  // way to read it whole, so it carries the label the cell shows.
+  const lines = (options: string[]) =>
+    listOf('lines', record([text('item', 40), choice('status', options)], 'line'));
+
+  /** The `title` on the wrapper around the cell showing `shown`. */
+  function tooltipOf(container: HTMLElement, shown: string) {
+    const cell = within(container.querySelector('tbody')!).getByText(shown);
+    return cell.closest('[title]')?.getAttribute('title');
+  }
+
+  it('carries the code in studio', () => {
+    const { container } = renderIn(
+      'studio',
+      <ResultField field={lines(STATUSES)} value={[{ item: 'Pump', status: 'HIGH_RISK' }]} />,
+    );
+    expect(tooltipOf(container, 'HIGH_RISK')).toBe('HIGH_RISK');
+  });
+
+  it('carries the words in app', () => {
+    const { container } = renderIn(
+      'app',
+      <ResultField
+        field={lines(STATUSES)}
+        value={[{ item: 'Pump', status: 'unit_price_differs_from_po' }]}
+      />,
+    );
+    expect(tooltipOf(container, 'Unit price differs from po')).toBe('Unit price differs from po');
+  });
+
+  it('carries the code in app when the enum falls back to its codes', () => {
+    const { container } = renderIn(
+      'app',
+      <ResultField field={lines(COLLIDING)} value={[{ item: 'Pump', status: 'high_risk' }]} />,
+    );
+    expect(tooltipOf(container, 'high_risk')).toBe('high_risk');
+  });
+
+  it("keeps the payload's text for every other kind", () => {
+    const { container } = renderIn(
+      'app',
+      <ResultField field={lines(STATUSES)} value={[{ item: 'pump_housing', status: 'USD' }]} />,
+    );
+    // An identifier-looking `text` value is not an enum, and is not worded.
+    expect(tooltipOf(container, 'pump_housing')).toBe('pump_housing');
+  });
+});
+
 describe('no other value changes with the presentation', () => {
   // The enum arm is the whole difference: a number and a text read the same
   // in both presentations.

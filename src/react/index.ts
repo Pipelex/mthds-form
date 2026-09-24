@@ -63,7 +63,6 @@ export { FieldDomIdProvider, useFieldDomId } from './field-dom-id';
 export type { FieldPresentation } from './field-presentation';
 export {
   FieldPresentationProvider,
-  humanizeEnumValue,
   humanizeFieldName,
   useFieldPresentation,
 } from './field-presentation';
