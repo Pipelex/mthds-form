@@ -374,6 +374,14 @@ function CopyButton({
   title?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  // The check mark reverts after a moment. The timer belongs to the effect, so
+  // it is cleared when the control unmounts rather than firing into a
+  // component, or a document, that is gone.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   if (typeof navigator === 'undefined' || !navigator.clipboard) return null;
   return (
     <button
@@ -386,10 +394,7 @@ function CopyButton({
         // keeps the write inside the gesture. `writeText` stays the path where
         // there is nothing to mint, and the fallback covers a browser without
         // `ClipboardItem`.
-        const done = () => {
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1500);
-        };
+        const done = () => setCopied(true);
         if (!provide) {
           void navigator.clipboard.writeText(value ?? '').then(done);
           return;
