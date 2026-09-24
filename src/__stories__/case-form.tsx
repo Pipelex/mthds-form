@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { InputForm, PipeIOContracts, RunField } from '../core';
-import { buildRunFields, getPipeInputForm, getPipeIOContract } from '../core';
-import { FieldRenderer } from '../react';
+import { buildRunFields, getPipeInputForm, getPipeIOContract, narrowFileFormats } from '../core';
+import { FieldPresentationProvider, FieldRenderer, type FieldPresentation } from '../react';
 
 /**
  * The one harness every fixture-driven story renders through.
@@ -37,6 +37,14 @@ export interface CaseFormProps {
    * the one control state a host drives rather than the value.
    */
   uploadingIds?: readonly string[];
+  /**
+   * The MIME types a host's upload path takes. When set, the derived fields go
+   * through `narrowFileFormats` with it, exactly as a host narrows its form
+   * once with the list its server checks uploads against.
+   */
+  narrowTo?: readonly string[];
+  /** How label chrome and file cards read: `studio` (the default) or `app`. */
+  presentation?: FieldPresentation;
 }
 
 export function deriveCaseFields(
@@ -64,11 +72,13 @@ export function CaseForm({
   errors,
   disabled,
   uploadingIds,
+  narrowTo,
+  presentation = 'studio',
 }: CaseFormProps) {
-  const fields = React.useMemo(
-    () => deriveCaseFields(contracts, inputForm, domain, pipeCode),
-    [contracts, inputForm, domain, pipeCode],
-  );
+  const fields = React.useMemo(() => {
+    const derived = deriveCaseFields(contracts, inputForm, domain, pipeCode);
+    return narrowTo ? narrowFileFormats(derived, narrowTo) : derived;
+  }, [contracts, inputForm, domain, pipeCode, narrowTo]);
   const [values, setValues] = React.useState<Record<string, unknown>>(initialValues ?? {});
   const env = React.useMemo(
     () => ({ disabled, uploadingIds: uploadingIds ? new Set(uploadingIds) : undefined }),
@@ -76,18 +86,20 @@ export function CaseForm({
   );
 
   return (
-    <div style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
-      {fields.map((field) => (
-        <FieldRenderer
-          key={field.name}
-          field={field}
-          id={`${pipeCode}-${field.name}`}
-          value={values[field.name]}
-          error={errors?.[field.name]}
-          env={env}
-          onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
-        />
-      ))}
-    </div>
+    <FieldPresentationProvider presentation={presentation}>
+      <div style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
+        {fields.map((field) => (
+          <FieldRenderer
+            key={field.name}
+            field={field}
+            id={`${pipeCode}-${field.name}`}
+            value={values[field.name]}
+            error={errors?.[field.name]}
+            env={env}
+            onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
+          />
+        ))}
+      </div>
+    </FieldPresentationProvider>
   );
 }

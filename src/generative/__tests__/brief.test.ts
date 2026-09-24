@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunField } from '../../core';
+import { IMAGE_FORMATS } from '../../core/file-formats';
 import { inputBrief, isDelegatedInput, resultBrief } from '../brief';
 import { seedInputs } from '../state';
 
@@ -58,7 +59,7 @@ describe('the brief of an input page', () => {
         },
       ],
     },
-    { kind: 'image', name: 'inspiration', required: false },
+    { kind: 'image', name: 'inspiration', required: false, formats: IMAGE_FORMATS },
   ];
   const brief = inputBrief({ pipeRef: 'trips.plan_trip', name: 'Trip' }, fields);
   const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);

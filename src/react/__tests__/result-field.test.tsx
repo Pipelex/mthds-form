@@ -30,6 +30,7 @@ import type {
   RunField,
   TextRunField,
 } from '../../core';
+import { formatsForKind } from '../../core/file-formats';
 import { FieldPresentationProvider } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultField } from '../result-field';
@@ -74,6 +75,7 @@ const file = (name: string, kind: 'document' | 'image'): FileRunField => ({
   name,
   conceptRef: kind === 'document' ? 'native.Document' : 'native.Image',
   required: true,
+  formats: formatsForKind(kind),
 });
 const object = (name: string, fields: ObjectRunField['fields']): ObjectRunField => ({
   kind: 'object',

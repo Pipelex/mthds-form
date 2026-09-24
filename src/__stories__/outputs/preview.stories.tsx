@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
+import { DOCUMENT_FORMATS } from '../../core';
 import type { FileRunField } from '../../core/descriptor';
 import { DEFAULT_FIELD_STRINGS, StuffViewer } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
@@ -60,6 +61,7 @@ const document: FileRunField = {
   conceptRef: 'native.Document',
   required: true,
   description: 'A document the browser can fetch and render',
+  formats: DOCUMENT_FORMATS,
 };
 
 function Preview({ value }: { value: unknown }) {

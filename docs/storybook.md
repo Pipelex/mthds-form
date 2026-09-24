@@ -81,7 +81,7 @@ Before rendering, the harness runs the two checks a host runs (`validateAgainstC
 
 ## What a file slot accepts
 
-Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, and both the label under a dropzone and the filter it enforces read that one table, so they cannot disagree.
+Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, `buildRunFields` stamps it on each file field as `formats`, and the hint under a dropzone, the filter it hands the picker and the check it enforces all read that one list, so they cannot disagree. A host whose upload path takes less narrows the list with `narrowFileFormats`, and the `Inputs/Files` stories show a narrowed slot beside a plain one ([upload-seam.md](upload-seam.md)).
 
 | Slot       | Accepts                                                           |
 | ---------- | ----------------------------------------------------------------- |
