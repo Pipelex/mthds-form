@@ -17,6 +17,30 @@ The package never uploads anything. A file control takes a file from the user an
 />
 ```
 
+## What a slot accepts is one list, and a host narrows it once
+
+Every `document` and `image` field carries `formats`, the list of formats that slot accepts. `buildRunFields` stamps it from the kind's table in `file-formats.ts`, which holds everything the runtime can decode for that kind and records how it was measured ([storybook.md](storybook.md#what-a-file-slot-accepts) has the table). The wire says nothing about it, because which bytes a runtime can decode is a property of the runtime and not of the method.
+
+The file control reads that one list in three places: the hint under the dropzone, the filter it hands the operating system's file picker, and the check a picked or dropped file must pass before `onDropFile` is called. When a file is refused, the message names the same list. The three used to be computed apart, the hint from a label on the field and the other two from the kind's table, so a host that rewrote the label moved the hint alone and the picker went on offering files its own server would refuse after the upload had been asked for.
+
+**A host whose upload path takes less than the runtime can decode narrows the field tree once**, with the same list its server checks uploads against:
+
+```ts
+import { buildRunFields, narrowFileFormats } from '@pipelex/mthds-form';
+
+// The one list: the form is narrowed with it, and the server's upload check reads it too.
+export const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
+
+const fields = narrowFileFormats(buildRunFields(descriptor, contract.inputs), ALLOWED_MIME_TYPES);
+```
+
+- **One list serves every slot.** It is intersected with each slot's own formats, so the list above leaves a document slot with PDF, JPG and PNG and an image slot with PNG and JPG. A host never writes a list per slot, and narrowing never widens one: a MIME type the slot's kind cannot take is not in the intersection. Each slot keeps its table's order, and MIME types are compared without parameters and case-insensitively, as the check compares them.
+- **It walks the whole tree**, into records and list items, so a file three levels down is narrowed like one at the top.
+- **It throws when a slot would be left accepting nothing**, naming the field by its path (`cvs[].portrait`). A dropzone that refuses every file is a host's configuration error, and the form should fail where the host can see it rather than render a control that cannot be used.
+- **It never mutates what it is given.** File slots, records and lists come back as copies, and every other field as the same object.
+
+It lives in the core entry rather than on `FieldEnv` so that a host's server, which renders no control, can import the list's one definition and hold the same answer as its form. A server that has the narrowed field can apply the control's exact check with `isAcceptedFile(field.formats, file)`. It reads `RunField`, the kernel's own output, and never touches JSON Schema, so the two schema walks [architecture.md](architecture.md) allows stay the only two. Nothing on the wire changes, and neither does the value a file field holds.
+
 ## The ID is a path, and that is the contract
 
 `onDropFile` is handed the field's **ID**, and a host writes the result back at that path: `setValueAtPath(values, id.split('.'), uploaded)`. A row inside a list is `cvs.1`; a file inside a structure inside a list is `cvs.1.resume`.
@@ -67,6 +91,19 @@ A resolution that **fails** leaves the spinner rather than the file before it, a
 
 A file is previewable when the **filename** or the **URL** says so, tested separately. They used to be concatenated into one string and matched with an end-anchored extension test, which made the filename half dead code — a filename's extension was always followed by a space — so a value with a good filename and an extension-less URL (an opaque storage id, a `data:` URL) was offered no preview at all. A `data:` URL's declared MIME type is read too, since it is the only type such a URL carries.
 
+## What the card says under a file's name
+
+Once a file is attached, the control shows a card: the filename as its title, or "Attached file" (`uploadedFile`) when the value carries none, and a subtitle under it. What the subtitle says depends on what the value holds, because each case means something different to the person looking at the card:
+
+- **A `data:` URL** is the file itself, so the subtitle names its format and decoded size (`PDF · 36 KB`) rather than printing the base64.
+- **An `http` or `https` URL** is a link the person can read, usually one they pasted, so it is shown back to them as it is.
+- **Any other reference in `app`**, a `pipelex-storage://` URI above all, is an address only the host can resolve. The subtitle shows the format the filename's extension names when that is one of the slot's `formats`, and nothing otherwise. The person who just chose the file has no use for its storage address, and printing it is how one reached an end user's screen under every photo they uploaded.
+- **Any other reference in `studio`** stays printed, because a builder may need the address itself.
+
+The presentation comes from `FieldPresentationProvider`, the same switch the labels follow. The result view's file reference is unaffected: it already names a file by its filename and keeps the reference in its tooltip and behind its copy control ([result-view.md](result-view.md)).
+
+The two default strings on this path name no storage scheme either. The URL a person may paste instead of uploading asks for `https://…` (`urlPlaceholder`), and a host whose runner also takes its own storage references can say so by overriding it.
+
 ## The local preview belongs to the value it was made for
 
 Dropping a file shows it immediately, from an object URL, because the value the host writes is not something a browser can render. That preview is **bound** to a value: the control cannot know the URL at drop time — the host assigns it — so it adopts the first URL to appear once the upload is no longer in flight, and retires itself when the value changes to a different one.
@@ -78,3 +115,5 @@ Without that binding the object URL won unconditionally and was cleared only by 
 The tab stop is the `<input type="file">` itself, named by the field's label through `FieldShell`'s `htmlFor`. The visible dropzone stays `role="presentation"` and takes no focus.
 
 That is the opposite of react-dropzone's default, which puts `tabIndex: 0` and its own key handlers on the presentational div and leaves the input at `tabIndex: -1` — so the element a keyboard or voice-control user lands on is a generic with no role and no name. Giving that div a `role="button"` and a label of its own was the other option and was rejected: it would put a second named control in the accessibility tree for one value, when a file input already has exactly the right role and only ever lacked a name. Because the input is clip-hidden, the focus ring is drawn on the root with `focus-within`.
+
+The URL input behind "paste a URL instead" is named too, by `fileUrlAria`, which is given the field's label as the form shows it: "Link to the file for cv" in `studio`, "Link to the file for Cover letter" in `app`, and "Link to the file" in a list row, whose index labels it. The field's label is bound to the file input, so this input used to have no name at all, and its placeholder was the only thing a screen reader announced there.

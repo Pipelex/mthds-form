@@ -501,7 +501,7 @@ const WEB_URL_RE = /^\s*https?:\/\//i;
 /**
  * The line under an attached file's name, or `undefined` for none.
  *
- * What the value holds decides it, because the four cases say different things
+ * What the value holds decides it, because each case means something different
  * to the person looking at the card:
  *
  * - A `data:` URL IS the file, so it is named by its format and size rather
