@@ -17,7 +17,7 @@ import {
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { useResolveShareUrl, useResolveUrl, type ResolveUrl } from './result-env';
+import { useResolveShareUrl, useResolveUrl, useTableColumns, type ResolveUrl } from './result-env';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Check,
@@ -931,8 +931,7 @@ function RecordSummary({ field, value }: { field: ObjectRunField; value: unknown
   if (!isRecord(value) || Object.keys(value).length === 0) return <Absent />;
   const naming = isNativeHtmlNode(field)
     ? undefined
-    : (field.fields.find((member) => member.kind === 'text') ??
-      field.fields.find((member) => member.kind === 'prose'));
+    : (recordNameField(field.fields) ?? field.fields.find((member) => member.kind === 'prose'));
   if (naming === undefined) {
     return (
       <span className="whitespace-nowrap text-[12.5px] text-muted-foreground">
@@ -1129,6 +1128,11 @@ function fitsACellWhole(field: RunField): boolean {
  * gets no column of chevrons that reveal nothing. Bounded is read from the
  * descriptor's constraint rather than assumed from the kind; see
  * `fitsACellWhole` for why that distinction had to be made.
+ *
+ * **A record wider than the host's budget shows the top of a ranking** — its
+ * name, then the values that fit a cell whole — and a row opens whenever a
+ * column is hidden, because the open row is the whole record. See
+ * `chooseColumns`.
  */
 function ObjectTable({
   columns,
@@ -1136,6 +1140,7 @@ function ObjectTable({
   items,
   label,
 }: {
+  /** Every field the element declares; the table shows the ones it chooses. */
   columns: readonly RunField[];
   /** The element descriptor, used to render an expanded row in full. */
   element: RunField;
@@ -1145,10 +1150,14 @@ function ObjectTable({
 }) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
+  const budget = useTableColumns();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const [viewportWidth, setViewportWidth] = useState<number>();
-  const canExpand = columns.some((column) => !fitsACellWhole(column));
+  const { shown, hidden, name } = chooseColumns(columns, budget);
+  // A hidden column is more to show, exactly as a clipped cell is: the open row
+  // renders the whole record, so nothing the budget leaves out is lost.
+  const canExpand = hidden > 0 || shown.some((column) => !fitsACellWhole(column));
 
   // The width of what is VISIBLE, not of the table.
   //
@@ -1230,7 +1239,7 @@ function ObjectTable({
                 <span className="sr-only">{s.rowDetailsColumn}</span>
               </th>
             )}
-            {columns.map((column) => (
+            {shown.map((column) => (
               <th
                 key={column.name}
                 scope="col"
@@ -1282,7 +1291,7 @@ function ObjectTable({
                       is open: an open row is not being scanned against its
                       neighbours, it is being read. */}
                   {isOpen ? (
-                    <td colSpan={columns.length} className="bg-card/40 p-0">
+                    <td colSpan={shown.length} className="bg-card/40 p-0">
                       <div
                         className="sticky left-0 px-3.5 py-3"
                         {...(viewportWidth
@@ -1303,7 +1312,7 @@ function ObjectTable({
                       </div>
                     </td>
                   ) : (
-                    columns.map((column) => {
+                    shown.map((column) => {
                       const cell =
                         typeof item === 'object' && item !== null
                           ? ownProp(item as Record<string, unknown>, column.name)
@@ -1316,13 +1325,29 @@ function ObjectTable({
                             date broken over two lines to save a scrollbar. The
                             cap stops the opposite failure - one long label making
                             a 200-character column - and the full value is a click
-                            or a hover away. */}
+                            or a hover away.
+
+                            The NAME of a ranked table is the one cell that wraps,
+                            and the one with no cap. It is what a reader
+                            identifies a row by, and a name cut at the cap is the
+                            fault the ranking was built for. A cell that wraps
+                            cannot push the table wider, so a cap has nothing to
+                            stop there and the name takes the width the panel
+                            leaves it. Wrapping also makes it the one column that
+                            can give width back, so auto table layout squeezes it
+                            first when the panel is narrow - into a ribbon, but
+                            for the floor under it, which is the chip column's
+                            floor for the same reason. `[&>span]` reaches the
+                            value's own span, which is `whitespace-nowrap` in
+                            every cell: only this caller knows the name may wrap. */}
                           <div
                             className={cn(
                               'max-w-[44ch]',
-                              column.kind === 'list' && isInlineColumn(column)
-                                ? 'min-w-[16ch]'
-                                : 'truncate',
+                              column === name
+                                ? 'max-w-none min-w-[16ch] wrap-break-word [&>span]:whitespace-normal'
+                                : column.kind === 'list' && isInlineColumn(column)
+                                  ? 'min-w-[16ch]'
+                                  : 'truncate',
                             )}
                             {...(typeof cell === 'string' || typeof cell === 'number'
                               ? { title: String(cell) }
@@ -1533,10 +1558,92 @@ function FileRows({ items, kind }: { items: readonly unknown[]; kind: 'document'
  * scannable shape for every other column to accommodate the widest one; they are
  * now shown in the row's expansion instead. What is left is the one case that is
  * not a record at all.
+ *
+ * Which of them a table SHOWS is a second question, answered by `chooseColumns`
+ * against the host's budget.
  */
-function tableColumns(item: RunField): readonly RunField[] | undefined {
+function recordColumns(item: RunField): readonly RunField[] | undefined {
   if (item.kind !== 'object' || item.fields.length === 0) return undefined;
   return item.fields;
+}
+
+/**
+ * The field that NAMES a record: its first `text` field in authored order.
+ *
+ * One rule, read in two places. A nested record's cell is named by it
+ * (`RecordSummary`), and a table of records ranks it first and gives it a floor.
+ * It is read off the field list alone, never off a value, so every row of a
+ * column is named by the same field.
+ */
+function recordNameField(fields: readonly RunField[]): RunField | undefined {
+  return fields.find((member) => member.kind === 'text');
+}
+
+/**
+ * Where a column ranks when a record has more fields than its table shows —
+ * the lower tier is kept first, and within a tier the authored order decides.
+ *
+ * 1. **The record's name** — the column a reader identifies a row by.
+ * 2. **A field that fits a cell whole** — an enum, a number, a date, a boolean,
+ *    a bounded `text` (see `fitsACellWhole`). These are the values a reader
+ *    compares down a column, and they cost the table the least width.
+ * 3. **Any other `text`, and a list of scalars** — a cell shows them, but may
+ *    have to cut them short.
+ * 4. **Everything else** — prose, a nested record, a list of records, a file. A
+ *    cell shows only a first line or a count for these anyway, and they are
+ *    where a wide table's width went.
+ *
+ * Read from the descriptor and never from a value, like every other layout rule
+ * here: a table has the same columns in every row, and its shape does not move
+ * with the data it happens to be showing.
+ */
+function columnTier(field: RunField, name: RunField | undefined): 1 | 2 | 3 | 4 {
+  if (field === name) return 1;
+  // A list of bounded scalars fits whole too, since chips wrap; but its row
+  // height grows with its length, so it ranks with the lists, below the values.
+  if (field.kind !== 'list' && fitsACellWhole(field)) return 2;
+  if (field.kind === 'text' || (field.kind === 'list' && isInlineColumn(field))) return 3;
+  return 4;
+}
+
+/** What a table of records shows, once its budget has been applied. */
+interface ChosenColumns {
+  /** The columns shown, in AUTHORED order. */
+  shown: readonly RunField[];
+  /** How many of the record's fields only the row's detail shows. */
+  hidden: number;
+  /** The name column, when the table had to choose. It is the one given a floor. */
+  name?: RunField;
+}
+
+/**
+ * The columns a table shows: the top of the ranking, up to the budget, laid out
+ * in the order the method's author wrote them.
+ *
+ * **The ranking selects and does not reorder.** Authored order is a fact the
+ * descriptor carries deliberately, and a table whose columns moved whenever a
+ * field was added would read differently from the record its rows open into.
+ *
+ * **Within the budget nothing is chosen, so nothing changes.** Every field is a
+ * column, no name is singled out, and the table renders exactly as it did
+ * before a budget existed. The budget exists for the tables that ran off to the
+ * right, and it touches only those.
+ */
+function chooseColumns(fields: readonly RunField[], budget: number): ChosenColumns {
+  if (fields.length <= budget) return { shown: fields, hidden: 0 };
+  const name = recordNameField(fields);
+  const kept = new Set(
+    fields
+      .map((field, index) => ({ field, index, tier: columnTier(field, name) }))
+      .sort((a, b) => a.tier - b.tier || a.index - b.index)
+      .slice(0, budget)
+      .map(({ field }) => field),
+  );
+  return {
+    shown: fields.filter((field) => kept.has(field)),
+    hidden: fields.length - kept.size,
+    ...(name ? { name } : {}),
+  };
 }
 
 export interface ResultFieldProps {
@@ -1717,7 +1824,7 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
       // array property is bare on the wire to begin with. The `items`-key sniff
       // that used to stand in for the schema is gone.
       const items = Array.isArray(unwrapped) ? unwrapped : [];
-      const columns = tableColumns(field.item);
+      const columns = recordColumns(field.item);
       return (
         <div className="space-y-2">
           {/* `hideLabel` is honoured here as everywhere else - it was not, and

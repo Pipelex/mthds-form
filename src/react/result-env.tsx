@@ -83,6 +83,22 @@ interface ResultEnv {
   resolveUrl?: ResolveUrl;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
+  /**
+   * How many data columns a table of records shows. Five when unset.
+   *
+   * A record with more fields than this keeps the columns a reader decides on —
+   * its name first, then the values that fit a cell whole — and the rest move
+   * into the row's detail, one click away. The columns shown keep the order the
+   * method's author wrote them in. A record within the budget is untouched.
+   *
+   * It is a COUNT rather than a width the view measures, and that is the point:
+   * a count renders the same table on a server, in a test and in a browser,
+   * where a measured budget would change the table's shape after hydration, and
+   * differently from one host to the next. A host that knows its panel is wide
+   * raises it; `Infinity` shows every column. A value below one reads as one,
+   * which is the record's name alone.
+   */
+  tableColumns?: number;
 }
 
 const ResultEnvContext = createContext<ResultEnv>({});
@@ -91,11 +107,12 @@ export function ResultEnvProvider({
   resolveUrl,
   resolveShareUrl,
   proseImages,
+  tableColumns,
   children,
 }: ResultEnv & { children: ReactNode }) {
   const env = useMemo(
-    () => ({ resolveUrl, resolveShareUrl, proseImages }),
-    [resolveUrl, resolveShareUrl, proseImages],
+    () => ({ resolveUrl, resolveShareUrl, proseImages, tableColumns }),
+    [resolveUrl, resolveShareUrl, proseImages, tableColumns],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
 }
@@ -127,4 +144,24 @@ export function useResolveShareUrl(): ResolveShareUrl | undefined {
 /** The prose-image policy, defaulted to the safe answer for a host that stated none. */
 export function useProseImages(): ProseImages {
   return use(ResultEnvContext).proseImages ?? 'link';
+}
+
+/**
+ * The column budget a table of records starts from when the host states none.
+ *
+ * Five columns of short values fit a method app's result panel once the name
+ * has its floor: the name, and four values a reader compares down a column. See
+ * `docs/result-view.md` for how the columns are chosen.
+ */
+const DEFAULT_TABLE_COLUMNS = 5;
+
+/**
+ * The column budget, normalised: the default when the host stated none (or a
+ * `NaN`), a whole number otherwise, and never below one. `Infinity` passes
+ * through, and is how a host shows every column.
+ */
+export function useTableColumns(): number {
+  const budget = use(ResultEnvContext).tableColumns;
+  if (budget === undefined || Number.isNaN(budget)) return DEFAULT_TABLE_COLUMNS;
+  return Math.max(1, Math.floor(budget));
 }
