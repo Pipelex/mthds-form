@@ -61,73 +61,20 @@ export interface MarkdownProps {
    * {@link ProseImages} for why the default is not to load.
    */
   proseImages?: ProseImages;
-  /**
-   * How a text that is ONE paragraph renders. `'block'` (the default) is a
-   * paragraph inside the block container, as every other text gets. `'inline'`
-   * is an inline run with no container at all, exactly the element a plain
-   * value renders as - so a value that sits BESIDE its label, and ends at the
-   * right edge of its column when it is one line, still does once it is
-   * typeset. See {@link InlineRun}.
-   */
-  loneParagraph?: 'block' | 'inline';
 }
 
-export function Markdown({ text, className, proseImages, loneParagraph = 'block' }: MarkdownProps) {
+export function Markdown({ text, className, proseImages }: MarkdownProps) {
   const tokens = React.useMemo(() => marked.lexer(text, LEX_OPTIONS), [text]);
   const fromEnv = useProseImages();
   // The prop wins over the provider, so a host rendering one prose value its own
   // way does not have to nest a second provider to say so.
   const mode = proseImages ?? fromEnv;
-  const lone = loneParagraph === 'inline' ? soleParagraph(tokens) : undefined;
   return (
     <ProseImagesContext value={mode}>
-      {lone ? (
-        <InlineRun paragraph={lone} className={className} />
-      ) : (
-        <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
-          <Blocks tokens={tokens} />
-        </div>
-      )}
+      <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
+        <Blocks tokens={tokens} />
+      </div>
     </ProseImagesContext>
-  );
-}
-
-/**
- * The paragraph, when it is all the text holds. `space` tokens are the blank
- * lines around it, which render nothing, so they do not count as a second
- * block.
- */
-function soleParagraph(tokens: readonly Token[]): Tokens.Paragraph | undefined {
-  const blocks = tokens.filter((token) => token.type !== 'space');
-  const [only] = blocks;
-  return blocks.length === 1 && only?.type === 'paragraph' ? (only as Tokens.Paragraph) : undefined;
-}
-
-/**
- * A lone paragraph as an inline run - the SAME element a plain value is.
- *
- * The result view shows a `text` value beside its label, and a one-line answer
- * sits at the right edge of its column, which works because the answer is an
- * inline run inside a box as wide as its content. A block container around a
- * paragraph lays out differently: its line box is its own rather than the
- * surrounding one, so the rows of a record could shift by a few pixels the
- * moment its values were typeset. So when a text holds one paragraph, it is
- * rendered as the span it always was - same classes, same `pre-wrap` - with
- * only its inline markup typeset inside it. A plain one-liner comes out
- * byte-identical to the unformatted rendering, and `**bold**` inside one is a
- * `<strong>` in the same place.
- *
- * `pre-wrap` is safe here where it would not be around blocks: with `breaks`
- * on, every newline inside a paragraph is its own `br` token, so no text child
- * carries one to be broken twice.
- */
-function InlineRun({ paragraph, className }: { paragraph: Tokens.Paragraph; className?: string }) {
-  return (
-    <span
-      className={cn('text-[13px] leading-relaxed text-foreground whitespace-pre-wrap', className)}
-    >
-      <Inline tokens={paragraph.tokens} />
-    </span>
   );
 }
 

@@ -37,7 +37,6 @@ export {
   useResolveShareUrl,
   useResolveUrl,
   useResolvedUrl,
-  useResultLocale,
 } from './result-env';
 
 // The markup arm of the result view, exported on its own for a host that renders

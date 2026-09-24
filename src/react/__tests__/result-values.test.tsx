@@ -1,24 +1,20 @@
 // @vitest-environment jsdom
 /**
- * A result's VALUES, as a person reads them.
+ * A result's ENUM values, as a person reads them.
  *
- * Three rules, each asserted by rendering because each is a fact about what
- * reaches the page:
+ * An enum value is its code in `studio` and its code in words in `app`, in a
+ * stacked row, a table cell and a chip alike, and through the same rule
+ * `EnumField` offers its options under - so an enum whose options would read
+ * the same shows its codes in the result too. It is the only value the two
+ * presentations show differently. Each rule is asserted by rendering, because
+ * each is a fact about what reaches the page.
  *
- * - an enum value is its code in `studio` and its code in words in `app`;
- * - a number is printed as it arrived in `studio`, and grouped with bounded
- *   decimals in `app`, in a locale the host states rather than the runtime's;
- * - a `text` value the descriptor does not bound to a cell is typeset as
- *   Markdown in both presentations, except in a table cell or a chip, and a
- *   one-line value keeps exactly the markup it had.
- *
- * And the constraint under all three: only the rendering changes. The JSON
- * view, the copy control and the download carry the payload as it came.
+ * And the constraint under it: only the rendering changes. The JSON view, the
+ * copy control and the download carry the payload as it came.
  *
  * The fixtures are hand-built `RunField`s for the reason `result-field.test.tsx`
- * gives: unit inputs chosen to hit one branch each. A bounded `text` is one of
- * them, and no generated fixture can produce it - a structures-only corpus has
- * no way to declare `max_length`.
+ * gives: unit inputs chosen to hit one branch each. A colliding enum is one of
+ * them, and no real method would declare one on purpose.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -32,8 +28,6 @@ import type {
 } from '../../core';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
-import { formatNumber } from '../number-format';
-import { ResultEnvProvider } from '../result-env';
 import { ResultField } from '../result-field';
 import { StuffViewer } from '../stuff-viewer';
 
@@ -80,9 +74,9 @@ function renderIn(presentation: FieldPresentation, ui: React.ReactElement) {
   );
 }
 
-const STATUSES = ['matches_po', 'unit_price_differs_from_po', 'HIGH_RISK'];
-const MEMO =
-  '## Memo\n\nThe unit price is **above** the order.\n\n| Line | Price |\n|---|---|\n| Pump | 612.40 |';
+const STATUSES = ['matches_po', 'unit_price_differs_from_po', 'HIGH_RISK', 'USD'];
+/** Two codes that both read "High risk" once worded. */
+const COLLIDING = ['high_risk', 'HIGH_RISK', 'low_risk'];
 
 describe('an enum value follows the presentation', () => {
   const review = record([choice('status', STATUSES), choice('risk', STATUSES)]);
@@ -100,6 +94,15 @@ describe('an enum value follows the presentation', () => {
     expect(screen.getByText('Unit price differs from po')).toBeTruthy();
     expect(screen.getByText('High risk')).toBeTruthy();
     expect(screen.queryByText('unit_price_differs_from_po')).toBeNull();
+  });
+
+  it('keeps a single all-caps token as written in app', () => {
+    renderIn(
+      'app',
+      <ResultField field={record([choice('currency', STATUSES)])} value={{ currency: 'USD' }} />,
+    );
+    expect(screen.getByText('USD')).toBeTruthy();
+    expect(screen.queryByText('Usd')).toBeNull();
   });
 
   it('carries the rule into a table cell', () => {
@@ -131,180 +134,88 @@ describe('an enum value follows the presentation', () => {
     );
     expect(screen.getByText('3')).toBeTruthy();
   });
-});
 
-describe('a number follows the presentation', () => {
-  const amounts = record([number('total'), number('units'), number('variance'), number('score')]);
-  const value = { total: 2116.2, units: 1200, variance: 0.0042, score: 0.85 };
-
-  it('prints it as it arrived in studio', () => {
-    renderIn('studio', <ResultField field={amounts} value={value} />);
-    expect(screen.getByText('2116.2')).toBeTruthy();
-    expect(screen.getByText('1200')).toBeTruthy();
-    expect(screen.getByText('0.0042')).toBeTruthy();
-  });
-
-  it('groups it and bounds its decimals in app', () => {
-    renderIn('app', <ResultField field={amounts} value={value} />);
-    expect(screen.getByText('2,116.2')).toBeTruthy();
-    // An integer only gains grouping.
-    expect(screen.getByText('1,200')).toBeTruthy();
-    // Below 1, three significant digits: the value does not collapse to 0.
-    expect(screen.getByText('0.0042')).toBeTruthy();
-    expect(screen.getByText('0.85')).toBeTruthy();
-    expect(screen.queryByText('2116.2')).toBeNull();
-  });
-
-  it('keeps at most two decimals at a magnitude of 1 or more, and three significant digits below', () => {
-    expect(formatNumber(3.14159, 'en-US')).toBe('3.14');
-    expect(formatNumber(-1234.567, 'en-US')).toBe('-1,234.57');
-    expect(formatNumber(0.123456, 'en-US')).toBe('0.123');
-    expect(formatNumber(-0.5, 'en-US')).toBe('-0.5');
-    expect(formatNumber(0, 'en-US')).toBe('0');
-  });
-
-  it('carries the rule into a table cell', () => {
-    const lines = listOf('lines', record([text('item', 40), number('amount')], 'line'));
-    const { container } = renderIn(
-      'app',
-      <ResultField field={lines} value={[{ item: 'Pump', amount: 2116.2 }]} />,
-    );
-    expect(within(container.querySelector('tbody')!).getByText('2,116.2')).toBeTruthy();
-  });
-
-  it('formats in the locale the host states', () => {
+  it('prints a value the enum does not declare as it came', () => {
+    // Worded, an undeclared `in_review` would read as a choice the method
+    // never offered.
     renderIn(
       'app',
-      <ResultEnvProvider locale="de-DE">
-        <ResultField field={amounts} value={value} />
-      </ResultEnvProvider>,
+      <ResultField field={record([choice('status', STATUSES)])} value={{ status: 'in_review' }} />,
     );
-    expect(screen.getByText('2.116,2')).toBeTruthy();
-    expect(screen.getByText('0,0042')).toBeTruthy();
-  });
-
-  it('builds the formatters once per locale, not once per render', () => {
-    // A locale no other test uses, so the module's cache is cold for it. The
-    // spy forwards to the real constructor, and counts.
-    const Real = Intl.NumberFormat;
-    const construct = vi.spyOn(Intl, 'NumberFormat').mockImplementation(function (
-      ...args: ConstructorParameters<typeof Real>
-    ) {
-      return new Real(...args);
-    } as unknown as typeof Real);
-    const ui = (
-      <ResultEnvProvider locale="fr-CA">
-        <ResultField field={amounts} value={value} />
-      </ResultEnvProvider>
-    );
-    const { rerender } = renderIn('app', ui);
-    const afterFirst = construct.mock.calls.length;
-    expect(afterFirst).toBeGreaterThan(0);
-    rerender(<FieldPresentationProvider presentation="app">{ui}</FieldPresentationProvider>);
-    renderIn('app', ui);
-    expect(construct.mock.calls.length).toBe(afterFirst);
-    construct.mockRestore();
-  });
-
-  it('prints a value that is not a number as it came', () => {
-    renderIn('app', <ResultField field={record([number('total')])} value={{ total: '2116.2' }} />);
-    expect(screen.getByText('2116.2')).toBeTruthy();
+    expect(screen.getByText('in_review')).toBeTruthy();
+    expect(screen.queryByText('In review')).toBeNull();
   });
 });
 
-describe('an unbounded text value is typeset', () => {
-  it.each(['studio', 'app'] as const)('typesets a heading and a table in %s', (presentation) => {
-    const { container } = renderIn(
-      presentation,
-      <ResultField field={record([text('memo')])} value={{ memo: MEMO }} />,
+describe('an enum whose options would read the same shows its codes', () => {
+  // The same rule `EnumField` applies to its options, so a result reads as the
+  // form that produced it did (`enum-field.test.tsx`).
+
+  it('shows the codes in a stacked row in app', () => {
+    const review = record([choice('risk', COLLIDING), choice('status', STATUSES)]);
+    renderIn(
+      'app',
+      <ResultField field={review} value={{ risk: 'low_risk', status: 'matches_po' }} />,
     );
-    expect(screen.getByRole('heading', { name: 'Memo' })).toBeTruthy();
-    expect(screen.getByText('above').tagName).toBe('STRONG');
-    expect(container.querySelector('table')).not.toBeNull();
-    expect(container.textContent).not.toContain('## Memo');
-    expect(container.textContent).not.toContain('|');
+    // Every option of the colliding enum, not only the two that collide.
+    expect(screen.getByText('low_risk')).toBeTruthy();
+    expect(screen.queryByText('Low risk')).toBeNull();
+    // Another enum on the same record is worded as usual: the fallback is per
+    // enum, not per record.
+    expect(screen.getByText('Matches po')).toBeTruthy();
   });
 
-  it('keeps a BOUNDED text plain: its author said it is short', () => {
-    const { container } = render(
-      <ResultField field={record([text('memo', 60)])} value={{ memo: MEMO }} />,
-    );
-    expect(screen.queryByRole('heading', { name: 'Memo' })).toBeNull();
-    expect(container.querySelector('table, strong')).toBeNull();
-    expect(container.textContent).toContain('## Memo');
-  });
-
-  it('keeps a table cell plain', () => {
-    const lines = listOf('memos', record([text('memo')], 'entry'));
-    const { container } = render(<ResultField field={lines} value={[{ memo: MEMO }]} />);
+  it('shows the codes in a table cell and a chip in app', () => {
+    const lines = listOf('lines', record([text('item', 40), choice('risk', COLLIDING)], 'line'));
+    const rows = [
+      { item: 'Pump', risk: 'high_risk' },
+      { item: 'Kit', risk: 'HIGH_RISK' },
+    ];
+    const { container, unmount } = renderIn('app', <ResultField field={lines} value={rows} />);
     const body = container.querySelector('tbody')!;
-    expect(within(body).queryByRole('heading')).toBeNull();
-    expect(body.querySelector('table, strong')).toBeNull();
-    expect(body.textContent).toContain('## Memo');
-  });
+    expect(within(body).getByText('high_risk')).toBeTruthy();
+    expect(within(body).getByText('HIGH_RISK')).toBeTruthy();
+    expect(body.textContent).not.toContain('High risk');
+    unmount();
 
-  it('keeps a chip plain', () => {
-    render(<ResultField field={listOf('notes', text('note'))} value={['a **bold** claim']} />);
-    expect(screen.getByText('a **bold** claim')).toBeTruthy();
-    expect(screen.queryByText('bold')).toBeNull();
-  });
-
-  it('typesets a text result at the top of the panel too', () => {
-    render(<ResultField field={text('memo')} value={MEMO} />);
-    expect(screen.getByRole('heading', { name: 'Memo' })).toBeTruthy();
+    const flags = listOf('flags', choice('flag', COLLIDING));
+    renderIn('app', <ResultField field={flags} value={['high_risk', 'HIGH_RISK']} />);
+    expect(screen.getByText('high_risk')).toBeTruthy();
+    expect(screen.getByText('HIGH_RISK')).toBeTruthy();
+    expect(screen.queryByText('High risk')).toBeNull();
   });
 });
 
-describe('a one-line text value keeps its markup', () => {
-  // The hard constraint: a one-line value sits beside its label and ends at the
-  // right edge of its column, and typesetting must not move it. So its markup
-  // is pinned twice - against the literal element, and against the rendering a
-  // bounded field still gets, which is the path it took before typesetting.
-  const PLAIN =
-    '<span class="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">Acme Logistics</span>';
+describe('no other value changes with the presentation', () => {
+  // The enum arm is the whole difference: a number and a text read the same
+  // in both presentations.
+  const review = record([number('total'), text('memo')]);
+  const value = { total: 2116.2, memo: 'The unit price is **above** the order.' };
 
-  function valueCell(maxLength?: number) {
-    const { container, unmount } = render(
-      <ResultField
-        field={record([text('supplier', maxLength)])}
-        value={{ supplier: 'Acme Logistics' }}
-      />,
-    );
-    const span = screen.getByText('Acme Logistics');
-    const cell = span.parentElement!.parentElement!;
-    const html = cell.outerHTML;
-    unmount();
-    return { container, span, cell, html };
-  }
-
-  it('renders exactly the span a plain value is', () => {
-    const { span, cell } = valueCell();
-    expect(span.outerHTML).toBe(PLAIN);
-    // Inside the same flex row that puts it at the right edge.
-    expect(cell.className).toContain('justify-end');
-  });
-
-  it('renders exactly what the unformatted path renders', () => {
-    expect(valueCell().html).toBe(valueCell(40).html);
+  it.each(['studio', 'app'] as const)('prints a number and a text as they came in %s', (mode) => {
+    const { container } = renderIn(mode, <ResultField field={review} value={value} />);
+    expect(screen.getByText('2116.2')).toBeTruthy();
+    expect(screen.getByText(value.memo)).toBeTruthy();
+    expect(container.querySelector('strong')).toBeNull();
   });
 });
 
 describe('only the rendering changes', () => {
-  const review = record([choice('status', STATUSES), number('total'), text('memo')]);
-  const value = { status: 'unit_price_differs_from_po', total: 2116.2, memo: MEMO };
+  const review = record([choice('status', STATUSES), choice('risk', STATUSES)]);
+  const value = { status: 'unit_price_differs_from_po', risk: 'HIGH_RISK' };
 
   function panel() {
     return renderIn('app', <StuffViewer field={review} value={value} name="review" />);
   }
 
-  it('keeps the code, the number and the source on the JSON view', async () => {
+  it('keeps the code on the JSON view', async () => {
     const { container } = panel();
     expect(screen.getByText('Unit price differs from po')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
     const json = container.querySelector('pre')!.textContent!;
     expect(json).toBe(JSON.stringify(value, null, 2));
     expect(json).toContain('"status": "unit_price_differs_from_po"');
-    expect(json).toContain('"total": 2116.2');
+    expect(json).toContain('"risk": "HIGH_RISK"');
   });
 
   describe('the clipboard', () => {
@@ -312,12 +223,6 @@ describe('only the rendering changes', () => {
     beforeEach(() => {
       writeText.mockClear();
       Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    });
-
-    it('copies the Markdown source of a typeset text, not its rendering', async () => {
-      renderIn('app', <ResultField field={text('memo')} value={MEMO} />);
-      await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyText }));
-      expect(writeText).toHaveBeenCalledWith(MEMO);
     });
 
     it('copies the payload from the JSON view as it came', async () => {

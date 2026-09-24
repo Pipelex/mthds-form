@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import type { ObjectRunField, RunField } from '../core';
+import type { EnumRunField, ObjectRunField, RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import type { CompositeMember, DocumentContentView } from '../core/native-content';
 import {
@@ -17,7 +17,7 @@ import {
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { useResolveShareUrl, useResolveUrl, useResultLocale, type ResolveUrl } from './result-env';
+import { useResolveShareUrl, useResolveUrl, type ResolveUrl } from './result-env';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Check,
@@ -37,12 +37,11 @@ import { Markdown } from './markdown';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import {
-  enumValueLabel,
+  enumLabeler,
   fieldLabel,
   humanizeFieldName,
   useFieldPresentation,
 } from './field-presentation';
-import { formatNumber } from './number-format';
 import { cn } from './utils';
 
 /**
@@ -287,54 +286,24 @@ function DateValue({ value }: { value: unknown }) {
  * bundle and the JSON say and what the builder will search for next. A method
  * app's reader has seen neither, and gets "Unit price differs from po" - in a
  * stacked row, a table cell and a chip alike, which is why this is an arm of
- * `LeafValue` rather than something one layout does. Only a string code is
- * worded; anything else is the payload disagreeing with its descriptor, and is
- * shown as it is.
+ * `LeafValue` rather than something one layout does. The wording is
+ * `enumLabeler`'s, the same rule `EnumField` offers its options under, so a
+ * result reads as the form that produced it did, codes included when two
+ * options would read the same. Only a string is worded; anything else is the
+ * payload disagreeing with its descriptor, and is shown as it is.
  */
-function EnumValue({ value, compact }: { value: unknown; compact: boolean }) {
+function EnumValue({
+  field,
+  value,
+  compact,
+}: {
+  field: EnumRunField;
+  value: unknown;
+  compact: boolean;
+}) {
   const presentation = useFieldPresentation();
-  const shown = typeof value === 'string' ? enumValueLabel(value, presentation) : value;
+  const shown = typeof value === 'string' ? enumLabeler(field.options, presentation)(value) : value;
   return <Scalar value={shown} compact={compact} />;
-}
-
-/**
- * A number: as the payload holds it in `studio`, grouped with bounded decimals
- * in `app`, in the locale the host states on `ResultEnvProvider`. See
- * `number-format.ts` for the rule and why the locale is never the runtime's.
- */
-function NumberValue({ value, compact }: { value: unknown; compact: boolean }) {
-  const presentation = useFieldPresentation();
-  const locale = useResultLocale();
-  const shown =
-    presentation === 'app' && typeof value === 'number' ? formatNumber(value, locale) : value;
-  return <Scalar value={shown} compact={compact} />;
-}
-
-/**
- * A `text` value, TYPESET when the descriptor does not bound it to a cell.
- *
- * What a model writes into an unbounded `text` slot is often a memo with a
- * heading and a table rather than the short line the kind suggests, and
- * printed plain its `#` and `|` reach the reader. So a `text` field that is
- * not guaranteed to fit a cell - `fitsACellWhole`, which reads the authored
- * `max_length` and never the value - is typeset exactly as `prose` is, in both
- * presentations. A bounded one stays plain: its author said it is short, and
- * nothing short needs a heading.
- *
- * A one-line value must not move. It sits beside its label and ends at the
- * right edge of its column, so a lone paragraph is typeset as the inline run a
- * plain value always was rather than as a block (`loneParagraph="inline"`),
- * and a plain one-liner renders exactly as it did before any of this.
- *
- * The accepted risk: a short unbounded value that BEGINS with block syntax -
- * `# `, `- `, `1. `, or four spaces of indentation - renders as a heading, a
- * list or a code block.
- */
-function TextValue({ field, value }: { field: RunField; value: unknown }) {
-  if (fitsACellWhole(field) || typeof value !== 'string' || value === '') {
-    return <Scalar value={value} />;
-  }
-  return <Markdown text={value} loneParagraph="inline" />;
 }
 
 /**
@@ -913,18 +882,11 @@ function LeafValue({
   field,
   value: raw,
   compact = false,
-  chip = false,
 }: {
   field: RunField;
   value: unknown;
   /** Rendering into a table cell: one line, no preserved newlines. */
   compact?: boolean;
-  /**
-   * Rendering into a chip: a short value in a pill, where a typeset block has
-   * no place either. Only the `text` arm reads it; a chip keeps its plain
-   * string as a table cell does.
-   */
-  chip?: boolean;
 }) {
   const value = unwrap(field, raw);
   switch (field.kind) {
@@ -971,18 +933,7 @@ function LeafValue({
       // non-compact arm is only the payload-disagrees floor every kind has.
       return compact ? <RecordSummary field={field} value={value} /> : <Scalar value={value} />;
     case 'enum':
-      return <EnumValue value={value} compact={compact} />;
-    case 'number':
-      return <NumberValue value={value} compact={compact} />;
-    case 'text':
-      // A cell and a chip keep the plain string, for the reason `prose` does:
-      // the point of a compact context is one line, and the row or the record
-      // carries the rest.
-      return compact || chip ? (
-        <Scalar value={value} compact={compact} />
-      ) : (
-        <TextValue field={field} value={value} />
-      );
+      return <EnumValue field={field} value={value} compact={compact} />;
     default:
       return <Scalar value={value} compact={compact} />;
   }
@@ -1097,7 +1048,7 @@ function ScalarChips({ field, items }: { field: RunField; items: readonly unknow
           key={index}
           className="rounded-md border border-border bg-card/40 px-2 py-0.5 text-[12.5px] text-foreground"
         >
-          <LeafValue field={field} value={item} chip />
+          <LeafValue field={field} value={item} />
         </span>
       ))}
     </div>

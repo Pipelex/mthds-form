@@ -7,7 +7,7 @@ import type { EnumRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { useFieldDomId } from './field-dom-id';
-import { enumValueLabel, useFieldPresentation } from './field-presentation';
+import { enumLabeler, useFieldPresentation } from './field-presentation';
 
 interface EnumFieldProps {
   field: EnumRunField;
@@ -35,13 +35,14 @@ const CLEAR_VALUE = '__none__';
  * a person picks "Unit price differs from po" and the form stores
  * `unit_price_differs_from_po`, because the result that run produces shows the
  * same field in words too, and a form and its result have to read the same
- * way. The segmented rule measures the label it shows, which is the text that
- * has to fit on the row.
+ * way - which is why both go through `enumLabeler`, including its fallback to
+ * the codes when two options would read the same. The segmented rule measures
+ * the label it shows, which is the text that has to fit on the row.
  */
 export function EnumField({ field, value, onChange, id, error, disabled }: EnumFieldProps) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
-  const labelOf = (option: string) => enumValueLabel(option, presentation);
+  const labelOf = enumLabeler(field.options, presentation);
   const isSegmented =
     field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
   const domId = useFieldDomId(id);

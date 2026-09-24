@@ -3,20 +3,17 @@ description = "Concepts whose values are written for a reader rather than for a 
 
 # ─── An invoice checked against its purchase order ──────────────────────────
 #
-# Every field is here for one value rule:
+# Every field is here for a way a value can read to a person:
 #
-#   supplier         an unbounded `text` a run fills with one line, which must
-#                    still sit at the right edge beside its label once `text`
-#                    is typeset;
-#   memo             an unbounded `text` a run fills with Markdown - a heading,
-#                    a paragraph and a table - which is typeset rather than
-#                    printed;
 #   verdict, risk    coded choices, one snake_case and one all-caps, which a
 #                    method app shows in words;
-#   amount_due,      amounts above and below 1, which a method app groups and
-#   price_variance   bounds;
-#   lines            all of it again in table cells, where a Markdown `note`
-#                    stays plain and the row opens onto it typeset.
+#   supplier         an unbounded `text` a run fills with one line;
+#   memo             an unbounded `text` a run fills with Markdown - a heading,
+#                    a paragraph and a table;
+#   amount_due,      amounts above and below 1;
+#   price_variance
+#   lines            all of it again in table cells, with a `status` choice
+#                    and a Markdown `note` on every line.
 
 [concept.CheckedLine]
 description = "One invoice line, checked against the purchase order"

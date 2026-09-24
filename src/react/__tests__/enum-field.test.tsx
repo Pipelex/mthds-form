@@ -11,7 +11,7 @@
  * code the method declared, never the words a person read.
  */
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EnumRunField } from '../../core';
@@ -74,6 +74,13 @@ describe('the options follow the presentation', () => {
     expect(screen.queryByText('hold_for_review')).toBeNull();
   });
 
+  it('keeps a single all-caps token as written in app', () => {
+    render(<Harness field={choice(['USD', 'EUR', 'other_currency'])} presentation="app" />);
+    expect(screen.getByRole('radio', { name: 'USD' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'EUR' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Other currency' })).toBeTruthy();
+  });
+
   it('stores the code when the words are picked', async () => {
     const values: (string | undefined)[] = [];
     render(<Harness field={field} presentation="app" seen={(value) => values.push(value)} />);
@@ -108,5 +115,67 @@ describe('the segmented rule measures the label it shows', () => {
     render(<Harness field={field} presentation="studio" />);
     expect(screen.getByRole('combobox')).toBeTruthy();
     expect(screen.queryByRole('radio')).toBeNull();
+  });
+});
+
+describe('options that would read the same are shown as codes', () => {
+  // `high_risk` and `HIGH_RISK` are two codes, and worded they are both "High
+  // risk": a person offered the same words twice is choosing blind. So the
+  // whole enum shows its codes as written, every option included, and the
+  // result view does the same for that field (`result-values.test.tsx`).
+
+  it('shows every option as its code on the segmented control', () => {
+    const field = choice(['high_risk', 'HIGH_RISK', 'low_risk']);
+    render(<Harness field={field} presentation="app" />);
+    expect(screen.getByRole('radio', { name: 'high_risk' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'HIGH_RISK' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'low_risk' })).toBeTruthy();
+    expect(screen.queryByText('High risk')).toBeNull();
+    expect(screen.queryByText('Low risk')).toBeNull();
+  });
+
+  describe('on the select', () => {
+    const scrollIntoView = Element.prototype.scrollIntoView;
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = () => undefined;
+    });
+    afterEach(() => {
+      Element.prototype.scrollIntoView = scrollIntoView;
+    });
+
+    it('shows every option as its code', async () => {
+      const field = choice(['foo-bar', 'foo_bar', 'baz', 'qux', 'quux']);
+      const values: (string | undefined)[] = [];
+      render(
+        <Harness
+          field={field}
+          presentation="app"
+          initial="foo_bar"
+          seen={(value) => values.push(value)}
+        />,
+      );
+      const trigger = screen.getByRole('combobox');
+      expect(trigger).toHaveTextContent('foo_bar');
+      expect(trigger).not.toHaveTextContent('Foo bar');
+      // Opened from the keyboard: Radix's pointer path asks for pointer capture,
+      // which jsdom does not implement. Opening scrolls the picked item into
+      // view, which jsdom does not implement either, so it is stubbed around
+      // this test alone.
+      trigger.focus();
+      await userEvent.keyboard('{Enter}');
+      const offered = screen.getAllByRole('option').map((option) => option.textContent);
+      expect(offered).toEqual(expect.arrayContaining(['foo-bar', 'foo_bar', 'baz', 'qux', 'quux']));
+      expect(offered).not.toContain('Foo bar');
+      expect(offered).not.toContain('Baz');
+      // Up from the picked `foo_bar` is its twin, and picking it stores that code.
+      await userEvent.keyboard('{ArrowUp}{Enter}');
+      expect(values).toEqual(['foo-bar']);
+    });
+  });
+
+  it('words the options once no two of them collide', () => {
+    render(<Harness field={choice(['high_risk', 'low_risk'])} presentation="app" />);
+    expect(screen.getByRole('radio', { name: 'High risk' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Low risk' })).toBeTruthy();
   });
 });
