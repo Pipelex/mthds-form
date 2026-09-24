@@ -123,6 +123,7 @@ jobs:
       - name: Create git tag if missing
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ALREADY_PUBLISHED: ${{ steps.check_published.outputs.already_published }}
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           if git ls-remote --exit-code origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
@@ -139,19 +140,35 @@ jobs:
           # later run takes the branch above and the wrong association is
           # permanent.
           #
-          # npm records the publishing commit as `gitHead`. On the normal path
-          # it equals this run's SHA. When it cannot be read at all - the
-          # registry has not propagated the publish this run just made -
-          # falling back to this run's SHA is exactly right, because that IS
-          # the publishing run.
+          # npm records the publishing commit as `gitHead`, and on the normal
+          # path it equals this run's SHA. When it cannot be read, what that
+          # means depends on who published. If this run did, the registry has
+          # not propagated the publish yet, and this run's SHA is exactly right
+          # because this IS the publishing run. If an earlier run did, the
+          # registry has already answered this run once, so an empty answer is
+          # an error, and no commit here can be vouched for. The step fails
+          # rather than skipping, because a missing tag is not left missing:
+          # `gh release create` would make one on whatever `main` points at.
           PUBLISHED_SHA="$(npm view "@pipelex/mthds-form@$VERSION" gitHead 2>/dev/null || true)"
-          TARGET_SHA="$GITHUB_SHA"
-          if [ -n "$PUBLISHED_SHA" ] && [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
-            echo "::warning::npm published $VERSION from $PUBLISHED_SHA, not $GITHUB_SHA. Tagging the published commit."
-            git fetch --depth=1 origin "$PUBLISHED_SHA"
-            TARGET_SHA="$PUBLISHED_SHA"
+          if [ -z "$PUBLISHED_SHA" ]; then
+            if [ "$ALREADY_PUBLISHED" != "false" ]; then
+              echo "::error::npm did not say which commit published $VERSION, and this run did not publish it, so there is no commit to tag. Re-run this job, or push the tag v$VERSION by hand on the commit that published it; the next run then finds the tag and goes on to the release."
+              exit 1
+            fi
+            PUBLISHED_SHA="$GITHUB_SHA"
           fi
-          git tag "v$VERSION" "$TARGET_SHA"
+          if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
+            echo "::warning::npm published $VERSION from $PUBLISHED_SHA, not $GITHUB_SHA. Tagging the published commit."
+            # A version published by hand from a commit that never reached
+            # GitHub has no commit to tag, so this stays a failure; tagging
+            # anything else is the wrong association this step exists to
+            # prevent.
+            if ! git fetch --depth=1 origin "$PUBLISHED_SHA"; then
+              echo "::error::npm published $VERSION from $PUBLISHED_SHA, which origin does not have. Push that commit, or push the tag v$VERSION by hand on the commit that should carry it; the next run then finds the tag and goes on to the release."
+              exit 1
+            fi
+          fi
+          git tag "v$VERSION" "$PUBLISHED_SHA"
           git push origin "v$VERSION"
 
   # Not gated on already_published either, for the same recovery reason: the
