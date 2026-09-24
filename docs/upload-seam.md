@@ -104,6 +104,8 @@ The presentation comes from `FieldPresentationProvider`, the same switch the lab
 
 The two default strings on this path name no storage scheme either. The URL a person may paste instead of uploading asks for `https://…` (`urlPlaceholder`), and a host whose runner also takes its own storage references can say so by overriding it.
 
+**The link input follows the card's rule.** It can be open while a stored file is the value: opened after the file was attached, left open through an upload, or written into by the host. In `app` it therefore shows a value only when that value is a web link or is the text the input itself typed, and it is empty over any other reference, so a `pipelex-storage://` address never appears there either. Masking every value that is not yet a web link would have emptied the input on the first keystroke, since a URL being typed is not one until it is finished. In `studio` the input shows the value as it is.
+
 ## The local preview belongs to the value it was made for
 
 Dropping a file shows it immediately, from an object URL, because the value the host writes is not something a browser can render. That preview is **bound** to a value: the control cannot know the URL at drop time — the host assigns it — so it adopts the first URL to appear once the upload is no longer in flight, and retires itself when the value changes to a different one.

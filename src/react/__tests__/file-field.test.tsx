@@ -203,6 +203,99 @@ describe('a stored reference never reaches an end user', () => {
   });
 });
 
+describe('the link input never prints a stored reference in app', () => {
+  /**
+   * The card was not the only place a storage address reached an end user. The
+   * "paste a URL instead" input showed the value's URL verbatim, and it can be
+   * open while a stored file is the value: opened after a file was attached,
+   * left open through an upload, or written into by the host. These read the
+   * INPUT'S VALUE - `textContent` never contains it, which is how the first
+   * pass over the card missed this door.
+   */
+  const STORED = 'pipelex-storage://org_1/runs/run_1/uploads/0116d9cc480a9d10';
+  const linkInput = () => screen.getByRole('textbox') as HTMLInputElement;
+
+  /** A host that owns the value, can write a stored reference, and reports the last write. */
+  function HostOwnedIn({
+    presentation,
+    initial,
+    onWrite = noop,
+  }: {
+    presentation: FieldPresentation;
+    initial?: FileValue;
+    onWrite?: (value: FileValue | undefined) => void;
+  }) {
+    const [value, setValue] = useState<FileValue | undefined>(initial);
+    return (
+      <FieldPresentationProvider presentation={presentation}>
+        <DocumentField
+          field={field}
+          value={value}
+          onDropFile={noop}
+          onChange={(next) => {
+            onWrite(next);
+            setValue(next);
+          }}
+          id="cv"
+        />
+        <button type="button" onClick={() => setValue({ filename: 'scan.pdf', url: STORED })}>
+          host writes a stored file
+        </button>
+      </FieldPresentationProvider>
+    );
+  }
+
+  it('opens empty in app when a stored reference is the value', async () => {
+    const user = userEvent.setup();
+    render(<HostOwnedIn presentation="app" initial={{ filename: 'scan.pdf', url: STORED }} />);
+    await user.click(urlToggle());
+    expect(linkInput().value).toBe('');
+  });
+
+  it('stays empty in app when the host writes a stored reference into it while open', async () => {
+    const user = userEvent.setup();
+    render(<HostOwnedIn presentation="app" />);
+    await user.click(urlToggle());
+    await user.click(screen.getByRole('button', { name: 'host writes a stored file' }));
+    expect(linkInput().value).toBe('');
+  });
+
+  it('still builds a URL typed character by character, including before it is a web link', async () => {
+    // A mask on "is this a web link" alone would empty the input on the first
+    // keystroke, because `h` is not one yet. What the input typed is its own.
+    const user = userEvent.setup();
+    const onWrite = vi.fn();
+    render(
+      <HostOwnedIn
+        presentation="app"
+        initial={{ filename: 'scan.pdf', url: STORED }}
+        onWrite={onWrite}
+      />,
+    );
+    await user.click(urlToggle());
+    await user.type(linkInput(), 'example.com/brief.pdf');
+    expect(linkInput().value).toBe('example.com/brief.pdf');
+    await user.clear(linkInput());
+    await user.type(linkInput(), 'https://example.com/brief.pdf');
+    expect(linkInput().value).toBe('https://example.com/brief.pdf');
+    expect(onWrite).toHaveBeenLastCalledWith({ url: 'https://example.com/brief.pdf' });
+  });
+
+  it('shows a web link the value already holds, in app', async () => {
+    const user = userEvent.setup();
+    render(<HostOwnedIn presentation="app" initial={{ url: 'https://example.com/brief.pdf' }} />);
+    await user.click(urlToggle());
+    expect(linkInput().value).toBe('https://example.com/brief.pdf');
+  });
+
+  it('shows the stored reference in studio, where a builder may need it', async () => {
+    const user = userEvent.setup();
+    render(<HostOwnedIn presentation="studio" initial={{ filename: 'scan.pdf', url: STORED }} />);
+    await user.click(urlToggle());
+    expect(linkInput().value).toBe(STORED);
+  });
+});
+
 describe('the default strings name no storage scheme', () => {
   it('asks for a web link in the URL placeholder', async () => {
     const user = userEvent.setup();

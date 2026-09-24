@@ -47,6 +47,8 @@ interface FileFieldProps {
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)(\?|$)/i;
 const PDF_EXT_RE = /\.pdf(\?|$)/i;
 const DATA_URL_MIME_RE = /^data:([^;,]+)/i;
+/** `http:` or `https:` - a link the person can read, and may have pasted. */
+const WEB_URL_RE = /^\s*https?:\/\//i;
 
 /*
  * This control reads the kernel's URL gate directly - `viewableUrl` from core,
@@ -120,6 +122,8 @@ function FileField({
   const presentation = useFieldPresentation();
   const domId = useFieldDomId(id);
   const [showUrl, setShowUrl] = useState(false);
+  // The last text the link input itself wrote into the value. See `urlText`.
+  const [typedUrl, setTypedUrl] = useState<string | null>(null);
   // The preview is collapsed by default - opened on demand via a "Preview" button.
   const [previewOpen, setPreviewOpen] = useState(false);
   const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
@@ -313,6 +317,17 @@ function FileField({
   // one.
   const previewPending = !previewSrc && !!storageUri && resolved?.uri !== storageUri;
 
+  // What the link input shows. In `app` it must not print a reference only the
+  // host can resolve: the input can be open while a stored file is the value -
+  // opened after the file was attached, left open through an upload, or written
+  // into by the host - and it used to show the `pipelex-storage://` address in
+  // full. Masking every value that is not a web link would break typing, since
+  // a URL being typed is not one yet, so only text the input did not produce
+  // itself is masked. `studio` shows the value as it is, as its card does.
+  const urlValue = value?.url ?? '';
+  const urlText =
+    presentation === 'studio' || WEB_URL_RE.test(urlValue) || urlValue === typedUrl ? urlValue : '';
+
   return (
     <FieldShell
       name={field.name}
@@ -434,7 +449,7 @@ function FileField({
         <input
           type="text"
           autoFocus
-          value={value?.url ?? ''}
+          value={urlText}
           disabled={busy}
           // A name of its own. The field's label is bound to the file input, so
           // without this the placeholder was the only thing a screen reader
@@ -443,6 +458,7 @@ function FileField({
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
             setLocal(null);
+            setTypedUrl(e.target.value);
             onChange(e.target.value ? { url: e.target.value } : undefined);
           }}
           className={cn(fieldControlClass, 'h-9 px-3 font-mono text-[12px]')}
@@ -494,9 +510,6 @@ function PdfPreview({ src }: { src: string }) {
     </object>
   );
 }
-
-/** `http:` or `https:` - a link the person can read, and may have pasted. */
-const WEB_URL_RE = /^\s*https?:\/\//i;
 
 /**
  * The line under an attached file's name, or `undefined` for none.
