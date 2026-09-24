@@ -1,0 +1,51 @@
+domain      = "readability"
+description = "Concepts whose values are written for a reader rather than for a builder: coded choices, amounts, and free text a model writes in Markdown, so the result view's value rules are exercised on a real run."
+
+# ─── An invoice checked against its purchase order ──────────────────────────
+#
+# Every field is here for a way a value can read to a person:
+#
+#   verdict, risk    coded choices, one snake_case and one all-caps, which a
+#                    method app shows in words;
+#   supplier         an unbounded `text` a run fills with one line;
+#   memo             an unbounded `text` a run fills with Markdown - a heading,
+#                    a paragraph and a table;
+#   amount_due,      amounts above and below 1;
+#   price_variance
+#   lines            all of it again in table cells, with a `status` choice
+#                    and a Markdown `note` on every line.
+
+[concept.CheckedLine]
+description = "One invoice line, checked against the purchase order"
+
+[concept.CheckedLine.structure]
+item       = { type = "text", description = "What was invoiced", required = true }
+quantity   = { type = "integer", description = "How many units were invoiced", required = true }
+unit_price = { type = "number", description = "The invoiced price of one unit", required = true }
+status     = { type = "text", description = "How the line compares with the purchase order", required = true, choices = [
+  "matches_po",
+  "unit_price_differs_from_po",
+  "quantity_differs_from_po",
+  "not_on_po",
+] }
+note       = { type = "text", description = "What the reviewer noticed on this line, as one Markdown sentence with its key figure in bold", required = true }
+
+[concept.InvoiceCheck]
+description = "A supplier invoice checked against its purchase order"
+
+[concept.InvoiceCheck.structure]
+supplier       = { type = "text", description = "The supplier's name", required = true }
+verdict        = { type = "text", description = "What to do with the invoice", required = true, choices = [
+  "approve",
+  "hold_for_review",
+  "reject",
+] }
+risk           = { type = "text", description = "How risky paying it as it stands would be", required = true, choices = [
+  "LOW_RISK",
+  "MEDIUM_RISK",
+  "HIGH_RISK",
+] }
+amount_due     = { type = "number", description = "The total the invoice asks for", required = true }
+price_variance = { type = "number", description = "The largest unit-price variance against the purchase order, as a fraction", required = true }
+memo           = { type = "text", description = "A memo for the approver, in Markdown: a level-two heading, one short paragraph, and a table comparing invoiced and ordered prices", required = true }
+lines          = { type = "list", item_type = "concept", item_concept_ref = "CheckedLine", description = "The invoice's lines, each checked", required = true }

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { collectStuffFiles } from '../stuff-files';
 import type { RunField } from '../descriptor';
+import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../file-formats';
 
 const image = (name: string): RunField => ({
   kind: 'image',
   name,
   conceptRef: 'native.Image',
   required: true,
+  formats: IMAGE_FORMATS,
 });
 
 const document_ = (name: string): RunField => ({
@@ -14,6 +16,7 @@ const document_ = (name: string): RunField => ({
   name,
   conceptRef: 'native.Document',
   required: true,
+  formats: DOCUMENT_FORMATS,
 });
 
 const text = (name: string): RunField => ({
@@ -159,6 +162,25 @@ describe('collectStuffFiles — markup', () => {
 
   it('skips markup that carries none', () => {
     expect(collectStuffFiles(html, { css_class: 'report' })).toEqual([]);
+  });
+
+  it('reads a list of native.Html as one file per page', () => {
+    // A plural node carries its element's concept, so it used to be taken for
+    // ONE page: the list has no markup of its own, and every page was missed.
+    const pages: RunField = {
+      ...html,
+      kind: 'list',
+      conceptRef: 'native.Html',
+      contentKey: 'items',
+      item: { ...html, name: 'item' },
+    };
+    const files = collectStuffFiles(pages, {
+      items: [{ inner_html: '<h1>One</h1>' }, { inner_html: '<h1>Two</h1>' }],
+    });
+    expect(files).toEqual([
+      { text: '<h1>One</h1>', extension: 'html', path: 'output.0', kind: 'markup' },
+      { text: '<h1>Two</h1>', extension: 'html', path: 'output.1', kind: 'markup' },
+    ]);
   });
 
   it('does not walk into a native.Html node looking for files', () => {

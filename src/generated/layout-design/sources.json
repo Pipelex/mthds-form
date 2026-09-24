@@ -1,15 +1,15 @@
 {
   "comment": "Written by /pipelex-integrate. `method` and `target` are how this tree was generated — re-run the skill to refresh it. `bundle_dir` is the directory the call site loads and `sources` the SHA-256 of every .mthds file under it, so a bundle change that was never regenerated — a file edited, removed or added — is detectable. Not part of the codegen lock; do not hand-edit.",
   "generator": "pipelex-integrate",
-  "method": { "files": ["data/generative/ui-designer.mthds"] },
+  "method": { "files": ["methods/layout-design.mthds"] },
   "target": "ts-zod",
   "pipe": {
-    "pipe_ref": "generative.ui_designer",
-    "inputs": { "catalog": "generative.Catalog", "brief": "native.Text", "seed": "native.Text?" },
+    "pipe_ref": "generative.design_layout",
+    "inputs": { "catalog": "generative.Catalog", "brief": "generative.Brief", "seed": "native.Text?" },
     "output": "native.Text"
   },
-  "bundle_dir": "data/generative",
+  "bundle_dir": "methods",
   "sources": {
-    "data/generative/ui-designer.mthds": "80bafaa9a2f5e3c91026b5f90f09508bdb31e2c1cc941224e34241c91485cb49"
+    "methods/layout-design.mthds": "7bc8c64c6b59eedeaf1093a494245979b6d6d0f68992a955226dd733fc628a91"
   }
 }

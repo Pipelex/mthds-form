@@ -1,5 +1,5 @@
 import type { Spec } from '@json-render/core';
-import type { PagePlan } from '../generated/ui-designer/types';
+import type { PagePlan } from '../generated/layout-design/types';
 
 /**
  * A spec with its provenance - the shape every fixture takes, whoever produced
@@ -17,7 +17,7 @@ import type { PagePlan } from '../generated/ui-designer/types';
 
 /** How a spec came to be. */
 export type Producer =
-  /** The designer method, `data/generative/ui-designer.mthds`, run on the hosted API. */
+  /** The designer method, `methods/layout-design.mthds`, run on the hosted API. */
   | 'pipelex-method'
   /** A Claude Code subagent in a fresh context, given the method, the catalog data and the brief and nothing else. */
   | 'claude-code-subagent'

@@ -2,7 +2,7 @@
  * Specs captured for the heroes of data/methods/summarize_people/bundle.mthds - DO NOT EDIT.
  *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
- * `data/generative/ui-designer.mthds` on the hosted API through `@pipelex/sdk` over
+ * `methods/layout-design.mthds` on the hosted API through `@pipelex/sdk` over
  * each hero's brief (MODEL=, SEED= and TEMPERATURE= choose the run) and validates
  * what came back against the catalog. Take in another producer's JSONL with the
  * `--capture` command of scripts/generate-fixtures.mjs, which validates it the same
@@ -28,11 +28,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'summarize_people.summarize_people',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: '15d195df65f3',
-    date: '2026-09-16',
+    promptHash: '2b2325fd1231',
+    date: '2026-09-17',
     brief: 'wip/generative-ui/briefs/summarize_people.summarize_people.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["hero","people-section","run","footer"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"People summaries","lede":"Add the people you want summarized."},"children":[]}}\n{"op":"add","path":"/elements/people-section","value":{"type":"Section","props":{"title":"The people"},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}\n{"op":"add","path":"/elements/footer","value":{"type":"Footer","props":{"text":"","tag":"summarize_people"},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["hero","work"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"People summaries","lede":"Hand over your list of people and get a short summary written for each one."},"children":[]}}\n{"op":"add","path":"/elements/work","value":{"type":"Section","props":{"title":"The people"},"children":["people-field","run-cta"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/run-cta","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -41,23 +41,24 @@ export const SPECS: SpecFixture[] = [
           props: {
             direction: 'vertical',
             gap: 'lg',
+            align: 'stretch',
           },
-          children: ['hero', 'people-section', 'run', 'footer'],
+          children: ['hero', 'work'],
         },
         hero: {
           type: 'Hero',
           props: {
             headline: 'People summaries',
-            lede: 'Add the people you want summarized.',
+            lede: 'Hand over your list of people and get a short summary written for each one.',
           },
           children: [],
         },
-        'people-section': {
+        work: {
           type: 'Section',
           props: {
             title: 'The people',
           },
-          children: ['people-field'],
+          children: ['people-field', 'run-cta'],
         },
         'people-field': {
           type: 'MthdsField',
@@ -66,7 +67,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        run: {
+        'run-cta': {
           type: 'Cta',
           props: {
             label: 'Summarize everyone',
@@ -83,57 +84,40 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        footer: {
-          type: 'Footer',
-          props: {
-            text: '',
-            tag: 'summarize_people',
-          },
-          children: [],
-        },
       },
     },
     plan: {
       purpose:
-        'A page for someone who has a list of people and wants a short summary of each — they arrive with the records in hand and leave with the method running against them.',
+        'A page for someone with a list of people from a CSV who wants a short summary written for each one, and needs only to hand over the list and run.',
       title: 'People summaries',
       composition:
-        "A single quiet column, no rail and no steps: this page holds one input and one action, so anything more would be scaffolding. A calm Hero opens with the app's name and one muted line naming what happens. Below it, the work sits in a single Section — the people list, delegated whole to its own control, given room to breathe. The run closes the page as a full-width Cta directly beneath the work, since nothing gates it and there is nothing to review first. A muted Footer carries the method tag at the far right.",
+        'A single quiet column, centered and unhurried. It opens with a Hero that names the job in one bold line and sets one muted line beneath it, so a person knows at a glance what this page does. Below the Hero, one Section holds the whole of the work: the people list, delegated to its own control, given the full width because it is the only thing to attend to. The run sits at the foot of that Section as a full-width Cta, so the eye travels headline → the list → the one action, top to bottom, with nothing beside it and nothing folded away. There is only one input and it is delegated, so there is nothing to group or stage; restraint is the whole design here.',
       regions: [
         {
           title: null,
           purpose:
-            'Opens the page: names the app and says in one line what it does, so the person knows they are in the right place before they touch anything.',
+            'The opening: one headline naming what happens here, one muted line beneath it, so the person lands knowing exactly what this page is for.',
           container: 'Hero',
           elements: [
-            'Hero, headline "People summaries", muted line "Add the people you want summarized."',
+            'Hero headline: People summaries',
+            'Hero subline (muted): Hand over your list of people and get a short summary written for each one.',
           ],
         },
         {
           title: 'The people',
           purpose:
-            'Collects the one input the run needs — the list of person records — delegated whole to its own control since the brief marks it delegated.',
+            'Holds the one input and the one action: the list of people, delegated whole, then the control that runs the method beneath it at full width.',
           container: 'Section',
-          elements: ['MthdsField, path /inputs/people'],
-        },
-        {
-          title: null,
-          purpose:
-            'Runs the method; sits at the foot of the column because nothing gates it and there is nothing to review first.',
-          container: 'Cta',
-          elements: ['Cta, label "Summarize everyone", on.press bound to validateForm then run'],
-        },
-        {
-          title: null,
-          purpose: 'Closes the page quietly with the method tag.',
-          container: 'Footer',
-          elements: ['Footer, mono tag "summarize_people"'],
+          elements: [
+            'MthdsField path /inputs/people',
+            'Cta label "Summarize everyone", on.press bound to validateForm then run',
+          ],
         },
       ],
       call_to_action: 'Summarize everyone',
       defaults: null,
       delegated: [
-        '/inputs/people — the brief marks it delegated; a list of Person structures, rendered whole by MthdsField at its path.',
+        '/inputs/people — the brief marks it delegated: a list of Person structures read from CSV rows, rendered whole with MthdsField.',
       ],
     },
   },

@@ -9,7 +9,7 @@
  * beside them is the thing this design exists to refuse.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ObjectRunField, RunField, TextRunField } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
@@ -104,6 +104,26 @@ describe('the result panel', () => {
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyJson }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"reference"'));
+    vi.unstubAllGlobals();
+  });
+
+  it('clears the timer that reverts its check mark when it unmounts', async () => {
+    // A timer left running fires into a component that is gone - and, in a
+    // test run, into a document that has been torn down.
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    const set = vi.spyOn(window, 'setTimeout');
+    const clear = vi.spyOn(window, 'clearTimeout');
+    const { unmount } = render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.copyJson }));
+    await waitFor(() => expect(set).toHaveBeenCalledWith(expect.any(Function), 1500));
+    const index = set.mock.calls.findIndex(([, delay]) => delay === 1500);
+    const timer = set.mock.results[index]!.value;
+    unmount();
+    expect(clear).toHaveBeenCalledWith(timer);
+    set.mockRestore();
+    clear.mockRestore();
     vi.unstubAllGlobals();
   });
 

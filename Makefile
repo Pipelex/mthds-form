@@ -22,7 +22,7 @@ typecheck:
 	npx tsc --noEmit
 
 # The offline drift gate over the designer method's generated tree: every
-# stamped file in src/generated/ui-designer/ against its codegen.lock, and the
+# stamped file in src/generated/layout-design/ against its codegen.lock, and the
 # method's source against the hash recorded beside it. No engine, no network,
 # no key. Red means the types were not regenerated after a bundle edit - the
 # refresh is /pipelex-integrate, never a hand edit of the tree.
@@ -73,13 +73,16 @@ fixtures:
 fixtures-runs:
 	npx tsx scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY)) $(if $(PIPE),--pipe $(PIPE))
 
-# The BRIEFS: for each generative hero, the Markdown brief rendered from the
-# committed descriptors and payloads, plus the catalog data the designer method
-# is handed and the prompt hash (the method's text and that data, together).
-# Committed under wip/generative-ui/briefs/, because with the method file it is
-# the record of exactly what a producer was handed - and the file each spec
-# fixture's `brief` field points at. Free and offline. Node cannot resolve this
-# repo's extensionless TypeScript imports on its own, so the pass runs under tsx.
+# The BRIEFS: for each generative hero, the brief as DATA - built from the
+# committed descriptors and payloads - laid out by the designer method's own
+# template stage through the sibling ../pipelex checkout's venv
+# (PIPELEX_PYTHON, as `fixtures` needs it), and written beside that data, the
+# catalog data the method is handed and the prompt hash (the method's text and
+# the catalog, together). Committed under wip/generative-ui/briefs/, because
+# with the method file it is the record of exactly what a producer was handed -
+# and the file each spec fixture's `brief` field points at. Free and offline: no
+# model is called. Node cannot resolve this repo's extensionless TypeScript
+# imports on its own, so the pass runs under tsx.
 briefs:
 	npx tsx scripts/generate-fixtures.mjs --briefs
 
@@ -88,11 +91,22 @@ briefs:
 # inference budget and needs a Pipelex API key in PIPELEX_API_KEY (PIPELEX_BASE_URL
 # points it at another deployment), exactly as `fixtures-runs` does.
 # ONLY=<pipe code> narrows it to one hero; MODEL=<id> overrides every stage's pin in
-# data/generative/ui-designer.mthds for a comparative run; SEED=1 gives the run a
+# methods/layout-design.mthds for a comparative run; SEED=1 gives the run a
 # fresh creative seed, recorded on the fixture. A spec another producer wrote is
 # taken in the same way, with `--capture` - see scripts/generate-fixtures.mjs.
 fixtures-specs:
 	MODEL="$(MODEL)" npx tsx scripts/generate-fixtures.mjs --specs $(if $(ONLY),--only $(ONLY))
+
+# The PROMPT PIN: move `PROMPT_HASH` to what the method and the catalog hash to
+# now. Free and offline; it runs under tsx only because it builds the catalog
+# from `src/`. Every edit to the method's text moves the pin, and the captured
+# layouts stay stamped with the older one until `make fixtures-specs` re-runs
+# them - which costs inference budget and returns pages that want a design
+# review. While the method is still being worked on, `METHOD_WIP=1 make test`
+# says that instead of failing on it; CI ignores the variable and holds the
+# stamps. See src/__stories__/__tests__/method-wip.ts.
+prompt-hash:
+	npx tsx scripts/generate-fixtures.mjs --prompt-hash
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

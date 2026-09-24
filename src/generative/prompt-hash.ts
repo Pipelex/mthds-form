@@ -6,7 +6,7 @@ import type { DesignerCatalog } from './designer-catalog';
  * which is the designer method's text and the catalog it was handed.
  *
  * The prompt is no longer one string this package renders: it is the method
- * (`data/generative/ui-designer.mthds`, every paragraph as prose) applied to
+ * (`methods/layout-design.mthds`, every paragraph as prose) applied to
  * the catalog as data (`designerCatalog()`). Both are what a run was actually
  * given, so both are hashed - a reworded rule and a renamed prop each move
  * the pin, exactly as they did when the prompt was rendered here. The model
@@ -26,7 +26,7 @@ import type { DesignerCatalog } from './designer-catalog';
  * back to the kernel's own form - because the vocabulary it was written in is
  * no longer the vocabulary this entry renders.
  */
-export const PROMPT_HASH = '15d195df65f3';
+export const PROMPT_HASH = '2b2325fd1231';
 
 /**
  * What the hash is computed over: the method's text as shipped, then the

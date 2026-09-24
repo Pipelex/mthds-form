@@ -50,7 +50,14 @@
  * A stale entry here is worse than no list at all, because it refuses a file the
  * runtime would have taken. If the deck grows a format, this table moves with it.
  *
- * Pure data. No React, no ajv, nothing imported.
+ * **The table is the source; a field's `formats` is what gets read.** The
+ * helpers below take a format LIST rather than a kind, because what a given
+ * slot accepts can be narrower than its kind: a host whose server takes only
+ * some of these types narrows the field tree once (`narrowFileFormats`), and
+ * the dropzone's hint, its picker filter and its check all read the narrowed
+ * list, so the three cannot disagree with each other or with that server.
+ *
+ * Pure data and pure functions over it. No React, no ajv, nothing imported.
  */
 
 /** One accepted format: its MIME type and the extensions that carry it. */
@@ -86,35 +93,61 @@ export const IMAGE_FORMATS: readonly FileFormat[] = [
   { mimeType: 'image/webp', extensions: ['.webp'], label: 'WEBP' },
 ];
 
+/**
+ * The source table: every format a slot of this kind can take, before a host
+ * narrows it. `buildRunFields` stamps this onto each `document` and `image`
+ * field as its `formats`, and everything downstream reads the field's list
+ * rather than coming back here - which is what lets a host narrow one list and
+ * have the hint, the picker and the check all follow it.
+ */
 export function formatsForKind(kind: 'document' | 'image'): readonly FileFormat[] {
   return kind === 'image' ? IMAGE_FORMATS : DOCUMENT_FORMATS;
 }
 
-/** `"PDF, DOCX, PPTX"` — the hint shown under a dropzone. */
-export function acceptLabelForKind(kind: 'document' | 'image'): string {
-  return formatsForKind(kind)
-    .map((format) => format.label)
-    .join(', ');
+/**
+ * A MIME type as the table spells it: no parameters, no surrounding space,
+ * lowercase. `APPLICATION/PDF; version=1.7` is `application/pdf`.
+ */
+export function normalizeMimeType(type: string): string {
+  return type.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+}
+
+/** `"PDF, JPG, PNG"` - the hint shown under a dropzone. */
+export function acceptLabel(formats: readonly FileFormat[]): string {
+  return formats.map((format) => format.label).join(', ');
 }
 
 /**
- * Whether a picked file is one this kind accepts.
+ * The format a filename's extension names, among these formats, or `undefined`
+ * when it names none of them. Case-insensitive, because `PHOTO.PNG` is a PNG.
+ */
+export function formatOfFilename(
+  formats: readonly FileFormat[],
+  filename: string,
+): FileFormat | undefined {
+  const name = filename.toLowerCase();
+  return formats.find((format) => format.extensions.some((ext) => name.endsWith(ext)));
+}
+
+/**
+ * Whether a picked file is one of these formats.
  *
  * Checks the MIME type first and falls back to the extension, because a
  * browser's `File.type` is empty often enough to matter: an OS with no handler
  * registered for `.docx` reports `''`, and refusing that file would be refusing
  * a valid one over a fact about the user's machine. A wrong-but-present MIME
  * type is still a rejection — that is the case this exists for.
+ *
+ * It takes the field's own list, never the kind's, so a slot a host narrowed
+ * refuses exactly what its hint no longer names.
  */
 export function isAcceptedFile(
-  kind: 'document' | 'image',
+  formats: readonly FileFormat[],
   file: { name: string; type: string },
 ): boolean {
-  const formats = formatsForKind(kind);
-  const mimeType = file.type.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  const mimeType = normalizeMimeType(file.type);
   if (mimeType) return formats.some((format) => format.mimeType === mimeType);
-  const name = file.name.toLowerCase();
-  return formats.some((format) => format.extensions.some((ext) => name.endsWith(ext)));
+  return formatOfFilename(formats, file.name) !== undefined;
 }
 
 /**
@@ -124,8 +157,8 @@ export function isAcceptedFile(
  * `accept` attribute is built from. Listing extensions BESIDE the MIME type is
  * what makes the empty-`File.type` case above work in the OS picker too.
  */
-export function acceptMapForKind(kind: 'document' | 'image'): Record<string, string[]> {
+export function acceptMap(formats: readonly FileFormat[]): Record<string, string[]> {
   const map: Record<string, string[]> = {};
-  for (const format of formatsForKind(kind)) map[format.mimeType] = [...format.extensions];
+  for (const format of formats) map[format.mimeType] = [...format.extensions];
   return map;
 }

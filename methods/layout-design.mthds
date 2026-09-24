@@ -1,18 +1,26 @@
 domain      = "generative"
 description = "Lays out one page for a method - its inputs, or its result - as a json-render spec over a catalog of components, bound to the state the host provides."
-main_pipe   = "ui_designer"
+main_pipe   = "design_layout"
 
 # The designer method. THIS FILE IS THE PROMPT: every paragraph the models
 # read - the output format, the state contract, the design direction, the
-# rules, the seed procedure - is written here as prose, and the only things
-# rendered into it are the inputs. The catalog arrives as DATA (the components
-# with their props signatures and descriptions, the actions), so a component
-# added to the vocabulary appears in the prompts with no change here, and the
-# prose that names components (the direction, the rules) is the method's own
-# reading of the vocabulary it was written for.
+# rules, the seed procedure, and the brief's own prose - is written here, and
+# the only things rendered into it are the inputs. The catalog arrives as DATA
+# (the components with their props signatures and descriptions, the actions),
+# so a component added to the vocabulary appears in the prompts with no change
+# here, and the prose that names components (the direction, the rules) is the
+# method's own reading of the vocabulary it was written for. The brief arrives
+# as data too: the page's paths with their kinds, presence and constraints,
+# which of them are delegated, what gates the run, and on a result page the
+# state of one real run - and `render_brief` below is the template that lays
+# it out as the Markdown both models read.
 #
-# It runs in two stages, and `ui_designer` is the sequence of them:
+# It runs in three stages, and `design_layout` is the sequence of them:
 #
+# - `render_brief` lays the brief out. It is a Jinja2 template over the data,
+#   with no model behind it, and its text is what the two stages below read
+#   under `@brief_text`. Every sentence of the brief - the headings, how a
+#   path line reads, what "delegated" says - is here and nowhere else.
 # - `plan_page` reads the brief and the catalog - and the creative seed, when
 #   there is one - and writes a PagePlan: what the page is for, its title,
 #   its composition, its regions with the elements and paths each holds, what
@@ -30,22 +38,34 @@ main_pipe   = "ui_designer"
 # Neither prompt prescribes a composition. There is no skeleton a page must
 # have, no region it must contain, no place a control must sit, and the prose
 # names none of the catalog's chrome components: what a component is for is
-# in its own description, which travels as data. The rules that remain are the
-# ones a page is wrong without - the brief's paths, the bindings that fit,
-# delegation, who owns the state, one control that runs the method, heading
-# order, integrity of the tree. The shape of the page is the planner's
-# decision, written into the plan, and the builder's job is to build it.
+# in its own description, which travels as data - and the one control that
+# runs the method is named by the brief, as data, for the same reason. The
+# rules that remain are the ones a page is wrong without - the brief's paths,
+# the bindings that fit, delegation, who owns the state, one control that
+# runs the method, heading order, integrity of the tree. The shape of the
+# page is the planner's decision, written into the plan, and the builder's
+# job is to build it.
 #
-# Two things to know before editing the prompts:
+# Three things to know before editing the prompts:
 #
 # - A literal dollar sign is written `$$`, because `$name` is the language's
 #   inline-substitution shorthand. Every json-render expression key in the
 #   prose (`$$state`, `$$bindState`, `$$item`, `$$cond`, `$$template`, ...)
-#   is spelled that way and renders as a single `$`.
-# - The component and action lists, and the plan, are Jinja2 loops. A loop
-#   body ends with its own newline, so the heading that follows a loop sits
-#   directly under `{% endfor %}` to render exactly one blank line between
-#   the two.
+#   is spelled that way and renders as a single `$`, in the brief's template
+#   as much as in the prompts.
+# - The component and action lists, and the plan, are Jinja2 loops in the two
+#   prompts, which keep every newline they are written with. A loop body ends
+#   with its own newline, so the heading that follows a loop sits directly
+#   under `{% endfor %}` to render exactly one blank line between the two.
+# - The brief's template is a `markdown` template, and that category trims:
+#   a line holding only a `{% %}` tag renders as nothing, so a loop or a
+#   condition is written on lines of its own and the text between them keeps
+#   its own newlines. Two traps. A line that ENDS with a `{% %}` tag loses
+#   its newline with it, so such a tag is closed with `+%}`, which keeps the
+#   newline. And every `{% set %}` is written at the top level of the
+#   template, before any text, never inside a loop or a condition: the
+#   runtime reads a name set inside a block as an input the pipe did not
+#   declare, and refuses the method.
 #
 # The output is Text carrying JSONL patches - the format the prompt asks for -
 # rather than a typed structure: a spec is a map of heterogeneous elements
@@ -55,9 +75,9 @@ main_pipe   = "ui_designer"
 # text, and fails loudly on any issue, so a repair is a change HERE, never to
 # the fixture.
 #
-# Both stages pin the same model. The specs pass takes MODEL=<id> to override
-# every pin at once for a comparative run (and TEMPERATURE=<n> for a model
-# that fixes its own), and records which model produced each fixture.
+# Both model stages pin the same model. The specs pass takes MODEL=<id> to
+# override every pin at once for a comparative run (and TEMPERATURE=<n> for a
+# model that fixes its own), and records which model produced each fixture.
 #
 # The optional `seed` is the creative seed of the planner's last section: a
 # random string the harness generates, handed over as one line the prompt
@@ -90,6 +110,38 @@ name        = { type = "text", description = "The action's name, exactly as a bi
 description = { type = "text", description = "What the action does and the params it takes.", required = true }
 built_in    = { type = "boolean", description = "True when the runtime handles the action without a handler from the host.", required = true }
 
+[concept.Brief]
+description = "The page's half of the prompt, as data: which page it is and for which pipe, every path in the state with what it is, which paths are delegated and what gates the run, and on a result page the state of one real run - rendered from the method's own descriptor and from nothing else."
+
+[concept.Brief.structure]
+side         = { choices = ["input", "result"], description = "Which page is being designed: the form a run is started from, or what a run produced.", required = true }
+pipe_ref     = { type = "text", description = "The pipe the page is for, as `domain.pipe_code`.", required = true }
+description  = { type = "text", description = "One sentence on what the page is about: the pipe's own description, or the host's summary of it." }
+name         = { type = "text", description = "On an input page, the method's name as the host lists it - the one product name the page may carry. Absent when the host lists none." }
+paths        = { type = "list", item_type = "concept", item_concept_ref = "PathEntry", description = "Every path in the state the page binds or reads, in reading order and flattened: a structure's members follow it one level deeper, and a list's item members follow the list, spelled relative to one item.", required = true }
+run_control  = { type = "text", description = "On an input page, the catalog component that runs the method, by name; the page has exactly one of it." }
+sample_state = { type = "text", description = "On a result page, the state of one real run as the host loads it, as JSON - what `/result` held after one actual run, so magnitudes and lengths can be judged. Never copied into a page." }
+
+[concept.PathEntry]
+description = "One path of the state, as the brief describes it: where it is, what it holds, what it is called, what constrains it, and whether the page lays it out or hands it back to the kernel's own control."
+
+[concept.PathEntry.structure]
+depth            = { type = "integer", description = "How deep the path sits under the page's root, for the indentation of its line: 0 for a top-level input or the result itself.", required = true }
+path             = { type = "text", description = "The path, spelled exactly as the page binds or reads it: absolute (`/inputs/request/city`), or relative to one item of the list above when `relative` is set (`city`, or `teams/<i>/name` inside a nested list).", required = true }
+kind             = { type = "text", description = "What the path holds, in words: `text`, `number`, `integer`, `boolean`, `date`, `prose (markdown)`, `choice of \"a\" | \"b\"`, `document (a file)`, `image (a file)`, `structure <concept>`, `list of <kind>`, or the native concept it carries.", required = true }
+name             = { type = "text", description = "The member's name as the method spells it. Absent on the result's own root entry, which is the whole result." }
+title            = { type = "text", description = "The member's human title, when the method gives one that differs from its name." }
+description      = { type = "text", description = "What the member is for, as the method's author wrote it." }
+required         = { type = "boolean", description = "On an input page, whether the input must be filled before the run: true for a required input, false for an optional one." }
+gating           = { type = "boolean", description = "On an input page, true when the run waits for this input - a top-level fact only." }
+notes            = { type = "list", item_type = "text", description = "The constraints and hints in words, each on its own: `min 1`, `at most 80 characters`, `default \"x\"`, `examples ...`, `hints intent=label`." }
+default          = { type = "text", description = "The authored default value, as JSON, when the method states one - the seed a `/state` patch sets." }
+delegated        = { type = "boolean", description = "True when the page hands the path back to the kernel's own control - MthdsField on an input page, MthdsResult on a result page - because the catalog cannot enter or show it. A delegated structure's members are not listed.", required = true }
+relative         = { type = "boolean", description = "True when the path is spelled relative to one item of the list above it, as a DataTable column or `$item` reads it, rather than from the page's root." }
+item_kind        = { type = "text", description = "On a list whose items the brief describes: what one item holds, in the same words as `kind`." }
+item_description = { type = "text", description = "On a list whose items the brief describes: what one item is for, as the method's author wrote it." }
+item_laid_out    = { type = "boolean", description = "On a list whose items the brief describes: true when the item's members follow this entry, one each, spelled relative to one item." }
+
 [concept.PagePlan]
 description = "The designer's plan for one page, settled before any element is written: what the page is for, how it is composed - a decision the plan makes, with no shape given in advance - what each region shows or collects and with which components, what runs the method, and what is delegated."
 
@@ -111,20 +163,116 @@ purpose   = { type = "text", description = "What this region shows or collects, 
 container = { type = "text", description = "The component the region is built with, by its catalog name, when the composition has settled it; otherwise empty, and the builder chooses one that builds what the composition describes." }
 elements  = { type = "list", item_type = "text", description = "The elements inside it in order, one line each: the component by its catalog name, the path it binds or reads spelled exactly as the brief lists it, and the choices it lists when it lists any. A container names what it holds.", required = true }
 
-[pipe.ui_designer]
+[pipe.design_layout]
 type = "PipeSequence"
-description = "Design one page from the catalog and the brief: plan it, then build it as the JSONL patches of a spec bound to the host's state."
-inputs = { catalog = "Catalog", brief = "Text", seed = "Text?" }
+description = "Design one page from the catalog and the brief: lay the brief out, plan the page from it, then build it as the JSONL patches of a spec bound to the host's state."
+inputs = { catalog = "Catalog", brief = "Brief", seed = "Text?" }
 output = "Text"
 steps = [
+  { pipe = "render_brief", result = "brief_text" },
   { pipe = "plan_page", result = "plan" },
   { pipe = "emit_page", result = "page" },
 ]
 
+[pipe.render_brief]
+type        = "PipeCompose"
+description = "Lay the brief out as the Markdown both model stages read: the page and its pipe, the state and every path in it, what is delegated, and - on an input page - the defaults and what runs the method, or - on a result page - the state of one real run."
+inputs      = { brief = "Brief" }
+output      = "Text"
+
+[pipe.render_brief.template]
+category = "markdown"
+template = """
+{% set hatch = "MthdsField" if brief.side == "input" else "MthdsResult" %}
+{% set delegated = brief.paths | selectattr("delegated") | rejectattr("relative") | list %}
+{% set defaults = brief.paths | selectattr("default") | list %}
+{% set gating = brief.paths | selectattr("gating") | list %}
+# {{ "Input" if brief.side == "input" else "Result" }} page: {{ brief.pipe_ref }}
+
+{% if brief.description %}
+{{ brief.description }}
+{% elif brief.side == "input" %}
+A method with the inputs below.
+{% else %}
+The result of a method, described below.
+{% endif %}
+
+{% if brief.name %}
+## Name
+
+The method is called «{{ brief.name }}», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.
+
+{% endif %}
+## State
+
+{% if brief.side == "input" %}
+The form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$$bindState` at its path; a structure's members bind at their own paths beneath it.
+{% else %}
+The host loads the run's result under `/result` before the page renders. Read every value with `$$state`; emit no `/state` patches. Paths:
+{% endif %}
+
+{% for entry in brief.paths %}
+{{ "  " * entry.depth }}- `{{ entry.path }}` — {{ entry.kind }}{% if brief.side == "input" %}, {{ "required" if entry.required else "optional" }}{% if entry.gating %}, gates the run{% endif %}{% endif %}{% if entry.name %} — {% if entry.title %}{{ entry.title }} (`{{ entry.name }}`){% else %}`{{ entry.name }}`{% endif %}{% endif %}{% if entry.description %}: {{ entry.description }}{% endif %}{% if entry.notes %} ({{ entry.notes | join("; ") }}){% endif %}{% if entry.delegated and entry.relative %} (a DataTable prints it as text; delegate the whole list to {{ hatch }} to render it properly){% elif entry.delegated %} **[delegate: {{ hatch }}]**{% endif +%}
+{% if entry.item_kind %}
+{{ "  " * (entry.depth + 1) }}- each item is a {{ entry.item_kind }}{% if entry.item_description %} ({{ entry.item_description }}){% endif %}{% if entry.item_laid_out and entry.relative %}, with:{% elif entry.item_laid_out %}, with these members (paths relative to one item, for DataTable columns or $$item):{% endif +%}
+{% endif %}
+{% endfor %}
+
+## Delegated
+
+{% if delegated %}
+{% if brief.side == "input" %}
+Render these with `MthdsField` at the path, and nothing else:
+{% else %}
+Render these with `MthdsResult` at the path - they are kinds the catalog cannot show properly:
+{% endif %}
+
+{% for entry in delegated %}
+- `{{ entry.path }}` ({{ entry.kind }})
+{% endfor %}
+{% elif brief.side == "input" %}
+None: every input can be entered with the catalog's own inputs. `MthdsField` remains available for any you would rather not style.
+{% else %}
+None. `MthdsResult` remains available for any structure you choose not to lay out.
+{% endif %}
+{% if brief.side == "input" %}
+
+## Defaults
+
+{% if defaults %}
+Seed these, and only these, with `/state` patches (`{"op":"add","path":"/state/inputs/...","value":...}`):
+
+{% for entry in defaults %}
+- `{{ entry.path }}` = {{ entry.default }}
+{% endfor %}
+{% else %}
+None. Emit no `/state` patches.
+{% endif %}
+
+## Run
+
+{% if gating %}
+The run waits for `{{ gating | map(attribute="name") | join("`, `") }}`; say so near the {{ brief.run_control }}, briefly.
+{% else %}
+Nothing gates the run.
+{% endif %}
+The page has exactly one `{{ brief.run_control }}`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.
+{% else %}
+
+## One real run, as loaded
+
+The state of one actual run, so you can judge magnitudes and lengths. Bind to the paths; do not copy these values into the spec.
+
+```json
+{{ brief.sample_state }}
+```
+{% endif %}
+"""
+
 [pipe.plan_page]
 type = "PipeLLM"
 description = "Read the brief and plan the page: what it is for, how it is composed, what each region holds and with which components, what runs the method, and what is delegated."
-inputs = { catalog = "Catalog", brief = "Text", seed = "Text?" }
+inputs = { catalog = "Catalog", brief_text = "Text", seed = "Text?" }
 output = "PagePlan"
 model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 8192 }
 system_prompt = """
@@ -173,7 +321,7 @@ Never show, quote or mention the seed. Two designers given different seeds must 
 
 Below is the brief for the page you are planning. It is the ONLY source of paths: every value the page shows or binds must be at a path the brief lists, spelled exactly as written.
 
-@brief
+@brief_text
 
 ---
 
@@ -187,7 +335,7 @@ Plan this page.
 [pipe.emit_page]
 type        = "PipeLLM"
 description = "Build the page the plan describes: emit the JSONL patches of a spec over the catalog, bound to the host's state at the paths the brief lists."
-inputs      = { plan = "PagePlan", catalog = "Catalog", brief = "Text" }
+inputs      = { plan = "PagePlan", catalog = "Catalog", brief_text = "Text" }
 output      = "Text"
 # The object form, because the default output cap (4096 tokens on this model)
 # is not enough for a page over a deeply nested result: the Company hero's
@@ -296,7 +444,7 @@ RULES:
 
 Below is the brief for the page you are building. It is the ONLY source of paths: every value you show or bind must be at a path the brief lists, spelled exactly as written.
 
-@brief
+@brief_text
 
 ---
 

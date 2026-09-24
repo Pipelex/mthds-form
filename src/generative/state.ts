@@ -1,12 +1,6 @@
 import type { RunField } from '../core';
 import { hasOwnProp } from '../core/own-property';
-import {
-  formatDateContent,
-  isNativeCompositeNode,
-  isNativeDateNode,
-  isNativeHtmlNode,
-  readDateContent,
-} from '../core/native-content';
+import { formatDateContent, isNativeValueNode, readDateContent } from '../core/native-content';
 
 /**
  * The two state loaders - what fills the trees a spec binds to.
@@ -39,7 +33,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *    the ones a model would bind to anyway;
  *  - the three native concepts the kind vocabulary cannot name (`native.Html`,
  *    `native.Date`, `native.Composite`) pass through whole, for the escape
- *    hatch to render;
+ *    hatch to render - and a list of one is still a list, an array of whole
+ *    values, which is what the kernel renders when the brief delegates it;
  *  - a scalar passes through.
  *
  * A top-level scalar's `contentKey` wrapper is NOT unwrapped: `ResultField`
@@ -48,9 +43,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function payloadToState(field: RunField, payload: unknown): unknown {
   if (payload === undefined || payload === null) return payload;
-  if (isNativeHtmlNode(field) || isNativeDateNode(field) || isNativeCompositeNode(field)) {
-    return payload;
-  }
+  if (isNativeValueNode(field)) return payload;
   switch (field.kind) {
     case 'date': {
       const content = readDateContent(payload);

@@ -56,6 +56,8 @@ The wire descriptor states what each field IS; `buildRunFields` maps it structur
 
 Submitting goes through the gate: `buildRunInputsSchema` → `prepareRunInputs` → `validateRunInputs` → `apiInputsFromSchemaData`. The verdict is structured (`RunInputError[]`), and `describeValidationError` renders it for a person.
 
+A file field (`document` or `image`) carries `formats`, the formats its slot accepts, and the control's hint, file-picker filter and check all read that one list. A host whose upload path takes fewer types narrows the whole tree once with `narrowFileFormats(fields, mimeTypes)` and has its server check uploads against the same list. [docs/upload-seam.md](docs/upload-seam.md) is everything a file control and its host owe each other.
+
 ## Theming
 
 The controls carry Tailwind classes over the standard shadcn/ui semantic tokens (`--background`, `--input`, `--border`, `--primary`, …). A host that already defines those tokens gets controls that match its product with no configuration. A host with no Tailwind build loads the prebuilt `@pipelex/mthds-form/styles.css`. Both paths, and the exact token list, are in [docs/theming.md](docs/theming.md).
@@ -68,6 +70,7 @@ The controls carry Tailwind classes over the standard shadcn/ui semantic tokens 
 | [docs/dependency-budget.md](docs/dependency-budget.md) | what each layer may depend on, and how that is enforced |
 | [docs/theming.md](docs/theming.md) | the token contract and host setup |
 | [docs/wire-correspondence.md](docs/wire-correspondence.md) | the name-for-name wire ↔ `RunField` mapping |
+| [docs/upload-seam.md](docs/upload-seam.md) | what a file control and its host owe each other: accepted formats and narrowing them, write-back paths, previews, the file card |
 | [docs/derivation-swap.md](docs/derivation-swap.md) | the record of the swap to the wire descriptor — what changed, what survived |
 
 ## Development

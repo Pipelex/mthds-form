@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
@@ -145,6 +145,14 @@ function highlight(json: string) {
 export function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
   const [copied, setCopied] = useState(false);
+  // The check mark reverts after a moment. The timer belongs to the effect, so
+  // it is cleared when the control unmounts rather than firing into a
+  // component, or a document, that is gone.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   // `stringifyValue` handles the shapes `JSON.stringify` refuses (a BigInt, a
   // circular reference) rather than throwing inside a view whose whole purpose
   // is to show what is there.
@@ -164,10 +172,7 @@ export function JsonView({ value }: { value: unknown }) {
         <button
           type="button"
           onClick={() => {
-            void navigator.clipboard.writeText(text).then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1500);
-            });
+            void navigator.clipboard.writeText(text).then(() => setCopied(true));
           }}
           aria-label={s.copyJson}
           className="absolute right-2 top-2 rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"

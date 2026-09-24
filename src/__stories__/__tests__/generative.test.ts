@@ -10,7 +10,7 @@ import {
   getPipeInputForm,
   getPipeOutputForm,
 } from '../../core';
-import { renderInputBrief, renderResultBrief } from '../../generative/brief';
+import { inputBrief, isDelegatedResult, resultBrief } from '../../generative/brief';
 import { catalog } from '../../generative/catalog';
 import { fixtureId } from '../../generative/fixture';
 import { layoutProblems } from '../../generative/layout-fits';
@@ -21,6 +21,7 @@ import {
   resultFieldAtPath,
 } from '../../generative/paths';
 import { PROMPT_HASH } from '../../generative/prompt-hash';
+import { METHOD_WIP } from './method-wip';
 import { payloadToState, seedInputs } from '../../generative/state';
 import { specFromJsonl } from '../../generative/stream';
 import { formatProblems, validateAgainstCatalog } from '../../generative/validate';
@@ -30,6 +31,7 @@ import * as extractInvoice from '../_generated/extract_invoice';
 import { SPECS as INVOICE_SPECS } from '../_generated/extract_invoice.specs';
 import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
+import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import * as results from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 import * as scalars from '../_generated/scalars';
@@ -120,6 +122,23 @@ describe('the result loader', () => {
     );
   });
 
+  it('loads a list of native.Date as a list, passing each date through whole', () => {
+    // A plural node carries its element's concept, so the native passthrough
+    // used to take the whole list for ONE date and hand it on unloaded. The
+    // list is a list: unwrapped to an array, and each item - which IS a date -
+    // passed through for the escape hatch to render.
+    const dates = buildResultField(
+      getPipeOutputForm(lists.OUTPUT_FORM, 'lists', 'dates')!,
+      getPipeIOContract(lists.CONTRACTS, 'lists', 'dates')!.output.json_schema,
+    );
+    const payload = LIST_PAYLOADS['lists.dates'] as { items: unknown[] };
+    expect(payloadToState(dates, payload)).toEqual(payload.items);
+    // And the brief delegates the list whole, so the escape hatch at /result
+    // is handed exactly this array - the one shape the kernel renders.
+    expect(isDelegatedResult(dates)).toBe(true);
+    expect(dates.kind === 'list' && isDelegatedResult(dates.item)).toBe(true);
+  });
+
   it('seeds only authored defaults', () => {
     const contractWithDefault = getPipeIOContract(
       structured.CONTRACTS,
@@ -162,12 +181,19 @@ describe('the briefs', () => {
       getPipeInputForm(structured.INPUT_FORM, 'structured', 'invoice_with_source')!,
       contract.inputs,
     );
-    const brief = renderInputBrief({ pipeRef: 'structured.invoice_with_source' }, fields);
-    expect(brief).toContain('`/inputs/source` — document (a file)');
-    expect(brief).toContain('`/inputs/invoice/issued_on` — date');
-    expect(brief).toMatch(/`\/inputs\/invoice\/lines` — list[^\n]*\[delegate: MthdsField\]/);
-    expect(brief).toContain('`/inputs/invoice/reference` — text, required');
-    expect(brief).not.toContain('json_schema');
+    const brief = inputBrief({ pipeRef: 'structured.invoice_with_source' }, fields);
+    const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);
+    expect(entry('/inputs/source')).toMatchObject({ kind: 'document (a file)', delegated: true });
+    expect(entry('/inputs/invoice/issued_on')).toMatchObject({ kind: 'date', delegated: true });
+    expect(entry('/inputs/invoice/lines')?.kind).toMatch(/^list of /);
+    expect(entry('/inputs/invoice/lines')?.delegated).toBe(true);
+    expect(entry('/inputs/invoice/reference')).toMatchObject({
+      kind: 'text',
+      required: true,
+      delegated: false,
+    });
+    expect(brief.run_control).toBe('Cta');
+    expect(JSON.stringify(brief)).not.toContain('json_schema');
   });
 
   it('carry one loaded run beside the result paths', () => {
@@ -176,15 +202,57 @@ describe('the briefs', () => {
       getPipeOutputForm(results.OUTPUT_FORM, 'results', 'nested_result')!,
       contract.output.json_schema,
     );
-    const brief = renderResultBrief(
+    const brief = resultBrief(
       { pipeRef: 'results.nested_result' },
       field,
       payloadToState(field, PAYLOADS['results.nested_result']),
     );
-    expect(brief).toContain('`/result/lines` — list of structure results.LineItem');
-    expect(brief).toContain('`unit_price` — number');
-    expect(brief).toContain('"issued_on": "2026-03-14"');
-    expect(brief).not.toContain('__class__');
+    const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);
+    expect(entry('/result/lines')).toMatchObject({
+      kind: 'list of structure results.LineItem',
+      item_kind: 'structure results.LineItem',
+      item_laid_out: true,
+    });
+    expect(entry('unit_price')).toMatchObject({ kind: 'number', relative: true, depth: 3 });
+    expect(brief.sample_state).toContain('"issued_on": "2026-03-14"');
+    expect(brief.sample_state).not.toContain('__class__');
+  });
+
+  describe('delegate a list of native dates whole', () => {
+    // A list of `native.Date` is a list, so the native predicates refuse it -
+    // but no catalog component reads a date's `{date, time}` either, so the
+    // brief hands the whole list to the kernel rather than offering its items
+    // to a repeat.
+    const contract = getPipeIOContract(lists.CONTRACTS, 'lists', 'dates')!;
+    const field = buildResultField(
+      getPipeOutputForm(lists.OUTPUT_FORM, 'lists', 'dates')!,
+      contract.output.json_schema,
+    );
+    const state = payloadToState(field, LIST_PAYLOADS['lists.dates']);
+    const brief = resultBrief({ pipeRef: 'lists.dates' }, field, state);
+
+    it('as one delegated entry at the root, named a list of dates', () => {
+      expect(brief.paths).toEqual([
+        expect.objectContaining({
+          depth: 0,
+          path: '/result',
+          kind: 'list of date (native.Date)',
+          delegated: true,
+        }),
+      ]);
+    });
+
+    it('with no item for a repeat to lay out', () => {
+      const [root] = brief.paths;
+      expect(root?.item_laid_out).toBeUndefined();
+      expect(root?.item_kind).toBeUndefined();
+      expect(brief.paths.some((entry) => entry.relative)).toBe(false);
+    });
+
+    it('beside the state the escape hatch then renders: every date, whole', () => {
+      expect(Array.isArray(state)).toBe(true);
+      expect(JSON.parse(brief.sample_state ?? 'null')).toEqual(state);
+    });
   });
 });
 
@@ -275,16 +343,22 @@ describe('the captured layouts', () => {
     describe(`${fixture.pipeRef} (${fixtureId(fixture)})`, () => {
       const inputs = inputsOf(fixture.pipeRef);
 
-      it('was produced against the prompt the package ships', () => {
+      it('names a brief that is on disk', () => {
+        expect(existsSync(path.join(REPO, fixture.brief)), fixture.brief).toBe(true);
+      });
+
+      // The two stamp assertions, and the only two `METHOD_WIP=1` stands down
+      // for - see ./method-wip.ts. Every other assertion here still holds under
+      // the hatch, because a prompt edit stales the stamp and nothing else.
+      it.skipIf(METHOD_WIP)('was produced against the prompt the package ships', () => {
         expect(fixture.promptHash).toBe(PROMPT_HASH);
       });
 
-      it('names a brief that is on disk, carrying the same prompt', () => {
-        const briefPath = path.join(REPO, fixture.brief);
-        expect(existsSync(briefPath), fixture.brief).toBe(true);
+      it.skipIf(METHOD_WIP)('names a brief carrying the prompt it was produced against', () => {
         // The brief opens with the hash of the prompt it was written beside, so
         // the fixture and the record it points at cannot drift apart silently.
-        expect(readFileSync(briefPath, 'utf8').split('\n')[0]).toContain(fixture.promptHash);
+        const brief = readFileSync(path.join(REPO, fixture.brief), 'utf8');
+        expect(brief.split('\n')[0]).toContain(fixture.promptHash);
       });
 
       it('compiles from its own JSONL to its spec', () => {
