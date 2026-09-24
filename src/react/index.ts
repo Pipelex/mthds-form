@@ -37,6 +37,7 @@ export {
   useResolveShareUrl,
   useResolveUrl,
   useResolvedUrl,
+  useResultLocale,
 } from './result-env';
 
 // The markup arm of the result view, exported on its own for a host that renders
@@ -63,6 +64,7 @@ export { FieldDomIdProvider, useFieldDomId } from './field-dom-id';
 export type { FieldPresentation } from './field-presentation';
 export {
   FieldPresentationProvider,
+  humanizeEnumValue,
   humanizeFieldName,
   useFieldPresentation,
 } from './field-presentation';

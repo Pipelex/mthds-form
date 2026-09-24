@@ -83,6 +83,14 @@ interface ResultEnv {
   resolveUrl?: ResolveUrl;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
+  /**
+   * The BCP 47 locale a result's numbers are formatted in, under the `app`
+   * presentation. Defaults to `en-US`, and never to the runtime's own default:
+   * a page rendered on a server in one locale and hydrated in a browser in
+   * another would print `2,116.2` on one side and `2 116,2` on the other, which
+   * is a hydration mismatch. A host that knows its reader's locale states it.
+   */
+  locale?: string;
 }
 
 const ResultEnvContext = createContext<ResultEnv>({});
@@ -91,11 +99,12 @@ export function ResultEnvProvider({
   resolveUrl,
   resolveShareUrl,
   proseImages,
+  locale,
   children,
 }: ResultEnv & { children: ReactNode }) {
   const env = useMemo(
-    () => ({ resolveUrl, resolveShareUrl, proseImages }),
-    [resolveUrl, resolveShareUrl, proseImages],
+    () => ({ resolveUrl, resolveShareUrl, proseImages, locale }),
+    [resolveUrl, resolveShareUrl, proseImages, locale],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
 }
@@ -127,4 +136,15 @@ export function useResolveShareUrl(): ResolveShareUrl | undefined {
 /** The prose-image policy, defaulted to the safe answer for a host that stated none. */
 export function useProseImages(): ProseImages {
   return use(ResultEnvContext).proseImages ?? 'link';
+}
+
+/** Pinned, never the runtime's default - see `ResultEnv.locale`. */
+const DEFAULT_RESULT_LOCALE = 'en-US';
+
+/**
+ * The locale a result's numbers are formatted in, defaulted to `en-US` rather
+ * than to the runtime's, so a server and a browser print the same text.
+ */
+export function useResultLocale(): string {
+  return use(ResultEnvContext).locale ?? DEFAULT_RESULT_LOCALE;
 }

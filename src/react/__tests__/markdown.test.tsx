@@ -282,3 +282,49 @@ describe('a linked image does not open an anchor inside an anchor', () => {
     );
   });
 });
+
+describe('a lone paragraph can be an inline run', () => {
+  // The result view shows a `text` value beside its label, and a one-line
+  // answer ends at the right edge of its column. That layout was built around
+  // an inline run, so a typeset `text` value asks for its lone paragraph as
+  // one rather than as a block.
+  const PLAIN = 'text-[13px] leading-relaxed text-foreground whitespace-pre-wrap';
+
+  it('keeps the block container by default, which is how prose renders', () => {
+    const { container } = render(<Markdown text="Just a sentence." />);
+    expect(container.firstElementChild?.tagName).toBe('DIV');
+    expect(container.querySelector('p')?.textContent).toBe('Just a sentence.');
+  });
+
+  it('renders a plain one-liner as the very span a plain value is', () => {
+    const { container } = render(<Markdown text="Acme Logistics" loneParagraph="inline" />);
+    expect(container.innerHTML).toBe(`<span class="${PLAIN}">Acme Logistics</span>`);
+  });
+
+  it('typesets inline markup inside the run', () => {
+    const { container } = render(<Markdown text="Acme **Logistics**" loneParagraph="inline" />);
+    const run = container.firstElementChild as HTMLElement;
+    expect(run.tagName).toBe('SPAN');
+    expect(run.querySelector('strong')?.textContent).toBe('Logistics');
+    expect(container.querySelector('p, div')).toBeNull();
+  });
+
+  it('counts blank lines around the paragraph as nothing', () => {
+    const { container } = render(<Markdown text={'\n\nAcme\n\n'} loneParagraph="inline" />);
+    expect(container.innerHTML).toBe(`<span class="${PLAIN}">Acme</span>`);
+  });
+
+  it('keeps the block container once there is more than one block', () => {
+    const { container } = render(
+      <Markdown text={'## Memo\n\nTwo lines.'} loneParagraph="inline" />,
+    );
+    expect(container.firstElementChild?.tagName).toBe('DIV');
+    expect(container.querySelector('h2')?.textContent).toBe('Memo');
+    expect(container.querySelector('p')?.textContent).toBe('Two lines.');
+  });
+
+  it('keeps a single block that is not a paragraph a block', () => {
+    const { container } = render(<Markdown text="# Memo" loneParagraph="inline" />);
+    expect(container.querySelector('h1')?.textContent).toBe('Memo');
+  });
+});
