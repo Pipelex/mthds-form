@@ -70,6 +70,8 @@ Three arms read a structure rather than a scalar, and they read it through `src/
 
 `native.Page` needs no arm of its own: its descriptor is an `object` over `{text_and_images, page_view}`, so it works by recursion into the arms above.
 
+**A native arm answers for the node, never for a list of it.** The `native.Date`, `native.Html` and `native.Composite` arms are keyed by concept, and plurality is not on the concept: a plural node's `concept_ref` is its element's (see [The plural wrap](#the-plural-wrap)), so a `native.Date[]` result is a `list` node whose concept reads `native.Date`. Asked about the concept alone, the date arm took the whole list for one date and rendered it as absent where a table of dates belonged, and the file walk behind the download took a list of pages for one page and collected none. So the predicates in `native-content.ts` refuse a node whose stated kind is `list`, and the list's `item` answers for itself. The kind is the descriptor's own statement, so this is still a reading of stated facts and never of a value.
+
 ## Labels follow the presentation, exactly as the form does
 
 A result and the form that produced it show the **same fields**, so they must read the same way. `ResultField` and `ObjectTable` therefore read `useFieldPresentation` and go through the same `fieldLabel(title, name, presentation)` expression as `FieldShell`:

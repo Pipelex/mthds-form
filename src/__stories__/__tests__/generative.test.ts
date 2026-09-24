@@ -10,7 +10,7 @@ import {
   getPipeInputForm,
   getPipeOutputForm,
 } from '../../core';
-import { inputBrief, resultBrief } from '../../generative/brief';
+import { inputBrief, isDelegatedResult, resultBrief } from '../../generative/brief';
 import { catalog } from '../../generative/catalog';
 import { fixtureId } from '../../generative/fixture';
 import { layoutProblems } from '../../generative/layout-fits';
@@ -31,6 +31,7 @@ import * as extractInvoice from '../_generated/extract_invoice';
 import { SPECS as INVOICE_SPECS } from '../_generated/extract_invoice.specs';
 import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
+import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import * as results from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 import * as scalars from '../_generated/scalars';
@@ -119,6 +120,22 @@ describe('the result loader', () => {
     expect(Array.isArray(payloadToState(pluralField, PAYLOADS['results.plural_result']))).toBe(
       true,
     );
+  });
+
+  it('loads a list of native.Date as a list, passing each date through whole', () => {
+    // A plural node carries its element's concept, so the native passthrough
+    // used to take the whole list for ONE date and hand it on unloaded. The
+    // list is a list: unwrapped to an array, and each item - which IS a date -
+    // passed through for the escape hatch to render.
+    const dates = buildResultField(
+      getPipeOutputForm(lists.OUTPUT_FORM, 'lists', 'dates')!,
+      getPipeIOContract(lists.CONTRACTS, 'lists', 'dates')!.output.json_schema,
+    );
+    const payload = LIST_PAYLOADS['lists.dates'] as { items: unknown[] };
+    expect(payloadToState(dates, payload)).toEqual(payload.items);
+    // Delegated as a list of dates is: the item, not the list.
+    expect(isDelegatedResult(dates)).toBe(false);
+    expect(dates.kind === 'list' && isDelegatedResult(dates.item)).toBe(true);
   });
 
   it('seeds only authored defaults', () => {

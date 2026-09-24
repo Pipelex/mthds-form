@@ -84,6 +84,15 @@ export const OfNumbers: Story = {
 export const OfDates: Story = {
   name: 'Dates → table',
   args: story('dates'),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // A table per theme, with a row per date. The list's node carries its
+    // element's concept, `native.Date`, and the date arm used to take the whole
+    // list for one date and render it as absent.
+    await expect(canvas.getAllByRole('table')).toHaveLength(BOTH_THEMES);
+    const table = canvas.getAllByRole('table')[0] as HTMLTableElement;
+    await expect(table.tBodies[0]?.rows).toHaveLength(items('dates').length);
+  },
 };
 
 // ─── Records ─────────────────────────────────────────────────────────────────
