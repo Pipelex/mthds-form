@@ -1,4 +1,4 @@
-import { readDataUrl, viewableUrl } from './native-content';
+import { dataUrlExtensions, readDataUrl, viewableUrl } from './native-content';
 import { collectStuffFiles, type StuffFile, type StuffFileKind } from './stuff-files';
 import type { RunField } from './descriptor';
 
@@ -34,7 +34,8 @@ interface SaveFileCommon {
   /**
    * What to save it as: a bare file name, never a path. The file's own
    * `filename` when it states one, else the base name and the file's place in
-   * the result (`report-output-figures-0-image.png`).
+   * the result (`report-output-figures-0-image.png`). No two files in one plan
+   * share a name, compared without case.
    */
   name: string;
   /**
@@ -141,14 +142,55 @@ export function planStuffSave(field: RunField, value: unknown, options: SavePlan
   const isBareFile = found.length === 1 && found[0]?.path === field.name;
   if (isBareFile && files.length === 1) return { files, unavailable };
 
-  files.push({
-    name: `${safeName(options.baseName) || 'result'}.json`,
-    mimeType: 'application/json',
-    kind: 'data',
-    path: field.name,
-    text: jsonCopy(value),
+  const jsonName = `${safeName(options.baseName) || 'result'}.json`;
+  return {
+    files: [
+      ...distinctNames(files, jsonName),
+      {
+        name: jsonName,
+        mimeType: 'application/json',
+        kind: 'data',
+        path: field.name,
+        text: jsonCopy(value),
+      },
+    ],
+    unavailable,
+  };
+}
+
+/**
+ * The plan's files with no two sharing a name, and none taking the JSON copy's.
+ *
+ * A name derived from a file's place is unique by construction, but a name the
+ * payload states is not: two documents a method wrote as `scan.pdf`, or one it
+ * called `report.json` beside the JSON copy of `report`. A browser suffixes a
+ * duplicate download itself, but a host's delivery may write the names as given,
+ * into a folder or an archive, where the second file silently replaces the
+ * first. So the first file keeps its name and each later one gets a number
+ * before its extension (`scan-2.pdf`), compared without case, as the file
+ * systems readers mostly use compare them.
+ *
+ * That is the whole plan's concern: a file's own button saves one file, which
+ * collides with nothing, under its own name.
+ */
+function distinctNames(files: readonly SaveFile[], reserved: string): SaveFile[] {
+  const taken = new Set([reserved.toLowerCase()]);
+  return files.map((file) => {
+    let name = file.name;
+    for (let count = 2; taken.has(name.toLowerCase()); count += 1) {
+      name = numbered(file.name, count);
+    }
+    taken.add(name.toLowerCase());
+    return name === file.name ? file : { ...file, name };
   });
-  return { files, unavailable };
+}
+
+/** `scan.pdf` as `scan-2.pdf`: the number before the extension, so the type still reads. */
+function numbered(name: string, count: number): string {
+  const extension = extensionOf(name);
+  return extension
+    ? `${name.slice(0, -(extension.length + 1))}-${count}.${name.slice(-extension.length)}`
+    : `${name}-${count}`;
 }
 
 /**
@@ -185,32 +227,13 @@ export function planFileSave(file: StuffFile, options: SavePlanOptions): SaveFil
     // under `image.html` is a page that runs when the reader opens it.
     return {
       ...common,
-      name: nameFor(file, options.baseName, extensionsFor(encoded.mediaType)),
+      name: nameFor(file, options.baseName, dataUrlExtensions(encoded.mediaType)),
       mimeType: encoded.mediaType,
       url,
     };
   }
   const name = nameFor(file, options.baseName);
   return { ...common, name, mimeType: file.mimeType ?? typeForName(name), url };
-}
-
-/**
- * The media types the URL gate admits in a `data:` URL, and the extensions a
- * saved file of each may carry, the first being the one given when the name
- * has none of them. A type missing here gets no extension rather than a guess;
- * the gate keeps the list closed, so today there is none.
- */
-const DATA_URL_EXTENSIONS: Readonly<Record<string, readonly string[]>> = {
-  'image/png': ['png'],
-  'image/jpeg': ['jpg', 'jpeg'],
-  'image/gif': ['gif'],
-  'image/webp': ['webp'],
-  'image/avif': ['avif'],
-  'application/pdf': ['pdf'],
-};
-
-function extensionsFor(mediaType: string): readonly string[] {
-  return DATA_URL_EXTENSIONS[mediaType] ?? [];
 }
 
 /** The type a name's extension implies, for a stored file whose payload states none. */

@@ -303,7 +303,9 @@ export function formatDateContent(content: DateContentView): string {
 }
 
 /**
- * The media types a `data:` URL may carry and still be viewable.
+ * The media types a `data:` URL may carry and still be viewable, each with the
+ * extensions a saved file of that type may carry, the first being the one given
+ * to a name that has none of them.
  *
  * An allow-list rather than a deny-list, because the question a sink asks is
  * "can this paint without executing", and only a closed set answers it. The
@@ -315,15 +317,27 @@ export function formatDateContent(content: DateContentView): string {
  * `image/svg+xml` is deliberately absent: an SVG paints as a picture and
  * EXECUTES as a document the moment it is opened in a tab, which is one click
  * away from every image this package paints.
+ *
+ * The extensions live here, beside each admitted type, rather than in the save
+ * planner that reads them: a type admitted without one would save under a name
+ * with no extension, and the two lists used to be kept in step by hand.
  */
-const VIEWABLE_DATA_MEDIA_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'image/avif',
-  'application/pdf',
+const VIEWABLE_DATA_MEDIA_TYPES: ReadonlyMap<string, readonly [string, ...string[]]> = new Map([
+  ['image/png', ['png']],
+  ['image/jpeg', ['jpg', 'jpeg']],
+  ['image/gif', ['gif']],
+  ['image/webp', ['webp']],
+  ['image/avif', ['avif']],
+  ['application/pdf', ['pdf']],
 ]);
+
+/**
+ * The extensions a saved `data:` file of this admitted media type may carry,
+ * the first being its own. Empty for a type the gate does not admit.
+ */
+export function dataUrlExtensions(mediaType: string): readonly string[] {
+  return VIEWABLE_DATA_MEDIA_TYPES.get(mediaType) ?? [];
+}
 
 /**
  * An origin no host can be, to resolve a relative reference against.

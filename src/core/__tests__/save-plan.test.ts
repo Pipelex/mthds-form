@@ -225,6 +225,47 @@ describe('a planned name is a name, never a path', () => {
   });
 });
 
+describe('no two files in one plan share a name', () => {
+  it('numbers a name the payload states twice, before its extension', () => {
+    const plan = planStuffSave(
+      report([document_('front'), document_('back')]),
+      {
+        front: { url: 'https://cdn.example/1.pdf', filename: 'scan.pdf' },
+        back: { url: 'https://cdn.example/2.pdf', filename: 'scan.pdf' },
+      },
+      { baseName: 'report' },
+    );
+    expect(plan.files.map((file) => file.name)).toEqual(['scan.pdf', 'scan-2.pdf', 'report.json']);
+  });
+
+  it("keeps the JSON copy's name for the JSON copy, whatever case a file uses", () => {
+    const plan = planStuffSave(
+      report([document_('export'), text('title')]),
+      { export: { url: 'https://cdn.example/r.json', filename: 'Report.JSON' }, title: 'T' },
+      { baseName: 'report' },
+    );
+    expect(plan.files.map((file) => file.name)).toEqual(['Report-2.JSON', 'report.json']);
+  });
+
+  it('skips a number another file already holds', () => {
+    const plan = planStuffSave(
+      report([document_('a'), document_('b'), document_('c')]),
+      {
+        a: { url: 'https://cdn.example/1.pdf', filename: 'scan.pdf' },
+        b: { url: 'https://cdn.example/2.pdf', filename: 'scan-2.pdf' },
+        c: { url: 'https://cdn.example/3.pdf', filename: 'scan.pdf' },
+      },
+      { baseName: 'report' },
+    );
+    expect(plan.files.map((file) => file.name)).toEqual([
+      'scan.pdf',
+      'scan-2.pdf',
+      'scan-3.pdf',
+      'report.json',
+    ]);
+  });
+});
+
 describe('planFileSave: one file, as its own button saves it', () => {
   it('plans the file exactly as the whole-result plan does', () => {
     const field = report([image('chart'), text('summary')]);
