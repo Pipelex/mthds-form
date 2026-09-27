@@ -580,6 +580,12 @@ function useStuffFile(kind: StuffFileKind, value: unknown): StuffFile | undefine
   return location ? readStuffFile(kind, value, location.path.join('.')) : undefined;
 }
 
+/** One press of a file's button, and the file it saved: its planned name and bytes. */
+interface FileSaveAttempt {
+  identity: string;
+  state: 'saving' | 'saved' | 'failed';
+}
+
 /**
  * Save this one file — through the host's save function when it supplied one,
  * the browser tab's otherwise, exactly as the whole-result download does, with
@@ -593,12 +599,6 @@ function useStuffFile(kind: StuffFileKind, value: unknown): StuffFile | undefine
  * technology, until the reader tries again. The success mark reverts after a
  * moment, as the copy control's does.
  */
-/** One press of a file's button, and the file it saved: its planned name and bytes. */
-interface FileSaveAttempt {
-  identity: string;
-  state: 'saving' | 'saved' | 'failed';
-}
-
 function FileDownloadButton({ file }: { file: StuffFile }) {
   const s = useFieldStrings();
   const location = useResultLocation();
@@ -636,15 +636,12 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         onClick={() => {
           const started: FileSaveAttempt = { identity, state: 'saving' };
           setAttempt(started);
-          void save([planned]).then((result) =>
+          void save([planned]).then((result) => {
+            const settled = result.failed.length > 0 ? 'failed' : 'saved';
             // Only the latest press settles the button; an earlier one still in
             // flight answers for a state nobody is looking at any more.
-            setAttempt((current) =>
-              current === started
-                ? { identity, state: result.failed.length > 0 ? 'failed' : 'saved' }
-                : current,
-            ),
-          );
+            setAttempt((current) => (current === started ? { identity, state: settled } : current));
+          });
         }}
         disabled={state === 'saving'}
         aria-label={label}

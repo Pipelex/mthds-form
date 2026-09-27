@@ -306,6 +306,17 @@ describe('a download that does not arrive says so', () => {
     ).toBeTruthy();
   });
 
+  it('treats a save function that answers with no failed list as delivering nothing', async () => {
+    // A bridge typed loosely can resolve anything. Reading a list off `{}` used
+    // to throw during the file button's render, taking the whole view down.
+    const saveFiles = (async () => ({})) as unknown as SaveFiles;
+    render(<Panel saveFiles={saveFiles} />);
+    await userEvent.click(fileButtons()[1]!);
+    expect(await screen.findByText(S.downloadFileFailed)).toBeTruthy();
+    await userEvent.click(headerButton()!);
+    expect(await screen.findByText(/^5 files could not be saved/)).toBeTruthy();
+  });
+
   it('treats a save function that throws as delivering nothing', async () => {
     const saveFiles: SaveFiles = async () => {
       throw new Error('bridge gone');
@@ -350,6 +361,35 @@ describe('a download belongs to the result it was made from', () => {
     rerender(<Panel saveFiles={host.saveFiles} value={NEXT} />);
     expect(headerButton()!.hasAttribute('disabled')).toBe(false);
     await act(async () => host.answers[0]!());
+    expect(screen.queryByText(/could not be saved/)).toBeNull();
+  });
+
+  it('keeps its state for a result the host rebuilds equal on every render', async () => {
+    // A host that re-parses its payload on each render or poll hands the panel
+    // a new object holding the same result; that is still the result saved.
+    const rebuilt = () => JSON.parse(JSON.stringify(VALUE)) as unknown;
+    const host = pendingHost();
+    const { rerender } = render(<Panel saveFiles={host.saveFiles} value={rebuilt()} />);
+    await userEvent.click(headerButton()!);
+    rerender(<Panel saveFiles={host.saveFiles} value={rebuilt()} />);
+    expect(headerButton()!.hasAttribute('disabled')).toBe(true);
+    await act(async () => host.answers[0]!());
+    expect(await screen.findByText(/could not be saved/)).toBeTruthy();
+    rerender(<Panel saveFiles={host.saveFiles} value={rebuilt()} />);
+    expect(screen.queryByText(/could not be saved/)).toBeTruthy();
+  });
+
+  it("never carries one result's failures to another holding an equal value under another name", async () => {
+    const saveFiles: SaveFiles = async (files) => everyFileFailed(files);
+    const Verdict = ({ name }: { name: string }) => (
+      <ResultEnvProvider saveFiles={saveFiles}>
+        <StuffViewer field={text('verdict')} value="ok" name={name} />
+      </ResultEnvProvider>
+    );
+    const { rerender } = render(<Verdict name="verdict_a" />);
+    await userEvent.click(headerButton()!);
+    await screen.findByText(/could not be saved: verdict_a.json/);
+    rerender(<Verdict name="verdict_b" />);
     expect(screen.queryByText(/could not be saved/)).toBeNull();
   });
 

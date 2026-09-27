@@ -237,6 +237,7 @@ export function useResolveShareUrl(): ResolveShareUrl | undefined {
  *   has delivered nothing it can vouch for, so every file is reported failed. A
  *   host function that is not `async` and throws on a missing bridge would
  *   otherwise leave the control that asked waiting for good, and say nothing.
+ *   So has one that resolves to something with no `failed` list.
  */
 export function useSaveFiles(): SaveFiles {
   const save = use(ResultEnvContext).saveFiles ?? saveInBrowser;
@@ -248,8 +249,16 @@ async function deliver(save: SaveFiles, files: readonly SaveFile[]): Promise<Sav
     file.url === undefined ? file : { ...file, url: absoluteUrl(file.url) },
   );
   try {
-    const { failed } = await save(handed);
-    return { failed };
+    // Read as a host may actually answer: one typed loosely, a bridge that
+    // resolves `any`, can hand back an object with no `failed` list. It cannot
+    // vouch for anything then, and reading the list off it would throw inside
+    // the control that asked, which for a file's button is a render error that
+    // takes the whole view down.
+    const result = (await save(handed)) as Partial<SaveResult> | undefined;
+    if (Array.isArray(result?.failed)) return { failed: result.failed };
+    return {
+      failed: handed.map((file) => ({ file, reason: 'The save function reported no result' })),
+    };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return { failed: handed.map((file) => ({ file, reason })) };

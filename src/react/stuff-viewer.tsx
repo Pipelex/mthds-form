@@ -203,7 +203,43 @@ export function JsonView({ value }: { value: unknown }) {
 
 /** One press of the header's Download, and the result it saved. */
 interface DownloadAttempt {
+  field: RunField;
+  baseName: string;
   value: unknown;
+  /** The same three as text, written once, when the press is made. */
+  key: string | undefined;
+}
+
+/**
+ * Whether an attempt was made on the result now shown.
+ *
+ * The same descriptor, base name and value objects answer at once. Otherwise
+ * the two are compared as text, so an equal result a host rebuilt on this
+ * render still matches, while two results that hold an equal value under
+ * different names or descriptors do not. The text is written only while an
+ * attempt is on screen, which is the only time the question is asked.
+ */
+function isShownResult(
+  attempt: DownloadAttempt,
+  field: RunField,
+  baseName: string,
+  value: unknown,
+): boolean {
+  if (attempt.field === field && attempt.baseName === baseName && attempt.value === value) {
+    return true;
+  }
+  return attempt.key !== undefined && attempt.key === resultKey(field, baseName, value);
+}
+
+/** A result as text, for {@link isShownResult}; `undefined` for a value JSON cannot write. */
+function resultKey(field: RunField, baseName: string, value: unknown): string | undefined {
+  try {
+    return JSON.stringify([baseName, field, value], (_key, member: unknown) =>
+      typeof member === 'bigint' ? `${member}n` : member,
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 export function StuffViewer({ downloads, ...props }: StuffViewerProps) {
@@ -237,8 +273,9 @@ function StuffPanel({
   // panel mounted and hands it the next result (a rerun, another node) must not
   // see the last result's failures under the new one, nor a save still in
   // flight for the last one disable the control or report on this one. So each
-  // attempt records the value it saved, and only an attempt on the value now
-  // shown is drawn.
+  // attempt records the result it saved, and only an attempt on the result now
+  // shown is drawn — matched by what it holds rather than by the object, since
+  // a host may rebuild an equal result on every render.
   const [saving, setSaving] = useState<DownloadAttempt | null>(null);
   // The names of the files the last download could not hand over, shown until
   // the next one. Empty when everything arrived.
@@ -247,8 +284,9 @@ function StuffPanel({
     names: readonly string[];
   } | null>(null);
   const latest = useRef<DownloadAttempt | null>(null);
-  const savingShown = saving !== null && saving.value === value;
-  const missedShown = missed && missed.attempt.value === value ? missed.names : [];
+  const savingShown = saving !== null && isShownResult(saving, field, baseName, value);
+  const missedShown =
+    missed && isShownResult(missed.attempt, field, baseName, value) ? missed.names : [];
   // The same resolver the rendered view paints images through, so a download
   // saves exactly what the reader is looking at — a host that proxies its
   // storage does not need to configure the two separately.
@@ -257,7 +295,12 @@ function StuffPanel({
   const downloadShown = useResultDownloadShown();
 
   const handleDownload = useCallback(async () => {
-    const attempt: DownloadAttempt = { value };
+    const attempt: DownloadAttempt = {
+      field,
+      baseName,
+      value,
+      key: resultKey(field, baseName, value),
+    };
     latest.current = attempt;
     setSaving(attempt);
     setMissed(null);
