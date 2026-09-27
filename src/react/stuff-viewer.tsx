@@ -1,13 +1,20 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
+import { planStuffSave } from '../core/save-plan';
 import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
 import { useFieldStrings } from './field-strings';
-import { downloadStuff } from './download-stuff';
-import { useResolveUrl } from './result-env';
+import {
+  DownloadDisplayOverride,
+  useResolveUrl,
+  useResultDownloadShown,
+  useSaveFiles,
+  type DownloadDisplay,
+} from './result-env';
+import { ResultRoot } from './result-location';
 import { cn } from './utils';
 
 /**
@@ -63,15 +70,18 @@ export interface StuffViewerProps {
   defaultView?: StuffViewerView;
   /**
    * Names the saved files: `<baseName>.json`, and any file inside the stuff
-   * that carries no name of its own. Defaults to the field's name, which is
-   * what the header shows.
+   * that carries no name of its own, whichever control saved it. Defaults to
+   * the field's name, which is what the header shows.
    */
   downloadBaseName?: string;
   /**
-   * Hide the download control. For a host that saves results its own way, or a
-   * surface where saving makes no sense — a preview inside an editor, say.
+   * Which download controls this panel draws, laid key by key over what
+   * `ResultEnvProvider` says: `{ result: false }` drops the header's Download
+   * and keeps each file's own button, `{ files: false }` the reverse. For a
+   * surface where saving makes no sense (a preview inside an editor, say), set
+   * both to `false`.
    */
-  hideDownload?: boolean;
+  downloads?: DownloadDisplay;
   className?: string;
 }
 
@@ -191,41 +201,129 @@ export function JsonView({ value }: { value: unknown }) {
   );
 }
 
-export function StuffViewer({
+/** One press of the header's Download, and the result it saved. */
+interface DownloadAttempt {
+  field: RunField;
+  baseName: string;
+  value: unknown;
+  /** The same three as text, written once, when the press is made. */
+  key: string | undefined;
+}
+
+/**
+ * Whether an attempt was made on the result now shown.
+ *
+ * The same descriptor, base name and value objects answer at once. Otherwise
+ * the two are compared as text, so an equal result a host rebuilt on this
+ * render still matches, while two results that hold an equal value under
+ * different names or descriptors do not. The text is written only while an
+ * attempt is on screen, which is the only time the question is asked.
+ */
+function isShownResult(
+  attempt: DownloadAttempt,
+  field: RunField,
+  baseName: string,
+  value: unknown,
+): boolean {
+  if (attempt.field === field && attempt.baseName === baseName && attempt.value === value) {
+    return true;
+  }
+  return attempt.key !== undefined && attempt.key === resultKey(field, baseName, value);
+}
+
+/** A result as text, for {@link isShownResult}; `undefined` for a value JSON cannot write. */
+function resultKey(field: RunField, baseName: string, value: unknown): string | undefined {
+  try {
+    return JSON.stringify([baseName, field, value], (_key, member: unknown) =>
+      typeof member === 'bigint' ? `${member}n` : member,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+export function StuffViewer({ downloads, ...props }: StuffViewerProps) {
+  // The panel's own display settings reach every file button in its tree, not
+  // only its header, so they are laid over the provider's before anything
+  // beneath reads them.
+  return (
+    <DownloadDisplayOverride downloads={downloads}>
+      <StuffPanel {...props} />
+    </DownloadDisplayOverride>
+  );
+}
+
+function StuffPanel({
   field,
   value,
   name,
   defaultView = 'rendered',
   downloadBaseName,
-  hideDownload = false,
   className,
-}: StuffViewerProps) {
+}: Omit<StuffViewerProps, 'downloads'>) {
   const s = useFieldStrings();
   // The caller's name wins over the descriptor's, and it is applied to the
   // FIELD rather than passed to the header alone: the download's default base
   // name reads the same property, and the two naming the item differently is
   // exactly the drift this component exists to prevent.
   const named = name ? { ...field, name } : field;
+  const baseName = downloadBaseName ?? named.name ?? 'result';
   const [view, setView] = useState<StuffViewerView>(defaultView);
-  const [saving, setSaving] = useState(false);
+  // A download belongs to the result it was made from. A host that keeps this
+  // panel mounted and hands it the next result (a rerun, another node) must not
+  // see the last result's failures under the new one, nor a save still in
+  // flight for the last one disable the control or report on this one. So each
+  // attempt records the result it saved, and only an attempt on the result now
+  // shown is drawn — matched by what it holds rather than by the object, since
+  // a host may rebuild an equal result on every render.
+  const [saving, setSaving] = useState<DownloadAttempt | null>(null);
+  // The names of the files the last download could not hand over, shown until
+  // the next one. Empty when everything arrived.
+  const [missed, setMissed] = useState<{
+    attempt: DownloadAttempt;
+    names: readonly string[];
+  } | null>(null);
+  const latest = useRef<DownloadAttempt | null>(null);
+  const savingShown = saving !== null && isShownResult(saving, field, baseName, value);
+  const missedShown =
+    missed && isShownResult(missed.attempt, field, baseName, value) ? missed.names : [];
   // The same resolver the rendered view paints images through, so a download
-  // fetches exactly what the reader is looking at — a host that proxies its
+  // saves exactly what the reader is looking at — a host that proxies its
   // storage does not need to configure the two separately.
   const resolveUrl = useResolveUrl();
+  const save = useSaveFiles();
+  const downloadShown = useResultDownloadShown();
 
   const handleDownload = useCallback(async () => {
-    setSaving(true);
+    const attempt: DownloadAttempt = {
+      field,
+      baseName,
+      value,
+      key: resultKey(field, baseName, value),
+    };
+    latest.current = attempt;
+    setSaving(attempt);
+    setMissed(null);
     try {
-      await downloadStuff({
-        field,
-        value,
-        baseName: downloadBaseName ?? named.name ?? 'result',
-        resolveUrl,
+      // The descriptor's own field, not the renamed one: the file names carry
+      // each file's place in the result, and that place is the descriptor's.
+      const plan = planStuffSave(field, value, {
+        baseName,
+        ...(resolveUrl ? { resolveUrl } : {}),
+      });
+      const { failed } = await save(plan.files);
+      if (latest.current !== attempt) return;
+      setMissed({
+        attempt,
+        names: [
+          ...plan.unavailable.map((file) => file.name),
+          ...failed.map((failure) => failure.file.name),
+        ],
       });
     } finally {
-      setSaving(false);
+      setSaving((current) => (current === attempt ? null : current));
     }
-  }, [field, named.name, value, downloadBaseName, resolveUrl]);
+  }, [field, value, baseName, resolveUrl, save]);
   const views: { id: StuffViewerView; label: string }[] = [
     { id: 'rendered', label: s.viewRendered },
     { id: 'json', label: s.viewJson },
@@ -241,20 +339,20 @@ export function StuffViewer({
           <ResultHeader field={named} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {!hideDownload && (
+          {downloadShown && (
             <button
               type="button"
               onClick={() => void handleDownload()}
-              disabled={saving}
+              disabled={savingShown}
               aria-label={s.download}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
             >
-              {saving ? (
+              {savingShown ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}
-              {saving ? s.downloading : s.download}
+              {savingShown ? s.downloading : s.download}
             </button>
           )}
           <div
@@ -282,10 +380,26 @@ export function StuffViewer({
         </div>
       </div>
 
+      {/* Said, not swallowed: a reader expecting three attachments and getting
+          two could not tell before. The JSON copy still carries each missing
+          file's reference, when it was planned. The live region is there from
+          the start and only its text changes, because a region inserted with
+          its message already in it is not reliably announced. */}
+      {downloadShown && (
+        <p
+          role="status"
+          className={cn('text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
+        >
+          {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
+        </p>
+      )}
+
       {view === 'json' ? (
         <JsonView value={value} />
       ) : (
-        <ResultField field={field} value={value} hideLabel />
+        <ResultRoot baseName={baseName} path={[field.name]}>
+          <ResultField field={field} value={value} hideLabel />
+        </ResultRoot>
       )}
     </div>
   );

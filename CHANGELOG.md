@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.12.0] - 2026-09-27
+
+### Highlights
+
+- **A host decides how a result's files are saved.** Every download reaches `saveFiles` on `ResultEnvProvider` as a plan of named files, so a view running in a sandboxed frame can ask its host to deliver them rather than losing them in the tab.
+- **Every file in a result can be saved on its own**, from a button beside its copy control, under the name the whole-result download gives it.
+- **A download that misses a file says which one**, instead of opening a tab a popup blocker suppresses or skipping the file without a word.
+
+### Added
+
+- **`ResultEnvProvider` takes `saveFiles`, the host's way to deliver saved files**: every download, from the header's Download and from each file's own button, hands it the files to save as a plan, each with a name, a media type, and either the URL the gate admitted or the inline text, and it resolves to the files it could not deliver; a function that throws is read as having delivered none. A root-relative URL, such as a resolver's `/api/assets/…`, reaches it absolute, resolved against the view's document. A host whose view runs in a sandboxed frame supplies one that asks the host to deliver the files, passing the URLs on as links; without one, `saveInBrowser` saves them in the browser tab. See [docs/result-view.md](docs/result-view.md#saving-a-result).
+- **Each file in a result has its own download button**: a standalone image, a gallery tile, a document, an HTML page, and a file inside a record or a table row's detail each carry a button beside the copy control that saves that one file, under the same name the whole-result download gives it. It is drawn only when the file can be saved.
+- **`planStuffSave` and `planFileSave` in the core entry**: the plan every download is built from, computed with no DOM, for a host that renders results its own way and still wants the same files under the same names. No two files in one plan share a name: a name the payload states twice is numbered (`scan-2.pdf`), so a delivery that writes names as given into a folder or an archive never replaces one file with another.
+
+### Changed
+
+- **`StuffViewer`'s `hideDownload` is replaced by `downloads` (Breaking)**: `ResultEnvProvider` and `StuffViewer` take `downloads: { result, files }`, which shows or hides the whole-result download and the per-file buttons independently, and `files` takes the kinds that should carry a button (`'image'`, `'document'`, `'markup'`) as well as `true` or `false`. Set on the provider, it reaches every file however deeply nested; `StuffViewer`'s prop overrides it key by key for one panel. `hideDownload` is now `downloads={{ result: false, files: false }}`: the per-file buttons are new and drawn by default, so `{ result: false }` alone keeps a button on every file.
+- **`downloadStuff` and `ResolveForDownload` are replaced by `planStuffSave` and `saveInBrowser` (Breaking)**: the one-call equivalent is `saveInBrowser(planStuffSave(field, value, { baseName, resolveUrl }).files)`, which resolves to the files that did not arrive instead of returning nothing.
+- **`FieldStrings` gains `downloadIncomplete`, `downloadFile` and `downloadFileFailed` (Breaking)**: the line naming the files a download could not save, the per-file button's label, which is given the name the file saves under, and what that button says when its file did not arrive. A host that supplies a complete `FieldStrings` rather than a partial override adds them.
+
+### Fixed
+
+- **A download that misses a file says so**: the header's Download fell back to opening a file it could not fetch in a new tab, after the fetch, where a popup blocker suppresses it without a trace, and it skipped a file whose reference the URL gate refused with nothing said. It now names every file that did not arrive under the header, and a file's own button shows its failure.
+- **Copying a file's link from a `srcdoc` frame gives a working URL**: a root-relative link was made absolute against `location.origin`, which is the string `"null"` in a `srcdoc` or `about:blank` frame, so the clipboard received `null/api/assets/…`. It is now resolved against the document's base URL, as the browser resolves the same path for an image, and only a path the URL gate admits is resolved at all.
+- **A `data:` file is saved under the type the URL gate admitted**: a `data:` URL admitted as an image was saved under the payload's own `filename`, or the tail of its payload, so image bytes declared as `image/png` could be saved as `image.html`. The extension now comes from the admitted media type, and every saved name is reduced to its last path segment.
+- **The GitHub release page carries the changelog entry as it was written**: the notes used to lose every blank line and every line's indentation on the way to the release page, so an entry's paragraphs, lists and sub-headings ran together into one block. They now arrive verbatim.
+
 ## [v0.11.0] - 2026-09-24
 
 ### Highlights

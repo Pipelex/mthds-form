@@ -81,6 +81,7 @@ import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
 import { fieldControlClass } from '../react/field-styles';
+import { ResultRoot } from '../react/result-location';
 import {
   Select as SelectRoot,
   SelectContent,
@@ -92,7 +93,7 @@ import { ToggleGroup, ToggleGroupItem } from '../react/ui/toggle-group';
 import { cn } from '../react/utils';
 import { baseCatalog, type ICON_NAMES, type METRIC_FORMATS } from './components';
 import * as shadcn from './ui/shadcn';
-import { inputFieldAtPath, resultFieldAtPath } from './paths';
+import { inputFieldAtPath, RESULT_ROOT, resultFieldAtPath, segmentsUnder } from './paths';
 
 /**
  * The registry: what each catalog entry RENDERS as.
@@ -248,8 +249,17 @@ function MthdsResult({ props }: BaseComponentProps<{ path: string; hideLabel?: b
   const path = useAbsolutePath(props.path) ?? '';
   const field = scope.result && path ? resultFieldAtPath(scope.result, path) : undefined;
   const value = useStateValue<unknown>(path);
-  if (!field) return <Unresolved path={props.path} side="result" />;
-  return <ResultField field={field} value={value} hideLabel={props.hideLabel ?? false} />;
+  if (!field || !scope.result) return <Unresolved path={props.path} side="result" />;
+  // The subtree's place in the whole result, so a file inside it saves under
+  // the name the whole-result download gives it. Left to itself, `ResultField`
+  // would root the location at its own node's name, and every entry of a
+  // repeat would save as `image-image.png`.
+  const place = [scope.result.name, ...(segmentsUnder(RESULT_ROOT, path) ?? [])];
+  return (
+    <ResultRoot baseName={scope.result.name} path={place}>
+      <ResultField field={field} value={value} hideLabel={props.hideLabel ?? false} />
+    </ResultRoot>
+  );
 }
 
 // ─── A Select with an accessible name ────────────────────────────────────────
