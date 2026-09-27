@@ -9,7 +9,7 @@
  * one test here drives it end to end from a file's button.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
   FileRunField,
@@ -19,7 +19,7 @@ import type {
   TextRunField,
 } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
-import type { SaveFile, SaveFiles } from '../../core/save-plan';
+import type { SaveFile, SaveFiles, SaveResult } from '../../core/save-plan';
 import { DEFAULT_FIELD_STRINGS as S } from '../field-strings';
 import { ResultEnvProvider, type DownloadDisplay } from '../result-env';
 import { ResultField } from '../result-field';
@@ -87,10 +87,12 @@ function Panel({
   saveFiles,
   provider,
   viewer,
+  value = VALUE,
 }: {
   saveFiles?: SaveFiles;
   provider?: DownloadDisplay;
   viewer?: DownloadDisplay;
+  value?: unknown;
 }) {
   return (
     <ResultEnvProvider
@@ -99,7 +101,7 @@ function Panel({
     >
       <StuffViewer
         field={report}
-        value={VALUE}
+        value={value}
         name="report"
         {...(viewer ? { downloads: viewer } : {})}
       />
@@ -108,9 +110,14 @@ function Panel({
 }
 
 const headerButton = () => screen.queryByRole('button', { name: S.download });
-const fileButtons = () => screen.queryAllByRole('button', { name: S.downloadFile });
-/** Each file button's title is the name it saves under, which says which file it is. */
-const fileButtonNames = () => fileButtons().map((button) => button.getAttribute('title'));
+/** A file's button is named by the file it saves: "Download report-output-figures-0.png". */
+const FILE_BUTTON = S.downloadFile('');
+const fileButtons = () =>
+  screen.queryAllByRole('button', { name: (name) => name.startsWith(FILE_BUTTON) });
+/** The name each file button saves under, read off its accessible name. */
+const fileButtonNames = () =>
+  fileButtons().map((button) => button.getAttribute('aria-label')?.slice(FILE_BUTTON.length));
+const fileButton = (name: string) => screen.getByRole('button', { name: S.downloadFile(name) });
 
 describe("a host's save function receives every download as a plan", () => {
   it('receives the whole result from the header control', async () => {
@@ -162,7 +169,7 @@ describe("a host's save function receives every download as a plan", () => {
     render(<Panel saveFiles={host.saveFiles} />);
     // A gallery tile, two levels down: the name matches what the header's plan
     // calls the same file, so the reader gets one name whichever control they used.
-    await userEvent.click(screen.getByTitle('report-output-figures-1.png'));
+    await userEvent.click(fileButton('report-output-figures-1.png'));
     await waitFor(() => expect(host.plans).toHaveLength(1));
     expect(host.plans[0]).toEqual([
       {
@@ -236,7 +243,7 @@ describe("a host's save function receives every download as a plan", () => {
       </ResultEnvProvider>,
     );
     // No panel above it, so the outermost ResultField is the root and names it.
-    await userEvent.click(screen.getByTitle('output-output-1-scan.pdf'));
+    await userEvent.click(fileButton('output-output-1-scan.pdf'));
     await waitFor(() => expect(host.plans).toHaveLength(1));
     expect(host.plans[0]?.[0]).toMatchObject({
       path: 'output.1.scan',
@@ -308,6 +315,65 @@ describe('a download that does not arrive says so', () => {
     const status = await screen.findByText(S.downloadFileFailed);
     expect(status.getAttribute('role')).toBe('status');
     expect(fileButtons()[1]!.getAttribute('aria-describedby')).toBe(status.id);
+  });
+});
+
+describe('a download belongs to the result it was made from', () => {
+  const everyFileFailed = (files: readonly SaveFile[]): SaveResult => ({
+    failed: files.map((file) => ({ file })),
+  });
+  /** A host save function that answers only when the test says, failing every file. */
+  function pendingHost() {
+    const answers: (() => void)[] = [];
+    const saveFiles: SaveFiles = (files) =>
+      new Promise<SaveResult>((resolve) => {
+        answers.push(() => resolve(everyFileFailed(files)));
+      });
+    return { answers, saveFiles };
+  }
+  const NEXT = { ...VALUE, figures: [{ url: 'https://cdn.example/c.png' }] };
+
+  it("drops the last result's failures when the panel is handed the next one", async () => {
+    const saveFiles: SaveFiles = async (files) => everyFileFailed(files);
+    const { rerender } = render(<Panel saveFiles={saveFiles} />);
+    await userEvent.click(headerButton()!);
+    await screen.findByText(/could not be saved/);
+    rerender(<Panel saveFiles={saveFiles} value={NEXT} />);
+    expect(screen.queryByText(/could not be saved/)).toBeNull();
+  });
+
+  it('lets a save still in flight for the last result neither disable nor report on the next', async () => {
+    const host = pendingHost();
+    const { rerender } = render(<Panel saveFiles={host.saveFiles} />);
+    await userEvent.click(headerButton()!);
+    expect(headerButton()!.hasAttribute('disabled')).toBe(true);
+    rerender(<Panel saveFiles={host.saveFiles} value={NEXT} />);
+    expect(headerButton()!.hasAttribute('disabled')).toBe(false);
+    await act(async () => host.answers[0]!());
+    expect(screen.queryByText(/could not be saved/)).toBeNull();
+  });
+
+  it("drops a file button's failure when another file takes its place", async () => {
+    const saveFiles: SaveFiles = async (files) => everyFileFailed(files);
+    const { rerender } = render(<Panel saveFiles={saveFiles} />);
+    const tile = () => fileButton('report-output-figures-0.png');
+    await userEvent.click(tile());
+    await screen.findByText(S.downloadFileFailed);
+    rerender(<Panel saveFiles={saveFiles} value={NEXT} />);
+    expect(screen.queryByText(S.downloadFileFailed)).toBeNull();
+    expect(tile().hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it("does not let an old file's save settle the button of the file that replaced it", async () => {
+    const host = pendingHost();
+    const { rerender } = render(<Panel saveFiles={host.saveFiles} />);
+    const tile = () => fileButton('report-output-figures-0.png');
+    await userEvent.click(tile());
+    expect(tile().hasAttribute('disabled')).toBe(true);
+    rerender(<Panel saveFiles={host.saveFiles} value={NEXT} />);
+    expect(tile().hasAttribute('disabled')).toBe(false);
+    await act(async () => host.answers[0]!());
+    expect(screen.queryByText(S.downloadFileFailed)).toBeNull();
   });
 });
 
@@ -386,8 +452,7 @@ describe('with no host save function, a file button saves in the browser', () =>
       saved.push(this.download);
     });
     render(<Panel />);
-    const tile = screen.getByTitle('report-output-figures-0.png');
-    await userEvent.click(tile);
+    await userEvent.click(fileButton('report-output-figures-0.png'));
     await waitFor(() => expect(saved).toEqual(['report-output-figures-0.png']));
     expect(fetchSpy).toHaveBeenCalledWith('https://cdn.example/a.png');
     expect(screen.queryByText(S.downloadFileFailed)).toBeNull();

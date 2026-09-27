@@ -12,7 +12,7 @@
 
 - **`StuffViewer`'s `hideDownload` is replaced by `downloads` (Breaking)**: `ResultEnvProvider` and `StuffViewer` take `downloads: { result, files }`, which shows or hides the whole-result download and the per-file buttons independently, and `files` takes the kinds that should carry a button (`'image'`, `'document'`, `'markup'`) as well as `true` or `false`. Set on the provider, it reaches every file however deeply nested; `StuffViewer`'s prop overrides it key by key for one panel. `hideDownload` is now `downloads={{ result: false }}`.
 - **`downloadStuff` and `ResolveForDownload` are replaced by `planStuffSave` and `saveInBrowser` (Breaking)**: the one-call equivalent is `saveInBrowser(planStuffSave(field, value, { baseName, resolveUrl }).files)`, which resolves to the files that did not arrive instead of returning nothing.
-- **`FieldStrings` gains `downloadIncomplete`, `downloadFile` and `downloadFileFailed` (Breaking)**: the line naming the files a download could not save, the per-file button's label, and what that button says when its file did not arrive. A host that supplies a complete `FieldStrings` rather than a partial override adds them.
+- **`FieldStrings` gains `downloadIncomplete`, `downloadFile` and `downloadFileFailed` (Breaking)**: the line naming the files a download could not save, the per-file button's label, which is given the name the file saves under, and what that button says when its file did not arrive. A host that supplies a complete `FieldStrings` rather than a partial override adds them.
 
 ### Fixed
 

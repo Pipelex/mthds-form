@@ -69,6 +69,11 @@ const meta = { title: 'Outputs/Downloads', component: Downloads } satisfies Meta
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** A file's button is named by the file it saves: "Download solar_system.pdf". */
+const FILE_BUTTON = {
+  name: (name: string) => name.startsWith(DEFAULT_FIELD_STRINGS.downloadFile('')),
+};
+
 /** The first theme pane: the pair renders every story twice. */
 function pane(canvasElement: HTMLElement) {
   const demo = canvasElement.querySelector<HTMLElement>('[data-downloads-demo]');
@@ -94,13 +99,11 @@ export const Both: Story = {
     const canvas = pane(canvasElement);
     await openFirstRow(canvasElement);
     await expect(canvas.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download })).toBeTruthy();
-    await expect(
-      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile }),
-    ).toHaveLength(3);
+    await expect(canvas.getAllByRole('button', FILE_BUTTON)).toHaveLength(3);
 
     // One file's button hands the host a plan of that one file.
     await userEvent.click(
-      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile })[1]!,
+      canvas.getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile('solar_system.pdf') }),
     );
     await waitFor(() =>
       expect(canvasElement.querySelector('[data-host-log]')?.textContent).toContain(
@@ -118,9 +121,7 @@ export const WholeResultOnly: Story = {
     const canvas = pane(canvasElement);
     await openFirstRow(canvasElement);
     await expect(canvas.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download })).toBeTruthy();
-    await expect(
-      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile }),
-    ).toHaveLength(0);
+    await expect(canvas.queryAllByRole('button', FILE_BUTTON)).toHaveLength(0);
   },
 };
 
@@ -132,9 +133,7 @@ export const EachFileOnly: Story = {
     const canvas = pane(canvasElement);
     await openFirstRow(canvasElement);
     await expect(canvas.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.download })).toBeNull();
-    await expect(
-      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile }),
-    ).toHaveLength(3);
+    await expect(canvas.getAllByRole('button', FILE_BUTTON)).toHaveLength(3);
   },
 };
 
@@ -147,13 +146,9 @@ export const ImagesOnly: Story = {
   args: { downloads: { result: false, files: ['image'] } },
   play: async ({ canvasElement }) => {
     const canvas = pane(canvasElement);
-    await expect(
-      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile }),
-    ).toHaveLength(0);
+    await expect(canvas.queryAllByRole('button', FILE_BUTTON)).toHaveLength(0);
     await openFirstRow(canvasElement);
-    await expect(
-      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile }),
-    ).toHaveLength(1);
+    await expect(canvas.getAllByRole('button', FILE_BUTTON)).toHaveLength(1);
   },
 };
 
@@ -164,8 +159,6 @@ export const Neither: Story = {
     const canvas = pane(canvasElement);
     await openFirstRow(canvasElement);
     await expect(canvas.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.download })).toBeNull();
-    await expect(
-      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile }),
-    ).toHaveLength(0);
+    await expect(canvas.queryAllByRole('button', FILE_BUTTON)).toHaveLength(0);
   },
 };

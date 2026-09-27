@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { planStuffSave } from '../core/save-plan';
@@ -201,6 +201,11 @@ export function JsonView({ value }: { value: unknown }) {
   );
 }
 
+/** One press of the header's Download, and the result it saved. */
+interface DownloadAttempt {
+  value: unknown;
+}
+
 export function StuffViewer({ downloads, ...props }: StuffViewerProps) {
   // The panel's own display settings reach every file button in its tree, not
   // only its header, so they are laid over the provider's before anything
@@ -228,10 +233,22 @@ function StuffPanel({
   const named = name ? { ...field, name } : field;
   const baseName = downloadBaseName ?? named.name ?? 'result';
   const [view, setView] = useState<StuffViewerView>(defaultView);
-  const [saving, setSaving] = useState(false);
+  // A download belongs to the result it was made from. A host that keeps this
+  // panel mounted and hands it the next result (a rerun, another node) must not
+  // see the last result's failures under the new one, nor a save still in
+  // flight for the last one disable the control or report on this one. So each
+  // attempt records the value it saved, and only an attempt on the value now
+  // shown is drawn.
+  const [saving, setSaving] = useState<DownloadAttempt | null>(null);
   // The names of the files the last download could not hand over, shown until
   // the next one. Empty when everything arrived.
-  const [missed, setMissed] = useState<readonly string[]>([]);
+  const [missed, setMissed] = useState<{
+    attempt: DownloadAttempt;
+    names: readonly string[];
+  } | null>(null);
+  const latest = useRef<DownloadAttempt | null>(null);
+  const savingShown = saving !== null && saving.value === value;
+  const missedShown = missed && missed.attempt.value === value ? missed.names : [];
   // The same resolver the rendered view paints images through, so a download
   // saves exactly what the reader is looking at — a host that proxies its
   // storage does not need to configure the two separately.
@@ -240,8 +257,10 @@ function StuffPanel({
   const downloadShown = useResultDownloadShown();
 
   const handleDownload = useCallback(async () => {
-    setSaving(true);
-    setMissed([]);
+    const attempt: DownloadAttempt = { value };
+    latest.current = attempt;
+    setSaving(attempt);
+    setMissed(null);
     try {
       // The descriptor's own field, not the renamed one: the file names carry
       // each file's place in the result, and that place is the descriptor's.
@@ -250,12 +269,16 @@ function StuffPanel({
         ...(resolveUrl ? { resolveUrl } : {}),
       });
       const { failed } = await save(plan.files);
-      setMissed([
-        ...plan.unavailable.map((file) => file.name),
-        ...failed.map((failure) => failure.file.name),
-      ]);
+      if (latest.current !== attempt) return;
+      setMissed({
+        attempt,
+        names: [
+          ...plan.unavailable.map((file) => file.name),
+          ...failed.map((failure) => failure.file.name),
+        ],
+      });
     } finally {
-      setSaving(false);
+      setSaving((current) => (current === attempt ? null : current));
     }
   }, [field, value, baseName, resolveUrl, save]);
   const views: { id: StuffViewerView; label: string }[] = [
@@ -277,16 +300,16 @@ function StuffPanel({
             <button
               type="button"
               onClick={() => void handleDownload()}
-              disabled={saving}
+              disabled={savingShown}
               aria-label={s.download}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
             >
-              {saving ? (
+              {savingShown ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}
-              {saving ? s.downloading : s.download}
+              {savingShown ? s.downloading : s.download}
             </button>
           )}
           <div
@@ -322,9 +345,9 @@ function StuffPanel({
       {downloadShown && (
         <p
           role="status"
-          className={cn('text-[12px] text-destructive', missed.length === 0 && 'sr-only')}
+          className={cn('text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
         >
-          {missed.length > 0 ? s.downloadIncomplete(missed) : ''}
+          {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
         </p>
       )}
 

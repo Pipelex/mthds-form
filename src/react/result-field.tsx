@@ -593,6 +593,12 @@ function useStuffFile(kind: StuffFileKind, value: unknown): StuffFile | undefine
  * technology, until the reader tries again. The success mark reverts after a
  * moment, as the copy control's does.
  */
+/** One press of a file's button, and the file it saved: its planned name and bytes. */
+interface FileSaveAttempt {
+  identity: string;
+  state: 'saving' | 'saved' | 'failed';
+}
+
 function FileDownloadButton({ file }: { file: StuffFile }) {
   const s = useFieldStrings();
   const location = useResultLocation();
@@ -600,32 +606,49 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
   const save = useSaveFiles();
   const shown = useFileDownloadShown(file.kind);
   const statusId = useId();
-  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  // The state belongs to the file it was drawn for. Entries are keyed by their
+  // index, so a rerun that puts another file at the same place keeps this
+  // component; without the file's identity beside the state, the new file would
+  // show the old one's failure, or be marked by a save still in flight for it.
+  const [attempt, setAttempt] = useState<FileSaveAttempt | null>(null);
   useEffect(() => {
-    if (state !== 'saved') return;
-    const timer = window.setTimeout(() => setState('idle'), 1500);
+    if (attempt?.state !== 'saved') return;
+    const timer = window.setTimeout(
+      () => setAttempt((current) => (current === attempt ? null : current)),
+      1500,
+    );
     return () => window.clearTimeout(timer);
-  }, [state]);
+  }, [attempt]);
   if (!shown) return null;
   const planned = planFileSave(file, {
     baseName: location?.baseName ?? file.path,
     ...(resolve ? { resolveUrl: resolve } : {}),
   });
   if (!planned) return null;
+  const identity = `${planned.name}\n${planned.url ?? planned.text}`;
+  const state = attempt?.identity === identity ? attempt.state : 'idle';
   const failed = state === 'failed';
+  const label = s.downloadFile(planned.name);
   return (
     <>
       <button
         type="button"
         onClick={() => {
-          setState('saving');
+          const started: FileSaveAttempt = { identity, state: 'saving' };
+          setAttempt(started);
           void save([planned]).then((result) =>
-            setState(result.failed.length > 0 ? 'failed' : 'saved'),
+            // Only the latest press settles the button; an earlier one still in
+            // flight answers for a state nobody is looking at any more.
+            setAttempt((current) =>
+              current === started
+                ? { identity, state: result.failed.length > 0 ? 'failed' : 'saved' }
+                : current,
+            ),
           );
         }}
         disabled={state === 'saving'}
-        aria-label={s.downloadFile}
-        title={failed ? s.downloadFileFailed : planned.name}
+        aria-label={label}
+        title={failed ? s.downloadFileFailed : label}
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
           'shrink-0 rounded p-0.5 hover:bg-card focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60',

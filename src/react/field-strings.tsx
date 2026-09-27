@@ -114,8 +114,12 @@ export interface FieldStrings {
    * the names the files would have been saved under.
    */
   downloadIncomplete: (names: readonly string[]) => string;
-  /** The button beside each file that saves that one file. */
-  downloadFile: string;
+  /**
+   * The button beside each file that saves that one file, given the name it
+   * saves under: a gallery of buttons all called "Download" would leave a
+   * screen-reader user unable to tell which file each one saves.
+   */
+  downloadFile: (name: string) => string;
   /** What that button says when the file did not arrive. */
   downloadFileFailed: string;
   /** The result panel's two views, and the control that copies the payload. */
@@ -184,7 +188,7 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   downloading: 'Downloading…',
   downloadIncomplete: (names) =>
     `${names.length === 1 ? 'One file' : `${names.length} files`} could not be saved: ${names.join(', ')}`,
-  downloadFile: 'Download the file',
+  downloadFile: (name) => `Download ${name}`,
   downloadFileFailed: 'The file could not be saved',
   viewRendered: 'Result',
   viewJson: 'JSON',
