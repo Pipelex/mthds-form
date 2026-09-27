@@ -1907,7 +1907,7 @@ export function ResultField(props: ResultFieldProps) {
   const location = useResultLocation();
   if (location) return <ResultNode {...props} />;
   return (
-    <ResultRoot baseName={props.field.name} name={props.field.name}>
+    <ResultRoot baseName={props.field.name} path={[props.field.name]}>
       <ResultNode {...props} />
     </ResultRoot>
   );

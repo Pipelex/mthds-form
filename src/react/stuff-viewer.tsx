@@ -354,7 +354,7 @@ function StuffPanel({
       {view === 'json' ? (
         <JsonView value={value} />
       ) : (
-        <ResultRoot baseName={baseName} name={field.name}>
+        <ResultRoot baseName={baseName} path={[field.name]}>
           <ResultField field={field} value={value} hideLabel />
         </ResultRoot>
       )}

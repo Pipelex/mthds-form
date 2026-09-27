@@ -67,7 +67,7 @@ So the fallback rule, in full: **the kernel's plain form renders when there is n
 A catalog cannot render everything a method can declare — a file upload, a date, a document, prose, markup. Rather than approximate them, a layout hands them back:
 
 - **`MthdsField`** at an `/inputs/...` path renders the kernel's own control for that field.
-- **`MthdsResult`** at a `/result/...` path renders the kernel's own read-only view of that subtree.
+- **`MthdsResult`** at a `/result/...` path renders the kernel's own read-only view of that subtree. A file inside it carries its own download button and saves under the name the whole-result download gives it, because the hatch places the subtree at its path in the result (see [result-view.md](result-view.md#a-files-own-download-button)).
 
 Each takes a `path` literal and nothing else. That is what keeps rule 1 intact: the hatch does not describe the field, it points at it, and the kernel reads the descriptor as it always does. Inside a repeat the path is relative to the item, which is how one subtree of every item is delegated.
 

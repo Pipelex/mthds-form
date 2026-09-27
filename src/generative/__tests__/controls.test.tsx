@@ -2,8 +2,8 @@ import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { FileRunField } from '../../core';
-import { DOCUMENT_FORMATS } from '../../core/file-formats';
+import type { FileRunField, ObjectRunField } from '../../core';
+import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
 import type { BrandManifest } from '../manifest';
 import { GenerativePage } from '../page';
@@ -166,6 +166,80 @@ describe('the ids the catalog controls mint', () => {
     expect(screen.getAllByLabelText('Note')).toHaveLength(2);
     expect(screen.getAllByLabelText('Memo')).toHaveLength(2);
     expect(screen.getAllByRole('radiogroup', { name: 'Pace' })).toHaveLength(2);
+  });
+});
+
+/**
+ * A result hatch renders one subtree of the result on its own, and a file in
+ * it must save under the name the whole-result download gives it. Rendered
+ * bare, the subtree used to root its own location at its node's name, so every
+ * entry of a repeat saved as `report-image.png`, over one another.
+ */
+describe('the files a result hatch shows', () => {
+  const RESULT: ObjectRunField = {
+    kind: 'object',
+    name: 'report',
+    conceptRef: 'demo.Report',
+    required: true,
+    fields: [
+      {
+        kind: 'list',
+        name: 'figures',
+        conceptRef: 'demo.Figure',
+        required: true,
+        item: {
+          kind: 'object',
+          name: 'figures',
+          conceptRef: 'demo.Figure',
+          required: true,
+          fields: [
+            {
+              kind: 'image',
+              name: 'image',
+              conceptRef: 'native.Image',
+              required: true,
+              formats: IMAGE_FORMATS,
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const SPEC: Spec = {
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['rows'] },
+      rows: {
+        type: 'Stack',
+        props: {},
+        children: ['figure'],
+        repeat: { statePath: '/result/figures' },
+      },
+      figure: { type: 'MthdsResult', props: { path: 'image' }, children: [] },
+    },
+  };
+
+  it('are named by their place in the whole result, one per entry of a repeat', () => {
+    render(
+      <GenerativePage
+        spec={SPEC}
+        store={createStateStore({
+          result: {
+            figures: [
+              { image: { url: 'https://cdn.example/a.png' } },
+              { image: { url: 'https://cdn.example/b.png' } },
+            ],
+          },
+        })}
+        scope={{ result: RESULT }}
+        brand={BRAND}
+      />,
+    );
+    for (const name of ['report-report-figures-0-image.png', 'report-report-figures-1-image.png']) {
+      expect(
+        screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile(name) }),
+      ).toBeInTheDocument();
+    }
   });
 });
 

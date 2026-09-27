@@ -35,18 +35,30 @@ export function useResultLocation(): ResultLocation | undefined {
   return use(ResultLocationContext);
 }
 
-/** Establishes the root of a result: the panel does, or the outermost `ResultField` when none did. */
+/**
+ * Establishes where a rendered tree sits in its result: the panel does, at the
+ * root, and so does the outermost `ResultField` when nothing above it did.
+ *
+ * `path` is usually the root node's name alone. A view that renders one
+ * subtree of a result on its own, as a generative layout's result hatch does,
+ * passes the subtree's whole place instead, root name first, so its files are
+ * named as the whole-result download names them.
+ */
 export function ResultRoot({
   baseName,
-  name,
+  path,
   children,
 }: {
   baseName: string;
-  /** The root node's own name, which the path starts from. */
-  name: string;
+  /** The rendered node's place, one segment per record field or list index, from the root node's name. */
+  path: readonly string[];
   children: ReactNode;
 }) {
-  const location = useMemo(() => ({ baseName, path: [name] }), [baseName, name]);
+  // Keyed on the segments rather than the array, which a caller builds anew
+  // each render, so the tree beneath is not handed a new location every time.
+  // No segment holds a NUL: each is a field's name or an index.
+  const key = path.join('\u0000');
+  const location = useMemo(() => ({ baseName, path: key.split('\u0000') }), [baseName, key]);
   return <ResultLocationContext value={location}>{children}</ResultLocationContext>;
 }
 
