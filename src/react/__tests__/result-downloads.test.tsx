@@ -185,6 +185,23 @@ describe("a host's save function receives every download as a plan", () => {
     ]);
   });
 
+  it("hands a host a resolver's root-relative route as an absolute URL", async () => {
+    // A host delivering outside the view's frame would read `/api/assets/…`
+    // against its own page; made absolute here, it means what the view meant.
+    const host = recordingHost();
+    render(
+      <ResultEnvProvider
+        saveFiles={host.saveFiles}
+        resolveUrl={(url) => `/api/assets/${url.slice(18)}`}
+      >
+        <StuffViewer field={document_('output')} value={{ url: 'pipelex-storage://q3.pdf' }} />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(fileButtons()[0]!);
+    await waitFor(() => expect(host.plans).toHaveLength(1));
+    expect(host.plans[0]?.[0]?.url).toBe(new URL('/api/assets/q3.pdf', document.baseURI).href);
+  });
+
   it('draws none for a stored reference nothing resolves, since it could not be saved', () => {
     render(
       <StuffViewer field={document_('output')} value={{ url: 'pipelex-storage://x/q3.pdf' }} />,
@@ -256,6 +273,30 @@ describe('a download that does not arrive says so', () => {
     await userEvent.click(headerButton()!);
     expect(await screen.findByText(S.downloadIncomplete(['report-output-chart']))).toBeTruthy();
     expect(host.plans[0]?.map((file) => file.name)).toEqual(['report.json']);
+  });
+
+  it('treats a save function that throws before returning a promise as delivering nothing', async () => {
+    // A thin, non-async wrapper over a bridge that is not there throws on the
+    // call itself, where a `.then` never sees it.
+    const saveFiles = ((): never => {
+      throw new Error('bridge gone');
+    }) as SaveFiles;
+    render(<Panel saveFiles={saveFiles} />);
+    await userEvent.click(fileButtons()[1]!);
+    expect(await screen.findByText(S.downloadFileFailed)).toBeTruthy();
+    expect(fileButtons()[1]!.hasAttribute('disabled')).toBe(false);
+    await userEvent.click(headerButton()!);
+    expect(
+      await screen.findByText(
+        S.downloadIncomplete([
+          'report-output-summary.html',
+          'q3.pdf',
+          'report-output-figures-0.png',
+          'report-output-figures-1.png',
+          'report.json',
+        ]),
+      ),
+    ).toBeTruthy();
   });
 
   it('treats a save function that throws as delivering nothing', async () => {

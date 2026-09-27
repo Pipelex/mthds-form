@@ -28,6 +28,7 @@ import {
   useTableColumns,
   type ResolveUrl,
 } from './result-env';
+import { absoluteUrl } from './absolute-url';
 import { ResultAt, ResultRoot, useResultLocation } from './result-location';
 import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import {
@@ -476,12 +477,6 @@ function CopyUrlButton({ url, storageUrl }: { url: string; storageUrl?: string }
   return <CopyButton provide={provide} label={s.copyUrl} title={url} />;
 }
 
-/** A root-relative path made absolute against the current origin; anything else verbatim. */
-function absoluteUrl(url: string): string {
-  if (!/^\/(?!\/)/.test(url) || typeof window === 'undefined') return url;
-  return `${window.location.origin}${url}`;
-}
-
 /**
  * A file reference, as one line.
  *
@@ -624,9 +619,8 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         type="button"
         onClick={() => {
           setState('saving');
-          save([planned]).then(
-            (result) => setState(result.failed.length > 0 ? 'failed' : 'saved'),
-            () => setState('failed'),
+          void save([planned]).then((result) =>
+            setState(result.failed.length > 0 ? 'failed' : 'saved'),
           );
         }}
         disabled={state === 'saving'}

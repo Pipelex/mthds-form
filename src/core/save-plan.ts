@@ -53,8 +53,10 @@ interface SaveFileCommon {
  * One file to hand to the reader: exactly one of `url` and `text` is set.
  *
  * `url` is the string the URL gate returned, after the host's resolver was
- * asked first, so a delivery never acts on a member nothing judged. `text` is
- * content the result carries inline.
+ * asked first, so a delivery never acts on a member nothing judged. It may be a
+ * root-relative path, which a planner with no document cannot resolve; the
+ * result view makes one absolute against its own document before a delivery
+ * sees it. `text` is content the result carries inline.
  */
 export type SaveFile =
   | (SaveFileCommon & { url: string; text?: undefined })
@@ -98,8 +100,8 @@ export interface SaveResult {
  * whose view runs in a sandboxed frame supplies one that asks the host to.
  *
  * It resolves rather than rejects when a file does not go out, and names that
- * file in `failed`, so the control that asked can tell the reader. A rejection
- * is read as every file having failed.
+ * file in `failed`, so the control that asked can tell the reader. A throw or
+ * a rejection is read as every file having failed.
  */
 export type SaveFiles = (files: readonly SaveFile[]) => Promise<SaveResult>;
 

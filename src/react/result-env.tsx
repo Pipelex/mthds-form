@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, use, useMemo, type ReactNode } from 'react';
-import type { SaveFiles } from '../core/save-plan';
+import { createContext, use, useCallback, useMemo, type ReactNode } from 'react';
+import type { SaveFile, SaveFiles, SaveResult } from '../core/save-plan';
 import type { StuffFileKind } from '../core/stuff-files';
+import { absoluteUrl } from './absolute-url';
 import { saveInBrowser } from './save-in-browser';
 
 /**
@@ -225,9 +226,34 @@ export function useResolveShareUrl(): ResolveShareUrl | undefined {
   return use(ResultEnvContext).resolveShareUrl;
 }
 
-/** How saved files reach the reader: the host's function, or the browser tab's. */
+/**
+ * How saved files reach the reader: the host's function, or the browser tab's,
+ * wrapped so that every control asking can rely on the answer.
+ *
+ * - A root-relative URL is made absolute against this document before it is
+ *   handed over, so a host delivering outside the view's frame reads
+ *   `/api/assets/x` as the view did rather than against its own page.
+ * - A delivery that throws, before returning a promise or by rejecting one,
+ *   has delivered nothing it can vouch for, so every file is reported failed. A
+ *   host function that is not `async` and throws on a missing bridge would
+ *   otherwise leave the control that asked waiting for good, and say nothing.
+ */
 export function useSaveFiles(): SaveFiles {
-  return use(ResultEnvContext).saveFiles ?? saveInBrowser;
+  const save = use(ResultEnvContext).saveFiles ?? saveInBrowser;
+  return useCallback((files) => deliver(save, files), [save]);
+}
+
+async function deliver(save: SaveFiles, files: readonly SaveFile[]): Promise<SaveResult> {
+  const handed = files.map((file) =>
+    file.url === undefined ? file : { ...file, url: absoluteUrl(file.url) },
+  );
+  try {
+    const { failed } = await save(handed);
+    return { failed };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { failed: handed.map((file) => ({ file, reason })) };
+  }
 }
 
 /** Whether the whole-result download control is drawn. */

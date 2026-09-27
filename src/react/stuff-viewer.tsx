@@ -249,12 +249,11 @@ function StuffPanel({
         baseName,
         ...(resolveUrl ? { resolveUrl } : {}),
       });
-      const failed = await save(plan.files).then(
-        (result) => result.failed.map((failure) => failure.file.name),
-        // A delivery that throws has handed over nothing it can vouch for.
-        () => plan.files.map((file) => file.name),
-      );
-      setMissed([...plan.unavailable.map((file) => file.name), ...failed]);
+      const { failed } = await save(plan.files);
+      setMissed([
+        ...plan.unavailable.map((file) => file.name),
+        ...failed.map((failure) => failure.file.name),
+      ]);
     } finally {
       setSaving(false);
     }
