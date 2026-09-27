@@ -108,6 +108,20 @@ export interface FieldStrings {
   download: string;
   /** Announced while the files are being fetched. */
   downloading: string;
+  /**
+   * What the whole-result download says when some files did not arrive: the
+   * ones no URL could be found for, and the ones the delivery reported. Takes
+   * the names the files would have been saved under.
+   */
+  downloadIncomplete: (names: readonly string[]) => string;
+  /**
+   * The button beside each file that saves that one file, given the name it
+   * saves under: a gallery of buttons all called "Download" would leave a
+   * screen-reader user unable to tell which file each one saves.
+   */
+  downloadFile: (name: string) => string;
+  /** What that button says when the file did not arrive. */
+  downloadFileFailed: string;
   /** The result panel's two views, and the control that copies the payload. */
   viewRendered: string;
   viewJson: string;
@@ -172,6 +186,10 @@ export const DEFAULT_FIELD_STRINGS: FieldStrings = {
   copyText: 'Copy the text',
   download: 'Download',
   downloading: 'Downloading…',
+  downloadIncomplete: (names) =>
+    `${names.length === 1 ? 'One file' : `${names.length} files`} could not be saved: ${names.join(', ')}`,
+  downloadFile: (name) => `Download ${name}`,
+  downloadFileFailed: 'The file could not be saved',
   viewRendered: 'Result',
   viewJson: 'JSON',
   copyJson: 'Copy the JSON',

@@ -367,9 +367,12 @@ describe('the default strings name no storage scheme', () => {
   });
 
   it('holds for every default string, not only those two', () => {
-    const texts = Object.values(DEFAULT_FIELD_STRINGS).map((entry) =>
+    // A string that takes a list of names is called with one; every other
+    // function takes the word-and-count pair.
+    const argumentsFor: Partial<Record<string, unknown[]>> = { downloadIncomplete: [['x']] };
+    const texts = Object.entries(DEFAULT_FIELD_STRINGS).map(([key, entry]) =>
       typeof entry === 'function'
-        ? String((entry as (...args: unknown[]) => unknown)('x', 2))
+        ? String((entry as (...args: unknown[]) => unknown)(...(argumentsFor[key] ?? ['x', 2])))
         : entry,
     );
     for (const text of texts) expect(text).not.toMatch(/storage:\/\//);

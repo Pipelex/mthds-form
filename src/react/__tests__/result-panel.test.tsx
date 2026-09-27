@@ -11,8 +11,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ObjectRunField, RunField, TextRunField } from '../../core';
+import type { ObjectRunField, RunField, SaveFiles, TextRunField } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
+import { ResultEnvProvider } from '../result-env';
 import { StuffViewer } from '../stuff-viewer';
 
 const text = (name: string): TextRunField => ({
@@ -183,13 +184,19 @@ describe('the stuff name', () => {
     expect(screen.getByText('output')).toBeTruthy();
   });
 
-  it('feeds the same name to the download, so the file agrees with the header', () => {
-    // Asserted on the seam rather than by driving a real download: the name
-    // reaches `downloadStuff` through the SAME `named.name` the header reads,
-    // which is the property that keeps the two from ever disagreeing. Stubbing
-    // an anchor to read `download` back tests jsdom, not this.
-    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} name="report_pages" />);
+  it('feeds the same name to the download, so the file agrees with the header', async () => {
+    // Asserted on the seam rather than by driving a real download: a host save
+    // function receives the plan, and the JSON copy is named from the SAME
+    // `named.name` the header reads.
+    const saveFiles = vi.fn<SaveFiles>(async () => ({ failed: [] }));
+    render(
+      <ResultEnvProvider saveFiles={saveFiles}>
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} name="report_pages" />
+      </ResultEnvProvider>,
+    );
     expect(screen.getByText('report_pages')).toBeTruthy();
-    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download }));
+    await waitFor(() => expect(saveFiles).toHaveBeenCalledOnce());
+    expect(saveFiles.mock.calls[0]?.[0]).toMatchObject([{ name: 'report_pages.json' }]);
   });
 });

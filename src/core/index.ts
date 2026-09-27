@@ -46,7 +46,22 @@ export { buildResultField, buildRunFields, getPipeInputForm } from './derive';
 export type { OutputForm, PipeOutputFormDescriptor } from './output-form';
 export { getPipeOutputForm } from './output-form';
 export { collectStuffFiles } from './stuff-files';
-export type { StuffFile } from './stuff-files';
+export type { StuffFile, StuffFileKind } from './stuff-files';
+// What saving a result means, planned with no DOM: the files, their names and
+// types, and the URL the gate admitted or the inline text for each. Exported
+// for a host that renders results its own way and still wants the same
+// downloads; the browser delivery is `./react`'s. See ./save-plan.
+export type {
+  SaveFailure,
+  SaveFile,
+  SaveFileKind,
+  SaveFiles,
+  SavePlan,
+  SavePlanOptions,
+  SaveResult,
+  UnavailableFile,
+} from './save-plan';
+export { planFileSave, planStuffSave } from './save-plan';
 
 // What a `document` or `image` slot accepts - a mirror of the runtime's format
 // table, exported because a host that uploads files needs the same answer the

@@ -34,7 +34,47 @@ export interface StuffFile {
   mimeType?: string;
   /** Where it sat, dotted: `report.attachments.2.scan`. Names a saved file. */
   path: string;
-  kind: 'image' | 'document' | 'markup';
+  kind: StuffFileKind;
+}
+
+/**
+ * What a file is: a picture, a document, or a page of markup the stuff carries
+ * inline. It is the descriptor's statement (the node's kind, or its concept for
+ * `native.Html`), never a reading of the bytes.
+ */
+export type StuffFileKind = 'image' | 'document' | 'markup';
+
+/**
+ * One file value, read as the file it is declared to be — or `undefined` when
+ * the value holds nothing to save (no URL, no markup).
+ *
+ * The walk below calls this for every file node it reaches, and the result view
+ * calls it for the one file a control is drawn beside, so a file's own download
+ * button and the whole-result download read the value the same way. `kind` is
+ * the caller's statement from the descriptor; this never inspects the value to
+ * decide what it is.
+ */
+export function readStuffFile(
+  kind: StuffFileKind,
+  value: unknown,
+  path: string,
+): StuffFile | undefined {
+  if (kind === 'markup') {
+    const content = readHtmlContent(value);
+    return content?.innerHtml
+      ? { text: content.innerHtml, extension: 'html', path, kind }
+      : undefined;
+  }
+  const content = kind === 'image' ? readImageContent(value) : readDocumentContent(value);
+  if (!content?.url) return undefined;
+  return {
+    url: content.url,
+    publicUrl: content.publicUrl,
+    filename: content.filename,
+    mimeType: content.mimeType,
+    path,
+    kind,
+  };
 }
 
 /**
@@ -74,45 +114,16 @@ function walk(field: RunField, raw: unknown, path: string[], out: StuffFile[]): 
   // whether the concept refines `native.Html`, which is the standard's own way
   // to ask; it never looks at the value to decide.
   if (isNativeHtmlNode(field)) {
-    const content = readHtmlContent(value);
-    if (content?.innerHtml) {
-      out.push({
-        text: content.innerHtml,
-        extension: 'html',
-        path: here.join('.'),
-        kind: 'markup',
-      });
-    }
+    const file = readStuffFile('markup', value, here.join('.'));
+    if (file) out.push(file);
     return;
   }
 
   switch (field.kind) {
-    case 'image': {
-      const content = readImageContent(value);
-      if (content?.url) {
-        out.push({
-          url: content.url,
-          publicUrl: content.publicUrl,
-          filename: content.filename,
-          mimeType: content.mimeType,
-          path: here.join('.'),
-          kind: 'image',
-        });
-      }
-      return;
-    }
+    case 'image':
     case 'document': {
-      const content = readDocumentContent(value);
-      if (content?.url) {
-        out.push({
-          url: content.url,
-          publicUrl: content.publicUrl,
-          filename: content.filename,
-          mimeType: content.mimeType,
-          path: here.join('.'),
-          kind: 'document',
-        });
-      }
+      const file = readStuffFile(field.kind, value, here.join('.'));
+      if (file) out.push(file);
       return;
     }
     case 'object': {

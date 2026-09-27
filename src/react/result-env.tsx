@@ -1,6 +1,10 @@
 'use client';
 
-import { createContext, use, useMemo, type ReactNode } from 'react';
+import { createContext, use, useCallback, useMemo, type ReactNode } from 'react';
+import type { SaveFile, SaveFiles, SaveResult } from '../core/save-plan';
+import type { StuffFileKind } from '../core/stuff-files';
+import { absoluteUrl } from './absolute-url';
+import { saveInBrowser } from './save-in-browser';
 
 /**
  * The host's seam for turning a stored reference into something a browser can
@@ -79,10 +83,58 @@ export type ResolveShareUrl = (url: string) => Promise<string | undefined>;
  */
 export type ProseImages = 'link' | 'load';
 
+/**
+ * Which download controls a result view draws, each set on its own.
+ *
+ * Apps want different things here: one shows only the download of the whole
+ * result, another only a download on each image, a third both, a fourth
+ * neither because it saves results its own way. So the two are independent,
+ * and the per-file one can be narrowed to the kinds of file that should carry
+ * it.
+ *
+ * Set once on `ResultEnvProvider`, because a file's own button is drawn deep
+ * inside the result (a gallery tile, a table row's detail, a nested record) and
+ * has to follow the setting whether or not a `StuffViewer` wraps it.
+ * `StuffViewer`'s own `downloads` prop overrides it, key by key, for that one
+ * panel.
+ *
+ * Hiding a control never disables saving: a host with its own save UI still
+ * plans with `planStuffSave` and delivers through its own function.
+ */
+export interface DownloadDisplay {
+  /** The header control that saves the whole result. Drawn unless `false`. */
+  result?: boolean;
+  /**
+   * Each file's own download button: on every file when `true` (the default),
+   * on none when `false`, or only on the kinds listed — `'image'`,
+   * `'document'`, and `'markup'` for an HTML page.
+   */
+  files?: boolean | readonly StuffFileKind[];
+}
+
 interface ResultEnv {
   resolveUrl?: ResolveUrl;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
+  /**
+   * How saved files reach the reader. Every download goes through it: the
+   * whole-result control and each file's own button alike, each handing it the
+   * files to save as a plan (a name, a media type, and the URL the gate
+   * admitted or the inline text).
+   *
+   * Unset, files are saved by the browser tab (`saveInBrowser`), which fetches
+   * each URL and saves the bytes through an object URL and a clicked link. A
+   * host whose view runs in a sandboxed frame is refused all of that, and
+   * supplies a function that asks the host to deliver the files instead —
+   * passing the URLs on as links, since a host's download bridge fetches links
+   * itself.
+   *
+   * It reports the files it could not deliver rather than throwing, so the
+   * control can tell the reader which ones did not arrive.
+   */
+  saveFiles?: SaveFiles;
+  /** Which download controls are drawn. Both, on every kind of file, when unset. */
+  downloads?: DownloadDisplay;
   /**
    * How many data columns a table of records shows. Five when unset.
    *
@@ -108,13 +160,46 @@ export function ResultEnvProvider({
   resolveShareUrl,
   proseImages,
   tableColumns,
+  saveFiles,
+  downloads,
   children,
 }: ResultEnv & { children: ReactNode }) {
   const env = useMemo(
-    () => ({ resolveUrl, resolveShareUrl, proseImages, tableColumns }),
-    [resolveUrl, resolveShareUrl, proseImages, tableColumns],
+    () => ({ resolveUrl, resolveShareUrl, proseImages, tableColumns, saveFiles, downloads }),
+    [resolveUrl, resolveShareUrl, proseImages, tableColumns, saveFiles, downloads],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
+}
+
+/**
+ * The provider's download display with one panel's own settings laid over it,
+ * key by key, for everything beneath. Internal: it is how `StuffViewer`'s
+ * `downloads` prop reaches the file buttons drawn deep inside its tree.
+ */
+export function DownloadDisplayOverride({
+  downloads,
+  children,
+}: {
+  downloads: DownloadDisplay | undefined;
+  children: ReactNode;
+}) {
+  const env = use(ResultEnvContext);
+  const result = downloads?.result;
+  const files = downloads?.files;
+  const merged = useMemo(
+    () =>
+      result === undefined && files === undefined
+        ? env
+        : {
+            ...env,
+            downloads: {
+              result: result ?? env.downloads?.result,
+              files: files ?? env.downloads?.files,
+            },
+          },
+    [env, result, files],
+  );
+  return <ResultEnvContext value={merged}>{children}</ResultEnvContext>;
 }
 
 /**
@@ -139,6 +224,56 @@ export function useResolveUrl(): ResolveUrl | undefined {
 /** The share-URL minter, when the host supplies one. */
 export function useResolveShareUrl(): ResolveShareUrl | undefined {
   return use(ResultEnvContext).resolveShareUrl;
+}
+
+/**
+ * How saved files reach the reader: the host's function, or the browser tab's,
+ * wrapped so that every control asking can rely on the answer.
+ *
+ * - A root-relative URL is made absolute against this document before it is
+ *   handed over, so a host delivering outside the view's frame reads
+ *   `/api/assets/x` as the view did rather than against its own page.
+ * - A delivery that throws, before returning a promise or by rejecting one,
+ *   has delivered nothing it can vouch for, so every file is reported failed. A
+ *   host function that is not `async` and throws on a missing bridge would
+ *   otherwise leave the control that asked waiting for good, and say nothing.
+ *   So has one that resolves to something with no `failed` list.
+ */
+export function useSaveFiles(): SaveFiles {
+  const save = use(ResultEnvContext).saveFiles ?? saveInBrowser;
+  return useCallback((files) => deliver(save, files), [save]);
+}
+
+async function deliver(save: SaveFiles, files: readonly SaveFile[]): Promise<SaveResult> {
+  const handed = files.map((file) =>
+    file.url === undefined ? file : { ...file, url: absoluteUrl(file.url) },
+  );
+  try {
+    // Read as a host may actually answer: one typed loosely, a bridge that
+    // resolves `any`, can hand back an object with no `failed` list. It cannot
+    // vouch for anything then, and reading the list off it would throw inside
+    // the control that asked, which for a file's button is a render error that
+    // takes the whole view down.
+    const result = (await save(handed)) as Partial<SaveResult> | undefined;
+    if (Array.isArray(result?.failed)) return { failed: result.failed };
+    return {
+      failed: handed.map((file) => ({ file, reason: 'The save function reported no result' })),
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { failed: handed.map((file) => ({ file, reason })) };
+  }
+}
+
+/** Whether the whole-result download control is drawn. */
+export function useResultDownloadShown(): boolean {
+  return use(ResultEnvContext).downloads?.result ?? true;
+}
+
+/** Whether a file of this kind carries its own download button. */
+export function useFileDownloadShown(kind: StuffFileKind): boolean {
+  const files = use(ResultEnvContext).downloads?.files ?? true;
+  return typeof files === 'boolean' ? files : files.includes(kind);
 }
 
 /** The prose-image policy, defaulted to the safe answer for a host that stated none. */
