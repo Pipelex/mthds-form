@@ -25,12 +25,16 @@ export { ResultField } from './result-field';
 // tree beneath them. `ResultField` stays exported for a host composing its own.
 export type { StuffViewerProps, StuffViewerView } from './stuff-viewer';
 export { JsonView, StuffViewer } from './stuff-viewer';
-export { downloadStuff } from './download-stuff';
-export type { ResolveForDownload } from './download-stuff';
+// The default delivery for a planned save: fetch each URL and save the bytes in
+// this browser tab. What a host gets when it supplies no `saveFiles`, exported
+// for one that falls back to it. The plan itself is the core entry's
+// (`planStuffSave`).
+export { saveInBrowser } from './save-in-browser';
 // The host's seam for turning a stored reference into a fetchable URL. Without
 // it a result view paints whatever `public_url` the payload carries, which on a
-// hosted platform is a presigned URL that expires — see result-env.tsx.
-export type { ProseImages, ResolveShareUrl, ResolveUrl } from './result-env';
+// hosted platform is a presigned URL that expires — see result-env.tsx. The same
+// provider takes the host's save function and which download controls to draw.
+export type { DownloadDisplay, ProseImages, ResolveShareUrl, ResolveUrl } from './result-env';
 export {
   ResultEnvProvider,
   useProseImages,

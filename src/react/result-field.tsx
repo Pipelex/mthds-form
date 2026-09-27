@@ -18,18 +18,30 @@ import {
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { useResolveShareUrl, useResolveUrl, useTableColumns, type ResolveUrl } from './result-env';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { planFileSave } from '../core/save-plan';
+import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff-files';
+import {
+  useFileDownloadShown,
+  useResolveShareUrl,
+  useResolveUrl,
+  useSaveFiles,
+  useTableColumns,
+  type ResolveUrl,
+} from './result-env';
+import { ResultAt, ResultRoot, useResultLocation } from './result-location';
+import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   Eye,
   EyeOff,
   FileText,
   ImageOff,
   Loader2,
+  TriangleAlert,
 } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
@@ -485,12 +497,15 @@ function FileRef({
   storageUrl,
   mimeType,
   filename,
+  file,
 }: {
   url: string;
   /** The underlying reference, so the copy control can mint a share URL from it. */
   storageUrl?: string;
   mimeType?: string;
   filename?: string;
+  /** The file as the download reads it, when this line may offer to save it. */
+  file?: StuffFile;
 }) {
   const s = useFieldStrings();
   // Read ONCE: counting a payload means walking it, and the payload is the
@@ -526,8 +541,117 @@ function FileRef({
           {label}
         </span>
       )}
-      <CopyUrlButton url={url} {...(storageUrl ? { storageUrl } : {})} />
+      <FileActions copy={{ url, ...(storageUrl ? { storageUrl } : {}) }} file={file} />
     </span>
+  );
+}
+
+/**
+ * The controls beside a file: copy its URL, save it.
+ *
+ * One row, drawn in one place, for every file the result view shows — a
+ * standalone image, a gallery tile, a document, an HTML page. That is so the
+ * next control joins this row rather than growing a second seam: a host action
+ * on a file, such as handing an image to an assistant, belongs beside Download.
+ */
+function FileActions({
+  copy,
+  file,
+}: {
+  /** The URL to copy, and the reference a share URL is minted from. Absent for inline content. */
+  copy?: { url: string; storageUrl?: string };
+  file: StuffFile | undefined;
+}) {
+  return (
+    <span className="flex shrink-0 items-center gap-0.5">
+      {copy && (
+        <CopyUrlButton
+          url={copy.url}
+          {...(copy.storageUrl ? { storageUrl: copy.storageUrl } : {})}
+        />
+      )}
+      {file && <FileDownloadButton file={file} />}
+    </span>
+  );
+}
+
+/**
+ * The file a control is drawn beside, read as the whole-result download reads
+ * it: same reader, same place in the result, so the file saves under the same
+ * name whichever control the reader used. `undefined` outside a result tree.
+ */
+function useStuffFile(kind: StuffFileKind, value: unknown): StuffFile | undefined {
+  const location = useResultLocation();
+  return location ? readStuffFile(kind, value, location.path.join('.')) : undefined;
+}
+
+/**
+ * Save this one file — through the host's save function when it supplied one,
+ * the browser tab's otherwise, exactly as the whole-result download does, with
+ * a plan of one file and no JSON copy.
+ *
+ * Drawn only when the host's display settings want a button on this kind of
+ * file, and only when the file CAN be saved: a stored reference nothing
+ * resolves offers no download, because it would be a click that does nothing.
+ *
+ * A file that does not arrive says so, on the button and to assistive
+ * technology, until the reader tries again. The success mark reverts after a
+ * moment, as the copy control's does.
+ */
+function FileDownloadButton({ file }: { file: StuffFile }) {
+  const s = useFieldStrings();
+  const location = useResultLocation();
+  const resolve = useResolveUrl();
+  const save = useSaveFiles();
+  const shown = useFileDownloadShown(file.kind);
+  const statusId = useId();
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  useEffect(() => {
+    if (state !== 'saved') return;
+    const timer = window.setTimeout(() => setState('idle'), 1500);
+    return () => window.clearTimeout(timer);
+  }, [state]);
+  if (!shown) return null;
+  const planned = planFileSave(file, {
+    baseName: location?.baseName ?? file.path,
+    ...(resolve ? { resolveUrl: resolve } : {}),
+  });
+  if (!planned) return null;
+  const failed = state === 'failed';
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setState('saving');
+          save([planned]).then(
+            (result) => setState(result.failed.length > 0 ? 'failed' : 'saved'),
+            () => setState('failed'),
+          );
+        }}
+        disabled={state === 'saving'}
+        aria-label={s.downloadFile}
+        title={failed ? s.downloadFileFailed : planned.name}
+        {...(failed ? { 'aria-describedby': statusId } : {})}
+        className={cn(
+          'shrink-0 rounded p-0.5 hover:bg-card focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60',
+          failed ? 'text-destructive' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        {state === 'saving' ? (
+          <Loader2 aria-hidden className="size-3.5 animate-spin" />
+        ) : state === 'saved' ? (
+          <Check aria-hidden className="size-3.5" />
+        ) : failed ? (
+          <TriangleAlert aria-hidden className="size-3.5" />
+        ) : (
+          <Download aria-hidden className="size-3.5" />
+        )}
+      </button>
+      <span id={statusId} role="status" className="sr-only">
+        {failed ? s.downloadFileFailed : ''}
+      </span>
+    </>
   );
 }
 
@@ -712,6 +836,7 @@ function DocumentValue({ value }: { value: unknown }) {
   // missing a URL.
   const resolve = useResolveUrl();
   const [open, setOpen] = useState(false);
+  const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
   const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename, s);
@@ -727,6 +852,7 @@ function DocumentValue({ value }: { value: unknown }) {
             storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
+            file={file}
           />
           {content.snippet && (
             <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -769,6 +895,7 @@ function ImageValue({
 }) {
   const s = useFieldStrings();
   const resolve = useResolveUrl();
+  const file = useStuffFile('image', value);
   const content = readImageContent(value);
   if (!content) return <Absent />;
   const src = paintableUrl(content, resolve);
@@ -824,6 +951,7 @@ function ImageValue({
               url={content.url}
               mimeType={content.mimeType}
               {...(content.filename ? { filename: content.filename } : {})}
+              file={file}
             />
           </div>
         </div>
@@ -846,6 +974,7 @@ function ImageValue({
           url={content.url}
           mimeType={content.mimeType}
           {...(content.filename ? { filename: content.filename } : {})}
+          file={file}
         />
       )}
       {src && !compact && (
@@ -858,6 +987,7 @@ function ImageValue({
             storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
+            file={file}
           />
         </div>
       )}
@@ -1330,7 +1460,7 @@ function ObjectTable({
             // then all fit would otherwise stay open with no chevron at all.
             const isOpen = canExpand && expanded.has(index);
             return (
-              <Fragment key={index}>
+              <ResultAt key={index} segment={String(index)}>
                 <tr className="border-b border-border/60 last:border-b-0">
                   {canExpand && (
                     <td className="px-1 pt-px align-top">
@@ -1377,6 +1507,8 @@ function ObjectTable({
                             }
                           : {})}
                       >
+                        {/* Inside the row's own `ResultAt`, so a file in the
+                            record is placed at this entry's index. */}
                         <ResultField field={element} value={item} hideLabel />
                       </div>
                     </td>
@@ -1430,14 +1562,16 @@ function ObjectTable({
                               ? { title: cellTitle(column, cell, presentation) }
                               : {})}
                           >
-                            <LeafValue field={column} value={cell} compact />
+                            <ResultAt segment={column.name}>
+                              <LeafValue field={column} value={cell} compact />
+                            </ResultAt>
                           </div>
                         </td>
                       );
                     })
                   )}
                 </tr>
-              </Fragment>
+              </ResultAt>
             );
           })}
         </tbody>
@@ -1601,7 +1735,9 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
     <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
       {items.map((item, index) => (
         <div key={index} className="overflow-hidden rounded-lg border border-border bg-card/40">
-          <ImageValue value={item} inGallery />
+          <ResultAt segment={String(index)}>
+            <ImageValue value={item} inGallery />
+          </ResultAt>
         </div>
       ))}
     </div>
@@ -1620,7 +1756,13 @@ function FileRows({ items, kind }: { items: readonly unknown[]; kind: 'document'
     <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       {items.map((item, index) => (
         <div key={index} className="bg-card/40 px-3.5 py-2">
-          {kind === 'document' ? <DocumentValue value={item} /> : <ImageValue value={item} inRow />}
+          <ResultAt segment={String(index)}>
+            {kind === 'document' ? (
+              <DocumentValue value={item} />
+            ) : (
+              <ImageValue value={item} inRow />
+            )}
+          </ResultAt>
         </div>
       ))}
     </div>
@@ -1737,10 +1879,29 @@ export interface ResultFieldProps {
   hideLabel?: boolean;
 }
 
-/** The single dispatch point, mirroring `FieldRenderer` on the input side. */
-export function ResultField({ field, value, depth = 0, hideLabel = false }: ResultFieldProps) {
+/**
+ * The single dispatch point, mirroring `FieldRenderer` on the input side.
+ *
+ * The outermost one also marks the root of the result, when no panel above it
+ * has: a file's own download button names the file by its place in the result,
+ * and the place starts here. Every nested one finds the root already there.
+ */
+export function ResultField(props: ResultFieldProps) {
+  const location = useResultLocation();
+  if (location) return <ResultNode {...props} />;
+  return (
+    <ResultRoot baseName={props.field.name} name={props.field.name}>
+      <ResultNode {...props} />
+    </ResultRoot>
+  );
+}
+
+function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldProps) {
   const s = useFieldStrings();
   const unwrapped = unwrap(field, value);
+  // Read up here, before any arm returns, because hooks may not follow one.
+  const pageDownloadShown = useFileDownloadShown('markup');
+  const location = useResultLocation();
 
   // The description rides the label's `title`, at every depth including this
   // one.
@@ -1782,9 +1943,24 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
   // the switch below would render its two members as text and call it done.
   if (isNativeHtmlNode(field)) {
     const content = readHtmlContent(unwrapped);
+    // The page is a file too, and the one a reader most wants to keep: its save
+    // control rides the label row as a text value's copy control does, and
+    // survives `hideLabel` for the same reason. It is the same row every other
+    // file's controls sit in.
+    const page =
+      pageDownloadShown && location
+        ? readStuffFile('markup', unwrapped, location.path.join('.'))
+        : undefined;
     return (
       <div className="space-y-2">
-        {header}
+        {page ? (
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">{header}</div>
+            <FileActions file={page} />
+          </div>
+        ) : (
+          header
+        )}
         {content ? <HtmlPreview content={content} /> : <Absent />}
       </div>
     );
@@ -1887,7 +2063,9 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
                 </Fragment>
               ) : (
                 <div key={child.name} className="col-span-2 min-w-0">
-                  <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                  <ResultAt segment={child.name}>
+                    <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                  </ResultAt>
                 </div>
               ),
             )}
@@ -1928,7 +2106,9 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
             <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
               {items.map((item, index) => (
                 <div key={index} className="bg-card/40 px-3 py-1.5">
-                  <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                  <ResultAt segment={String(index)}>
+                    <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                  </ResultAt>
                 </div>
               ))}
             </div>
@@ -1970,7 +2150,9 @@ export function ResultField({ field, value, depth = 0, hideLabel = false }: Resu
                   className="space-y-2 rounded-lg border border-border bg-card/40 px-3.5 py-3"
                 >
                   <span className="font-mono text-[10px] text-muted-foreground">{index + 1}</span>
-                  <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                  <ResultAt segment={String(index)}>
+                    <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                  </ResultAt>
                 </div>
               ))}
             </div>

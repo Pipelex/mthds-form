@@ -57,7 +57,7 @@ The gallery pins an image model explicitly (`options = { model = "$gen-image-tes
 
 ### Files, and the one payload the corpus cannot produce
 
-`Outputs/Media` is the section for results carrying files, and it is the one place a story supplies its own payload. The reason is worth stating, because it is the exception that proves the rule rather than a corner cut.
+`Outputs/Media` is the section for results carrying files, and with `Outputs/Downloads`, which renders the same report under each download display setting, it is the one place a story supplies its own payload. Both read it from `src/__stories__/outputs/media-payloads.ts`. The reason is worth stating, because it is the exception that proves the rule rather than a corner cut.
 
 A run's file-bearing results carry `pipelex-storage://` references, which resolve only through the host's own resolver. A browser looking at Storybook cannot fetch one — so a corpus payload would show grey tiles and a preview button that could not fire, which is a case the section already covers on purpose (`A storage reference → no preview`). What it could not show is the other case: what this looks like when a URL IS fetchable, which is where a host in production mostly lives.
 

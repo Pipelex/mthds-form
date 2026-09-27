@@ -4,10 +4,17 @@ import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
+import { planStuffSave } from '../core/save-plan';
 import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
 import { useFieldStrings } from './field-strings';
-import { downloadStuff } from './download-stuff';
-import { useResolveUrl } from './result-env';
+import {
+  DownloadDisplayOverride,
+  useResolveUrl,
+  useResultDownloadShown,
+  useSaveFiles,
+  type DownloadDisplay,
+} from './result-env';
+import { ResultRoot } from './result-location';
 import { cn } from './utils';
 
 /**
@@ -63,15 +70,18 @@ export interface StuffViewerProps {
   defaultView?: StuffViewerView;
   /**
    * Names the saved files: `<baseName>.json`, and any file inside the stuff
-   * that carries no name of its own. Defaults to the field's name, which is
-   * what the header shows.
+   * that carries no name of its own, whichever control saved it. Defaults to
+   * the field's name, which is what the header shows.
    */
   downloadBaseName?: string;
   /**
-   * Hide the download control. For a host that saves results its own way, or a
-   * surface where saving makes no sense — a preview inside an editor, say.
+   * Which download controls this panel draws, laid key by key over what
+   * `ResultEnvProvider` says: `{ result: false }` drops the header's Download
+   * and keeps each file's own button, `{ files: false }` the reverse. For a
+   * surface where saving makes no sense (a preview inside an editor, say), set
+   * both to `false`.
    */
-  hideDownload?: boolean;
+  downloads?: DownloadDisplay;
   className?: string;
 }
 
@@ -191,41 +201,64 @@ export function JsonView({ value }: { value: unknown }) {
   );
 }
 
-export function StuffViewer({
+export function StuffViewer({ downloads, ...props }: StuffViewerProps) {
+  // The panel's own display settings reach every file button in its tree, not
+  // only its header, so they are laid over the provider's before anything
+  // beneath reads them.
+  return (
+    <DownloadDisplayOverride downloads={downloads}>
+      <StuffPanel {...props} />
+    </DownloadDisplayOverride>
+  );
+}
+
+function StuffPanel({
   field,
   value,
   name,
   defaultView = 'rendered',
   downloadBaseName,
-  hideDownload = false,
   className,
-}: StuffViewerProps) {
+}: Omit<StuffViewerProps, 'downloads'>) {
   const s = useFieldStrings();
   // The caller's name wins over the descriptor's, and it is applied to the
   // FIELD rather than passed to the header alone: the download's default base
   // name reads the same property, and the two naming the item differently is
   // exactly the drift this component exists to prevent.
   const named = name ? { ...field, name } : field;
+  const baseName = downloadBaseName ?? named.name ?? 'result';
   const [view, setView] = useState<StuffViewerView>(defaultView);
   const [saving, setSaving] = useState(false);
+  // The names of the files the last download could not hand over, shown until
+  // the next one. Empty when everything arrived.
+  const [missed, setMissed] = useState<readonly string[]>([]);
   // The same resolver the rendered view paints images through, so a download
-  // fetches exactly what the reader is looking at — a host that proxies its
+  // saves exactly what the reader is looking at — a host that proxies its
   // storage does not need to configure the two separately.
   const resolveUrl = useResolveUrl();
+  const save = useSaveFiles();
+  const downloadShown = useResultDownloadShown();
 
   const handleDownload = useCallback(async () => {
     setSaving(true);
+    setMissed([]);
     try {
-      await downloadStuff({
-        field,
-        value,
-        baseName: downloadBaseName ?? named.name ?? 'result',
-        resolveUrl,
+      // The descriptor's own field, not the renamed one: the file names carry
+      // each file's place in the result, and that place is the descriptor's.
+      const plan = planStuffSave(field, value, {
+        baseName,
+        ...(resolveUrl ? { resolveUrl } : {}),
       });
+      const failed = await save(plan.files).then(
+        (result) => result.failed.map((failure) => failure.file.name),
+        // A delivery that throws has handed over nothing it can vouch for.
+        () => plan.files.map((file) => file.name),
+      );
+      setMissed([...plan.unavailable.map((file) => file.name), ...failed]);
     } finally {
       setSaving(false);
     }
-  }, [field, named.name, value, downloadBaseName, resolveUrl]);
+  }, [field, value, baseName, resolveUrl, save]);
   const views: { id: StuffViewerView; label: string }[] = [
     { id: 'rendered', label: s.viewRendered },
     { id: 'json', label: s.viewJson },
@@ -241,7 +274,7 @@ export function StuffViewer({
           <ResultHeader field={named} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {!hideDownload && (
+          {downloadShown && (
             <button
               type="button"
               onClick={() => void handleDownload()}
@@ -282,10 +315,26 @@ export function StuffViewer({
         </div>
       </div>
 
+      {/* Said, not swallowed: a reader expecting three attachments and getting
+          two could not tell before. The JSON copy still carries each missing
+          file's reference, when it was planned. The live region is there from
+          the start and only its text changes, because a region inserted with
+          its message already in it is not reliably announced. */}
+      {downloadShown && (
+        <p
+          role="status"
+          className={cn('text-[12px] text-destructive', missed.length === 0 && 'sr-only')}
+        >
+          {missed.length > 0 ? s.downloadIncomplete(missed) : ''}
+        </p>
+      )}
+
       {view === 'json' ? (
         <JsonView value={value} />
       ) : (
-        <ResultField field={field} value={value} hideLabel />
+        <ResultRoot baseName={baseName} name={field.name}>
+          <ResultField field={field} value={value} hideLabel />
+        </ResultRoot>
       )}
     </div>
   );
