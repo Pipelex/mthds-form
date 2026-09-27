@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [v0.12.0] - 2026-09-27
+
+### Highlights
+
+- **A host decides how a result's files are saved.** Every download reaches `saveFiles` on `ResultEnvProvider` as a plan of named files, so a view running in a sandboxed frame can ask its host to deliver them rather than losing them in the tab.
+- **Every file in a result can be saved on its own**, from a button beside its copy control, under the name the whole-result download gives it.
+- **A download that misses a file says which one**, instead of opening a tab a popup blocker suppresses or skipping the file without a word.
 
 ### Added
 
