@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260928-50baa2
 ---
 
@@ -38,13 +38,13 @@ Update the assertions that pin the doubled name, and add the ones the report cal
 - [x] `/rev`, at the depth it derives, converged in round 4. Rounds 1 and 2 at profile 2 were clean, but code-review at `low` read only the source files, so neither counted as full coverage; round 3 ran at profile 4 to cover the whole diff.
   - Round 3's adversarial Codex pass held that dropping the root makes two panels given the same base name over different roots save their unnamed file under one name, and proposed keeping the root when it differs from the base. Verified and rejected: the kernel never promised distinct names across separate plans (two runs of one pipe already saved `output-output.png` twice), only a caller passing one base to two panels reaches it, which `downloadBaseName`'s documentation now warns against, and the proposed rule brings back `generate_portrait-output.png`, the defect this item reports. The design's unconditional drop stands.
   - Round 3's cubic pass found that the public `StuffFile.path` did not say its first segment must be the root's name, which the saved name now drops. Fixed in `57b2284`: `StuffFile.path`, `planFileSave` and `docs/result-view.md` say so.
-- [ ] Open the PR to `dev`, titled `fix/File-name-repeats-root · L-260928-50baa2`, its body two or three sentences and `Closes L-260928-50baa2`; merge and land with `/ledger-land --merge`.
-- [ ] Record here the SHA the fix merged as, and any decision the review changed.
+- [x] Open the PR to `dev`, titled `fix/File-name-repeats-root · L-260928-50baa2`, its body two or three sentences and `Closes L-260928-50baa2`; merge and land with `/ledger-land --merge`. It was #43.
+- [x] Record here the SHA the fix merged as, and any decision the review changed. The fix merged into `dev` as `b635fe2`; the review changed no decision of the design, and added the root-first statement on `StuffFile.path` above.
 
 ## Phase 2 — the fix is published as v0.12.1
 
-- [ ] `/release` cuts v0.12.1: a patch, since the change is a fix to a name with no API, type or wire change. If anything else has landed under `## [Unreleased]` by then, let that decide the version instead.
-- [ ] After the release PR merges and publishes, `/ledger-land` it, and record the published version here.
+- [x] `/release` cuts v0.12.1: a patch, since the change is a fix to a name with no API, type or wire change. If anything else has landed under `## [Unreleased]` by then, let that decide the version instead. Nothing else had, so it is v0.12.1, cut on `release/v0.12.1` under the release item L-260928-b2ca68.
+- [x] After the release PR merges and publishes, `/ledger-land` it, and record the published version here. The campaign ships as `@pipelex/mthds-form` v0.12.1; the landing verifies the publish on npm, the `v0.12.1` tag and the release run before it closes L-260928-b2ca68.
 
 ## Phase 3 — the console saves under the new names (L-260928-36c8f1, pipelex-mcp)
 
