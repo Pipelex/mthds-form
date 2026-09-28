@@ -1,10 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.12.1] - 2026-09-28
 
 ### Fixed
 
-- **A saved file no longer repeats the result's name**: a file with no name of its own was named by the base name followed by its whole place in the result, which starts at the root the base name already stands for, so a result that is one image saved as `output-output.png` and a figure inside a report as `report-report-figures-0.png`. They now save as `output.png` and `report-figures-0.png`, so a host's `downloadBaseName`, or the `name` it gives a panel, names a one-file result outright. It applies to the header's Download, each file's own button, the generative result hatch, and `planStuffSave` and `planFileSave`; a planned file's `path` is unchanged.
+- **A saved file no longer repeats the result's name**: a file with no name of its own was named by the base name followed by its whole place in the result, which starts at the root the base name already stands for, so a result that is one image saved as `output-output.png` and a figure inside a report as `report-report-figures-0.png`. They now save as `output.png` and `report-figures-0.png`, so a host's `downloadBaseName`, or the `name` it gives a panel, names a one-file result outright. It applies to the header's Download, each file's own button, the generative result hatch, and `planStuffSave` and `planFileSave`; a planned file's `path` is unchanged, and a `StuffFile` handed to `planFileSave` has its `path` start at the root's name, as `collectStuffFiles` builds it.
 
 ## [v0.12.0] - 2026-09-27
 
