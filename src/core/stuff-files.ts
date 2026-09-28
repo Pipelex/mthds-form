@@ -32,7 +32,13 @@ export interface StuffFile {
   /** The file's own name when it states one — otherwise the caller derives it. */
   filename?: string;
   mimeType?: string;
-  /** Where it sat, dotted: `report.attachments.2.scan`. Names a saved file. */
+  /**
+   * Where it sat, dotted, starting at the root's name:
+   * `report.attachments.2.scan`. A saved file with no name of its own is named
+   * by the base name and the segments after the first (`report-attachments-2-scan`),
+   * since the base name stands for the root, so a hand-built path must start at
+   * the root's name too, or its first real segment is lost.
+   */
   path: string;
   kind: StuffFileKind;
 }
