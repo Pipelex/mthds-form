@@ -253,7 +253,7 @@ function MthdsResult({ props }: BaseComponentProps<{ path: string; hideLabel?: b
   // The subtree's place in the whole result, so a file inside it saves under
   // the name the whole-result download gives it. Left to itself, `ResultField`
   // would root the location at its own node's name, and every entry of a
-  // repeat would save as `image-image.png`.
+  // repeat would save as `image.png`.
   const place = [scope.result.name, ...(segmentsUnder(RESULT_ROOT, path) ?? [])];
   return (
     <ResultRoot baseName={scope.result.name} path={place}>

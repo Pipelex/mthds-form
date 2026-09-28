@@ -619,9 +619,11 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
     );
     return () => window.clearTimeout(timer);
   }, [attempt]);
-  if (!shown) return null;
+  // A file is only ever read inside a result location, so this is the case
+  // that does not occur; without a base name there is nothing to name it by.
+  if (!shown || !location) return null;
   const planned = planFileSave(file, {
-    baseName: location?.baseName ?? file.path,
+    baseName: location.baseName,
     ...(resolve ? { resolveUrl: resolve } : {}),
   });
   if (!planned) return null;

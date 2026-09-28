@@ -8,9 +8,9 @@ import { createContext, use, useMemo, type ReactNode } from 'react';
  *
  * ## Why a file's button needs to know
  *
- * A file with no name of its own is saved under the base name and its place in
- * the result (`report-output-figures-0-image.png`), because two unnamed images
- * from one result must not both land as `image.png`. The whole-result download
+ * A file with no name of its own is saved under the base name and its place
+ * below the result's root (`report-figures-0-image.png`), because two unnamed
+ * images from one result must not both land as `image.png`. The whole-result download
  * reads that place off the descriptor walk in core. A file's own button is drawn
  * by the arm that paints the file, deep in the tree, and holds only the file's
  * value — so without this, the same file would be saved under two different
@@ -20,11 +20,19 @@ import { createContext, use, useMemo, type ReactNode } from 'react';
  * name, then a field's name for each record entered, then an entry's index for
  * each list entered. Each branch of `ResultField` that renders a child wraps it
  * in {@link ResultAt}, and every branch that does not can hold no file.
+ *
+ * The first segment must be the root node's name, because the saved name
+ * leaves it out: the base name already stands for the root, so a result that
+ * is one image saves as `output.png` rather than `output-output.png`.
  */
 export interface ResultLocation {
   /** Names the saved files: the panel's download base name, or the root node's name. */
   baseName: string;
-  /** The node's place, one segment per record field or list index, from the root node's name. */
+  /**
+   * The node's place, one segment per record field or list index, from the
+   * root node's name. The saved name drops that first segment, so it must be
+   * the root's name and nothing else.
+   */
   path: readonly string[];
 }
 
@@ -42,7 +50,9 @@ export function useResultLocation(): ResultLocation | undefined {
  * `path` is usually the root node's name alone. A view that renders one
  * subtree of a result on its own, as a generative layout's result hatch does,
  * passes the subtree's whole place instead, root name first, so its files are
- * named as the whole-result download names them.
+ * named as the whole-result download names them. The root name comes first in
+ * either case because a saved name drops the first segment as the one the base
+ * name already stands for.
  */
 export function ResultRoot({
   baseName,

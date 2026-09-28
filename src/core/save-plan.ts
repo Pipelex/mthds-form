@@ -33,9 +33,10 @@ export type SaveFileKind = StuffFileKind | 'data';
 interface SaveFileCommon {
   /**
    * What to save it as: a bare file name, never a path. The file's own
-   * `filename` when it states one, else the base name and the file's place in
-   * the result (`report-output-figures-0-image.png`). No two files in one plan
-   * share a name, compared without case.
+   * `filename` when it states one, else the base name and the file's place
+   * below the result's root (`report-figures-0-image.png`), or the base name
+   * alone for a file that is the whole result (`output.png`). No two files in
+   * one plan share a name, compared without case.
    */
   name: string;
   /**
@@ -106,7 +107,11 @@ export interface SaveResult {
 export type SaveFiles = (files: readonly SaveFile[]) => Promise<SaveResult>;
 
 export interface SavePlanOptions {
-  /** Names the JSON copy (`<baseName>.json`) and prefixes a file that has no name of its own. */
+  /**
+   * Names the whole stuff: the JSON copy is `<baseName>.json`, a file with no
+   * name of its own below the root is `<baseName>-<place>`, and a file that is
+   * the whole stuff is `<baseName>.<ext>`.
+   */
   baseName: string;
   /** The same resolver the result view paints through, asked before the payload's own URLs. */
   resolveUrl?: (url: string) => string | undefined;
@@ -198,6 +203,10 @@ function numbered(name: string, count: number): string {
 /**
  * One file, planned on its own — what a file's own download button saves.
  *
+ * The file's `path` starts at the root's name, as `collectStuffFiles` builds
+ * it: the name leaves that first segment out, because the base name already
+ * stands for the root.
+ *
  * `undefined` when the file cannot be saved: a stored reference the host's
  * resolver does not answer and no URL the gate admits beside it. The button is
  * not drawn then, so a reader is never offered a download that cannot happen.
@@ -260,10 +269,17 @@ function typeForName(name: string): string {
  * What a saved file is called.
  *
  * The file's own `filename` wins when it has one: it is the name the producer
- * chose and the reader recognises. Otherwise the descriptor path names it
- * (`report-report-attachments-2`), which is unlovely but unambiguous, since two
- * images from one result must not both land as `image.png` and overwrite each
- * other in the download folder.
+ * chose and the reader recognises. Otherwise the base name and the file's place
+ * below the root name it (`report-attachments-2`), which is unlovely but
+ * unambiguous, since two images from one result must not both land as
+ * `image.png` and overwrite each other in the download folder.
+ *
+ * The path's first segment is left out because it is always the root's name,
+ * and the base name already stands for the root, as it does in `<base>.json`:
+ * keeping it would save the one image a pipe outputs as `output-output.png`. A
+ * file that IS the root has no place below it and is named by the base name
+ * alone. Every segment is a field's name or an index, neither of which holds a
+ * dot, so splitting on dots recovers them.
  *
  * `allowed` is set for a `data:` URL, whose admitted type is the only thing
  * allowed to decide the extension: a name carrying one of those extensions
@@ -271,7 +287,9 @@ function typeForName(name: string): string {
  */
 function nameFor(file: StuffFile, base: string, allowed?: readonly string[]): string {
   const own = file.filename ? safeName(file.filename) : '';
-  const stem = own || `${safeName(base) || 'result'}-${file.path.replace(/\./g, '-')}`;
+  const place = file.path.split('.').slice(1).join('-');
+  const named = safeName(base) || 'result';
+  const stem = own || (place ? `${named}-${place}` : named);
   const stated = own ? extensionOf(own) : '';
   if (allowed) {
     if (stated && allowed.includes(stated)) return stem;
