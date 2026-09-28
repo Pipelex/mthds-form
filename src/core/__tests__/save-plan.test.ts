@@ -62,7 +62,7 @@ describe('planStuffSave: what a whole result saves as', () => {
       {
         kind: 'image',
         path: 'report.chart',
-        name: 'quarter-report-chart.png',
+        name: 'quarter-chart.png',
         mimeType: 'image/png',
         url: 'https://cdn.example/chart.png',
       },
@@ -92,7 +92,7 @@ describe('planStuffSave: what a whole result saves as', () => {
     expect(plan.files[0]).toEqual({
       kind: 'markup',
       path: 'report.summary',
-      name: 'r-report-summary.html',
+      name: 'r-summary.html',
       mimeType: 'text/html',
       text: '<h1>Hi</h1>',
     });
@@ -104,12 +104,52 @@ describe('planStuffSave: what a whole result saves as', () => {
       { url: 'https://cdn.example/a.png' },
       { baseName: 'output' },
     );
-    expect(plan.files.map((file) => file.name)).toEqual(['output-output.png']);
+    expect(plan.files.map((file) => file.name)).toEqual(['output.png']);
+  });
+
+  it('names a result that IS one file by the base name alone, whatever the root is called', () => {
+    // The base name stands for the root, so the root's own name is never added
+    // to it: a caller that names the stuff after the pipe gets the pipe's name.
+    const plan = planStuffSave(
+      image('output'),
+      { url: 'https://cdn.example/a.png' },
+      { baseName: 'generate_portrait' },
+    );
+    expect(plan.files.map((file) => file.name)).toEqual(['generate_portrait.png']);
+  });
+
+  it('names the entries of a list-rooted result by their index below the root', () => {
+    const images: RunField = {
+      kind: 'list',
+      name: 'output',
+      conceptRef: 'native.Image',
+      required: true,
+      item: image('item'),
+    };
+    const plan = planStuffSave(
+      images,
+      [{ url: 'https://cdn.example/a.png' }, { url: 'https://cdn.example/b.png' }],
+      { baseName: 'output' },
+    );
+    expect(plan.files.map((file) => [file.path, file.name])).toEqual([
+      ['output.0', 'output-0.png'],
+      ['output.1', 'output-1.png'],
+      ['output', 'output.json'],
+    ]);
+  });
+
+  it('keeps the root in the path while leaving it out of the name', () => {
+    const [file] = planStuffSave(
+      report([image('chart'), text('summary')]),
+      { chart: { url: 'https://cdn.example/chart.png' }, summary: 'x' },
+      { baseName: 'quarter' },
+    ).files;
+    expect(file).toMatchObject({ path: 'report.chart', name: 'quarter-chart.png' });
   });
 
   it('plans a page that is the whole result as the page alone', () => {
     const plan = planStuffSave(page('output'), { inner_html: '<p>x</p>' }, { baseName: 'memo' });
-    expect(plan.files.map((file) => file.name)).toEqual(['memo-output.html']);
+    expect(plan.files.map((file) => file.name)).toEqual(['memo.html']);
   });
 
   it('never plans JSON that throws on a BigInt', () => {
@@ -127,7 +167,7 @@ describe('the planner judges a URL before it plans one', () => {
     );
     expect(plan.files.map((file) => file.kind)).toEqual(['data']);
     expect(plan.unavailable).toEqual([
-      { name: 'report-report-chart', kind: 'image', path: 'report.chart' },
+      { name: 'report-chart', kind: 'image', path: 'report.chart' },
     ]);
   });
 
@@ -167,7 +207,7 @@ describe('the planner judges a URL before it plans one', () => {
       { baseName: 'output' },
     );
     expect(plan.files.map((file) => file.name)).toEqual(['output.json']);
-    expect(plan.unavailable.map((file) => file.path)).toEqual(['output']);
+    expect(plan.unavailable).toEqual([{ name: 'output', kind: 'image', path: 'output' }]);
   });
 });
 
@@ -190,7 +230,7 @@ describe('a data: file is named by the type the gate admitted', () => {
       { baseName: 'generated_image' },
     ).files;
     expect(file).toMatchObject({
-      name: 'generated_image-generated_image.png',
+      name: 'generated_image.png',
       mimeType: 'image/png',
     });
   });
@@ -221,7 +261,7 @@ describe('a planned name is a name, never a path', () => {
       { url: 'https://cdn.example/x.pdf', filename: '../' },
       { baseName: 'output' },
     ).files;
-    expect(file?.name).toBe('output-output.pdf');
+    expect(file?.name).toBe('output.pdf');
   });
 });
 

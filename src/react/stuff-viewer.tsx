@@ -69,9 +69,13 @@ export interface StuffViewerProps {
   /** Which view opens first. Rendered, unless a host has a reason. */
   defaultView?: StuffViewerView;
   /**
-   * Names the saved files: `<baseName>.json`, and any file inside the stuff
-   * that carries no name of its own, whichever control saved it. Defaults to
-   * the field's name, which is what the header shows.
+   * Names the saved files, whichever control saved them: the base name names
+   * the whole stuff, so the JSON copy is `<baseName>.json`, a file inside the
+   * stuff that carries no name of its own is `<baseName>-<place>`, and a stuff
+   * that is one file saves as `<baseName>.<ext>`. Defaults to the field's name,
+   * which is what the header shows. Give each stuff a distinct base name, as
+   * the default already is: two panels handed the same one save their unnamed
+   * files under the same names.
    */
   downloadBaseName?: string;
   /**

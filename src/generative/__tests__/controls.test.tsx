@@ -173,7 +173,7 @@ describe('the ids the catalog controls mint', () => {
  * A result hatch renders one subtree of the result on its own, and a file in
  * it must save under the name the whole-result download gives it. Rendered
  * bare, the subtree used to root its own location at its node's name, so every
- * entry of a repeat saved as `report-image.png`, over one another.
+ * entry of a repeat saved under one name, over one another.
  */
 describe('the files a result hatch shows', () => {
   const RESULT: ObjectRunField = {
@@ -235,7 +235,7 @@ describe('the files a result hatch shows', () => {
         brand={BRAND}
       />,
     );
-    for (const name of ['report-report-figures-0-image.png', 'report-report-figures-1-image.png']) {
+    for (const name of ['report-figures-0-image.png', 'report-figures-1-image.png']) {
       expect(
         screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile(name) }),
       ).toBeInTheDocument();

@@ -110,7 +110,7 @@ function Panel({
 }
 
 const headerButton = () => screen.queryByRole('button', { name: S.download });
-/** A file's button is named by the file it saves: "Download report-output-figures-0.png". */
+/** A file's button is named by the file it saves: "Download report-figures-0.png". */
 const FILE_BUTTON = S.downloadFile('');
 const fileButtons = () =>
   screen.queryAllByRole('button', { name: (name) => name.startsWith(FILE_BUTTON) });
@@ -129,7 +129,7 @@ describe("a host's save function receives every download as a plan", () => {
       {
         kind: 'markup',
         path: 'output.summary',
-        name: 'report-output-summary.html',
+        name: 'report-summary.html',
         mimeType: 'text/html',
         text: '<h1>Findings</h1>',
       },
@@ -143,14 +143,14 @@ describe("a host's save function receives every download as a plan", () => {
       {
         kind: 'image',
         path: 'output.figures.0',
-        name: 'report-output-figures-0.png',
+        name: 'report-figures-0.png',
         mimeType: 'image/png',
         url: 'https://cdn.example/a.png',
       },
       {
         kind: 'image',
         path: 'output.figures.1',
-        name: 'report-output-figures-1.png',
+        name: 'report-figures-1.png',
         mimeType: 'image/png',
         url: 'https://cdn.example/b.png',
       },
@@ -169,13 +169,13 @@ describe("a host's save function receives every download as a plan", () => {
     render(<Panel saveFiles={host.saveFiles} />);
     // A gallery tile, two levels down: the name matches what the header's plan
     // calls the same file, so the reader gets one name whichever control they used.
-    await userEvent.click(fileButton('report-output-figures-1.png'));
+    await userEvent.click(fileButton('report-figures-1.png'));
     await waitFor(() => expect(host.plans).toHaveLength(1));
     expect(host.plans[0]).toEqual([
       {
         kind: 'image',
         path: 'output.figures.1',
-        name: 'report-output-figures-1.png',
+        name: 'report-figures-1.png',
         mimeType: 'image/png',
         url: 'https://cdn.example/b.png',
       },
@@ -185,10 +185,10 @@ describe("a host's save function receives every download as a plan", () => {
   it('draws a button on every file the result shows: the page, the document and each image', () => {
     render(<Panel />);
     expect(fileButtonNames()).toEqual([
-      'report-output-summary.html',
+      'report-summary.html',
       'q3.pdf',
-      'report-output-figures-0.png',
-      'report-output-figures-1.png',
+      'report-figures-0.png',
+      'report-figures-1.png',
     ]);
   });
 
@@ -243,12 +243,52 @@ describe("a host's save function receives every download as a plan", () => {
       </ResultEnvProvider>,
     );
     // No panel above it, so the outermost ResultField is the root and names it.
-    await userEvent.click(fileButton('output-output-1-scan.pdf'));
+    await userEvent.click(fileButton('output-1-scan.pdf'));
     await waitFor(() => expect(host.plans).toHaveLength(1));
     expect(host.plans[0]?.[0]).toMatchObject({
       path: 'output.1.scan',
       url: 'https://cdn.example/2.pdf',
     });
+  });
+});
+
+describe('a saved file is named after the root once', () => {
+  // The reported case: a pipe whose output is one image, shown with nothing to
+  // name it but the descriptor. The base name stands for the root, so the root's
+  // own name is never added to it again.
+  const portrait = image('output');
+  const ONE_IMAGE = { url: 'https://cdn.example/portrait.png' };
+
+  async function savedByEachControl(props: { name?: string; downloadBaseName?: string }) {
+    const host = recordingHost();
+    render(
+      <ResultEnvProvider saveFiles={host.saveFiles}>
+        <StuffViewer field={portrait} value={ONE_IMAGE} {...props} />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(headerButton()!);
+    await waitFor(() => expect(host.plans).toHaveLength(1));
+    await userEvent.click(fileButtons()[0]!);
+    await waitFor(() => expect(host.plans).toHaveLength(2));
+    return host.plans.map((plan) => plan.map((file) => file.name));
+  }
+
+  it("saves a one-image result as output.png from the header and the image's own button", async () => {
+    expect(await savedByEachControl({})).toEqual([['output.png'], ['output.png']]);
+  });
+
+  it('names it after the panel when the host names the panel', async () => {
+    expect(await savedByEachControl({ name: 'portrait' })).toEqual([
+      ['portrait.png'],
+      ['portrait.png'],
+    ]);
+  });
+
+  it('names it after the download base name when the host passes one', async () => {
+    expect(await savedByEachControl({ downloadBaseName: 'generate_portrait' })).toEqual([
+      ['generate_portrait.png'],
+      ['generate_portrait.png'],
+    ]);
   });
 });
 
@@ -261,7 +301,7 @@ describe('a download that does not arrive says so', () => {
     await userEvent.click(headerButton()!);
     expect(
       await screen.findByText(
-        S.downloadIncomplete(['report-output-figures-0.png', 'report-output-figures-1.png']),
+        S.downloadIncomplete(['report-figures-0.png', 'report-figures-1.png']),
       ),
     ).toBeTruthy();
   });
@@ -278,7 +318,7 @@ describe('a download that does not arrive says so', () => {
       </ResultEnvProvider>,
     );
     await userEvent.click(headerButton()!);
-    expect(await screen.findByText(S.downloadIncomplete(['report-output-chart']))).toBeTruthy();
+    expect(await screen.findByText(S.downloadIncomplete(['report-chart']))).toBeTruthy();
     expect(host.plans[0]?.map((file) => file.name)).toEqual(['report.json']);
   });
 
@@ -296,10 +336,10 @@ describe('a download that does not arrive says so', () => {
     expect(
       await screen.findByText(
         S.downloadIncomplete([
-          'report-output-summary.html',
+          'report-summary.html',
           'q3.pdf',
-          'report-output-figures-0.png',
-          'report-output-figures-1.png',
+          'report-figures-0.png',
+          'report-figures-1.png',
           'report.json',
         ]),
       ),
@@ -396,7 +436,7 @@ describe('a download belongs to the result it was made from', () => {
   it("drops a file button's failure when another file takes its place", async () => {
     const saveFiles: SaveFiles = async (files) => everyFileFailed(files);
     const { rerender } = render(<Panel saveFiles={saveFiles} />);
-    const tile = () => fileButton('report-output-figures-0.png');
+    const tile = () => fileButton('report-figures-0.png');
     await userEvent.click(tile());
     await screen.findByText(S.downloadFileFailed);
     rerender(<Panel saveFiles={saveFiles} value={NEXT} />);
@@ -407,7 +447,7 @@ describe('a download belongs to the result it was made from', () => {
   it("does not let an old file's save settle the button of the file that replaced it", async () => {
     const host = pendingHost();
     const { rerender } = render(<Panel saveFiles={host.saveFiles} />);
-    const tile = () => fileButton('report-output-figures-0.png');
+    const tile = () => fileButton('report-figures-0.png');
     await userEvent.click(tile());
     expect(tile().hasAttribute('disabled')).toBe(true);
     rerender(<Panel saveFiles={host.saveFiles} value={NEXT} />);
@@ -433,10 +473,7 @@ describe('each display setting is independent of the other', () => {
   it('narrows the file buttons to the kinds listed', () => {
     render(<Panel provider={{ files: ['image'] }} />);
     expect(headerButton()).toBeTruthy();
-    expect(fileButtonNames()).toEqual([
-      'report-output-figures-0.png',
-      'report-output-figures-1.png',
-    ]);
+    expect(fileButtonNames()).toEqual(['report-figures-0.png', 'report-figures-1.png']);
   });
 
   it('draws neither when both are off', () => {
@@ -454,7 +491,7 @@ describe('each display setting is independent of the other', () => {
     );
     // `result` was not overridden, so the provider's `false` stands.
     expect(headerButton()).toBeNull();
-    expect(fileButtonNames()).toEqual(['report-output-summary.html', 'q3.pdf']);
+    expect(fileButtonNames()).toEqual(['report-summary.html', 'q3.pdf']);
   });
 
   it('reaches a ResultField that no StuffViewer wraps', () => {
@@ -492,8 +529,8 @@ describe('with no host save function, a file button saves in the browser', () =>
       saved.push(this.download);
     });
     render(<Panel />);
-    await userEvent.click(fileButton('report-output-figures-0.png'));
-    await waitFor(() => expect(saved).toEqual(['report-output-figures-0.png']));
+    await userEvent.click(fileButton('report-figures-0.png'));
+    await waitFor(() => expect(saved).toEqual(['report-figures-0.png']));
     expect(fetchSpy).toHaveBeenCalledWith('https://cdn.example/a.png');
     expect(screen.queryByText(S.downloadFileFailed)).toBeNull();
   });
