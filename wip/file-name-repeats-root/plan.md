@@ -35,7 +35,9 @@ Update the assertions that pin the doubled name, and add the ones the report cal
 ### Checkpoint 1
 
 - [x] `make check` and the whole suite, then `make all`, which ends in `make assert-bundle` (this repo has no `agent-test` target, so `make all` ran the suite).
-- [ ] `/rev`, at the depth it derives.
+- [x] `/rev`, at the depth it derives, converged in round 4. Rounds 1 and 2 at profile 2 were clean, but code-review at `low` read only the source files, so neither counted as full coverage; round 3 ran at profile 4 to cover the whole diff.
+  - Round 3's adversarial Codex pass held that dropping the root makes two panels given the same base name over different roots save their unnamed file under one name, and proposed keeping the root when it differs from the base. Verified and rejected: the kernel never promised distinct names across separate plans (two runs of one pipe already saved `output-output.png` twice), only a caller passing one base to two panels reaches it, which `downloadBaseName`'s documentation now warns against, and the proposed rule brings back `generate_portrait-output.png`, the defect this item reports. The design's unconditional drop stands.
+  - Round 3's cubic pass found that the public `StuffFile.path` did not say its first segment must be the root's name, which the saved name now drops. Fixed in `57b2284`: `StuffFile.path`, `planFileSave` and `docs/result-view.md` say so.
 - [ ] Open the PR to `dev`, titled `fix/File-name-repeats-root · L-260928-50baa2`, its body two or three sentences and `Closes L-260928-50baa2`; merge and land with `/ledger-land --merge`.
 - [ ] Record here the SHA the fix merged as, and any decision the review changed.
 
