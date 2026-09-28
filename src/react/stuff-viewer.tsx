@@ -309,8 +309,9 @@ function StuffPanel({
     setSaving(attempt);
     setMissed(null);
     try {
-      // The descriptor's own field, not the renamed one: the file names carry
-      // each file's place in the result, and that place is the descriptor's.
+      // The descriptor's own field, not the renamed one: each planned file's
+      // path is its place in the result, which is the descriptor's, and the
+      // file buttons below plan from the same place.
       const plan = planStuffSave(field, value, {
         baseName,
         ...(resolveUrl ? { resolveUrl } : {}),

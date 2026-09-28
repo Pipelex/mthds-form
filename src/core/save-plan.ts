@@ -203,6 +203,10 @@ function numbered(name: string, count: number): string {
 /**
  * One file, planned on its own — what a file's own download button saves.
  *
+ * The file's `path` starts at the root's name, as `collectStuffFiles` builds
+ * it: the name leaves that first segment out, because the base name already
+ * stands for the root.
+ *
  * `undefined` when the file cannot be saved: a stored reference the host's
  * resolver does not answer and no URL the gate admits beside it. The button is
  * not drawn then, so a reader is never offered a download that cannot happen.
