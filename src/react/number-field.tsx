@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from './utils';
 import type { NumberRunField } from '../core';
@@ -44,7 +45,7 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
       conceptRef={field.conceptRef}
       category="number"
       description={field.description ?? rangeHint}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
     >

@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
@@ -54,7 +55,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
       conceptRef={field.conceptRef}
       category="choice"
       description={field.description}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={isSegmented ? undefined : domId}
     >

@@ -130,7 +130,13 @@ export {
 // because the near-miss pair is easy to pick and impossible to test for without
 // a structured concept.
 export type { Readiness } from './readiness';
-export { computeReadiness, fieldFilled, isFilled, mustBeFilled } from './readiness';
+export {
+  computeReadiness,
+  fieldFilled,
+  isFilled,
+  mustBeFilled,
+  shownAsOptional,
+} from './readiness';
 
 // The typed pipe_io_contracts mirror and its gating predicates.
 export type {
