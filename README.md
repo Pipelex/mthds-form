@@ -58,6 +58,19 @@ Submitting goes through the gate: `buildRunInputsSchema` → `prepareRunInputs` 
 
 A file field (`document` or `image`) carries `formats`, the formats its slot accepts, and the control's hint, file-picker filter and check all read that one list. A host whose upload path takes fewer types narrows the whole tree once with `narrowFileFormats(fields, mimeTypes)` and has its server check uploads against the same list. [docs/upload-seam.md](docs/upload-seam.md) is everything a file control and its host owe each other.
 
+A host puts its own words on the form in two places. The controls' copy comes through `FieldStringsProvider`: `locale` picks a language pack (`fr`, `fr-FR`, `en`…, English when unknown) and `strings` overrides single keys on top. The method's labels, helper lines, placeholders and enum option labels are set per field by path with `applyFieldOverrides`; an enum shows `optionLabels[code]` and still stores the code:
+
+```tsx
+const fields = applyFieldOverrides(buildRunFields(form, contract), {
+  'customer.display_name': { title: 'Nom du client' },
+  'boutique.code': { title: 'Boutique', optionLabels: { LILLE: 'Lille', PARIS_15: 'Paris 15e' } },
+});
+
+<FieldStringsProvider locale="fr">{/* the form over `fields` */}</FieldStringsProvider>;
+```
+
+[docs/i18n.md](docs/i18n.md) has the path syntax and the rules.
+
 ## Theming
 
 The controls carry Tailwind classes over the standard shadcn/ui semantic tokens (`--background`, `--input`, `--border`, `--primary`, …). A host that already defines those tokens gets controls that match its product with no configuration. A host with no Tailwind build loads the prebuilt `@pipelex/mthds-form/styles.css`. Both paths, and the exact token list, are in [docs/theming.md](docs/theming.md).
@@ -71,6 +84,7 @@ The controls carry Tailwind classes over the standard shadcn/ui semantic tokens 
 | [docs/theming.md](docs/theming.md) | the token contract and host setup |
 | [docs/wire-correspondence.md](docs/wire-correspondence.md) | the name-for-name wire ↔ `RunField` mapping |
 | [docs/upload-seam.md](docs/upload-seam.md) | what a file control and its host owe each other: accepted formats and narrowing them, write-back paths, previews, the file card |
+| [docs/i18n.md](docs/i18n.md) | wording a form for its reader: the controls' strings, the French set, per-field overrides and enum option labels |
 | [docs/derivation-swap.md](docs/derivation-swap.md) | the record of the swap to the wire descriptor — what changed, what survived |
 
 ## Development
