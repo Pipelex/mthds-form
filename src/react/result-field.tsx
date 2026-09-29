@@ -304,9 +304,8 @@ function DateValue({ value }: { value: unknown }) {
  * `LeafValue` rather than something one layout does. The wording is
  * `enumLabeler`'s, the same rule `EnumField` offers its options under, so a
  * result reads as the form that produced it did, codes included when two
- * options would read the same. A host's `optionLabels` win over both, in both
- * presentations, as they do in the form. Only a string is worded; anything
- * else is the payload disagreeing with its descriptor, and is shown as it is.
+ * options would read the same. Only a string is worded; anything else is the
+ * payload disagreeing with its descriptor, and is shown as it is.
  */
 function EnumValue({
   field,
@@ -318,10 +317,7 @@ function EnumValue({
   compact: boolean;
 }) {
   const presentation = useFieldPresentation();
-  const shown =
-    typeof value === 'string'
-      ? enumLabeler(field.options, presentation, field.optionLabels)(value)
-      : value;
+  const shown = typeof value === 'string' ? enumLabeler(field.options, presentation)(value) : value;
   return <Scalar value={shown} compact={compact} />;
 }
 
@@ -334,7 +330,7 @@ function EnumValue({
  */
 function cellTitle(column: RunField, cell: string | number, presentation: FieldPresentation) {
   return column.kind === 'enum' && typeof cell === 'string'
-    ? enumLabeler(column.options, presentation, column.optionLabels)(cell)
+    ? enumLabeler(column.options, presentation)(cell)
     : String(cell);
 }
 

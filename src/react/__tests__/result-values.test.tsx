@@ -147,31 +147,6 @@ describe('an enum value follows the presentation', () => {
   });
 });
 
-describe('an enum value a host labelled', () => {
-  const boutique: EnumRunField = {
-    ...choice('boutique', ['LILLE', 'PARIS_15']),
-    optionLabels: { LILLE: 'Lille (59)' },
-  };
-
-  it.each(['studio', 'app'] as const)('shows the label in %s', (presentation) => {
-    renderIn(
-      presentation,
-      <ResultField field={record([boutique])} value={{ boutique: 'LILLE' }} />,
-    );
-    expect(screen.getByText('Lille (59)')).toBeTruthy();
-    expect(screen.queryByText('LILLE')).toBeNull();
-  });
-
-  it('carries the label into a table cell', () => {
-    const rows = listOf('stops', record([text('note', 40), boutique], 'stop'));
-    const { container } = renderIn(
-      'app',
-      <ResultField field={rows} value={[{ note: 'a', boutique: 'LILLE' }]} />,
-    );
-    expect(within(container.querySelector('tbody')!).getByText('Lille (59)')).toBeTruthy();
-  });
-});
-
 describe('an enum whose options would read the same shows its codes', () => {
   // The same rule `EnumField` applies to its options, so a result reads as the
   // form that produced it did (`enum-field.test.tsx`).

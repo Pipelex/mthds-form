@@ -139,16 +139,6 @@ export interface BooleanRunField extends RunFieldCommon {
 export interface EnumRunField extends RunFieldCommon {
   kind: 'enum';
   options: string[];
-  /**
-   * What a person reads for an option, keyed by the option's code
-   * (`{ LILLE: 'Lille (59)' }`). Not a wire fact - the descriptor carries the
-   * authored `choices` only - so a host sets it, usually through
-   * `applyFieldOverrides`. Like an authored `title`, a label shown here is
-   * authoritative in both presentations; an option it does not name reads as it
-   * would without it. Only what is SHOWN changes: the form still stores the
-   * code, and the JSON view, the copy control and the download keep it.
-   */
-  optionLabels?: Record<string, string>;
 }
 
 export interface FileRunField extends RunFieldCommon {
