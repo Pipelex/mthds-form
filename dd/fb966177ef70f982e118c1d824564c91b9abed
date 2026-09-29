@@ -1,0 +1,29 @@
+README.md
+  s_4233f74ffb8da3::t_ec748cfd7bdbb3 61,64,67,82
+docs/architecture.md
+  s_4233f74ffb8da3::t_6ee07b43b89e4c 56
+docs/i18n.md
+  s_4233f74ffb8da3::t_66acd813824935 3
+docs/wire-correspondence.md
+  s_4233f74ffb8da3::t_4346b83a45c7a8 15
+src/react/enum-field.tsx
+  s_4233f74ffb8da3::t_347cc1e4b85322 45
+src/react/result-field.tsx
+  s_4233f74ffb8da3::t_3865bbcf1a631d 307-308,320,333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ddfb966177ef70f982e118c1d824564c91b9abed",
+  "prompts": {},
+  "sessions": {
+    "s_4233f74ffb8da3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd6031ed-45ff-4580-a468-dd77621e2581",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
