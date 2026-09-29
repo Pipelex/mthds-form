@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { cn } from './utils';
 import type { ProseRunField, TextRunField } from '../core';
 import { FieldShell } from './field-shell';
@@ -27,7 +28,7 @@ export function TextField({ field, value, onChange, id, error, disabled }: TextF
       conceptRef={field.conceptRef}
       category="text"
       description={field.description}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
     >
@@ -69,7 +70,7 @@ export function ProseField({ field, value, onChange, id, error, disabled }: Pros
       conceptRef={field.conceptRef}
       category="text"
       description={field.description}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
     >

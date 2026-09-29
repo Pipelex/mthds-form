@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from './utils';
@@ -150,7 +151,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             ? s.itemsCountOf(items.length, field.itemCount)
             : s.itemsCount(items.length)}
         </span>
-        {!field.required && (
+        {shownAsOptional(field) && (
           <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             {s.optionalBadge}
           </span>

@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
@@ -461,7 +462,7 @@ function FileField({
       conceptRef={field.conceptRef}
       category={category}
       description={field.description}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       // Names the file input, the way every other control in the set names its
       // own - or the link input, when there is no upload and so no file input.

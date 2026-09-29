@@ -223,3 +223,14 @@ export function computeReadiness(fields: RunField[], values: Record<string, unkn
     .map((f) => f.title ?? f.name);
   return { total: gating.length, ready: gating.length - missing.length, missing };
 }
+
+/**
+ * Whether a person should see this field as optional: not required AND carrying no authored
+ * default. The standard marks a defaulted field `required: false` (it can never be missing), but it
+ * is always filled, so presenting it as optional — the badge, the fold behind the optional toggle —
+ * misreads it: a choice defaulted to one of its options is still a choice the user must see.
+ * Presentation only; what gates a run is `mustBeFilled`.
+ */
+export function shownAsOptional(field: RunField): boolean {
+  return !field.required && field.defaultValue === undefined;
+}
