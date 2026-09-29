@@ -6,25 +6,44 @@
  *
  * The count-bearing messages apply French plural rules, where zero and one both
  * take the singular (`0 élément`, `1 élément`, `2 éléments`), and a size is
- * written the French way: `Ko` and `Mo`, a decimal comma, a space before them.
+ * written the French way: `ko` and `Mo`, a decimal comma, a space before them.
+ * Both come from `Intl` (`PluralRules`, `NumberFormat`), not hand-written rules.
  * A colon takes the no-break space French typography puts before it, so it
  * never wraps onto a line of its own.
  *
  * Typed as `FieldStrings` rather than `Partial`, so a key added to the contract
  * fails the build here until it is translated.
  */
-import type { FieldStrings } from './field-strings';
+import type { FieldStrings } from '../field-strings';
 
-/** French plural choice: zero and one take the singular. */
-function plural(count: number, one: string, many: string): string {
-  return count <= 1 ? one : many;
+// Plurals and sizes come from the platform's `Intl`, not from hand-written rules: it knows French
+// (zero and one take the singular, `ko` and `Mo`, a decimal comma, a narrow no-break space before
+// the unit), and it is how every other locale pack added beside this one gets its rules right.
+const PLURALS = new Intl.PluralRules('fr');
+const BYTES = new Intl.NumberFormat('fr-FR', { style: 'unit', unit: 'byte', unitDisplay: 'long' });
+const KILOBYTES = new Intl.NumberFormat('fr-FR', {
+  style: 'unit',
+  unit: 'kilobyte',
+  unitDisplay: 'short',
+  maximumFractionDigits: 0,
+});
+const MEGABYTES = new Intl.NumberFormat('fr-FR', {
+  style: 'unit',
+  unit: 'megabyte',
+  unitDisplay: 'short',
+  maximumFractionDigits: 1,
+});
+
+/** The noun agreeing with `count`, by French plural rules. */
+function plural(count: number, one: string, other: string): string {
+  return PLURALS.select(count) === 'one' ? one : other;
 }
 
-/** `512 octets`, `36 Ko`, `1,4 Mo` — the English formatter's binary multiples, in French. */
+/** `512 octets`, `36 ko`, `1,4 Mo`, on the English formatter's binary multiples. */
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} ${plural(bytes, 'octet', 'octets')}`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
-  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} Mo`;
+  if (bytes < 1024) return BYTES.format(bytes);
+  if (bytes < 1024 * 1024) return KILOBYTES.format(bytes / 1024);
+  return MEGABYTES.format(bytes / (1024 * 1024));
 }
 
 export const FR_FIELD_STRINGS: FieldStrings = {

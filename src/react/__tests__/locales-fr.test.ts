@@ -54,10 +54,10 @@ describe('FR_FIELD_STRINGS', () => {
 
   it('writes a size the French way', () => {
     const s = FR_FIELD_STRINGS;
-    expect(s.encodedFileSummary('PNG', 1)).toBe('PNG · 1 octet');
-    expect(s.encodedFileSummary('PNG', 512)).toBe('PNG · 512 octets');
-    expect(s.encodedFileSummary('PDF', 36 * 1024)).toBe('PDF · 36 Ko');
-    expect(s.encodedFileSummary('PDF', 1.4 * 1024 * 1024)).toBe('PDF · 1,4 Mo');
+    expect(normalize(s.encodedFileSummary('PNG', 1))).toBe('PNG · 1 octet');
+    expect(normalize(s.encodedFileSummary('PNG', 512))).toBe('PNG · 512 octets');
+    expect(normalize(s.encodedFileSummary('PDF', 36 * 1024))).toBe('PDF · 36 ko');
+    expect(normalize(s.encodedFileSummary('PDF', 1.4 * 1024 * 1024))).toBe('PDF · 1,4 Mo');
   });
 
   it('names the files a download missed, in the singular and the plural', () => {
@@ -68,3 +68,8 @@ describe('FR_FIELD_STRINGS', () => {
     );
   });
 });
+
+/** `Intl` separates number and unit with a narrow no-break space; compare on plain spaces. */
+function normalize(text: string): string {
+  return text.replace(/\u202f|\u00a0/g, ' ');
+}

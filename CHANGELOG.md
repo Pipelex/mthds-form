@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`FR_FIELD_STRINGS`, a complete French `FieldStrings`, in the `./react` entry**: every control's copy in French, with French plural rules (zero and one take the singular), sizes as `Ko` and `Mo` with a decimal comma, and a no-break space before a colon. A host mounts it with `FieldStringsProvider`, or spreads its own words over it. See [docs/i18n.md](docs/i18n.md).
+- **`FR_FIELD_STRINGS`, a complete French `FieldStrings`, in the `./react` entry**: every control's copy in French, with French plural rules and sizes (`ko`, `Mo`, decimal comma) from `Intl`, in `src/react/locales/fr.ts`, and a no-break space before a colon. A host mounts it with `FieldStringsProvider`, or spreads its own words over it. See [docs/i18n.md](docs/i18n.md).
 - **`optionLabels` on an enum field**: a host maps an enum's codes to what a person reads (`{ LILLE: 'Lille (59)' }`), and `EnumField`, the result view's value, its table cells and their tooltips show the label in both presentations, as an authored `title` is shown. An option the labels leave out reads as before, a value the enum does not declare is shown as it came, and the form still stores the code. It is not a wire fact, so the derivation never sets it.
 - **`applyFieldOverrides` and `FieldOverride` in the core entry**: a host sets its own `title`, `description`, `placeholder` and enum `optionLabels` on the fields a path names — `customer.display_name`, `boutique.code`, and `lines[].unit_price` for a field of every row of a list — over what the descriptor states. It returns a new tree, ignores a path that names no field, and reports each such path to an optional `onUnmatched`. See [docs/i18n.md](docs/i18n.md).
 
