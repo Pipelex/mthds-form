@@ -79,6 +79,11 @@ export {
   isAcceptedFile,
 } from './file-formats';
 export { narrowFileFormats } from './narrow-file-formats';
+// A host's own words over the descriptor's - label, helper line, placeholder,
+// enum option labels - set per field by a dotted path, the same kind of pass
+// over the tree as `narrowFileFormats`. See ./field-overrides.
+export type { FieldOverride } from './field-overrides';
+export { applyFieldOverrides } from './field-overrides';
 
 // ...and how to READ what one comes back as. The result side's twin of that
 // table: the pinned content models of `native.Document`, `native.Image` and

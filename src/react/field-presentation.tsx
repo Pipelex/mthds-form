@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use, type ReactNode } from 'react';
+import { ownProp } from '../core/own-property';
 
 /**
  * How a field's LABEL chrome, and the enum values a person reads, should read.
@@ -122,8 +123,30 @@ const CODE_SEPARATOR = /[_-]/;
  *   enum read in two registers, so the whole enum falls back.
  * - **A value the enum does not declare.** It is the payload disagreeing with
  *   its descriptor, and worded it could pass for an option it is not.
+ *
+ * A host's `optionLabels` (the field's, passed as the third argument) come
+ * before all of that, in BOTH presentations, the way an authored `title` does:
+ * they are words someone chose for the page, not a guess from the code. A
+ * declared option they name reads as they say; one they leave out reads as it
+ * would without them. They name declared options only, so an undeclared value
+ * still shows as it came, and two options a host labels alike are the host's
+ * to tell apart - the collision fallback judges the codes' own wording.
  */
 export function enumLabeler(
+  options: readonly string[],
+  presentation: FieldPresentation,
+  optionLabels?: Readonly<Record<string, string>>,
+): (value: string) => string {
+  const fallback = presentationLabeler(options, presentation);
+  if (optionLabels === undefined) return fallback;
+  return (value) => {
+    const label = options.includes(value) ? ownProp(optionLabels, value) : undefined;
+    return label ?? fallback(value);
+  };
+}
+
+/** The labeler with no host labels: codes in `studio`, cached words in `app`. */
+function presentationLabeler(
   options: readonly string[],
   presentation: FieldPresentation,
 ): (value: string) => string {

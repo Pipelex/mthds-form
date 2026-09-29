@@ -161,3 +161,32 @@ describe('enumLabeler', () => {
     expect(enumLabeler(distinct, 'app')('foo_bar')).toBe('Foo bar');
   });
 });
+
+describe('enumLabeler with a host’s option labels', () => {
+  const options = ['LILLE', 'PARIS_15', 'hold_for_review'];
+  const labels = { LILLE: 'Lille (59)', PARIS_15: 'Paris 15e' };
+
+  it.each(['studio', 'app'] as const)(
+    'shows a labelled option as labelled in %s',
+    (presentation) => {
+      const label = enumLabeler(options, presentation, labels);
+      expect(label('LILLE')).toBe('Lille (59)');
+      expect(label('PARIS_15')).toBe('Paris 15e');
+    },
+  );
+
+  it('falls back to the presentation for an option it does not name', () => {
+    expect(enumLabeler(options, 'app', labels)('hold_for_review')).toBe('Hold for review');
+    expect(enumLabeler(options, 'studio', labels)('hold_for_review')).toBe('hold_for_review');
+  });
+
+  it('never labels a value the enum does not declare', () => {
+    expect(enumLabeler(['LILLE'], 'app', { LILLE: 'Lille', ROUBAIX: 'Roubaix' })('ROUBAIX')).toBe(
+      'ROUBAIX',
+    );
+  });
+
+  it('does not read an inherited property as a label', () => {
+    expect(enumLabeler(['constructor'], 'studio', {})('constructor')).toBe('constructor');
+  });
+});

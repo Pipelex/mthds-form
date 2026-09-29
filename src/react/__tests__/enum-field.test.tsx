@@ -202,3 +202,38 @@ describe('the segmented control is named by the label the field shows', () => {
     expect(screen.getByRole('radiogroup', { name: 'How risky' })).toBeTruthy();
   });
 });
+
+describe('a host’s option labels', () => {
+  const field: EnumRunField = {
+    ...choice(['LILLE', 'PARIS_15', 'hold_for_review']),
+    optionLabels: { LILLE: 'Lille (59)', PARIS_15: 'Paris 15e' },
+  };
+
+  it.each(['studio', 'app'] as const)(
+    'are shown in %s, and the code is stored',
+    async (presentation) => {
+      const values: (string | undefined)[] = [];
+      render(
+        <Harness field={field} presentation={presentation} seen={(value) => values.push(value)} />,
+      );
+      expect(screen.queryByText('LILLE')).toBeNull();
+      await userEvent.click(screen.getByRole('radio', { name: 'Lille (59)' }));
+      expect(values).toEqual(['LILLE']);
+    },
+  );
+
+  it('leave an option they do not name to the presentation', () => {
+    render(<Harness field={field} presentation="app" />);
+    expect(screen.getByRole('radio', { name: 'Paris 15e' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Hold for review' })).toBeTruthy();
+  });
+
+  it('name the picked option on the select too', () => {
+    const long: EnumRunField = {
+      ...choice(['LILLE', 'PARIS_15', 'LYON', 'NANTES', 'BORDEAUX']),
+      optionLabels: { PARIS_15: 'Paris 15e' },
+    };
+    render(<Harness field={long} presentation="studio" initial="PARIS_15" />);
+    expect(screen.getByRole('combobox')).toHaveTextContent('Paris 15e');
+  });
+});

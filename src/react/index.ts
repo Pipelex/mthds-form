@@ -61,6 +61,8 @@ export { fieldControlClass } from './field-styles';
 
 export type { FieldStrings } from './field-strings';
 export { DEFAULT_FIELD_STRINGS, FieldStringsProvider, useFieldStrings } from './field-strings';
+// A complete French `FieldStrings`, for a host with no catalogue of its own.
+export { FR_FIELD_STRINGS } from './field-strings-fr';
 
 export { FieldDomIdProvider, useFieldDomId } from './field-dom-id';
 
