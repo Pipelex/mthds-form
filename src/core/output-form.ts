@@ -3,8 +3,8 @@
  *
  * **This module used to declare the artifact; now it only addresses it.** The
  * types come from `mthds/protocol`, exactly as the input side's do — the
- * standard grew `output_form` as a page of its own, and grew `json_schema` on
- * the output contract in the same version, so a renderer reads both off the wire
+ * protocol package grew `output_form` and `json_schema` on the output contract
+ * in the same version, `mthds` 0.25.0, so a renderer reads both off the wire
  * instead of having them supplied beside it. What is left here is the twin of
  * `getPipeInputForm`: the lookup, and the tolerance for the same two key
  * conventions. [docs/contract-mirror.md](../../docs/contract-mirror.md) states
@@ -27,8 +27,9 @@
  * | presentation view | `input_form` | `output_form` |
  *
  * The two rows that used to read "nothing" are the change this package was built
- * against while it was still a proposal; L-260902-fb24e8 is where it landed
- * upstream. The one asymmetry the language keeps is
+ * against while it was still a proposal. The standard has the `output_form`
+ * page and has yet to write `json_schema` into its output contract
+ * (L-260902-d45673). The one asymmetry the language keeps is
  * `presence` versus `optional`: `!` MUST NOT appear on an output, so a
  * three-valued output marker would have an arm nothing could ever produce.
  */
