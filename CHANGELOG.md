@@ -373,7 +373,7 @@ See [docs/result-view.md](docs/result-view.md).
 
   The `OUTPUT_SCHEMAS` export is gone from the generated fixtures. It existed because the output contract had nowhere to put a schema; it does now, so a consumer reads `contract.output.json_schema` beside the input ones. Requires `mthds` 0.25.0.
 
-  `wip/output-form-standard-change.md` is the argument that landed the change upstream, and this package's branch was the evidence behind it — including the one thing the plan had wrong: it proposed mirroring the input side verbatim and emitting a bare array for a plural output, which describes a payload no runtime produces.
+  This package's branch was the evidence behind the change upstream — including the one thing the original proposal had wrong: it proposed mirroring the input side verbatim and emitting a bare array for a plural output, which describes a payload no runtime produces.
 
 - **The result view renders every kind, reads the standard's content models, and stops guessing.** `ResultField`'s dispatch is now exhaustive over `RunFieldKind` with a `satisfies never` fall-through. It used to end in a `default:` that did `String(value)`, so a `document` result rendered as the literal text `[object Object]` — no exception, no warning, no failing type, just a wrong pixel. A twelfth kind now fails the build instead of rendering wrong. The `document`, `image` and `date` arms read their values through the new `core/native-content` module, against the content models `native-concepts.md` pins; `native.Page` needs no arm of its own and works by recursion.
 

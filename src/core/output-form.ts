@@ -27,8 +27,8 @@
  * | presentation view | `input_form` | `output_form` |
  *
  * The two rows that used to read "nothing" are the change this package was built
- * against while it was still a proposal; `wip/output-form-standard-change.md` is
- * the argument that landed it. The one asymmetry the language keeps is
+ * against while it was still a proposal; L-260902-fb24e8 is where it landed
+ * upstream. The one asymmetry the language keeps is
  * `presence` versus `optional`: `!` MUST NOT appear on an output, so a
  * three-valued output marker would have an arm nothing could ever produce.
  */

@@ -30,7 +30,7 @@ export const SPECS: SpecFixture[] = [
     model: 'claude-4.8-opus',
     promptHash: '2b2325fd1231',
     date: '2026-09-17',
-    brief: 'wip/generative-ui/briefs/invoice_extraction.process_invoice.md',
+    brief: 'data/briefs/invoice_extraction.process_invoice.md',
     jsonl:
       '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"center"},"children":["hero","work"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"Invoice extraction","headline":"Read an invoice","lede":"Drop in an invoice and we\'ll pull out the figures that matter."},"children":[]}}\n{"op":"add","path":"/elements/work","value":{"type":"Card","props":{},"children":["document","run"]}}\n{"op":"add","path":"/elements/document","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Extract the invoice","hint":"We\'ll need the document before we can start."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {

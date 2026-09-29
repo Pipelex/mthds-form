@@ -58,7 +58,7 @@ import { HEROES, pipeRefOf } from '../heroes';
 
 const REPO = path.resolve(__dirname, '../../..');
 /** Where `make briefs` writes what a producer was handed - a fixture's `brief` points here. */
-const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
+const BRIEFS_DIR = path.join(REPO, 'data/briefs');
 
 interface CaseModule {
   PIPE_REFS: readonly string[];
