@@ -1,0 +1,31 @@
+CHANGELOG.md
+  s_4233f74ffb8da3::t_1e72abce710621 7
+docs/i18n.md
+  s_4233f74ffb8da3::t_262ea9281c5ead 44-49
+src/react/__tests__/locales.test.tsx
+  s_4233f74ffb8da3::t_97a230935621d6 1-56
+src/react/field-strings.tsx
+  s_4233f74ffb8da3::t_ea0d1440f94b34 16-17,148-149,153-157,159,163-164,167
+src/react/index.ts
+  s_4233f74ffb8da3::t_da385ab70ac079 65,67
+src/react/locales/en.ts
+  s_4233f74ffb8da3::t_844fd891cdf864 1-66
+src/react/locales/index.ts
+  s_4233f74ffb8da3::t_92dac3e5892c2e 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "217d7038f1992c8412e65c9e865273874a3638b4",
+  "prompts": {},
+  "sessions": {
+    "s_4233f74ffb8da3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd6031ed-45ff-4580-a468-dd77621e2581",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
