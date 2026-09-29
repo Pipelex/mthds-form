@@ -6,7 +6,6 @@ coverage/
 .claude/
 .github/
 docs/
-wip/
 vitest.config.mts
 tsup.config.ts
 eslint.config.mjs

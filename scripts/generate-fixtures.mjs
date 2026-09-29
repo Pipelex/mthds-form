@@ -987,9 +987,9 @@ async function heroBrief(hero, g) {
   return g.resultBrief({ pipeRef, description }, field, g.payloadToState(field, PAYLOADS[pipeRef]));
 }
 
-const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
+const BRIEFS_DIR = path.join(REPO, 'data/briefs');
 
-/** `wip/generative-ui/briefs/<pipeRef>.md`, repo-relative - the provenance a spec fixture names. */
+/** `data/briefs/<pipeRef>.md`, repo-relative - the provenance a spec fixture names. */
 function briefRelPath(pipeRef) {
   return path.relative(REPO, path.join(BRIEFS_DIR, `${pipeRef}.md`));
 }
@@ -1106,7 +1106,7 @@ function committedBrief(pipeRef) {
  * For each hero, the brief is built as data from the committed descriptors
  * (and, on the result side, the committed payload loaded into the result
  * tree), laid out by the method's own template through the local runtime,
- * and written under `wip/generative-ui/briefs/` beside that data, the catalog
+ * and written under `data/briefs/` beside that data, the catalog
  * data and the prompt hash. That file, with the method it names, is the
  * record of exactly what a producer was given - the artifacts every spec is
  * produced from - and it is what the `brief` field of a spec fixture points at.
@@ -1203,7 +1203,7 @@ function writeSpecsModule(caseName, specs) {
  * on the HOSTED API through `@pipelex/sdk`, compiles the text that came back
  * as JSONL patches, validates the spec against the catalog - structure, every
  * element type, every prop, one panel per tab or step - and FAILS on any
- * issue, keeping the rejected text under `wip/generative-ui/briefs/`. A
+ * issue, keeping the rejected text under `data/briefs/`. A
  * repair is a change to the method or to the prompt, committed; never a hand
  * edit of the fixture.
  *

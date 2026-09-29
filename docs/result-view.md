@@ -9,10 +9,10 @@ The claim underneath all of it is one line — **an output is a concept ref exac
 |                                  | Inputs                              | Outputs                                          |
 | -------------------------------- | ----------------------------------- | ------------------------------------------------ |
 | identity, plurality, optionality | `pipe_io_contracts`                 | `pipe_io_contracts`                              |
-| shape / JSON Schema              | `json_schema` on the input contract | **nothing on the contract** — supplied beside it |
-| presentation view                | `input_form`                        | **nothing at all** — simulated by `output_form`  |
+| shape / JSON Schema              | `json_schema` on the input contract | `json_schema` on the output contract             |
+| presentation view                | `input_form`                        | `output_form`                                    |
 
-Two of the three cells on the output side are empty in MTHDS today, and `src/core/output-form.ts` is the record of what would fill them. It is deliberately shaped like what the standard would plausibly adopt, so adopting it later is an import change rather than a rewrite. The argument for making that change lives in `wip/output-form-standard-change.md`.
+Both of the lower output cells were empty in MTHDS when this package was built, and it simulated them in the shape the standard would plausibly adopt. The `mthds` protocol package adopted both in one version, 0.25.0, so `src/core/output-form.ts` now re-exports the types from `mthds/protocol` and keeps only the lookup, `getPipeOutputForm`, exactly as the input side does. The standard's own pages lag the package by one cell: `output_form` has its page, and `json_schema` on the output contract is not written into the standard yet (L-260902-d45673).
 
 ## `buildResultField(descriptor, schema)`
 

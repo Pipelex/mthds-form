@@ -78,7 +78,7 @@ fixtures-runs:
 # template stage through the sibling ../pipelex checkout's venv
 # (PIPELEX_PYTHON, as `fixtures` needs it), and written beside that data, the
 # catalog data the method is handed and the prompt hash (the method's text and
-# the catalog, together). Committed under wip/generative-ui/briefs/, because
+# the catalog, together). Committed under data/briefs/, because
 # with the method file it is the record of exactly what a producer was handed -
 # and the file each spec fixture's `brief` field points at. Free and offline: no
 # model is called. Node cannot resolve this repo's extensionless TypeScript
