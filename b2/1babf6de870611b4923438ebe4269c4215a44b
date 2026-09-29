@@ -1,0 +1,41 @@
+CHANGELOG.md
+  s_4233f74ffb8da3::t_4b419cc25999ad 10-13
+src/core/__tests__/shown-as-optional.test.ts
+  s_4233f74ffb8da3::t_2047cbabd2bab0 1-31
+src/core/index.ts
+  s_4233f74ffb8da3::t_ec64cb560908a2 133-139
+src/core/readiness.ts
+  s_4233f74ffb8da3::t_0cc9340a9e9c4d 226-236
+src/react/date-field.tsx
+  s_4233f74ffb8da3::t_1ad9d381dfbc43 3,34
+src/react/enum-field.tsx
+  s_4233f74ffb8da3::t_90ecc6e9d79a59 3,58
+src/react/file-field.tsx
+  s_4233f74ffb8da3::t_daa5aa4a95a233 3,465
+src/react/list-field.tsx
+  s_4233f74ffb8da3::t_b2e770830e19da 3,154
+src/react/number-field.tsx
+  s_4233f74ffb8da3::t_192f64fa9ad8cd 3,48
+src/react/object-field.tsx
+  s_4233f74ffb8da3::t_2d986f430cbcb4 7,43-45,48,62
+src/react/text-field.tsx
+  s_4233f74ffb8da3::t_4c3d2e1a4b83f5 3,31,73
+src/react/unknown-field.tsx
+  s_4233f74ffb8da3::t_5a4e5348f08eb7 3,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b21babf6de870611b4923438ebe4269c4215a44b",
+  "prompts": {},
+  "sessions": {
+    "s_4233f74ffb8da3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd6031ed-45ff-4580-a468-dd77621e2581",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
