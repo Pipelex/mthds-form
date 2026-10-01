@@ -18,7 +18,7 @@ import {
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { planFileSave } from '../core/save-plan';
+import { planFileSave, splitFileName } from '../core/save-plan';
 import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff-files';
 import {
   useFileDownloadShown,
@@ -49,6 +49,7 @@ import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
 import { PdfDownloadButton } from './pdf-download-button';
+import { useFileNamePrompt } from './file-name-dialog';
 import { Markdown } from './markdown';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
@@ -607,6 +608,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
   const resolve = useResolveUrl();
   const save = useSaveFiles();
   const shown = useFileDownloadShown(file.kind);
+  const { ask, dialog } = useFileNamePrompt();
   const statusId = useId();
   // The state belongs to the file it was drawn for. Entries are keyed by their
   // index, so a rerun that puts another file at the same place keeps this
@@ -637,15 +639,20 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
     <>
       <button
         type="button"
-        onClick={() => {
+        onClick={async () => {
+          // The reader's name, when the host asks for one, is the planned
+          // file's name: the extension the plan chose stays, so a `data:` file
+          // keeps the one its admitted type allows.
+          const { stem, extension } = splitFileName(planned.name);
+          const name = await ask(stem, extension);
+          if (name === null) return;
           const started: FileSaveAttempt = { identity, state: 'saving' };
           setAttempt(started);
-          void save([planned]).then((result) => {
-            const settled = result.failed.length > 0 ? 'failed' : 'saved';
-            // Only the latest press settles the button; an earlier one still in
-            // flight answers for a state nobody is looking at any more.
-            setAttempt((current) => (current === started ? { identity, state: settled } : current));
-          });
+          const result = await save([name === planned.name ? planned : { ...planned, name }]);
+          const settled = result.failed.length > 0 ? 'failed' : 'saved';
+          // Only the latest press settles the button; an earlier one still in
+          // flight answers for a state nobody is looking at any more.
+          setAttempt((current) => (current === started ? { identity, state: settled } : current));
         }}
         disabled={state === 'saving'}
         aria-label={label}
@@ -669,6 +676,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
       <span id={statusId} role="status" className="sr-only">
         {failed ? s.downloadFileFailed : ''}
       </span>
+      {dialog}
     </>
   );
 }

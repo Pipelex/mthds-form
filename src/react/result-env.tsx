@@ -115,6 +115,18 @@ export interface DownloadDisplay {
    * page in the browser and saves it. Drawn unless `false`.
    */
   pdf?: boolean;
+  /**
+   * Ask the reader for the file's name before each download, in a dialog
+   * pre-filled with the name the plan chose. Off unless `true`.
+   *
+   * It is a behaviour of every download control rather than a control of its
+   * own, which is why it sits beside the three that say which are drawn: the
+   * PDF, the page's HTML, a file's own button, and the whole-result download.
+   * A whole-result download saving one file asks for that file's name; one
+   * saving several asks for the name they share, the base name, which names
+   * the JSON copy and every file the payload did not name itself.
+   */
+  askFileName?: boolean;
 }
 
 interface ResultEnv {
@@ -192,9 +204,10 @@ export function DownloadDisplayOverride({
   const result = downloads?.result;
   const files = downloads?.files;
   const pdf = downloads?.pdf;
+  const askFileName = downloads?.askFileName;
   const merged = useMemo(
     () =>
-      result === undefined && files === undefined && pdf === undefined
+      result === undefined && files === undefined && pdf === undefined && askFileName === undefined
         ? env
         : {
             ...env,
@@ -202,9 +215,10 @@ export function DownloadDisplayOverride({
               result: result ?? env.downloads?.result,
               files: files ?? env.downloads?.files,
               pdf: pdf ?? env.downloads?.pdf,
+              askFileName: askFileName ?? env.downloads?.askFileName,
             },
           },
-    [env, result, files, pdf],
+    [env, result, files, pdf, askFileName],
   );
   return <ResultEnvContext value={merged}>{children}</ResultEnvContext>;
 }
@@ -286,6 +300,11 @@ export function useFileDownloadShown(kind: StuffFileKind): boolean {
 /** Whether an HTML page carries its "Download PDF" control. */
 export function usePdfSaveShown(): boolean {
   return use(ResultEnvContext).downloads?.pdf ?? true;
+}
+
+/** Whether a download asks the reader for the file's name first. */
+export function useAskFileName(): boolean {
+  return use(ResultEnvContext).downloads?.askFileName ?? false;
 }
 
 /** The prose-image policy, defaulted to the safe answer for a host that stated none. */

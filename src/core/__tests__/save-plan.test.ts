@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FileRunField, ObjectRunField, RunField, TextRunField } from '../descriptor';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../file-formats';
-import { planFileSave, planStuffSave } from '../save-plan';
+import { planFileSave, planStuffSave, splitFileName, typedFileStem } from '../save-plan';
 import { collectStuffFiles } from '../stuff-files';
 
 const image = (name: string): FileRunField => ({
@@ -319,5 +319,38 @@ describe('planFileSave: one file, as its own button saves it', () => {
   it('plans nothing for a file no URL the gate admits was found for', () => {
     const [file] = collectStuffFiles(image('output'), { url: 'pipelex-storage://x' });
     expect(planFileSave(file!, { baseName: 'r' })).toBeUndefined();
+  });
+});
+
+describe('a name the reader types for a download', () => {
+  it('splits a planned name at its extension, keeping the dot with it', () => {
+    expect(splitFileName('devis.pdf')).toEqual({ stem: 'devis', extension: '.pdf' });
+    expect(splitFileName('report.final.html')).toEqual({
+      stem: 'report.final',
+      extension: '.html',
+    });
+    expect(splitFileName('README')).toEqual({ stem: 'README', extension: '' });
+    expect(splitFileName('.json')).toEqual({ stem: '.json', extension: '' });
+  });
+
+  it('replaces separators and reserved characters rather than cutting at them', () => {
+    expect(typedFileStem('Devis 12/2026', '.pdf')).toBe('Devis 12-2026');
+    expect(typedFileStem('a\\b:c*d?e"f<g>h|i', '')).toBe('a-b-c-d-e-f-g-h-i');
+  });
+
+  it('drops control characters, leading dots and trailing dots and spaces', () => {
+    expect(typedFileStem('x\u0000y\u007fz', '.pdf')).toBe('xyz');
+    expect(typedFileStem('  ..hidden.  ', '.pdf')).toBe('hidden');
+  });
+
+  it('drops a copy of the extension the reader typed, whatever its case', () => {
+    expect(typedFileStem('devis.PDF', '.pdf')).toBe('devis');
+    expect(typedFileStem('devis.pdf', '')).toBe('devis.pdf');
+  });
+
+  it('is empty when nothing is left, for the caller to keep the planned name', () => {
+    expect(typedFileStem('   ', '.pdf')).toBe('');
+    expect(typedFileStem('..', '.pdf')).toBe('');
+    expect(typedFileStem('.pdf', '.pdf')).toBe('');
   });
 });

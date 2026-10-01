@@ -165,3 +165,57 @@ export const Neither: Story = {
     await expect(canvas.queryAllByRole('button', FILE_BUTTON)).toHaveLength(0);
   },
 };
+
+/** The document's own button, which every story above draws. */
+const openNameDialog = async (canvasElement: HTMLElement) => {
+  const canvas = pane(canvasElement);
+  await userEvent.click(
+    canvas.getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile('solar_system.pdf') }),
+  );
+  return canvas.getByRole('dialog', { name: DEFAULT_FIELD_STRINGS.fileNameTitle });
+};
+
+/**
+ * **Asking for the name first** (`askFileName: true`) — every download opens
+ * a dialog on the name the plan chose, without its extension and selected, so
+ * typing replaces it; the extension stays as it was. Enter downloads under the
+ * new name, Escape or the backdrop cancels. Off unless a host turns it on.
+ */
+export const AskFileName: Story = {
+  name: 'Ask for the file name',
+  args: { downloads: { askFileName: true } },
+  play: async ({ canvasElement }) => {
+    const dialog = within(await openNameDialog(canvasElement));
+    const field = dialog.getByRole('textbox', { name: DEFAULT_FIELD_STRINGS.fileNameTitle });
+    await expect(field).toHaveValue('solar_system');
+    await expect(field).toHaveFocus();
+    await expect(dialog.getByText('.pdf')).toBeVisible();
+    await userEvent.keyboard('Système solaire');
+    await userEvent.click(
+      dialog.getByRole('button', { name: DEFAULT_FIELD_STRINGS.fileNameConfirm }),
+    );
+    await waitFor(() =>
+      expect(canvasElement.querySelector('[data-host-log]')?.textContent).toContain(
+        'The host received Système solaire.pdf',
+      ),
+    );
+    await expect(canvasElement.querySelector('[role="dialog"]')).toBeNull();
+  },
+};
+
+/**
+ * **The dialog, open** — left open so the accessibility check reads it in both
+ * themes: a modal dialog named by its title, a field named the same and
+ * described by its extension, and two buttons.
+ */
+export const AskFileNameOpen: Story = {
+  name: 'Ask for the file name (dialog open)',
+  args: { downloads: { askFileName: true } },
+  play: async ({ canvasElement }) => {
+    const dialog = await openNameDialog(canvasElement);
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const field = within(dialog).getByRole<HTMLInputElement>('textbox');
+    await expect(field).toHaveFocus();
+    await expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
+  },
+};

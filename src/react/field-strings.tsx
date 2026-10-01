@@ -135,6 +135,14 @@ export interface FieldStrings {
    * one page, where a bare "Download" would not say which of the two it saves.
    */
   downloadHtml: string;
+  /**
+   * The dialog that asks for a download's name, when the host turns
+   * `downloads.askFileName` on: its title, which also names the field, and its
+   * two buttons.
+   */
+  fileNameTitle: string;
+  fileNameCancel: string;
+  fileNameConfirm: string;
   /** The result panel's two views, and the control that copies the payload. */
   viewRendered: string;
   viewJson: string;

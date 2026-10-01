@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
-import { planFileSave, planStuffSave } from '../core/save-plan';
+import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
 import { readStuffFile } from '../core/stuff-files';
 import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
 import { useFieldPresentation } from './field-presentation';
@@ -21,6 +21,7 @@ import {
   type DownloadDisplay,
 } from './result-env';
 import { PdfDownloadButton } from './pdf-download-button';
+import { useFileNamePrompt } from './file-name-dialog';
 import { ResultRoot } from './result-location';
 import { cn } from './utils';
 
@@ -349,6 +350,7 @@ function StuffPanel({
   const resultDownloadShown = useResultDownloadShown();
   const pageDownloadShown = useFileDownloadShown('markup');
   const pdfShown = usePdfSaveShown();
+  const { ask, dialog } = useFileNamePrompt();
   // A result that is one page: its node is `native.Html` or refines it, which
   // the descriptor states, and the value holds the markup that kind documents.
   const page = isNativeHtmlNode(field) ? readHtmlContent(value) : undefined;
@@ -357,6 +359,30 @@ function StuffPanel({
   const downloadShown = resultDownloadShown || (page !== undefined && pageDownloadShown);
 
   const handleDownload = useCallback(async () => {
+    // The descriptor's own field, not the renamed one: each planned file's
+    // path is its place in the result, which is the descriptor's, and the
+    // file buttons below plan from the same place.
+    const options = resolveUrl ? { resolveUrl } : {};
+    let plan: SavePlan = planStuffSave(field, value, { baseName, ...options });
+    // The reader's name, when the host asks for one, flows into the plan. A
+    // plan of one file asks for that file's name and keeps its extension; a
+    // plan of several asks for the name they share, the base name (prefilled
+    // as the JSON copy, which the plan puts last, is named), and is planned
+    // again under it, so the JSON copy and every file the payload did not name
+    // itself carry the reader's name and the plan still allots distinct names.
+    const only = plan.files.length === 1 ? plan.files[0] : undefined;
+    const json = plan.files.length > 1 ? plan.files[plan.files.length - 1] : undefined;
+    if (only) {
+      const { stem, extension } = splitFileName(only.name);
+      const name = await ask(stem, extension);
+      if (name === null) return;
+      if (name !== only.name) plan = { ...plan, files: [{ ...only, name }] };
+    } else if (json) {
+      const { stem } = splitFileName(json.name);
+      const name = await ask(stem, '');
+      if (name === null) return;
+      if (name !== stem) plan = planStuffSave(field, value, { baseName: name, ...options });
+    }
     const attempt: DownloadAttempt = {
       field,
       baseName,
@@ -367,13 +393,6 @@ function StuffPanel({
     setSaving(attempt);
     setMissed(null);
     try {
-      // The descriptor's own field, not the renamed one: each planned file's
-      // path is its place in the result, which is the descriptor's, and the
-      // file buttons below plan from the same place.
-      const plan = planStuffSave(field, value, {
-        baseName,
-        ...(resolveUrl ? { resolveUrl } : {}),
-      });
       const { failed } = await save(plan.files);
       if (latest.current !== attempt) return;
       setMissed({
@@ -386,7 +405,7 @@ function StuffPanel({
     } finally {
       setSaving((current) => (current === attempt ? null : current));
     }
-  }, [field, value, baseName, resolveUrl, save]);
+  }, [field, value, baseName, resolveUrl, save, ask]);
   const labels: Record<StuffViewerView, string> = { rendered: s.viewRendered, json: s.viewJson };
   // The PDF is named as the page's HTML download is, with its own extension, so
   // the two files a reader saves of one page share a name.
@@ -426,6 +445,7 @@ function StuffPanel({
               {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
             </button>
           )}
+          {dialog}
           {offered.length > 1 && (
             <div
               role="group"

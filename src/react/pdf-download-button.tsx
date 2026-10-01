@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { FileDown, Loader2, TriangleAlert } from 'lucide-react';
 import type { HtmlContentView } from '../core/native-content';
 import { useFieldStrings } from './field-strings';
+import { useFileNamePrompt } from './file-name-dialog';
 import { renderHtmlPdf } from './html-pdf';
 import { useSaveFiles } from './result-env';
 import { cn } from './utils';
@@ -50,22 +51,35 @@ export function PdfDownloadButton({
   const statusId = useId();
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
   const failed = state === 'failed';
+  const { ask, dialog } = useFileNamePrompt();
   const name = `${pdfStem(fileName) || 'page'}.pdf`;
 
   const download = async () => {
+    // The name comes first, when the host asks for it: the reader is not kept
+    // waiting on a PDF they may yet cancel, and the name they choose is the one
+    // the PDF is made and planned under.
+    const chosen = await ask(pdfStem(fileName) || 'page', '.pdf');
+    if (chosen === null) return;
+    const title = chosen === name ? pdfStem(fileName) : pdfStem(chosen);
     setState('busy');
     try {
       // A fragment that names no face of its own is laid out in the one around
       // the control, as it reads on screen.
       const fontFamily = ref.current ? getComputedStyle(ref.current).fontFamily : undefined;
       const { blob } = await renderHtmlPdf(content, {
-        ...(pdfStem(fileName) ? { title: pdfStem(fileName) } : {}),
+        ...(title ? { title } : {}),
         ...(imgSrc === undefined ? {} : { imgSrc }),
         ...(fontSrc === undefined ? {} : { fontSrc }),
         ...(fontFamily ? { fontFamily } : {}),
       });
       const { failed: missed } = await save([
-        { name, mimeType: 'application/pdf', kind: 'markup', path, url: await dataUrl(blob) },
+        {
+          name: chosen,
+          mimeType: 'application/pdf',
+          kind: 'markup',
+          path,
+          url: await dataUrl(blob),
+        },
       ]);
       setState(missed.length > 0 ? 'failed' : 'idle');
     } catch {
@@ -106,6 +120,7 @@ export function PdfDownloadButton({
       <span id={statusId} role="status" className="sr-only">
         {failed ? s.downloadPdfFailed : ''}
       </span>
+      {dialog}
     </>
   );
 }
