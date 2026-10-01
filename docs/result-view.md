@@ -6,11 +6,11 @@ The claim underneath all of it is one line — **an output is a concept ref exac
 
 ## The three artifacts
 
-|                                  | Inputs                              | Outputs                                          |
-| -------------------------------- | ----------------------------------- | ------------------------------------------------ |
-| identity, plurality, optionality | `pipe_io_contracts`                 | `pipe_io_contracts`                              |
-| shape / JSON Schema              | `json_schema` on the input contract | `json_schema` on the output contract             |
-| presentation view                | `input_form`                        | `output_form`                                    |
+|                                  | Inputs                              | Outputs                              |
+| -------------------------------- | ----------------------------------- | ------------------------------------ |
+| identity, plurality, optionality | `pipe_io_contracts`                 | `pipe_io_contracts`                  |
+| shape / JSON Schema              | `json_schema` on the input contract | `json_schema` on the output contract |
+| presentation view                | `input_form`                        | `output_form`                        |
 
 Both of the lower output cells were empty in MTHDS when this package was built, and it simulated them in the shape the standard would plausibly adopt. The `mthds` protocol package adopted both in one version, 0.25.0, so `src/core/output-form.ts` now re-exports the types from `mthds/protocol` and keeps only the lookup, `getPipeOutputForm`, exactly as the input side does. The standard's own pages lag the package by one cell: `output_form` has its page, and `json_schema` on the output contract is not written into the standard yet (L-260902-d45673).
 
@@ -58,7 +58,7 @@ The panel draws the header once and tells `ResultField` to skip its own. Two hea
 
 ### A result that is one page
 
-A result whose node is `native.Html`, or a concept refining it, is one page — a quote, an invoice — and the panel shows it as that page rather than as a result holding a page. The test is the one the page arm already makes, `isNativeHtmlNode`, a membership test on the descriptor's `concept_ref` and `refines`; a plural of pages is a `list` node and answers no. The panel then draws **one row**: the title (the host's `name`, else the descriptor's, labelled as the presentation says), "Download PDF" as the primary control, one download of the page's HTML (reading "Download HTML", so the two say which file each saves), and the view switch only where more than one view is offered. Beneath it the page, edge to edge, with no border or rounding around it (`HtmlPreview`'s `bare`), since a box around a page that is the whole view is chrome around chrome.
+A result whose node is `native.Html`, or a concept refining it, is one page — a quote, an invoice — and the panel shows it as that page rather than as a result holding a page. The test is the one the page arm already makes, `isNativeHtmlNode`, a membership test on the descriptor's `concept_ref` and `refines`; a plural of pages is a `list` node and answers no. The panel then draws **one row**, with no title in `app` (the page carries its own; `studio` keeps the stuff's name): the title (the host's `name`, else the descriptor's, labelled as the presentation says), "Download PDF" as the primary control, one download of the page's HTML (reading "Download HTML", so the two say which file each saves), and the view switch only where more than one view is offered. Beneath it the page, edge to edge, with no border or rounding around it (`HtmlPreview`'s `bare`), since a box around a page that is the whole view is chrome around chrome.
 
 Before this, such a result drew three layers above the page: the panel's header with its download and switch, then the page arm's own control row with its PDF control and a second download of the same file, then the page's bordered box. The header's download plans `<downloadBaseName>.html` alone for a result that is one page ([Saving a result](#saving-a-result)), which is exactly what the page's own button saved, so the two are one control here, drawn when either `downloads.result` or the `markup` files setting asks for it. The page inside a structure keeps its own row, because there the header's download saves the whole structure and the page's saves the page.
 
@@ -140,7 +140,7 @@ Three rules replaced it, and each follows from a fact the descriptor already sta
 
 **A nested record's cell is its name, never its JSON.** The name is the record's first `text` field in authored order (`candidate_name`, `subject`), else its first `prose` field, shown as that field's own cell would show it; a record with neither says how many fields it holds. The pick is read off the field list, not the value, so every row of a column is named by the same field and an empty one reads as that field's absence. Printing the object was the default until a CV screening's candidates table read `{ "candidate_name": "Amara Okafor", "criterion_s…` down its first column, in the collapsed table a person reads before anything else. Two concepts are exempt from the rule: a `native.Date` cell shows the date, and a `native.Html` cell takes the count, because its first text field is markup source.
 
-**Whether a row can be OPENED is a different question, and reading it from the kind was wrong.** The toggle used to appear only where `isInlineColumn` was false — which treated `text` as always-fitting, because the standard calls it "a short single-line string". But *short* is not a property the kind carries: a `text` node is bounded only when the author wrote `max_length`, and an unbounded one is a slot a model will happily fill with three sentences. A table of nothing but `text` columns therefore got **no toggle at all**, and every cell truncated with no way to read the rest — the one outcome a result view must not produce. So `fitsACellWhole` reads the guarantee from the CONSTRAINT: a boolean, a date, a number and an enum are bounded by what they are, a `text` is bounded when it says so, and everything else gets its row a toggle. A `native.Date` member fits too, although its node is an `object`, because its cell reads it as one compact date. A list fits only when its cell shows the entries at all, which is when they are chips; a list of anything else is a count in its cell, however short each entry is. Still descriptor-driven — no value is measured, so a table's shape does not change with the data it happens to be showing. A field the budget leaves out gets the row a toggle too, whatever its kind, because it is on the row only once the row is open. The record's name never earns one, because it wraps whole: a record whose only long field is its name has nothing more to show, and a chevron opening onto the same values is chrome pretending to be a feature.
+**Whether a row can be OPENED is a different question, and reading it from the kind was wrong.** The toggle used to appear only where `isInlineColumn` was false — which treated `text` as always-fitting, because the standard calls it "a short single-line string". But _short_ is not a property the kind carries: a `text` node is bounded only when the author wrote `max_length`, and an unbounded one is a slot a model will happily fill with three sentences. A table of nothing but `text` columns therefore got **no toggle at all**, and every cell truncated with no way to read the rest — the one outcome a result view must not produce. So `fitsACellWhole` reads the guarantee from the CONSTRAINT: a boolean, a date, a number and an enum are bounded by what they are, a `text` is bounded when it says so, and everything else gets its row a toggle. A `native.Date` member fits too, although its node is an `object`, because its cell reads it as one compact date. A list fits only when its cell shows the entries at all, which is when they are chips; a list of anything else is a count in its cell, however short each entry is. Still descriptor-driven — no value is measured, so a table's shape does not change with the data it happens to be showing. A field the budget leaves out gets the row a toggle too, whatever its kind, because it is on the row only once the row is open. The record's name never earns one, because it wraps whole: a record whose only long field is its name has nothing more to show, and a chevron opening onto the same values is chrome pretending to be a feature.
 
 **A column description lives on its header.** Once, on hover and on focus, through the same tooltip every other description uses. Under every value it would be the same sentence fifteen times.
 
@@ -215,7 +215,9 @@ Each planned file is a `SaveFile`: a bare `name` (never a path), a `mimeType`, t
 **The delivery is the host's, or the browser tab's.** `ResultEnvProvider` takes a `saveFiles` function beside `resolveUrl`, and every download goes through it, the whole-result control and each file's own button alike:
 
 ```tsx
-<ResultEnvProvider resolveUrl={resolveUrl} saveFiles={saveThroughHost}>…</ResultEnvProvider>
+<ResultEnvProvider resolveUrl={resolveUrl} saveFiles={saveThroughHost}>
+  …
+</ResultEnvProvider>
 ```
 
 It receives the planned files and resolves to `{ failed }`, naming each file it could not deliver; every file not listed went out, and a function that throws or rejects is read as having delivered nothing, including one that is not `async` and throws before it returns a promise, as is one that resolves to something with no `failed` list. With none supplied, `saveInBrowser` delivers: it writes inline content to a blob, fetches each URL and saves the bytes under the planned name. It is exported for a host whose bridge is not always there and wants to fall back to it.
@@ -232,15 +234,15 @@ Every file the rendered result shows carries a button that saves that one file: 
 
 Apps want different things: one shows only the whole-result download, another only a download on each image, a third both, a fourth neither because it saves results its own way. So the two are set independently, on `ResultEnvProvider`, through `downloads`:
 
-| Setting | Draws |
-| --- | --- |
-| unset, or `{ result: true, files: true }` | the header's Download and a button on every file |
-| `{ files: false }` | the header's Download only |
-| `{ result: false }` | each file's button only |
-| `{ result: false, files: ['image'] }` | a button on each image, and nothing else |
-| `{ result: false, files: false }` | neither |
-| `{ pdf: false }` | everything above but the "Download PDF" on an HTML page ([Downloading a page as PDF](#downloading-a-page-as-pdf)) |
-| `{ askFileName: true }` | the same controls, each asking for the file's name before it downloads ([Asking for the file name](#asking-for-the-file-name)) |
+| Setting                                   | Draws                                                                                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| unset, or `{ result: true, files: true }` | the header's Download and a button on every file                                                                               |
+| `{ files: false }`                        | the header's Download only                                                                                                     |
+| `{ result: false }`                       | each file's button only                                                                                                        |
+| `{ result: false, files: ['image'] }`     | a button on each image, and nothing else                                                                                       |
+| `{ result: false, files: false }`         | neither                                                                                                                        |
+| `{ pdf: false }`                          | everything above but the "Download PDF" on an HTML page ([Downloading a page as PDF](#downloading-a-page-as-pdf))              |
+| `{ askFileName: true }`                   | the same controls, each asking for the file's name before it downloads ([Asking for the file name](#asking-for-the-file-name)) |
 
 A result that is one page has a single download, since both controls save the same file: it is drawn when `result` is on or `files` covers `'markup'`, and hidden only when neither is ([A result that is one page](#a-result-that-is-one-page)).
 
@@ -296,21 +298,21 @@ Every URL in a payload is model-adjacent data. The runtime put it there, but wha
 
 **One predicate, parsed rather than prefix-matched.** `viewableUrl` in `src/core/native-content.ts` is the whole answer, and `isViewableUrl` is the type guard over it. It first strips what the WHATWG URL parser strips — leading and trailing C0 controls and spaces, every internal tab, line feed and carriage return — then parses and branches on the protocol the parser reports:
 
-| Scheme | Verdict |
-| --- | --- |
-| `http:`, `https:` | viewable |
-| `blob:` | viewable — a blob URL is bound to the origin that minted it, so a payload cannot forge one pointing elsewhere |
-| `data:` | viewable only for `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/avif` and `application/pdf` |
-| a root-relative path | viewable when resolving it against a sentinel origin STAYS on that origin |
-| everything else | not viewable — `javascript:`, `file:`, `pipelex-storage:`, `data:text/html`, `data:image/svg+xml` |
+| Scheme               | Verdict                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `http:`, `https:`    | viewable                                                                                                      |
+| `blob:`              | viewable — a blob URL is bound to the origin that minted it, so a payload cannot forge one pointing elsewhere |
+| `data:`              | viewable only for `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/avif` and `application/pdf`    |
+| a root-relative path | viewable when resolving it against a sentinel origin STAYS on that origin                                     |
+| everything else      | not viewable — `javascript:`, `file:`, `pipelex-storage:`, `data:text/html`, `data:image/svg+xml`             |
 
-The `data:` arm is an allow-list because the question is "can this paint without executing", and only a closed set answers it. `application/pdf` is in it because the input control previews a `data:application/pdf` value a storage-less host wrote back, through an `<object>`, and reads this same predicate to decide. `image/svg+xml` is out because an SVG paints as a picture and *executes* as a document the moment it is opened in a tab — which is one click away from every image this view paints, since a painted image is wrapped in a link to itself.
+The `data:` arm is an allow-list because the question is "can this paint without executing", and only a closed set answers it. `application/pdf` is in it because the input control previews a `data:application/pdf` value a storage-less host wrote back, through an `<object>`, and reads this same predicate to decide. `image/svg+xml` is out because an SVG paints as a picture and _executes_ as a document the moment it is opened in a tab — which is one click away from every image this view paints, since a painted image is wrapped in a link to itself.
 
 Stripping before parsing also closes the oldest bypass of a prefix match: `java\tscript:alert(1)` is a URL the browser strips into `javascript:` and runs, and a `/^javascript:/` test never saw one. Normalising first and branching on the parsed protocol handles it structurally, rather than by adding a pattern per trick.
 
 The path arm settles four spellings. `//host/x` is protocol-relative and points at another origin while looking like a path; the URL parser reads `\\host\x` and `/\host/x` the same way. All three are refused on the SPELLING — a second character of `/` or `\` — and `/api/assets/x` is kept, where a regex needed an arm per spelling and had none for the backslashes. The sentinel-origin check stays behind that as a second answer, but it cannot be the only one: "did it stay on the sentinel" reads as the protocol-relative rule and is blind in exactly one place, the sentinel's own host, so `//url-gate.invalid/x` passed the test written to stop it.
 
-**The sentinel is scaffolding, and never a destination.** Whether a candidate carries a scheme is read off the STRING, by RFC 3986's grammar, before any base is applied — because the parser resolves a candidate whose scheme equals the base's *against* that base. Deciding it instead with a second, base-less parse let the two disagree: `https:cdn.example/x.png` is a legal URL a browser resolves against the page, and the gate returned `https://url-gate.invalid/cdn.example/x.png` — the internal placeholder, in a real `<img src>`, in place of a URL that worked.
+**The sentinel is scaffolding, and never a destination.** Whether a candidate carries a scheme is read off the STRING, by RFC 3986's grammar, before any base is applied — because the parser resolves a candidate whose scheme equals the base's _against_ that base. Deciding it instead with a second, base-less parse let the two disagree: `https:cdn.example/x.png` is a legal URL a browser resolves against the page, and the gate returned `https://url-gate.invalid/cdn.example/x.png` — the internal placeholder, in a real `<img src>`, in place of a URL that worked.
 
 **The string that was judged is the string that is used.** `viewableUrl` returns the normalised URL rather than a yes or no, and every sink takes what it returned. This is not tidiness. `" https://cdn/x.png"` parses as `https:` and fails `/^https?:/`, so a host that validated `public_url` by parsing and a kernel that prefix-matched disagreed about which member was acceptable — the kernel skipped the validated one and painted `url`, which nothing had validated. Returning the judged string makes that disagreement unrepresentable, and it is why a host that wants to pre-judge a payload should call `viewableUrl` rather than restate it.
 
@@ -320,16 +322,16 @@ The path arm settles four spellings. `//host/x` is protocol-relative and points 
 
 **The frame carries no `sandbox` attribute, and that is a platform constraint rather than a preference.** Measured against a same-origin PDF on Chrome 152 and Firefox 155:
 
-| `sandbox` | Chrome 152 | Firefox 155 |
-| --- | --- | --- |
-| attribute absent | renders | renders |
-| `""` | broken-document icon | viewer chrome, blank page |
-| `allow-same-origin` | broken-document icon | viewer chrome, blank page |
-| `allow-scripts` | broken-document icon | renders |
-| `allow-same-origin allow-scripts` | broken-document icon | renders |
-| `allow-downloads` | broken-document icon | viewer chrome, blank page |
+| `sandbox`                         | Chrome 152           | Firefox 155               |
+| --------------------------------- | -------------------- | ------------------------- |
+| attribute absent                  | renders              | renders                   |
+| `""`                              | broken-document icon | viewer chrome, blank page |
+| `allow-same-origin`               | broken-document icon | viewer chrome, blank page |
+| `allow-scripts`                   | broken-document icon | renders                   |
+| `allow-same-origin allow-scripts` | broken-document icon | renders                   |
+| `allow-downloads`                 | broken-document icon | viewer chrome, blank page |
 
-The two fail for different reasons. The attribute sets the HTML specification's *sandboxed plugins browsing context flag* unconditionally and no token unsets it — `allow-plugins` was never adopted — and Chrome's PDF viewer is plugin content, so every token set fails there, the maximal one included, which is what identifies the flag as the cause rather than a missing capability. Firefox's pdf.js is not plugin content but a JavaScript viewer, so it renders exactly when `allow-scripts` is granted. **The intersection is empty: the only column that renders in both is no `sandbox` attribute at all.**
+The two fail for different reasons. The attribute sets the HTML specification's _sandboxed plugins browsing context flag_ unconditionally and no token unsets it — `allow-plugins` was never adopted — and Chrome's PDF viewer is plugin content, so every token set fails there, the maximal one included, which is what identifies the flag as the cause rather than a missing capability. Firefox's pdf.js is not plugin content but a JavaScript viewer, so it renders exactly when `allow-scripts` is granted. **The intersection is empty: the only column that renders in both is no `sandbox` attribute at all.**
 
 The Firefox result is the one that survives a browser changing its mind. The token it requires is `allow-scripts` — a frame sandboxed to permit only script execution is strictly worse than a frame with no sandbox attribute — so there is no version of this where a sandbox is the right tool. It would delete the preview for the commonest document a run returns, or cost the one token that matters and buy nothing. The scheme gate above is what makes the frame safe, and it is enough. (Safari was not measured: it has no headless screenshot mode. Its answer cannot widen an already-empty intersection.)
 
@@ -376,9 +378,14 @@ A method that renders a page embeds the pictures it produced as stored reference
 ```tsx
 type ResolveUrls = (
   uris: readonly string[],
-) => Promise<ReadonlyMap<string, string | null | undefined> | Readonly<Record<string, string | null | undefined>>>;
+) => Promise<
+  | ReadonlyMap<string, string | null | undefined>
+  | Readonly<Record<string, string | null | undefined>>
+>;
 
-<ResultEnvProvider resolveUrl={resolveUrl} resolveUrls={resolveUrls}>…</ResultEnvProvider>
+<ResultEnvProvider resolveUrl={resolveUrl} resolveUrls={resolveUrls}>
+  …
+</ResultEnvProvider>;
 ```
 
 The distinct references of a page go to `resolveUrls` in one call, which is one round trip for a page with twenty pictures; a host that presigns mints them all at once. Its answer is a `Map` or a plain record from reference to URL, and a reference left out (or answered `null`) is one the host cannot resolve. A reference the bulk answer does not give a usable URL for is then asked of `resolveUrl`, so a host that resolves by rewriting onto its own `/assets` route needs no bulk resolver at all. It is a separate, optional field rather than an async `resolveUrl` because the synchronous seam is right for the file arms ([`ResolveUrl`'s comment](../src/react/result-env.tsx) says why) and a page is the one place every reference is known at once.
@@ -393,7 +400,7 @@ The distinct references of a page go to `resolveUrls` in one call, which is one 
 
 ## `native.Composite`: the one arm that reads the value
 
-Every layout above is decided by the descriptor, and that rule is load-bearing. `native.Composite` is the documented exception, and the reason is that there is nothing to read: a composite declares no members, so the standard's own honest answer is `kind: "unknown"` with a payload schema of `{additionalProperties: true}` and no properties. Both are true. The standard's note on `unknown` says a renderer then falls back to raw entry against the contract's `json_schema` — and that schema says *any object*.
+Every layout above is decided by the descriptor, and that rule is load-bearing. `native.Composite` is the documented exception, and the reason is that there is nothing to read: a composite declares no members, so the standard's own honest answer is `kind: "unknown"` with a payload schema of `{additionalProperties: true}` and no properties. Both are true. The standard's note on `unknown` says a renderer then falls back to raw entry against the contract's `json_schema` — and that schema says _any object_.
 
 So the descriptor has abdicated, deliberately, and the choice left is between printing the whole thing as a JSON blob and reading the members as the `StuffContent`s they are **by definition**. A composite is a named composition of contents; that is not a guess about a payload, it is what the concept means. `CompositeValue` therefore renders one labelled block per member, and `NativeValue` renders each member as the most specific content model it matches.
 

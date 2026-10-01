@@ -59,7 +59,8 @@ import { cn } from './utils';
  *
  * A result whose node IS `native.Html`, or a concept refining it (read off the
  * descriptor's `concept_ref` and `refines`, never off the value), is one page,
- * and the panel shows it as that page: one row holding the title, "Download
+ * and the panel shows it as that page: one row holding the title (none in
+ * `app`, where the page carries its own), "Download
  * PDF" as the primary control and one HTML download, then the page edge to
  * edge with no box around it. The page's own control row and the header's
  * download saved the same file, so they are one control here.
@@ -429,9 +430,15 @@ function StuffPanel({
           own - two headers that agree today drift tomorrow. It stays put across
           both views, so switching does not move the thing you are reading. */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <div className="min-w-0 space-y-1">
-          <ResultHeader field={named} />
-        </div>
+        {/* A one-page result in an app carries its own title on the page, so
+            the panel adds none: its row is the page's controls alone. */}
+        {page && presentation === 'app' ? (
+          <div />
+        ) : (
+          <div className="min-w-0 space-y-1">
+            <ResultHeader field={named} />
+          </div>
+        )}
         <div className="flex shrink-0 items-center gap-2">
           {page && pdfName !== undefined && (
             <PdfDownloadButton

@@ -461,8 +461,9 @@ export const DownloadPdf: Story = {
 
 /**
  * **A refined page in a method app.** A concept refining `native.Html`, read
- * through `refines`, in `app` presentation and French: one row holding the
- * title, "Télécharger le PDF" and the HTML download, then the page, edge to edge.
+ * through `refines`, in `app` presentation and French: one row holding
+ * "Télécharger le PDF" and the HTML download, with no title (the page carries
+ * its own), then the page, edge to edge.
  * No Résultat/JSON switch (a builder's tool, kept in `studio`), no second
  * control row above the page.
  */
@@ -476,14 +477,12 @@ export const RefinedPageInApp: Story = {
     await expect(panel.getAllByRole('button', { name: 'Télécharger le PDF' })).toHaveLength(1);
     await expect(panel.getAllByRole('button', { name: 'Télécharger le HTML' })).toHaveLength(1);
     await expect(panel.queryByRole('group', { name: 'Affichage du résultat' })).toBeNull();
-    await expect(panel.getByText('Devis client')).toBeVisible();
+    await expect(panel.queryByText('Devis client')).toBeNull();
 
-    // One row: the title and both controls share a line.
-    const title = panel.getByText('Devis client').getBoundingClientRect();
+    // One row: both controls share a line.
+    const html = panel.getByRole('button', { name: 'Télécharger le HTML' }).getBoundingClientRect();
     const pdf = panel.getByRole('button', { name: 'Télécharger le PDF' }).getBoundingClientRect();
-    await expect(Math.abs(title.top + title.height / 2 - (pdf.top + pdf.height / 2))).toBeLessThan(
-      8,
-    );
+    await expect(Math.abs(html.top + html.height / 2 - (pdf.top + pdf.height / 2))).toBeLessThan(8);
 
     // Then the page, edge to edge with the panel, with no box drawn around it.
     const frame = pageFrame(canvasElement);
@@ -652,7 +651,7 @@ export const InAScrollingPanel: Story = {
     // One wheel over the page scrolls it, and the control row stays put.
     const pointer = await browserPointer();
     if (!pointer) return;
-    const title = within(panel).getByText('Devis client');
+    const title = within(panel).getByRole('button', { name: 'Télécharger le PDF' });
     const titleTop = title.getBoundingClientRect().top;
     await pointer.wheel(frame, { delta: { y: 400 } });
     await waitFor(() => expect(doc.defaultView!.scrollY + panel.scrollTop).toBeGreaterThan(0));
