@@ -1,24 +1,33 @@
 /**
- * An optional structure's presence toggle, as the kernel states it.
+ * An optional structure, as the kernel states it.
  *
- * The control is a thin reading of four kernel answers: whether a field carries
- * the toggle (`hasPresenceToggle`), whether it reads open for a value
- * (`presenceOpen`), what opening it writes (`seedObjectValue`), and
- * whether the field still folds behind its container's optional disclosure
- * (`foldsBehindOptionalDisclosure`). What the run makes of the value is
- * `fieldFilled`'s answer, asserted here at depth two and three; the browser and
- * the server gate are held to the same answers in `gate-agreement.test.ts`.
+ * The object control is a thin reading of these answers: whether a field is
+ * an optional structure (`isOptionalStructure`), whether it reads open for a
+ * value (`optionalStructureOpen`), whether it is folded behind its container's
+ * "+ N optional" disclosure (`isFoldedOptional`), what opening it writes
+ * (`seedObjectValue`), and what that disclosure writes when it expands or
+ * collapses (`openOptionalStructures`, `closeOptionalStructures`). What the run
+ * makes of the value is `fieldFilled`'s answer, asserted here at depth two and
+ * three; the browser and the server gate are held to the same answers in
+ * `gate-agreement.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import type { ObjectRunField, RunField, TextRunField } from '../descriptor';
 import {
+  anyOptionalStructureOpen,
   computeReadiness,
   fieldFilled,
   foldsBehindOptionalDisclosure,
-  hasPresenceToggle,
-  presenceOpen,
+  isFoldedOptional,
+  isOptionalStructure,
+  optionalStructureOpen,
 } from '../readiness';
-import { seedInputs, seedObjectValue } from '../seed';
+import {
+  closeOptionalStructures,
+  openOptionalStructures,
+  seedInputs,
+  seedObjectValue,
+} from '../seed';
 
 const text = (name: string, extra: Partial<TextRunField> = {}): TextRunField => ({
   kind: 'text',
@@ -83,7 +92,7 @@ describe('seedObjectValue', () => {
   it('is an empty object when no child carries a default, which still reads open', () => {
     const plain = object('adresse', [text('rue')], { required: false });
     expect(seedObjectValue(plain)).toEqual({});
-    expect(presenceOpen(seedObjectValue(plain))).toBe(true);
+    expect(optionalStructureOpen(seedObjectValue(plain))).toBe(true);
   });
 
   it("prefers the structure's own object default, as a copy", () => {
@@ -105,32 +114,47 @@ describe('seedObjectValue', () => {
   });
 });
 
-describe('the presence toggle', () => {
-  it('is carried by an optional structure only', () => {
-    expect(hasPresenceToggle(bank)).toBe(true);
-    expect(hasPresenceToggle(shop)).toBe(false);
-    expect(hasPresenceToggle(text('note', { required: false }))).toBe(false);
+describe('the disclosure', () => {
+  it('treats an optional structure only as one', () => {
+    expect(isOptionalStructure(bank)).toBe(true);
+    expect(isOptionalStructure(shop)).toBe(false);
+    expect(isOptionalStructure(text('note', { required: false }))).toBe(false);
   });
 
-  it('reads open over any plain object and closed over an absence', () => {
-    expect(presenceOpen({})).toBe(true);
-    expect(presenceOpen({ iban: 'FR76' })).toBe(true);
-    expect(presenceOpen(undefined)).toBe(false);
-    expect(presenceOpen(null)).toBe(false);
-    expect(presenceOpen([])).toBe(false);
+  it('reads a structure open over any plain object and closed over an absence', () => {
+    expect(optionalStructureOpen({})).toBe(true);
+    expect(optionalStructureOpen({ iban: 'FR76' })).toBe(true);
+    expect(optionalStructureOpen(undefined)).toBe(false);
+    expect(optionalStructureOpen(null)).toBe(false);
+    expect(optionalStructureOpen([])).toBe(false);
   });
 
-  it('keeps a toggled structure out of the optional disclosure, and nothing else', () => {
-    expect(foldsBehindOptionalDisclosure(bank)).toBe(false);
-    expect(foldsBehindOptionalDisclosure(text('note', { required: false }))).toBe(true);
-    expect(
-      foldsBehindOptionalDisclosure(text('note', { required: false, defaultValue: 'x' })),
-    ).toBe(false);
-    expect(foldsBehindOptionalDisclosure(text('nom'))).toBe(false);
+  it('folds a closed structure with the empty optional fields, and an open one never', () => {
+    expect(foldsBehindOptionalDisclosure(bank)).toBe(true);
+    expect(isFoldedOptional(bank, undefined)).toBe(true);
+    expect(isFoldedOptional(bank, {})).toBe(false);
+    expect(isFoldedOptional(text('note', { required: false }), '')).toBe(true);
+    expect(isFoldedOptional(text('note', { required: false }), 'x')).toBe(false);
+    expect(isFoldedOptional(text('note', { required: false, defaultValue: 'x' }), '')).toBe(false);
+    expect(isFoldedOptional(text('nom'), '')).toBe(false);
+  });
+
+  it('opens every closed structure with its seed, and closes every one', () => {
+    const fields = [text('nom'), text('note', { required: false }), bank];
+    const opened = openOptionalStructures(fields, { nom: 'Lille' });
+    expect(opened).toEqual({ nom: 'Lille', compte_bancaire: seedObjectValue(bank) });
+    expect(anyOptionalStructureOpen(fields, opened)).toBe(true);
+    // An open one is kept as it is, edits and all.
+    const edited = { nom: 'Lille', compte_bancaire: { iban: 'X' } };
+    expect(openOptionalStructures(fields, edited)).toEqual(edited);
+
+    const closed = closeOptionalStructures(fields, opened);
+    expect(closed).toEqual({ nom: 'Lille', compte_bancaire: undefined });
+    expect(anyOptionalStructureOpen(fields, closed)).toBe(false);
   });
 });
 
-describe('fieldFilled over a toggled structure', () => {
+describe('fieldFilled over an optional structure', () => {
   const account = object('compte', [text('iban'), text('titulaire', { required: false })], {
     required: false,
   });

@@ -129,7 +129,7 @@ describe('the seeds an input page lists', () => {
       ],
     },
     { kind: 'text', name: 'note', required: false, defaultValue: 'hello' },
-    // An optional structure with NO default of its own: its presence toggle
+    // An optional structure with NO default of its own: its disclosure
     // starts closed, so a member's default is no seed, only a note.
     {
       kind: 'object',

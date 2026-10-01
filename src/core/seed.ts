@@ -6,6 +6,8 @@
  */
 
 import type { ObjectRunField, RunField } from './descriptor';
+import { ownProp } from './own-property';
+import { isOptionalStructure, optionalStructureOpen } from './readiness';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -21,8 +23,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * placeholder would count as filled.
  *
  * **An optional structure is not descended into.** Its presence is a choice the
- * person makes with the structure's own disclosure (see `hasPresenceToggle`),
- * so a seed that put its children's defaults inside it would make that choice
+ * person makes with the "+ N optional" disclosure it folds behind (see
+ * `isOptionalStructure`), so a seed that put its children's defaults inside it would make that choice
  * for them: the structure would arrive open and be sent, merely because its
  * concept declares defaults. It is seeded only when the structure itself
  * carries an authored default; otherwise it stays absent, and turning it on
@@ -47,12 +49,44 @@ export function seedInputs(fields: readonly RunField[]): Record<string, unknown>
  * structure's own authored default when it carries an object one, otherwise
  * an object seeded from its children's defaults by `seedInputs` - which is `{}`
  * when none of them declares one. Always a plain object, so the disclosure that
- * reads the value back (`presenceOpen`) reads open.
+ * reads the value back (`optionalStructureOpen`) reads open.
  *
  * Optional structures beneath it stay absent, by `seedInputs`' own rule: each
- * has its own disclosure.
+ * opens with its own container's disclosure.
  */
 export function seedObjectValue(field: ObjectRunField): Record<string, unknown> {
   if (isRecord(field.defaultValue)) return { ...field.defaultValue };
   return seedInputs(field.fields);
+}
+
+/**
+ * What expanding a "+ N optional" disclosure writes: `values` with every
+ * CLOSED optional structure among `fields` opened to `seedObjectValue(field)`.
+ * Open ones and every other field are kept as they are. Returns a new object.
+ */
+export function openOptionalStructures(
+  fields: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...values };
+  for (const field of fields) {
+    if (isOptionalStructure(field) && !optionalStructureOpen(ownProp(values, field.name))) {
+      out[field.name] = seedObjectValue(field);
+    }
+  }
+  return out;
+}
+
+/**
+ * What collapsing a "+ N optional" disclosure writes: `values` with every
+ * optional structure among `fields` closed to `undefined`, so each leaves the
+ * payload. Every other field is kept as it is. Returns a new object.
+ */
+export function closeOptionalStructures(
+  fields: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...values };
+  for (const field of fields) if (isOptionalStructure(field)) out[field.name] = undefined;
+  return out;
 }

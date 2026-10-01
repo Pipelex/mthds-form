@@ -4,11 +4,12 @@
 
 ### Added
 
-- **An optional structure is its own disclosure**: an optional structured field, at any depth and at the top level, is shown closed as a single "+ <label>" button in the style of the "+ N optional" toggle, and opens to its usual card under a "− <label>" button; it is no longer folded behind (or counted by) its parent's optional toggle. Opening writes `seedObjectValue(field)`, the structure seeded from its own or its children's authored defaults, and closing writes `undefined`, which drops it from the payload; the state is read from the value, so a host that seeds the structure has opened it. The core entry exports `seedObjectValue`, `seedInputs`, `hasPresenceToggle`, `presenceOpen` and `foldsBehindOptionalDisclosure`, so a host or a server seeds and reads it the way the control does. See [docs/architecture.md](docs/architecture.md#an-optional-structures-presence-toggle).
+- **The "+ N optional" disclosure opens and closes optional structures**: a closed optional structured field (absent value), at any depth, folds behind its parent's "+ N optional fields" toggle and is counted there. Expanding the toggle opens every one in that object with `seedObjectValue(field)`, the structure seeded from its own or its children's authored defaults, and collapsing it closes every one to `undefined`, which drops it from the payload; the toggle reads expanded while any is open, so a restored value offers to close it. The core entry exports `seedObjectValue`, `seedInputs`, `openOptionalStructures`, `closeOptionalStructures`, `isOptionalStructure`, `optionalStructureOpen`, `foldsBehindOptionalDisclosure`, `isFoldedOptional` and `anyOptionalStructureOpen`, so a host renders its top-level disclosure the same way. See [docs/architecture.md](docs/architecture.md#optional-structures).
 
 ### Changed
 
 - **`seedInputs` leaves an optional structure closed (Breaking)**: it used to seed an optional structure with its children's defaults, which sent it whether or not the person wanted it. It now seeds an optional structure only when the structure carries an authored default of its own, at every depth, and moves to the core entry, still re-exported from `./generative`; a generative brief lists no seed beneath such a structure either. A host that wants one open from the start writes `seedObjectValue(field)` at its path.
+- **An optional structure no longer shows the optional badge**: open, it reads as its label, description and card.
 - **The "+ N optional" toggle states `aria-expanded`**: assistive technology now hears whether the optional fields it folds are shown.
 
 ### Fixed

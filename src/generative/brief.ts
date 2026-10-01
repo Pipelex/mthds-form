@@ -234,7 +234,7 @@ function describe(
   if (field.kind === 'object') {
     // Beneath an optional structure with no default of its own nothing is
     // seeded either: whether it is there at all is the person's choice, made
-    // with its presence toggle, and `seedInputs` leaves it absent. Listing its
+    // with its disclosure, and `seedInputs` leaves it absent. Listing its
     // members' defaults as seeds would have a layout open it.
     const seededBelow =
       seeded || field.defaultValue !== undefined || (side === 'input' && !field.required);

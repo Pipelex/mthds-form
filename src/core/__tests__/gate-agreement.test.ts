@@ -222,7 +222,7 @@ const REFS: PipeInputContract = {
 
 /**
  * An optional structure inside a structure, and another inside that one - the
- * shape a presence toggle writes at depth two and three. Pipelex refuses a field
+ * shape an optional disclosure writes at depth two and three. Pipelex refuses a field
  * both required and defaulted, so a defaulted child arrives optional, as
  * `titulaire` does here; `iban` and `rue` are the required children that only
  * fall due once their structure is opened.
@@ -656,7 +656,7 @@ const ROWS: Row[] = [
     runnable: false,
   },
 
-  // ─── an optional structure's presence toggle, at depth two and three ──────
+  // ─── an optional structure opened and closed, at depth two and three ─────
   {
     label: 'an optional ref child opened and left empty',
     inputs: { w: REFS },

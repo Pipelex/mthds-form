@@ -127,7 +127,7 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
     // is present, a content model carries no `minLength`) and readiness never
     // looked below `bank`, so the button stayed live and the run went out with
     // a required child blank. An optional child that holds nothing is absent,
-    // and absence blocks nothing - which is what closing its presence toggle writes.
+    // and absence blocks nothing - which is what closing it writes.
     return field.fields.every((f) => {
       const child = ownProp(obj, f.name);
       return f.required ? fieldFilled(f, child) : !isFilled(child) || fieldFilled(f, child);
@@ -249,27 +249,27 @@ export function shownAsOptional(field: RunField): boolean {
 }
 
 /**
- * Whether a field carries its own presence toggle: an OPTIONAL structured
- * concept, at any depth - a structure inside a structure, or an optional
- * structured input at the top level.
+ * Whether a field is an optional structure: an OPTIONAL structured concept, at
+ * any depth - a structure inside a structure, or an optional structured input
+ * at the top level.
  *
- * Such a field is its own disclosure. Its value is either absent (closed) or
- * an object (open), and closing it is the one way a person says "none of this"
- * once the structure's children carry defaults - a half-filled optional
- * structure otherwise reads as a choice nobody made. It therefore never folds
- * behind its parent's "+ N optional" disclosure
- * (`foldsBehindOptionalDisclosure`).
+ * Its value is either absent (closed) or an object (open), and closing it is
+ * the one way a person says "none of this" once the structure's children carry
+ * defaults - a half-filled optional structure otherwise reads as a choice
+ * nobody made. It folds behind its container's "+ N optional" disclosure while
+ * closed, and that disclosure opens and closes it
+ * (`openOptionalStructures`, `closeOptionalStructures`).
  *
  * An item of a list is never one: a row is in the array because the person
- * added it, so adding is its toggle.
+ * added it.
  */
-export function hasPresenceToggle(field: RunField): field is ObjectRunField {
+export function isOptionalStructure(field: RunField): field is ObjectRunField {
   return field.kind === 'object' && !field.required;
 }
 
 /**
- * Whether a presence toggle reads open for this value: a plain object, even
- * `{}`. `undefined` and `null` read closed.
+ * Whether an optional structure reads open for this value: a plain object,
+ * even `{}`. `undefined` and `null` read closed.
  *
  * Derived from the value, never held beside it, so a host that seeds the value
  * (`seedObjectValue`) has opened the structure, and one that clears it has
@@ -279,16 +279,37 @@ export function hasPresenceToggle(field: RunField): field is ObjectRunField {
  * left blank always was, while one holding anything owes its concept every
  * required child (`fieldFilled`).
  */
-export function presenceOpen(value: unknown): boolean {
+export function optionalStructureOpen(value: unknown): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
- * Whether a field, while empty, folds behind its container's "+ N optional"
- * disclosure: shown as optional (`shownAsOptional`) AND not carrying a
- * presence toggle of its own (`hasPresenceToggle`), which is always visible.
- * The disclosure's count is the number of empty fields this answers `true` for.
+ * Whether a field takes part in its container's "+ N optional" disclosure:
+ * shown as optional (`shownAsOptional`), or an optional structure
+ * (`isOptionalStructure`) whatever its defaults.
  */
 export function foldsBehindOptionalDisclosure(field: RunField): boolean {
-  return shownAsOptional(field) && !hasPresenceToggle(field);
+  return shownAsOptional(field) || isOptionalStructure(field);
+}
+
+/**
+ * Whether a field is folded behind the disclosure right now, for this value:
+ * it takes part in the disclosure and is empty - for an optional structure,
+ * closed (`optionalStructureOpen`); for any other field, not `isFilled`. The
+ * disclosure's count, "+ N optional", is the number of fields this answers
+ * `true` for while it is collapsed.
+ */
+export function isFoldedOptional(field: RunField, value: unknown): boolean {
+  if (!foldsBehindOptionalDisclosure(field)) return false;
+  return isOptionalStructure(field) ? !optionalStructureOpen(value) : !isFilled(value);
+}
+
+/** Whether any optional structure among `fields` is open in `values`. */
+export function anyOptionalStructureOpen(
+  fields: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): boolean {
+  return fields.some(
+    (f) => isOptionalStructure(f) && optionalStructureOpen(ownProp(values, f.name)),
+  );
 }

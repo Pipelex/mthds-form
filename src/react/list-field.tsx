@@ -178,9 +178,8 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             <div className="min-w-0 flex-1">
               <FieldRenderer
                 // `required: true`: a row is in the array because the person
-                // added it, so it is never optional and never carries the
-                // presence toggle an optional structure gets - adding the row
-                // was the toggle.
+                // added it, so it is never optional - an object row is never an
+                // optional structure that folds or closes.
                 field={{
                   ...field.item,
                   title: '',
