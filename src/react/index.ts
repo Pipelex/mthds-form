@@ -63,13 +63,14 @@ export {
 // than an innerHTML write - see the module header for what the sandbox stops.
 export type { HtmlPreviewProps } from './html-preview';
 export { HtmlPreview } from './html-preview';
-// Save an HTML page as PDF through the browser's print dialog, from a
-// script-free copy, under the name the host suggests. The result view draws the
-// control on every page; these are for a host drawing its own.
-export type { PrintHtmlOptions } from './print-html';
-export { printHtml } from './print-html';
-export type { SaveAsPdfButtonProps } from './save-as-pdf-button';
-export { SaveAsPdfButton } from './save-as-pdf-button';
+// Make a PDF of an HTML page in the browser, from a script-free copy laid out
+// with its print rules, and save it in one click. The result view draws the
+// control on every page; these are for a host drawing its own. The libraries
+// that paint and assemble the PDF load on first use, never with this entry.
+export type { HtmlPdf, HtmlPdfOptions } from './html-pdf';
+export { renderHtmlPdf } from './html-pdf';
+export type { PdfDownloadButtonProps } from './pdf-download-button';
+export { PdfDownloadButton } from './pdf-download-button';
 // How every `prose` result is typeset. Exported because a host rendering its
 // own summary of a run wants the same typesetting the panel uses, and because
 // re-deriving it is how two markdown renderings on one page start to disagree.

@@ -48,7 +48,7 @@ import {
 import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
-import { SaveAsPdfButton } from './save-as-pdf-button';
+import { PdfDownloadButton } from './pdf-download-button';
 import { Markdown } from './markdown';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
@@ -1656,7 +1656,7 @@ function NativeValue({ value }: { value: unknown }) {
 
   const html = readHtmlContent(value);
   // A composite member carries no file controls, as its download carries none.
-  if (html) return <HtmlPreview content={html} saveAsPdf={false} />;
+  if (html) return <HtmlPreview content={html} downloadPdf={false} />;
 
   const date = readDateContent(value);
   if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
@@ -1967,12 +1967,12 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
     // control rides the label row as a text value's copy control does, and
     // survives `hideLabel` for the same reason. It is the same row every other
     // file's controls sit in.
-    const pageFile = location
-      ? readStuffFile('markup', unwrapped, location.path.join('.'))
-      : undefined;
+    const pagePath = location?.path.join('.');
+    const pageFile =
+      pagePath === undefined ? undefined : readStuffFile('markup', unwrapped, pagePath);
     const page = pageDownloadShown ? pageFile : undefined;
-    // Its "Save as PDF" joins the same row, and the PDF is named as the page's
-    // own download is, without the extension: `<downloadBaseName>.pdf` for a
+    // Its "Download PDF" joins the same row, and the PDF is named as the page's
+    // own download is, with its own extension: `<downloadBaseName>.pdf` for a
     // result that is one page, the page's place after it for one inside a
     // structure, so the two files a reader saves of one page share a name.
     const pdfName =
@@ -1985,14 +1985,18 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">{header}</div>
             {content && pdfName !== undefined ? (
-              <SaveAsPdfButton content={content} {...(pdfName ? { fileName: pdfName } : {})} />
+              <PdfDownloadButton
+                content={content}
+                {...(pagePath === undefined ? {} : { path: pagePath })}
+                {...(pdfName ? { fileName: pdfName } : {})}
+              />
             ) : null}
             <FileActions file={page} />
           </div>
         ) : (
           header
         )}
-        {content ? <HtmlPreview content={content} saveAsPdf={false} /> : <Absent />}
+        {content ? <HtmlPreview content={content} downloadPdf={false} /> : <Absent />}
       </div>
     );
   }

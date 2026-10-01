@@ -24,9 +24,9 @@ import { resultFieldFor } from '../result-view';
  * What it shows: the page continued as one document rather than nested in
  * ours, on white whatever the theme, edge to edge, as tall as it is, and in
  * the face it links, which the frame's `font-src` now lets it load; and its
- * **Save as PDF**, which prints a script-free copy through the browser's own
- * dialog under the panel's `downloadBaseName`. The page carries a script, to
- * show that neither frame runs it.
+ * **Download PDF**, which makes the PDF in the browser from a script-free copy
+ * laid out with the page's print rules, and saves it under the panel's
+ * `downloadBaseName`. The page carries a script, to show that no frame runs it.
  */
 
 const FACE_PATH = new URL(
@@ -186,82 +186,273 @@ export const WholePage: Story = {
   },
 };
 
-/** What the print copy looked like the moment the browser started printing it. */
-interface PrintSnapshot {
+/**
+ * A two-page quote, written the way a method's quote template writes one: the
+ * house face linked root-relative (`/fonts/…`, a stand-in face under the name
+ * `Calibri`, since the real one cannot be redistributed), a page-frame table
+ * whose empty `tfoot` reserves the footer's room on every page, a footer laid
+ * out `position: fixed` in print so every page repeats it, a table of lines
+ * long enough to run past one A4 page, with a header the next page repeats,
+ * and rules for print only: a red band that only paper shows, a blue band only
+ * the screen shows. No `@page` rule, so it prints on A4 with 1 cm margins.
+ */
+const LINE_ROWS = Array.from(
+  { length: 34 },
+  (_, i) =>
+    `<tr><td>Opération ${i + 1} — révision, nettoyage et contrôle de l’étanchéité du boîtier</td><td class="num">${(40 + i).toFixed(2).replace('.', ',')} €</td></tr>`,
+).join('');
+
+const LONG_QUOTE_PAGE = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Devis 250883-1</title>
+<style>
+  @font-face { font-family: Calibri; font-weight: 400; src: url('/fonts/nunito-sans-regular.woff2') format('woff2'); }
+  @font-face { font-family: Calibri; font-weight: 700; src: url('/fonts/nunito-sans-bold.woff2') format('woff2'); }
+  *{box-sizing:border-box}
+  body{margin:0;background:#f2f2f2;color:#1a1a1a;font:14px/1.55 Calibri,Carlito,Arial,sans-serif;}
+  .sheet{max-width:820px;margin:24px auto;background:#fff;padding:44px 52px 32px;box-shadow:0 1px 6px rgba(0,0,0,.12);}
+  h1{font-size:20px;margin:0 0 6px}
+  h2{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid #111;padding-bottom:5px;margin:26px 0 12px;break-after:avoid}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#1f2a44;color:#fff;text-align:left;padding:6px 8px}
+  td{padding:8px 4px;border-bottom:1px solid #dcdcdc;vertical-align:top}
+  td.num{text-align:right;white-space:nowrap}
+  tr{break-inside:avoid}
+  .payment{margin-top:26px;font-size:12px;break-inside:avoid}
+  .band{height:40px;margin:12px 0}
+  .print-only{display:none;background:rgb(230,0,0)}
+  .screen-only{background:rgb(0,0,230)}
+  table.page-frame{width:100%;border-collapse:collapse}
+  table.page-frame > tbody > tr, table.page-frame > tfoot > tr{break-inside:auto}
+  table.page-frame > tbody > tr > td, table.page-frame > tfoot > tr > td{padding:0;border:0}
+  .footer-space{display:none;height:64px}
+  footer.legal{margin-top:24px;border-top:3px solid rgb(0,150,0);padding-top:8px;text-align:center;font-size:10px}
+  @media print{
+    body{background:#fff}
+    .sheet{box-shadow:none;margin:0;max-width:none;padding:24px 28px 0}
+    .print-only{display:block}
+    .screen-only{display:none}
+    .footer-space{display:block}
+    footer.legal{position:fixed;left:28px;right:28px;bottom:0;margin:0;padding:8px 0 6px;background:#fff}
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+<table class="page-frame">
+<tfoot><tr><td><div class="footer-space"></div></td></tr></tfoot>
+<tbody><tr><td>
+  <div class="band print-only"></div>
+  <div class="band screen-only"></div>
+  <h1>DEVIS N° 250883-1 HAMI THOMAS</h1>
+  <div>Établi le 1 octobre 2026 · valable 30 jours</div>
+  <h2>Interventions</h2>
+  <table class="lines">
+    <thead><tr><th>Prestation</th><th class="num">Prix TTC</th></tr></thead>
+    <tbody>${LINE_ROWS}</tbody>
+  </table>
+  <div class="payment">
+    <div>Pour régler ce devis par virement bancaire, merci d’utiliser les coordonnées ci-dessous.</div>
+    <div><b>IBAN</b> : FR76 3000 4023 2300 0121 7031 678</div>
+  </div>
+</td></tr></tbody>
+</table>
+<footer class="legal">Atelier de démonstration | Lille — SIRET 000 000 000 00000</footer>
+</div>
+<script>window.parent.__quotePageScriptRan = true;</script>
+</body>
+</html>`;
+
+function LongQuote({ maxWidth }: { maxWidth: number }) {
+  const field = React.useMemo(
+    () => resultFieldFor(CONTRACTS, OUTPUT_FORM, 'results', 'quote_page_result'),
+    [],
+  );
+  return (
+    <div data-html-page-demo style={{ maxWidth }}>
+      <StuffViewer
+        field={field}
+        value={{ inner_html: LONG_QUOTE_PAGE, css_class: null }}
+        name="devis_client"
+        downloadBaseName="Devis 250883-1 HAMI THOMAS"
+      />
+    </div>
+  );
+}
+
+/** What the PDF copy looked like once its print rules were promoted. */
+interface CopySnapshot {
   sandbox: string | null;
-  hostTitle: string;
-  frameTitle: string;
-  /** Each of the page's faces, with its load status. */
-  faces: string[];
-  stampLoaded: boolean;
-  scriptRan: boolean;
+  printOnly: string;
+  screenOnly: string;
+  footerPosition: string;
+  calibri: string[];
+}
+
+/** The PDF's pages, read back out of its bytes. */
+interface ReadPdf {
+  pageCount: number;
+  mediaBoxes: string[];
+  jpegs: Uint8Array[];
 }
 
 /**
- * **Save as PDF.** The control prints a separate copy of the page, and this
- * play watches that copy from the outside, in headless Chromium, where
- * `print()` dispatches `beforeprint` and `afterprint` without a dialog: at
- * `beforeprint` the copy is sandboxed with modals and no scripts, the tab is
- * titled with the suggested name (which is what Chrome's dialog proposes as
- * the file name), the page's linked faces have loaded, the one it uses only
- * in print included, and its image has arrived; after `afterprint` the copy is gone and the tab has its title back.
+ * Read a PDF the way a test can without a PDF library: its page objects, their
+ * media boxes, and each page's JPEG, which `jspdf` writes as a `DCTDecode`
+ * stream of the JPEG's own bytes.
  */
-export const SaveAsPdf: Story = {
-  name: 'Save as PDF',
+function readPdf(bytes: Uint8Array): ReadPdf {
+  let text = '';
+  for (const byte of bytes) text += String.fromCharCode(byte);
+  const pageCount = (text.match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length;
+  const mediaBoxes = Array.from(text.matchAll(/\/MediaBox\s*\[([^\]]*)\]/g), (m) =>
+    m[1]!.trim().replace(/\s+/g, ' '),
+  );
+  const jpegs: Uint8Array[] = [];
+  const dict = /<<([^>]*\/DCTDecode[^>]*)>>\s*stream\r?\n/g;
+  let match;
+  while ((match = dict.exec(text)) !== null) {
+    const length = Number(/\/Length\s+(\d+)/.exec(match[1]!)?.[1]);
+    const start = match.index + match[0].length;
+    jpegs.push(bytes.slice(start, start + length));
+  }
+  return { pageCount, mediaBoxes, jpegs };
+}
+
+/** How many pixels of a region of a page match a colour test. */
+async function countPixels(
+  jpeg: Uint8Array,
+  region: { top: number; bottom: number },
+  test: (r: number, g: number, b: number) => boolean,
+): Promise<number> {
+  const bitmap = await createImageBitmap(new Blob([jpeg as BlobPart], { type: 'image/jpeg' }));
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext('2d')!;
+  context.drawImage(bitmap, 0, 0);
+  const top = Math.round(region.top * bitmap.height);
+  const height = Math.max(1, Math.round((region.bottom - region.top) * bitmap.height));
+  const { data } = context.getImageData(0, top, bitmap.width, height);
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (test(data[i]!, data[i + 1]!, data[i + 2]!)) count++;
+  }
+  return count;
+}
+
+const isRed = (r: number, g: number, b: number) => r > 190 && g < 70 && b < 70;
+const isBlue = (r: number, g: number, b: number) => b > 190 && r < 70 && g < 70;
+const isGreen = (r: number, g: number, b: number) => g > 110 && r < 70 && b < 70;
+const isNavy = (r: number, g: number, b: number) => r < 50 && g < 60 && b > 50 && b < 90;
+
+/**
+ * **Download PDF.** One click and the browser saves `Devis 250883-1 HAMI
+ * THOMAS.pdf`, made here in headless Chromium with no server and no dialog.
+ * The play catches the download at the link the default delivery clicks,
+ * watches the PDF copy from outside while it is laid out (sandboxed with no
+ * scripts, its print rules promoted: the print-only band shown, the
+ * screen-only band hidden, the footer fixed, the linked face loaded), then
+ * reads the PDF back: two A4 pages, a sane size, and in the raster itself the
+ * print-only band on page one and never the screen-only one, the table's
+ * header repeated at the top of page two, and the fixed footer at the foot of
+ * both pages.
+ */
+export const DownloadPdf: Story = {
+  name: 'Download PDF',
+  render: (args) => <LongQuote {...args} />,
   play: async ({ canvasElement }) => {
     const demo = canvasElement.querySelector<HTMLElement>('[data-html-page-demo]');
     if (!demo) throw new Error('No page demo rendered');
-    const hostTitle = document.title;
     const record = window as unknown as { __quotePageScriptRan?: boolean };
     record.__quotePageScriptRan = false;
-    let snapshot: PrintSnapshot | undefined;
-    let printed = false;
 
-    // Capture-phase, so this runs before the print's own `load` handler and
-    // can listen on the copy's window before anything is printed.
-    const watch = (event: Event) => {
-      const frame = event.target;
-      if (!(frame instanceof HTMLIFrameElement)) return;
-      if (!frame.getAttribute('sandbox')?.includes('allow-modals')) return;
-      const win = frame.contentWindow!;
-      win.addEventListener('beforeprint', () => {
-        const doc = frame.contentDocument!;
-        const stamp = doc.querySelector<HTMLImageElement>('img.stamp');
-        snapshot = {
-          sandbox: frame.getAttribute('sandbox'),
-          hostTitle: document.title,
-          frameTitle: doc.title,
-          faces: Array.from(doc.fonts)
-            .filter((face) => face.family.includes('Quote'))
-            .map((face) => `${face.family.replace(/['"]/g, '')} ${face.status}`),
-          stampLoaded: !!stamp && stamp.complete && stamp.naturalWidth > 0,
-          scriptRan: record.__quotePageScriptRan === true,
-        };
-      });
-      win.addEventListener('afterprint', () => {
-        printed = true;
-      });
+    // The download as the browser would receive it: the clicked link's name,
+    // and its bytes, read before the delivery revokes the object URL.
+    let download: { name: string; bytes: Promise<ArrayBuffer> } | undefined;
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      if (!this.download.endsWith('.pdf')) return click.call(this);
+      download = {
+        name: this.download,
+        bytes: fetch(this.href).then((response) => response.arrayBuffer()),
+      };
     };
-    document.addEventListener('load', watch, true);
+
+    let snapshot: CopySnapshot | undefined;
+    const poll = setInterval(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('iframe[data-mthds-pdf-copy]');
+      const doc = frame?.contentDocument;
+      const printOnly = doc?.querySelector('.print-only');
+      if (!frame || !doc || !printOnly || snapshot) return;
+      const win = doc.defaultView!;
+      if (win.getComputedStyle(printOnly).display !== 'block') return;
+      // Rewriting the media queries rebuilds the copy's faces, which the copy
+      // then loads again before it measures anything: read them once it has.
+      const faces = Array.from(doc.fonts).filter(
+        (face) => face.family.replace(/['"]/g, '') === 'Calibri',
+      );
+      if (faces.some((face) => face.status !== 'loaded')) return;
+      snapshot = {
+        sandbox: frame.getAttribute('sandbox'),
+        printOnly: win.getComputedStyle(printOnly).display,
+        screenOnly: win.getComputedStyle(doc.querySelector('.screen-only')!).display,
+        footerPosition: win.getComputedStyle(doc.querySelector('footer.legal')!).position,
+        calibri: faces.map((face) => `${face.weight} ${face.status}`),
+      };
+    }, 10);
+
     try {
       await userEvent.click(
-        within(demo).getByRole('button', { name: DEFAULT_FIELD_STRINGS.saveAsPdf }),
+        within(demo).getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadPdf }),
       );
-      await waitFor(() => expect(snapshot).toBeDefined(), { timeout: 10_000 });
-      await expect(snapshot).toEqual({
-        sandbox: 'allow-same-origin allow-modals',
-        hostTitle: 'Devis 250883-1 HAMI THOMAS',
-        frameTitle: 'Devis 250883-1 HAMI THOMAS',
-        faces: ['QuoteFace loaded', 'QuotePrintFace loaded'],
-        stampLoaded: true,
-        scriptRan: false,
-      });
+      await waitFor(() => expect(download).toBeDefined(), { timeout: 30_000 });
+      await expect(download!.name).toBe('Devis 250883-1 HAMI THOMAS.pdf');
 
-      await waitFor(() => expect(printed).toBe(true), { timeout: 10_000 });
-      await waitFor(() => expect(document.title).toBe(hostTitle));
-      await expect(document.querySelector('iframe[sandbox*="allow-modals"]')).toBeNull();
+      await expect(snapshot).toEqual({
+        sandbox: 'allow-same-origin',
+        printOnly: 'block',
+        screenOnly: 'none',
+        footerPosition: 'fixed',
+        calibri: ['400 loaded', '700 loaded'],
+      });
+      await expect(record.__quotePageScriptRan).toBe(false);
+      // The copy is gone once the PDF is made.
+      await expect(document.querySelector('iframe[data-mthds-pdf-copy]')).toBeNull();
+
+      const bytes = new Uint8Array(await download!.bytes);
+      const pdf = readPdf(bytes);
+      // eslint-disable-next-line no-console
+      console.info(`PDF: ${pdf.pageCount} pages, ${bytes.length} bytes`);
+      await expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
+      await expect(pdf.pageCount).toBe(2);
+      await expect(pdf.jpegs).toHaveLength(2);
+      for (const box of pdf.mediaBoxes) await expect(box).toMatch(/^0 0 595\.\d+ 841\.\d+$/);
+      await expect(bytes.length).toBeLessThan(2 * 2_000_000);
+
+      const [first, second] = pdf.jpegs as [Uint8Array, Uint8Array];
+      const whole = { top: 0, bottom: 1 };
+      // 1 cm of a 29.7 cm sheet is the top margin; the copy's padding follows.
+      await expect(await countPixels(first, { top: 0.02, bottom: 0.12 }, isRed)).toBeGreaterThan(
+        10_000,
+      );
+      await expect(await countPixels(first, whole, isBlue)).toBeLessThan(50);
+      await expect(await countPixels(second, whole, isRed)).toBeLessThan(50);
+      // Page two opens on the repeated header, a navy band under the margin.
+      await expect(await countPixels(second, { top: 0.03, bottom: 0.07 }, isNavy)).toBeGreaterThan(
+        10_000,
+      );
+      // Both pages carry the fixed footer's green rule, near the foot.
+      for (const page of [first, second]) {
+        await expect(await countPixels(page, { top: 0.9, bottom: 0.97 }, isGreen)).toBeGreaterThan(
+          1_000,
+        );
+      }
     } finally {
-      document.removeEventListener('load', watch, true);
+      clearInterval(poll);
+      HTMLAnchorElement.prototype.click = click;
     }
   },
 };
@@ -269,7 +460,7 @@ export const SaveAsPdf: Story = {
 /**
  * **A refined page in a method app.** A concept refining `native.Html`, read
  * through `refines`, in `app` presentation and French: one row holding the
- * title, "Enregistrer en PDF" and one download, then the page, edge to edge.
+ * title, "Télécharger le PDF" and the HTML download, then the page, edge to edge.
  * No Résultat/JSON switch (a builder's tool, kept in `studio`), no second
  * control row above the page.
  */
@@ -280,14 +471,14 @@ export const RefinedPageInApp: Story = {
     const demo = canvasElement.querySelector<HTMLElement>('[data-html-page-demo]');
     if (!demo) throw new Error('No page demo rendered');
     const panel = within(demo);
-    await expect(panel.getAllByRole('button', { name: 'Enregistrer en PDF' })).toHaveLength(1);
-    await expect(panel.getAllByRole('button', { name: /Télécharger/ })).toHaveLength(1);
+    await expect(panel.getAllByRole('button', { name: 'Télécharger le PDF' })).toHaveLength(1);
+    await expect(panel.getAllByRole('button', { name: 'Télécharger le HTML' })).toHaveLength(1);
     await expect(panel.queryByRole('group', { name: 'Affichage du résultat' })).toBeNull();
     await expect(panel.getByText('Devis client')).toBeVisible();
 
     // One row: the title and both controls share a line.
     const title = panel.getByText('Devis client').getBoundingClientRect();
-    const pdf = panel.getByRole('button', { name: 'Enregistrer en PDF' }).getBoundingClientRect();
+    const pdf = panel.getByRole('button', { name: 'Télécharger le PDF' }).getBoundingClientRect();
     await expect(Math.abs(title.top + title.height / 2 - (pdf.top + pdf.height / 2))).toBeLessThan(
       8,
     );

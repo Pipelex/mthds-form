@@ -20,7 +20,7 @@ import {
   useSaveFiles,
   type DownloadDisplay,
 } from './result-env';
-import { SaveAsPdfButton } from './save-as-pdf-button';
+import { PdfDownloadButton } from './pdf-download-button';
 import { ResultRoot } from './result-location';
 import { cn } from './utils';
 
@@ -58,10 +58,10 @@ import { cn } from './utils';
  *
  * A result whose node IS `native.Html`, or a concept refining it (read off the
  * descriptor's `concept_ref` and `refines`, never off the value), is one page,
- * and the panel shows it as that page: one row holding the title, "Save as PDF"
- * and one download, then the page edge to edge with no box around it. The
- * page's own control row and the header's download saved the same file, so
- * they are one control here.
+ * and the panel shows it as that page: one row holding the title, "Download
+ * PDF" as the primary control and one HTML download, then the page edge to
+ * edge with no box around it. The page's own control row and the header's
+ * download saved the same file, so they are one control here.
  */
 
 export type StuffViewerView = 'rendered' | 'json';
@@ -388,7 +388,7 @@ function StuffPanel({
     }
   }, [field, value, baseName, resolveUrl, save]);
   const labels: Record<StuffViewerView, string> = { rendered: s.viewRendered, json: s.viewJson };
-  // The PDF is named as the page's HTML download is, without the extension, so
+  // The PDF is named as the page's HTML download is, with its own extension, so
   // the two files a reader saves of one page share a name.
   const pdfName = page && pdfShown ? pdfFileName(field, value, baseName) : undefined;
 
@@ -403,10 +403,11 @@ function StuffPanel({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {page && pdfName !== undefined && (
-            <SaveAsPdfButton
+            <PdfDownloadButton
               content={page}
+              path={field.name}
+              primary
               {...(pdfName ? { fileName: pdfName } : {})}
-              className="gap-1.5 rounded-md border border-border px-2 py-1 font-normal"
             />
           )}
           {downloadShown && (
@@ -414,7 +415,7 @@ function StuffPanel({
               type="button"
               onClick={() => void handleDownload()}
               disabled={savingShown}
-              aria-label={s.download}
+              aria-label={page ? s.downloadHtml : s.download}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
             >
               {savingShown ? (
@@ -422,7 +423,7 @@ function StuffPanel({
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}
-              {savingShown ? s.downloading : s.download}
+              {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
             </button>
           )}
           {offered.length > 1 && (
@@ -472,7 +473,7 @@ function StuffPanel({
         // The page is the panel's main view: drawn here rather than through
         // `ResultField`, whose page arm would add a second control row saving
         // the same file, and with no box around it.
-        <HtmlPreview content={page} saveAsPdf={false} bare />
+        <HtmlPreview content={page} downloadPdf={false} bare />
       ) : (
         <ResultRoot baseName={baseName} path={[field.name]}>
           <ResultField field={field} value={value} hideLabel />
@@ -483,9 +484,9 @@ function StuffPanel({
 }
 
 /**
- * The name the print dialog proposes for a one-page result's PDF: the page's
- * own HTML download name, without its extension. `''` when the page plans no
- * file, which leaves the dialog to propose the tab's title.
+ * A one-page result's PDF name, without the extension: the page's own HTML
+ * download name, without its own. `''` when the page plans no file, which
+ * leaves the button to its default.
  */
 function pdfFileName(field: RunField, value: unknown, baseName: string): string {
   const file = readStuffFile('markup', value, field.name);

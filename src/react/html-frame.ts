@@ -2,7 +2,7 @@ import type { HtmlContentView } from '../core/native-content';
 
 /**
  * The document a `native.Html` result is framed in: the on-screen preview's and
- * the print copy's, built by one function so the two cannot drift on the policy
+ * the PDF copy's, built by one function so the two cannot drift on the policy
  * that keeps model markup from reaching the host. Internal to the `./react`
  * entry; see `html-preview.tsx` for why a frame at all, and
  * `docs/result-view.md` § Markup for the policy.
@@ -39,18 +39,9 @@ export function pageTypography(font: string): FrameTypography {
  * rule but `body`'s is `:where()`, and the sheet comes first in the head, so a
  * page's own CSS wins over all of it.
  */
-export function frameStyles(
-  { color, mutedColor, borderColor, font }: FrameTypography,
-  { print = false }: { print?: boolean } = {},
-): string {
+export function frameStyles({ color, mutedColor, borderColor, font }: FrameTypography): string {
   return `
-    :root { color-scheme: inherit;${
-      // A printed copy keeps its backgrounds and colours, the way a headless
-      // print to PDF with backgrounds on does: the browser's dialog drops them
-      // by default, and a quote whose table header is a filled band would lose
-      // the band. Inherited, so a page can still opt an element out.
-      print ? ' print-color-adjust: exact; -webkit-print-color-adjust: exact;' : ''
-    } }
+    :root { color-scheme: inherit; }
     body {
       margin: 0;
       color: ${color};
@@ -99,8 +90,6 @@ export interface FrameDocumentOptions {
   styles: string;
   imgSrc: string;
   fontSrc: string;
-  /** The document's `<title>`, for the print copy. None on screen. */
-  title?: string;
 }
 
 /**
@@ -123,19 +112,17 @@ export interface FrameDocumentOptions {
  * the text `<head>` would have fooled into writing the policy inside the
  * comment.
  *
- * The page's own stylesheet comes after ours and so wins; its own `<title>`
- * comes after ours, so the print copy's title is the one the document reports.
+ * The page's own stylesheet comes after ours and so wins.
  * The stated `css_class` wraps a fragment only, since a document has its own
  * body.
  */
 export function frameDocument(
   content: HtmlContentView,
-  { styles, imgSrc, fontSrc, title }: FrameDocumentOptions,
+  { styles, imgSrc, fontSrc }: FrameDocumentOptions,
 ): string {
   const head = [
     '<!doctype html><html><head><meta charset="utf-8">',
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${imgSrc}; font-src ${fontSrc}; base-uri 'none'; form-action 'none'">`,
-    title === undefined ? '' : `<title>${escapeText(title)}</title>`,
     `<style>${styles}</style></head>`,
   ].join('');
   if (isWholeDocument(content.innerHtml)) return head + content.innerHtml;
@@ -150,9 +137,4 @@ export function frameDocument(
 /** A class name is written into an attribute, so its quotes must not close it. */
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-/** A title is text, so its markup must not open an element. */
-function escapeText(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 }

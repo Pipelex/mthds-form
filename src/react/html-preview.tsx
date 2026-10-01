@@ -10,7 +10,7 @@ import {
   pageTypography,
 } from './html-frame';
 import { usePdfSaveShown } from './result-env';
-import { SaveAsPdfButton } from './save-as-pdf-button';
+import { PdfDownloadButton } from './pdf-download-button';
 
 /**
  * A `native.Html` result, rendered as the markup it is — inside a sandbox.
@@ -116,15 +116,12 @@ export interface HtmlPreviewProps {
    */
   fontSrc?: string;
   /**
-   * Draw the "Save as PDF" control above the page. Follows the result
+   * Draw the "Download PDF" control above the page. Follows the result
    * environment's `downloads.pdf` when unset, which draws it. The result view
    * passes `false` and draws its own in the page's control row.
    */
-  saveAsPdf?: boolean;
-  /**
-   * The name the print dialog proposes for the PDF, without the extension.
-   * Unset, the dialog proposes the tab's title.
-   */
+  downloadPdf?: boolean;
+  /** The PDF's file name, without the extension. `page` when unset. */
   pdfFileName?: string;
   /**
    * Draw a whole document with no border and no rounding, edge to edge with
@@ -143,7 +140,7 @@ export function HtmlPreview({
   maxHeight,
   imgSrc = DEFAULT_IMG_SRC,
   fontSrc,
-  saveAsPdf,
+  downloadPdf,
   pdfFileName,
   bare = false,
 }: HtmlPreviewProps) {
@@ -153,7 +150,7 @@ export function HtmlPreview({
   const [height, setHeight] = useState(0);
   const page = isWholeDocument(content.innerHtml);
   const pdfSetting = usePdfSaveShown();
-  const pdfShown = saveAsPdf ?? pdfSetting;
+  const pdfShown = downloadPdf ?? pdfSetting;
   const limit = maxHeight ?? (page ? undefined : FRAGMENT_MAX_HEIGHT);
 
   // The frame's document is built in an effect, not during render, because it
@@ -247,7 +244,7 @@ export function HtmlPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-end">
-        <SaveAsPdfButton
+        <PdfDownloadButton
           content={content}
           imgSrc={imgSrc}
           {...(fontSrc === undefined ? {} : { fontSrc })}

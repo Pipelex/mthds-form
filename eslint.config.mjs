@@ -52,6 +52,18 @@ const BUDGET_PATTERNS = [
     message:
       'The standard client is types-only - `import type` only. See docs/dependency-budget.md.',
   },
+  {
+    // The PDF download's painter and assembler are loaded with `import()` on
+    // the first click, in `src/react/html-pdf.ts`, so a host that never makes a
+    // PDF ships neither. A static import anywhere would put them in an entry's
+    // chunk; this rule sees static imports only, which is the point - the one
+    // dynamic `import()` stays allowed. `scripts/assert-bundle.mjs` holds the
+    // same line on the built graph.
+    group: ['jspdf', 'jspdf/*', 'modern-screenshot', 'modern-screenshot/*'],
+    allowTypeImports: true,
+    message:
+      'jspdf and modern-screenshot are loaded with import() on first use only. See docs/dependency-budget.md.',
+  },
 ];
 
 /**

@@ -111,8 +111,8 @@ export interface DownloadDisplay {
    */
   files?: boolean | readonly StuffFileKind[];
   /**
-   * The "Save as PDF" control on each HTML page, which prints the page through
-   * the browser's own dialog. Drawn unless `false`.
+   * The "Download PDF" control on each HTML page, which makes a PDF of the
+   * page in the browser and saves it. Drawn unless `false`.
    */
   pdf?: boolean;
 }
@@ -283,7 +283,7 @@ export function useFileDownloadShown(kind: StuffFileKind): boolean {
   return typeof files === 'boolean' ? files : files.includes(kind);
 }
 
-/** Whether an HTML page carries its "Save as PDF" control. */
+/** Whether an HTML page carries its "Download PDF" control. */
 export function usePdfSaveShown(): boolean {
   return use(ResultEnvContext).downloads?.pdf ?? true;
 }

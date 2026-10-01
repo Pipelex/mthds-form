@@ -113,7 +113,10 @@ const headerButton = () => screen.queryByRole('button', { name: S.download });
 /** A file's button is named by the file it saves: "Download report-figures-0.png". */
 const FILE_BUTTON = S.downloadFile('');
 const fileButtons = () =>
-  screen.queryAllByRole('button', { name: (name) => name.startsWith(FILE_BUTTON) });
+  screen.queryAllByRole('button', {
+    // "Download PDF" shares the prefix and is not a file's own button.
+    name: (name) => name.startsWith(FILE_BUTTON) && name !== S.downloadPdf,
+  });
 /** The name each file button saves under, read off its accessible name. */
 const fileButtonNames = () =>
   fileButtons().map((button) => button.getAttribute('aria-label')?.slice(FILE_BUTTON.length));

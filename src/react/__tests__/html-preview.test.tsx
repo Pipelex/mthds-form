@@ -76,11 +76,6 @@ describe('frameDocument over a whole document', () => {
     expect(policyOf(doc)).toContain("default-src 'none'");
   });
 
-  it('gives the print copy its title ahead of the document’s own', () => {
-    const doc = parse(frameDocument({ innerHtml: QUOTE }, { ...OPTIONS, title: 'Devis A&B <1>' }));
-    expect(doc.title).toBe('Devis A&B <1>');
-  });
-
   it('wraps a fragment in the stated class, and a whole document not at all', () => {
     const fragment = parse(frameDocument({ innerHtml: '<p>x</p>', cssClass: 'invoice' }, OPTIONS));
     expect(fragment.body.firstElementChild?.className).toBe('invoice');

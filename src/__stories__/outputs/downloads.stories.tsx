@@ -71,7 +71,10 @@ type Story = StoryObj<typeof meta>;
 
 /** A file's button is named by the file it saves: "Download solar_system.pdf". */
 const FILE_BUTTON = {
-  name: (name: string) => name.startsWith(DEFAULT_FIELD_STRINGS.downloadFile('')),
+  // "Download PDF" shares the prefix and is not a file's own button.
+  name: (name: string) =>
+    name.startsWith(DEFAULT_FIELD_STRINGS.downloadFile('')) &&
+    name !== DEFAULT_FIELD_STRINGS.downloadPdf,
 };
 
 /** The first theme pane: the pair renders every story twice. */
