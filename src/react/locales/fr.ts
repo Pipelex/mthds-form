@@ -90,6 +90,8 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     }\u00a0: ${names.join(', ')}`,
   downloadFile: (name) => `Télécharger ${name}`,
   downloadFileFailed: 'Le fichier n’a pas pu être enregistré',
+  saveAsPdf: 'Enregistrer en PDF',
+  saveAsPdfFailed: 'La fenêtre d’impression ne s’est pas ouverte',
   viewRendered: 'Résultat',
   viewJson: 'JSON',
   copyJson: 'Copier le JSON',

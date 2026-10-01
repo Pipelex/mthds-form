@@ -51,6 +51,8 @@ export const EN_FIELD_STRINGS: FieldStrings = {
     `${names.length === 1 ? 'One file' : `${names.length} files`} could not be saved: ${names.join(', ')}`,
   downloadFile: (name) => `Download ${name}`,
   downloadFileFailed: 'The file could not be saved',
+  saveAsPdf: 'Save as PDF',
+  saveAsPdfFailed: 'The print dialog did not open',
   viewRendered: 'Result',
   viewJson: 'JSON',
   copyJson: 'Copy the JSON',

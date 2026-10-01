@@ -9,6 +9,8 @@ import {
   isWholeDocument,
   pageTypography,
 } from './html-frame';
+import { usePdfSaveShown } from './result-env';
+import { SaveAsPdfButton } from './save-as-pdf-button';
 
 /**
  * A `native.Html` result, rendered as the markup it is — inside a sandbox.
@@ -113,6 +115,17 @@ export interface HtmlPreviewProps {
    * blocked one silently changes the face the page was designed in.
    */
   fontSrc?: string;
+  /**
+   * Draw the "Save as PDF" control above the page. Follows the result
+   * environment's `downloads.pdf` when unset, which draws it. The result view
+   * passes `false` and draws its own in the page's control row.
+   */
+  saveAsPdf?: boolean;
+  /**
+   * The name the print dialog proposes for the PDF, without the extension.
+   * Unset, the dialog proposes the tab's title.
+   */
+  pdfFileName?: string;
 }
 
 /** The fragment preview's default height limit; a whole document has none. */
@@ -123,12 +136,16 @@ export function HtmlPreview({
   maxHeight,
   imgSrc = DEFAULT_IMG_SRC,
   fontSrc,
+  saveAsPdf,
+  pdfFileName,
 }: HtmlPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [height, setHeight] = useState(0);
   const page = isWholeDocument(content.innerHtml);
+  const pdfSetting = usePdfSaveShown();
+  const pdfShown = saveAsPdf ?? pdfSetting;
   const limit = maxHeight ?? (page ? undefined : FRAGMENT_MAX_HEIGHT);
 
   // The frame's document is built in an effect, not during render, because it
@@ -187,7 +204,7 @@ export function HtmlPreview({
     return () => observer.disconnect();
   }, [doc]);
 
-  return (
+  const frameBox = (
     <div
       ref={hostRef}
       {...(page ? { 'data-html-page': '' } : {})}
@@ -214,6 +231,20 @@ export function HtmlPreview({
           }}
         />
       )}
+    </div>
+  );
+  if (!pdfShown) return frameBox;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-end">
+        <SaveAsPdfButton
+          content={content}
+          imgSrc={imgSrc}
+          {...(fontSrc === undefined ? {} : { fontSrc })}
+          {...(pdfFileName === undefined ? {} : { fileName: pdfFileName })}
+        />
+      </div>
+      {frameBox}
     </div>
   );
 }

@@ -110,6 +110,11 @@ export interface DownloadDisplay {
    * `'document'`, and `'markup'` for an HTML page.
    */
   files?: boolean | readonly StuffFileKind[];
+  /**
+   * The "Save as PDF" control on each HTML page, which prints the page through
+   * the browser's own dialog. Drawn unless `false`.
+   */
+  pdf?: boolean;
 }
 
 interface ResultEnv {
@@ -186,18 +191,20 @@ export function DownloadDisplayOverride({
   const env = use(ResultEnvContext);
   const result = downloads?.result;
   const files = downloads?.files;
+  const pdf = downloads?.pdf;
   const merged = useMemo(
     () =>
-      result === undefined && files === undefined
+      result === undefined && files === undefined && pdf === undefined
         ? env
         : {
             ...env,
             downloads: {
               result: result ?? env.downloads?.result,
               files: files ?? env.downloads?.files,
+              pdf: pdf ?? env.downloads?.pdf,
             },
           },
-    [env, result, files],
+    [env, result, files, pdf],
   );
   return <ResultEnvContext value={merged}>{children}</ResultEnvContext>;
 }
@@ -274,6 +281,11 @@ export function useResultDownloadShown(): boolean {
 export function useFileDownloadShown(kind: StuffFileKind): boolean {
   const files = use(ResultEnvContext).downloads?.files ?? true;
   return typeof files === 'boolean' ? files : files.includes(kind);
+}
+
+/** Whether an HTML page carries its "Save as PDF" control. */
+export function usePdfSaveShown(): boolean {
+  return use(ResultEnvContext).downloads?.pdf ?? true;
 }
 
 /** The prose-image policy, defaulted to the safe answer for a host that stated none. */

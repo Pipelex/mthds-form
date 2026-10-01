@@ -124,6 +124,13 @@ export interface FieldStrings {
   downloadFile: (name: string) => string;
   /** What that button says when the file did not arrive. */
   downloadFileFailed: string;
+  /**
+   * The control on an HTML page that prints it through the browser's dialog,
+   * whose "Save as PDF" destination writes the file.
+   */
+  saveAsPdf: string;
+  /** What that control says when the browser did not open its print dialog. */
+  saveAsPdfFailed: string;
   /** The result panel's two views, and the control that copies the payload. */
   viewRendered: string;
   viewJson: string;

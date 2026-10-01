@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, waitFor } from 'storybook/test';
-import { StuffViewer } from '../../react';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { DEFAULT_FIELD_STRINGS, StuffViewer } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { resultFieldFor } from '../result-view';
 
@@ -18,11 +18,24 @@ import { resultFieldFor } from '../result-view';
  *
  * What it shows: the page continued as one document rather than nested in
  * ours, on white whatever the theme, edge to edge, as tall as it is, and in
- * the face it links, which the frame's `font-src` now lets it load.
+ * the face it links, which the frame's `font-src` now lets it load; and its
+ * **Save as PDF**, which prints a script-free copy through the browser's own
+ * dialog under the panel's `downloadBaseName`. The page carries a script, to
+ * show that neither frame runs it.
  */
 
 const FACE_PATH = new URL(
   '../../../node_modules/storybook/assets/browser/nunito-sans-regular.woff2',
+  import.meta.url,
+).pathname;
+
+/**
+ * A face the page uses only in print. A screen never asks for it, so nothing
+ * loads it until something does: the print copy asks for every declared face
+ * before it prints, or the PDF would fall back for the lines that use it.
+ */
+const PRINT_FACE_PATH = new URL(
+  '../../../node_modules/storybook/assets/browser/nunito-sans-bold.woff2',
   import.meta.url,
 ).pathname;
 
@@ -42,7 +55,8 @@ const QUOTE_PAGE = `<!DOCTYPE html>
   th { background: #1f2a44; color: #fff; text-align: left; padding: 6px 8px; }
   td { border-bottom: 1px solid #ddd; padding: 6px 8px; }
   .total td { font-weight: 700; border-bottom: 0; }
-  @media print { body { padding: 0; } .screen-only { display: none; } }
+  @font-face { font-family: 'QuotePrintFace'; font-weight: 700; src: url('${PRINT_FACE_PATH}') format('woff2'); }
+  @media print { body { padding: 0; } .screen-only { display: none; } .total td { font-family: 'QuotePrintFace'; } }
   @page { size: A4; margin: 12mm; }
 </style>
 </head>
@@ -59,6 +73,8 @@ const QUOTE_PAGE = `<!DOCTYPE html>
   </table>
   <p class="screen-only">Cette ligne n'apparaît qu'à l'écran.</p>
 </div>
+<img class="stamp" loading="lazy" alt="Cachet" src="/figure_1.jpg" width="120">
+<script>window.parent.__quotePageScriptRan = true;</script>
 </body>
 </html>`;
 
@@ -127,5 +143,85 @@ export const WholePage: Story = {
     // As tall as the page: the sheet alone is 1000px, beyond any preview box.
     await waitFor(() => expect(frame.getBoundingClientRect().height).toBeGreaterThan(1000));
     await expect(frame.style.maxHeight).toBe('');
+  },
+};
+
+/** What the print copy looked like the moment the browser started printing it. */
+interface PrintSnapshot {
+  sandbox: string | null;
+  hostTitle: string;
+  frameTitle: string;
+  /** Each of the page's faces, with its load status. */
+  faces: string[];
+  stampLoaded: boolean;
+  scriptRan: boolean;
+}
+
+/**
+ * **Save as PDF.** The control prints a separate copy of the page, and this
+ * play watches that copy from the outside, in headless Chromium, where
+ * `print()` dispatches `beforeprint` and `afterprint` without a dialog: at
+ * `beforeprint` the copy is sandboxed with modals and no scripts, the tab is
+ * titled with the suggested name (which is what Chrome's dialog proposes as
+ * the file name), the page's linked faces have loaded, the one it uses only
+ * in print included, and its image has arrived; after `afterprint` the copy is gone and the tab has its title back.
+ */
+export const SaveAsPdf: Story = {
+  name: 'Save as PDF',
+  play: async ({ canvasElement }) => {
+    const demo = canvasElement.querySelector<HTMLElement>('[data-html-page-demo]');
+    if (!demo) throw new Error('No page demo rendered');
+    const hostTitle = document.title;
+    const record = window as unknown as { __quotePageScriptRan?: boolean };
+    record.__quotePageScriptRan = false;
+    let snapshot: PrintSnapshot | undefined;
+    let printed = false;
+
+    // Capture-phase, so this runs before the print's own `load` handler and
+    // can listen on the copy's window before anything is printed.
+    const watch = (event: Event) => {
+      const frame = event.target;
+      if (!(frame instanceof HTMLIFrameElement)) return;
+      if (!frame.getAttribute('sandbox')?.includes('allow-modals')) return;
+      const win = frame.contentWindow!;
+      win.addEventListener('beforeprint', () => {
+        const doc = frame.contentDocument!;
+        const stamp = doc.querySelector<HTMLImageElement>('img.stamp');
+        snapshot = {
+          sandbox: frame.getAttribute('sandbox'),
+          hostTitle: document.title,
+          frameTitle: doc.title,
+          faces: Array.from(doc.fonts)
+            .filter((face) => face.family.includes('Quote'))
+            .map((face) => `${face.family.replace(/['"]/g, '')} ${face.status}`),
+          stampLoaded: !!stamp && stamp.complete && stamp.naturalWidth > 0,
+          scriptRan: record.__quotePageScriptRan === true,
+        };
+      });
+      win.addEventListener('afterprint', () => {
+        printed = true;
+      });
+    };
+    document.addEventListener('load', watch, true);
+    try {
+      await userEvent.click(
+        within(demo).getByRole('button', { name: DEFAULT_FIELD_STRINGS.saveAsPdf }),
+      );
+      await waitFor(() => expect(snapshot).toBeDefined(), { timeout: 10_000 });
+      await expect(snapshot).toEqual({
+        sandbox: 'allow-same-origin allow-modals',
+        hostTitle: 'Devis 250883-1 HAMI THOMAS',
+        frameTitle: 'Devis 250883-1 HAMI THOMAS',
+        faces: ['QuoteFace loaded', 'QuotePrintFace loaded'],
+        stampLoaded: true,
+        scriptRan: false,
+      });
+
+      await waitFor(() => expect(printed).toBe(true), { timeout: 10_000 });
+      await waitFor(() => expect(document.title).toBe(hostTitle));
+      await expect(document.querySelector('iframe[sandbox*="allow-modals"]')).toBeNull();
+    } finally {
+      document.removeEventListener('load', watch, true);
+    }
   },
 };

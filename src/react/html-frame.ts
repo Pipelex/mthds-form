@@ -39,9 +39,18 @@ export function pageTypography(font: string): FrameTypography {
  * rule but `body`'s is `:where()`, and the sheet comes first in the head, so a
  * page's own CSS wins over all of it.
  */
-export function frameStyles({ color, mutedColor, borderColor, font }: FrameTypography): string {
+export function frameStyles(
+  { color, mutedColor, borderColor, font }: FrameTypography,
+  { print = false }: { print?: boolean } = {},
+): string {
   return `
-    :root { color-scheme: inherit; }
+    :root { color-scheme: inherit;${
+      // A printed copy keeps its backgrounds and colours, the way a headless
+      // print to PDF with backgrounds on does: the browser's dialog drops them
+      // by default, and a quote whose table header is a filled band would lose
+      // the band. Inherited, so a page can still opt an element out.
+      print ? ' print-color-adjust: exact; -webkit-print-color-adjust: exact;' : ''
+    } }
     body {
       margin: 0;
       color: ${color};
