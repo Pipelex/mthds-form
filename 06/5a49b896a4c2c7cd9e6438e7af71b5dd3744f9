@@ -1,0 +1,46 @@
+docs/method-form.md
+  s_05a530b5d83b6b::t_2dd0b392f6123a 1-77
+src/__stories__/inputs/method-form.stories.tsx
+  s_05a530b5d83b6b::t_5b06a4af511e3a 1-126
+src/react/index.ts
+  s_05a530b5d83b6b::t_4b0f4bbf33bdba 21-35
+src/react/method-form.tsx
+  s_05a530b5d83b6b::t_e22894edfb01cf 1-424
+src/react/__tests__/method-form.test.tsx
+  s_05a530b5d83b6b::t_c3b4d873fc9f72 1-274
+  s_05a530b5d83b6b::t_5dfab500d0bd03 275-285
+CHANGELOG.md
+  s_05a530b5d83b6b::t_aa9b3131e6509b 7-8,14
+README.md
+  s_05a530b5d83b6b::t_64a9ba9f16b9ee 51-60,91
+docs/architecture.md
+  s_05a530b5d83b6b::t_ae0b88e1371a43 62-63,115
+docs/i18n.md
+  s_05a530b5d83b6b::t_8a0771f9071a56 13-14
+docs/upload-seam.md
+  s_05a530b5d83b6b::t_117901f2bed031 22-23
+src/__stories__/case-form.tsx
+  s_05a530b5d83b6b::t_8a15c77325fe9e 28-33
+src/react/field-strings.tsx
+  s_05a530b5d83b6b::t_860d1dc58508e5 146-158
+src/react/locales/en.ts
+  s_05a530b5d83b6b::t_24ee4c2e68e952 66-68
+src/react/locales/fr.ts
+  s_05a530b5d83b6b::t_dfc75eb9cf86d8 107-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "065a49b896a4c2c7cd9e6438e7af71b5dd3744f9",
+  "prompts": {},
+  "sessions": {
+    "s_05a530b5d83b6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a8010b7-8d27-4d36-9005-09d2ad4a427c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
