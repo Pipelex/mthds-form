@@ -49,15 +49,32 @@ const bank = object(
 const shop = object('boutique', [text('nom'), bank]);
 
 describe('seedInputs', () => {
-  it('leaves an optional structure absent, however many defaults its children carry', () => {
-    expect(seedInputs([shop])).toEqual({});
-    expect(seedInputs([bank])).toEqual({});
+  it('seeds an optional structure when it has defaults to seed, at any depth', () => {
+    const all = { titulaire: 'Atlas SAS', banque: 'BNP', bic: 'BNPAFRPP', iban: 'FR76' };
+    expect(seedInputs([bank])).toEqual({ compte_bancaire: all });
+    expect(seedInputs([shop])).toEqual({ boutique: { compte_bancaire: all } });
   });
 
-  it('still seeds into a required structure, and an optional one that has a default of its own', () => {
-    const required = object('boutique', [text('nom', { required: false, defaultValue: 'Lille' })]);
-    expect(seedInputs([required])).toEqual({ boutique: { nom: 'Lille' } });
+  it('seeds a top-level optional structure from one defaulted child', () => {
+    const price = object(
+      'prix_or',
+      [text('prix_au_gramme', { required: false, defaultValue: 41 })],
+      {
+        required: false,
+      },
+    );
+    expect(seedInputs([price])).toEqual({ prix_or: { prix_au_gramme: 41 } });
+  });
 
+  it('leaves an optional structure with nothing to seed absent', () => {
+    const plain = object('adresse', [text('rue'), text('ville', { required: false })], {
+      required: false,
+    });
+    expect(seedInputs([plain])).toEqual({});
+    expect(seedInputs([object('boutique', [text('nom'), plain])])).toEqual({});
+  });
+
+  it("seeds a structure's own default whole", () => {
     const defaulted = { ...bank, defaultValue: { titulaire: 'X' } };
     expect(seedInputs([defaulted])).toEqual({ compte_bancaire: { titulaire: 'X' } });
   });
@@ -87,14 +104,17 @@ describe('seedObjectValue', () => {
     expect(seeded).not.toBe(own);
   });
 
-  it('leaves an optional structure beneath it switched off', () => {
-    const inner = object('adresse', [text('rue', { required: false, defaultValue: 'Neuve' })], {
+  it('seeds an optional structure beneath it only when that one has defaults', () => {
+    const seeded = object('adresse', [text('rue', { required: false, defaultValue: 'Neuve' })], {
       required: false,
     });
-    const outer = object('compte', [text('iban', { required: false, defaultValue: 'FR' }), inner], {
-      required: false,
-    });
-    expect(seedObjectValue(outer)).toEqual({ iban: 'FR' });
+    const empty = object('agence', [text('code')], { required: false });
+    const outer = object(
+      'compte',
+      [text('iban', { required: false, defaultValue: 'FR' }), seeded, empty],
+      { required: false },
+    );
+    expect(seedObjectValue(outer)).toEqual({ iban: 'FR', adresse: { rue: 'Neuve' } });
   });
 });
 

@@ -112,7 +112,7 @@ describe('the presence switch', () => {
     render(<Harness field={shop([text('nom'), nested])} initial={{ nom: 'Lille' }} />);
 
     await userEvent.click(screen.getByRole('switch', { name: /bank account/i }));
-    // The inner structure starts off: turning its parent on seeds no switch for it.
+    // The inner structure has no default to seed, so turning its parent on leaves it off.
     const inner = screen.getByRole('switch', { name: /adresse/i });
     expect(inner).toHaveAttribute('aria-checked', 'false');
 
