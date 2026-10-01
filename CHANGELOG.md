@@ -1,13 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [v0.13.0] - 2026-09-29
 
 ### Added
 
 - **A language switch: `FieldStringsProvider` takes `locale`** (`fr`, `fr-FR`, `en-GB`…), and `fieldStringsFor(locale)` picks the pack by its primary language subtag, falling back to English. `strings` is now optional and overrides single keys on top of the chosen pack. English moves to `src/react/locales/en.ts` as `EN_FIELD_STRINGS` (`DEFAULT_FIELD_STRINGS` still names it), and `SUPPORTED_LOCALES` / `FIELD_STRINGS_BY_LOCALE` list the packs. See [docs/i18n.md](docs/i18n.md).
 - **`FR_FIELD_STRINGS`, a complete French `FieldStrings`, in the `./react` entry**: every control's copy in French, with French plural rules and sizes (`ko`, `Mo`, decimal comma) from `Intl`, in `src/react/locales/fr.ts`, and a no-break space before a colon. A host mounts it with `FieldStringsProvider`, or spreads its own words over it. See [docs/i18n.md](docs/i18n.md).
-- **`optionLabels` on an enum field**: a host maps an enum's codes to what a person reads (`{ LILLE: 'Lille (59)' }`), and `EnumField`, the result view's value, its table cells and their tooltips show the label in both presentations, as an authored `title` is shown. An option the labels leave out reads as before, a value the enum does not declare is shown as it came, and the form still stores the code. It is not a wire fact, so the derivation never sets it.
-- **`applyFieldOverrides` and `FieldOverride` in the core entry**: a host sets its own `title`, `description`, `placeholder` and enum `optionLabels` on the fields a path names — `customer.display_name`, `boutique.code`, and `lines[].unit_price` for a field of every row of a list — over what the descriptor states. It returns a new tree, ignores a path that names no field, and reports each such path to an optional `onUnmatched`. See [docs/i18n.md](docs/i18n.md).
+
+### Fixed
+
+- **A field with a default no longer shows as optional**: the standard marks a defaulted field `required: false`, since it can never be missing, and the controls read that as optional, badging it and folding it behind the optional toggle. `shownAsOptional(field)` in the core entry is now what decides both, and it is false for a field that carries a `default_value`, so a choice defaulted to one of its options is shown like a required one. What gates a run is unchanged.
 
 ## [v0.12.1] - 2026-09-28
 

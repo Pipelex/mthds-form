@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { cn } from './utils';
 import type { DateRunField } from '../core';
 import { toDateInputValue, toStoredDateValue } from '../core/date-format';
@@ -30,7 +31,7 @@ export function DateField({ field, value, onChange, id, error, disabled }: DateF
       conceptRef={field.conceptRef}
       category="date"
       description={field.description}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
     >

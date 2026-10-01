@@ -79,11 +79,6 @@ export {
   isAcceptedFile,
 } from './file-formats';
 export { narrowFileFormats } from './narrow-file-formats';
-// A host's own words over the descriptor's - label, helper line, placeholder,
-// enum option labels - set per field by a dotted path, the same kind of pass
-// over the tree as `narrowFileFormats`. See ./field-overrides.
-export type { FieldOverride } from './field-overrides';
-export { applyFieldOverrides } from './field-overrides';
 
 // ...and how to READ what one comes back as. The result side's twin of that
 // table: the pinned content models of `native.Document`, `native.Image` and
@@ -135,7 +130,13 @@ export {
 // because the near-miss pair is easy to pick and impossible to test for without
 // a structured concept.
 export type { Readiness } from './readiness';
-export { computeReadiness, fieldFilled, isFilled, mustBeFilled } from './readiness';
+export {
+  computeReadiness,
+  fieldFilled,
+  isFilled,
+  mustBeFilled,
+  shownAsOptional,
+} from './readiness';
 
 // The typed pipe_io_contracts mirror and its gating predicates.
 export type {
