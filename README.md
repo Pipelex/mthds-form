@@ -48,6 +48,16 @@ return fields.map((field) => (
 ));
 ```
 
+That loop, with the seed, the uploads, the optional disclosure, the required marks and the run inputs around it, is what `useMethodForm` and `MethodForm` already are: a host that renders a method's whole form mounts those and keeps only its panel and its run button. See [docs/method-form.md](docs/method-form.md).
+
+```tsx
+import { MethodForm, useMethodForm } from '@pipelex/mthds-form/react';
+
+const form = useMethodForm({ descriptor, contract, uploadFile });
+// form.values, form.inputs (what a run takes), form.ready, form.attempt()
+return <MethodForm form={form} locale="fr" presentation="app" />;
+```
+
 `pipe_io_contracts` is always on a valid validate report; `input_form` is its sibling presentation view, opted into with `views: ["input_form"]` on the validate request. Both lookups take their arguments in wire order — **the map, domain, pipe code** — and the last two are strings, so swapping them typechecks. They resolve anyway against a map keyed by bare pipe code, and fail only against one keyed by namespaced `pipe_ref`, a long way from the call.
 
 `computeReadiness` reports `{ total, ready, missing }` — `missing` names the inputs still to fill, so it is both the Run gate and what a form tells the user is left.
@@ -78,6 +88,7 @@ The controls carry Tailwind classes over the standard shadcn/ui semantic tokens 
 | [docs/dependency-budget.md](docs/dependency-budget.md) | what each layer may depend on, and how that is enforced |
 | [docs/theming.md](docs/theming.md) | the token contract and host setup |
 | [docs/wire-correspondence.md](docs/wire-correspondence.md) | the name-for-name wire ↔ `RunField` mapping |
+| [docs/method-form.md](docs/method-form.md) | the whole form of one method: `useMethodForm` and `MethodForm`, what they cover and what stays the host's |
 | [docs/upload-seam.md](docs/upload-seam.md) | what a file control and its host owe each other: accepted formats and narrowing them, write-back paths, previews, the file card |
 | [docs/i18n.md](docs/i18n.md) | wording a form for its reader: the controls' strings, the French set and the locale switch |
 | [docs/derivation-swap.md](docs/derivation-swap.md) | the record of the swap to the wire descriptor — what changed, what survived |

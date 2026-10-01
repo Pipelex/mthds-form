@@ -104,4 +104,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     `${count} ${plural(count, 'champ facultatif', 'champs facultatifs')}`,
   optionalInputsCount: (count) =>
     `${count} ${plural(count, 'entrée facultative', 'entrées facultatives')}`,
+  requiredField: 'Obligatoire',
+  incompleteField: 'Incomplet\u00a0: remplissez ses champs obligatoires',
+  uploadFailed: 'Ce fichier n’a pas pu être envoyé. Réessayez.',
 };

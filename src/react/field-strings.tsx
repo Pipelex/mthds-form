@@ -143,6 +143,19 @@ export interface FieldStrings {
   hideOptionalInputs: string;
   optionalFieldsCount: (count: number) => string;
   optionalInputsCount: (count: number) => string;
+  /**
+   * The mark `MethodForm` puts on an input the run needs and does not have,
+   * once the person has tried to run.
+   */
+  requiredField: string;
+  /**
+   * The mark on an optional input that was started but is not complete, once
+   * the person has tried to run: a started structure owes its concept every
+   * required field.
+   */
+  incompleteField: string;
+  /** What a file field says when the host's `uploadFile` rejected its file. */
+  uploadFailed: string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

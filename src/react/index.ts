@@ -18,6 +18,21 @@ export { ObjectField } from './object-field';
 export { ProseField, TextField } from './text-field';
 export { UnknownField } from './unknown-field';
 
+// The whole input form of one method: `useMethodForm` holds its state (the
+// seed, the uploads, the gate, the run inputs) and `MethodForm` renders its
+// fields. The host keeps its panel, its run button and its history. See
+// docs/method-form.md.
+export type {
+  MethodFormController,
+  MethodFormProps,
+  MethodFormState,
+  MethodFormUploadContext,
+  MethodFormValues,
+  UploadedFile,
+  UseMethodFormOptions,
+} from './method-form';
+export { MethodForm, useMethodForm } from './method-form';
+
 export type { ResultFieldProps } from './result-field';
 export { ResultField } from './result-field';
 
