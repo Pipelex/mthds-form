@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **`runValuesFromStore` keeps an optional structure the stored run went without closed**: a stored `null` (or no value at all) for an optional structure, at any depth, used to come back as an object of empty children, which reads as open, so a reloaded run showed every structure it had left out as opened and blank. It now comes back `undefined`, closed. A required structure still gets its shell.
 - **A half-filled optional structure inside a structure now blocks the run**: readiness and the server gate checked a structure's required children only, so an optional child structure holding something but with a required child blank passed both and went out incomplete. Such a child is now held to its own concept at every depth, as a touched optional input already was at the top level.
 
 ## [v0.13.0] - 2026-09-29
