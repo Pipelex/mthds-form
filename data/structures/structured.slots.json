@@ -51,6 +51,20 @@
           "concept": "Document"
         }
       ]
+    },
+    {
+      "code": "shop_with_bank",
+      "slots": [
+        {
+          "name": "shop",
+          "concept": "Shop"
+        },
+        {
+          "name": "refund_account",
+          "concept": "BankDetails",
+          "presence": "optional"
+        }
+      ]
     }
   ]
 }

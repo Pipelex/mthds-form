@@ -143,6 +143,12 @@ export interface FieldStrings {
   hideOptionalInputs: string;
   optionalFieldsCount: (count: number) => string;
   optionalInputsCount: (count: number) => string;
+  /**
+   * The words beside an optional structure's presence switch. The switch is ON
+   * while the structure is part of the run and OFF while it is left out; its
+   * accessible name is these words followed by the structure's label.
+   */
+  includeOptional: string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

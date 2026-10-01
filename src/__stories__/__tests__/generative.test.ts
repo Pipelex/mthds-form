@@ -22,7 +22,8 @@ import {
 } from '../../generative/paths';
 import { PROMPT_HASH } from '../../generative/prompt-hash';
 import { METHOD_WIP } from './method-wip';
-import { payloadToState, seedInputs } from '../../generative/state';
+import { payloadToState } from '../../generative/state';
+import { seedInputs } from '../../core/seed';
 import { specFromJsonl } from '../../generative/stream';
 import { formatProblems, validateAgainstCatalog } from '../../generative/validate';
 import * as designSlides from '../_generated/design_slides';

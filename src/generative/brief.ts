@@ -185,7 +185,8 @@ type Side = 'input' | 'result';
  * defaulted structure lists none of its own - two `/state` patches on one
  * subtree would make the seed depend on the order a model emits them in -
  * while its notes still state it, as a fact about the field rather than an
- * instruction.
+ * instruction. An optional structure with no default of its own seeds nothing
+ * beneath it, for the same reason `seedInputs` leaves it absent.
  */
 function entryOf(
   field: RunField,
@@ -231,7 +232,12 @@ function describe(
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
-    const seededBelow = seeded || field.defaultValue !== undefined;
+    // Beneath an optional structure with no default of its own nothing is
+    // seeded either: whether it is there at all is the person's choice, made
+    // with its presence switch, and `seedInputs` leaves it absent. Listing its
+    // members' defaults as seeds would have a layout switch it on.
+    const seededBelow =
+      seeded || field.defaultValue !== undefined || (side === 'input' && !field.required);
     for (const child of field.fields) {
       describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow);
     }

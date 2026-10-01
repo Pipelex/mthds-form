@@ -41,3 +41,18 @@ status      = { type = "text", description = "Where the invoice stands", require
 billed_to   = { type = "concept", concept_ref = "Address", description = "Who it is billed to", required = true }
 lines       = { type = "list", item_type = "concept", item_concept_ref = "LineItem", description = "The billable lines", required = true }
 notes       = { type = "text", description = "Free-form notes", required = false }
+
+[concept.BankDetails]
+description = "Where a payment is sent"
+
+[concept.BankDetails.structure]
+holder = { type = "text", description = "Who holds the account", required = false, default_value = "Atlas SAS" }
+bank   = { type = "text", description = "The bank's name", required = false, default_value = "BNP Paribas" }
+iban   = { type = "text", description = "The account number", required = true }
+
+[concept.Shop]
+description = "A shop and, when it is paid directly, its bank details"
+
+[concept.Shop.structure]
+name         = { type = "text", description = "The shop's name", required = true }
+bank_account = { type = "concept", concept_ref = "BankDetails", description = "Where to pay the shop, when it is paid directly", required = false }

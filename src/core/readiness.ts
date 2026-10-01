@@ -3,7 +3,7 @@
  * button may fire and which inputs are still missing.
  */
 
-import type { RunField } from './descriptor';
+import type { ObjectRunField, RunField } from './descriptor';
 import { hasOwnProp, ownProp } from './own-property';
 
 /**
@@ -118,7 +118,20 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
   if (field.kind === 'object') {
     if (!isFilled(value)) return false;
     const obj = (value ?? {}) as Record<string, unknown>;
-    return field.fields.every((f) => !f.required || fieldFilled(f, ownProp(obj, f.name)));
+    // A required child must be filled. An OPTIONAL child the value holds
+    // something in owes its own concept the same - the rule a touched optional
+    // input follows at the top level (`computeReadiness`) and a started list
+    // row follows below, applied at every depth. Asking required children
+    // alone let a half-filled optional structure INSIDE a structure through:
+    // `{bank: {holder: 'x', iban: ''}}` satisfied ajv (a present empty string
+    // is present, a content model carries no `minLength`) and readiness never
+    // looked below `bank`, so the button stayed live and the run went out with
+    // a required child blank. An optional child that holds nothing is absent,
+    // and absence blocks nothing - which is what its switch OFF writes.
+    return field.fields.every((f) => {
+      const child = ownProp(obj, f.name);
+      return f.required ? fieldFilled(f, child) : !isFilled(child) || fieldFilled(f, child);
+    });
   }
   if (field.kind === 'list') {
     // Too many items is not filled, and this is asked of EVERY list, not only
@@ -233,4 +246,48 @@ export function computeReadiness(fields: RunField[], values: Record<string, unkn
  */
 export function shownAsOptional(field: RunField): boolean {
   return !field.required && field.defaultValue === undefined;
+}
+
+/**
+ * Whether a field carries its own presence switch: an OPTIONAL structured
+ * concept, at any depth - a structure inside a structure, or an optional
+ * structured input at the top level.
+ *
+ * Such a field is its own disclosure. Its value is either absent (OFF) or an
+ * object (ON), and the switch is the one way a person says "none of this" once
+ * the structure's children carry defaults - a half-filled optional structure
+ * otherwise reads as a choice nobody made. It therefore never folds behind its
+ * parent's "+ N optional" disclosure (`foldsBehindOptionalDisclosure`).
+ *
+ * An item of a list is never one: a row is in the array because the person
+ * added it, so adding is its switch.
+ */
+export function hasPresenceSwitch(field: RunField): field is ObjectRunField {
+  return field.kind === 'object' && !field.required;
+}
+
+/**
+ * Whether a presence switch reads ON for this value: a plain object, even `{}`.
+ * `undefined` and `null` read OFF.
+ *
+ * Derived from the value, never held beside it, so a host that seeds the value
+ * (`seedObjectValue`) has turned the switch on, and one that clears it has
+ * turned it off. ON is presentation; what the run makes of the value is
+ * `isFilled`'s answer as everywhere else - an ON structure holding nothing at
+ * all is still absent on the wire, exactly as an opened optional section left
+ * blank always was, while one holding anything owes its concept every required
+ * child (`fieldFilled`).
+ */
+export function presenceSwitchOn(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Whether a field, while empty, folds behind its container's "+ N optional"
+ * disclosure: shown as optional (`shownAsOptional`) AND not carrying a
+ * presence switch of its own (`hasPresenceSwitch`), which is always visible.
+ * The disclosure's count is the number of empty fields this answers `true` for.
+ */
+export function foldsBehindOptionalDisclosure(field: RunField): boolean {
+  return shownAsOptional(field) && !hasPresenceSwitch(field);
 }

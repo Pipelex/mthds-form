@@ -93,7 +93,10 @@ export {
   resultFieldAtPath,
   segmentsUnder,
 } from './paths';
-export { payloadToState, seedInputs } from './state';
+export { payloadToState } from './state';
+// The seed is the kernel's (`src/core/seed.ts`), re-exported here so a host on
+// this entry seeds its store without a second import.
+export { seedInputs } from '../core/seed';
 
 // A layout with its provenance: who produced it, on which model, under which prompt.
 export {

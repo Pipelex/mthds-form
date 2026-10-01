@@ -177,7 +177,16 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             </span>
             <div className="min-w-0 flex-1">
               <FieldRenderer
-                field={{ ...field.item, title: '', name: `${field.name}[${index}]` }}
+                // `required: true`: a row is in the array because the person
+                // added it, so it is never optional and never carries the
+                // presence switch an optional structure gets - adding the row
+                // was the switch.
+                field={{
+                  ...field.item,
+                  title: '',
+                  name: `${field.name}[${index}]`,
+                  required: true,
+                }}
                 value={item}
                 onChange={(v) => setItem(index, v)}
                 id={`${id}.${index}`}

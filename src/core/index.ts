@@ -133,10 +133,20 @@ export type { Readiness } from './readiness';
 export {
   computeReadiness,
   fieldFilled,
+  foldsBehindOptionalDisclosure,
+  hasPresenceSwitch,
   isFilled,
   mustBeFilled,
+  presenceSwitchOn,
   shownAsOptional,
 } from './readiness';
+
+// Seeding from the method's authored defaults. `seedInputs` seeds a whole form
+// and leaves every optional structure absent; `seedObjectValue` is what one
+// optional structure holds the moment its presence switch turns on - the same
+// call the control makes, exported so a host (or a server) that wants the
+// structure on from the start writes exactly that value. See ./seed.
+export { seedInputs, seedObjectValue } from './seed';
 
 // The typed pipe_io_contracts mirror and its gating predicates.
 export type {

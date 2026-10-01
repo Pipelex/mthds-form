@@ -104,4 +104,5 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     `${count} ${plural(count, 'champ facultatif', 'champs facultatifs')}`,
   optionalInputsCount: (count) =>
     `${count} ${plural(count, 'entrée facultative', 'entrées facultatives')}`,
+  includeOptional: 'Renseigner',
 };
