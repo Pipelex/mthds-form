@@ -1,0 +1,47 @@
+CHANGELOG.md
+  s_05a530b5d83b6b::t_339e674a2f63aa 14-15
+data/structures/results.mthds
+  s_05a530b5d83b6b::t_d94c3a7e4a7649 157-168
+data/structures/results.slots.json
+  s_05a530b5d83b6b::t_3c3b703e53de66 2,182-191
+docs/result-view.md
+  s_05a530b5d83b6b::t_79490276d9e395 55-56,59-68,240-241,258,331
+src/__stories__/_generated/results.ts
+  s_05a530b5d83b6b::t_17601b39d86fbb 4,26,1585-1639,1844-1856,2523-2546,2591-2592
+src/__stories__/outputs/html-page.stories.tsx
+  s_05a530b5d83b6b::t_42ab8d0a089109 4-9,103-137,268-302
+src/react/__tests__/result-panel.test.tsx
+  s_3aa00652c9186b::t_3e4b8202fb74b2 15,144-189
+src/react/__tests__/result-values.test.tsx
+  s_05a530b5d83b6b::t_94299fefbf0fb0 256-257,259-262
+src/react/__tests__/save-as-pdf.test.tsx
+  s_05a530b5d83b6b::t_1ef92de41d74fb 107-172,181
+src/react/html-preview.tsx
+  s_05a530b5d83b6b::t_f2540a47805847 129-135,148,221-223
+src/react/stuff-viewer.tsx
+  s_05a530b5d83b6b::t_d22cff219072c9 7-9,11,13,16-17,23,49-64,69-73,97-108,303,309-315,322-325,349-357,390-393,400,405-411,428-451,471-475,484-494
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cf56be3cfd1a661f12d11daa3d387a5f3c35005e",
+  "prompts": {},
+  "sessions": {
+    "s_05a530b5d83b6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a8010b7-8d27-4d36-9005-09d2ad4a427c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    },
+    "s_3aa00652c9186b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "208369ad-e72b-437c-a3ce-c5c246ecd80b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}
