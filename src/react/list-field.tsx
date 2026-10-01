@@ -179,8 +179,8 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               <FieldRenderer
                 // `required: true`: a row is in the array because the person
                 // added it, so it is never optional and never carries the
-                // presence switch an optional structure gets - adding the row
-                // was the switch.
+                // presence toggle an optional structure gets - adding the row
+                // was the toggle.
                 field={{
                   ...field.item,
                   title: '',

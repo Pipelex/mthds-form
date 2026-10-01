@@ -76,17 +76,17 @@ export const FilledDeep: Story = {
 };
 
 /**
- * Optional structures carry a presence switch in their header instead of the
- * optional badge: one nested inside a required structure (`shop.bank_account`)
- * and one at the top level (`refund_account`). Both start off, because nothing
- * seeded them; turning one on seeds its children's authored defaults (`holder`,
+ * Optional structures are their own disclosure, drawn with the "+" collapse
+ * control the optional fields fold behind and worded by the structure's label: one nested inside a required structure (`shop.bank_account`)
+ * and one at the top level (`refund_account`). Both start closed, because nothing
+ * opened them; opening one seeds its children's authored defaults (`holder`,
  * `bank`) and leaves the required `iban` for the person. See
- * docs/architecture.md § "An optional structure's presence switch".
+ * docs/architecture.md § "An optional structure's presence toggle".
  */
 export const OptionalStructures: Story = { args: { pipeCode: 'shop_with_bank' } };
 
-/** The same pipe with the host having switched the nested structure on. */
-export const OptionalStructureOn: Story = {
+/** The same pipe with the host having opened the nested structure. */
+export const OptionalStructureOpen: Story = {
   args: {
     pipeCode: 'shop_with_bank',
     initialValues: {

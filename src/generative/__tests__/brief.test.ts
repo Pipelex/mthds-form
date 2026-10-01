@@ -129,9 +129,8 @@ describe('the seeds an input page lists', () => {
       ],
     },
     { kind: 'text', name: 'note', required: false, defaultValue: 'hello' },
-    // An optional structure with NO default of its own but a defaulted member:
-    // `seedInputs` seeds it (switching it on) from that member, so the brief
-    // lists the member's default as the seed.
+    // An optional structure with NO default of its own: its presence toggle
+    // starts closed, so a member's default is no seed, only a note.
     {
       kind: 'object',
       name: 'bank',
@@ -150,9 +149,9 @@ describe('the seeds an input page lists', () => {
     expect(entry('/inputs/note')?.default).toBe('"hello"');
   });
 
-  it("seeds an optional structure through its members' defaults", () => {
+  it('lists no seed beneath an optional structure that has no default of its own', () => {
     expect(entry('/inputs/bank')?.default).toBeUndefined();
-    expect(entry('/inputs/bank/holder')?.default).toBe('"Atlas"');
+    expect(entry('/inputs/bank/holder')?.default).toBeUndefined();
   });
 
   it('lists seeds that, applied in order, are exactly what seedInputs seeds', () => {

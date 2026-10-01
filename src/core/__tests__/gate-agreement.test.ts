@@ -222,10 +222,10 @@ const REFS: PipeInputContract = {
 
 /**
  * An optional structure inside a structure, and another inside that one - the
- * shape a presence switch writes at depth two and three. Pipelex refuses a field
+ * shape a presence toggle writes at depth two and three. Pipelex refuses a field
  * both required and defaulted, so a defaulted child arrives optional, as
  * `titulaire` does here; `iban` and `rue` are the required children that only
- * fall due once their structure is switched on.
+ * fall due once their structure is opened.
  */
 const shopSchema = {
   title: 'Boutique',
@@ -656,21 +656,21 @@ const ROWS: Row[] = [
     runnable: false,
   },
 
-  // ─── an optional structure's presence switch, at depth two and three ──────
+  // ─── an optional structure's presence toggle, at depth two and three ──────
   {
-    label: 'an optional ref child switched on and left empty',
+    label: 'an optional ref child opened and left empty',
     inputs: { w: REFS },
     values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: {} } },
     runnable: true,
   },
   {
-    label: 'an optional ref child switched on and half filled',
+    label: 'an optional ref child opened and half filled',
     inputs: { w: REFS },
     values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: { notes: 'later' } } },
     runnable: false,
   },
   {
-    label: 'an optional ref child switched on with its required child blank',
+    label: 'an optional ref child opened with its required child blank',
     inputs: { w: REFS },
     values: {
       w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: { name: '', notes: 'later' } },
@@ -678,43 +678,43 @@ const ROWS: Row[] = [
     runnable: false,
   },
   {
-    label: 'an optional ref child switched on and filled',
+    label: 'an optional ref child opened and filled',
     inputs: { w: REFS },
     values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: { name: 'E' } } },
     runnable: true,
   },
   {
-    label: 'a nested optional structure switched off',
+    label: 'a nested optional structure closed',
     inputs: { shop: SHOP },
     values: { shop: { nom: 'Atlas Lille', compte: undefined } },
     runnable: true,
   },
   {
-    label: 'a nested optional structure switched on with only its seeded default',
+    label: 'a nested optional structure opened with only its seeded default',
     inputs: { shop: SHOP },
     values: { shop: { nom: 'Atlas Lille', compte: { titulaire: 'Atlas' } } },
     runnable: false,
   },
   {
-    label: 'a nested optional structure switched on with its required child blank',
+    label: 'a nested optional structure opened with its required child blank',
     inputs: { shop: SHOP },
     values: { shop: { nom: 'Atlas Lille', compte: { titulaire: 'Atlas', iban: '' } } },
     runnable: false,
   },
   {
-    label: 'a nested optional structure switched on and filled',
+    label: 'a nested optional structure opened and filled',
     inputs: { shop: SHOP },
     values: { shop: { nom: 'Atlas Lille', compte: { titulaire: 'Atlas', iban: 'FR76' } } },
     runnable: true,
   },
   {
-    label: 'a third-level optional structure switched on and left empty',
+    label: 'a third-level optional structure opened and left empty',
     inputs: { shop: SHOP },
     values: { shop: { nom: 'Atlas Lille', compte: { iban: 'FR76', adresse: {} } } },
     runnable: true,
   },
   {
-    label: 'a third-level optional structure switched on with its required child blank',
+    label: 'a third-level optional structure opened with its required child blank',
     inputs: { shop: SHOP },
     values: {
       shop: { nom: 'Atlas Lille', compte: { iban: 'FR76', adresse: { rue: '', ville: 'Lille' } } },
@@ -722,7 +722,7 @@ const ROWS: Row[] = [
     runnable: false,
   },
   {
-    label: 'a third-level optional structure switched on and filled',
+    label: 'a third-level optional structure opened and filled',
     inputs: { shop: SHOP },
     values: {
       shop: { nom: 'Atlas Lille', compte: { iban: 'FR76', adresse: { rue: '1 rue Neuve' } } },

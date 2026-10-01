@@ -1,9 +1,9 @@
 /**
- * An optional structure's presence switch, as the kernel states it.
+ * An optional structure's presence toggle, as the kernel states it.
  *
  * The control is a thin reading of four kernel answers: whether a field carries
- * the switch (`hasPresenceSwitch`), whether it reads ON for a value
- * (`presenceSwitchOn`), what turning it on writes (`seedObjectValue`), and
+ * the toggle (`hasPresenceToggle`), whether it reads open for a value
+ * (`presenceOpen`), what opening it writes (`seedObjectValue`), and
  * whether the field still folds behind its container's optional disclosure
  * (`foldsBehindOptionalDisclosure`). What the run makes of the value is
  * `fieldFilled`'s answer, asserted here at depth two and three; the browser and
@@ -15,8 +15,8 @@ import {
   computeReadiness,
   fieldFilled,
   foldsBehindOptionalDisclosure,
-  hasPresenceSwitch,
-  presenceSwitchOn,
+  hasPresenceToggle,
+  presenceOpen,
 } from '../readiness';
 import { seedInputs, seedObjectValue } from '../seed';
 
@@ -49,32 +49,22 @@ const bank = object(
 const shop = object('boutique', [text('nom'), bank]);
 
 describe('seedInputs', () => {
-  it('seeds an optional structure when it has defaults to seed, at any depth', () => {
-    const all = { titulaire: 'Atlas SAS', banque: 'BNP', bic: 'BNPAFRPP', iban: 'FR76' };
-    expect(seedInputs([bank])).toEqual({ compte_bancaire: all });
-    expect(seedInputs([shop])).toEqual({ boutique: { compte_bancaire: all } });
-  });
-
-  it('seeds a top-level optional structure from one defaulted child', () => {
+  it('leaves an optional structure absent, however many defaults its children carry', () => {
+    expect(seedInputs([shop])).toEqual({});
+    expect(seedInputs([bank])).toEqual({});
     const price = object(
       'prix_or',
       [text('prix_au_gramme', { required: false, defaultValue: 41 })],
-      {
-        required: false,
-      },
+      { required: false },
     );
-    expect(seedInputs([price])).toEqual({ prix_or: { prix_au_gramme: 41 } });
+    expect(seedInputs([price])).toEqual({});
+    expect(seedObjectValue(price)).toEqual({ prix_au_gramme: 41 });
   });
 
-  it('leaves an optional structure with nothing to seed absent', () => {
-    const plain = object('adresse', [text('rue'), text('ville', { required: false })], {
-      required: false,
-    });
-    expect(seedInputs([plain])).toEqual({});
-    expect(seedInputs([object('boutique', [text('nom'), plain])])).toEqual({});
-  });
+  it('still seeds into a required structure, and an optional one that has a default of its own', () => {
+    const required = object('boutique', [text('nom', { required: false, defaultValue: 'Lille' })]);
+    expect(seedInputs([required])).toEqual({ boutique: { nom: 'Lille' } });
 
-  it("seeds a structure's own default whole", () => {
     const defaulted = { ...bank, defaultValue: { titulaire: 'X' } };
     expect(seedInputs([defaulted])).toEqual({ compte_bancaire: { titulaire: 'X' } });
   });
@@ -90,10 +80,10 @@ describe('seedObjectValue', () => {
     });
   });
 
-  it('is an empty object when no child carries a default, which still reads ON', () => {
+  it('is an empty object when no child carries a default, which still reads open', () => {
     const plain = object('adresse', [text('rue')], { required: false });
     expect(seedObjectValue(plain)).toEqual({});
-    expect(presenceSwitchOn(seedObjectValue(plain))).toBe(true);
+    expect(presenceOpen(seedObjectValue(plain))).toBe(true);
   });
 
   it("prefers the structure's own object default, as a copy", () => {
@@ -104,36 +94,33 @@ describe('seedObjectValue', () => {
     expect(seeded).not.toBe(own);
   });
 
-  it('seeds an optional structure beneath it only when that one has defaults', () => {
-    const seeded = object('adresse', [text('rue', { required: false, defaultValue: 'Neuve' })], {
+  it('leaves an optional structure beneath it closed', () => {
+    const inner = object('adresse', [text('rue', { required: false, defaultValue: 'Neuve' })], {
       required: false,
     });
-    const empty = object('agence', [text('code')], { required: false });
-    const outer = object(
-      'compte',
-      [text('iban', { required: false, defaultValue: 'FR' }), seeded, empty],
-      { required: false },
-    );
-    expect(seedObjectValue(outer)).toEqual({ iban: 'FR', adresse: { rue: 'Neuve' } });
+    const outer = object('compte', [text('iban', { required: false, defaultValue: 'FR' }), inner], {
+      required: false,
+    });
+    expect(seedObjectValue(outer)).toEqual({ iban: 'FR' });
   });
 });
 
-describe('the switch', () => {
+describe('the presence toggle', () => {
   it('is carried by an optional structure only', () => {
-    expect(hasPresenceSwitch(bank)).toBe(true);
-    expect(hasPresenceSwitch(shop)).toBe(false);
-    expect(hasPresenceSwitch(text('note', { required: false }))).toBe(false);
+    expect(hasPresenceToggle(bank)).toBe(true);
+    expect(hasPresenceToggle(shop)).toBe(false);
+    expect(hasPresenceToggle(text('note', { required: false }))).toBe(false);
   });
 
-  it('reads ON over any plain object and OFF over an absence', () => {
-    expect(presenceSwitchOn({})).toBe(true);
-    expect(presenceSwitchOn({ iban: 'FR76' })).toBe(true);
-    expect(presenceSwitchOn(undefined)).toBe(false);
-    expect(presenceSwitchOn(null)).toBe(false);
-    expect(presenceSwitchOn([])).toBe(false);
+  it('reads open over any plain object and closed over an absence', () => {
+    expect(presenceOpen({})).toBe(true);
+    expect(presenceOpen({ iban: 'FR76' })).toBe(true);
+    expect(presenceOpen(undefined)).toBe(false);
+    expect(presenceOpen(null)).toBe(false);
+    expect(presenceOpen([])).toBe(false);
   });
 
-  it('keeps a switched structure out of the optional disclosure, and nothing else', () => {
+  it('keeps a toggled structure out of the optional disclosure, and nothing else', () => {
     expect(foldsBehindOptionalDisclosure(bank)).toBe(false);
     expect(foldsBehindOptionalDisclosure(text('note', { required: false }))).toBe(true);
     expect(
@@ -143,7 +130,7 @@ describe('the switch', () => {
   });
 });
 
-describe('fieldFilled over a switched structure', () => {
+describe('fieldFilled over a toggled structure', () => {
   const account = object('compte', [text('iban'), text('titulaire', { required: false })], {
     required: false,
   });
@@ -155,7 +142,7 @@ describe('fieldFilled over a switched structure', () => {
     object('compte', [...account.fields, address], { required: false }),
   ]);
 
-  it('blocks nothing while the structure is off, or on and empty', () => {
+  it('blocks nothing while the structure is closed, or open and empty', () => {
     expect(fieldFilled(deep, { nom: 'Lille' })).toBe(true);
     expect(fieldFilled(deep, { nom: 'Lille', compte: undefined })).toBe(true);
     expect(fieldFilled(deep, { nom: 'Lille', compte: {} })).toBe(true);

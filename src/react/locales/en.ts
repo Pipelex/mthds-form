@@ -63,5 +63,4 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   hideOptionalInputs: 'Hide optional inputs',
   optionalFieldsCount: (count) => (count === 1 ? '1 optional field' : `${count} optional fields`),
   optionalInputsCount: (count) => (count === 1 ? '1 optional input' : `${count} optional inputs`),
-  includeOptional: 'Include',
 };

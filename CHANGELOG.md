@@ -4,12 +4,12 @@
 
 ### Added
 
-- **An optional structure carries a presence switch**: an optional structured field, at any depth and at the top level, shows an "Include" switch in its header instead of the optional badge, and is no longer folded behind (or counted by) its parent's "+ N optional" toggle. The switch reads the value — ON over any object, OFF over an absent one — and writes `undefined` when turned off and `seedObjectValue(field)`, the structure seeded from its own or its descendants' authored defaults, when turned on; a structure with defaults to seed therefore starts ON when a form is seeded with `seedInputs`. The core entry exports `seedObjectValue`, `seedInputs`, `hasPresenceSwitch`, `presenceSwitchOn` and `foldsBehindOptionalDisclosure`, so a host or a server seeds and reads the switch the way the control does. See [docs/architecture.md](docs/architecture.md#an-optional-structures-presence-switch).
+- **An optional structure is its own disclosure**: an optional structured field, at any depth and at the top level, is shown closed as a single "+ <label>" button in the style of the "+ N optional" toggle, and opens to its usual card under a "− <label>" button; it is no longer folded behind (or counted by) its parent's optional toggle. Opening writes `seedObjectValue(field)`, the structure seeded from its own or its children's authored defaults, and closing writes `undefined`, which drops it from the payload; the state is read from the value, so a host that seeds the structure has opened it. The core entry exports `seedObjectValue`, `seedInputs`, `hasPresenceToggle`, `presenceOpen` and `foldsBehindOptionalDisclosure`, so a host or a server seeds and reads it the way the control does. See [docs/architecture.md](docs/architecture.md#an-optional-structures-presence-toggle).
 
 ### Changed
 
-- **`FieldStrings` gains `includeOptional` (Breaking)**: the words beside an optional structure's switch, "Include" in English and "Renseigner" in French. A host that supplies a complete `FieldStrings` rather than a partial override adds it.
-- **`seedInputs` moves to the core entry**: it is exported from `@pipelex/mthds-form`, so a server seeds a form the way the controls do, and stays re-exported from `./generative`. What it seeds is unchanged: a structure, optional ones included, is seeded with `seedObjectValue` when it carries a default of its own or one beneath it, which switches it on, and left absent otherwise.
+- **`seedInputs` leaves an optional structure closed (Breaking)**: it used to seed an optional structure with its children's defaults, which sent it whether or not the person wanted it. It now seeds an optional structure only when the structure carries an authored default of its own, at every depth, and moves to the core entry, still re-exported from `./generative`; a generative brief lists no seed beneath such a structure either. A host that wants one open from the start writes `seedObjectValue(field)` at its path.
+- **The "+ N optional" toggle states `aria-expanded`**: assistive technology now hears whether the optional fields it folds are shown.
 
 ### Fixed
 
