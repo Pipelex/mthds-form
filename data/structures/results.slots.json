@@ -1,5 +1,5 @@
 {
-  "description": "Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. One pipe carries no 'run' block and cannot: `nested_media_result` resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure. Its descriptor is generated like every other; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch.",
+  "description": "Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. Two pipes carry no 'run' block. `nested_media_result` cannot: it resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch. `quote_page_result` need not: its story supplies a whole document linking a face Storybook serves, which no run can produce. Both descriptors are generated like every other.",
   "pipes": [
     {
       "code": "plain_text_result",
@@ -173,6 +173,16 @@
     {
       "code": "nested_media_result",
       "output": "Report",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ]
+    },
+    {
+      "code": "quote_page_result",
+      "output": "QuotePage",
       "slots": [
         {
           "name": "note",

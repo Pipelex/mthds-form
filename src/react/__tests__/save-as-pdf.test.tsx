@@ -104,6 +104,72 @@ describe('the control on a result that is one page', () => {
   });
 });
 
+describe('a result that is one page', () => {
+  const refined: RunField = {
+    kind: 'object',
+    name: 'output',
+    conceptRef: 'quotes.ClientQuote',
+    refines: ['native.Html'],
+    required: true,
+    fields: [text('inner_html'), text('css_class')],
+  };
+
+  it('draws one control row: the title, the PDF and one download', () => {
+    const { container } = render(<StuffViewer field={refined} value={VALUE} name="devis" />);
+    expect(pdfButtons()).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /download/i })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: S.download })).toBeTruthy();
+    // The page's own row, which saved the same file, is not drawn.
+    expect(screen.queryByRole('button', { name: S.downloadFile('devis.html') })).toBeNull();
+    // And the page has no box around it.
+    const box = container.querySelector('[data-html-page]')!;
+    expect(box.className).not.toContain('border');
+  });
+
+  it('reads the refinement off the descriptor, in French', () => {
+    render(
+      <FieldStringsProvider locale="fr">
+        <StuffViewer field={refined} value={VALUE} name="devis_client" />
+      </FieldStringsProvider>,
+    );
+    expect(screen.getAllByRole('button', { name: FR_FIELD_STRINGS.saveAsPdf })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: FR_FIELD_STRINGS.download })).toHaveLength(1);
+  });
+
+  it('draws the one download when only the page’s file button is asked for', () => {
+    render(
+      <StuffViewer
+        field={refined}
+        value={VALUE}
+        downloads={{ result: false, files: ['markup'] }}
+      />,
+    );
+    expect(screen.getAllByRole('button', { name: S.download })).toHaveLength(1);
+  });
+
+  it('draws no download when neither is asked for', () => {
+    render(
+      <StuffViewer field={refined} value={VALUE} downloads={{ result: false, files: false }} />,
+    );
+    expect(screen.queryByRole('button', { name: S.download })).toBeNull();
+    expect(pdfButtons()).toHaveLength(1);
+  });
+
+  it('keeps the page’s own row for a page inside a structure', () => {
+    const report: ObjectRunField = {
+      kind: 'object',
+      name: 'output',
+      conceptRef: 'demo.Report',
+      required: true,
+      fields: [page('summary'), text('title')],
+    };
+    render(
+      <StuffViewer field={report} value={{ summary: VALUE, title: 'Q3' }} downloadBaseName="r" />,
+    );
+    expect(screen.getByRole('button', { name: S.downloadFile('r-summary.html') })).toBeTruthy();
+  });
+});
+
 describe('the switch', () => {
   it('hides it on the provider, with the downloads left as they are', () => {
     render(
@@ -112,7 +178,7 @@ describe('the switch', () => {
       </ResultEnvProvider>,
     );
     expect(pdfButtons()).toHaveLength(0);
-    expect(screen.getByRole('button', { name: S.downloadFile('quote.html') })).toBeTruthy();
+    expect(screen.getByRole('button', { name: S.download })).toBeTruthy();
   });
 
   it('hides it on one panel, key by key over the provider', () => {

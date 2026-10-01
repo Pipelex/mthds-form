@@ -253,8 +253,13 @@ describe('only the rendering changes', () => {
   const review = record([choice('status', STATUSES), choice('risk', STATUSES)]);
   const value = { status: 'unit_price_differs_from_po', risk: 'HIGH_RISK' };
 
+  // `app` offers the rendered result alone by default; a host asking for the
+  // JSON view gets it, and the receipt is what this block is about.
   function panel() {
-    return renderIn('app', <StuffViewer field={review} value={value} name="review" />);
+    return renderIn(
+      'app',
+      <StuffViewer field={review} value={value} name="review" views={['rendered', 'json']} />,
+    );
   }
 
   it('keeps the code on the JSON view', async () => {

@@ -126,6 +126,13 @@ export interface HtmlPreviewProps {
    * Unset, the dialog proposes the tab's title.
    */
   pdfFileName?: string;
+  /**
+   * Draw a whole document with no border and no rounding, edge to edge with
+   * its container: for a page that IS the view (a result that is one page),
+   * where a box around it is chrome around chrome. A fragment keeps its themed
+   * box either way, since that box is its padding.
+   */
+  bare?: boolean;
 }
 
 /** The fragment preview's default height limit; a whole document has none. */
@@ -138,6 +145,7 @@ export function HtmlPreview({
   fontSrc,
   saveAsPdf,
   pdfFileName,
+  bare = false,
 }: HtmlPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -210,7 +218,9 @@ export function HtmlPreview({
       {...(page ? { 'data-html-page': '' } : {})}
       className={
         page
-          ? 'overflow-hidden rounded-lg border border-border bg-white text-[13px] text-black'
+          ? bare
+            ? 'overflow-hidden bg-white text-[13px] text-black'
+            : 'overflow-hidden rounded-lg border border-border bg-white text-[13px] text-black'
           : 'overflow-hidden rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[13px] text-foreground'
       }
     >

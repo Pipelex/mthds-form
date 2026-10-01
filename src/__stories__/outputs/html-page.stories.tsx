@@ -1,7 +1,12 @@
 import * as React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
-import { DEFAULT_FIELD_STRINGS, StuffViewer } from '../../react';
+import {
+  DEFAULT_FIELD_STRINGS,
+  FieldPresentationProvider,
+  FieldStringsProvider,
+  StuffViewer,
+} from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { resultFieldFor } from '../result-view';
 
@@ -91,6 +96,41 @@ function HtmlPage({ maxWidth }: { maxWidth: number }) {
         name="devis"
         downloadBaseName="Devis 250883-1 HAMI THOMAS"
       />
+    </div>
+  );
+}
+
+/**
+ * The same quote, styled for a screen the way a method's printable template
+ * usually is: a grey desk around a white sheet, the desk dropped in print.
+ */
+const DESK_QUOTE_PAGE = QUOTE_PAGE.replace(
+  'body { font-family',
+  'body { background: #f2f2f2; } .sheet { max-width: 720px; margin: 24px auto; background: #fff; padding: 40px; box-shadow: 0 1px 6px rgba(0,0,0,.12); } @media print { body { background: #fff; } .sheet { margin: 0; box-shadow: none; } } body { font-family',
+);
+
+/**
+ * A method's own concept refining `native.Html`, in a method app: the host
+ * renders it in `app` presentation and French, passing nothing but the name
+ * and the download's base name, as a quote app does.
+ */
+function RefinedPage({ maxWidth }: { maxWidth: number }) {
+  const field = React.useMemo(
+    () => resultFieldFor(CONTRACTS, OUTPUT_FORM, 'results', 'quote_page_result'),
+    [],
+  );
+  return (
+    <div data-html-page-demo style={{ maxWidth }}>
+      <FieldStringsProvider locale="fr">
+        <FieldPresentationProvider presentation="app">
+          <StuffViewer
+            field={field}
+            value={{ inner_html: DESK_QUOTE_PAGE, css_class: null }}
+            name="devis_client"
+            downloadBaseName="Devis 250883-1 HAMI THOMAS"
+          />
+        </FieldPresentationProvider>
+      </FieldStringsProvider>
     </div>
   );
 }
@@ -223,5 +263,40 @@ export const SaveAsPdf: Story = {
     } finally {
       document.removeEventListener('load', watch, true);
     }
+  },
+};
+
+/**
+ * **A refined page in a method app.** A concept refining `native.Html`, read
+ * through `refines`, in `app` presentation and French: one row holding the
+ * title, "Enregistrer en PDF" and one download, then the page, edge to edge.
+ * No Résultat/JSON switch (a builder's tool, kept in `studio`), no second
+ * control row above the page.
+ */
+export const RefinedPageInApp: Story = {
+  name: 'A refined page in a method app',
+  render: (args) => <RefinedPage {...args} />,
+  play: async ({ canvasElement }) => {
+    const demo = canvasElement.querySelector<HTMLElement>('[data-html-page-demo]');
+    if (!demo) throw new Error('No page demo rendered');
+    const panel = within(demo);
+    await expect(panel.getAllByRole('button', { name: 'Enregistrer en PDF' })).toHaveLength(1);
+    await expect(panel.getAllByRole('button', { name: /Télécharger/ })).toHaveLength(1);
+    await expect(panel.queryByRole('group', { name: 'Affichage du résultat' })).toBeNull();
+    await expect(panel.getByText('Devis client')).toBeVisible();
+
+    // One row: the title and both controls share a line.
+    const title = panel.getByText('Devis client').getBoundingClientRect();
+    const pdf = panel.getByRole('button', { name: 'Enregistrer en PDF' }).getBoundingClientRect();
+    await expect(Math.abs(title.top + title.height / 2 - (pdf.top + pdf.height / 2))).toBeLessThan(
+      8,
+    );
+
+    // Then the page, edge to edge with the panel, with no box drawn around it.
+    const frame = pageFrame(canvasElement);
+    await waitFor(() => expect(frame.contentDocument?.querySelector('h1')).toBeTruthy());
+    const box = demo.querySelector<HTMLElement>('[data-html-page]')!;
+    await expect(getComputedStyle(box).borderTopWidth).toBe('0px');
+    await expect(box.getBoundingClientRect().width).toBe(demo.getBoundingClientRect().width);
   },
 };

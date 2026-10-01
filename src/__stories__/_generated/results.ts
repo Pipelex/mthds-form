@@ -1,7 +1,7 @@
 /**
  * Generated from data/structures/results.mthds - DO NOT EDIT.
  *
- * Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. One pipe carries no 'run' block and cannot: `nested_media_result` resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure. Its descriptor is generated like every other; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch.
+ * Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. Two pipes carry no 'run' block. `nested_media_result` cannot: it resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch. `quote_page_result` need not: its story supplies a whole document linking a face Storybook serves, which no run can produce. Both descriptors are generated like every other.
  *
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
@@ -23,6 +23,7 @@ export const PIPE_REFS = [
   'results.page_result',
   'results.plain_text_result',
   'results.plural_result',
+  'results.quote_page_result',
   'results.yes_no_result',
 ] as const;
 
@@ -1581,6 +1582,61 @@ export const CONTRACTS: PipeIOContracts = {
       optional: false,
     },
   },
+  'results.quote_page_result': {
+    inputs: {
+      note: {
+        concept_ref: 'native.Text',
+        item_count: null,
+        json_schema: {
+          description: 'A text',
+          properties: {
+            text: {
+              description: 'The text',
+              title: 'Text',
+              type: 'string',
+            },
+          },
+          required: ['text'],
+          title: 'native.Text',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'results.QuotePage',
+      item_count: null,
+      json_schema: {
+        description: 'A client quote, rendered as one printable HTML page',
+        properties: {
+          css_class: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'The CSS class of the content',
+            title: 'Css Class',
+          },
+          inner_html: {
+            description: 'The inner HTML of the content',
+            title: 'Inner Html',
+            type: 'string',
+          },
+        },
+        required: ['inner_html'],
+        title: 'results.QuotePage',
+        type: 'object',
+      },
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
   'results.yes_no_result': {
     inputs: {
       note: {
@@ -1773,6 +1829,19 @@ export const INPUT_FORM: InputForm = {
     ],
   },
   'results.plural_result': {
+    fields: [
+      {
+        concept_ref: 'native.Text',
+        description: 'A text',
+        gating: true,
+        kind: 'prose',
+        name: 'note',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
+  'results.quote_page_result': {
     fields: [
       {
         concept_ref: 'native.Text',
@@ -2451,6 +2520,30 @@ export const OUTPUT_FORM: OutputForm = {
       required: true,
     },
   },
+  'results.quote_page_result': {
+    field: {
+      concept_ref: 'results.QuotePage',
+      description: 'A client quote, rendered as one printable HTML page',
+      fields: [
+        {
+          description: 'The inner HTML of the content',
+          kind: 'text',
+          name: 'inner_html',
+          required: true,
+        },
+        {
+          description: 'The CSS class of the content',
+          kind: 'text',
+          name: 'css_class',
+          required: false,
+        },
+      ],
+      kind: 'object',
+      name: 'output',
+      refines: ['native.Html'],
+      required: true,
+    },
+  },
   'results.yes_no_result': {
     field: {
       concept_ref: 'native.YesNo',
@@ -2494,6 +2587,8 @@ export const PIPE_DESCRIPTIONS: Record<string, string> = {
   'results.plain_text_result':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'results.plural_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.quote_page_result':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'results.yes_no_result':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
