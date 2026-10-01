@@ -118,11 +118,10 @@ export const NativeDate: Story = {
  * An `Html` output — a multi-property content model (`{inner_html, css_class}`),
  * so it renders as an object rather than unwrapping.
  *
- * The markup is shown as **text**, deliberately. Injecting a model's HTML into
- * the host's DOM is an XSS sink, and a kernel that did it would be making that
- * decision on every host's behalf. A host that wants it rendered holds the
- * string and decides — with its own sanitizer — which is exactly the seam the
- * descriptor's `kind` makes possible.
+ * The markup is rendered in a sandboxed frame with no scripts, never injected
+ * into the host's DOM: a model's HTML there would be an XSS sink on the host's
+ * origin. See `docs/result-view.md` § Markup, and `Outputs/Html page` for a
+ * whole document.
  */
 export const NativeHtml: Story = {
   args: story('html_result', 720),

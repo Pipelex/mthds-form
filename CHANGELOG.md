@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **`HtmlPreview` shows a whole document as one page**: markup that opens on a doctype, `<html>` or `<head>` is continued after the frame's own head rather than nested inside its body, so the page's head (styles, print rules, title) stays in the head, after the frame's policy, and its `<html lang>` is kept. Such a page renders edge to edge on white, whatever the theme, and as tall as the document, with no height limit unless `maxHeight` is passed; a fragment keeps the themed preview box. `css_class` now wraps a fragment only. See [docs/result-view.md](docs/result-view.md#markup).
+- **`HtmlPreview`'s default `img-src` adds `'self'`**: `'self' data: https:`, so a page on a plain-`http:` development host reaches the host's own images, as `https:` already let it in production.
 - **`seedInputs` leaves an optional structure closed (Breaking)**: it used to seed an optional structure with its children's defaults, which sent it whether or not the person wanted it. It now seeds an optional structure only when the structure carries an authored default of its own, at every depth, and moves to the core entry, still re-exported from `./generative`; a generative brief lists no seed beneath such a structure either. A host that wants one open from the start writes `seedObjectValue(field)` at its path.
 - **`FieldStrings` gains `requiredField`, `incompleteField` and `uploadFailed` (Breaking)**: the marks `MethodForm` puts on an input after an attempt, and what a file field says when the host's upload rejected. English and French are supplied; a host that supplies a complete `FieldStrings` rather than a partial override adds them.
 - **An optional structure no longer shows the optional badge**: open, it reads as its label, description and card.
@@ -17,6 +19,7 @@
 
 ### Fixed
 
+- **An HTML result loads the fonts it links**: the frame's policy left `font-src` to `default-src 'none'`, so a page linking its typeface (a quote template's `/fonts/…`, or a font service) rendered in a fallback face. `HtmlPreview` takes `fontSrc`, which follows `imgSrc` unless set.
 - **`runValuesFromStore` keeps an optional structure the stored run went without closed**: a stored `null` (or no value at all) for an optional structure, at any depth, used to come back as an object of empty children, which reads as open, so a reloaded run showed every structure it had left out as opened and blank. It now comes back `undefined`, closed. A required structure still gets its shell.
 - **A half-filled optional structure inside a structure now blocks the run**: readiness and the server gate checked a structure's required children only, so an optional child structure holding something but with a required child blank passed both and went out incomplete. Such a child is now held to its own concept at every depth, as a touched optional input already was at the top level.
 

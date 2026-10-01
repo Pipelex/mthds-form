@@ -2,6 +2,13 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { HtmlContentView } from '../core/native-content';
+import {
+  DEFAULT_IMG_SRC,
+  frameDocument,
+  frameStyles,
+  isWholeDocument,
+  pageTypography,
+} from './html-frame';
 
 /**
  * A `native.Html` result, rendered as the markup it is — inside a sandbox.
@@ -30,8 +37,12 @@ import type { HtmlContentView } from '../core/native-content';
  *   one — same-origin is only dangerous *together with* scripts, and without it
  *   the parent could not measure the content to size the frame.
  * - **A `Content-Security-Policy` meta.** `default-src 'none'` with inline
- *   styles allowed, and `img-src` carrying whatever `imgSrc` says — `data:` and
- *   `https:` by default.
+ *   styles allowed, `img-src` carrying whatever `imgSrc` says — the host's own
+ *   origin, `data:` and `https:` by default — and `font-src` whatever `fontSrc`
+ *   says, which follows `imgSrc` unless set. A font, like an image, is a fetch
+ *   that runs nothing; `font-src` used to be left to `default-src 'none'`, so a
+ *   page that links the face it was designed in (`/fonts/…` on the host, or a
+ *   font service) rendered in a fallback face.
  *
  *   `https:` was NOT in that list at first, and the reasoning was that markup
  *   carrying `<img src="https://tracker/…">` phones home the moment a result is
@@ -54,6 +65,15 @@ import type { HtmlContentView } from '../core/native-content';
  * script anywhere in the document — so it is the browser reporting that the
  * sandbox is on, not a report that something in the markup tried to run.
  *
+ * ## A whole document is shown as the page it is
+ *
+ * A method that renders a printable page (a quote, an invoice) writes a whole
+ * document with its own head, and reads as that page or not at all. So a whole
+ * document is continued rather than nested in ours (`html-frame.ts` says how),
+ * shown on white in black ink whatever the theme around it, edge to edge
+ * without the preview's padding, and as tall as it is: no `maxHeight` applies
+ * unless the host passes one. A fragment is the rest of this comment.
+ *
  * ## Why the styles are copied in rather than inherited
  *
  * A frame is a separate document: none of the host's CSS crosses into it, so
@@ -64,66 +84,6 @@ import type { HtmlContentView } from '../core/native-content';
  * from the DOM rather than from tokens is what makes it follow a host's theme
  * without this package knowing what the host's tokens are called.
  */
-
-/** What `img-src` allows by default: inline data and ordinary remote images. */
-const DEFAULT_IMG_SRC = 'data: https:';
-
-/** The frame's own stylesheet: the host's typography, and table chrome. */
-function frameStyles(color: string, mutedColor: string, borderColor: string, font: string): string {
-  return `
-    :root { color-scheme: inherit; }
-    body {
-      margin: 0;
-      color: ${color};
-      font-family: ${font};
-      font-size: 13px;
-      line-height: 1.55;
-      background: transparent;
-      overflow-wrap: anywhere;
-    }
-    :where(h1, h2, h3, h4, h5, h6) { margin: 0 0 0.4em; line-height: 1.25; }
-    :where(h1) { font-size: 1.4em; }
-    :where(h2) { font-size: 1.2em; }
-    :where(h3) { font-size: 1.05em; }
-    :where(p, ul, ol, table, pre, blockquote) { margin: 0 0 0.75em; }
-    :where(ul, ol) { padding-inline-start: 1.25em; }
-    :where(table) { border-collapse: collapse; width: 100%; }
-    :where(th, td) {
-      border: 1px solid ${borderColor};
-      padding: 4px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    :where(th) { font-weight: 600; }
-    :where(caption) { caption-side: top; color: ${mutedColor}; padding-bottom: 4px; text-align: left; }
-    :where(a) { color: inherit; }
-    :where(code, pre) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
-    :where(pre) { white-space: pre-wrap; }
-    :where(blockquote) { border-inline-start: 2px solid ${borderColor}; margin-inline-start: 0; padding-inline-start: 0.75em; color: ${mutedColor}; }
-    :where(img) { max-width: 100%; height: auto; }
-    :where(hr) { border: 0; border-top: 1px solid ${borderColor}; }
-    :where(*:last-child) { margin-bottom: 0; }
-  `;
-}
-
-/** The whole frame document. The CSP rides a meta because there is no header. */
-function frameDocument(content: HtmlContentView, styles: string, imgSrc: string): string {
-  const body = content.cssClass
-    ? // The class the value states, honoured the way the runtime's own HTML
-      // rendering honours it: as a wrapper, not as something merged into ours.
-      `<div class="${escapeAttribute(content.cssClass)}">${content.innerHtml}</div>`
-    : content.innerHtml;
-  return [
-    '<!doctype html><html><head><meta charset="utf-8">',
-    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${imgSrc}; base-uri 'none'; form-action 'none'">`,
-    `<style>${styles}</style></head><body>${body}</body></html>`,
-  ].join('');
-}
-
-/** A class name is written into an attribute, so its quotes must not close it. */
-function escapeAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
 
 /** SSR has no layout to measure; `useEffect` on the server is a no-op anyway. */
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -137,26 +97,39 @@ export interface HtmlPreviewProps {
    * 480px showed three paragraphs of one with a scrollbar down the side while
    * the panel around it sat empty — the reader scrolls twice to read once. The
    * frame still sizes itself to its CONTENT, so a short snippet stays short;
-   * this only says how far it may grow before scrolling instead.
+   * this only says how far it may grow before scrolling instead. A whole
+   * document has no limit unless one is passed: it is a page, and is read whole.
    */
   maxHeight?: number;
   /**
-   * The frame's `img-src`. Defaults to `data: https:` — a method's HTML result
-   * embeds the images that method produced. Pass `"data:"` to block remote
-   * images entirely, or name an origin to allow only your own storage.
+   * The frame's `img-src`. Defaults to `'self' data: https:` — a method's HTML
+   * result embeds the images that method produced. Pass `"data:"` to block
+   * remote images entirely, or name an origin to allow only your own storage.
    */
   imgSrc?: string;
+  /**
+   * The frame's `font-src`. Follows `imgSrc` when unset: a page's fonts come
+   * from where its images do, the host's own origin or a font service, and a
+   * blocked one silently changes the face the page was designed in.
+   */
+  fontSrc?: string;
 }
+
+/** The fragment preview's default height limit; a whole document has none. */
+const FRAGMENT_MAX_HEIGHT = 1400;
 
 export function HtmlPreview({
   content,
-  maxHeight = 1400,
+  maxHeight,
   imgSrc = DEFAULT_IMG_SRC,
+  fontSrc,
 }: HtmlPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [height, setHeight] = useState(0);
+  const page = isWholeDocument(content.innerHtml);
+  const limit = maxHeight ?? (page ? undefined : FRAGMENT_MAX_HEIGHT);
 
   // The frame's document is built in an effect, not during render, because it
   // reads the host's COMPUTED style - which does not exist until the element is
@@ -165,26 +138,38 @@ export function HtmlPreview({
     const host = hostRef.current;
     if (!host) return;
     const computed = getComputedStyle(host);
+    const typography = page
+      ? pageTypography(computed.fontFamily)
+      : {
+          color: computed.color,
+          mutedColor: computed.getPropertyValue('--muted-foreground').trim() || computed.color,
+          borderColor: computed.borderColor || computed.color,
+          font: computed.fontFamily,
+        };
     setDoc(
-      frameDocument(
-        content,
-        frameStyles(
-          computed.color,
-          computed.getPropertyValue('--muted-foreground').trim() || computed.color,
-          computed.borderColor || computed.color,
-          computed.fontFamily,
-        ),
+      frameDocument(content, {
+        styles: frameStyles(typography),
         imgSrc,
-      ),
+        fontSrc: fontSrc ?? imgSrc,
+      }),
     );
-  }, [content, imgSrc]);
+  }, [content, imgSrc, fontSrc, page]);
 
   // Size the frame to its content. `allow-same-origin` is what makes this
   // readable; a frame we could not measure would be a fixed box with a scrollbar
-  // around two lines of markup.
+  // around two lines of markup. The root's height counts what the body's does
+  // not: a whole document's own body margin.
   const measure = () => {
-    const body = frameRef.current?.contentDocument?.body;
-    if (body) setHeight(body.scrollHeight);
+    const frameDoc = frameRef.current?.contentDocument;
+    const body = frameDoc?.body;
+    if (!frameDoc || !body) return;
+    setHeight(Math.max(body.scrollHeight, frameDoc.documentElement.scrollHeight));
+  };
+
+  const onLoad = () => {
+    measure();
+    // A linked font arrives after `load` and reflows the page, often taller.
+    void frameRef.current?.contentDocument?.fonts?.ready.then(measure, () => undefined);
   };
 
   useEffect(() => {
@@ -205,21 +190,27 @@ export function HtmlPreview({
   return (
     <div
       ref={hostRef}
-      className="overflow-hidden rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[13px] text-foreground"
+      {...(page ? { 'data-html-page': '' } : {})}
+      className={
+        page
+          ? 'overflow-hidden rounded-lg border border-border bg-white text-[13px] text-black'
+          : 'overflow-hidden rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[13px] text-foreground'
+      }
     >
       {doc === null ? null : (
         <iframe
           ref={frameRef}
           title={content.cssClass ? `HTML result (${content.cssClass})` : 'HTML result'}
           srcDoc={doc}
-          onLoad={measure}
+          onLoad={onLoad}
           sandbox="allow-same-origin"
           style={{
             display: 'block',
             width: '100%',
             border: 0,
-            height: height === 0 ? undefined : Math.min(height, maxHeight),
-            maxHeight,
+            height:
+              height === 0 ? undefined : limit === undefined ? height : Math.min(height, limit),
+            ...(limit === undefined ? {} : { maxHeight: limit }),
           }}
         />
       )}
