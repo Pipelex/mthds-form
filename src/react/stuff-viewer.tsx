@@ -410,13 +410,25 @@ function StuffPanel({
   // The PDF is named as the page's HTML download is, with its own extension, so
   // the two files a reader saves of one page share a name.
   const pdfName = page && pdfShown ? pdfFileName(field, value, baseName) : undefined;
+  const pageView = page !== undefined && view !== 'json';
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div
+      className={cn(
+        // A page shown as the view is a flex column that may shrink: in a host
+        // whose scrolling panel is a flex column (`flex min-h-0 flex-col
+        // overflow-y-auto`), the page's frame takes the panel's remaining
+        // height and scrolls inside itself, so there is one scroll container
+        // under the pointer and the first wheel scrolls the page. Anywhere
+        // else the column is as tall as its content and nothing changes.
+        pageView ? 'flex min-h-0 flex-col gap-2' : 'space-y-2',
+        className,
+      )}
+    >
       {/* The header is drawn once, here, and `ResultField` is told to skip its
           own - two headers that agree today drift tomorrow. It stays put across
           both views, so switching does not move the thing you are reading. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <div className="min-w-0 space-y-1">
           <ResultHeader field={named} />
         </div>
@@ -481,7 +493,10 @@ function StuffPanel({
       {downloadShown && (
         <p
           role="status"
-          className={cn('text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
+          className={cn(
+            'shrink-0 text-[12px] text-destructive',
+            missedShown.length === 0 && 'sr-only',
+          )}
         >
           {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
         </p>
@@ -493,7 +508,7 @@ function StuffPanel({
         // The page is the panel's main view: drawn here rather than through
         // `ResultField`, whose page arm would add a second control row saving
         // the same file, and with no box around it.
-        <HtmlPreview content={page} downloadPdf={false} bare />
+        <HtmlPreview content={page} downloadPdf={false} bare fill />
       ) : (
         <ResultRoot baseName={baseName} path={[field.name]}>
           <ResultField field={field} value={value} hideLabel />

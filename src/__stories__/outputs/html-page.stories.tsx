@@ -576,3 +576,130 @@ export const StoredPicturesPage: Story = {
     await expect(lost.naturalWidth).toBe(0);
   },
 };
+
+/**
+ * A method app's layout: the result panel is a flex column of fixed height
+ * whose body scrolls (`flex min-h-0 flex-1 flex-col overflow-y-auto`), and the
+ * viewer is put in that scrolling body with nothing else said about height.
+ */
+function InScrollingPanel({ maxWidth }: { maxWidth: number }) {
+  const field = React.useMemo(
+    () => resultFieldFor(CONTRACTS, OUTPUT_FORM, 'results', 'quote_page_result'),
+    [],
+  );
+  return (
+    <div
+      data-html-page-demo
+      style={{ maxWidth, height: 560, display: 'flex', flexDirection: 'column', padding: 12 }}
+    >
+      <div data-scroll-panel className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+        <FieldStringsProvider locale="fr">
+          <FieldPresentationProvider presentation="app">
+            <StuffViewer
+              field={field}
+              value={{ inner_html: DESK_QUOTE_PAGE, css_class: null }}
+              name="devis_client"
+              downloadBaseName="Devis 250883-1 HAMI THOMAS"
+            />
+          </FieldPresentationProvider>
+        </FieldStringsProvider>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The browser's own pointer, when the stories run as tests: `vitest/browser`
+ * drives Playwright's mouse, so a wheel goes through the browser's input
+ * pipeline (hit testing, scroll latching) as a reader's would. Absent in the
+ * Storybook UI, where the play function stops short of the gesture.
+ */
+async function browserPointer() {
+  try {
+    return (await import('vitest/browser')).userEvent;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * **In a scrolling panel.** A method app puts the viewer in the scrolling body
+ * of a fixed-height panel. The page's frame takes the height the control row
+ * leaves and scrolls inside itself, so the page is the one scroll container
+ * under the pointer: ONE wheel gesture over it scrolls it. The control row
+ * stays where it is. A page as tall as itself inside the panel made the first
+ * gesture land on the frame's document, which had nowhere to scroll.
+ */
+export const InAScrollingPanel: Story = {
+  name: 'In a scrolling panel',
+  render: (args) => <InScrollingPanel {...args} />,
+  play: async ({ canvasElement }) => {
+    const panel = canvasElement.querySelector<HTMLElement>('[data-scroll-panel]');
+    if (!panel) throw new Error('No scrolling panel rendered');
+    const frame = pageFrame(canvasElement);
+    await waitFor(() => expect(frame.contentDocument?.querySelector('h1')).toBeTruthy());
+    const doc = frame.contentDocument!;
+
+    // The frame fills what the panel leaves, and the page scrolls inside it:
+    // the panel itself has nothing left to scroll.
+    await waitFor(() =>
+      expect(doc.documentElement.scrollHeight).toBeGreaterThan(doc.documentElement.clientHeight),
+    );
+    const panelBox = panel.getBoundingClientRect();
+    await expect(frame.getBoundingClientRect().bottom).toBeLessThanOrEqual(panelBox.bottom + 1);
+    await expect(panel.scrollHeight - panel.clientHeight).toBeLessThanOrEqual(1);
+
+    // One wheel over the page scrolls it, and the control row stays put.
+    const pointer = await browserPointer();
+    if (!pointer) return;
+    const title = within(panel).getByText('Devis client');
+    const titleTop = title.getBoundingClientRect().top;
+    await pointer.wheel(frame, { delta: { y: 400 } });
+    await waitFor(() => expect(doc.defaultView!.scrollY + panel.scrollTop).toBeGreaterThan(0));
+    await expect(title.getBoundingClientRect().top).toBe(titleTop);
+
+    // The page is still a page: its text can be selected.
+    const selection = doc.getSelection()!;
+    selection.selectAllChildren(doc.querySelector('h1')!);
+    await expect(selection.toString()).toContain('DEVIS');
+  },
+};
+
+/**
+ * A host that gives the viewer no bounded height: the page is as tall as it
+ * is, and whatever scrolls around it is the host's.
+ */
+function InUnboundedColumn({ maxWidth }: { maxWidth: number }) {
+  const field = React.useMemo(
+    () => resultFieldFor(CONTRACTS, OUTPUT_FORM, 'results', 'quote_page_result'),
+    [],
+  );
+  return (
+    <div data-html-page-demo style={{ maxWidth }}>
+      <div className="flex flex-col gap-2">
+        <StuffViewer
+          field={field}
+          value={{ inner_html: DESK_QUOTE_PAGE, css_class: null }}
+          name="devis_client"
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * **In a column with no height of its own.** The same flex column, unbounded:
+ * nothing asks the page to shrink, so the frame is the page's whole height and
+ * does not scroll.
+ */
+export const InAnUnboundedColumn: Story = {
+  name: 'In an unbounded column',
+  render: (args) => <InUnboundedColumn {...args} />,
+  play: async ({ canvasElement }) => {
+    const frame = pageFrame(canvasElement);
+    await waitFor(() => expect(frame.contentDocument?.querySelector('h1')).toBeTruthy());
+    const doc = frame.contentDocument!.documentElement;
+    await waitFor(() => expect(frame.getBoundingClientRect().height).toBeGreaterThan(1000));
+    await expect(doc.scrollHeight).toBeLessThanOrEqual(doc.clientHeight);
+  },
+};

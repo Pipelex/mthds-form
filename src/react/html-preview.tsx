@@ -22,6 +22,7 @@ import {
 } from './markup-storage';
 import { useMarkupResolvers, usePdfSaveShown } from './result-env';
 import { PdfDownloadButton } from './pdf-download-button';
+import { cn } from './utils';
 
 /**
  * A `native.Html` result, rendered as the markup it is — inside a sandbox.
@@ -141,10 +142,27 @@ export interface HtmlPreviewProps {
    * box either way, since that box is its padding.
    */
   bare?: boolean;
+  /**
+   * Let a whole document's frame shrink to the height its container leaves it
+   * and scroll inside itself, when that container is a flex column of bounded
+   * height (a host's scrolling panel, `flex min-h-0 flex-col overflow-y-auto`).
+   * The page is then the one scroll container under the pointer, so the first
+   * wheel gesture over it scrolls it. In any other container the frame stays
+   * as tall as the page. The result view passes it for a result that is one
+   * page; a fragment ignores it.
+   */
+  fill?: boolean;
 }
 
 /** The fragment preview's default height limit; a whole document has none. */
 const FRAGMENT_MAX_HEIGHT = 1400;
+
+/**
+ * How short a filling page's frame may get before its container scrolls
+ * instead: below this, a panel squeezed by its own chrome would show the page
+ * through a slit.
+ */
+const FILL_MIN_HEIGHT = 320;
 
 export function HtmlPreview({
   content,
@@ -154,6 +172,7 @@ export function HtmlPreview({
   downloadPdf,
   pdfFileName,
   bare = false,
+  fill = false,
 }: HtmlPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -174,6 +193,7 @@ export function HtmlPreview({
   const pdfSetting = usePdfSaveShown();
   const pdfShown = downloadPdf ?? pdfSetting;
   const limit = maxHeight ?? (page ? undefined : FRAGMENT_MAX_HEIGHT);
+  const filling = page && fill;
 
   // The frame's document is built in an effect, not during render, because it
   // reads the host's COMPUTED style - which does not exist until the element is
@@ -235,13 +255,15 @@ export function HtmlPreview({
     <div
       ref={hostRef}
       {...(page ? { 'data-html-page': '' } : {})}
-      className={
+      className={cn(
         page
           ? bare
             ? 'overflow-hidden bg-white text-[13px] text-black'
             : 'overflow-hidden rounded-lg border border-border bg-white text-[13px] text-black'
-          : 'overflow-hidden rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[13px] text-foreground'
-      }
+          : 'overflow-hidden rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[13px] text-foreground',
+        // A flex column that may shrink, so the frame inside can.
+        filling && 'flex min-h-0 flex-col',
+      )}
     >
       {resolved === undefined ? (
         // The page's stored pictures are being resolved: a short wait, said
@@ -268,6 +290,14 @@ export function HtmlPreview({
             height:
               height === 0 ? undefined : limit === undefined ? height : Math.min(height, limit),
             ...(limit === undefined ? {} : { maxHeight: limit }),
+            // Its height is the page's, as a flex basis: in a bounded flex
+            // column it shrinks to what is left (never below the floor) and the
+            // page scrolls inside the frame; anywhere else it is the page's.
+            // `minHeight` is explicit because a replaced element's automatic
+            // minimum is its own height, which would forbid the shrink.
+            ...(filling && height > 0
+              ? { flex: '0 1 auto', minHeight: Math.min(height, FILL_MIN_HEIGHT) }
+              : {}),
           }}
         />
       )}
