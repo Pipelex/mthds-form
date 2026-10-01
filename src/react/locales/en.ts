@@ -54,6 +54,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   downloadPdf: 'Download PDF',
   downloadPdfBusy: 'Preparing the PDF…',
   downloadPdfFailed: 'The PDF could not be made',
+  pageLoading: 'Loading the page…',
   downloadHtml: 'Download HTML',
   fileNameTitle: 'File name',
   fileNameCancel: 'Cancel',

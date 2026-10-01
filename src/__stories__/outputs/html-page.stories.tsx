@@ -5,7 +5,9 @@ import {
   DEFAULT_FIELD_STRINGS,
   FieldPresentationProvider,
   FieldStringsProvider,
+  ResultEnvProvider,
   StuffViewer,
+  type ResolveUrls,
 } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { resultFieldFor } from '../result-view';
@@ -489,5 +491,88 @@ export const RefinedPageInApp: Story = {
     const box = demo.querySelector<HTMLElement>('[data-html-page]')!;
     await expect(getComputedStyle(box).borderTopWidth).toBe('0px');
     await expect(box.getBoundingClientRect().width).toBe(demo.getBoundingClientRect().width);
+  },
+};
+
+/**
+ * A page that embeds its pictures as stored references, as a method's page
+ * template does: one the host can resolve and one it cannot.
+ */
+const STORED_PICTURE = 'pipelex-storage://runs/demo/figure_1.jpg';
+const LOST_PICTURE = 'pipelex-storage://runs/demo/gone.jpg';
+const STORED_PICTURES_PAGE = `<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Devis</title>
+<style>body{margin:0;padding:32px 40px;font:13px/1.5 system-ui,sans-serif}img{display:block;margin:12px 0}</style>
+</head>
+<body>
+<h1>DEVIS N° 250883-1</h1>
+<img data-picture="stored" alt="Photo de la montre" src="${STORED_PICTURE}" width="160">
+<img data-picture="lost" alt="Photo perdue" src="${LOST_PICTURE}" width="160">
+</body>
+</html>`;
+
+/**
+ * A host's bulk resolver: a round trip that answers every reference it knows
+ * at once, here onto a file this Storybook serves, and leaves out the one it
+ * does not.
+ */
+const resolveStoredPictures: ResolveUrls = (uris) =>
+  new Promise((resolve) => {
+    setTimeout(
+      () =>
+        resolve(
+          new Map(
+            uris.filter((uri) => uri === STORED_PICTURE).map((uri) => [uri, '/figure_1.jpg']),
+          ),
+        ),
+      150,
+    );
+  });
+
+function StoredPictures({ maxWidth }: { maxWidth: number }) {
+  const field = React.useMemo(
+    () => resultFieldFor(CONTRACTS, OUTPUT_FORM, 'results', 'html_result'),
+    [],
+  );
+  return (
+    <div data-html-page-demo style={{ maxWidth }}>
+      <ResultEnvProvider resolveUrls={resolveStoredPictures}>
+        <StuffViewer
+          field={field}
+          value={{ inner_html: STORED_PICTURES_PAGE, css_class: null }}
+          name="devis"
+        />
+      </ResultEnvProvider>
+    </div>
+  );
+}
+
+/**
+ * **Stored pictures.** The page names its pictures as `pipelex-storage://`
+ * references, which the frame cannot load. The panel shows a short loading
+ * state while the host's `resolveUrls` answers, then frames the page with the
+ * answered picture loaded from the URL the host gave, and the one the host
+ * could not resolve left broken rather than the page withheld.
+ */
+export const StoredPicturesPage: Story = {
+  name: 'Stored pictures',
+  render: (args) => <StoredPictures {...args} />,
+  play: async ({ canvasElement }) => {
+    const demo = canvasElement.querySelector<HTMLElement>('[data-html-page-demo]');
+    if (!demo) throw new Error('No page demo rendered');
+    await expect(within(demo).getByText(DEFAULT_FIELD_STRINGS.pageLoading)).toBeVisible();
+    await waitFor(() =>
+      expect(pageFrame(canvasElement).contentDocument?.querySelector('h1')).toBeTruthy(),
+    );
+    const doc = pageFrame(canvasElement).contentDocument!;
+    const stored = doc.querySelector<HTMLImageElement>('img[data-picture="stored"]')!;
+    const lost = doc.querySelector<HTMLImageElement>('img[data-picture="lost"]')!;
+    await expect(stored.getAttribute('src')).toBe('/figure_1.jpg');
+    await waitFor(() => expect(stored.complete && stored.naturalWidth > 0).toBe(true), {
+      timeout: 5000,
+    });
+    await expect(lost.getAttribute('src')).toBe(LOST_PICTURE);
+    await expect(lost.naturalWidth).toBe(0);
   },
 };

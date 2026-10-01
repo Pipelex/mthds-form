@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import type { HtmlContentView } from '../core/native-content';
+import { useFieldStrings } from './field-strings';
 import {
   DEFAULT_IMG_SRC,
   frameDocument,
@@ -9,7 +11,16 @@ import {
   isWholeDocument,
   pageTypography,
 } from './html-frame';
-import { usePdfSaveShown } from './result-env';
+import {
+  answerFor,
+  askBulkUntimed,
+  MARKUP_RESOLVE_TIMEOUT_MS,
+  mayHoldStorageRefs,
+  rewriteStorageRefs,
+  storageRefsIn,
+  type BulkAnswer,
+} from './markup-storage';
+import { useMarkupResolvers, usePdfSaveShown } from './result-env';
 import { PdfDownloadButton } from './pdf-download-button';
 
 /**
@@ -146,8 +157,19 @@ export function HtmlPreview({
 }: HtmlPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const s = useFieldStrings();
   const [doc, setDoc] = useState<string | null>(null);
   const [height, setHeight] = useState(0);
+  const resolvedHtml = useResolvedMarkup(content.innerHtml);
+  const resolved = useMemo(
+    () =>
+      resolvedHtml === undefined
+        ? undefined
+        : resolvedHtml === content.innerHtml
+          ? content
+          : { ...content, innerHtml: resolvedHtml },
+    [content, resolvedHtml],
+  );
   const page = isWholeDocument(content.innerHtml);
   const pdfSetting = usePdfSaveShown();
   const pdfShown = downloadPdf ?? pdfSetting;
@@ -158,7 +180,7 @@ export function HtmlPreview({
   // in the document, and differs between the two themes a story renders at once.
   useIsomorphicLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host || !resolved) return;
     const computed = getComputedStyle(host);
     const typography = page
       ? pageTypography(computed.fontFamily)
@@ -169,13 +191,13 @@ export function HtmlPreview({
           font: computed.fontFamily,
         };
     setDoc(
-      frameDocument(content, {
+      frameDocument(resolved, {
         styles: frameStyles(typography),
         imgSrc,
         fontSrc: fontSrc ?? imgSrc,
       }),
     );
-  }, [content, imgSrc, fontSrc, page]);
+  }, [resolved, imgSrc, fontSrc, page]);
 
   // Size the frame to its content. `allow-same-origin` is what makes this
   // readable; a frame we could not measure would be a fixed box with a scrollbar
@@ -221,7 +243,18 @@ export function HtmlPreview({
           : 'overflow-hidden rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[13px] text-foreground'
       }
     >
-      {doc === null ? null : (
+      {resolved === undefined ? (
+        // The page's stored pictures are being resolved: a short wait, said
+        // as such, rather than a page painted with broken images first.
+        <div
+          role="status"
+          data-html-resolving
+          className="flex min-h-24 items-center justify-center gap-2 text-[12px] text-muted-foreground"
+        >
+          <Loader2 aria-hidden className="size-4 animate-spin" />
+          <span>{s.pageLoading}</span>
+        </div>
+      ) : doc === null ? null : (
         <iframe
           ref={frameRef}
           title={content.cssClass ? `HTML result (${content.cssClass})` : 'HTML result'}
@@ -254,4 +287,68 @@ export function HtmlPreview({
       {frameBox}
     </div>
   );
+}
+
+/**
+ * The page's markup with the stored references its pictures name resolved
+ * through the result environment's resolvers (`markup-storage.ts`), or
+ * `undefined` while that is under way.
+ *
+ * Markup that cannot hold a reference, or a host with no resolver, is the
+ * markup itself, at once and on the server alike. Otherwise the work is done
+ * in an effect, since the parser it needs is the browser's: with only the
+ * synchronous `resolveUrl` it lands on the next render; with a bulk
+ * `resolveUrls` it lands when that answers, and if that takes longer than
+ * `MARKUP_RESOLVE_TIMEOUT_MS` the page is shown first with what `resolveUrl`
+ * answers, then again with the bulk answer if it arrives late.
+ *
+ * A resolution of the same markup is kept on screen while a new one runs (a
+ * host that recreates its resolver on every render would otherwise flash the
+ * loading state each time).
+ */
+function useResolvedMarkup(markup: string): string | undefined {
+  const resolvers = useMarkupResolvers();
+  const needed =
+    (resolvers.resolveUrl !== undefined || resolvers.resolveUrls !== undefined) &&
+    mayHoldStorageRefs(markup);
+  const [shown, setShown] = useState<{ source: string; html: string } | null>(null);
+
+  useEffect(() => {
+    if (!needed) return;
+    let live = true;
+    const show = (bulk?: BulkAnswer) => {
+      if (!live) return;
+      let html = markup;
+      try {
+        html = rewriteStorageRefs(markup, answerFor(bulk, resolvers.resolveUrl));
+      } catch {
+        // The page without its pictures is still the page.
+      }
+      setShown({ source: markup, html });
+    };
+    let refs: string[] = [];
+    try {
+      refs = storageRefsIn(markup);
+    } catch {
+      refs = [];
+    }
+    if (refs.length === 0 || !resolvers.resolveUrls) {
+      show();
+      return () => {
+        live = false;
+      };
+    }
+    const timer = setTimeout(() => show(), MARKUP_RESOLVE_TIMEOUT_MS);
+    void askBulkUntimed(resolvers.resolveUrls, refs).then((bulk) => {
+      clearTimeout(timer);
+      show(bulk);
+    });
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [needed, markup, resolvers]);
+
+  if (!needed) return markup;
+  return shown?.source === markup ? shown.html : undefined;
 }

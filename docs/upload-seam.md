@@ -134,6 +134,8 @@ The result is **bound to the URI it was resolved from**, the same way the local 
 
 A resolution that **fails** leaves the "cannot be shown" state rather than the file before it, and is caught rather than left to escape as an unhandled rejection into the host's app. `resolveUrl` is a network call, so rejecting is ordinary; the viewer shows the same thing it shows for a resolver that answers `null`. Both are recorded as the resolver's answer for that URI, because a refusal is an answer: they used to be recorded as no answer at all, which left the spinner waiting on a resolver that had already replied. Closing and reopening the preview asks the resolver again, and the refusal is forgotten when it does, so the retry shows the spinner until its own answer lands.
 
+The result view has a second, optional resolver beside it, `resolveUrls` on `ResultEnvProvider`: an async, bulk one, asked for every stored picture an HTML page names in one call, before the page is framed, made into a PDF or saved. A reference it leaves out is asked of `resolveUrl`. See [result-view.md](result-view.md#stored-pictures-inside-a-page).
+
 ## What the control decides it can preview
 
 A file is previewable when the **filename** or the **URL** says so, tested separately. They used to be concatenated into one string and matched with an end-anchored extension test, which made the filename half dead code — a filename's extension was always followed by a space — so a value with a good filename and an extension-less URL (an opaque storage id, a `data:` URL) was offered no preview at all. A `data:` URL's declared MIME type is read too, since it is the only type such a URL carries.

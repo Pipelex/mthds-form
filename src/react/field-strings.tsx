@@ -131,6 +131,11 @@ export interface FieldStrings {
   /** What that control says when the PDF could not be made or saved. */
   downloadPdfFailed: string;
   /**
+   * Shown in place of an HTML page for the moment the stored pictures it names
+   * are being resolved through the host.
+   */
+  pageLoading: string;
+  /**
    * The page's own HTML download, beside "Download PDF" on a result that is
    * one page, where a bare "Download" would not say which of the two it saves.
    */

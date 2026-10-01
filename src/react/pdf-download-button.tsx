@@ -6,7 +6,8 @@ import type { HtmlContentView } from '../core/native-content';
 import { useFieldStrings } from './field-strings';
 import { useFileNamePrompt } from './file-name-dialog';
 import { renderHtmlPdf } from './html-pdf';
-import { useSaveFiles } from './result-env';
+import { resolveHtmlStorageUrls } from './markup-storage';
+import { useMarkupResolvers, useSaveFiles } from './result-env';
 import { cn } from './utils';
 
 export interface PdfDownloadButtonProps {
@@ -30,7 +31,9 @@ export interface PdfDownloadButtonProps {
  * `<fileName>.pdf`. The PDF is made in the browser (`renderHtmlPdf`) from a
  * script-free copy of the page laid out with its print rules, and handed to the
  * result environment's `saveFiles` like every other download, so a host that
- * delivers files its own way delivers this one too.
+ * delivers files its own way delivers this one too. The stored pictures the
+ * page names are resolved through the environment's resolvers first, as its
+ * preview's are.
  *
  * Busy while the PDF is made, which takes a moment for the fonts and the
  * raster; a PDF that could not be made or saved turns the control into a
@@ -47,6 +50,7 @@ export function PdfDownloadButton({
 }: PdfDownloadButtonProps) {
   const s = useFieldStrings();
   const save = useSaveFiles();
+  const resolvers = useMarkupResolvers();
   const ref = useRef<HTMLButtonElement>(null);
   const statusId = useId();
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
@@ -66,7 +70,12 @@ export function PdfDownloadButton({
       // A fragment that names no face of its own is laid out in the one around
       // the control, as it reads on screen.
       const fontFamily = ref.current ? getComputedStyle(ref.current).fontFamily : undefined;
-      const { blob } = await renderHtmlPdf(content, {
+      // The page's stored pictures are resolved at the click, through the
+      // host, so a presigned URL is minted for this PDF rather than reused
+      // from a preview that may have outlived it.
+      const innerHtml = await resolveHtmlStorageUrls(content.innerHtml, resolvers);
+      const page = innerHtml === content.innerHtml ? content : { ...content, innerHtml };
+      const { blob } = await renderHtmlPdf(page, {
         ...(title ? { title } : {}),
         ...(imgSrc === undefined ? {} : { imgSrc }),
         ...(fontSrc === undefined ? {} : { fontSrc }),
