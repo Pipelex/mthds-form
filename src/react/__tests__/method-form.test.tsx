@@ -93,10 +93,10 @@ describe('what the form renders and reports', () => {
   it('reports wire-shaped run inputs and the gate as the person fills the form', async () => {
     const user = userEvent.setup();
     render(<Harness {...SHOP} />);
-    await user.type(screen.getByLabelText('name'), 'Atlas Lille');
+    await user.type(screen.getByLabelText('name'), 'Boutique Exemple');
     expect(state().ready).toBe(true);
     expect(state().inputs).toEqual({
-      shop: { concept: 'structured.Shop', content: { name: 'Atlas Lille' } },
+      shop: { concept: 'structured.Shop', content: { name: 'Boutique Exemple' } },
     });
   });
 
@@ -121,22 +121,25 @@ describe('initial values', () => {
   it('lays a host value over the method’s seed until the first edit', async () => {
     const user = userEvent.setup();
     render(
-      <Harness {...FLAT} initialValues={(seed) => ({ ...seed, address: { city: 'Lille' } })} />,
+      <Harness
+        {...FLAT}
+        initialValues={(seed) => ({ ...seed, address: { city: 'Exempleville' } })}
+      />,
     );
-    expect(state().values).toEqual({ address: { city: 'Lille' } });
+    expect(state().values).toEqual({ address: { city: 'Exempleville' } });
     await user.type(screen.getByLabelText('street'), '1 rue');
-    expect(state().values.address).toMatchObject({ city: 'Lille', street: '1 rue' });
+    expect(state().values.address).toMatchObject({ city: 'Exempleville', street: '1 rue' });
   });
 
   it('restores given values, and a reset goes back to them', async () => {
     const user = userEvent.setup();
-    const restored = { shop: { name: 'Atlas Rouen' } };
+    const restored = { shop: { name: 'Boutique Démo' } };
     render(<Harness {...SHOP} initialValues={restored} />);
-    expect(screen.getByLabelText('name')).toHaveValue('Atlas Rouen');
+    expect(screen.getByLabelText('name')).toHaveValue('Boutique Démo');
     await user.clear(screen.getByLabelText('name'));
     expect(state().ready).toBe(false);
     await user.click(screen.getByRole('button', { name: 'Start over' }));
-    expect(screen.getByLabelText('name')).toHaveValue('Atlas Rouen');
+    expect(screen.getByLabelText('name')).toHaveValue('Boutique Démo');
     expect(state().ready).toBe(true);
   });
 });
@@ -150,9 +153,12 @@ describe('the top-level optional disclosure', () => {
 
     await user.click(disclosure);
     expect(screen.getByText('refund_account')).toBeInTheDocument();
-    expect(state().values.refund_account).toEqual({ holder: 'Atlas SAS', bank: 'BNP Paribas' });
+    expect(state().values.refund_account).toEqual({
+      holder: 'Boutique Exemple SAS',
+      bank: 'Banque Exemple',
+    });
     // Opened with defaults, it holds something, so its required IBAN now gates.
-    await user.type(screen.getByLabelText('name'), 'Atlas Lille');
+    await user.type(screen.getByLabelText('name'), 'Boutique Exemple');
     expect(state().ready).toBe(false);
     expect(state().missing).toEqual(['refund_account']);
 
@@ -188,7 +194,7 @@ describe('the required marks', () => {
     await user.click(screen.getByRole('button', { name: 'Run' }));
     expect(state().attempted).toBe(true);
     expect(screen.getByText('Required')).toBeInTheDocument();
-    await user.type(screen.getByLabelText('name'), 'Atlas Lille');
+    await user.type(screen.getByLabelText('name'), 'Boutique Exemple');
     expect(screen.queryByText('Required')).not.toBeInTheDocument();
   });
 

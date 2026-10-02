@@ -46,8 +46,8 @@ notes       = { type = "text", description = "Free-form notes", required = false
 description = "Where a payment is sent"
 
 [concept.BankDetails.structure]
-holder = { type = "text", description = "Who holds the account", required = false, default_value = "Atlas SAS" }
-bank   = { type = "text", description = "The bank's name", required = false, default_value = "BNP Paribas" }
+holder = { type = "text", description = "Who holds the account", required = false, default_value = "Boutique Exemple SAS" }
+bank   = { type = "text", description = "The bank's name", required = false, default_value = "Banque Exemple" }
 iban   = { type = "text", description = "The account number", required = true }
 
 [concept.Shop]

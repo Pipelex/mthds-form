@@ -80,7 +80,7 @@ function Quote({
 }) {
   return (
     <ResultEnvProvider saveFiles={saveFiles} downloads={downloads}>
-      <StuffViewer field={page('quote')} value={QUOTE} downloadBaseName="Devis 250883-1" />
+      <StuffViewer field={page('quote')} value={QUOTE} downloadBaseName="Devis Q-2026-0042" />
     </ResultEnvProvider>
   );
 }
@@ -98,7 +98,7 @@ describe('the dialog', () => {
     expect(box).not.toBeNull();
     expect(box).toHaveAttribute('aria-modal', 'true');
     const input = field() as HTMLInputElement;
-    expect(input.value).toBe('Devis 250883-1');
+    expect(input.value).toBe('Devis Q-2026-0042');
     expect(input).toHaveFocus();
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, input.value.length]);
     // The extension is a fixed suffix, outside the field, and describes it.
@@ -183,8 +183,8 @@ describe('the dialog', () => {
     ['  ..cachée.  ', 'cachée.pdf'],
     ['devis.PDF', 'devis.pdf'],
     ['tab\there', 'tabhere.pdf'],
-    ['   ', 'Devis 250883-1.pdf'],
-    ['', 'Devis 250883-1.pdf'],
+    ['   ', 'Devis Q-2026-0042.pdf'],
+    ['', 'Devis Q-2026-0042.pdf'],
   ])('makes %j safe, as %j', async (typed, saved_) => {
     const { saved, saveFiles } = recorder();
     render(<Quote saveFiles={saveFiles} />);
@@ -216,7 +216,7 @@ describe('the setting', () => {
     await userEvent.click(pdfButton());
     await waitFor(() => expect(saved).toHaveLength(1));
     expect(dialog()).toBeNull();
-    expect(saved[0]![0]!.name).toBe('Devis 250883-1.pdf');
+    expect(saved[0]![0]!.name).toBe('Devis Q-2026-0042.pdf');
   });
 
   it('is laid over the provider by one panel, key by key', async () => {
@@ -258,7 +258,7 @@ describe('every download control asks, and the name reaches the plan', () => {
     const { saved, saveFiles } = recorder();
     render(<Quote saveFiles={saveFiles} />);
     await userEvent.click(screen.getByRole('button', { name: S.downloadHtml }));
-    expect(field()).toHaveValue('Devis 250883-1');
+    expect(field()).toHaveValue('Devis Q-2026-0042');
     expect(field()).toHaveAccessibleDescription('.html');
     await userEvent.keyboard('Devis final{Enter}');
     await waitFor(() => expect(saved).toHaveLength(1));

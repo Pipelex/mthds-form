@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/trips.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/trips.mthds - DO NOT EDIT.
  *
  * The trip planner's input side: one structure with every app-shaped control's natural home, plus an optional photo for the mood.
  *

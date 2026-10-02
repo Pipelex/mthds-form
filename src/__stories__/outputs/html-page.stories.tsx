@@ -69,13 +69,13 @@ const QUOTE_PAGE = `<!DOCTYPE html>
 </head>
 <body>
 <div class="sheet">
-  <h1>DEVIS N° 250883-1 HAMI THOMAS</h1>
+  <h1>DEVIS N° Q-2026-0042 JEANNE MARTIN</h1>
   <div class="meta">Établi le 1 octobre 2026 · valable 30 jours</div>
   <table>
     <tr><th>Prestation</th><th>Quantité</th><th>Montant</th></tr>
-    <tr><td>Révision complète du mouvement</td><td>1</td><td>480,00 €</td></tr>
-    <tr><td>Remplacement du verre saphir</td><td>1</td><td>220,00 €</td></tr>
-    <tr><td>Polissage du boîtier et du bracelet</td><td>1</td><td>150,00 €</td></tr>
+    <tr><td>Étude et conception</td><td>1</td><td>480,00 €</td></tr>
+    <tr><td>Fourniture du matériel</td><td>1</td><td>220,00 €</td></tr>
+    <tr><td>Installation et mise en service</td><td>1</td><td>150,00 €</td></tr>
     <tr class="total"><td>Total TTC</td><td></td><td>850,00 €</td></tr>
   </table>
   <p class="screen-only">Cette ligne n'apparaît qu'à l'écran.</p>
@@ -96,7 +96,7 @@ function HtmlPage({ maxWidth }: { maxWidth: number }) {
         field={field}
         value={{ inner_html: QUOTE_PAGE, css_class: null }}
         name="devis"
-        downloadBaseName="Devis 250883-1 HAMI THOMAS"
+        downloadBaseName="Devis Q-2026-0042 Jeanne Martin"
       />
     </div>
   );
@@ -129,7 +129,7 @@ function RefinedPage({ maxWidth }: { maxWidth: number }) {
             field={field}
             value={{ inner_html: DESK_QUOTE_PAGE, css_class: null }}
             name="devis_client"
-            downloadBaseName="Devis 250883-1 HAMI THOMAS"
+            downloadBaseName="Devis Q-2026-0042 Jeanne Martin"
           />
         </FieldPresentationProvider>
       </FieldStringsProvider>
@@ -190,8 +190,8 @@ export const WholePage: Story = {
 
 /**
  * A two-page quote, written the way a method's quote template writes one: the
- * house face linked root-relative (`/fonts/…`, a stand-in face under the name
- * `Calibri`, since the real one cannot be redistributed), a page-frame table
+ * house face linked root-relative (`/fonts/…`, a redistributable face
+ * under a house name of its own, `HouseSans`), a page-frame table
  * whose empty `tfoot` reserves the footer's room on every page, a footer laid
  * out `position: fixed` in print so every page repeats it, a table of lines
  * long enough to run past one A4 page, with a header the next page repeats,
@@ -201,19 +201,19 @@ export const WholePage: Story = {
 const LINE_ROWS = Array.from(
   { length: 34 },
   (_, i) =>
-    `<tr><td>Opération ${i + 1} — révision, nettoyage et contrôle de l’étanchéité du boîtier</td><td class="num">${(40 + i).toFixed(2).replace('.', ',')} €</td></tr>`,
+    `<tr><td>Prestation ${i + 1} — préparation, réalisation et contrôle</td><td class="num">${(40 + i).toFixed(2).replace('.', ',')} €</td></tr>`,
 ).join('');
 
 const LONG_QUOTE_PAGE = `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Devis 250883-1</title>
+<title>Devis Q-2026-0042</title>
 <style>
-  @font-face { font-family: Calibri; font-weight: 400; src: url('/fonts/nunito-sans-regular.woff2') format('woff2'); }
-  @font-face { font-family: Calibri; font-weight: 700; src: url('/fonts/nunito-sans-bold.woff2') format('woff2'); }
+  @font-face { font-family: HouseSans; font-weight: 400; src: url('/fonts/nunito-sans-regular.woff2') format('woff2'); }
+  @font-face { font-family: HouseSans; font-weight: 700; src: url('/fonts/nunito-sans-bold.woff2') format('woff2'); }
   *{box-sizing:border-box}
-  body{margin:0;background:#f2f2f2;color:#1a1a1a;font:14px/1.55 Calibri,Carlito,Arial,sans-serif;}
+  body{margin:0;background:#f2f2f2;color:#1a1a1a;font:14px/1.55 HouseSans,Arial,sans-serif;}
   .sheet{max-width:820px;margin:24px auto;background:#fff;padding:44px 52px 32px;box-shadow:0 1px 6px rgba(0,0,0,.12);}
   h1{font-size:20px;margin:0 0 6px}
   h2{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid #111;padding-bottom:5px;margin:26px 0 12px;break-after:avoid}
@@ -248,7 +248,7 @@ const LONG_QUOTE_PAGE = `<!doctype html>
 <tbody><tr><td>
   <div class="band print-only"></div>
   <div class="band screen-only"></div>
-  <h1>DEVIS N° 250883-1 HAMI THOMAS</h1>
+  <h1>DEVIS N° Q-2026-0042 JEANNE MARTIN</h1>
   <div>Établi le 1 octobre 2026 · valable 30 jours</div>
   <h2>Interventions</h2>
   <table class="lines">
@@ -256,12 +256,12 @@ const LONG_QUOTE_PAGE = `<!doctype html>
     <tbody>${LINE_ROWS}</tbody>
   </table>
   <div class="payment">
-    <div>Pour régler ce devis par virement bancaire, merci d’utiliser les coordonnées ci-dessous.</div>
-    <div><b>IBAN</b> : FR76 3000 4023 2300 0121 7031 678</div>
+    <div>Règlement par virement sur le compte suivant.</div>
+    <div><b>IBAN</b> : FR76 0000 0000 0000 0000 0000 000</div>
   </div>
 </td></tr></tbody>
 </table>
-<footer class="legal">Atelier de démonstration | Lille — SIRET 000 000 000 00000</footer>
+<footer class="legal">Boutique Exemple · Exempleville — SIRET 000 000 000 00000</footer>
 </div>
 <script>window.parent.__quotePageScriptRan = true;</script>
 </body>
@@ -278,7 +278,7 @@ function LongQuote({ maxWidth }: { maxWidth: number }) {
         field={field}
         value={{ inner_html: LONG_QUOTE_PAGE, css_class: null }}
         name="devis_client"
-        downloadBaseName="Devis 250883-1 HAMI THOMAS"
+        downloadBaseName="Devis Q-2026-0042 Jeanne Martin"
       />
     </div>
   );
@@ -290,7 +290,7 @@ interface CopySnapshot {
   printOnly: string;
   screenOnly: string;
   footerPosition: string;
-  calibri: string[];
+  houseFace: string[];
 }
 
 /** The PDF's pages, read back out of its bytes. */
@@ -351,8 +351,8 @@ const isGreen = (r: number, g: number, b: number) => g > 110 && r < 70 && b < 70
 const isNavy = (r: number, g: number, b: number) => r < 50 && g < 60 && b > 50 && b < 90;
 
 /**
- * **Download PDF.** One click and the browser saves `Devis 250883-1 HAMI
- * THOMAS.pdf`, made here in headless Chromium with no server and no dialog.
+ * **Download PDF.** One click and the browser saves `Devis Q-2026-0042 Jeanne
+ * Martin.pdf`, made here in headless Chromium with no server and no dialog.
  * The play catches the download at the link the default delivery clicks,
  * watches the PDF copy from outside while it is laid out (sandboxed with no
  * scripts, its print rules promoted: the print-only band shown, the
@@ -394,7 +394,7 @@ export const DownloadPdf: Story = {
       // Rewriting the media queries rebuilds the copy's faces, which the copy
       // then loads again before it measures anything: read them once it has.
       const faces = Array.from(doc.fonts).filter(
-        (face) => face.family.replace(/['"]/g, '') === 'Calibri',
+        (face) => face.family.replace(/['"]/g, '') === 'HouseSans',
       );
       if (faces.some((face) => face.status !== 'loaded')) return;
       snapshot = {
@@ -402,7 +402,7 @@ export const DownloadPdf: Story = {
         printOnly: win.getComputedStyle(printOnly).display,
         screenOnly: win.getComputedStyle(doc.querySelector('.screen-only')!).display,
         footerPosition: win.getComputedStyle(doc.querySelector('footer.legal')!).position,
-        calibri: faces.map((face) => `${face.weight} ${face.status}`),
+        houseFace: faces.map((face) => `${face.weight} ${face.status}`),
       };
     }, 10);
 
@@ -411,14 +411,14 @@ export const DownloadPdf: Story = {
         within(demo).getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadPdf }),
       );
       await waitFor(() => expect(download).toBeDefined(), { timeout: 30_000 });
-      await expect(download!.name).toBe('Devis 250883-1 HAMI THOMAS.pdf');
+      await expect(download!.name).toBe('Devis Q-2026-0042 Jeanne Martin.pdf');
 
       await expect(snapshot).toEqual({
         sandbox: 'allow-same-origin',
         printOnly: 'block',
         screenOnly: 'none',
         footerPosition: 'fixed',
-        calibri: ['400 loaded', '700 loaded'],
+        houseFace: ['400 loaded', '700 loaded'],
       });
       await expect(record.__quotePageScriptRan).toBe(false);
       // The copy is gone once the PDF is made.
@@ -505,8 +505,8 @@ const STORED_PICTURES_PAGE = `<!doctype html>
 <style>body{margin:0;padding:32px 40px;font:13px/1.5 system-ui,sans-serif}img{display:block;margin:12px 0}</style>
 </head>
 <body>
-<h1>DEVIS N° 250883-1</h1>
-<img data-picture="stored" alt="Photo de la montre" src="${STORED_PICTURE}" width="160">
+<h1>DEVIS N° Q-2026-0042</h1>
+<img data-picture="stored" alt="Photo du produit" src="${STORED_PICTURE}" width="160">
 <img data-picture="lost" alt="Photo perdue" src="${LOST_PICTURE}" width="160">
 </body>
 </html>`;
@@ -598,7 +598,7 @@ function InScrollingPanel({ maxWidth }: { maxWidth: number }) {
               field={field}
               value={{ inner_html: DESK_QUOTE_PAGE, css_class: null }}
               name="devis_client"
-              downloadBaseName="Devis 250883-1 HAMI THOMAS"
+              downloadBaseName="Devis Q-2026-0042 Jeanne Martin"
             />
           </FieldPresentationProvider>
         </FieldStringsProvider>

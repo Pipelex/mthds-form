@@ -74,7 +74,7 @@ describe('the control on a result that is one page', () => {
         <StuffViewer
           field={page('quote')}
           value={VALUE}
-          downloadBaseName="Devis 250883-1 HAMI THOMAS"
+          downloadBaseName="Devis Q-2026-0042 Jeanne Martin"
         />
       </ResultEnvProvider>,
     );
@@ -83,9 +83,9 @@ describe('the control on a result that is one page', () => {
     expect(renderPdf).toHaveBeenCalledTimes(1);
     const [content, options] = renderPdf.mock.calls[0]!;
     expect(content).toEqual({ innerHtml: QUOTE, cssClass: undefined });
-    expect(options?.title).toBe('Devis 250883-1 HAMI THOMAS');
+    expect(options?.title).toBe('Devis Q-2026-0042 Jeanne Martin');
     expect(saved[0]).toMatchObject({
-      name: 'Devis 250883-1 HAMI THOMAS.pdf',
+      name: 'Devis Q-2026-0042 Jeanne Martin.pdf',
       mimeType: 'application/pdf',
       kind: 'markup',
       path: 'quote',

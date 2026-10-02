@@ -244,7 +244,7 @@ const shopSchema = {
       title: 'Coordonnees',
       type: 'object',
       properties: {
-        titulaire: { title: 'Titulaire', type: 'string', default: 'Atlas' },
+        titulaire: { title: 'Titulaire', type: 'string', default: 'Boutique Exemple' },
         iban: { title: 'Iban', type: 'string' },
         adresse: { anyOf: [{ $ref: '#/$defs/Adresse' }, { type: 'null' }], default: null },
       },
@@ -272,7 +272,7 @@ const SHOP_FIELDS: InputFormField[] = [
     required: false,
     concept_ref: 'demo.Coordonnees',
     fields: [
-      { kind: 'text', name: 'titulaire', required: false, default_value: 'Atlas' },
+      { kind: 'text', name: 'titulaire', required: false, default_value: 'Boutique Exemple' },
       { kind: 'text', name: 'iban', required: true },
       {
         kind: 'object',
@@ -686,38 +686,45 @@ const ROWS: Row[] = [
   {
     label: 'a nested optional structure closed',
     inputs: { shop: SHOP },
-    values: { shop: { nom: 'Atlas Lille', compte: undefined } },
+    values: { shop: { nom: 'Boutique Exemple', compte: undefined } },
     runnable: true,
   },
   {
     label: 'a nested optional structure opened with only its seeded default',
     inputs: { shop: SHOP },
-    values: { shop: { nom: 'Atlas Lille', compte: { titulaire: 'Atlas' } } },
+    values: { shop: { nom: 'Boutique Exemple', compte: { titulaire: 'Boutique Exemple' } } },
     runnable: false,
   },
   {
     label: 'a nested optional structure opened with its required child blank',
     inputs: { shop: SHOP },
-    values: { shop: { nom: 'Atlas Lille', compte: { titulaire: 'Atlas', iban: '' } } },
+    values: {
+      shop: { nom: 'Boutique Exemple', compte: { titulaire: 'Boutique Exemple', iban: '' } },
+    },
     runnable: false,
   },
   {
     label: 'a nested optional structure opened and filled',
     inputs: { shop: SHOP },
-    values: { shop: { nom: 'Atlas Lille', compte: { titulaire: 'Atlas', iban: 'FR76' } } },
+    values: {
+      shop: { nom: 'Boutique Exemple', compte: { titulaire: 'Boutique Exemple', iban: 'FR76' } },
+    },
     runnable: true,
   },
   {
     label: 'a third-level optional structure opened and left empty',
     inputs: { shop: SHOP },
-    values: { shop: { nom: 'Atlas Lille', compte: { iban: 'FR76', adresse: {} } } },
+    values: { shop: { nom: 'Boutique Exemple', compte: { iban: 'FR76', adresse: {} } } },
     runnable: true,
   },
   {
     label: 'a third-level optional structure opened with its required child blank',
     inputs: { shop: SHOP },
     values: {
-      shop: { nom: 'Atlas Lille', compte: { iban: 'FR76', adresse: { rue: '', ville: 'Lille' } } },
+      shop: {
+        nom: 'Boutique Exemple',
+        compte: { iban: 'FR76', adresse: { rue: '', ville: 'Exempleville' } },
+      },
     },
     runnable: false,
   },
@@ -725,7 +732,10 @@ const ROWS: Row[] = [
     label: 'a third-level optional structure opened and filled',
     inputs: { shop: SHOP },
     values: {
-      shop: { nom: 'Atlas Lille', compte: { iban: 'FR76', adresse: { rue: '1 rue Neuve' } } },
+      shop: {
+        nom: 'Boutique Exemple',
+        compte: { iban: 'FR76', adresse: { rue: '1 rue de la Gare' } },
+      },
     },
     runnable: true,
   },

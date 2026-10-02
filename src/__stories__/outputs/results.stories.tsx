@@ -150,7 +150,7 @@ export const FlatStructure: Story = {
  * The SAME invoice, in the two presentations - the pair is the point.
  *
  * Every other story on this page renders in `studio`, the default, where a
- * label is the identifier the author wrote in `data/structures/results.mthds`:
+ * label is the identifier the author wrote in `src/__stories__/_structures/results.mthds`:
  * `issued_on`, in mono, beside `results.Invoice`. Nothing is prettified,
  * because in this mode a prettified name is a name that no longer matches the
  * bundle you would go and edit.

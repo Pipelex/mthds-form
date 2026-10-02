@@ -48,9 +48,9 @@ const object = (
 const bank = object(
   'compte_bancaire',
   [
-    text('titulaire', { required: false, defaultValue: 'Atlas SAS' }),
-    text('banque', { required: false, defaultValue: 'BNP' }),
-    text('bic', { required: false, defaultValue: 'BNPAFRPP' }),
+    text('titulaire', { required: false, defaultValue: 'Boutique Exemple SAS' }),
+    text('banque', { required: false, defaultValue: 'Banque Exemple' }),
+    text('bic', { required: false, defaultValue: 'BEXAFRPP' }),
     text('iban', { required: false, defaultValue: 'FR76' }),
   ],
   { required: false },
@@ -61,18 +61,18 @@ describe('seedInputs', () => {
   it('leaves an optional structure absent, however many defaults its children carry', () => {
     expect(seedInputs([shop])).toEqual({});
     expect(seedInputs([bank])).toEqual({});
-    const price = object(
-      'prix_or',
-      [text('prix_au_gramme', { required: false, defaultValue: 41 })],
-      { required: false },
-    );
+    const price = object('prix_or', [text('taux_horaire', { required: false, defaultValue: 60 })], {
+      required: false,
+    });
     expect(seedInputs([price])).toEqual({});
-    expect(seedObjectValue(price)).toEqual({ prix_au_gramme: 41 });
+    expect(seedObjectValue(price)).toEqual({ taux_horaire: 60 });
   });
 
   it('still seeds into a required structure, and an optional one that has a default of its own', () => {
-    const required = object('boutique', [text('nom', { required: false, defaultValue: 'Lille' })]);
-    expect(seedInputs([required])).toEqual({ boutique: { nom: 'Lille' } });
+    const required = object('boutique', [
+      text('nom', { required: false, defaultValue: 'Exempleville' }),
+    ]);
+    expect(seedInputs([required])).toEqual({ boutique: { nom: 'Exempleville' } });
 
     const defaulted = { ...bank, defaultValue: { titulaire: 'X' } };
     expect(seedInputs([defaulted])).toEqual({ compte_bancaire: { titulaire: 'X' } });
@@ -82,9 +82,9 @@ describe('seedInputs', () => {
 describe('seedObjectValue', () => {
   it("seeds the structure from its children's defaults", () => {
     expect(seedObjectValue(bank)).toEqual({
-      titulaire: 'Atlas SAS',
-      banque: 'BNP',
-      bic: 'BNPAFRPP',
+      titulaire: 'Boutique Exemple SAS',
+      banque: 'Banque Exemple',
+      bic: 'BEXAFRPP',
       iban: 'FR76',
     });
   });
@@ -104,7 +104,7 @@ describe('seedObjectValue', () => {
   });
 
   it('leaves an optional structure beneath it closed', () => {
-    const inner = object('adresse', [text('rue', { required: false, defaultValue: 'Neuve' })], {
+    const inner = object('adresse', [text('rue', { required: false, defaultValue: 'Gare' })], {
       required: false,
     });
     const outer = object('compte', [text('iban', { required: false, defaultValue: 'FR' }), inner], {
@@ -141,15 +141,15 @@ describe('the disclosure', () => {
 
   it('opens every closed structure with its seed, and closes every one', () => {
     const fields = [text('nom'), text('note', { required: false }), bank];
-    const opened = openOptionalStructures(fields, { nom: 'Lille' });
-    expect(opened).toEqual({ nom: 'Lille', compte_bancaire: seedObjectValue(bank) });
+    const opened = openOptionalStructures(fields, { nom: 'Exempleville' });
+    expect(opened).toEqual({ nom: 'Exempleville', compte_bancaire: seedObjectValue(bank) });
     expect(anyOptionalStructureOpen(fields, opened)).toBe(true);
     // An open one is kept as it is, edits and all.
-    const edited = { nom: 'Lille', compte_bancaire: { iban: 'X' } };
+    const edited = { nom: 'Exempleville', compte_bancaire: { iban: 'X' } };
     expect(openOptionalStructures(fields, edited)).toEqual(edited);
 
     const closed = closeOptionalStructures(fields, opened);
-    expect(closed).toEqual({ nom: 'Lille', compte_bancaire: undefined });
+    expect(closed).toEqual({ nom: 'Exempleville', compte_bancaire: undefined });
     expect(anyOptionalStructureOpen(fields, closed)).toBe(false);
   });
 });
@@ -167,17 +167,22 @@ describe('fieldFilled over an optional structure', () => {
   ]);
 
   it('blocks nothing while the structure is closed, or open and empty', () => {
-    expect(fieldFilled(deep, { nom: 'Lille' })).toBe(true);
-    expect(fieldFilled(deep, { nom: 'Lille', compte: undefined })).toBe(true);
-    expect(fieldFilled(deep, { nom: 'Lille', compte: {} })).toBe(true);
+    expect(fieldFilled(deep, { nom: 'Exempleville' })).toBe(true);
+    expect(fieldFilled(deep, { nom: 'Exempleville', compte: undefined })).toBe(true);
+    expect(fieldFilled(deep, { nom: 'Exempleville', compte: {} })).toBe(true);
   });
 
   it('holds a structure that holds anything to its required children, at depth two', () => {
-    expect(fieldFilled(deep, { nom: 'Lille', compte: { titulaire: 'Atlas' } })).toBe(false);
-    expect(fieldFilled(deep, { nom: 'Lille', compte: { titulaire: 'Atlas', iban: '' } })).toBe(
-      false,
-    );
-    expect(fieldFilled(deep, { nom: 'Lille', compte: { iban: 'FR76' } })).toBe(true);
+    expect(
+      fieldFilled(deep, { nom: 'Exempleville', compte: { titulaire: 'Boutique Exemple' } }),
+    ).toBe(false);
+    expect(
+      fieldFilled(deep, {
+        nom: 'Exempleville',
+        compte: { titulaire: 'Boutique Exemple', iban: '' },
+      }),
+    ).toBe(false);
+    expect(fieldFilled(deep, { nom: 'Exempleville', compte: { iban: 'FR76' } })).toBe(true);
   });
 
   it('and at depth three', () => {
@@ -185,9 +190,9 @@ describe('fieldFilled over an optional structure', () => {
       fieldFilled(deep, { nom: 'L', compte: { iban: 'FR', adresse } });
     expect(at(undefined)).toBe(true);
     expect(at({})).toBe(true);
-    expect(at({ ville: 'Lille' })).toBe(false);
-    expect(at({ rue: '  ', ville: 'Lille' })).toBe(false);
-    expect(at({ rue: '1 rue Neuve' })).toBe(true);
+    expect(at({ ville: 'Exempleville' })).toBe(false);
+    expect(at({ rue: '  ', ville: 'Exempleville' })).toBe(false);
+    expect(at({ rue: '1 rue de la Gare' })).toBe(true);
   });
 
   it('counts a top-level optional structure once it holds something, as before', () => {

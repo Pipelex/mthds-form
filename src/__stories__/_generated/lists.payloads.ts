@@ -1,5 +1,5 @@
 /**
- * Real payloads from real runs of data/structures/lists.mthds - DO NOT EDIT.
+ * Real payloads from real runs of src/__stories__/_structures/lists.mthds - DO NOT EDIT.
  *
  * Regenerate with `make fixtures-runs`, which runs each pipe on the hosted API
  * through `@pipelex/sdk` and copies back the `main_stuff` the run returned. This

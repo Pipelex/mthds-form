@@ -23,7 +23,7 @@ import { HEROES, pipeRefOf } from '../heroes';
  */
 
 const REPO = path.resolve(__dirname, '../../..');
-const STRUCTURES_DIR = path.join(REPO, 'data/structures');
+const STRUCTURES_DIR = path.join(REPO, 'src/__stories__/_structures');
 const METHODS_DIR = path.join(REPO, 'data/methods');
 const GENERATED_DIR = path.join(REPO, 'src/__stories__/_generated');
 
@@ -130,7 +130,7 @@ describe('the structures corpus', () => {
   it('emits modules that name their source', () => {
     for (const name of authoredCases()) {
       const source = readFileSync(path.join(GENERATED_DIR, `${name}.ts`), 'utf8');
-      expect(source).toContain(`data/structures/${name}.mthds`);
+      expect(source).toContain(`src/__stories__/_structures/${name}.mthds`);
       expect(source).toContain('DO NOT EDIT');
     }
     for (const name of methodCases()) {

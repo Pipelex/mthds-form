@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/readability.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/readability.mthds - DO NOT EDIT.
  *
  * A pipe whose RESULT is written for a reader rather than for a builder: an invoice checked against its purchase order, carrying coded choices in snake_case and in capitals, amounts above and below 1, a one-line text, and a Markdown memo held by a plain `text` field. It carries a 'run' block, so `make fixtures-runs` produces the real payload beside the descriptor.
  *

@@ -1,5 +1,5 @@
 /**
- * Specs captured for the heroes of data/structures/trips.mthds - DO NOT EDIT.
+ * Specs captured for the heroes of src/__stories__/_structures/trips.mthds - DO NOT EDIT.
  *
  * Regenerate the designer method's entries with `make fixtures-specs`, which runs
  * `methods/layout-design.mthds` on the hosted API through `@pipelex/sdk` over

@@ -41,19 +41,19 @@ Two of the carriers are not `PipeLLM`, and the language is why: a `PipeLLM` may 
 
 ### The lists corpus
 
-`data/structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table of its top-ranked columns, whose rows open onto the rest), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
+`src/__stories__/_structures/lists.mthds` is a second result case whose whole subject is **element shape**, because a list's layout is decided from its element's descriptor and from nothing else. One pipe per branch: scalars (chips), prose scalars (lines), a short record (a table), a twelve-column record (a table of its top-ranked columns, whose rows open onto the rest), a record carrying prose (cards), a record carrying records that carry lists (cards containing tables containing chips), a document (rows) and an image (a gallery). The stories are `Outputs/Lists`.
 
 It is a separate case rather than more pipes in `results` because the branches ARE the subject: a corpus that only ever met one of them proves nothing about the others, and the layout rules are the part most likely to be got wrong by someone who has only seen a two-row table.
 
 ### The readability corpus
 
-`data/structures/readability.mthds` is a third result case, and its subject is how a VALUE reads rather than how a result is laid out: one invoice checked against its purchase order, carrying coded choices in snake_case and in capitals, amounts above and below 1, a one-line `text`, and a Markdown memo held by a plain unbounded `text` field, with the same again in a list of records. The stories are `Outputs/Readability`, which render that run's enum values as codes in `studio` and as words in `app`, and which take two of the `results` payloads into `app` beside their `studio` renderings. The memo is Markdown because the run's note asked for it, which is what a method does, so the capture is a real model's answer rather than a shape written to suit a story. See [result-view.md](result-view.md) § "Labels and enum values follow the presentation".
+`src/__stories__/_structures/readability.mthds` is a third result case, and its subject is how a VALUE reads rather than how a result is laid out: one invoice checked against its purchase order, carrying coded choices in snake_case and in capitals, amounts above and below 1, a one-line `text`, and a Markdown memo held by a plain unbounded `text` field, with the same again in a list of records. The stories are `Outputs/Readability`, which render that run's enum values as codes in `studio` and as words in `app`, and which take two of the `results` payloads into `app` beside their `studio` renderings. The memo is Markdown because the run's note asked for it, which is what a method does, so the capture is a real model's answer rather than a shape written to suit a story. See [result-view.md](result-view.md) § "Labels and enum values follow the presentation".
 
 The gallery pins an image model explicitly (`options = { model = "$gen-image-testing" }`): the deck's default image backend refuses more than one image per call, so an `Image[3]` output needs one that does not.
 
 ### The tables corpus
 
-`data/structures/tables.mthds` takes the table as given and holds values that press on its own rules, the ones about what a cell does with a value rather than whether a list is a table at all. Its one pipe is a link checker's report, a record named by a web address, and some of those addresses carry a single word wider than the panel the stories render in: the value the name cell has to wrap without widening the table. The stories are `Outputs/Tables`, and their assertions measure the rendered widths, because a rule about a cell is a rule about layout and jsdom lays nothing out.
+`src/__stories__/_structures/tables.mthds` takes the table as given and holds values that press on its own rules, the ones about what a cell does with a value rather than whether a list is a table at all. Its one pipe is a link checker's report, a record named by a web address, and some of those addresses carry a single word wider than the panel the stories render in: the value the name cell has to wrap without widening the table. The stories are `Outputs/Tables`, and their assertions measure the rendered widths, because a rule about a cell is a rule about layout and jsdom lays nothing out.
 
 ### Files, and the one payload the corpus cannot produce
 
@@ -63,7 +63,7 @@ A run's file-bearing results carry `pipelex-storage://` references, which resolv
 
 So `data/inputs/` holds the served files — the corpus's own extraction PDF, and three real generated images downscaled to a size worth committing (the originals a run wrote are around two megabytes each). `.storybook/main.ts` serves that directory. The payload pass does not read the PDF from there: its run happens on the hosted API, so the `PipeExtract` carrier addresses the same file by its public URL.
 
-The **descriptor is still the corpus's own**, and that is the half that matters: `results.nested_media_result` is generated from `data/structures/results.mthds` like every other, so the kinds are the engine's. That pipe carries no `run` block and cannot — the language forbids a `PipeLLM` resolving to a concept containing images, and no other operator produces a structure — which is exactly why the payload is supplied and the descriptor is not.
+The **descriptor is still the corpus's own**, and that is the half that matters: `results.nested_media_result` is generated from `src/__stories__/_structures/results.mthds` like every other, so the kinds are the engine's. That pipe carries no `run` block and cannot — the language forbids a `PipeLLM` resolving to a concept containing images, and no other operator produces a structure — which is exactly why the payload is supplied and the descriptor is not.
 
 ### The three artifacts
 
@@ -141,12 +141,14 @@ The division matters in one direction in particular. Widening the scan **here** 
 
 ### What an author writes
 
-Two files per case, in `data/structures/`:
+Two files per case, in `src/__stories__/_structures/`:
 
 ```
 <case>.mthds        concepts and structures ONLY - no [pipe.*] table
 <case>.slots.json   the input SLOTS to project, grouped into carrier pipes
 ```
+
+They sit beside `src/__stories__/_generated/`, the fixtures they project to, because both serve only the stories and the suites: the whole `src/__stories__/` tree is outside the entries `tsup.config.ts` builds, and `package.json` ships `dist` alone, so neither reaches a consumer.
 
 `make fixtures` (or `make fixtures ONLY=<case>`) turns them into `src/__stories__/_generated/<case>.ts`, exporting a `CONTRACTS` and an `INPUT_FORM` typed against `mthds/protocol`. They are **annotated, not cast** — a fixture that drifts out of the standard's shape is a compile error rather than a silent lie.
 

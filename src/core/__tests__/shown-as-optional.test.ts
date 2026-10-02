@@ -5,14 +5,14 @@ import { mustBeFilled, shownAsOptional } from '../readiness';
 const enumField = (extra: Partial<EnumRunField>): EnumRunField => ({
   kind: 'enum',
   name: 'nom',
-  options: ['Lille', 'Rouen'],
+  options: ['Exempleville', 'Démoville'],
   required: false,
   ...extra,
 });
 
 describe('shownAsOptional', () => {
   it('does not show a defaulted field as optional, although the standard marks it not required', () => {
-    const field = enumField({ defaultValue: 'Lille' });
+    const field = enumField({ defaultValue: 'Exempleville' });
     expect(field.required).toBe(false);
     expect(shownAsOptional(field)).toBe(false);
   });
@@ -26,6 +26,8 @@ describe('shownAsOptional', () => {
   });
 
   it('changes nothing about what gates a run', () => {
-    expect(mustBeFilled(enumField({ defaultValue: 'Lille' }))).toBe(mustBeFilled(enumField({})));
+    expect(mustBeFilled(enumField({ defaultValue: 'Exempleville' }))).toBe(
+      mustBeFilled(enumField({})),
+    );
   });
 });

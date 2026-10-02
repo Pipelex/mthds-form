@@ -7,7 +7,7 @@ import { ResultView } from '../result-view';
  * The annual-report ledger, reproduced from a real run.
  *
  * Every other case in `Outputs/` is generated from an authored `.mthds` under
- * `data/structures/` — that is the rule, and this is the documented exception.
+ * `src/__stories__/_structures/` — that is the rule, and this is the documented exception.
  * It exists because three layout faults were reported against THIS payload and
  * none of the generated cases carried its shape: a record whose fields are all
  * short scalars EXCEPT one long list of records, with `?` numbers among the

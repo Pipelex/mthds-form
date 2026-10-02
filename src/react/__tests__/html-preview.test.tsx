@@ -18,11 +18,11 @@ const QUOTE = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Devis 250883-1</title>
-  <style>@font-face{font-family:'Calibri';src:url(/fonts/calibri-regular.woff2) format('woff2')}
-  body{font-family:'Calibri';margin:12mm} @media print{.no-print{display:none}}</style>
+  <title>Devis Q-2026-0042</title>
+  <style>@font-face{font-family:'HouseSans';src:url(/fonts/house-sans-regular.woff2) format('woff2')}
+  body{font-family:'HouseSans';margin:12mm} @media print{.no-print{display:none}}</style>
 </head>
-<body class="quote"><h1>DEVIS N° 250883-1</h1><p>Montant : 1 200 €</p></body>
+<body class="quote"><h1>DEVIS N° Q-2026-0042</h1><p>Montant : 1 200 €</p></body>
 </html>`;
 
 describe('isWholeDocument', () => {
@@ -54,7 +54,7 @@ describe('frameDocument over a whole document', () => {
     // The root keeps the document's language, and its body keeps its class.
     expect(doc.documentElement.getAttribute('lang')).toBe('fr');
     expect(doc.body.className).toBe('quote');
-    expect(doc.body.querySelector('h1')?.textContent).toBe('DEVIS N° 250883-1');
+    expect(doc.body.querySelector('h1')?.textContent).toBe('DEVIS N° Q-2026-0042');
   });
 
   it('puts the policy before anything the document says', () => {

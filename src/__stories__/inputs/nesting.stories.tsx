@@ -93,8 +93,12 @@ export const OptionalStructureOpen: Story = {
     pipeCode: 'shop_with_bank',
     initialValues: {
       shop: {
-        name: 'Atlas Lille',
-        bank_account: { holder: 'Atlas SAS', bank: 'BNP Paribas', iban: 'FR76 3000 4000' },
+        name: 'Boutique Exemple',
+        bank_account: {
+          holder: 'Boutique Exemple SAS',
+          bank: 'Banque Exemple',
+          iban: 'FR76 0000 0000',
+        },
       },
     },
   },

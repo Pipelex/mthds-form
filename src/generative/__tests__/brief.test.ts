@@ -136,7 +136,7 @@ describe('the seeds an input page lists', () => {
       name: 'bank',
       required: false,
       conceptRef: 'trips.BankDetails',
-      fields: [{ kind: 'text', name: 'holder', required: false, defaultValue: 'Atlas' }],
+      fields: [{ kind: 'text', name: 'holder', required: false, defaultValue: 'Boutique Exemple' }],
     },
   ];
   const brief = inputBrief({ pipeRef: 'trips.plan_trip' }, fields);

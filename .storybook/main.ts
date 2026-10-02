@@ -25,7 +25,7 @@ const config: StorybookConfig = {
   //
   // Storybook's own UI faces are served at `/fonts/` too, so a page fixture can
   // link a face root-relative, as a host's quote template links its own
-  // (`/fonts/calibri-regular.woff2`). The faces are Nunito Sans, under the OFL;
+  // (`/fonts/house-sans-regular.woff2`). The faces are Nunito Sans, under the OFL;
   // a proprietary face cannot be redistributed in an open-source repository.
   staticDirs: [
     '../data/inputs',

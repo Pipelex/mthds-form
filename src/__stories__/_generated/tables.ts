@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/tables.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/tables.mthds - DO NOT EDIT.
  *
  * Record lists whose values press on the table's own rules rather than on the choice of a table. A link checker's report is a table whose name column holds web addresses: each one a single token, and some of them longer than any panel is wide, which is the value the name cell has to wrap without widening the table. Every pipe runs for real.
  *

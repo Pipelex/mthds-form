@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/structured.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/structured.mthds - DO NOT EDIT.
  *
  * A realistic domain object: mixed scalars, an enum, a nested concept, and a list of concepts.
  *
@@ -795,7 +795,7 @@ export const CONTRACTS: PipeIOContracts = {
                   type: 'null',
                 },
               ],
-              default: 'BNP Paribas',
+              default: 'Banque Exemple',
               description: "The bank's name",
               title: 'Bank',
             },
@@ -808,7 +808,7 @@ export const CONTRACTS: PipeIOContracts = {
                   type: 'null',
                 },
               ],
-              default: 'Atlas SAS',
+              default: 'Boutique Exemple SAS',
               description: 'Who holds the account',
               title: 'Holder',
             },
@@ -842,7 +842,7 @@ export const CONTRACTS: PipeIOContracts = {
                       type: 'null',
                     },
                   ],
-                  default: 'BNP Paribas',
+                  default: 'Banque Exemple',
                   description: "The bank's name",
                   title: 'Bank',
                 },
@@ -855,7 +855,7 @@ export const CONTRACTS: PipeIOContracts = {
                       type: 'null',
                     },
                   ],
-                  default: 'Atlas SAS',
+                  default: 'Boutique Exemple SAS',
                   description: 'Who holds the account',
                   title: 'Holder',
                 },
@@ -1424,14 +1424,14 @@ export const INPUT_FORM: InputForm = {
             description: 'Where to pay the shop, when it is paid directly',
             fields: [
               {
-                default_value: 'Atlas SAS',
+                default_value: 'Boutique Exemple SAS',
                 description: 'Who holds the account',
                 kind: 'text',
                 name: 'holder',
                 required: false,
               },
               {
-                default_value: 'BNP Paribas',
+                default_value: 'Banque Exemple',
                 description: "The bank's name",
                 kind: 'text',
                 name: 'bank',
@@ -1460,14 +1460,14 @@ export const INPUT_FORM: InputForm = {
         description: 'Where a payment is sent',
         fields: [
           {
-            default_value: 'Atlas SAS',
+            default_value: 'Boutique Exemple SAS',
             description: 'Who holds the account',
             kind: 'text',
             name: 'holder',
             required: false,
           },
           {
-            default_value: 'BNP Paribas',
+            default_value: 'Banque Exemple',
             description: "The bank's name",
             kind: 'text',
             name: 'bank',

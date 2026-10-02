@@ -44,7 +44,7 @@ const QUOTE = `<!DOCTYPE html>
 <body class="quote">
 <!-- <img src="${LOGO}"> in a comment is not a picture -->
 <h1>DEVIS</h1>
-<img src="${PHOTO}" alt="montre">
+<img src="${PHOTO}" alt="produit">
 <IMG SRC='${PHOTO}' alt="encore">
 <p>Texte qui cite ${LOGO} sans le charger.</p>
 </body>
