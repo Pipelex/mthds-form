@@ -18,10 +18,11 @@ import {
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { planFileSave } from '../core/save-plan';
+import { planFileSave, splitFileName } from '../core/save-plan';
 import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff-files';
 import {
   useFileDownloadShown,
+  usePdfSaveShown,
   useResolveShareUrl,
   useResolveUrl,
   useSaveFiles,
@@ -47,6 +48,8 @@ import {
 import { ConceptPill } from './concept-pill';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
+import { PdfDownloadButton } from './pdf-download-button';
+import { useFileNamePrompt } from './file-name-dialog';
 import { Markdown } from './markdown';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
@@ -304,9 +307,8 @@ function DateValue({ value }: { value: unknown }) {
  * `LeafValue` rather than something one layout does. The wording is
  * `enumLabeler`'s, the same rule `EnumField` offers its options under, so a
  * result reads as the form that produced it did, codes included when two
- * options would read the same. A host's `optionLabels` win over both, in both
- * presentations, as they do in the form. Only a string is worded; anything
- * else is the payload disagreeing with its descriptor, and is shown as it is.
+ * options would read the same. Only a string is worded; anything else is the
+ * payload disagreeing with its descriptor, and is shown as it is.
  */
 function EnumValue({
   field,
@@ -318,10 +320,7 @@ function EnumValue({
   compact: boolean;
 }) {
   const presentation = useFieldPresentation();
-  const shown =
-    typeof value === 'string'
-      ? enumLabeler(field.options, presentation, field.optionLabels)(value)
-      : value;
+  const shown = typeof value === 'string' ? enumLabeler(field.options, presentation)(value) : value;
   return <Scalar value={shown} compact={compact} />;
 }
 
@@ -334,7 +333,7 @@ function EnumValue({
  */
 function cellTitle(column: RunField, cell: string | number, presentation: FieldPresentation) {
   return column.kind === 'enum' && typeof cell === 'string'
-    ? enumLabeler(column.options, presentation, column.optionLabels)(cell)
+    ? enumLabeler(column.options, presentation)(cell)
     : String(cell);
 }
 
@@ -609,6 +608,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
   const resolve = useResolveUrl();
   const save = useSaveFiles();
   const shown = useFileDownloadShown(file.kind);
+  const { ask, dialog } = useFileNamePrompt();
   const statusId = useId();
   // The state belongs to the file it was drawn for. Entries are keyed by their
   // index, so a rerun that puts another file at the same place keeps this
@@ -639,15 +639,20 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
     <>
       <button
         type="button"
-        onClick={() => {
+        onClick={async () => {
+          // The reader's name, when the host asks for one, is the planned
+          // file's name: the extension the plan chose stays, so a `data:` file
+          // keeps the one its admitted type allows.
+          const { stem, extension } = splitFileName(planned.name);
+          const name = await ask(stem, extension);
+          if (name === null) return;
           const started: FileSaveAttempt = { identity, state: 'saving' };
           setAttempt(started);
-          void save([planned]).then((result) => {
-            const settled = result.failed.length > 0 ? 'failed' : 'saved';
-            // Only the latest press settles the button; an earlier one still in
-            // flight answers for a state nobody is looking at any more.
-            setAttempt((current) => (current === started ? { identity, state: settled } : current));
-          });
+          const result = await save([name === planned.name ? planned : { ...planned, name }]);
+          const settled = result.failed.length > 0 ? 'failed' : 'saved';
+          // Only the latest press settles the button; an earlier one still in
+          // flight answers for a state nobody is looking at any more.
+          setAttempt((current) => (current === started ? { identity, state: settled } : current));
         }}
         disabled={state === 'saving'}
         aria-label={label}
@@ -671,6 +676,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
       <span id={statusId} role="status" className="sr-only">
         {failed ? s.downloadFileFailed : ''}
       </span>
+      {dialog}
     </>
   );
 }
@@ -1657,7 +1663,8 @@ function NativeValue({ value }: { value: unknown }) {
   if (value === null || value === undefined || value === '') return <Absent />;
 
   const html = readHtmlContent(value);
-  if (html) return <HtmlPreview content={html} />;
+  // A composite member carries no file controls, as its download carries none.
+  if (html) return <HtmlPreview content={html} downloadPdf={false} />;
 
   const date = readDateContent(value);
   if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
@@ -1921,6 +1928,7 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
   const unwrapped = unwrap(field, value);
   // Read up here, before any arm returns, because hooks may not follow one.
   const pageDownloadShown = useFileDownloadShown('markup');
+  const pdfShown = usePdfSaveShown();
   const location = useResultLocation();
 
   // The description rides the label's `title`, at every depth including this
@@ -1967,21 +1975,36 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
     // control rides the label row as a text value's copy control does, and
     // survives `hideLabel` for the same reason. It is the same row every other
     // file's controls sit in.
-    const page =
-      pageDownloadShown && location
-        ? readStuffFile('markup', unwrapped, location.path.join('.'))
+    const pagePath = location?.path.join('.');
+    const pageFile =
+      pagePath === undefined ? undefined : readStuffFile('markup', unwrapped, pagePath);
+    const page = pageDownloadShown ? pageFile : undefined;
+    // Its "Download PDF" joins the same row, and the PDF is named as the page's
+    // own download is, with its own extension: `<downloadBaseName>.pdf` for a
+    // result that is one page, the page's place after it for one inside a
+    // structure, so the two files a reader saves of one page share a name.
+    const pdfName =
+      pdfShown && content && pageFile && location
+        ? stem(planFileSave(pageFile, { baseName: location.baseName })?.name)
         : undefined;
     return (
       <div className="space-y-2">
-        {page ? (
+        {page || pdfName !== undefined ? (
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">{header}</div>
+            {content && pdfName !== undefined ? (
+              <PdfDownloadButton
+                content={content}
+                {...(pagePath === undefined ? {} : { path: pagePath })}
+                {...(pdfName ? { fileName: pdfName } : {})}
+              />
+            ) : null}
             <FileActions file={page} />
           </div>
         ) : (
           header
         )}
-        {content ? <HtmlPreview content={content} /> : <Absent />}
+        {content ? <HtmlPreview content={content} downloadPdf={false} /> : <Absent />}
       </div>
     );
   }
@@ -2224,4 +2247,9 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
   // rendered as `[object Object]`, silently, with nothing to notice it.
   field satisfies never;
   return null;
+}
+
+/** A saved file's name without its extension: what a PDF of the same page is called. */
+function stem(name: string | undefined): string {
+  return name === undefined ? '' : name.replace(/\.[^.]+$/, '');
 }

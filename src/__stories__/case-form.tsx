@@ -25,9 +25,12 @@ import {
  * rendering, and a fixture whose pipe_ref stops resolving fails loudly instead
  * of rendering an empty form.
  *
- * Deliberately NOT a form: no submit, no gate, no readiness. Those belong to a
- * host's panel and are covered by the run-gate suites. What a story asks is
- * what a control LOOKS like at a given input shape.
+ * Deliberately NOT a form: no submit, no gate, no readiness. The whole form a
+ * host mounts is `MethodForm` in the `./react` entry, promoted from this
+ * harness, with its own stories (`Inputs/Method Form`). This one stays the
+ * per-control harness, because a control story drives states a form owns
+ * itself - an upload in flight, a failed one, an error - from its args. What a
+ * story here asks is what a control LOOKS like at a given input shape.
  *
  * It does upload, in the one sense a story can: a picked or dropped file is
  * written back at its field's path as a `blob:` URL, the way a host writes its

@@ -55,7 +55,7 @@ st: storybook
 build-storybook:
 	npm run build-storybook
 
-# Regenerate the story fixtures from data/structures/. Needs the sibling
+# Regenerate the story fixtures from src/__stories__/_structures/. Needs the sibling
 # ../pipelex checkout's venv (PIPELEX_PYTHON) - dev-only, since the emitted .ts
 # files are committed and the stories read those. ONLY=<case> narrows it.
 fixtures:

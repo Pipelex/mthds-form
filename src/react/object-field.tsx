@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { cn } from './utils';
 import type { ObjectRunField } from '../core';
 import { ownProp } from '../core/own-property';
-import { isFilled } from '../core/readiness';
+import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from '../core/readiness';
+import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
-import { useFieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 
 interface ObjectFieldProps {
@@ -24,9 +24,16 @@ interface ObjectFieldProps {
  * A structured concept: its sub-fields rendered inside one hairline-grouped
  * card so nesting stays legible. Empty optional sub-fields collapse behind a
  * "+ N optional" toggle - required and already-filled fields always show.
+ *
+ * A CLOSED optional sub-structure (absent value) folds behind that toggle and
+ * is counted like any empty optional field. The toggle also opens and closes
+ * them: expanding writes `seedObjectValue` into every closed one, collapsing
+ * writes `undefined` into every one, so they leave the payload. It reads
+ * expanded while any of them is open, so a restored value that holds one
+ * offers to close it. An open optional structure renders like any other: its
+ * label, description and card, with no badge.
  */
 export function ObjectField({ field, value, onChange, id, error, env }: ObjectFieldProps) {
-  const s = useFieldStrings();
   const [showOptional, setShowOptional] = useState(false);
   // A grouped concept reads as a section heading in an app, not as a typed field.
   const presentation = useFieldPresentation();
@@ -40,10 +47,26 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   // `toString` reads as the inherited function from a bare index. The kernel
   // spells this read one way at every one of its sites; the control set is the
   // other half of "every".
-  const optionalEmpty = field.fields.filter((f) => !f.required && !isFilled(ownProp(data, f.name)));
-  const visible = showOptional
+  const folded = field.fields.filter((f) => isFoldedOptional(f, ownProp(data, f.name)));
+  const structureOpen = anyOptionalStructureOpen(field.fields, data);
+  const expanded = showOptional || structureOpen;
+  const visible = expanded
     ? field.fields
-    : field.fields.filter((f) => f.required || isFilled(ownProp(data, f.name)));
+    : field.fields.filter((f) => !isFoldedOptional(f, ownProp(data, f.name)));
+  const hasStructure = field.fields.some(isOptionalStructure);
+
+  const toggle = () => {
+    setShowOptional(!expanded);
+    // Only write when there is a structure to open or close: a toggle over
+    // leaf fields alone is view state the value never sees.
+    if (hasStructure) {
+      onChange(
+        expanded
+          ? closeOptionalStructures(field.fields, data)
+          : openOptionalStructures(field.fields, data),
+      );
+    }
+  };
 
   return (
     <div className="space-y-2">
@@ -57,11 +80,6 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           {fieldLabel(field.title, field.name, presentation)}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
-        {!field.required && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {s.optionalBadge}
-          </span>
-        )}
       </div>
       {field.description && (
         <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
@@ -84,11 +102,11 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           />
         ))}
 
-        {optionalEmpty.length > 0 && (
+        {(folded.length > 0 || structureOpen) && (
           <OptionalToggle
-            count={optionalEmpty.length}
-            expanded={showOptional}
-            onToggle={() => setShowOptional((v) => !v)}
+            count={folded.length}
+            expanded={expanded}
+            onToggle={toggle}
             noun="field"
           />
         )}

@@ -53,7 +53,7 @@ function Harness({
   field: ObjectRunField;
   initial?: Record<string, unknown>;
 }) {
-  const [value, setValue] = useState<Record<string, unknown>>(initial);
+  const [value, setValue] = useState<Record<string, unknown> | undefined>(initial);
   return <ObjectField field={field} value={value} onChange={setValue} id="brief" />;
 }
 

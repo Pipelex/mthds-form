@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/states.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/states.mthds - DO NOT EDIT.
  *
  * The state axis, factored out of the per-kind catalog: defaults, optionality, presence.
  *

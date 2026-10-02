@@ -4,16 +4,24 @@ import type * as React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
-import { planStuffSave } from '../core/save-plan';
+import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
+import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
+import { readStuffFile } from '../core/stuff-files';
 import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
+import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
+import { HtmlPreview } from './html-preview';
 import {
   DownloadDisplayOverride,
+  useFileDownloadShown,
+  usePdfSaveShown,
   useResolveUrl,
   useResultDownloadShown,
   useSaveFiles,
   type DownloadDisplay,
 } from './result-env';
+import { PdfDownloadButton } from './pdf-download-button';
+import { useFileNamePrompt } from './file-name-dialog';
 import { ResultRoot } from './result-location';
 import { cn } from './utils';
 
@@ -39,9 +47,31 @@ import { cn } from './utils';
  * match a host's design system. It is a renderer that cannot be improved without
  * shipping the engine. If a plain-text form is wanted, it is a COPY FORMAT and
  * belongs behind a copy control, not beside the view that reads the standard.
+ *
+ * ## Which views a reader is offered
+ *
+ * The JSON view is a builder's tool. In `studio` both views are offered; in
+ * `app` only the result is, so a person reading a method app's answer is not
+ * handed a switch to a receipt they have no use for. `views` overrides either
+ * default, and the switch is drawn only when it offers more than one view.
+ *
+ * ## A result that is one page
+ *
+ * A result whose node IS `native.Html`, or a concept refining it (read off the
+ * descriptor's `concept_ref` and `refines`, never off the value), is one page,
+ * and the panel shows it as that page: one row holding the title (none in
+ * `app`, where the page carries its own), "Download
+ * PDF" as the primary control and one HTML download, then the page edge to
+ * edge with no box around it. The page's own control row and the header's
+ * download saved the same file, so they are one control here.
  */
 
 export type StuffViewerView = 'rendered' | 'json';
+
+/** Both views, the result first: what `studio` offers. */
+const ALL_VIEWS: readonly StuffViewerView[] = ['rendered', 'json'];
+/** The result alone: what `app` offers, where the JSON receipt is a builder's tool. */
+const RESULT_ONLY: readonly StuffViewerView[] = ['rendered'];
 
 export interface StuffViewerProps {
   field: RunField;
@@ -66,7 +96,18 @@ export interface StuffViewerProps {
    * is named after the thing they were reading rather than `output.json`.
    */
   name?: string;
-  /** Which view opens first. Rendered, unless a host has a reason. */
+  /**
+   * Which views the reader may switch between, in the switch's order. Unset,
+   * it follows the presentation: both in `studio`, the rendered result alone in
+   * `app`, where the JSON receipt is a builder's tool. The switch is drawn only
+   * when more than one view is offered; an empty list counts as the rendered
+   * result alone.
+   */
+  views?: readonly StuffViewerView[];
+  /**
+   * Which view opens first. Rendered, unless a host has a reason. A view not
+   * among `views` opens the first one offered instead.
+   */
   defaultView?: StuffViewerView;
   /**
    * Names the saved files, whichever control saved them: the base name names
@@ -261,18 +302,29 @@ function StuffPanel({
   field,
   value,
   name,
+  views: viewsProp,
   defaultView = 'rendered',
   downloadBaseName,
   className,
 }: Omit<StuffViewerProps, 'downloads'>) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
+  const offered =
+    viewsProp && viewsProp.length > 0
+      ? viewsProp
+      : viewsProp || presentation === 'app'
+        ? RESULT_ONLY
+        : ALL_VIEWS;
   // The caller's name wins over the descriptor's, and it is applied to the
   // FIELD rather than passed to the header alone: the download's default base
   // name reads the same property, and the two naming the item differently is
   // exactly the drift this component exists to prevent.
   const named = name ? { ...field, name } : field;
   const baseName = downloadBaseName ?? named.name ?? 'result';
-  const [view, setView] = useState<StuffViewerView>(defaultView);
+  const [chosen, setView] = useState<StuffViewerView>(defaultView);
+  // A host may narrow the views after mounting (a presentation switched to
+  // `app`), so the view shown is always one still offered.
+  const view = offered.includes(chosen) ? chosen : (offered[0] ?? 'rendered');
   // A download belongs to the result it was made from. A host that keeps this
   // panel mounted and hands it the next result (a rerun, another node) must not
   // see the last result's failures under the new one, nor a save still in
@@ -296,9 +348,42 @@ function StuffPanel({
   // storage does not need to configure the two separately.
   const resolveUrl = useResolveUrl();
   const save = useSaveFiles();
-  const downloadShown = useResultDownloadShown();
+  const resultDownloadShown = useResultDownloadShown();
+  const pageDownloadShown = useFileDownloadShown('markup');
+  const pdfShown = usePdfSaveShown();
+  const { ask, dialog } = useFileNamePrompt();
+  // A result that is one page: its node is `native.Html` or refines it, which
+  // the descriptor states, and the value holds the markup that kind documents.
+  const page = isNativeHtmlNode(field) ? readHtmlContent(value) : undefined;
+  // For a page, the header's download and the page's own saved the same file,
+  // so the one control drawn is there when either setting asks for it.
+  const downloadShown = resultDownloadShown || (page !== undefined && pageDownloadShown);
 
   const handleDownload = useCallback(async () => {
+    // The descriptor's own field, not the renamed one: each planned file's
+    // path is its place in the result, which is the descriptor's, and the
+    // file buttons below plan from the same place.
+    const options = resolveUrl ? { resolveUrl } : {};
+    let plan: SavePlan = planStuffSave(field, value, { baseName, ...options });
+    // The reader's name, when the host asks for one, flows into the plan. A
+    // plan of one file asks for that file's name and keeps its extension; a
+    // plan of several asks for the name they share, the base name (prefilled
+    // as the JSON copy, which the plan puts last, is named), and is planned
+    // again under it, so the JSON copy and every file the payload did not name
+    // itself carry the reader's name and the plan still allots distinct names.
+    const only = plan.files.length === 1 ? plan.files[0] : undefined;
+    const json = plan.files.length > 1 ? plan.files[plan.files.length - 1] : undefined;
+    if (only) {
+      const { stem, extension } = splitFileName(only.name);
+      const name = await ask(stem, extension);
+      if (name === null) return;
+      if (name !== only.name) plan = { ...plan, files: [{ ...only, name }] };
+    } else if (json) {
+      const { stem } = splitFileName(json.name);
+      const name = await ask(stem, '');
+      if (name === null) return;
+      if (name !== stem) plan = planStuffSave(field, value, { baseName: name, ...options });
+    }
     const attempt: DownloadAttempt = {
       field,
       baseName,
@@ -309,13 +394,6 @@ function StuffPanel({
     setSaving(attempt);
     setMissed(null);
     try {
-      // The descriptor's own field, not the renamed one: each planned file's
-      // path is its place in the result, which is the descriptor's, and the
-      // file buttons below plan from the same place.
-      const plan = planStuffSave(field, value, {
-        baseName,
-        ...(resolveUrl ? { resolveUrl } : {}),
-      });
       const { failed } = await save(plan.files);
       if (latest.current !== attempt) return;
       setMissed({
@@ -328,28 +406,54 @@ function StuffPanel({
     } finally {
       setSaving((current) => (current === attempt ? null : current));
     }
-  }, [field, value, baseName, resolveUrl, save]);
-  const views: { id: StuffViewerView; label: string }[] = [
-    { id: 'rendered', label: s.viewRendered },
-    { id: 'json', label: s.viewJson },
-  ];
+  }, [field, value, baseName, resolveUrl, save, ask]);
+  const labels: Record<StuffViewerView, string> = { rendered: s.viewRendered, json: s.viewJson };
+  // The PDF is named as the page's HTML download is, with its own extension, so
+  // the two files a reader saves of one page share a name.
+  const pdfName = page && pdfShown ? pdfFileName(field, value, baseName) : undefined;
+  const pageView = page !== undefined && view !== 'json';
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div
+      className={cn(
+        // A page shown as the view is a flex column that may shrink: in a host
+        // whose scrolling panel is a flex column (`flex min-h-0 flex-col
+        // overflow-y-auto`), the page's frame takes the panel's remaining
+        // height and scrolls inside itself, so there is one scroll container
+        // under the pointer and the first wheel scrolls the page. Anywhere
+        // else the column is as tall as its content and nothing changes.
+        pageView ? 'flex min-h-0 flex-col gap-2' : 'space-y-2',
+        className,
+      )}
+    >
       {/* The header is drawn once, here, and `ResultField` is told to skip its
           own - two headers that agree today drift tomorrow. It stays put across
           both views, so switching does not move the thing you are reading. */}
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-        <div className="min-w-0 space-y-1">
-          <ResultHeader field={named} />
-        </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        {/* A one-page result in an app carries its own title on the page, so
+            the panel adds none: its row is the page's controls alone. */}
+        {page && presentation === 'app' ? (
+          <div />
+        ) : (
+          <div className="min-w-0 space-y-1">
+            <ResultHeader field={named} />
+          </div>
+        )}
         <div className="flex shrink-0 items-center gap-2">
+          {page && pdfName !== undefined && (
+            <PdfDownloadButton
+              content={page}
+              path={field.name}
+              primary
+              {...(pdfName ? { fileName: pdfName } : {})}
+            />
+          )}
           {downloadShown && (
             <button
               type="button"
               onClick={() => void handleDownload()}
               disabled={savingShown}
-              aria-label={s.download}
+              aria-label={page ? s.downloadHtml : s.download}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60"
             >
               {savingShown ? (
@@ -357,31 +461,34 @@ function StuffPanel({
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}
-              {savingShown ? s.downloading : s.download}
+              {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
             </button>
           )}
-          <div
-            role="group"
-            aria-label={s.resultViewGroup}
-            className="flex rounded-md border border-border p-0.5"
-          >
-            {views.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setView(id)}
-                aria-pressed={view === id}
-                className={cn(
-                  'rounded px-2 py-0.5 text-[12px] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1',
-                  view === id
-                    ? 'bg-card font-medium text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {dialog}
+          {offered.length > 1 && (
+            <div
+              role="group"
+              aria-label={s.resultViewGroup}
+              className="flex rounded-md border border-border p-0.5"
+            >
+              {offered.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setView(id)}
+                  aria-pressed={view === id}
+                  className={cn(
+                    'rounded px-2 py-0.5 text-[12px] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1',
+                    view === id
+                      ? 'bg-card font-medium text-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {labels[id]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -393,7 +500,10 @@ function StuffPanel({
       {downloadShown && (
         <p
           role="status"
-          className={cn('text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
+          className={cn(
+            'shrink-0 text-[12px] text-destructive',
+            missedShown.length === 0 && 'sr-only',
+          )}
         >
           {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
         </p>
@@ -401,6 +511,11 @@ function StuffPanel({
 
       {view === 'json' ? (
         <JsonView value={value} />
+      ) : page ? (
+        // The page is the panel's main view: drawn here rather than through
+        // `ResultField`, whose page arm would add a second control row saving
+        // the same file, and with no box around it.
+        <HtmlPreview content={page} downloadPdf={false} bare fill />
       ) : (
         <ResultRoot baseName={baseName} path={[field.name]}>
           <ResultField field={field} value={value} hideLabel />
@@ -408,4 +523,15 @@ function StuffPanel({
       )}
     </div>
   );
+}
+
+/**
+ * A one-page result's PDF name, without the extension: the page's own HTML
+ * download name, without its own. `''` when the page plans no file, which
+ * leaves the button to its default.
+ */
+function pdfFileName(field: RunField, value: unknown, baseName: string): string {
+  const file = readStuffFile('markup', value, field.name);
+  const name = file ? planFileSave(file, { baseName })?.name : undefined;
+  return name === undefined ? '' : name.replace(/\.[^.]+$/, '');
 }

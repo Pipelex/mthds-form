@@ -19,6 +19,8 @@ The package never uploads anything. A file control takes a file from the user an
 />
 ```
 
+A host rendering a method's whole form with `MethodForm` writes none of this by hand: it hands `useMethodForm` an `uploadFile` that stores a file and resolves to its URL, and the hook supplies `onDropFile`, tracks `uploadingIds` and `uploadErrors`, and writes the result back at the field's path. See [method-form.md](method-form.md).
+
 ## Which ways into a file value a host offers
 
 A file value has two ways in, and each is offered exactly when the host can honour it:
@@ -131,6 +133,8 @@ It is not needed for a URL the browser can already render — `http(s):`, `blob:
 The result is **bound to the URI it was resolved from**, the same way the local preview below is bound to the value it is the preview of — one rule, applied to both sources a preview can come from. A cached source with no record of its provenance is painted under whatever name the value carries next: when an open preview moved between two storage URIs, the chip named the new file over a preview still showing the old one, and it stayed there until the next resolution landed. Keeping the URI beside the source makes that impossible by construction rather than briefly wrong — clearing it from an effect would still paint one frame of the old file, which is why the check is computed in render.
 
 A resolution that **fails** leaves the "cannot be shown" state rather than the file before it, and is caught rather than left to escape as an unhandled rejection into the host's app. `resolveUrl` is a network call, so rejecting is ordinary; the viewer shows the same thing it shows for a resolver that answers `null`. Both are recorded as the resolver's answer for that URI, because a refusal is an answer: they used to be recorded as no answer at all, which left the spinner waiting on a resolver that had already replied. Closing and reopening the preview asks the resolver again, and the refusal is forgotten when it does, so the retry shows the spinner until its own answer lands.
+
+The result view has a second, optional resolver beside it, `resolveUrls` on `ResultEnvProvider`: an async, bulk one, asked for every stored picture an HTML page names in one call, before the page is framed, made into a PDF or saved. A reference it leaves out is asked of `resolveUrl`. See [result-view.md](result-view.md#stored-pictures-inside-a-page).
 
 ## What the control decides it can preview
 

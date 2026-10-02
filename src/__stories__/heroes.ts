@@ -6,7 +6,7 @@
  * on one side of the run: an INPUT hero renders the pipe's inputs, a RESULT
  * hero renders what a run of it produced.
  *
- * Two kinds of case carry a hero. A STRUCTURES case (`data/structures/`) is
+ * Two kinds of case carry a hero. A STRUCTURES case (`src/__stories__/_structures/`) is
  * written to vary the axes of a slot, its carriers are synthesized, and the
  * hero states the one sentence its brief opens with. An AUTHORED METHOD
  * (`data/methods/<case>/`) is a bundle somebody wrote, taken in verbatim, and
@@ -22,11 +22,11 @@ export interface Hero {
   /** `input` renders `input_form`; `result` renders `output_form` over a captured payload. */
   side: 'input' | 'result';
   /**
-   * `structures`: `data/structures/<case>.mthds` with synthesized carriers.
+   * `structures`: `src/__stories__/_structures/<case>.mthds` with synthesized carriers.
    * `methods`: `data/methods/<case>/bundle.mthds`, an authored method, verbatim.
    */
   source: HeroSource;
-  /** The corpus case: the file stem under `data/structures/`, or the directory under `data/methods/`. */
+  /** The corpus case: the file stem under `src/__stories__/_structures/`, or the directory under `data/methods/`. */
   caseName: string;
   /** The case's domain, the first half of the pipe ref. */
   domain: string;
@@ -118,7 +118,7 @@ export function pipeRefOf(hero: Hero): string {
 export function bundlePathOf(hero: Hero): string {
   return hero.source === 'methods'
     ? `data/methods/${hero.caseName}/bundle.mthds`
-    : `data/structures/${hero.caseName}.mthds`;
+    : `src/__stories__/_structures/${hero.caseName}.mthds`;
 }
 
 /**

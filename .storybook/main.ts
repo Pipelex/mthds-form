@@ -22,7 +22,15 @@ const config: StorybookConfig = {
   // `pipelex-storage://` reference resolves only through the host's resolver -
   // so the preview seam has no other way to be looked at. See
   // `outputs/preview.stories.tsx`.
-  staticDirs: ['../data/inputs'],
+  //
+  // Storybook's own UI faces are served at `/fonts/` too, so a page fixture can
+  // link a face root-relative, as a host's quote template links its own
+  // (`/fonts/house-sans-regular.woff2`). The faces are Nunito Sans, under the OFL;
+  // a proprietary face cannot be redistributed in an open-source repository.
+  staticDirs: [
+    '../data/inputs',
+    { from: '../node_modules/storybook/assets/browser', to: '/fonts' },
+  ],
   addons: ['@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-vitest'],
   framework: '@storybook/react-vite',
   viteFinal: async (viteConfig) => {
@@ -64,7 +72,11 @@ const config: StorybookConfig = {
         '@radix-ui/react-toggle-group',
         'class-variance-authority',
         'clsx',
+        // Loaded with `import()` on the first PDF download, so Vite would
+        // otherwise discover them mid-run.
+        'jspdf',
         'lucide-react',
+        'modern-screenshot',
         'react-dropzone',
         'tailwind-merge',
         'zod',

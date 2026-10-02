@@ -90,6 +90,14 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     }\u00a0: ${names.join(', ')}`,
   downloadFile: (name) => `Télécharger ${name}`,
   downloadFileFailed: 'Le fichier n’a pas pu être enregistré',
+  downloadPdf: 'Télécharger le PDF',
+  downloadPdfBusy: 'Préparation du PDF…',
+  downloadPdfFailed: 'Le PDF n’a pas pu être créé',
+  pageLoading: 'Chargement de la page…',
+  downloadHtml: 'Télécharger le HTML',
+  fileNameTitle: 'Nom du fichier',
+  fileNameCancel: 'Annuler',
+  fileNameConfirm: 'Télécharger',
   viewRendered: 'Résultat',
   viewJson: 'JSON',
   copyJson: 'Copier le JSON',
@@ -104,4 +112,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     `${count} ${plural(count, 'champ facultatif', 'champs facultatifs')}`,
   optionalInputsCount: (count) =>
     `${count} ${plural(count, 'entrée facultative', 'entrées facultatives')}`,
+  requiredField: 'Obligatoire',
+  incompleteField: 'Incomplet\u00a0: remplissez ses champs obligatoires',
+  uploadFailed: 'Ce fichier n’a pas pu être envoyé. Réessayez.',
 };

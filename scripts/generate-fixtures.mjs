@@ -11,7 +11,7 @@
  *
  * ## What an author writes, and what this writes
  *
- * An author writes exactly two files per case, both in `data/structures/`:
+ * An author writes exactly two files per case, both in `src/__stories__/_structures/`:
  *
  *   <case>.mthds        concepts and structures ONLY - no `[pipe.*]` table
  *   <case>.slots.json   the input SLOTS to project, grouped into carrier pipes
@@ -133,7 +133,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const STRUCTURES_DIR = path.join(REPO, 'data/structures');
+const STRUCTURES_DIR = path.join(REPO, 'src/__stories__/_structures');
 const METHODS_DIR = path.join(REPO, 'data/methods');
 const OUT_DIR = path.join(REPO, 'src/__stories__/_generated');
 
@@ -242,7 +242,7 @@ function sourcePathOf(caseName) {
   if (existsSync(path.join(METHODS_DIR, caseName, 'case.json'))) {
     return `data/methods/${caseName}/bundle.mthds`;
   }
-  return `data/structures/${caseName}.mthds`;
+  return `src/__stories__/_structures/${caseName}.mthds`;
 }
 
 /**
@@ -1562,12 +1562,12 @@ function main() {
   if (shared.length > 0) {
     die(
       `a case is one kind or the other, never both - ${shared.join(', ')} is in both ` +
-        `data/structures/ and data/methods/, and the two would write the same module.`,
+        `src/__stories__/_structures/ and data/methods/, and the two would write the same module.`,
     );
   }
   const cases = [...structures, ...methods].filter((name) => !only || name === only);
   if (only && cases.length === 0) {
-    die(`no case named '${only}' in data/structures/ or data/methods/.`);
+    die(`no case named '${only}' in src/__stories__/_structures/ or data/methods/.`);
   }
   if (cases.length === 0) {
     process.stdout.write('generate-fixtures: no cases in data/, nothing to do.\n');

@@ -26,7 +26,7 @@ describe('buildRunFields date mapping', () => {
     const inputs: Record<string, PipeInputContract> = {
       quote_date: {
         ...PLAIN_SINGLE,
-        concept_ref: 'atlas.QuoteDate',
+        concept_ref: 'demo.QuoteDate',
         json_schema: {
           type: 'object',
           properties: { date: { type: 'string', format: 'date-time', title: 'Date' } },
@@ -38,7 +38,7 @@ describe('buildRunFields date mapping', () => {
       ...WIRE_PLAIN,
       kind: 'object',
       name: 'quote_date',
-      concept_ref: 'atlas.QuoteDate',
+      concept_ref: 'demo.QuoteDate',
       fields: [{ kind: 'date', name: 'date', datetime: true, required: true }],
     });
 
@@ -53,7 +53,7 @@ describe('buildRunFields date mapping', () => {
     const inputs: Record<string, PipeInputContract> = {
       day: {
         ...PLAIN_SINGLE,
-        concept_ref: 'atlas.Day',
+        concept_ref: 'demo.Day',
         json_schema: { type: 'string', format: 'date' },
       },
     };
@@ -61,7 +61,7 @@ describe('buildRunFields date mapping', () => {
       ...WIRE_PLAIN,
       kind: 'date',
       name: 'day',
-      concept_ref: 'atlas.Day',
+      concept_ref: 'demo.Day',
       datetime: false,
     });
 
@@ -73,13 +73,13 @@ describe('buildRunFields date mapping', () => {
 
   it('keeps a wire `text` node a text field - the kind is the wire’s to state', () => {
     const inputs: Record<string, PipeInputContract> = {
-      label: { ...PLAIN_SINGLE, concept_ref: 'atlas.Label', json_schema: { type: 'string' } },
+      label: { ...PLAIN_SINGLE, concept_ref: 'demo.Label', json_schema: { type: 'string' } },
     };
     const descriptor = descriptorOf({
       ...WIRE_PLAIN,
       kind: 'text',
       name: 'label',
-      concept_ref: 'atlas.Label',
+      concept_ref: 'demo.Label',
     });
     expect(buildRunFields(descriptor, inputs)[0]!.kind).toBe('text');
   });

@@ -154,3 +154,15 @@ title   = { type = "text", description = "The report's title", required = true }
 summary = { type = "concept", concept_ref = "native.Html", description = "The summary, as markup", required = true }
 source  = { type = "concept", concept_ref = "native.Document", description = "The document it was drawn from", required = true }
 figures = { type = "list", item_type = "concept", item_concept_ref = "Figure", description = "The illustrations", required = true }
+
+# ─── A refined page ──────────────────────────────────────────────────────────
+#
+# A method whose answer is one printable page declares its own concept over
+# `native.Html` (a quote, an invoice) rather than returning the native itself.
+# The result view reads `refines` and shows it as the page it is. Like
+# `nested_media_result`, its pipe carries no 'run' block: the story supplies a
+# whole document linking a face Storybook serves, which no run can produce.
+
+[concept.QuotePage]
+description = "A client quote, rendered as one printable HTML page"
+refines     = "Html"

@@ -128,6 +128,80 @@ const BANNED = [
 
 const failures = [];
 
+/**
+ * The PDF download's two libraries, loaded on the first click and never with
+ * an entry. `./react` (and `./generative`, which reaches it) may reach them
+ * only through a dynamic `import()`, which a consumer's bundler splits into a
+ * chunk of its own that a host that never makes a PDF never loads; a STATIC
+ * edge to either would put them in the chunk every form ships. The core entry
+ * may not reach them at all.
+ *
+ * Fail-closed in both directions: the check also requires `./react` to reach
+ * both dynamically, because a graph that reached neither would pass the static
+ * half while the PDF control had quietly stopped working.
+ */
+const LAZY = /^jspdf($|\/)|^modern-screenshot($|\/)/;
+
+/** Like `graphOf`, but the bare specifiers split by how they are reached. */
+function staticGraphOf(entry) {
+  const files = new Set();
+  const statics = new Set();
+  const dynamics = new Set();
+  const queue = [resolve(entry)];
+  while (queue.length > 0) {
+    const file = queue.pop();
+    if (files.has(file)) continue;
+    files.add(file);
+    const code = readFileSync(file, 'utf8');
+    const dynamic = new Set();
+    for (const match of code.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+      dynamic.add(match[1]);
+      if (!match[1].startsWith('.')) dynamics.add(match[1]);
+    }
+    for (const specifier of specifiersOf(code)) {
+      // A specifier reached only through `import()` is not a static edge; a
+      // relative chunk reached that way is not walked as static either.
+      const onlyDynamic =
+        dynamic.has(specifier) &&
+        !new RegExp(`(?:^|[\\n;])\\s*(?:import|export)\\b[^;]*?['"]${specifier.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}['"]`).test(code);
+      if (onlyDynamic) continue;
+      if (specifier.startsWith('.')) queue.push(resolve(dirname(file), specifier));
+      else statics.add(specifier);
+    }
+  }
+  return { files, statics, dynamics };
+}
+
+for (const entry of ['core', 'react', 'generative']) {
+  const path = `${DIST}/${entry}/index.js`;
+  const { statics } = staticGraphOf(path);
+  const reached = [...statics].filter((specifier) => LAZY.test(specifier));
+  if (reached.length > 0) {
+    failures.push(
+      `${entry}/index.js reaches ${reached.join(', ')} through a static import - the PDF libraries load with import() on first use. See docs/dependency-budget.md.`,
+    );
+  } else {
+    console.log(`ok  ${entry}/index.js has no static edge to jspdf or modern-screenshot`);
+  }
+}
+{
+  const core = [...graphOf(`${DIST}/core/index.js`).externals].filter((s) => LAZY.test(s));
+  if (core.length > 0) {
+    failures.push(`core/index.js reaches ${core.join(', ')} - the headless entry makes no PDF.`);
+  } else {
+    console.log('ok  core/index.js reaches neither PDF library, even dynamically');
+  }
+  const { dynamics } = staticGraphOf(`${DIST}/react/index.js`);
+  const missing = ['jspdf', 'modern-screenshot'].filter((name) => !dynamics.has(name));
+  if (missing.length > 0) {
+    failures.push(
+      `react/index.js does not load ${missing.join(', ')} through import() - the PDF download would fail at run time, or a static import replaced it.`,
+    );
+  } else {
+    console.log('ok  react/index.js loads jspdf and modern-screenshot through import() only');
+  }
+}
+
 for (const { entry, match, why } of BANNED) {
   const { files, externals } = graphOf(entry);
   const reached = [...externals].filter((specifier) => match.test(specifier));

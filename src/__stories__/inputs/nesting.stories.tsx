@@ -74,3 +74,32 @@ export const FilledDeep: Story = {
     },
   },
 };
+
+/**
+ * An optional structure nested in a required one (`shop.bank_account`) folds
+ * behind the shop's "+ 1 optional field" disclosure while closed. Expanding it
+ * opens the structure, seeding its children's authored defaults (`holder`,
+ * `bank`) and leaving the required `iban` for the person; collapsing it closes
+ * the structure, which leaves the payload. The top-level `refund_account` is
+ * rendered open-shaped because this harness draws every input: folding a
+ * top-level input is the host's disclosure, built on the same kernel helpers.
+ * See docs/architecture.md § "Optional structures".
+ */
+export const OptionalStructures: Story = { args: { pipeCode: 'shop_with_bank' } };
+
+/** The same pipe restored with the nested structure open: the disclosure reads expanded and offers to close it. */
+export const OptionalStructureOpen: Story = {
+  args: {
+    pipeCode: 'shop_with_bank',
+    initialValues: {
+      shop: {
+        name: 'Boutique Exemple',
+        bank_account: {
+          holder: 'Boutique Exemple SAS',
+          bank: 'Banque Exemple',
+          iban: 'FR76 0000 0000',
+        },
+      },
+    },
+  },
+};

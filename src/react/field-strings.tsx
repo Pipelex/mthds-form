@@ -124,6 +124,30 @@ export interface FieldStrings {
   downloadFile: (name: string) => string;
   /** What that button says when the file did not arrive. */
   downloadFileFailed: string;
+  /** The control on an HTML page that saves it as a PDF, in one click. */
+  downloadPdf: string;
+  /** What that control says while the PDF is being made. */
+  downloadPdfBusy: string;
+  /** What that control says when the PDF could not be made or saved. */
+  downloadPdfFailed: string;
+  /**
+   * Shown in place of an HTML page for the moment the stored pictures it names
+   * are being resolved through the host.
+   */
+  pageLoading: string;
+  /**
+   * The page's own HTML download, beside "Download PDF" on a result that is
+   * one page, where a bare "Download" would not say which of the two it saves.
+   */
+  downloadHtml: string;
+  /**
+   * The dialog that asks for a download's name, when the host turns
+   * `downloads.askFileName` on: its title, which also names the field, and its
+   * two buttons.
+   */
+  fileNameTitle: string;
+  fileNameCancel: string;
+  fileNameConfirm: string;
   /** The result panel's two views, and the control that copies the payload. */
   viewRendered: string;
   viewJson: string;
@@ -143,6 +167,19 @@ export interface FieldStrings {
   hideOptionalInputs: string;
   optionalFieldsCount: (count: number) => string;
   optionalInputsCount: (count: number) => string;
+  /**
+   * The mark `MethodForm` puts on an input the run needs and does not have,
+   * once the person has tried to run.
+   */
+  requiredField: string;
+  /**
+   * The mark on an optional input that was started but is not complete, once
+   * the person has tried to run: a started structure owes its concept every
+   * required field.
+   */
+  incompleteField: string;
+  /** What a file field says when the host's `uploadFile` rejected its file. */
+  uploadFailed: string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

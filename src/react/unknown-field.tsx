@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { cn } from './utils';
 import type { UnknownRunField } from '../core';
 import { FieldShell } from './field-shell';
@@ -31,7 +32,7 @@ export function UnknownField({ field, value, onChange, id, error, disabled }: Un
       conceptRef={field.conceptRef}
       category="structured"
       description={field.description ?? s.jsonHint}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
     >

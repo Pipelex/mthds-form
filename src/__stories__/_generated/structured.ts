@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/structured.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/structured.mthds - DO NOT EDIT.
  *
  * A realistic domain object: mixed scalars, an enum, a nested concept, and a list of concepts.
  *
@@ -15,6 +15,7 @@ export const PIPE_REFS = [
   'structured.list_of_objects',
   'structured.many_invoices',
   'structured.one_invoice',
+  'structured.shop_with_bank',
 ] as const;
 
 export const CONTRACTS: PipeIOContracts = {
@@ -777,6 +778,146 @@ export const CONTRACTS: PipeIOContracts = {
       optional: false,
     },
   },
+  'structured.shop_with_bank': {
+    inputs: {
+      refund_account: {
+        concept_ref: 'structured.BankDetails',
+        item_count: null,
+        json_schema: {
+          description: 'Where a payment is sent',
+          properties: {
+            bank: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: 'Banque Exemple',
+              description: "The bank's name",
+              title: 'Bank',
+            },
+            holder: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: 'Boutique Exemple SAS',
+              description: 'Who holds the account',
+              title: 'Holder',
+            },
+            iban: {
+              description: 'The account number',
+              title: 'Iban',
+              type: 'string',
+            },
+          },
+          required: ['iban'],
+          title: 'structured.BankDetails',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'optional',
+      },
+      shop: {
+        concept_ref: 'structured.Shop',
+        item_count: null,
+        json_schema: {
+          $defs: {
+            structured__BankDetails: {
+              description: 'Where a payment is sent',
+              properties: {
+                bank: {
+                  anyOf: [
+                    {
+                      type: 'string',
+                    },
+                    {
+                      type: 'null',
+                    },
+                  ],
+                  default: 'Banque Exemple',
+                  description: "The bank's name",
+                  title: 'Bank',
+                },
+                holder: {
+                  anyOf: [
+                    {
+                      type: 'string',
+                    },
+                    {
+                      type: 'null',
+                    },
+                  ],
+                  default: 'Boutique Exemple SAS',
+                  description: 'Who holds the account',
+                  title: 'Holder',
+                },
+                iban: {
+                  description: 'The account number',
+                  title: 'Iban',
+                  type: 'string',
+                },
+              },
+              required: ['iban'],
+              title: 'structured__BankDetails',
+              type: 'object',
+            },
+          },
+          description: 'A shop and, when it is paid directly, its bank details',
+          properties: {
+            bank_account: {
+              anyOf: [
+                {
+                  $ref: '#/$defs/structured__BankDetails',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'Where to pay the shop, when it is paid directly',
+            },
+            name: {
+              description: "The shop's name",
+              title: 'Name',
+              type: 'string',
+            },
+          },
+          required: ['name'],
+          title: 'structured.Shop',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'native.Text',
+      item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
 };
 
 export const INPUT_FORM: InputForm = {
@@ -1266,6 +1407,87 @@ export const INPUT_FORM: InputForm = {
       },
     ],
   },
+  'structured.shop_with_bank': {
+    fields: [
+      {
+        concept_ref: 'structured.Shop',
+        description: 'A shop and, when it is paid directly, its bank details',
+        fields: [
+          {
+            description: "The shop's name",
+            kind: 'text',
+            name: 'name',
+            required: true,
+          },
+          {
+            concept_ref: 'structured.BankDetails',
+            description: 'Where to pay the shop, when it is paid directly',
+            fields: [
+              {
+                default_value: 'Boutique Exemple SAS',
+                description: 'Who holds the account',
+                kind: 'text',
+                name: 'holder',
+                required: false,
+              },
+              {
+                default_value: 'Banque Exemple',
+                description: "The bank's name",
+                kind: 'text',
+                name: 'bank',
+                required: false,
+              },
+              {
+                description: 'The account number',
+                kind: 'text',
+                name: 'iban',
+                required: true,
+              },
+            ],
+            kind: 'object',
+            name: 'bank_account',
+            required: false,
+          },
+        ],
+        gating: true,
+        kind: 'object',
+        name: 'shop',
+        presence: 'plain',
+        required: true,
+      },
+      {
+        concept_ref: 'structured.BankDetails',
+        description: 'Where a payment is sent',
+        fields: [
+          {
+            default_value: 'Boutique Exemple SAS',
+            description: 'Who holds the account',
+            kind: 'text',
+            name: 'holder',
+            required: false,
+          },
+          {
+            default_value: 'Banque Exemple',
+            description: "The bank's name",
+            kind: 'text',
+            name: 'bank',
+            required: false,
+          },
+          {
+            description: 'The account number',
+            kind: 'text',
+            name: 'iban',
+            required: true,
+          },
+        ],
+        gating: false,
+        kind: 'object',
+        name: 'refund_account',
+        presence: 'optional',
+        required: false,
+      },
+    ],
+  },
 };
 
 /**
@@ -1320,6 +1542,15 @@ export const OUTPUT_FORM: OutputForm = {
       required: true,
     },
   },
+  'structured.shop_with_bank': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
 };
 
 /**
@@ -1338,6 +1569,8 @@ export const PIPE_DESCRIPTIONS: Record<string, string> = {
   'structured.many_invoices':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'structured.one_invoice':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'structured.shop_with_bank':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
 };
 

@@ -18,6 +18,21 @@ export { ObjectField } from './object-field';
 export { ProseField, TextField } from './text-field';
 export { UnknownField } from './unknown-field';
 
+// The whole input form of one method: `useMethodForm` holds its state (the
+// seed, the uploads, the gate, the run inputs) and `MethodForm` renders its
+// fields. The host keeps its panel, its run button and its history. See
+// docs/method-form.md.
+export type {
+  MethodFormController,
+  MethodFormProps,
+  MethodFormState,
+  MethodFormUploadContext,
+  MethodFormValues,
+  UploadedFile,
+  UseMethodFormOptions,
+} from './method-form';
+export { MethodForm, useMethodForm } from './method-form';
+
 export type { ResultFieldProps } from './result-field';
 export { ResultField } from './result-field';
 
@@ -34,7 +49,13 @@ export { saveInBrowser } from './save-in-browser';
 // it a result view paints whatever `public_url` the payload carries, which on a
 // hosted platform is a presigned URL that expires — see result-env.tsx. The same
 // provider takes the host's save function and which download controls to draw.
-export type { DownloadDisplay, ProseImages, ResolveShareUrl, ResolveUrl } from './result-env';
+export type {
+  DownloadDisplay,
+  ProseImages,
+  ResolveShareUrl,
+  ResolveUrl,
+  ResolveUrls,
+} from './result-env';
 export {
   ResultEnvProvider,
   useProseImages,
@@ -48,6 +69,19 @@ export {
 // than an innerHTML write - see the module header for what the sandbox stops.
 export type { HtmlPreviewProps } from './html-preview';
 export { HtmlPreview } from './html-preview';
+// Make a PDF of an HTML page in the browser, from a script-free copy laid out
+// with its print rules, and save it in one click. The result view draws the
+// control on every page; these are for a host drawing its own. The libraries
+// that paint and assemble the PDF load on first use, never with this entry.
+export type { HtmlPdf, HtmlPdfOptions } from './html-pdf';
+export { renderHtmlPdf } from './html-pdf';
+export type { PdfDownloadButtonProps } from './pdf-download-button';
+export { PdfDownloadButton } from './pdf-download-button';
+// The stored pictures an HTML page names, resolved through a host's resolvers:
+// what the result view does before it frames, rasterises or saves a page, for a
+// host calling `renderHtmlPdf` or saving a page on its own.
+export type { MarkupResolvers } from './markup-storage';
+export { resolveHtmlStorageUrls } from './markup-storage';
 // How every `prose` result is typeset. Exported because a host rendering its
 // own summary of a run wants the same typesetting the panel uses, and because
 // re-deriving it is how two markdown renderings on one page start to disagree.

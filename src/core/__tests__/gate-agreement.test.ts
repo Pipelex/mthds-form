@@ -221,6 +221,74 @@ const REFS: PipeInputContract = {
 };
 
 /**
+ * An optional structure inside a structure, and another inside that one - the
+ * shape an optional disclosure writes at depth two and three. Pipelex refuses a field
+ * both required and defaulted, so a defaulted child arrives optional, as
+ * `titulaire` does here; `iban` and `rue` are the required children that only
+ * fall due once their structure is opened.
+ */
+const shopSchema = {
+  title: 'Boutique',
+  type: 'object',
+  $defs: {
+    Adresse: {
+      title: 'Adresse',
+      type: 'object',
+      properties: {
+        rue: { title: 'Rue', type: 'string' },
+        ville: { title: 'Ville', type: 'string' },
+      },
+      required: ['rue'],
+    },
+    Coordonnees: {
+      title: 'Coordonnees',
+      type: 'object',
+      properties: {
+        titulaire: { title: 'Titulaire', type: 'string', default: 'Boutique Exemple' },
+        iban: { title: 'Iban', type: 'string' },
+        adresse: { anyOf: [{ $ref: '#/$defs/Adresse' }, { type: 'null' }], default: null },
+      },
+      required: ['iban'],
+    },
+  },
+  properties: {
+    nom: { title: 'Nom', type: 'string' },
+    compte: { anyOf: [{ $ref: '#/$defs/Coordonnees' }, { type: 'null' }], default: null },
+  },
+  required: ['nom'],
+};
+
+const SHOP: PipeInputContract = {
+  ...PLAIN_SINGLE,
+  concept_ref: 'demo.Boutique',
+  json_schema: shopSchema,
+};
+
+const SHOP_FIELDS: InputFormField[] = [
+  { kind: 'text', name: 'nom', required: true },
+  {
+    kind: 'object',
+    name: 'compte',
+    required: false,
+    concept_ref: 'demo.Coordonnees',
+    fields: [
+      { kind: 'text', name: 'titulaire', required: false, default_value: 'Boutique Exemple' },
+      { kind: 'text', name: 'iban', required: true },
+      {
+        kind: 'object',
+        name: 'adresse',
+        required: false,
+        concept_ref: 'demo.Adresse',
+        fields: [
+          { kind: 'text', name: 'rue', required: true },
+          { kind: 'text', name: 'ville', required: false },
+        ],
+      },
+    ],
+  },
+];
+
+/**
  * The wire descriptor node each contract fixture arrives with - hand-authored
  * per the standard's kind assignment, keyed by fixture IDENTITY so the table's
  * rows stay exactly what they were. Since the swap, readiness runs over the
@@ -409,6 +477,16 @@ const WIRE = new Map<PipeInputContract, (name: string) => InputFormTopLevelField
       ],
     }),
   ],
+  [
+    SHOP,
+    (name) => ({
+      ...WIRE_PLAIN,
+      kind: 'object',
+      name,
+      concept_ref: 'demo.Boutique',
+      fields: SHOP_FIELDS,
+    }),
+  ],
 ]);
 
 /** The render tree for a row's inputs: the wire descriptor mapped over them. */
@@ -576,6 +654,90 @@ const ROWS: Row[] = [
     inputs: { w: REFS },
     values: { w: { main: { name: 'Q3' }, audit: { notes: 'later' } } },
     runnable: false,
+  },
+
+  // ─── an optional structure opened and closed, at depth two and three ─────
+  {
+    label: 'an optional ref child opened and left empty',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: {} } },
+    runnable: true,
+  },
+  {
+    label: 'an optional ref child opened and half filled',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: { notes: 'later' } } },
+    runnable: false,
+  },
+  {
+    label: 'an optional ref child opened with its required child blank',
+    inputs: { w: REFS },
+    values: {
+      w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: { name: '', notes: 'later' } },
+    },
+    runnable: false,
+  },
+  {
+    label: 'an optional ref child opened and filled',
+    inputs: { w: REFS },
+    values: { w: { main: { name: 'Q3' }, audit: { name: 'A1' }, extra: { name: 'E' } } },
+    runnable: true,
+  },
+  {
+    label: 'a nested optional structure closed',
+    inputs: { shop: SHOP },
+    values: { shop: { nom: 'Boutique Exemple', compte: undefined } },
+    runnable: true,
+  },
+  {
+    label: 'a nested optional structure opened with only its seeded default',
+    inputs: { shop: SHOP },
+    values: { shop: { nom: 'Boutique Exemple', compte: { titulaire: 'Boutique Exemple' } } },
+    runnable: false,
+  },
+  {
+    label: 'a nested optional structure opened with its required child blank',
+    inputs: { shop: SHOP },
+    values: {
+      shop: { nom: 'Boutique Exemple', compte: { titulaire: 'Boutique Exemple', iban: '' } },
+    },
+    runnable: false,
+  },
+  {
+    label: 'a nested optional structure opened and filled',
+    inputs: { shop: SHOP },
+    values: {
+      shop: { nom: 'Boutique Exemple', compte: { titulaire: 'Boutique Exemple', iban: 'FR76' } },
+    },
+    runnable: true,
+  },
+  {
+    label: 'a third-level optional structure opened and left empty',
+    inputs: { shop: SHOP },
+    values: { shop: { nom: 'Boutique Exemple', compte: { iban: 'FR76', adresse: {} } } },
+    runnable: true,
+  },
+  {
+    label: 'a third-level optional structure opened with its required child blank',
+    inputs: { shop: SHOP },
+    values: {
+      shop: {
+        nom: 'Boutique Exemple',
+        compte: { iban: 'FR76', adresse: { rue: '', ville: 'Exempleville' } },
+      },
+    },
+    runnable: false,
+  },
+  {
+    label: 'a third-level optional structure opened and filled',
+    inputs: { shop: SHOP },
+    values: {
+      shop: {
+        nom: 'Boutique Exemple',
+        compte: { iban: 'FR76', adresse: { rue: '1 rue de la Gare' } },
+      },
+    },
+    runnable: true,
   },
 
   // ─── plurals ──────────────────────────────────────────────────────────────

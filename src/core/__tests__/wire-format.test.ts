@@ -161,11 +161,11 @@ describe('deflateInput', () => {
     // `concept`/`content` where the concept's own fields belong).
     it('is IDEMPOTENT - never adds a second wrapper', () => {
       const value = { pricing_model: 'recommended_passthrough', vat_rate: 20 };
-      const once = deflateInput(value, 'atlas_devis.PricingConfig');
-      const twice = deflateInput(once, 'atlas_devis.PricingConfig');
+      const once = deflateInput(value, 'demo_quote.PricingConfig');
+      const twice = deflateInput(once, 'demo_quote.PricingConfig');
 
       expect(twice).toEqual(once);
-      expect(twice).toEqual({ concept: 'atlas_devis.PricingConfig', content: value });
+      expect(twice).toEqual({ concept: 'demo_quote.PricingConfig', content: value });
     });
 
     it('is idempotent for list items too', () => {
@@ -177,11 +177,11 @@ describe('deflateInput', () => {
     it('re-wraps a double-wrapped value back to exactly one layer', () => {
       // The corrupted shape already persisted in DynamoDB.
       const corrupted = {
-        concept: 'atlas_devis.QuoteDate',
-        content: { concept: 'atlas_devis.QuoteDate', content: { date: '2026-07-06' } },
+        concept: 'demo_quote.QuoteDate',
+        content: { concept: 'demo_quote.QuoteDate', content: { date: '2026-07-06' } },
       };
-      expect(deflateInput(corrupted, 'atlas_devis.QuoteDate')).toEqual({
-        concept: 'atlas_devis.QuoteDate',
+      expect(deflateInput(corrupted, 'demo_quote.QuoteDate')).toEqual({
+        concept: 'demo_quote.QuoteDate',
         content: { date: '2026-07-06' },
       });
     });
@@ -342,13 +342,13 @@ describe('inflateInput', () => {
     // level deeper. This is the reported "my inputs are gone" bug.
     it('unwraps a DOUBLE-wrapped value all the way to the fields', () => {
       const corrupted = {
-        concept: 'atlas_devis.PricingConfig',
+        concept: 'demo_quote.PricingConfig',
         content: {
           content: { pricing_model: 'recommended_passthrough', vat_rate: 20 },
-          concept: 'atlas_devis.PricingConfig',
+          concept: 'demo_quote.PricingConfig',
         },
       };
-      expect(inflateInput(corrupted, 'atlas_devis.PricingConfig')).toEqual({
+      expect(inflateInput(corrupted, 'demo_quote.PricingConfig')).toEqual({
         pricing_model: 'recommended_passthrough',
         vat_rate: 20,
       });
@@ -357,15 +357,15 @@ describe('inflateInput', () => {
     it('drops the stray sibling keys a double wrap left behind', () => {
       // RJSF wrote its `address_lines: []` default onto the WRAPPER object.
       const corrupted = {
-        concept: 'atlas_devis.MaisonProfile',
+        concept: 'demo_quote.ShopProfile',
         content: {
           address_lines: [],
-          content: { name: 'Atelier Thomas Hebrard', address_lines: ['12 rue de la Paix'] },
-          concept: 'atlas_devis.MaisonProfile',
+          content: { name: 'Atelier Exemple', address_lines: ['12 rue de la Paix'] },
+          concept: 'demo_quote.ShopProfile',
         },
       };
-      expect(inflateInput(corrupted, 'atlas_devis.MaisonProfile')).toEqual({
-        name: 'Atelier Thomas Hebrard',
+      expect(inflateInput(corrupted, 'demo_quote.ShopProfile')).toEqual({
+        name: 'Atelier Exemple',
         address_lines: ['12 rue de la Paix'],
       });
     });

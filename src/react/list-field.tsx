@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from './utils';
@@ -150,7 +151,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             ? s.itemsCountOf(items.length, field.itemCount)
             : s.itemsCount(items.length)}
         </span>
-        {!field.required && (
+        {shownAsOptional(field) && (
           <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             {s.optionalBadge}
           </span>
@@ -176,7 +177,15 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             </span>
             <div className="min-w-0 flex-1">
               <FieldRenderer
-                field={{ ...field.item, title: '', name: `${field.name}[${index}]` }}
+                // `required: true`: a row is in the array because the person
+                // added it, so it is never optional - an object row is never an
+                // optional structure that folds or closes.
+                field={{
+                  ...field.item,
+                  title: '',
+                  name: `${field.name}[${index}]`,
+                  required: true,
+                }}
                 value={item}
                 onChange={(v) => setItem(index, v)}
                 id={`${id}.${index}`}

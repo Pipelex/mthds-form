@@ -1,5 +1,6 @@
 'use client';
 
+import { shownAsOptional } from '../core/readiness';
 import { Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
@@ -38,14 +39,11 @@ const CLEAR_VALUE = '__none__';
  * way - which is why both apply one rule, including its fallback to the codes
  * when two options would read the same. The segmented rule measures the label
  * it shows, which is the text that has to fit on the row.
- *
- * A host's `optionLabels` override that wording in both presentations, and the
- * stored value is still the code: `Lille (59)` shown, `LILLE` sent.
  */
 export function EnumField({ field, value, onChange, id, error, disabled }: EnumFieldProps) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
-  const labelOf = enumLabeler(field.options, presentation, field.optionLabels);
+  const labelOf = enumLabeler(field.options, presentation);
   const isSegmented =
     field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
   const domId = useFieldDomId(id);
@@ -57,7 +55,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
       conceptRef={field.conceptRef}
       category="choice"
       description={field.description}
-      required={field.required}
+      required={!shownAsOptional(field)}
       error={error}
       htmlFor={isSegmented ? undefined : domId}
     >

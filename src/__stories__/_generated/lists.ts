@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/lists.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/lists.mthds - DO NOT EDIT.
  *
  * One case per ELEMENT shape a result list can hold, because the layout a list gets is decided from its element's descriptor and nothing else. Scalars, a short record, a twelve-column record, a record carrying prose, a record carrying records that carry lists, and both file kinds. Every pipe runs for real; the image case is a PipeImgGen because the language forbids a PipeLLM resolving to a concept that contains images. The gallery pins an image model explicitly: the deck's default backend refuses more than one image per call (`can't generate multiple images at once`), so a `Image[3]` output needs one that does not.
  *
