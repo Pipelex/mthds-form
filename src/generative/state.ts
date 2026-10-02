@@ -81,25 +81,3 @@ export function payloadToState(field: RunField, payload: unknown): unknown {
       return field satisfies never;
   }
 }
-
-/**
- * The `/inputs` seed: the authored defaults, and nothing else.
- *
- * A defaulted field carries `defaultValue` (never the `null` a schema
- * projection attaches to an optional field); a structure's defaults sit inside
- * it. What is NOT seeded is an empty string or a zero for an unfilled field -
- * the kernel's readiness treats an absent value as absent, and a seeded
- * placeholder would count as filled.
- */
-export function seedInputs(fields: readonly RunField[]): Record<string, unknown> {
-  const seed: Record<string, unknown> = {};
-  for (const field of fields) {
-    if (field.defaultValue !== undefined) {
-      seed[field.name] = field.defaultValue;
-    } else if (field.kind === 'object') {
-      const nested = seedInputs(field.fields);
-      if (Object.keys(nested).length > 0) seed[field.name] = nested;
-    }
-  }
-  return seed;
-}

@@ -46,7 +46,7 @@ const preview: Preview = {
      * is a deliberate change to every such host's colours and not a side effect
      * of adding stories. This comment names all of them on purpose: a blanket
      * switch-off whose recorded reason covers one row is how the rest went
-     * unmeasured. Tracked in `wip/default-palette-contrast.md`, with the numbers
+     * unmeasured. Tracked as L-260904-bfcb02, with the numbers
      * and the pending decision; the rule goes back on with the fix. Everything
      * axe checks that is NOT a palette question - labels, roles, accessible
      * names, aria wiring - still fails the build.

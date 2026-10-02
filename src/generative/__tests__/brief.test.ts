@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { RunField } from '../../core';
 import { IMAGE_FORMATS } from '../../core/file-formats';
 import { inputBrief, isDelegatedInput, resultBrief } from '../brief';
-import { seedInputs } from '../state';
+import { seedInputs } from '../../core/seed';
 
 /**
  * The brief as data: which paths the kernel keeps, and how the descriptor's
@@ -129,6 +129,15 @@ describe('the seeds an input page lists', () => {
       ],
     },
     { kind: 'text', name: 'note', required: false, defaultValue: 'hello' },
+    // An optional structure with NO default of its own: its disclosure
+    // starts closed, so a member's default is no seed, only a note.
+    {
+      kind: 'object',
+      name: 'bank',
+      required: false,
+      conceptRef: 'trips.BankDetails',
+      fields: [{ kind: 'text', name: 'holder', required: false, defaultValue: 'Boutique Exemple' }],
+    },
   ];
   const brief = inputBrief({ pipeRef: 'trips.plan_trip' }, fields);
   const entry = (path: string) => brief.paths.find((candidate) => candidate.path === path);
@@ -138,6 +147,11 @@ describe('the seeds an input page lists', () => {
     expect(entry('/inputs/request/budget')?.default).toBeUndefined();
     expect(entry('/inputs/request/budget')).toMatchObject({ notes: ['default 100'] });
     expect(entry('/inputs/note')?.default).toBe('"hello"');
+  });
+
+  it('lists no seed beneath an optional structure that has no default of its own', () => {
+    expect(entry('/inputs/bank')?.default).toBeUndefined();
+    expect(entry('/inputs/bank/holder')?.default).toBeUndefined();
   });
 
   it('lists seeds that, applied in order, are exactly what seedInputs seeds', () => {

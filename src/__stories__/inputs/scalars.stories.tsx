@@ -6,7 +6,7 @@ import { CONTRACTS, INPUT_FORM } from '../_generated/scalars';
 /**
  * The scalar kinds, each on its own carrier pipe.
  *
- * Every story here is a projection of `data/structures/scalars.mthds` through
+ * Every story here is a projection of `src/__stories__/_structures/scalars.mthds` through
  * the same builders the hosted `/validate` runs, so what renders is what a real
  * method of that shape would produce - not an approximation of one.
  */

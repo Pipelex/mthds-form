@@ -146,7 +146,7 @@ export const AWordDocument: Story = {
  * - expanding a figure's row → the picture at full size, beside its caption.
  *
  * The descriptor is the corpus's own — `results.nested_media_result`, generated
- * from `data/structures/results.mthds` like every other. Only the payload is
+ * from `src/__stories__/_structures/results.mthds` like every other. Only the payload is
  * supplied here, and the docstring above `REPORT` says why it must be.
  */
 export const ANestedReport: StoryObj<typeof ResultView> = {

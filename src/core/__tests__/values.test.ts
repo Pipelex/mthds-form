@@ -597,3 +597,107 @@ describe('rjsfDataFromRunValues over a freshly added empty list item', () => {
     expect(data['focus']).toBeUndefined();
   });
 });
+
+describe('runValuesFromStore over an optional structure the stored run went without', () => {
+  const ACCOUNT_SCHEMA = {
+    type: 'object',
+    properties: {
+      titulaire: { type: 'string' },
+      banque: { type: 'string' },
+      bic: { type: 'string' },
+      iban: { type: 'string' },
+    },
+    required: ['titulaire', 'iban'],
+  };
+  const CONTRACT: Record<string, PipeInputContract> = {
+    boutique: {
+      ...PLAIN_SINGLE,
+      concept_ref: 'demo.Boutique',
+      json_schema: {
+        type: 'object',
+        properties: {
+          nom: { type: 'string' },
+          compte_bancaire: { anyOf: [ACCOUNT_SCHEMA, { type: 'null' }], default: null },
+        },
+        required: ['nom'],
+      },
+    },
+    remise: {
+      ...OPTIONAL_SINGLE,
+      concept_ref: 'demo.Remise',
+      json_schema: {
+        type: 'object',
+        properties: { taux: { type: 'number' } },
+        required: ['taux'],
+      },
+    },
+  };
+  const ACCOUNT_FIELDS = [
+    { kind: 'text', name: 'titulaire', required: true },
+    { kind: 'text', name: 'banque', required: false },
+    { kind: 'text', name: 'bic', required: false },
+    { kind: 'text', name: 'iban', required: true },
+  ] as const;
+  const FIELDS = buildRunFields(
+    descriptorOf(
+      {
+        ...WIRE_PLAIN,
+        kind: 'object',
+        name: 'boutique',
+        concept_ref: 'demo.Boutique',
+        fields: [
+          { kind: 'text', name: 'nom', required: true },
+          { kind: 'object', name: 'compte_bancaire', required: false, fields: [...ACCOUNT_FIELDS] },
+        ],
+      },
+      {
+        ...WIRE_OPTIONAL,
+        kind: 'object',
+        name: 'remise',
+        concept_ref: 'demo.Remise',
+        fields: [{ kind: 'number', name: 'taux', integer: false, required: true }],
+      },
+    ),
+    CONTRACT,
+  );
+
+  it('keeps a nested optional structure stored as null closed', () => {
+    const values = runValuesFromStore(
+      { boutique: { nom: 'Atelier', compte_bancaire: null } },
+      FIELDS,
+      CONTRACT,
+    );
+    expect(values['boutique']).toEqual({ nom: 'Atelier', compte_bancaire: undefined });
+  });
+
+  it('keeps a nested optional structure the store left out closed', () => {
+    const values = runValuesFromStore({ boutique: { nom: 'Atelier' } }, FIELDS, CONTRACT);
+    expect((values['boutique'] as Record<string, unknown>)['compte_bancaire']).toBeUndefined();
+  });
+
+  it('keeps a top-level optional structure stored as null, or absent, closed', () => {
+    expect(runValuesFromStore({ remise: null }, FIELDS, CONTRACT)['remise']).toBeUndefined();
+    expect(runValuesFromStore({}, FIELDS, CONTRACT)['remise']).toBeUndefined();
+  });
+
+  it('opens a stored optional structure that holds an object', () => {
+    const values = runValuesFromStore(
+      { boutique: { nom: 'Atelier', compte_bancaire: { titulaire: 'A', iban: 'FR76' } } },
+      FIELDS,
+      CONTRACT,
+    );
+    expect((values['boutique'] as Record<string, unknown>)['compte_bancaire']).toEqual({
+      titulaire: 'A',
+      banque: undefined,
+      bic: undefined,
+      iban: 'FR76',
+    });
+  });
+
+  it('still gives a required structure its shell when the store holds none', () => {
+    expect(runValuesFromStore({}, FIELDS, CONTRACT)['boutique']).toEqual({
+      nom: undefined,
+      compte_bancaire: undefined,
+    });
+  });
+});

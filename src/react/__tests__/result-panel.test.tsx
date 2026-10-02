@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ObjectRunField, RunField, SaveFiles, TextRunField } from '../../core';
+import { FieldPresentationProvider } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultEnvProvider } from '../result-env';
 import { StuffViewer } from '../stuff-viewer';
@@ -137,6 +138,52 @@ describe('the result panel', () => {
   it('opens on JSON when a host asks it to', () => {
     render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} defaultView="json" />);
     expect(screen.getByText(/"reference"/)).toBeTruthy();
+  });
+});
+
+describe('which views are offered', () => {
+  const switchGroup = () =>
+    screen.queryByRole('group', { name: DEFAULT_FIELD_STRINGS.resultViewGroup });
+
+  it('offers both in studio, the default presentation', () => {
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
+    expect(switchGroup()).toBeTruthy();
+  });
+
+  it('offers the result alone in app, with no switch drawn', () => {
+    const { container } = render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} defaultView="json" />
+      </FieldPresentationProvider>,
+    );
+    expect(switchGroup()).toBeNull();
+    // A JSON default the presentation does not offer opens the result instead.
+    expect(container.querySelector('pre')).toBeNull();
+    expect(screen.getByText('INV-1')).toBeTruthy();
+  });
+
+  it('follows the host’s views over either default', async () => {
+    const { container } = render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} views={['rendered', 'json']} />
+      </FieldPresentationProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
+    expect(container.querySelector('pre')!.textContent).toContain('"reference": "INV-1"');
+  });
+
+  it('draws no switch for one view, and shows that one', () => {
+    const { container } = render(
+      <StuffViewer field={invoice} value={{ reference: 'INV-1' }} views={['json']} />,
+    );
+    expect(switchGroup()).toBeNull();
+    expect(container.querySelector('pre')!.textContent).toContain('"reference": "INV-1"');
+  });
+
+  it('reads an empty list as the result alone', () => {
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} views={[]} />);
+    expect(switchGroup()).toBeNull();
+    expect(screen.getByText('INV-1')).toBeTruthy();
   });
 });
 

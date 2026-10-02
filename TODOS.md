@@ -1,6 +1,6 @@
 # TODOS — inbox fix campaign
 
-Implementation plan for the issues triaged in [wip/issues.md](wip/issues.md) (the 2026-08-24 sweep of the workspace inbox). Issue numbers below refer to that document. Work accumulates in the changelog under `## [Unreleased]`; releases are cut with `/release` when we decide to publish, not per phase.
+Implementation plan for the issues triaged in the 2026-08-24 sweep of the workspace inbox, which shipped in v0.4.0 (L-260826-ce0af6, whose notes say where the triage is kept). Issue numbers below refer to that triage. Work accumulates in the changelog under `## [Unreleased]`; releases are cut with `/release` when we decide to publish, not per phase.
 
 **Verification setup:** the siblings resolve `@pipelex/mthds-form` from the npm registry, not from this checkout — so exercising a fix in `pipelex-starter-js`, `mthds-ui` or the consuming app host means `npm pack` here and `npm install <tarball> --no-save` there, then restoring (`rm -rf node_modules/@pipelex/mthds-form && npm install`) and `git checkout` on anything the run touched. Verify without leaving a change behind: a sibling adopting the new kernel is that repo's own commit, on its own bump. Each inbox filing carries its own repro. Run `make check` and `make test` here before calling any phase done.
 
@@ -36,9 +36,9 @@ A fixed-count list **renders exactly like a variable one** and **gates like a pl
 
 - **`presence` is not the only new field: inputs now carry `multiplicity` too.** The kernel deliberately keeps `isPluralInput` a *schema* test rather than moving it to the new field. The schema is what `buildRunFields` maps and therefore what the user is shown; a gate predicate reading the other field could disagree with the rendered control, which is precisely the failure `mustBeFilled` exists to prevent. `multiplicity` is read for the one question the schema cannot answer as directly — whether a list declares an exact count.
 - **The mirror was verified against real serialization, not against the Python source.** `PipeInputContract.model_dump(mode="json")` emits `{concept_ref, presence, multiplicity, item_count, json_schema}` with `item_count: null`, and the output emits `{concept_ref, multiplicity, item_count, optional}`. Required typing is correct for all of them: `pipe_io_contracts` rides the validate **valid** arm, which `pipelex-api/api/routes/pipelex/validate.py:214` dumps *without* `exclude_none`.
-- **The hosted plane speaks this shape as of `pipelex` 0.52.0.** The reshape (`4bb97ec1f`) shipped there, and `pipelex-server` has moved every one of its pin sites onto it (root `constraint-dependencies`, the three plugin libs, the Daytona snapshot) and consumes `pipelex-api` `v0.17.0`, which pins the same core. The window is now the deploy rather than the release: until that hosted deploy goes out, a form talking to the older runtime reads every `?` input as `plain` and gates it — fail-closed, never a wrong payload, but a visible difference in what a form does. That is the release-cascade window, and it is called out in the changelog entry.
+- **The hosted plane speaks this shape as of `pipelex` 0.52.0.** The reshape (`4bb97ec1f`) shipped there, and the hosted plane has moved its pins onto it and consumes `pipelex-api` `v0.17.0`, which pins the same core. The window is now the deploy rather than the release: until that hosted deploy goes out, a form talking to the older runtime reads every `?` input as `plain` and gates it — fail-closed, never a wrong payload, but a visible difference in what a form does. That is the release-cascade window, and it is called out in the changelog entry.
 - **Required typing turned a silent semantic break into a loud one.** In `pipelex-starter-js` the reshape surfaced as a type error at every construction site (its `src/generated/*/contracts.ts` are codegen output and will carry the new shape once regenerated against a reshaped runtime) instead of as `?` inputs quietly becoming required. That is the argument for typing the always-on-the-wire fields as required rather than optional.
-- **`mthds-ui`'s fixture dumper strips `item_count`** — `exclude_none=True` at `scripts/dump_pipe_io_contracts.py:70`, so the fixtures lose a field the wire carries, invisibly, because the generated modules cast through `unknown`. Their suites pass either way. Filed as `../wip/inbox/2026-08-24-mthds-ui-contract-dump-strips-item-count.md`.
+- **`mthds-ui`'s fixture dumper strips `item_count`** — `exclude_none=True` at `scripts/dump_pipe_io_contracts.py:70`, so the fixtures lose a field the wire carries, invisibly, because the generated modules cast through `unknown`. Their suites pass either way. Filed as L-260824-f89ea2.
 - **The regeneration carries a second, unrelated S2 change**: schema `title` now reads the concept ref (`DocumentContent` → `native.Document`, `document_batch__PageSummary` → `document_batch.PageSummary`). Nothing in the kernel keys on `title`, and `mthds-ui`'s suites were green across it, but a host that renders `title` as a label will see it change.
 
 #### Also fixed along the way
@@ -90,7 +90,7 @@ Installed as a tarball, its suite reproduced the filing exactly — `computeRead
 
 **Reached 2026-08-24.** `make check`, `make test` (380 tests) and `make build` green. Phase 1 is committed as `07cb281`; Phases 2 and 3 sit in the working tree on this branch.
 
-Browser readiness and the server gate now answer together by construction, and the remaining phases are independent of each other. On resume, re-read `wip/issues.md` sections C–D.
+Browser readiness and the server gate now answer together by construction, and the remaining phases are independent of each other.
 
 #### What the invariant table found
 
@@ -108,7 +108,7 @@ An OVER-full fixed list (four items in a `[3]` slot) is still live on the button
 - **`mthds-ui`:** `runSubmitGate` assembled the same four steps and **omitted the emptiness check altogether** — its own test said so in its name, "does not, on its own, catch a required text input left blank". So that panel's submit gate was more permissive than the button in front of it: an untouched file input emits `{url: ""}`, which the schema accepts. Replacing it with `gateRunInputs` flipped that test into "catches a required text input left blank, by name". All 1968 tests green including the Storybook interaction runs, typecheck and lint clean.
 - Both were then reverted and the registry copy reinstalled: `mthds-ui` 1968 green, the starter 384 green, both trees clean.
 
-**Adoption note for the siblings' own bump commits.** Both need the Phase 1 fixture reshape first (`mthds-ui` is holding its fixtures on the pre-S2 shape on purpose). Then: the starter swaps `src/lib/runInputs.ts` to the shim and drops its `schemaFor` export and test; `mthds-ui` swaps `runSubmitGate`'s body and flips the test named above. `mthds-ui`'s fixture dumper still strips `item_count` (filed as `../wip/inbox/2026-08-24-mthds-ui-contract-dump-strips-item-count.md`) — worth fixing before it regenerates.
+**Adoption note for the siblings' own bump commits.** Both need the Phase 1 fixture reshape first (`mthds-ui` is holding its fixtures on the pre-S2 shape on purpose). Then: the starter swaps `src/lib/runInputs.ts` to the shim and drops its `schemaFor` export and test; `mthds-ui` swaps `runSubmitGate`'s body and flips the test named above. `mthds-ui`'s fixture dumper still strips `item_count` (filed as L-260824-f89ea2) — worth fixing before it regenerates.
 
 ## Phase 4 — Readiness/`isFilled` hardening (issues 4, 5, 6)
 
@@ -211,7 +211,7 @@ What reading the siblings does establish, and running them would not have establ
 **Adoption notes for the siblings' own bump commits.**
 
 - `pipelex-starter-js`: `PdfForm.test.tsx` goes back to `getByLabelText`; `PdfForm.tsx` drops `encodingIds` from its form-wide `busy` and passes run state alone (the comment at `:99-108` names this moment); the `resolveUrl` workaround stays useful for real storage URIs but is no longer needed for `data:` URLs. Its upstream-gap notes in `docs/input-form.md` lose the preview and accessible-name entries.
-- `mthds-ui`: `wip/adopt-form/deferred-review-residues.md` can strike the list-row residue — the drop-then-remove sequence is unperformable now that removal is blocked while the list is busy.
+- `mthds-ui`: the deferred review residues of its form adoption (L-260824-67d734) can strike the list-row residue — the drop-then-remove sequence is unperformable now that removal is blocked while the list is busy.
 
 ## Phase 7 — ajv out of the client bundle (issue 11)
 

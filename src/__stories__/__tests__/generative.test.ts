@@ -22,7 +22,8 @@ import {
 } from '../../generative/paths';
 import { PROMPT_HASH } from '../../generative/prompt-hash';
 import { METHOD_WIP } from './method-wip';
-import { payloadToState, seedInputs } from '../../generative/state';
+import { payloadToState } from '../../generative/state';
+import { seedInputs } from '../../core/seed';
 import { specFromJsonl } from '../../generative/stream';
 import { formatProblems, validateAgainstCatalog } from '../../generative/validate';
 import * as designSlides from '../_generated/design_slides';
@@ -58,7 +59,7 @@ import { HEROES, pipeRefOf } from '../heroes';
 
 const REPO = path.resolve(__dirname, '../../..');
 /** Where `make briefs` writes what a producer was handed - a fixture's `brief` points here. */
-const BRIEFS_DIR = path.join(REPO, 'wip/generative-ui/briefs');
+const BRIEFS_DIR = path.join(REPO, 'data/briefs');
 
 interface CaseModule {
   PIPE_REFS: readonly string[];

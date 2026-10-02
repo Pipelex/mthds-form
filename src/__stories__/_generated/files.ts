@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/files.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/files.mthds - DO NOT EDIT.
  *
  * Document and image slots. Each pipe isolates ONE comparison, so a story can name what varies.
  *

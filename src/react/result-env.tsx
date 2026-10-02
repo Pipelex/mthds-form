@@ -4,7 +4,10 @@ import { createContext, use, useCallback, useMemo, type ReactNode } from 'react'
 import type { SaveFile, SaveFiles, SaveResult } from '../core/save-plan';
 import type { StuffFileKind } from '../core/stuff-files';
 import { absoluteUrl } from './absolute-url';
+import { resolveHtmlStorageUrls, type MarkupResolvers, type ResolveUrls } from './markup-storage';
 import { saveInBrowser } from './save-in-browser';
+
+export type { ResolveUrls } from './markup-storage';
 
 /**
  * The host's seam for turning a stored reference into something a browser can
@@ -110,10 +113,48 @@ export interface DownloadDisplay {
    * `'document'`, and `'markup'` for an HTML page.
    */
   files?: boolean | readonly StuffFileKind[];
+  /**
+   * The "Download PDF" control on each HTML page, which makes a PDF of the
+   * page in the browser and saves it. Drawn unless `false`.
+   */
+  pdf?: boolean;
+  /**
+   * Ask the reader for the file's name before each download, in a dialog
+   * pre-filled with the name the plan chose. Off unless `true`.
+   *
+   * It is a behaviour of every download control rather than a control of its
+   * own, which is why it sits beside the three that say which are drawn: the
+   * PDF, the page's HTML, a file's own button, and the whole-result download.
+   * A whole-result download saving one file asks for that file's name; one
+   * saving several asks for the name they share, the base name, which names
+   * the JSON copy and every file the payload did not name itself.
+   */
+  askFileName?: boolean;
 }
 
 interface ResultEnv {
   resolveUrl?: ResolveUrl;
+  /**
+   * Every stored reference an HTML page's pictures name, resolved in one call.
+   *
+   * A `native.Html` page embeds the pictures its method produced as
+   * `pipelex-storage://` references (`<img src>`, `srcset`, a CSS `url()`),
+   * which the frame cannot load. Before the page is shown, made into a PDF or
+   * downloaded as HTML, the view collects the distinct references it holds and
+   * hands them here, once, and writes each URL this answers into the page.
+   *
+   * Async and BULK, unlike `resolveUrl`, because a page is the one place every
+   * reference is known at once, and a host that presigns can mint them all in
+   * one round trip. Answer a `Map` or a plain record from reference to URL;
+   * leave a reference out, or answer `null`, for one this host cannot resolve.
+   * Each answer passes the URL gate like any resolver's.
+   *
+   * Optional. Unset, or for a reference it leaves out, each reference is asked
+   * of `resolveUrl`; neither answering leaves that picture broken and the page
+   * shown. A call that rejects or takes longer than ten seconds is read as no
+   * answer, so a page is never held back by it for good.
+   */
+  resolveUrls?: ResolveUrls;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
   /**
@@ -157,6 +198,7 @@ const ResultEnvContext = createContext<ResultEnv>({});
 
 export function ResultEnvProvider({
   resolveUrl,
+  resolveUrls,
   resolveShareUrl,
   proseImages,
   tableColumns,
@@ -165,8 +207,16 @@ export function ResultEnvProvider({
   children,
 }: ResultEnv & { children: ReactNode }) {
   const env = useMemo(
-    () => ({ resolveUrl, resolveShareUrl, proseImages, tableColumns, saveFiles, downloads }),
-    [resolveUrl, resolveShareUrl, proseImages, tableColumns, saveFiles, downloads],
+    () => ({
+      resolveUrl,
+      resolveUrls,
+      resolveShareUrl,
+      proseImages,
+      tableColumns,
+      saveFiles,
+      downloads,
+    }),
+    [resolveUrl, resolveUrls, resolveShareUrl, proseImages, tableColumns, saveFiles, downloads],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
 }
@@ -186,18 +236,22 @@ export function DownloadDisplayOverride({
   const env = use(ResultEnvContext);
   const result = downloads?.result;
   const files = downloads?.files;
+  const pdf = downloads?.pdf;
+  const askFileName = downloads?.askFileName;
   const merged = useMemo(
     () =>
-      result === undefined && files === undefined
+      result === undefined && files === undefined && pdf === undefined && askFileName === undefined
         ? env
         : {
             ...env,
             downloads: {
               result: result ?? env.downloads?.result,
               files: files ?? env.downloads?.files,
+              pdf: pdf ?? env.downloads?.pdf,
+              askFileName: askFileName ?? env.downloads?.askFileName,
             },
           },
-    [env, result, files],
+    [env, result, files, pdf, askFileName],
   );
   return <ResultEnvContext value={merged}>{children}</ResultEnvContext>;
 }
@@ -221,6 +275,15 @@ export function useResolveUrl(): ResolveUrl | undefined {
   return use(ResultEnvContext).resolveUrl;
 }
 
+/**
+ * The two resolvers an HTML page's stored pictures are answered by, stable
+ * while the host's functions are, for the page's preview, PDF and download.
+ */
+export function useMarkupResolvers(): MarkupResolvers {
+  const { resolveUrl, resolveUrls } = use(ResultEnvContext);
+  return useMemo(() => ({ resolveUrl, resolveUrls }), [resolveUrl, resolveUrls]);
+}
+
 /** The share-URL minter, when the host supplies one. */
 export function useResolveShareUrl(): ResolveShareUrl | undefined {
   return use(ResultEnvContext).resolveShareUrl;
@@ -238,15 +301,27 @@ export function useResolveShareUrl(): ResolveShareUrl | undefined {
  *   host function that is not `async` and throws on a missing bridge would
  *   otherwise leave the control that asked waiting for good, and say nothing.
  *   So has one that resolves to something with no `failed` list.
+ * - An HTML page saved as its text has the stored references its pictures name
+ *   resolved first, through the same resolvers its preview used, so the saved
+ *   file shows its pictures when opened.
  */
 export function useSaveFiles(): SaveFiles {
   const save = use(ResultEnvContext).saveFiles ?? saveInBrowser;
-  return useCallback((files) => deliver(save, files), [save]);
+  const resolvers = useMarkupResolvers();
+  return useCallback((files) => deliver(save, files, resolvers), [save, resolvers]);
 }
 
-async function deliver(save: SaveFiles, files: readonly SaveFile[]): Promise<SaveResult> {
-  const handed = files.map((file) =>
-    file.url === undefined ? file : { ...file, url: absoluteUrl(file.url) },
+async function deliver(
+  save: SaveFiles,
+  files: readonly SaveFile[],
+  resolvers: MarkupResolvers,
+): Promise<SaveResult> {
+  const handed = await Promise.all(
+    files.map(async (file): Promise<SaveFile> => {
+      if (file.url !== undefined) return { ...file, url: absoluteUrl(file.url) };
+      if (file.mimeType !== 'text/html') return file;
+      return { ...file, text: await resolveHtmlStorageUrls(file.text, resolvers) };
+    }),
   );
   try {
     // Read as a host may actually answer: one typed loosely, a bridge that
@@ -274,6 +349,16 @@ export function useResultDownloadShown(): boolean {
 export function useFileDownloadShown(kind: StuffFileKind): boolean {
   const files = use(ResultEnvContext).downloads?.files ?? true;
   return typeof files === 'boolean' ? files : files.includes(kind);
+}
+
+/** Whether an HTML page carries its "Download PDF" control. */
+export function usePdfSaveShown(): boolean {
+  return use(ResultEnvContext).downloads?.pdf ?? true;
+}
+
+/** Whether a download asks the reader for the file's name first. */
+export function useAskFileName(): boolean {
+  return use(ResultEnvContext).downloads?.askFileName ?? false;
 }
 
 /** The prose-image policy, defaulted to the safe answer for a host that stated none. */

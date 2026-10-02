@@ -55,7 +55,7 @@ st: storybook
 build-storybook:
 	npm run build-storybook
 
-# Regenerate the story fixtures from data/structures/. Needs the sibling
+# Regenerate the story fixtures from src/__stories__/_structures/. Needs the sibling
 # ../pipelex checkout's venv (PIPELEX_PYTHON) - dev-only, since the emitted .ts
 # files are committed and the stories read those. ONLY=<case> narrows it.
 fixtures:
@@ -78,7 +78,7 @@ fixtures-runs:
 # template stage through the sibling ../pipelex checkout's venv
 # (PIPELEX_PYTHON, as `fixtures` needs it), and written beside that data, the
 # catalog data the method is handed and the prompt hash (the method's text and
-# the catalog, together). Committed under wip/generative-ui/briefs/, because
+# the catalog, together). Committed under data/briefs/, because
 # with the method file it is the record of exactly what a producer was handed -
 # and the file each spec fixture's `brief` field points at. Free and offline: no
 # model is called. Node cannot resolve this repo's extensionless TypeScript

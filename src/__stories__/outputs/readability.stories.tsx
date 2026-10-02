@@ -22,7 +22,7 @@ import { ResultView, itemsOf } from '../result-view';
  * value is the only value the two presentations show differently; every other
  * value on these pages renders the same in both.
  *
- * The invoice check is `data/structures/readability.mthds`, captured from one
+ * The invoice check is `src/__stories__/_structures/readability.mthds`, captured from one
  * real run. The two `results` stories below it take enums the existing corpus
  * already holds, whose `studio` renderings are `Outputs/Results`.
  *

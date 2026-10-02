@@ -16,7 +16,9 @@ interface OptionalToggleProps {
  * The disclosure for empty optional entries. Optional inputs stay hidden until
  * the user asks for them - required (and already-filled) entries always show, so
  * the form opens at its simplest and grows only on demand. Used at the top level
- * and inside every structured concept, at any nesting depth.
+ * and inside every structured concept, at any nesting depth. An optional
+ * structure folds behind it too, and opens and closes with it: see
+ * `openOptionalStructures` / `closeOptionalStructures` in the core.
  */
 export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: OptionalToggleProps) {
   const s = useFieldStrings();
@@ -24,6 +26,7 @@ export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: Op
     <button
       type="button"
       onClick={onToggle}
+      aria-expanded={expanded}
       className="flex w-fit items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
     >
       {expanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}

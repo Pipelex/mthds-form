@@ -20,7 +20,7 @@ import type { PipeInputFormDescriptor } from 'mthds/protocol';
 import type { RunField } from './descriptor';
 import { buildRunFields } from './derive';
 import { ownProp } from './own-property';
-import { isFilled } from './readiness';
+import { isFilled, isOptionalStructure, optionalStructureOpen } from './readiness';
 import { isOptionalInput, isPluralInput } from './contracts';
 import { deflateAllInputs, inflateAllInputs } from './wire-format';
 import type { PipeIOContract, PipeInputContract } from './contracts';
@@ -145,6 +145,13 @@ function fromRjsf(field: RunField, value: unknown): unknown {
       return typeof value === 'string' && value ? { url: value } : undefined;
     }
     case 'object': {
+      // An optional structure the store holds no object for - absent, or the
+      // `null` a stored run writes for a structure it went without - stays
+      // CLOSED. Materializing a shell of `undefined` children here reopened it:
+      // `optionalStructureOpen` reads any plain object as open, so a run reloaded
+      // from the store showed every structure it had left out as opened and
+      // blank. A required structure has no closed state, and keeps its shell.
+      if (isOptionalStructure(field) && !optionalStructureOpen(value)) return undefined;
       const obj = (value && typeof value === 'object' ? value : {}) as Dict;
       const out: Dict = {};
       for (const child of field.fields) out[child.name] = fromRjsf(child, ownProp(obj, child.name));

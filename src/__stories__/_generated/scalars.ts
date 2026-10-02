@@ -1,5 +1,5 @@
 /**
- * Generated from data/structures/scalars.mthds - DO NOT EDIT.
+ * Generated from src/__stories__/_structures/scalars.mthds - DO NOT EDIT.
  *
  * The scalar kinds in isolation, one carrier pipe per axis.
  *

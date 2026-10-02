@@ -30,7 +30,7 @@ export const SPECS: SpecFixture[] = [
     model: 'claude-4.8-opus',
     promptHash: '2b2325fd1231',
     date: '2026-09-17',
-    brief: 'wip/generative-ui/briefs/summarize_people.summarize_people.md',
+    brief: 'data/briefs/summarize_people.summarize_people.md',
     jsonl:
       '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["hero","work"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"People summaries","lede":"Hand over your list of people and get a short summary written for each one."},"children":[]}}\n{"op":"add","path":"/elements/work","value":{"type":"Section","props":{"title":"The people"},"children":["people-field","run-cta"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/run-cta","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {

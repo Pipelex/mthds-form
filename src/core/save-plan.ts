@@ -319,14 +319,63 @@ function pathOf(url: string): string {
  * payload's say. Empty when nothing is left.
  */
 function safeName(name: string): string {
-  const printable = Array.from(name)
+  const trimmed = (printable(name).split(/[/\\]/).pop() ?? '').trim();
+  return trimmed === '.' || trimmed === '..' ? '' : trimmed;
+}
+
+/** The name without its control characters, which no file system wants in a name. */
+function printable(name: string): string {
+  return Array.from(name)
     .filter((character) => {
       const code = character.charCodeAt(0);
       return code > 0x1f && code !== 0x7f;
     })
     .join('');
-  const trimmed = (printable.split(/[/\\]/).pop() ?? '').trim();
-  return trimmed === '.' || trimmed === '..' ? '' : trimmed;
+}
+
+/**
+ * A planned name split at its extension, the way the plan reads one:
+ * `devis.pdf` is `devis` and `.pdf`, `report.final.html` is `report.final` and
+ * `.html`, and a name with no extension of one to eight letters and digits is
+ * all stem. The extension keeps its dot, so a name rebuilt from the two halves
+ * is the name.
+ */
+export function splitFileName(name: string): { stem: string; extension: string } {
+  const extension = name.match(/\.[A-Za-z0-9]{1,8}$/)?.[0] ?? '';
+  return extension && extension.length < name.length
+    ? { stem: name.slice(0, -extension.length), extension }
+    : { stem: name, extension: '' };
+}
+
+/**
+ * The name a reader typed for a file, made safe the way a planned name is, and
+ * a little stricter, since this one is typed rather than produced.
+ *
+ * Control characters go, as from every planned name. A path separator is
+ * REPLACED rather than cut at: a planned name keeps its last path segment
+ * because a payload's `filename` may be a path, but a reader who types
+ * `Devis 12/2026` means a name, and keeping `2026` alone would throw away what
+ * they wrote. The characters a common file system refuses in a name
+ * (`: * ? " < > |`) are replaced the same way, with a hyphen, because a host's
+ * bridge may write the name to disk as given. Leading dots go, so the file is
+ * not hidden, and trailing dots and spaces, which one file system drops
+ * silently. A copy of the extension the reader typed at the end is dropped,
+ * since the extension is added back after it: `devis.pdf` stays `devis.pdf`
+ * rather than becoming `devis.pdf.pdf`.
+ *
+ * Empty when nothing is left, which the caller reads as "keep the planned name".
+ */
+export function typedFileStem(typed: string, extension: string): string {
+  let stem = printable(typed)
+    .replace(/[/\\:*?"<>|]/g, '-')
+    .trim();
+  if (extension && stem.toLowerCase().endsWith(extension.toLowerCase())) {
+    stem = stem.slice(0, -extension.length);
+  }
+  return stem
+    .replace(/^[.\s]+/, '')
+    .replace(/[.\s]+$/, '')
+    .trim();
 }
 
 /**
