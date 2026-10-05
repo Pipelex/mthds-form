@@ -1,5 +1,9 @@
-# Copied verbatim from the Pipelex cookbook (MIT licence) - past this header, byte for byte:
+# Copied from the Pipelex cookbook (MIT licence) - past this header, byte for byte but for one line:
 # https://github.com/Pipelex/pipelex-cookbook/blob/4265d86a5551b788ccf1c7be5b00393e12c82aef/examples/b_basics/document_extract/extract_invoice/bundle.mthds
+# That line is the inputs of `extract_invoice_data`, which no longer declare the dotted key
+# "invoice_page.page_view" beside its root `invoice_page`: an input names a whole concept, and the
+# prompt reads `$invoice_page.page_view` through the root, as it always did. The root takes the
+# dotted key's place, first, which is the input order the runtime already reported.
 # An AUTHORED method: the pipes are the author's, and nothing here is synthesized.
 # The case is data/methods/extract_invoice/case.json; see scripts/generate-fixtures.mjs.
 
@@ -74,7 +78,7 @@ Analyze this invoice:
 
 type = "PipeLLM"
 description = "Extract invoice information from an invoice text transcript"
-inputs = { "invoice_page.page_view" = "Image", invoice_details = "InvoiceDetails", invoice_page = "Page" }
+inputs = { invoice_page = "Page", invoice_details = "InvoiceDetails" }
 output = "Invoice"
 model = "$vision"
 prompt = """
