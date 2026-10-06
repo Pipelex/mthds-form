@@ -3,7 +3,13 @@ import type { RunField } from '../../core';
 import { formatsForKind } from '../../core/file-formats';
 import { catalog } from '../catalog';
 import { layoutProblems } from '../layout-fits';
-import { type PageSketch, type SketchBlock, sketchBrief, sketchToSpec } from '../sketch';
+import {
+  type PageSketch,
+  type SketchBlock,
+  sketchBrief,
+  sketchFromOutline,
+  sketchToSpec,
+} from '../sketch';
 import { validateAgainstCatalog } from '../validate';
 
 /**
@@ -68,8 +74,16 @@ const columnPage = sketch(
 
 describe('the brief', () => {
   it('lists the top-level inputs only, in plain words, with no path', () => {
-    const brief = sketchBrief({ name: 'Qualify bid', produces: 'A go/no-go sheet' }, fields);
+    const brief = sketchBrief(
+      {
+        name: 'Qualify bid',
+        about: 'Assess a briefing against criteria',
+        produces: 'A go/no-go sheet',
+      },
+      fields,
+    );
     expect(brief.name).toBe('Qualify bid');
+    expect(brief.about).toBe('Assess a briefing against criteria');
     expect(brief.produces).toBe('A go/no-go sheet');
     expect(brief.inputs.map((input) => input.name)).toEqual([
       'briefing',
@@ -122,6 +136,20 @@ describe('a well-formed outline', () => {
       props: { label: 'Qualify the bid', hint: 'Needs the deck and the criteria' },
       on: { press: [{ action: 'validateForm' }, { action: 'run' }] },
     });
+  });
+
+  it('starts a line the outline wrote in lower case with a capital', () => {
+    const lowered = sketchToSpec(
+      sketch([
+        block(0, 'Section', 'The deck', 'the briefing you were sent'),
+        ...columnPage.blocks.slice(1),
+      ]),
+      fields,
+    );
+    if (!lowered.ok) throw new Error(lowered.problems.join('\n'));
+    expect(lowered.spec.elements['section-the-deck']?.props.lede).toBe(
+      'The briefing you were sent',
+    );
   });
 
   it('nests by depth', () => {
@@ -241,5 +269,117 @@ describe('a malformed outline is refused, every problem named', () => {
     expect(
       problemsOf([{ depth: 0, block: 'Hero' as SketchBlock['block'], text: 'x' }, ...complete]),
     ).toContain('block 1 is a "Hero", which is not a block the outline knows');
+  });
+});
+
+describe('the outline', () => {
+  /** An outline the designer wrote for Qualify bid, verbatim. */
+  const written = [
+    'Purpose: for a bid lead deciding whether to pursue an opportunity, to hand over the briefing and the house criteria and receive a go/no-go sheet.',
+    '',
+    '# Qualify a bid',
+    'Turn a briefing and your criteria into a go/no-go sheet.',
+    '',
+    '- Side: What a run produces',
+    '  - Text: A go/no-go sheet: the opportunity, a recommendation by your rule — and the questions it raises.',
+    "- Section: The briefing — the call for funding or tender you're weighing up.",
+    '  - Field: briefing',
+    '- Section: Your criteria',
+    '  - Field: criteria',
+    '- Fold: Briefing date',
+    '  - Field: `briefing_date`',
+    '- Run: Qualify this bid — produces a go/no-go sheet.',
+  ].join('\n');
+
+  it('reads the purpose, the title, the line under it and every bullet', () => {
+    const parse = sketchFromOutline(written);
+    if (!parse.ok) throw new Error(parse.problems.join('\n'));
+    expect(parse.sketch).toEqual({
+      purpose:
+        'for a bid lead deciding whether to pursue an opportunity, to hand over the briefing and the house criteria and receive a go/no-go sheet.',
+      title: 'Qualify a bid',
+      lede: 'Turn a briefing and your criteria into a go/no-go sheet.',
+      blocks: [
+        block(0, 'Side', 'What a run produces'),
+        block(
+          1,
+          'Text',
+          'A go/no-go sheet: the opportunity, a recommendation by your rule — and the questions it raises.',
+        ),
+        block(0, 'Section', 'The briefing', "the call for funding or tender you're weighing up."),
+        block(1, 'Field', 'briefing'),
+        block(0, 'Section', 'Your criteria'),
+        block(1, 'Field', 'criteria'),
+        block(0, 'Fold', 'Briefing date'),
+        block(1, 'Field', 'briefing_date'),
+        block(0, 'Run', 'Qualify this bid', 'produces a go/no-go sheet.'),
+      ],
+    });
+    expect(sketchToSpec(parse.sketch, fields).ok).toBe(true);
+  });
+
+  it('reads nesting relative to the bullets above, at any indentation', () => {
+    const parse = sketchFromOutline(
+      [
+        '```markdown',
+        '# Qualify a bid',
+        '- Steps',
+        '    - Step: The deck',
+        '        - Field: briefing',
+        '    - Step: The rest',
+        '        - Field: criteria',
+        '- Row',
+        '  - Field: briefing_date',
+        '```',
+      ].join('\n'),
+    );
+    if (!parse.ok) throw new Error(parse.problems.join('\n'));
+    expect(parse.sketch.blocks.map((one) => [one.depth, one.block])).toEqual([
+      [0, 'Steps'],
+      [1, 'Step'],
+      [2, 'Field'],
+      [1, 'Step'],
+      [2, 'Field'],
+      [0, 'Row'],
+      [1, 'Field'],
+    ]);
+    expect(parse.sketch).not.toHaveProperty('lede');
+  });
+
+  it('refuses what is not the grammar, every line named', () => {
+    const parse = sketchFromOutline(
+      [
+        'Purpose: x',
+        '- Field: briefing',
+        '# Qualify a bid',
+        '## Details',
+        '- Hero: Qualify',
+        '- Section The deck',
+        '- Run: Go',
+        'Hope this helps!',
+      ].join('\n'),
+    );
+    expect(parse.ok).toBe(false);
+    expect(parse.ok ? [] : parse.problems).toEqual([
+      'line 2 is a bullet before the title line',
+      'line 4 is a second heading; the page has one title: "## Details"',
+      'line 5 starts with "Hero:", which is not a block the outline knows',
+      'line 6 has no colon after "Section": "- Section The deck"',
+      'line 8 is not a bullet, after the bullets began: "Hope this helps!"',
+    ]);
+  });
+
+  it('refuses an outline with no title or no bullets', () => {
+    expect(sketchFromOutline('Purpose: x\n- Run: Go')).toEqual({
+      ok: false,
+      problems: [
+        'line 2 is a bullet before the title line',
+        'the outline has no title line ("# …")',
+      ],
+    });
+    expect(sketchFromOutline('# A title\nA line.')).toEqual({
+      ok: false,
+      problems: ['the outline has no bullets'],
+    });
   });
 });

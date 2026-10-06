@@ -8,16 +8,15 @@ main_pipe   = "sketch_page"
 # its copy. Everything a program can derive is derived by one instead.
 #
 # - The model writes a light Markdown outline, one block per bullet, nesting
-#   by indentation. It writes no JSON, no element key, no binding, no event,
-#   no prop name: `sketchToSpec` in `src/generative/sketch.ts` builds the
-#   json-render spec from the structured sketch and the method's descriptor,
-#   and the validator and the fit gate judge it exactly as they judge a layout
-#   from `layout-design.mthds`.
-# - `structuring_method = "preliminary_text"` has Pipelex expand this pipe into
-#   a draft (the outline, as text, kept in working memory as `draft_text`) and
-#   a PipeStructure that turns it into a `PageSketch`. The structure step reads
-#   only the outline and the field descriptions below, so those descriptions
-#   are its instructions, and it runs on a cheaper model.
+#   by indentation, and the pipe returns it as text. It writes no JSON, no
+#   element key, no binding, no event, no prop name. The outline's grammar is
+#   the program's, so the program reads it: `sketchFromOutline` in
+#   `src/generative/sketch.ts` parses it and names every line it cannot read,
+#   `sketchToSpec` builds the json-render spec from it and the method's
+#   descriptor, and the validator and the fit gate judge that spec exactly as
+#   they judge a layout from `layout-design.mthds`. A second model call to
+#   structure the outline was tried first and dropped: it cost more than the
+#   design call and, on a cheaper model, lost lines the draft held.
 # - Every input is placed with `Field`, which the host renders with the
 #   kernel's own control at that input's path. So the brief lists top-level
 #   inputs only, with no paths, no constraints and no delegation: the control
@@ -33,10 +32,11 @@ main_pipe   = "sketch_page"
 # and `@name` are the language's substitution sigils.
 
 [concept.SketchBrief]
-description = "What the designer is told about the method: its name, what a run produces, and its inputs."
+description = "What the designer is told about the method: its name, what it does, what a run produces, and its inputs."
 
 [concept.SketchBrief.structure]
 name     = { type = "text", description = "The method's name, as the host lists it.", required = true }
+about    = { type = "text", description = "What the method does, in its author's words: its main pipe's description." }
 produces = { type = "text", description = "What one run produces, in the method's own words." }
 inputs   = { type = "list", item_type = "concept", item_concept_ref = "SketchInput", description = "The method's inputs, in the order it declares them.", required = true }
 
@@ -50,49 +50,18 @@ kind        = { type = "text", description = "What it holds, in plain words.", r
 required    = { type = "boolean", description = "Whether a run needs it.", required = true }
 description = { type = "text", description = "What it is for, as the method's author wrote it." }
 
-[concept.PageSketch]
-description = "A page as its outline: what it is for, its title, and its blocks in reading order."
-
-[concept.PageSketch.structure]
-purpose = { type = "text", description = "The sentence after \"Purpose:\".", required = true }
-title   = { type = "text", description = "The page's title: the text of the line that starts with \"# \", without the \"# \".", required = true }
-lede    = { type = "text", description = "The line of plain text between the title line and the first bullet, copied word for word. Absent only when there is no such line." }
-blocks  = { type = "list", item_type = "concept", item_concept_ref = "SketchBlock", description = "Every bullet of the outline, in order, one block per bullet, nested ones included.", required = true }
-
-[concept.SketchBlock]
-description = "One bullet of the outline."
-
-[concept.SketchBlock.structure]
-depth = { type = "integer", description = "How deeply the bullet is indented: 0 for a bullet at the margin, 1 for a bullet indented once under another, 2 for twice, and so on.", required = true }
-block = { choices = [
-  "Section",
-  "Side",
-  "Row",
-  "Fold",
-  "Steps",
-  "Step",
-  "Tabs",
-  "Tab",
-  "Text",
-  "Field",
-  "Run",
-], description = "The word that starts the bullet.", required = true }
-text = { type = "text", description = "The words after the block's colon, up to \" — \" if the bullet has one: a title, a label, a sentence, or for a Field the input's name. Absent for Row, Steps and Tabs." }
-line = { type = "text", description = "The words after \" — \", when the bullet has them." }
-
 [pipe.sketch_page]
 type = "PipeLLM"
 description = "Sketch the method's input page as an outline of blocks: its purpose, its title, its composition and its copy."
 inputs = { brief = "SketchBrief", seed = "Text?" }
-output = "PageSketch"
-structuring_method = "preliminary_text"
+output = "Text"
 model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 4096 }
-model_to_structure = { model = "claude-5-sonnet", temperature = 0.1, max_tokens = 4096 }
 system_prompt = """
 You are a product designer with taste. You design one page: the page a person opens to run a method, give it its inputs and start it. It should feel like a small app made for this one job, never like a form.
 """
 prompt = """
 THE METHOD: {{ brief.name }}
+{% if brief.about %}What it does: {{ brief.about }}{% endif %}
 {% if brief.produces %}A run produces: {{ brief.produces }}{% endif %}
 
 Its inputs, in the method's order:

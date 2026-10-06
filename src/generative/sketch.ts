@@ -4,24 +4,26 @@ import { isNativeCompositeNode, isNativeDateNode, isNativeHtmlNode } from '../co
 import { INPUTS_ROOT, joinPath } from './paths';
 
 /**
- * The sketch designer's two halves in code: the brief it is handed, and the
- * assembly of what it returns into a json-render spec.
+ * The sketch designer's three halves in code: the brief it is handed, the
+ * parse of the outline it returns, and the assembly of that outline into a
+ * json-render spec.
  *
  * `experiments/page-sketch.mthds` asks a model for the only things a model has to
  * decide about an input page - what it is for, its title, its composition and
- * its copy - as a light Markdown outline that Pipelex structures into a
- * `PageSketch`. Everything else a layout carries is derivable, so it is
- * derived here and never asked for: the element keys, the children arrays,
- * the root, the bindings, the path of every input, the heading levels, the
- * call to action's events, and the props each block becomes. The spec this
- * builds is then judged by `validateAgainstCatalog` and `layoutProblems`
- * exactly as a spec a model wrote patch by patch would be.
+ * its copy - as a light Markdown outline, returned as text. The outline's
+ * grammar is this file's, so it is parsed here rather than by a second model
+ * call: `sketchFromOutline` reads it into a `PageSketch` and names every line it
+ * cannot read. Everything else a layout carries is derivable, so it is derived
+ * here and never asked for: the element keys, the children arrays, the root,
+ * the bindings, the path of every input, the heading levels, the call to
+ * action's events, and the props each block becomes. The spec this builds is
+ * then judged by `validateAgainstCatalog` and `layoutProblems` exactly as a
+ * spec a model wrote patch by patch would be.
  *
  * An experiment beside `brief.ts` and `layout-design.mthds`, for input pages
- * only. The shapes below restate the method's concepts by hand rather than
+ * only. The brief's shape restates the method's concepts by hand rather than
  * through codegen, because the method is not shipped yet; a field renamed in
- * the bundle is caught by the run that sends or reads it, not by the type
- * check.
+ * the bundle is caught by the run that sends it, not by the type check.
  */
 
 /** The concept a run request names for the sketch designer's `brief` input. */
@@ -39,14 +41,15 @@ export interface SketchInput {
 /** `SketchBrief` of `experiments/page-sketch.mthds`. */
 export interface SketchBrief {
   name: string;
+  about?: string;
   produces?: string;
   inputs: SketchInput[];
 }
 
 /**
  * The blocks an outline may use, each with the json-render component it
- * becomes. The method's prompt names exactly these, and its `SketchBlock.block`
- * choices list them; a block missing here is refused by name.
+ * becomes. The method's prompt names exactly these; a block missing here is
+ * refused by name.
  */
 export const SKETCH_BLOCKS = {
   Section: 'Section',
@@ -64,7 +67,10 @@ export const SKETCH_BLOCKS = {
 
 export type SketchBlockName = keyof typeof SKETCH_BLOCKS;
 
-/** `SketchBlock` of `experiments/page-sketch.mthds`: one bullet of the outline. */
+/**
+ * One bullet of the outline: how deeply it is indented (0 at the margin), its
+ * block, the words after the block's colon, and the words after " — ".
+ */
 export interface SketchBlock {
   depth: number;
   block: SketchBlockName;
@@ -72,12 +78,132 @@ export interface SketchBlock {
   line?: string | null;
 }
 
-/** `PageSketch` of `experiments/page-sketch.mthds`. */
+/** An outline as data: what the page is for, its title, the line under it, and its bullets in order. */
 export interface PageSketch {
   purpose: string;
   title: string;
   lede?: string | null;
   blocks: SketchBlock[];
+}
+
+/** What `sketchFromOutline` answers: the outline as data, or every line it could not read. */
+export type SketchParse = { ok: true; sketch: PageSketch } | { ok: false; problems: string[] };
+
+const PURPOSE_LINE = /^\**purpose:\**\s*(.*)$/i;
+const TITLE_LINE = /^#\s+(.+)$/;
+const HEADING_LINE = /^#+\s/;
+const BULLET_LINE = /^([ \t]*)[-*]\s+(.*)$/;
+const FENCE_LINE = /^```/;
+/** The block word, optionally in bold, then what follows it. */
+const BULLET_BODY = /^\*{0,2}([A-Za-z]+)\*{0,2}(.*)$/;
+/** The separator between a bullet's words and its optional line: an em or en dash between spaces. */
+const LINE_SEPARATOR = /\s+[—–]\s+/;
+
+/** A run of leading whitespace as a width, a tab counting as two spaces. */
+function widthOf(indent: string): number {
+  return indent.replace(/\t/g, '  ').length;
+}
+
+/** `briefing`, `` `briefing` `` and `"briefing"` are one input name. */
+function unquoted(words: string): string {
+  return words.replace(/^[`"'*]+|[`"'*.]+$/g, '').trim();
+}
+
+/**
+ * The outline the sketch designer wrote, read into a `PageSketch`.
+ *
+ * The grammar is the one the method's prompt teaches: a `Purpose:` line, a
+ * `# ` title, optional plain lines under it (the lede), then bullets, one block
+ * each, nesting by indentation. Indentation is read relative to the bullets
+ * above it, so two spaces and four both work: a bullet indented further than
+ * the one before is its child, and one indented less closes every bullet
+ * deeper than itself. Blank lines and a Markdown code fence around the whole
+ * outline are ignored, and so is anything before the title other than the
+ * purpose. Anything else is a problem, named with its line number: the parse
+ * never guesses, so a refusal shows what the model wrote.
+ *
+ * It checks the grammar only. Whether the blocks make a page - every input
+ * placed once, one Run, a Step under Steps - is `sketchToSpec`'s to judge.
+ */
+export function sketchFromOutline(outline: string): SketchParse {
+  const problems: string[] = [];
+  let purpose = '';
+  let title = '';
+  const lede: string[] = [];
+  const blocks: SketchBlock[] = [];
+  /** The indentation widths of the open bullets, outermost first. */
+  const widths: number[] = [];
+
+  outline.split(/\r?\n/).forEach((raw, position) => {
+    const number = position + 1;
+    const line = raw.trimEnd();
+    const bare = line.trim();
+    if (bare === '' || FENCE_LINE.test(bare)) return;
+
+    const bullet = BULLET_LINE.exec(line);
+    if (bullet === null) {
+      if (blocks.length > 0) {
+        problems.push(`line ${number} is not a bullet, after the bullets began: "${bare}"`);
+        return;
+      }
+      if (title === '') {
+        const purposeMatch = PURPOSE_LINE.exec(bare);
+        if (purposeMatch !== null) purpose = purposeMatch[1]!.trim();
+        const titleMatch = TITLE_LINE.exec(bare);
+        if (titleMatch !== null) title = titleMatch[1]!.trim();
+        return;
+      }
+      if (HEADING_LINE.test(bare)) {
+        problems.push(`line ${number} is a second heading; the page has one title: "${bare}"`);
+        return;
+      }
+      lede.push(bare);
+      return;
+    }
+
+    if (title === '') {
+      problems.push(`line ${number} is a bullet before the title line`);
+      return;
+    }
+    const width = widthOf(bullet[1]!);
+    while (widths.length > 0 && width < widths[widths.length - 1]!) widths.pop();
+    if (widths.length === 0 || width > widths[widths.length - 1]!) widths.push(width);
+
+    const body = BULLET_BODY.exec(bullet[2]!.trim());
+    const word = body?.[1];
+    if (body === null || word === undefined || !Object.hasOwn(SKETCH_BLOCKS, word)) {
+      const opening = bullet[2]!.trim().split(/\s/)[0];
+      problems.push(
+        `line ${number} starts with "${opening}", which is not a block the outline knows`,
+      );
+      return;
+    }
+    const block = word as SketchBlockName;
+    const after = body[2]!.trim();
+    if (after !== '' && after !== '.' && !after.startsWith(':')) {
+      problems.push(`line ${number} has no colon after "${block}": "${bare}"`);
+      return;
+    }
+    const rest = after.startsWith(':') ? after.slice(1).trim() : '';
+    // A Text is one sentence, so a dash in it is part of it; every other block's
+    // dash separates its words from its line.
+    const [words = '', ...tail] = block === 'Text' ? [rest] : rest.split(LINE_SEPARATOR);
+    const text = block === 'Field' ? unquoted(words) : words.trim();
+    blocks.push({
+      depth: widths.length - 1,
+      block,
+      ...(text === '' ? {} : { text }),
+      ...(tail.length === 0 ? {} : { line: tail.join(' — ').trim() }),
+    });
+  });
+
+  if (title === '') problems.push('the outline has no title line ("# …")');
+  if (blocks.length === 0 && problems.length === 0) problems.push('the outline has no bullets');
+  if (problems.length > 0) return { ok: false, problems };
+  return {
+    ok: true,
+    sketch: { purpose, title, ...(lede.length === 0 ? {} : { lede: lede.join(' ') }), blocks },
+  };
 }
 
 /** What an input holds, in the words a person filling the page would use. */
@@ -114,16 +240,18 @@ function kindWords(field: RunField): string {
 }
 
 /**
- * The brief for an input page: the method's name, what a run produces, and
- * its top-level inputs. No path, constraint or default travels: every input
- * is placed whole with `Field`, whose control owns all three.
+ * The brief for an input page: the method's name, what it does in its
+ * author's words, what a run produces, and its top-level inputs. No path,
+ * constraint or default travels: every input is placed whole with `Field`,
+ * whose control owns all three.
  */
 export function sketchBrief(
-  subject: { name: string; produces?: string },
+  subject: { name: string; about?: string; produces?: string },
   fields: readonly RunField[],
 ): SketchBrief {
   return {
     name: subject.name,
+    ...(subject.about ? { about: subject.about } : {}),
     ...(subject.produces ? { produces: subject.produces } : {}),
     inputs: fields.map((field): SketchInput => ({
       name: field.name,
@@ -334,7 +462,9 @@ export function sketchToSpec(sketch: PageSketch, fields: readonly RunField[]): S
   const build = (node: Node): string => {
     const children = (): string[] => node.children.map(build);
     const words = node.text;
-    const line = node.line || undefined;
+    // In the outline a line continues its bullet after a dash, so the model
+    // often starts it in lower case; on the page it stands as its own sentence.
+    const line = node.line ? node.line.charAt(0).toUpperCase() + node.line.slice(1) : undefined;
     switch (node.block) {
       case 'Section':
         return add(keyFor(`section-${words}`), {
