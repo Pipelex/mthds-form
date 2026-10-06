@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.14.1] - 2026-10-06
+
+### Changed
+
+- **The `extract_invoice` story bundle names whole concepts as inputs**: its extraction pipe declared the dotted input `"invoice_page.page_view"` beside the root `invoice_page`, a redundant key since the prompt reads that field through the root, so the pipe now declares `invoice_page` alone and the bundle stays valid once a runtime refuses dotted input names as `invalid_input_name`. The generated input form and every committed fixture are byte-identical, and the published package is unchanged.
+
 ## [v0.14.0] - 2026-10-02
 
 ### Highlights
