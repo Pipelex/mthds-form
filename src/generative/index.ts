@@ -45,6 +45,22 @@ export {
   type DesignerPathEntry,
 } from './brief';
 
+// The sketch designer, an experiment for input pages: the brief it is handed,
+// and the assembly of the outline it returns into a spec the two checks below
+// judge like any other. Its prompt is `experiments/page-sketch.mthds`.
+export {
+  SKETCH_BLOCKS,
+  SKETCH_BRIEF_CONCEPT,
+  sketchBrief,
+  sketchToSpec,
+  type PageSketch,
+  type SketchAssembly,
+  type SketchBlock,
+  type SketchBlockName,
+  type SketchBrief,
+  type SketchInput,
+} from './sketch';
+
 // The two checks a host runs before it renders a stored layout.
 export {
   formatProblems,

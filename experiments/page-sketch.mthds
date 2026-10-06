@@ -1,0 +1,130 @@
+domain      = "generative"
+description = "Sketches the input page of a method as a light outline of blocks, which the host assembles into a json-render layout."
+main_pipe   = "sketch_page"
+
+# The sketch designer: an experiment beside `layout-design.mthds`, for input
+# pages only. THIS FILE IS THE PROMPT, and it asks the model for the one thing
+# only a model can decide: the page's purpose, its title, its composition and
+# its copy. Everything a program can derive is derived by one instead.
+#
+# - The model writes a light Markdown outline, one block per bullet, nesting
+#   by indentation. It writes no JSON, no element key, no binding, no event,
+#   no prop name: `sketchToSpec` in `src/generative/sketch.ts` builds the
+#   json-render spec from the structured sketch and the method's descriptor,
+#   and the validator and the fit gate judge it exactly as they judge a layout
+#   from `layout-design.mthds`.
+# - `structuring_method = "preliminary_text"` has Pipelex expand this pipe into
+#   a draft (the outline, as text, kept in working memory as `draft_text`) and
+#   a PipeStructure that turns it into a `PageSketch`. The structure step reads
+#   only the outline and the field descriptions below, so those descriptions
+#   are its instructions, and it runs on a cheaper model.
+# - Every input is placed with `Field`, which the host renders with the
+#   kernel's own control at that input's path. So the brief lists top-level
+#   inputs only, with no paths, no constraints and no delegation: the control
+#   owns all of that.
+# - The vocabulary below is written into the prompt rather than sent as data:
+#   each block name is a key of `SKETCH_BLOCKS` in `sketch.ts`, which maps it
+#   to a catalog component, and a block the program does not know is refused
+#   by name.
+#
+# The prompt is a Jinja2 template that keeps every newline it is written with,
+# so a loop tag ends with `-%}` and the line after `{% endfor %}` follows one
+# blank line. Write no literal dollar sign or at sign in the prose: `$name`
+# and `@name` are the language's substitution sigils.
+
+[concept.SketchBrief]
+description = "What the designer is told about the method: its name, what a run produces, and its inputs."
+
+[concept.SketchBrief.structure]
+name     = { type = "text", description = "The method's name, as the host lists it.", required = true }
+produces = { type = "text", description = "What one run produces, in the method's own words." }
+inputs   = { type = "list", item_type = "concept", item_concept_ref = "SketchInput", description = "The method's inputs, in the order it declares them.", required = true }
+
+[concept.SketchInput]
+description = "One input of the method, as the person filling the page meets it."
+
+[concept.SketchInput.structure]
+name        = { type = "text", description = "The input's name, which a Field block names.", required = true }
+title       = { type = "text", description = "Its human title, when the method gives one that differs from its name." }
+kind        = { type = "text", description = "What it holds, in plain words.", required = true }
+required    = { type = "boolean", description = "Whether a run needs it.", required = true }
+description = { type = "text", description = "What it is for, as the method's author wrote it." }
+
+[concept.PageSketch]
+description = "A page as its outline: what it is for, its title, and its blocks in reading order."
+
+[concept.PageSketch.structure]
+purpose = { type = "text", description = "The sentence after \"Purpose:\".", required = true }
+title   = { type = "text", description = "The page's title: the text of the line that starts with \"# \", without the \"# \".", required = true }
+lede    = { type = "text", description = "The line of plain text between the title line and the first bullet, copied word for word. Absent only when there is no such line." }
+blocks  = { type = "list", item_type = "concept", item_concept_ref = "SketchBlock", description = "Every bullet of the outline, in order, one block per bullet, nested ones included.", required = true }
+
+[concept.SketchBlock]
+description = "One bullet of the outline."
+
+[concept.SketchBlock.structure]
+depth = { type = "integer", description = "How deeply the bullet is indented: 0 for a bullet at the margin, 1 for a bullet indented once under another, 2 for twice, and so on.", required = true }
+block = { choices = [
+  "Section",
+  "Side",
+  "Row",
+  "Fold",
+  "Steps",
+  "Step",
+  "Tabs",
+  "Tab",
+  "Text",
+  "Field",
+  "Run",
+], description = "The word that starts the bullet.", required = true }
+text = { type = "text", description = "The words after the block's colon, up to \" — \" if the bullet has one: a title, a label, a sentence, or for a Field the input's name. Absent for Row, Steps and Tabs." }
+line = { type = "text", description = "The words after \" — \", when the bullet has them." }
+
+[pipe.sketch_page]
+type = "PipeLLM"
+description = "Sketch the method's input page as an outline of blocks: its purpose, its title, its composition and its copy."
+inputs = { brief = "SketchBrief", seed = "Text?" }
+output = "PageSketch"
+structuring_method = "preliminary_text"
+model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 4096 }
+model_to_structure = { model = "claude-5-sonnet", temperature = 0.1, max_tokens = 4096 }
+system_prompt = """
+You are a product designer with taste. You design one page: the page a person opens to run a method, give it its inputs and start it. It should feel like a small app made for this one job, never like a form.
+"""
+prompt = """
+THE METHOD: {{ brief.name }}
+{% if brief.produces %}A run produces: {{ brief.produces }}{% endif %}
+
+Its inputs, in the method's order:
+{% for input in brief.inputs -%}
+- {{ input.name }}{% if input.title %} ("{{ input.title }}"){% endif %}: {{ input.kind }}, {{ "required" if input.required else "optional" }}{% if input.description %}. {{ input.description }}{% endif %}
+{% endfor %}
+Write the page as a light Markdown outline, and nothing else:
+
+Purpose: <one sentence: what this page is for, and who is in front of it>
+
+# <the page's title, named after the job: "Plan the trip", never "TripRequest">
+<optionally, one short line under the title>
+
+- <then the page, one block per bullet; a block held by another is indented two spaces under it>
+
+The blocks:
+- Section: <title> — <optional short line>. A titled part of the page, holding blocks.
+- Side: <title>. A boxed panel beside the rest of the page that stays in view while it scrolls. At most one, at the margin, holding blocks.
+- Row. Lays the blocks it holds side by side.
+- Fold: <title>. Folded away until the person opens it, holding blocks.
+- Steps. A journey shown one step at a time, holding only Step blocks.
+- Step: <label>. One step of the journey, holding blocks.
+- Tabs. One tab visible at a time, holding only Tab blocks.
+- Tab: <label>. One tab, holding blocks.
+- Text: <one sentence>. A line of copy.
+- Field: <input name>. The control for one input. It shows the input's own label and description.
+- Run: <label> — <optional hint>. The button that runs the method.
+
+Rules:
+- Every input is one Field, exactly once.
+- There is exactly one Run, labelled with the job in a person's words ("Plan my trip"), never "Submit". Inside Steps, it is in the last step.
+- Say nothing the method does not say: no product name but "{{ brief.name }}", no promise about speed, storage or privacy, no limit or format a Field already shows.
+
+@?seed
+"""
