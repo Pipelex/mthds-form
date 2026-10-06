@@ -93,7 +93,7 @@ The blocks:
 Rules:
 - Every input is one Field, exactly once.
 - There is exactly one Run, labelled with the job in a person's words ("Plan my trip"), never "Submit". Inside Steps, it is in the last step.
-- Say nothing the method does not say: no product name but "{{ brief.name }}", no promise about speed, storage or privacy, no limit or format a Field already shows.
+- Say nothing the method does not say: no product name but "{{ brief.name }}", no promise about speed, storage or privacy, and nothing a Field already shows: its input's label, its description, a limit or a format.
 
 @?seed
 """
