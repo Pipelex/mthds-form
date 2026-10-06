@@ -90,6 +90,16 @@ export default defineConfig({
         },
       },
       {
+        // The brand entry is isomorphic and network-free: its contract, its
+        // validator, its compiler and its site reader run in `node`, so a DOM or
+        // a network reference fails here as it would in a build script.
+        test: {
+          name: 'brand',
+          environment: 'node',
+          include: ['src/brand/**/*.test.ts'],
+        },
+      },
+      {
         // Not a test of the package at all: a test that the generated fixture
         // tree still matches the corpus it was generated from. Node, because it
         // reads directories. See src/__stories__/__tests__/corpus.test.ts.

@@ -21,6 +21,16 @@ const DIST = resolve('dist');
 const RENDERING_ENTRIES = ['react', 'generative'];
 
 /**
+ * The entries that must import with no DOM and no React: the headless kernel,
+ * and the brand entry, which a build script, a test and a server's fetcher
+ * import alike. Neither may carry a `'use client'` prologue.
+ */
+const ISOMORPHIC_ENTRIES = ['core', 'brand'];
+
+/** Every entry, for the bans that hold everywhere. */
+const ENTRIES = ['core', 'react', 'generative', 'brand'];
+
+/**
  * Import and re-export specifiers of a bundled module.
  *
  * Anchored to a statement boundary (line start or a preceding `;`) so a
@@ -77,12 +87,12 @@ function graphOf(entry) {
  * CLI anywhere. A failure names the reason for the package it actually found.
  */
 const BANNED = [
-  {
-    entry: `${DIST}/core/index.js`,
+  ...ISOMORPHIC_ENTRIES.map((entry) => ({
+    entry: `${DIST}/${entry}/index.js`,
     match: /^react($|\/)|^react-dom($|\/)/,
-    why: 'The `.` entry is headless and must stay importable from a server component.',
-  },
-  ...['react', 'generative'].map((entry) => ({
+    why: `The \`${entry === 'core' ? '.' : `./${entry}`}\` entry is isomorphic and must stay importable from a server component and a node script.`,
+  })),
+  ...['react', 'generative', 'brand'].map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^ajv($|-|\/)/,
     why: `The \`./${entry}\` entry must not drag the run gate's validator into a client bundle.`,
@@ -98,6 +108,11 @@ const BANNED = [
     match: /^@json-render($|\/)|^zod($|\/)/,
     why: `The \`${entry === 'core' ? '.' : './react'}\` entry must not carry the generative layer's dependencies. See docs/dependency-budget.md.`,
   })),
+  {
+    entry: `${DIST}/brand/index.js`,
+    match: /^@json-render($|\/)/,
+    why: 'The `./brand` entry renders nothing, so it must not carry a layout renderer. See docs/dependency-budget.md.',
+  },
   // The standard's TypeScript client is TYPES-ONLY, banned from EVERY
   // entry. The wire types it declares are erased at build, so a `mthds`
   // specifier surviving into either graph means a value import slipped in -
@@ -107,7 +122,7 @@ const BANNED = [
   // consumer's bundle for types that were supposed to disappear. Lint holds the
   // same line on source imports; this holds it on the built graph, which is
   // where a shared chunk would deliver it silently.
-  ...['core', 'react', 'generative'].map((entry) => ({
+  ...ENTRIES.map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^mthds($|\/)/,
     why: 'The standard client is a types-only dependency - its types are erased, so nothing named `mthds` may survive into a built graph. See docs/dependency-budget.md.',
@@ -119,7 +134,7 @@ const BANNED = [
   // fixture harness started designing pages on the hosted API, so an accidental
   // import from `src/` now resolves where it used to fail - which is exactly
   // when a graph check earns its place beside the lint rule.
-  ...['core', 'react', 'generative'].map((entry) => ({
+  ...ENTRIES.map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^@pipelex\/sdk($|\/)/,
     why: "The runtime's SDK is a harness devDependency, not a dependency of any entry. See docs/dependency-budget.md.",
@@ -172,7 +187,7 @@ function staticGraphOf(entry) {
   return { files, statics, dynamics };
 }
 
-for (const entry of ['core', 'react', 'generative']) {
+for (const entry of ENTRIES) {
   const path = `${DIST}/${entry}/index.js`;
   const { statics } = staticGraphOf(path);
   const reached = [...statics].filter((specifier) => LAZY.test(specifier));
@@ -185,11 +200,13 @@ for (const entry of ['core', 'react', 'generative']) {
   }
 }
 {
-  const core = [...graphOf(`${DIST}/core/index.js`).externals].filter((s) => LAZY.test(s));
-  if (core.length > 0) {
-    failures.push(`core/index.js reaches ${core.join(', ')} - the headless entry makes no PDF.`);
-  } else {
-    console.log('ok  core/index.js reaches neither PDF library, even dynamically');
+  for (const entry of ISOMORPHIC_ENTRIES) {
+    const reached = [...graphOf(`${DIST}/${entry}/index.js`).externals].filter((s) => LAZY.test(s));
+    if (reached.length > 0) {
+      failures.push(`${entry}/index.js reaches ${reached.join(', ')} - an entry that renders nothing makes no PDF.`);
+    } else {
+      console.log(`ok  ${entry}/index.js reaches neither PDF library, even dynamically`);
+    }
   }
   const { dynamics } = staticGraphOf(`${DIST}/react/index.js`);
   const missing = ['jspdf', 'modern-screenshot'].filter((name) => !dynamics.has(name));
@@ -213,6 +230,38 @@ for (const { entry, match, why } of BANNED) {
     console.log(
       `ok  ${relative(DIST, entry)} (${files.size} modules) reaches nothing matching ${match.source}`,
     );
+  }
+}
+
+/**
+ * The brand entry's budget is an allow-list, not a ban list: zod, and nothing
+ * else. It is the one entry whose dependency line can be stated exactly, so it
+ * is - a new specifier anywhere in its graph fails here whatever it is.
+ *
+ * And it never fetches. The site reader is a pure function over texts the host
+ * fetched behind its own guard; a `fetch(` reaching the entry's built graph
+ * would put a network call in code a server runs on a URL a user typed.
+ */
+{
+  const BRAND_ALLOWED = /^zod($|\/)/;
+  const { files, externals } = graphOf(`${DIST}/brand/index.js`);
+  const outside = [...externals].filter((specifier) => !BRAND_ALLOWED.test(specifier));
+  if (externals.size === 0 || outside.length > 0) {
+    failures.push(
+      outside.length > 0
+        ? `brand/index.js reaches ${outside.join(', ')} - the brand entry depends on zod and nothing else. See docs/dependency-budget.md.`
+        : 'brand/index.js reaches no external at all, so the allow-list compared nothing - the entry validates with zod and must reach it.',
+    );
+  } else {
+    console.log(`ok  brand/index.js (${files.size} modules) reaches zod and nothing else`);
+  }
+  const fetching = [...files].filter((file) => /\bfetch\s*\(/.test(readFileSync(file, 'utf8')));
+  if (fetching.length > 0) {
+    failures.push(
+      `brand/index.js reaches a fetch( call in ${fetching.map((file) => relative(DIST, file)).join(', ')} - the brand entry never fetches; the host does, behind its own guard. See docs/brand.md.`,
+    );
+  } else {
+    console.log('ok  brand/index.js reaches no fetch( call');
   }
 }
 
@@ -337,15 +386,18 @@ for (const entry of RENDERING_ENTRIES) {
   }
 }
 
-// The core entry is the one that must NOT carry the directive: a directive
-// prologue makes a module a client boundary, and the headless entry has to
-// stay importable from a server component.
-if (/^\s*["']use client["'];?/.test(coreBarrel)) {
-  failures.push(
-    "core/index.js carries a 'use client' directive - the headless entry must stay importable from a server component.",
-  );
-} else {
-  console.log("ok  core/index.js carries no 'use client' directive");
+// The isomorphic entries are the ones that must NOT carry the directive: a
+// directive prologue makes a module a client boundary, and each has to stay
+// importable from a server component.
+for (const entry of ISOMORPHIC_ENTRIES) {
+  const code = readFileSync(`${DIST}/${entry}/index.js`, 'utf8');
+  if (/^\s*["']use client["'];?/.test(code)) {
+    failures.push(
+      `${entry}/index.js carries a 'use client' directive - an isomorphic entry must stay importable from a server component.`,
+    );
+  } else {
+    console.log(`ok  ${entry}/index.js carries no 'use client' directive`);
+  }
 }
 
 // The designer method ships as data beside the entries, reachable through the
@@ -815,6 +867,57 @@ if (unshipped.length > 0) {
   failures.push(
     `dist/styles.css reads none of ${unshipped.join(', ')}, though the \`@theme inline\` block maps them and controls are expected to use them. Tailwind emits only the utilities the scanned trees actually reference, so this means the utilities were dropped - a commented-out mapping, a lost \`@source\` line - or the token genuinely has no consumer, in which case list it in UNUSED_BY_CONTROLS with the reason.`,
   );
+}
+
+// 4. The brand contract names the tokens a brand sets, and it is not a second
+//    list kept beside `theme.css`: its colours and its radius are exactly the
+//    tokens `theme.css` defines (its colours exactly the ones `.dark`
+//    restates), so a token added to the theme is a token a producer must set.
+//    Its two typography tokens are Tailwind's own theme variables, which
+//    `theme.css` must NOT define - unlayered, a value there overrides every
+//    host's typeface - and which the shipped sheet must declare, or a brand's
+//    `--font-sans` would be the only value the page's `font-sans` could read.
+//    Read from the BUILT entry, so what is checked is what a producer imports.
+{
+  const { BRAND_CONTRACT } = await import(`${DIST}/brand/index.js`);
+  const variablesOf = (...types) =>
+    BRAND_CONTRACT.filter((token) => types.includes(token.type)).map((token) => token.variable);
+  const themed = variablesOf('color', 'dimension');
+  const contractProblems = [];
+  const sameSet = (a, b) => a.length === b.length && a.every((name) => b.includes(name));
+  if (themed.length === 0) contractProblems.push('names no colour and no radius at all');
+  if (!sameSet(themed, [...lightPalette.keys()])) {
+    contractProblems.push(
+      `names ${themed.join(', ')} where theme.css's :root defines ${[...lightPalette.keys()].join(', ')}`,
+    );
+  }
+  const colors = variablesOf('color');
+  if (!sameSet(colors, [...darkPalette.keys()])) {
+    contractProblems.push(
+      `names the colours ${colors.join(', ')} where theme.css's .dark restates ${[...darkPalette.keys()].join(', ')}`,
+    );
+  }
+  const fonts = variablesOf('fontFamily');
+  if (!sameSet(fonts, ['--font-sans', '--font-mono'])) {
+    contractProblems.push(`names the typefaces ${fonts.join(', ') || 'nothing'}, not --font-sans and --font-mono`);
+  }
+  const themedFonts = fonts.filter((name) => lightPalette.has(name) || darkPalette.has(name));
+  if (themedFonts.length > 0) {
+    contractProblems.push(
+      `finds ${themedFonts.join(', ')} defined in theme.css, where a value overrides every host's own typeface`,
+    );
+  }
+  const undeclared = fonts.filter((name) => !selfDefined.has(name));
+  if (undeclared.length > 0) {
+    contractProblems.push(`finds ${undeclared.join(', ')} undeclared by dist/styles.css`);
+  }
+  if (contractProblems.length === 0) {
+    console.log(
+      `ok  the brand contract names theme.css's ${themed.length} tokens and Tailwind's two typefaces`,
+    );
+  } else {
+    failures.push(`The brand contract (src/brand/contract.ts) ${contractProblems.join('; ')}. See docs/brand.md.`);
+  }
 }
 
 // The prebuilt sheet is useless to a token-less host without the palette beside

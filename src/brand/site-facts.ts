@@ -1,0 +1,730 @@
+/**
+ * A website's design facts, read off its HTML and stylesheets, as data.
+ *
+ * A brand producer's first input, and deliberately not a model: what a site
+ * declares is a matter of fact - which class its `<html>` carries, which
+ * custom properties its stylesheets set, under which selector, and which of
+ * those declarations wins for the page as it is served, which colour
+ * utilities its markup uses most, which typefaces it loads, which radii it
+ * uses, which images could be its logo - and code reads facts exactly, every
+ * time, for nothing. What a model is for is the judgement that follows: which
+ * colour is the accent and which the canvas, what the light mode of a
+ * dark-only site should be, which image is the logo. So the facts are
+ * recorded verbatim, ranked by frequency where frequency is the evidence, and
+ * capped so the record stays readable.
+ *
+ * NOTHING HERE FETCHES. The reader is two pure functions over texts the host
+ * fetched: `stylesheetUrls` says which stylesheets a page links, and
+ * `siteFacts` reads the page and those stylesheets. A host fetches behind its
+ * own guard - a scheme, a size cap, a timeout - which is a policy this
+ * package has no business setting, and the same reader then runs in a script
+ * on a laptop and behind a platform's fetcher alike. Inline `<style>` blocks
+ * are read too. There is no browser and no script execution, so a site that
+ * paints itself from JavaScript alone yields fewer facts, which the record
+ * then shows.
+ *
+ * HTML is read by regex, which is enough for tags and attributes and is all
+ * this reads; CSS by a small scanner that keeps each rule's selector chain,
+ * nested at-rules included.
+ */
+
+/** How many of each ranked list to keep: enough to see the pattern, not the tail. */
+const KEEP = {
+  properties: 80,
+  literals: 40,
+  utilities: 60,
+  fontFamilies: 20,
+  fontUtilities: 12,
+  radii: 20,
+  radiusUtilities: 16,
+  logos: 12,
+};
+
+/** A page as the host fetched it. */
+export interface FetchedPage {
+  /** The URL that was asked for. */
+  url: string;
+  /** The URL the page was served from, after redirects; relative links resolve against it. */
+  finalUrl: string;
+  /** The day it was fetched, `YYYY-MM-DD`. A reader with no clock is told the date. */
+  fetchedAt: string;
+  html: string;
+  /** Each stylesheet `stylesheetUrls` named, in that order: its text, or why it could not be had. */
+  stylesheets: readonly FetchedStylesheet[];
+}
+
+export type FetchedStylesheet = { url: string; css: string } | { url: string; error: string };
+
+export interface Ranked {
+  value: string;
+  count: number;
+}
+
+export interface PropertyFacts {
+  name: string;
+  /** The value that wins for the page as served, by source order among the rules that apply at the root; null when none does. */
+  asServed: string | null;
+  /** Every declaration, with the selector chain it is set under. */
+  values: { value: string; under: string }[];
+}
+
+export interface LogoCandidate {
+  url: string | null;
+  alt?: string;
+  width?: string | null;
+  height?: string | null;
+  class?: string | null;
+  /** The original file behind a Next.js image URL. */
+  original?: string | null;
+  rel?: string;
+  sizes?: string | null;
+  type?: string | null;
+}
+
+export interface SiteFacts {
+  url: string;
+  finalUrl: string;
+  fetchedAt: string;
+  site: {
+    name: string | null;
+    title: string | null;
+    description: string | null;
+    lang: string | null;
+  };
+  scheme: {
+    htmlClass: string | null;
+    htmlDataAttributes: Record<string, string>;
+    bodyClass: string | null;
+    bodyDataAttributes: Record<string, string>;
+    themeColorMetas: { content: string | null; media: string | null }[];
+    colorSchemeDeclarations: string[];
+    rulesUnderADarkSelector: number;
+    rulesUnderPrefersDark: number;
+  };
+  stylesheets: { url: string; bytes?: number; error?: string }[];
+  inlineStyleBlocks: number;
+  colors: {
+    customProperties: PropertyFacts[];
+    literalsByFrequency: Ranked[];
+    utilitiesByFrequency: (Ranked & { resolves: string | null })[];
+  };
+  typography: {
+    fontFamiliesByFrequency: Ranked[];
+    fontFaces: string[];
+    webfontLinks: string[];
+    googleFamilies: string[];
+    fontPreloads: string[];
+    utilitiesByFrequency: Ranked[];
+  };
+  shape: {
+    radiiByFrequency: Ranked[];
+    utilitiesByFrequency: Ranked[];
+    radiusProperties: PropertyFacts[];
+  };
+  logos: {
+    candidates: LogoCandidate[];
+    headerSvgs: { ariaLabel: string | null; class: string | null; viewBox: string | null }[];
+  };
+}
+
+type Attrs = Record<string, string>;
+
+function resolveUrl(href: string, base: string): string | null {
+  try {
+    return new URL(href, base).toString();
+  } catch {
+    return null;
+  }
+}
+
+// ─── HTML, by regex ──────────────────────────────────────────────────────────
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function parseAttrs(text: string): Attrs {
+  const attrs: Attrs = {};
+  for (const match of text.matchAll(
+    /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g,
+  )) {
+    attrs[match[1]!.toLowerCase()] = decodeEntities(match[2] ?? match[3] ?? match[4] ?? '');
+  }
+  return attrs;
+}
+
+function tagsOf(html: string, name: string): Attrs[] {
+  return [...html.matchAll(new RegExp(`<${name}\\b([^>]*)>`, 'gi'))].map((match) =>
+    parseAttrs(match[1]!),
+  );
+}
+
+function firstTag(html: string, name: string): Attrs {
+  const match = new RegExp(`<${name}\\b([^>]*)>`, 'i').exec(html);
+  return match ? parseAttrs(match[1]!) : {};
+}
+
+function textOf(html: string, name: string): string | null {
+  const match = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, 'i').exec(html);
+  return match ? decodeEntities(match[1]!.replace(/\s+/g, ' ').trim()) : null;
+}
+
+function metaContent(metas: Attrs[], key: string): string | null {
+  const found = metas.find((meta) => meta.property === key || meta.name === key);
+  return found?.content ?? null;
+}
+
+/**
+ * The stylesheets a page links, resolved against the URL it was served from,
+ * in document order: what a host fetches before it calls `siteFacts`.
+ */
+export function stylesheetUrls(html: string, finalUrl: string): string[] {
+  const urls: string[] = [];
+  for (const link of tagsOf(html, 'link')) {
+    if (!/\bstylesheet\b/i.test(link.rel ?? '') || !link.href) continue;
+    const url = resolveUrl(link.href, finalUrl);
+    if (url) urls.push(url);
+  }
+  return urls;
+}
+
+// ─── CSS, by a small scanner ─────────────────────────────────────────────────
+
+function stripComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+interface Rule {
+  /** The selector chain, outermost first, at-rules included. */
+  selectors: string[];
+  body: string;
+}
+
+/** Every leaf block as its selector chain and its body. */
+function rulesOf(css: string): Rule[] {
+  const rules: Rule[] = [];
+  const stack: string[] = [];
+  let prelude = '';
+  let body = '';
+  let depth = 0;
+  for (let i = 0; i < css.length; i += 1) {
+    const char = css[i]!;
+    if (char === '{') {
+      stack.push(prelude.trim());
+      prelude = '';
+      body = '';
+      depth += 1;
+    } else if (char === '}') {
+      if (body.trim()) rules.push({ selectors: [...stack], body: body.trim() });
+      stack.pop();
+      depth -= 1;
+      body = '';
+      prelude = '';
+    } else if (depth === 0) {
+      prelude += char;
+    } else {
+      // Inside a block: text before a nested `{` is a prelude, text otherwise is body.
+      const nextOpen = css.indexOf('{', i);
+      const nextClose = css.indexOf('}', i);
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        prelude = css.slice(i, nextOpen);
+        // Declarations before a nested rule belong to the enclosing block.
+        const semicolon = prelude.lastIndexOf(';');
+        if (semicolon !== -1) {
+          body += prelude.slice(0, semicolon + 1);
+          prelude = prelude.slice(semicolon + 1);
+        }
+        i = nextOpen - 1;
+      } else {
+        body = css.slice(i, nextClose);
+        i = nextClose - 1;
+      }
+    }
+  }
+  return rules;
+}
+
+interface Declaration {
+  property: string;
+  value: string;
+}
+
+function declarationsOf(body: string): Declaration[] {
+  const declarations: Declaration[] = [];
+  for (const part of body.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const colon = trimmed.indexOf(':');
+    if (colon === -1) continue;
+    declarations.push({
+      property: trimmed.slice(0, colon).trim(),
+      value: trimmed.slice(colon + 1).trim(),
+    });
+  }
+  return declarations;
+}
+
+const COLOR_FUNCTION = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(/i;
+const HEX = /#[0-9a-f]{3,8}\b/i;
+const NAMED = /\b(?:white|black|transparent|currentcolor)\b/i;
+const TRIPLET =
+  /^\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*$|^\s*\d{1,3}(?:\.\d+)?\s+\d{1,3}(?:\.\d+)?%\s+\d{1,3}(?:\.\d+)?%\s*$/;
+
+function looksLikeColor(value: string): boolean {
+  return HEX.test(value) || COLOR_FUNCTION.test(value) || NAMED.test(value) || TRIPLET.test(value);
+}
+
+function looksLikeColorProperty(name: string, value: string): boolean {
+  return (
+    looksLikeColor(value) ||
+    /color|bg|background|fg|foreground|accent|primary|border|ring|surface|canvas|brand/i.test(name)
+  );
+}
+
+const COLOR_PROPERTIES = new Set([
+  'color',
+  'background',
+  'background-color',
+  'border-color',
+  'border-top-color',
+  'border-bottom-color',
+  'border-left-color',
+  'border-right-color',
+  'outline-color',
+  'fill',
+  'stroke',
+  'box-shadow',
+  'text-decoration-color',
+  'caret-color',
+  'accent-color',
+]);
+
+/** Every colour literal in a value, nested parentheses included: `#00bb95`, `rgb(0 187 149 / .5)`. */
+function colorLiterals(value: string): string[] {
+  const found: string[] = [];
+  for (const match of value.matchAll(/#[0-9a-f]{3,8}\b/gi)) found.push(match[0].toLowerCase());
+  const open = /\b(?:rgba?|hsla?|oklch|oklab|hwb|lab|lch)\(/gi;
+  let match: RegExpExecArray | null;
+  while ((match = open.exec(value)) !== null) {
+    let depth = 0;
+    let end = match.index + match[0].length - 1;
+    for (; end < value.length; end += 1) {
+      if (value[end] === '(') depth += 1;
+      if (value[end] === ')') depth -= 1;
+      if (depth === 0) break;
+    }
+    found.push(
+      value
+        .slice(match.index, end + 1)
+        .toLowerCase()
+        .replace(/\s+/g, ' '),
+    );
+  }
+  return found;
+}
+
+function rank(counts: Map<string, number>, keep: number): Ranked[] {
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, keep)
+    .map(([value, count]) => ({ value, count }));
+}
+
+function count(counts: Map<string, number>, key: string) {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/**
+ * Whether a rule's selector chain applies to the document AS SERVED: at its
+ * root, in the scheme it starts in, on a screen. What the facts then report as
+ * winning is source order among the declarations that apply - which is what
+ * decides between a framework's `:root` default and the site's own `:root`
+ * override loaded after it, the case that matters. Specificity is not
+ * weighed, and a chain this reader cannot parse (a descendant, a pseudo-class,
+ * an unknown at-rule) is taken as not applying at the root.
+ */
+function appliesAsServed(selectors: string[], htmlAttrs: Attrs, bodyAttrs: Attrs): boolean {
+  return selectors.every((member) => {
+    if (member.startsWith('@')) {
+      if (!/^@media\b/.test(member)) return /^@(?:layer|supports)\b/.test(member);
+      if (/prefers-color-scheme\s*:\s*dark/.test(member)) return false;
+      return !/\bprint\b/.test(member) || /\bscreen\b/.test(member);
+    }
+    return member
+      .split(',')
+      .map((alternative) => alternative.trim())
+      .some((alternative) => rootSelectorMatches(alternative, htmlAttrs, bodyAttrs));
+  });
+}
+
+/**
+ * A compound selector for the root or the body - `:root`, `html.dark`,
+ * `body[data-theme=x]`, `[data-md-color-scheme="default"]`, `:not(.light)` -
+ * against the attributes the page was served with.
+ */
+function rootSelectorMatches(selector: string, htmlAttrs: Attrs, bodyAttrs: Attrs): boolean {
+  const head = /^(:root|html|body|\*)/.exec(selector);
+  const rest = head ? selector.slice(head[0].length) : selector;
+  if (!head && rest === '') return false;
+  if (/[\s>+~]/.test(rest)) return false;
+  const parts =
+    rest.match(/\.(?:\\.|[\w-])+|\[[^\]]*\]|:not\([^)]*\)|::?[\w-]+(?:\([^)]*\))?/g) ?? [];
+  if (parts.join('') !== rest) return false;
+  const candidates =
+    head?.[0] === 'body'
+      ? [bodyAttrs]
+      : head && head[0] !== '*'
+        ? [htmlAttrs]
+        : [htmlAttrs, bodyAttrs];
+  return candidates.some((attrs) => parts.every((part) => partMatches(part, attrs)));
+}
+
+function partMatches(part: string, attrs: Attrs): boolean {
+  if (part.startsWith('.')) {
+    const name = part.slice(1).replace(/\\(.)/g, '$1');
+    return (attrs.class ?? '').split(/\s+/).includes(name);
+  }
+  if (part.startsWith('[')) {
+    const match = /^\[\s*([\w-]+)\s*(?:([~|^$*]?=)\s*("[^"]*"|'[^']*'|[^\]\s]+))?\s*\]$/.exec(part);
+    if (!match) return false;
+    const name = match[1]!.toLowerCase();
+    if (!(name in attrs)) return false;
+    if (!match[2]) return true;
+    const wanted = match[3]!.replace(/^["']|["']$/g, '');
+    const actual = attrs[name]!;
+    switch (match[2]) {
+      case '=':
+        return actual === wanted;
+      case '~=':
+        return actual.split(/\s+/).includes(wanted);
+      case '^=':
+        return actual.startsWith(wanted);
+      case '$=':
+        return actual.endsWith(wanted);
+      case '*=':
+        return actual.includes(wanted);
+      case '|=':
+        return actual === wanted || actual.startsWith(`${wanted}-`);
+      default:
+        return false;
+    }
+  }
+  if (part.startsWith(':not(')) {
+    const inner = part.slice(5, -1).trim();
+    const innerParts = inner.match(/\.(?:\\.|[\w-])+|\[[^\]]*\]/g) ?? [];
+    if (innerParts.join('') !== inner) return false;
+    return !innerParts.every((innerPart) => partMatches(innerPart, attrs));
+  }
+  return part === ':root';
+}
+
+interface PropertyEntry {
+  value: string;
+  under: string;
+  applies: boolean;
+}
+
+/** The value a custom property has for the page as served, by the cascade above; null when nothing applies. */
+function asServed(entries: readonly PropertyEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i]!.applies) return entries[i]!.value;
+  }
+  return null;
+}
+
+/** A custom property as the facts report it: what wins as served first, then every declaration. */
+function propertyFacts(name: string, entries: readonly PropertyEntry[]): PropertyFacts {
+  return {
+    name,
+    asServed: asServed(entries),
+    values: entries.map(({ value, under }) => ({ value, under })),
+  };
+}
+
+/** Substitute `var(--x)` from the collected properties, a few levels deep, by the value served. */
+function resolveVars(value: string, properties: Map<string, PropertyEntry[]>, depth = 0): string {
+  if (depth > 4 || !/var\(/.test(value)) return value;
+  const substituted = value.replace(
+    /var\((--[\w-]+)(?:\s*,\s*([^)]*))?\)/g,
+    (whole: string, name: string, fallback: string | undefined) => {
+      const known = properties.get(name);
+      if (known) return asServed(known) ?? known[0]!.value;
+      return fallback ?? whole;
+    },
+  );
+  return substituted === value ? value : resolveVars(substituted, properties, depth + 1);
+}
+
+// ─── The utilities the markup uses, by frequency ─────────────────────────────
+
+const NOT_A_COLOR: Record<string, RegExp> = {
+  text: /^text-(?:xs|sm|base|lg|[2-9]?xl|\[\d|left|center|right|justify|start|end|nowrap|wrap|balance|pretty|ellipsis|clip|top|middle|bottom|baseline|sub|super)$/,
+  bg: /^bg-(?:cover|contain|auto|center|top|bottom|left|right|no-repeat|repeat|fixed|local|scroll|clip|origin|none|blend|linear|radial|conic|\[url|\[image|\[length|\[position|\[size)/,
+  border:
+    /^border-(?:x|y|t|b|l|r|s|e|\d+|none|solid|dashed|dotted|double|hidden|collapse|separate|spacing)(?:-|$)|^border-\[\d/,
+  ring: /^ring-(?:\d+|inset|offset)(?:-|$)|^ring-\[\d/,
+  shadow: /^shadow-(?:xs|sm|md|lg|xl|2xl|none|inner)$|^shadow-\[\d/,
+  outline: /^outline-(?:\d+|none|solid|dashed|dotted|double|offset|hidden)(?:-|$)/,
+  divide: /^divide-(?:x|y|\d+|solid|dashed|dotted|double|none)(?:-|$)/,
+  from: /^from-\d+%$/,
+  via: /^via-\d+%$/,
+  to: /^to-\d+%$/,
+  fill: /^fill-none$/,
+  stroke: /^stroke-\d+$/,
+};
+
+function isColorUtility(cls: string): boolean {
+  const match =
+    /^(?:[a-z-]+:)*((text|bg|border|ring|shadow|outline|divide|from|via|to|fill|stroke|placeholder|decoration|accent|caret)-)/.exec(
+      cls,
+    );
+  if (!match) return false;
+  const bare = cls.replace(/^(?:[a-z-]+:)*/, '');
+  const exclusion = NOT_A_COLOR[match[2]!];
+  return !(exclusion && exclusion.test(bare));
+}
+
+/** The colour a utility paints, read from the stylesheets: `text-accent-teal` -> `#00bb95`. */
+function resolveUtility(
+  cls: string,
+  utilityRules: Map<string, Declaration[]>,
+  properties: Map<string, PropertyEntry[]>,
+): string | null {
+  const bare = cls.replace(/^(?:[a-z-]+:)*/, '');
+  const arbitrary = /\[(#[0-9a-f]{3,8}|(?:rgba?|hsla?|oklch|oklab|color)\([^\]]*\))\]/i.exec(bare);
+  if (arbitrary) return arbitrary[1]!;
+  const rule = utilityRules.get(bare) ?? utilityRules.get(bare.replace(/\/\d+$/, ''));
+  if (!rule) return null;
+  const declaration = rule.find((entry) => COLOR_PROPERTIES.has(entry.property));
+  return declaration ? resolveVars(declaration.value, properties) : null;
+}
+
+// ─── The reading ─────────────────────────────────────────────────────────────
+
+export function siteFacts(page: FetchedPage): SiteFacts {
+  const { html } = page;
+  const base = page.finalUrl;
+  const metas = tagsOf(html, 'meta');
+  const links = tagsOf(html, 'link');
+  const htmlAttrs = firstTag(html, 'html');
+  const bodyAttrs = firstTag(html, 'body');
+
+  const inline = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(
+    (match) => match[1]!,
+  );
+  const css = stripComments(
+    [...page.stylesheets.map((sheet) => ('css' in sheet ? sheet.css : '')), ...inline].join('\n'),
+  );
+  const rules = rulesOf(css);
+
+  // Custom properties, with the selector chain they are declared under. A
+  // site with two schemes declares the same name twice, under `:root` and
+  // under `.dark` (or a `[data-…]` attribute), and the chain is what tells
+  // them apart.
+  const properties = new Map<string, PropertyEntry[]>();
+  const literals = new Map<string, number>();
+  const fontFamilies = new Map<string, number>();
+  const fontFaces = new Set<string>();
+  const radii = new Map<string, number>();
+  const colorSchemes = new Map<string, number>();
+  const utilityRules = new Map<string, Declaration[]>();
+  let darkSelectors = 0;
+  let prefersDark = 0;
+  for (const rule of rules) {
+    const chain = rule.selectors.join(' ');
+    if (/\.dark\b|\[data-[\w-]*(?:theme|scheme|mode)[\w-]*=/.test(chain)) darkSelectors += 1;
+    if (/prefers-color-scheme\s*:\s*dark/.test(chain)) prefersDark += 1;
+    const declarations = declarationsOf(rule.body);
+    const own = rule.selectors[rule.selectors.length - 1] ?? '';
+    const single = /^\.((?:\\.|[\w-])+)(?::{1,2}[\w-]+(?:\([^)]*\))?)?$/.exec(own);
+    if (single) {
+      // A single-class rule: a utility, keyed by its unescaped class name.
+      const name = single[1]!.replace(/\\(.)/g, '$1');
+      if (!utilityRules.has(name)) utilityRules.set(name, declarations);
+    }
+    for (const { property, value } of declarations) {
+      if (property.startsWith('--')) {
+        // Tailwind's own internals (`--tw-ring-color`, `--tw-shadow`, the prose
+        // palette) are the framework's, not the site's.
+        if (property.startsWith('--tw-')) continue;
+        if (!looksLikeColorProperty(property, value)) continue;
+        let entries = properties.get(property);
+        if (!entries) {
+          entries = [];
+          properties.set(property, entries);
+        }
+        entries.push({
+          value,
+          under: chain || ':root',
+          applies: appliesAsServed(rule.selectors, htmlAttrs, bodyAttrs),
+        });
+        continue;
+      }
+      if (property === 'font-family') count(fontFamilies, value.replace(/\s+/g, ' '));
+      if (property === 'border-radius') count(radii, value);
+      if (property === 'color-scheme') count(colorSchemes, `${value} @ ${chain || ':root'}`);
+      if (
+        rule.selectors.some((selector) => /^@font-face/.test(selector)) &&
+        property === 'font-family'
+      ) {
+        fontFaces.add(value.replace(/["']/g, ''));
+      }
+      if (COLOR_PROPERTIES.has(property)) {
+        for (const literal of colorLiterals(resolveVars(value, properties)))
+          count(literals, literal);
+      }
+    }
+  }
+
+  // The classes the markup carries, by frequency, colour utilities only.
+  const utilities = new Map<string, number>();
+  const fontUtilities = new Map<string, number>();
+  const radiusUtilities = new Map<string, number>();
+  for (const match of html.matchAll(/\bclass(?:Name)?="([^"]*)"/g)) {
+    for (const cls of match[1]!.split(/\s+/).filter(Boolean)) {
+      const bare = cls.replace(/^(?:[a-z-]+:)*/, '');
+      if (isColorUtility(cls)) count(utilities, bare);
+      if (
+        /^font-(?!(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[\d|\d))/.test(
+          bare,
+        )
+      )
+        count(fontUtilities, bare);
+      if (/^rounded(?:-|$)/.test(bare)) count(radiusUtilities, bare);
+    }
+  }
+
+  const webfontLinks = links
+    .map((link) => link.href)
+    .filter(
+      (href): href is string =>
+        !!href &&
+        /fonts\.googleapis\.com|fonts\.bunny\.net|use\.typekit\.net|fonts\.cdnfonts\.com/.test(
+          href,
+        ),
+    );
+  const googleFamilies = webfontLinks.flatMap((href) =>
+    [...href.matchAll(/family=([^&:]+)/g)].map((match) =>
+      decodeURIComponent(match[1]!).replace(/\+/g, ' '),
+    ),
+  );
+  const fontPreloads = links
+    .filter((link) => /\bpreload\b/i.test(link.rel ?? '') && link.as === 'font' && link.href)
+    .map((link) => resolveUrl(link.href!, base))
+    .filter((url): url is string => url !== null);
+
+  // Logo candidates: an image whose alt, source or class says so, or whose alt
+  // is the site's name; the icons; the social image. A Next.js image URL is
+  // decoded to the original file too, since that is the one a page can load.
+  const siteName =
+    metaContent(metas, 'og:site_name') ?? metaContent(metas, 'application-name') ?? null;
+  const logos: LogoCandidate[] = [];
+  const seen = new Set<string>();
+  const addLogo = (candidate: LogoCandidate) => {
+    if (!candidate.url || seen.has(candidate.url)) return;
+    seen.add(candidate.url);
+    logos.push(candidate);
+  };
+  for (const img of tagsOf(html, 'img')) {
+    const src = img.src ?? img['data-src'] ?? null;
+    if (!src) continue;
+    const alt = img.alt ?? '';
+    const says = /logo|brand|wordmark/i.test(`${alt} ${src} ${img.class ?? ''}`);
+    const named = siteName ? alt.toLowerCase().startsWith(siteName.toLowerCase()) : false;
+    if (!says && !named) continue;
+    const candidate: LogoCandidate = {
+      url: resolveUrl(src, base),
+      alt,
+      width: img.width ?? null,
+      height: img.height ?? null,
+      class: img.class ?? null,
+    };
+    const nextImage = /\/_next\/image\?(?:.*&)?url=([^&]+)/.exec(src);
+    if (nextImage) candidate.original = resolveUrl(decodeURIComponent(nextImage[1]!), base);
+    addLogo(candidate);
+  }
+  for (const link of links) {
+    if (!/\b(?:icon|apple-touch-icon|mask-icon)\b/i.test(link.rel ?? '') || !link.href) continue;
+    addLogo({
+      url: resolveUrl(link.href, base),
+      rel: link.rel!,
+      sizes: link.sizes ?? null,
+      type: link.type ?? null,
+    });
+  }
+  const ogImage = metaContent(metas, 'og:image');
+  if (ogImage) addLogo({ url: resolveUrl(ogImage, base), rel: 'og:image' });
+  const headerSvgs = [...html.matchAll(/<(?:header|nav)\b[\s\S]*?<\/(?:header|nav)>/gi)]
+    .flatMap((match) =>
+      [...match[0].matchAll(/<svg\b([^>]*)>/gi)].map((svg) => parseAttrs(svg[1]!)),
+    )
+    .map((attrs) => ({
+      ariaLabel: attrs['aria-label'] ?? null,
+      class: attrs.class ?? null,
+      viewBox: attrs.viewbox ?? null,
+    }));
+
+  const themeColors = metas
+    .filter((meta) => meta.name === 'theme-color')
+    .map((meta) => ({ content: meta.content ?? null, media: meta.media ?? null }));
+
+  const dataAttributes = (attrs: Attrs) =>
+    Object.fromEntries(Object.entries(attrs).filter(([key]) => key.startsWith('data-')));
+
+  return {
+    url: page.url,
+    finalUrl: base,
+    fetchedAt: page.fetchedAt,
+    site: {
+      name: siteName,
+      title: textOf(html, 'title'),
+      description: metaContent(metas, 'description') ?? metaContent(metas, 'og:description'),
+      lang: htmlAttrs.lang ?? null,
+    },
+    scheme: {
+      htmlClass: htmlAttrs.class ?? null,
+      htmlDataAttributes: dataAttributes(htmlAttrs),
+      bodyClass: bodyAttrs.class ?? null,
+      bodyDataAttributes: dataAttributes(bodyAttrs),
+      themeColorMetas: themeColors,
+      colorSchemeDeclarations: rank(colorSchemes, 8).map((entry) => entry.value),
+      rulesUnderADarkSelector: darkSelectors,
+      rulesUnderPrefersDark: prefersDark,
+    },
+    stylesheets: page.stylesheets.map((sheet) =>
+      'css' in sheet ? { url: sheet.url, bytes: sheet.css.length } : sheet,
+    ),
+    inlineStyleBlocks: inline.length,
+    colors: {
+      customProperties: [...properties.entries()]
+        .slice(0, KEEP.properties)
+        .map(([name, values]) => propertyFacts(name, values)),
+      literalsByFrequency: rank(literals, KEEP.literals),
+      utilitiesByFrequency: rank(utilities, KEEP.utilities).map((entry) => ({
+        ...entry,
+        resolves: resolveUtility(entry.value, utilityRules, properties),
+      })),
+    },
+    typography: {
+      fontFamiliesByFrequency: rank(fontFamilies, KEEP.fontFamilies),
+      fontFaces: [...fontFaces],
+      webfontLinks,
+      googleFamilies: [...new Set(googleFamilies)],
+      fontPreloads,
+      utilitiesByFrequency: rank(fontUtilities, KEEP.fontUtilities),
+    },
+    shape: {
+      radiiByFrequency: rank(radii, KEEP.radii),
+      utilitiesByFrequency: rank(radiusUtilities, KEEP.radiusUtilities),
+      radiusProperties: [...properties.entries()]
+        .filter(([name]) => /radius/i.test(name))
+        .map(([name, values]) => propertyFacts(name, values)),
+    },
+    logos: { candidates: logos.slice(0, KEEP.logos), headerSvgs: headerSvgs.slice(0, 6) },
+  };
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import type { BrandManifest } from './manifest';
+import type { BrandManifest } from '../brand/manifest';
 
 /**
  * The manifest, handed down to the brand components: the app bar reads the

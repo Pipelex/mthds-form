@@ -1,0 +1,160 @@
+import { describe, expect, it } from 'vitest';
+import {
+  type BrandTokens,
+  colorHex,
+  contrastRatio,
+  resolveColor,
+  validateBrandTokens,
+} from '../tokens';
+import { corpusSource } from './corpus';
+
+/**
+ * The validator's cases. Each is a way a token file can be wrong that a
+ * standard DTCG tool lets through - Terrazzo 2.7.1 turned an unparseable string
+ * colour into black, crashed on a hex with no components and on a colour
+ * outside sRGB, and checked contrast in the light mode only - and the reason
+ * the contract is held here rather than left to one.
+ */
+
+const base = (): BrandTokens =>
+  structuredClone(corpusSource('pipelex', 'pipelex-method--claude-4.8-opus').tokens) as BrandTokens;
+
+const problemsOf = (tokens: unknown) => {
+  const result = validateBrandTokens(tokens);
+  return result.ok ? [] : result.problems;
+};
+
+describe('the token validator', () => {
+  it('accepts a committed brand', () => {
+    expect(problemsOf(base())).toEqual([]);
+  });
+
+  it('refuses a string colour, naming its path', () => {
+    const tokens = base();
+    (tokens.color.background as { $value: unknown }).$value = 'not a colour';
+    expect(
+      problemsOf(tokens).some((problem) => problem.startsWith('color.background.$value')),
+    ).toBe(true);
+  });
+
+  it('refuses a colour outside sRGB', () => {
+    const tokens = base();
+    (tokens.color.primary as { $value: unknown }).$value = {
+      colorSpace: 'display-p3',
+      components: [0, 0.73, 0.58],
+      alpha: 1,
+    };
+    expect(problemsOf(tokens).join('\n')).toMatch(/color\.primary\.\$value/);
+  });
+
+  it('refuses a token the contract does not name', () => {
+    const tokens = base();
+    (tokens.color as Record<string, unknown>).tertiary = tokens.color.primary;
+    expect(problemsOf(tokens).join('\n')).toMatch(/tertiary/);
+  });
+
+  it('refuses a missing token', () => {
+    const tokens = base();
+    delete (tokens.color as Record<string, unknown>).ring;
+    expect(problemsOf(tokens).join('\n')).toMatch(/color\.ring/);
+  });
+
+  it('refuses a token with no description', () => {
+    const tokens = base();
+    tokens.radius.base.$description = '';
+    expect(problemsOf(tokens).join('\n')).toMatch(/radius\.base\.\$description/);
+  });
+
+  it('refuses a mode other than dark', () => {
+    const tokens = base();
+    (tokens.color.primary.$extensions!.mode as Record<string, unknown>).light =
+      tokens.color.primary.$value;
+    expect(problemsOf(tokens).join('\n')).toMatch(/mode/);
+  });
+
+  it('accepts an alias with no dark value, which stands for both modes', () => {
+    const tokens = base();
+    tokens.color['card-foreground'] = {
+      $value: '{color.foreground}',
+      $description: 'Text on a card: the page ink, in both modes.',
+    };
+    const result = validateBrandTokens(tokens);
+    expect(result.ok ? [] : result.problems).toEqual([]);
+    if (!result.ok) throw new Error('unreachable');
+    expect(resolveColor(result.tokens, 'card-foreground', 'dark')).toEqual(
+      resolveColor(result.tokens, 'foreground', 'dark'),
+    );
+  });
+
+  it('refuses a colour with no dark value: only an alias stands for both modes', () => {
+    const tokens = base();
+    delete (tokens.color.primary as { $extensions?: unknown }).$extensions;
+    expect(problemsOf(tokens).join('\n')).toMatch(/color\.primary\.\$extensions/);
+  });
+
+  it('refuses an alias cycle', () => {
+    const tokens = base();
+    tokens.color.card.$value = '{color.popover}';
+    tokens.color.popover.$value = '{color.card}';
+    expect(problemsOf(tokens).join('\n')).toMatch(/alias cycle/);
+  });
+
+  it('refuses an alias to a token the contract has no colour for', () => {
+    const tokens = base();
+    tokens.color.ring.$value = '{color.tertiary}';
+    expect(problemsOf(tokens).join('\n')).toMatch(/tertiary/);
+  });
+
+  it('refuses a hex that disagrees with its components', () => {
+    const tokens = base();
+    tokens.color.primary.$value = {
+      colorSpace: 'srgb',
+      components: [0, 0.7333, 0.5843],
+      alpha: 1,
+      hex: '#ff0000',
+    };
+    expect(problemsOf(tokens).join('\n')).toMatch(/hex #ff0000 does not agree/);
+  });
+
+  it('refuses a pair below AA in the dark mode as well as in the light one', () => {
+    const tokens = base();
+    tokens.color['muted-foreground'].$extensions!.mode.dark = {
+      colorSpace: 'srgb',
+      components: [0.2, 0.2, 0.2],
+      alpha: 1,
+    };
+    expect(problemsOf(tokens).join('\n')).toMatch(
+      /color\.muted-foreground on color\.background \(dark\): contrast/,
+    );
+  });
+
+  it('reports every problem at once', () => {
+    const tokens = base();
+    tokens.color.ring.$value = '{color.tertiary}';
+    tokens.color.card.$value = '{color.popover}';
+    tokens.color.popover.$value = '{color.card}';
+    expect(problemsOf(tokens).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('the colour arithmetic', () => {
+  const black = {
+    colorSpace: 'srgb' as const,
+    components: [0, 0, 0] as [number, number, number],
+    alpha: 1,
+  };
+  const white = {
+    colorSpace: 'srgb' as const,
+    components: [1, 1, 1] as [number, number, number],
+    alpha: 1,
+  };
+
+  it('measures WCAG contrast', () => {
+    expect(contrastRatio(black, white)).toBeCloseTo(21, 5);
+    expect(contrastRatio(white, white)).toBe(1);
+  });
+
+  it('writes a hex without the alpha', () => {
+    expect(colorHex({ ...white, alpha: 0.5 })).toBe('#ffffff');
+  });
+});
