@@ -351,3 +351,37 @@ describe('a file input the page delegates to the kernel', () => {
     expect(screen.queryByText(DEFAULT_FIELD_STRINGS.uploadUnavailable)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A closed `Collapsible` shows its title and nothing else of what it holds, so
+ * the line that says when to open it has to live in the summary: inside the
+ * body it is read only by someone who already opened it.
+ */
+describe('a closed Collapsible', () => {
+  it('shows its description beside its title, in the summary, while closed', () => {
+    const FOLDED: Spec = {
+      root: 'fold',
+      elements: {
+        fold: {
+          type: 'Collapsible',
+          props: {
+            title: 'Add background',
+            description: 'Never answered from or cited.',
+            defaultOpen: false,
+          },
+          children: ['inside'],
+        },
+        inside: { type: 'Text', props: { text: 'Held inside.' }, children: [] },
+      },
+    };
+    const { container } = render(
+      <GenerativePage spec={FOLDED} store={createStateStore({})} scope={{}} />,
+    );
+    const details = container.querySelector('details');
+    expect(details).not.toHaveAttribute('open');
+    const summary = details?.querySelector('summary');
+    expect(summary).toHaveTextContent('Add background');
+    expect(summary).toHaveTextContent('Never answered from or cited.');
+    expect(summary).not.toHaveTextContent('Held inside.');
+  });
+});

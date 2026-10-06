@@ -483,7 +483,7 @@ export function sketchToSpec(sketch: PageSketch, fields: readonly RunField[]): S
       case 'Fold':
         return add(keyFor(`fold-${words}`), {
           type: 'Collapsible',
-          props: { title: words, defaultOpen: false },
+          props: { title: words, ...(line ? { description: line } : {}), defaultOpen: false },
           children: children(),
         });
       case 'Steps':

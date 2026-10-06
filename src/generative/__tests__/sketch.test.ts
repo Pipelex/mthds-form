@@ -157,6 +157,26 @@ describe('a well-formed outline', () => {
     expect(fold?.children).toHaveLength(1);
     expect(spec.elements[fold!.children![0]!]?.props.path).toBe('/inputs/briefing_date');
   });
+
+  it("shows a Fold's line under its title, where it stays in view while folded", () => {
+    const lined = sketchToSpec(
+      sketch([
+        ...columnPage.blocks.slice(0, 2),
+        block(1, 'Fold', 'When was it?', "only if the deck doesn't say"),
+        ...columnPage.blocks.slice(3),
+      ]),
+      fields,
+    );
+    if (!lined.ok) throw new Error(lined.problems.join('\n'));
+    const fold = Object.values(lined.spec.elements).find(
+      (element) => element.type === 'Collapsible',
+    );
+    expect(fold?.props).toMatchObject({
+      title: 'When was it?',
+      description: "Only if the deck doesn't say",
+    });
+    expect(validateAgainstCatalog(lined.spec, catalog).ok).toBe(true);
+  });
 });
 
 describe('a Side', () => {

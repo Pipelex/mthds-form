@@ -219,7 +219,13 @@ export function Separator({
 export function Collapsible({
   props,
   children,
-}: BaseComponentProps<{ title: string; defaultOpen?: boolean | null }>) {
+}: BaseComponentProps<{
+  title: string;
+  description?: string | null;
+  defaultOpen?: boolean | null;
+}>) {
+  // The description is part of the summary, so it stays in view while the
+  // section is closed, which is when a reader decides whether to open it.
   return (
     <details
       className="rounded-md border border-border"
@@ -228,6 +234,11 @@ export function Collapsible({
     >
       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium select-none">
         {props.title}
+        {props.description ? (
+          <span className="mt-0.5 block font-normal text-muted-foreground">
+            {props.description}
+          </span>
+        ) : null}
       </summary>
       <div className="border-t border-border px-4 py-3">{children}</div>
     </details>

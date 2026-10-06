@@ -75,10 +75,12 @@ export const shadcnComponentDefinitions = {
   Collapsible: {
     props: z.object({
       title: z.string(),
+      description: z.string().nullable(),
       defaultOpen: z.boolean().nullable(),
     }),
     slots: ['default'],
-    description: 'Collapsible section with trigger. Children render inside.',
+    description:
+      'Collapsible section with trigger. The description is a short line under the title that stays visible while the section is closed: say when to open it. Children render inside.',
   },
   // ── Content ───────────────────────────────────────────────────────────────
   Heading: {

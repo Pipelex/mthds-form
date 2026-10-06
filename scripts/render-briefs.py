@@ -84,7 +84,7 @@ def main() -> int:
         print("stdin must carry a JSON object keyed by pipe_ref", file=sys.stderr)
         return 2
 
-    make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(needs_inference=False)
     rendered = asyncio.run(render_all(bundle_dir, briefs))
     json.dump(rendered, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
