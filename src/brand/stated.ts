@@ -52,9 +52,17 @@ export function statedFactProblems(
     const accent = stated.accent?.[mode];
     if (!accent) continue;
     const primary = resolveColor(tokens, 'primary', mode);
-    if (primary && !colorIsHex(primary, accent)) {
+    if (!primary) continue;
+    if (!colorIsHex(primary, accent)) {
       problems.push(
         `tokens.json: color.primary (${mode}) resolves to ${colorHex(primary)}, but the accent for ${mode} mode was stated as ${accent}`,
+      );
+    }
+    // A hex carries no alpha, so the components alone would let a primary
+    // nobody can see honour the accent: a stated accent is an opaque colour.
+    if (primary.alpha < 1) {
+      problems.push(
+        `tokens.json: color.primary (${mode}) has alpha ${primary.alpha}, but the accent for ${mode} mode was stated as the opaque ${accent}, so it must be opaque (alpha 1)`,
       );
     }
   }

@@ -92,6 +92,24 @@ describe('the stated facts', () => {
     expect(problems[0]).toContain('color.primary (light)');
   });
 
+  it('refuses a translucent primary, though its components are the stated accent', () => {
+    // A hex carries no alpha: compared by its components alone, a primary
+    // nobody can see once honoured the accent and compiled to `/ 0`.
+    const tokens = structuredClone(source.tokens) as {
+      color: { primary: { $value: { alpha: number } } };
+    };
+    tokens.color.primary.$value.alpha = 0;
+    expect(
+      problemsOf({
+        ...source,
+        tokens,
+        provenance: { ...(source.provenance as object), stated: { accent: { light: '#1a1a1a' } } },
+      }),
+    ).toEqual([
+      'tokens.json: color.primary (light) has alpha 0, but the accent for light mode was stated as the opaque #1a1a1a, so it must be opaque (alpha 1)',
+    ]);
+  });
+
   it('refuses an accent stated for no mode in particular', () => {
     const problems = problemsWith({ accent: '#123456' });
     expect(problems.some((problem) => problem.startsWith('provenance.json: stated.accent'))).toBe(

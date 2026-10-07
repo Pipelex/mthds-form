@@ -75,7 +75,7 @@ Some things a site does not show, and no reading can supply them: the accent of 
 { "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" }, "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" } }
 ```
 
-A stated fact outranks every reading. `withStatedFacts(facts, stated)` places it in the facts a producer reads, right after the site's identity and ahead of every reading. The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must resolve to the stated accent in each mode it was stated for, and the manifest must carry each stated logo. Only what was stated is checked.
+A stated fact outranks every reading. `withStatedFacts(facts, stated)` places it in the facts a producer reads, right after the site's identity and ahead of every reading. The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must resolve to the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
 
 ## Compiling
 
