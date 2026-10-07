@@ -65,6 +65,8 @@ const LIMITS = {
   varDepth: 16,
   /** How many characters `var()` substitution may add over the whole reading. */
   substitution: 1_000_000,
+  /** A root attribute longer than this many characters is not searched for a substring (`*=`). */
+  attribute: 10_000,
 };
 
 /** A page as the host fetched it. */
@@ -90,9 +92,11 @@ export interface Ranked {
 export interface PropertyFacts {
   name: string;
   /**
-   * The value that wins for the page as served, among the declarations that
-   * apply at the root: an important one over a normal one, then by cascade
-   * layer, then by source order. Null when none applies.
+   * The value the page's content sees as served, among the declarations that
+   * apply at the root: one set on every element over one set on the body over
+   * one set on the root, since a custom property inherits; then an important
+   * one over a normal one, then by cascade layer, then by specificity, then by
+   * source order. Null when none applies.
    */
   asServed: string | null;
   /**
@@ -166,6 +170,37 @@ export interface SiteFacts {
 
 type Attrs = Record<string, string>;
 
+/**
+ * The attribute an element was served with, or undefined. Only the element's
+ * own: a selector naming `constructor` or `__proto__` must find nothing there,
+ * never a function.
+ */
+function attribute(attrs: Attrs, name: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : undefined;
+}
+
+/**
+ * An attribute's whitespace-separated words, split once per element and kept.
+ * A page's root carries one class list and every selector in its sheets asks
+ * about it, so splitting it per selector would cost the list's length times
+ * the sheets'.
+ */
+const WORDS = new WeakMap<Attrs, Map<string, ReadonlySet<string>>>();
+
+function wordsOf(attrs: Attrs, name: string): ReadonlySet<string> {
+  let byName = WORDS.get(attrs);
+  if (!byName) {
+    byName = new Map();
+    WORDS.set(attrs, byName);
+  }
+  let words = byName.get(name);
+  if (!words) {
+    words = new Set((attribute(attrs, name) ?? '').split(/\s+/).filter(Boolean));
+    byName.set(name, words);
+  }
+  return words;
+}
+
 /** A percent-encoded value from the markup, or null when its escapes are malformed. */
 function decoded(text: string): string | null {
   try {
@@ -197,12 +232,17 @@ function decodeEntities(text: string): string {
   return text.replace(/&(amp|quot|#39|lt|gt);/g, (_entity, name: string) => ENTITIES[name]!);
 }
 
+/**
+ * A tag's attributes, a boolean one (`disabled`) as the empty string, as HTML
+ * reads it. The record has no prototype, so it holds what the markup set and
+ * nothing else.
+ */
 function parseAttrs(text: string): Attrs {
-  const attrs: Attrs = {};
+  const attrs = Object.create(null) as Attrs;
   // A name starts where no name character precedes it, so a long run of them
   // is tried once rather than from each of its characters.
   for (const match of text.matchAll(
-    /(?<![\w:.-])([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g,
+    /(?<![\w:.-])([a-zA-Z_:][\w:.-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g,
   )) {
     attrs[match[1]!.toLowerCase()] = decodeEntities(match[2] ?? match[3] ?? match[4] ?? '');
   }
@@ -223,7 +263,7 @@ function tagsOf(html: string, name: string, limit = Number.POSITIVE_INFINITY): A
 }
 
 function firstTag(html: string, name: string): Attrs {
-  return tagsOf(html, name, 1)[0] ?? {};
+  return tagsOf(html, name, 1)[0] ?? parseAttrs('');
 }
 
 /** The text of the first `<name>` element, or null when it is never closed. */
@@ -249,8 +289,8 @@ function metaContent(metas: Attrs[], key: string): string | null {
   return found?.content ?? null;
 }
 
-/** A `<link>` tag's attributes, or a `<style>` element's text. */
-type LinkOrStyle = { link: Attrs } | { style: string };
+/** A `<link>` tag's attributes, or a `<style>` element's text and the media it applies under. */
+type LinkOrStyle = { link: Attrs } | { style: string; media: string | null };
 
 /**
  * The page's `<link>` tags and `<style>` texts in document order, as a browser
@@ -279,7 +319,10 @@ function linksAndStyles(html: string): LinkOrStyle[] {
     const close = ends[name as 'style' | 'script'];
     close.lastIndex = tagEnd + 1;
     const closed = close.exec(html);
-    if (name === 'style') found.push({ style: html.slice(tagEnd + 1, closed?.index) });
+    if (name === 'style') {
+      const media = mediaOf(parseAttrs(html.slice(open.lastIndex, tagEnd)));
+      found.push({ style: html.slice(tagEnd + 1, closed?.index), media });
+    }
     if (!closed) break;
     open.lastIndex = close.lastIndex;
   }
@@ -308,18 +351,47 @@ function linkedStylesheet(link: Attrs, base: string): string | null {
 }
 
 /**
+ * Whether a linked sheet is in the page's cascade at all. A disabled one is
+ * not, and neither is an alternate one, which a browser offers its reader
+ * rather than applies.
+ */
+function inCascade(link: Attrs): boolean {
+  return attribute(link, 'disabled') === undefined && !/\balternate\b/i.test(link.rel ?? '');
+}
+
+/**
+ * The media a sheet applies under, or null when it applies on every medium. A
+ * sheet linked as `print` that switches itself on once loaded
+ * (`onload="this.media='all'"`) is the usual way to load CSS without blocking
+ * the page, and applies everywhere.
+ */
+function mediaOf(attrs: Attrs): string | null {
+  const media = attribute(attrs, 'media')?.trim();
+  if (!media || /^all$/i.test(media)) return null;
+  if (/\bmedia\b/.test(attribute(attrs, 'onload') ?? '')) return null;
+  return media;
+}
+
+/** A sheet's text, and the media its `<link>` or `<style>` applies it under. */
+interface SheetText {
+  css: string;
+  media: string | null;
+}
+
+/**
  * The page's CSS in document order: each linked sheet where its `<link>` is,
  * each `<style>` block where it is. Source order decides which of two equal
  * rules wins, so an inline block that precedes a link must be read before it.
  * A link takes the sheet the host fetched for its URL, and a sheet the markup
- * does not account for is read last. Each text is a sheet of its own, as in a
+ * does not account for is read last. A sheet out of the cascade (disabled, or
+ * alternate) is taken and not read. Each text is a sheet of its own, as in a
  * browser: what one leaves open closes at its end.
  */
 function cssInDocumentOrder(
   page: FetchedPage,
   markup: readonly LinkOrStyle[],
-): { texts: string[]; inlineBlocks: number } {
-  const texts: string[] = [];
+): { texts: SheetText[]; inlineBlocks: number } {
+  const texts: SheetText[] = [];
   let inlineBlocks = 0;
   // The sheets fetched for each URL, in order, and how many of them links have taken.
   const byUrl = new Map<string, { indices: number[]; taken: number }>();
@@ -329,36 +401,73 @@ function cssInDocumentOrder(
     else byUrl.set(sheet.url, { indices: [index], taken: 0 });
   });
   const read = new Set<number>();
-  const sheetText = (index: number) => {
+  const sheetText = (index: number, link: Attrs | null) => {
     const sheet = page.stylesheets[index]!;
     read.add(index);
-    if ('css' in sheet) texts.push(sheet.css);
+    if (!('css' in sheet) || (link !== null && !inCascade(link))) return;
+    texts.push({ css: sheet.css, media: link === null ? null : mediaOf(link) });
   };
   for (const item of markup) {
     if ('style' in item) {
-      texts.push(item.style);
+      texts.push({ css: item.style, media: item.media });
       inlineBlocks += 1;
       continue;
     }
     const url = linkedStylesheet(item.link, page.finalUrl);
     const queue = url === null ? undefined : byUrl.get(url);
-    if (queue && queue.taken < queue.indices.length) sheetText(queue.indices[queue.taken++]!);
+    if (queue && queue.taken < queue.indices.length) {
+      sheetText(queue.indices[queue.taken++]!, item.link);
+    }
   }
   page.stylesheets.forEach((_sheet, index) => {
-    if (!read.has(index)) sheetText(index);
+    if (!read.has(index)) sheetText(index, null);
   });
   return { texts, inlineBlocks };
 }
 
 // ─── CSS, by a small scanner ─────────────────────────────────────────────────
 
+/**
+ * What a declaration that applies at the root is set on, in the order the
+ * page's content inherits from: the root, then the body, then every element.
+ * A custom property inherits, so the content sees the body's value over the
+ * root's whatever either's cascade, and its own (`*`) over both.
+ */
+const ON_ROOT = 0;
+const ON_BODY = 1;
+const ON_EVERY = 2;
+
+/**
+ * A selector's specificity, as far as one matching at the root can carry: its
+ * classes, attributes and pseudo-classes, then its types. An id is never
+ * matched here, so it has no column.
+ */
+type Specificity = readonly [classes: number, types: number];
+
+/** Where a rule applies at the root: what it is set on, and how specific the selector that matched it is. */
+interface RootMatch {
+  on: number;
+  specificity: Specificity;
+}
+
+const NO_SPECIFICITY: Specificity = [0, 0];
+
+function compareSpecificity(a: Specificity, b: Specificity): number {
+  return a[0] - b[0] || a[1] - b[1];
+}
+
+/** Positive when match `a` reaches the content over `b`: set nearer it, then more specific. */
+function compareMatches(a: RootMatch, b: RootMatch): number {
+  return a.on - b.on || compareSpecificity(a.specificity, b.specificity);
+}
+
 /** What a block contributes to every rule inside it, worked out once, when it opens. */
 interface Block {
   /** The selector chain, outermost first, at-rules included, cut at `LIMITS.under`. */
   under: string;
   cut: boolean;
-  /** Whether the chain applies to the document as served. */
-  applies: boolean;
+  /** Where the chain applies at the document's root as served, or null when it does not. */
+  match: RootMatch | null;
   dark: boolean;
   prefersDark: boolean;
   fontFace: boolean;
@@ -373,7 +482,7 @@ interface Block {
 const ROOT: Block = {
   under: '',
   cut: false,
-  applies: true,
+  match: { on: ON_ROOT, specificity: NO_SPECIFICITY },
   dark: false,
   prefersDark: false,
   fontFace: false,
@@ -439,9 +548,13 @@ class StylesheetScan {
     private readonly bodyAttrs: Attrs,
   ) {}
 
-  read(css: string): void {
+  /** Reads one sheet, under the media its `<link>` or `<style>` names, when it names one. */
+  read(css: string, media: string | null = null): void {
     const stack: Block[] = [];
-    const current = () => stack[stack.length - 1] ?? ROOT;
+    // A sheet applied under a medium is read as if a `@media` block held it,
+    // and a stray `}` cannot close that block, since it is not on the stack.
+    const base = media === null ? ROOT : this.open(ROOT, `@media ${media}`);
+    const current = () => stack[stack.length - 1] ?? base;
     let declarations: string[] = [];
     // The text since the last `{`, `}` or `;`, comments removed, and where the part not yet added to it starts.
     let pending = '';
@@ -526,7 +639,10 @@ class StylesheetScan {
     return {
       under: parent.cut ? parent.under : cut ? `${joined.slice(0, LIMITS.under)}…` : joined,
       cut,
-      applies: valid && parent.applies && memberApplies(prelude, this.htmlAttrs, this.bodyAttrs),
+      match:
+        valid && parent.match !== null
+          ? matchWithin(parent.match, prelude, this.htmlAttrs, this.bodyAttrs)
+          : null,
       dark: parent.dark || namesADarkScheme(prelude),
       prefersDark: parent.prefersDark || PREFERS_DARK.test(prelude),
       fontFace: parent.fontFace || prelude.startsWith('@font-face'),
@@ -587,28 +703,81 @@ function declarationOf(text: string): Declaration | null {
   };
 }
 
+/** Whether an at-rule holds for the document AS SERVED: on a screen, in the scheme it starts in. */
+function atRuleHolds(member: string): boolean {
+  if (!/^@media\b/.test(member)) return /^@(?:layer|supports)\b/.test(member);
+  if (PREFERS_DARK.test(member)) return false;
+  return !/\bprint\b/.test(member) || /\bscreen\b/.test(member);
+}
+
 /**
- * Whether a member of a rule's selector chain applies to the document AS
- * SERVED: at its root, in the scheme it starts in, on a screen. A chain this
- * reader cannot parse (a descendant, a pseudo-class, an unknown at-rule) is
- * taken as not applying at the root.
+ * Where a member of a rule's selector chain applies at the document's root as
+ * served, given where its parent applies, or null when it does not: an
+ * at-rule that holds keeps its parent's place, and a style rule takes the
+ * strongest of its selectors that match, adding its parent's specificity as
+ * nesting does. A selector this reader cannot parse (a descendant, most
+ * pseudo-classes) is taken as not applying at the root.
  */
-function memberApplies(member: string, htmlAttrs: Attrs, bodyAttrs: Attrs): boolean {
-  if (member.startsWith('@')) {
-    if (!/^@media\b/.test(member)) return /^@(?:layer|supports)\b/.test(member);
-    if (PREFERS_DARK.test(member)) return false;
-    return !/\bprint\b/.test(member) || /\bscreen\b/.test(member);
+function matchWithin(
+  parent: RootMatch,
+  member: string,
+  htmlAttrs: Attrs,
+  bodyAttrs: Attrs,
+): RootMatch | null {
+  if (member.startsWith('@')) return atRuleHolds(member) ? parent : null;
+  let best: RootMatch | null = null;
+  for (const alternative of selectorList(member)) {
+    const match = rootSelectorMatch(alternative, htmlAttrs, bodyAttrs);
+    if (match !== null && (best === null || compareMatches(match, best) > 0)) best = match;
   }
-  return member
-    .split(',')
-    .map((alternative) => alternative.trim())
-    .some((alternative) => rootSelectorMatches(alternative, htmlAttrs, bodyAttrs));
+  if (best === null) return null;
+  return {
+    on: best.on,
+    specificity: [
+      parent.specificity[0] + best.specificity[0],
+      parent.specificity[1] + best.specificity[1],
+    ],
+  };
+}
+
+/**
+ * A selector list cut at its top-level commas, each item trimmed: a comma
+ * inside parentheses, brackets or a string, or escaped (`\,`, as Tailwind
+ * writes one in a class name), separates nothing. One pass, so a list whose
+ * brackets never close costs no more than its length.
+ */
+function selectorList(text: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '\\') {
+      i += 1;
+    } else if (quote !== null) {
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === '(' || char === '[') {
+      depth += 1;
+    } else if ((char === ')' || char === ']') && depth > 0) {
+      depth -= 1;
+    } else if (char === ',' && depth === 0) {
+      items.push(text.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  items.push(text.slice(start).trim());
+  return items;
 }
 
 /**
  * A compound selector cut into its parts, or null when part of it is none of
  * them. The pattern is sticky, so each part must start where the last ended,
- * and a bracket never closed fails once rather than from every bracket.
+ * and a bracket never closed fails once rather than from every bracket. A
+ * combinator is none of them, so a selector reaching past the element it
+ * starts on fails here.
  */
 function partsOf(text: string, part: RegExp): string[] | null {
   const parts: string[] = [];
@@ -624,51 +793,74 @@ function partsOf(text: string, part: RegExp): string[] | null {
 const COMPOUND_PART = /\.(?:\\.|[\w-])+|\[[^\]]*\]|:not\([^)]*\)|::?[\w-]+(?:\([^)]*\))?/y;
 const NEGATED_PART = /\.(?:\\.|[\w-])+|\[[^\]]*\]/y;
 
-/**
- * A compound selector for the root or the body - `:root`, `html.dark`,
- * `body[data-theme=x]`, `[data-md-color-scheme="default"]`, `:not(.light)` -
- * against the attributes the page was served with.
- */
-function rootSelectorMatches(selector: string, htmlAttrs: Attrs, bodyAttrs: Attrs): boolean {
-  const head = /^(:root|html|body|\*)/.exec(selector);
-  const rest = head ? selector.slice(head[0].length) : selector;
-  if (!head && rest === '') return false;
-  if (/[\s>+~]/.test(rest)) return false;
-  const parts = partsOf(rest, COMPOUND_PART);
-  if (parts === null) return false;
-  const candidates =
-    head?.[0] === 'body'
-      ? [bodyAttrs]
-      : head && head[0] !== '*'
-        ? [htmlAttrs]
-        : [htmlAttrs, bodyAttrs];
-  return candidates.some((attrs) => parts.every((part) => partMatches(part, attrs)));
+/** The selectors a `:not(…)` part negates, each cut into its parts, or null when one is not a compound this reader reads. */
+function negatedSelectors(part: string): string[][] | null {
+  const selectors: string[][] = [];
+  for (const item of selectorList(part.slice(':not('.length, -1))) {
+    const parts = partsOf(item, NEGATED_PART);
+    if (parts === null || parts.length === 0) return null;
+    selectors.push(parts);
+  }
+  return selectors;
 }
 
-function partMatches(part: string, attrs: Attrs): boolean {
-  if (part.startsWith('.')) {
-    const name = part.slice(1).replace(/\\(.)/g, '$1');
-    return (attrs.class ?? '').split(/\s+/).includes(name);
+/** What one part of a compound adds to its specificity: one, or for `:not(…)` its most specific argument's. */
+function partWeight(part: string): number {
+  if (!part.startsWith(':not(')) return 1;
+  return (negatedSelectors(part) ?? []).reduce((most, parts) => Math.max(most, parts.length), 0);
+}
+
+/**
+ * A compound selector for the root or the body - `:root`, `html.dark`,
+ * `body[data-theme=x]`, `[data-md-color-scheme="default"]`, `:not(.light)`,
+ * `*` - matched against the attributes the page was served with: where it
+ * applies, or null when it applies at neither.
+ */
+function rootSelectorMatch(selector: string, htmlAttrs: Attrs, bodyAttrs: Attrs): RootMatch | null {
+  const head = /^(?::root|html|body|\*)/.exec(selector)?.[0] ?? null;
+  const rest = head === null ? selector : selector.slice(head.length);
+  if (head === null && rest === '') return null;
+  const parts = partsOf(rest, COMPOUND_PART);
+  if (parts === null) return null;
+  const specificity: Specificity = [
+    (head === ':root' ? 1 : 0) + parts.reduce((sum, part) => sum + partWeight(part), 0),
+    head === 'html' || head === 'body' ? 1 : 0,
+  ];
+  if (head === '*' && parts.length === 0) return { on: ON_EVERY, specificity };
+  const matches = (attrs: Attrs, root: boolean) =>
+    parts.every((part) => partMatches(part, attrs, root));
+  if (head !== ':root' && head !== 'html' && matches(bodyAttrs, false)) {
+    return { on: ON_BODY, specificity };
   }
+  if (head !== 'body' && matches(htmlAttrs, true)) return { on: ON_ROOT, specificity };
+  return null;
+}
+
+/** Whether one part of a compound matches an element, given its attributes and whether it is the root. */
+function partMatches(part: string, attrs: Attrs, root: boolean): boolean {
+  if (part.startsWith('.'))
+    return wordsOf(attrs, 'class').has(part.slice(1).replace(/\\(.)/g, '$1'));
   if (part.startsWith('[')) {
     const match = /^\[\s*([\w-]+)\s*(?:([~|^$*]?=)\s*("[^"]*"|'[^']*'|[^\]\s]+))?\s*\]$/.exec(part);
     if (!match) return false;
     const name = match[1]!.toLowerCase();
-    if (!(name in attrs)) return false;
+    const actual = attribute(attrs, name);
+    if (actual === undefined) return false;
     if (!match[2]) return true;
     const wanted = match[3]!.replace(/^["']|["']$/g, '');
-    const actual = attrs[name]!;
     switch (match[2]) {
       case '=':
         return actual === wanted;
       case '~=':
-        return actual.split(/\s+/).includes(wanted);
+        return wordsOf(attrs, name).has(wanted);
+      // An empty value matches nothing for the three substring tests.
       case '^=':
-        return actual.startsWith(wanted);
+        return wanted !== '' && actual.startsWith(wanted);
       case '$=':
-        return actual.endsWith(wanted);
+        return wanted !== '' && actual.endsWith(wanted);
       case '*=':
-        return actual.includes(wanted);
+        // The one test whose cost is the attribute's length rather than the selector's.
+        return wanted !== '' && actual.length <= LIMITS.attribute && actual.includes(wanted);
       case '|=':
         return actual === wanted || actual.startsWith(`${wanted}-`);
       default:
@@ -676,32 +868,38 @@ function partMatches(part: string, attrs: Attrs): boolean {
     }
   }
   if (part.startsWith(':not(')) {
-    const innerParts = partsOf(part.slice(5, -1).trim(), NEGATED_PART);
-    if (innerParts === null) return false;
-    return !innerParts.every((innerPart) => partMatches(innerPart, attrs));
+    const negated = negatedSelectors(part);
+    return (
+      negated !== null &&
+      !negated.some((parts) => parts.every((inner) => partMatches(inner, attrs, root)))
+    );
   }
-  return part === ':root';
+  return part === ':root' && root;
 }
 
 /** Where a declaration stands in the cascade, as far as this reader weighs it. */
 interface Standing {
   important: boolean;
   layer: readonly number[];
+  /** Its selector's specificity, when the rule applies at the root; nothing otherwise. */
+  specificity: Specificity;
   /** Its place in source order across the page's CSS. */
   order: number;
 }
 
 /**
- * Positive when `a` wins over `b`, by the cascade as this reader weighs it:
- * importance, then cascade layer, then source order. Specificity is not
- * weighed, which is why only the rules that apply at the root are compared.
+ * Positive when `a` wins over `b` on one element, by the cascade as this
+ * reader weighs it: importance, then cascade layer, then specificity, then
+ * source order. Only declarations whose specificity was measured are
+ * compared: the ones that apply at the root, and a utility's own rules, which
+ * share one selector.
  */
 function cascade(a: Standing, b: Standing): number {
   if (a.important !== b.important) return a.important ? 1 : -1;
   const layers = compareLayers(a.layer, b.layer);
   // An important declaration reverses the layer order, as the cascade does.
   if (layers !== 0) return a.important ? -layers : layers;
-  return a.order - b.order;
+  return compareSpecificity(a.specificity, b.specificity) || a.order - b.order;
 }
 
 /**
@@ -720,14 +918,21 @@ interface PropertyEntry extends Standing {
   value: string;
   written: string;
   under: string;
-  applies: boolean;
+  /** What it is set on when it applies at the root (`ON_ROOT`, `ON_BODY`, `ON_EVERY`), or null. */
+  on: number | null;
 }
 
-/** The declaration that wins for the page as served, or null when none applies. */
+/**
+ * The declaration the page's content sees as served, or null when none
+ * applies: the one set nearest the content, then the cascade's winner there.
+ */
 function winning(entries: readonly PropertyEntry[]): PropertyEntry | null {
   let best: PropertyEntry | null = null;
   for (const entry of entries) {
-    if (entry.applies && (best === null || cascade(entry, best) > 0)) best = entry;
+    if (entry.on === null) continue;
+    if (best === null || (entry.on - (best.on ?? ON_ROOT) || cascade(entry, best)) > 0) {
+      best = entry;
+    }
   }
   return best;
 }
@@ -1050,7 +1255,7 @@ export function siteFacts(page: FetchedPage): SiteFacts {
 
   const sheets = cssInDocumentOrder(page, markup);
   const scan = new StylesheetScan(htmlAttrs, bodyAttrs);
-  for (const css of sheets.texts) scan.read(css);
+  for (const { css, media } of sheets.texts) scan.read(css, media);
 
   // Custom properties, with the selector chain they are declared under. A
   // site with two schemes declares the same name twice, under `:root` and
@@ -1078,7 +1283,12 @@ export function siteFacts(page: FetchedPage): SiteFacts {
       const declaration = declarationOf(text);
       if (!declaration) continue;
       const { property, value, important } = declaration;
-      const standing: Standing = { important, layer: block.layer, order: (order += 1) };
+      const standing: Standing = {
+        important,
+        layer: block.layer,
+        specificity: block.match?.specificity ?? NO_SPECIFICITY,
+        order: (order += 1),
+      };
       for (const reference of value.matchAll(/var\(\s*(--[\w-]+)/g))
         count(references, reference[1]!);
       if (block.utility !== null) {
@@ -1102,7 +1312,7 @@ export function siteFacts(page: FetchedPage): SiteFacts {
           value,
           written: declaration.written,
           under,
-          applies: block.applies,
+          on: block.match?.on ?? null,
         });
         continue;
       }

@@ -288,6 +288,129 @@ describe('weighing the cascade as a browser does', () => {
     );
     expect(property(facts, '--c-84')?.references).toBe(1);
   });
+
+  it('lets the more specific root selector win, whatever comes later', () => {
+    const served = (css: string, html: string) => property(sheet(css, html), '--p')?.asServed;
+    expect(
+      served('html.dark { --p: #000000; } :root { --p: #ffffff; }', '<html class="dark">'),
+    ).toBe('#000000');
+    expect(
+      served(
+        'html[data-theme=dark] { --p: #000000; } :root { --p: #ffffff; }',
+        '<html data-theme="dark">',
+      ),
+    ).toBe('#000000');
+    expect(served(':root:not(.light) { --p: #000000; } :root { --p: #ffffff; }', '<html>')).toBe(
+      '#000000',
+    );
+    // Equal specificity falls back to source order.
+    expect(served(':root { --p: #000000; } :root { --p: #ffffff; }', '<html>')).toBe('#ffffff');
+  });
+
+  it("serves the body's value over the root's, and every element's over both, as the content inherits", () => {
+    const served = (css: string) => property(sheet(css, '<html><body>'), '--p')?.asServed;
+    // The body's own declaration is what its content inherits, even against an important root one.
+    expect(served('body { --p: #000000; } :root { --p: #ffffff !important; }')).toBe('#000000');
+    expect(served('* { --p: #111111; } body { --p: #222222; } :root { --p: #333333; }')).toBe(
+      '#111111',
+    );
+  });
+});
+
+describe('matching a root selector', () => {
+  const served = (css: string, html: string) =>
+    siteFacts(
+      page(html, [{ url: 'https://acme.example/s.css', css }]),
+    ).colors.customProperties.find((entry) => entry.name === '--p')?.asServed ?? null;
+
+  it('reads an attribute selector whose operator or value holds a space or a tilde', () => {
+    expect(served(':root[class~=dark] { --p: #ffffff; }', '<html class="dark">')).toBe('#ffffff');
+    expect(
+      served('[data-theme="dark mode"] { --p: #ffffff; }', '<html data-theme="dark mode">'),
+    ).toBe('#ffffff');
+    // A combinator still reaches past the root, and still does not apply there.
+    for (const selector of ['html .dark', 'html>body', ':root~x', ':root+x', ':root :not(.x)']) {
+      expect(served(`${selector} { --p: #ffffff; }`, '<html class="dark">'), selector).toBeNull();
+    }
+  });
+
+  it('cuts a selector list only at its top-level commas', () => {
+    expect(served(':root:not(.light, .contrast) { --p: #ffffff; }', '<html>')).toBe('#ffffff');
+    expect(
+      served(':root:not(.light, .contrast) { --p: #ffffff; }', '<html class="contrast">'),
+    ).toBeNull();
+    expect(served(':root[data-x="a,b"] { --p: #ffffff; }', '<html data-x="a,b">')).toBe('#ffffff');
+  });
+
+  it('finds no attribute the markup did not set, prototype names included', () => {
+    for (const selector of [':root[constructor]', ':root[constructor^=x]', '[__proto__*=x]']) {
+      expect(served(`${selector} { --p: #ffffff; }`, '<html>'), selector).toBeNull();
+    }
+  });
+
+  it('matches a boolean attribute, which the markup sets with no value', () => {
+    expect(served('[data-dark] { --p: #ffffff; }', '<html data-dark>')).toBe('#ffffff');
+  });
+});
+
+describe("reading a sheet under its link's media", () => {
+  const facts = (html: string, sheets: Record<string, string>) =>
+    siteFacts(
+      page(
+        html,
+        Object.entries(sheets).map(([name, css]) => ({ url: `https://acme.example/${name}`, css })),
+      ),
+    );
+  const served = (result: ReturnType<typeof siteFacts>) =>
+    result.colors.customProperties.find((entry) => entry.name === '--background')?.asServed;
+  const main = { 'main.css': ':root { --background: #ffffff; }' };
+
+  it('reads a print sheet and a dark one as not applying, and records them under their media', () => {
+    const result = facts(
+      '<link rel="stylesheet" href="/main.css"><link rel="stylesheet" media="print" href="/print.css"><link rel="stylesheet" media="(prefers-color-scheme: dark)" href="/dark.css">',
+      {
+        ...main,
+        'print.css': ':root { --background: #000000; }',
+        'dark.css': ':root { --background: #111111; }',
+      },
+    );
+    expect(served(result)).toBe('#ffffff');
+    expect(result.colors.customProperties[0]?.values.map((value) => value.under)).toEqual([
+      ':root',
+      '@media print :root',
+      '@media (prefers-color-scheme: dark) :root',
+    ]);
+    expect(result.scheme.rulesUnderPrefersDark).toBe(1);
+  });
+
+  it('reads a <style> under its media too', () => {
+    const result = facts(
+      '<link rel="stylesheet" href="/main.css"><style media="print">:root { --background: #000000; }</style>',
+      main,
+    );
+    expect(served(result)).toBe('#ffffff');
+  });
+
+  it('leaves a disabled sheet and an alternate one out of the cascade', () => {
+    const result = facts(
+      '<link rel="stylesheet" href="/main.css"><link rel="stylesheet" disabled href="/off.css"><link rel="alternate stylesheet" title="Dark" href="/alt.css">',
+      {
+        ...main,
+        'off.css': ':root { --background: #000000; }',
+        'alt.css': ':root { --background: #111111; }',
+      },
+    );
+    expect(served(result)).toBe('#ffffff');
+    expect(result.stylesheets.map((sheet) => sheet.url)).toHaveLength(3);
+  });
+
+  it('reads a sheet that switches itself on once loaded as applying everywhere', () => {
+    const result = facts(
+      `<link rel="stylesheet" href="/main.css"><link rel="stylesheet" media="print" onload="this.media='all'" href="/late.css">`,
+      { ...main, 'late.css': ':root { --background: #000000; }' },
+    );
+    expect(served(result)).toBe('#000000');
+  });
 });
 
 /**
@@ -425,7 +548,35 @@ describe('reading a hostile page in time proportional to its length', () => {
   const SIZE = 400_000;
   const fill = (unit: string) => unit.repeat(Math.ceil(SIZE / unit.length));
   const chain = Array.from({ length: SIZE / 30 }, (_, i) => `--color-${i}:var(--color-${i + 1});`);
+  const many = (each: (i: number) => string, size: number) =>
+    Array.from({ length: Math.ceil(size / each(0).length) }, (_, i) => each(i));
   const cases: [string, { html?: string; css?: string }][] = [
+    [
+      'a root carrying many classes, against as many class selectors',
+      {
+        html: `<html class="${many((i) => `c${i} `, SIZE / 2).join('')}">`,
+        css: many((i) => `.z${i}{--a:#000}`, SIZE / 2).join(''),
+      },
+    ],
+    [
+      'a long root attribute matched word by word by many selectors',
+      {
+        html: `<html data-x="${fill('a ')}">`,
+        css: many((i) => `[data-x~=b${i}]{--a:#000}`, SIZE).join(''),
+      },
+    ],
+    [
+      'a long root attribute searched by many substring selectors',
+      { html: `<html data-x="${fill('a')}">`, css: fill('[data-x*=ab]{--a:#000}') },
+    ],
+    [
+      'a selector list of many alternatives',
+      {
+        html: `<html class="${many((i) => `c${i} `, SIZE / 2).join('')}">`,
+        css: `${many((i) => `:root.z${i},`, SIZE / 2).join('')}:root{--a:#000}`,
+      },
+    ],
+    ['a :not( list never closed', { css: `:root:not(${fill('.a,')} { --a: #000; }` }],
     ['unclosed <header> tags', { html: fill('<header>') }],
     ['unclosed <style> elements', { html: fill('<style>') }],
     ['unclosed <title> elements', { html: fill('<title>') }],
