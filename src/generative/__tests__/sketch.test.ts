@@ -200,6 +200,83 @@ describe('a Side', () => {
     expect(validateAgainstCatalog(spec, catalog).ok).toBe(true);
     expect(layoutProblems({ inputs: fields }, spec)).toEqual([]);
   });
+
+  it('is lifted out of a Row to the margin, and the Row gives way to the block it is left with', () => {
+    const assembly = sketchToSpec(
+      sketch([
+        block(0, 'Row'),
+        block(1, 'Section', 'The deck'),
+        block(2, 'Field', 'briefing'),
+        block(2, 'Field', 'briefing_date'),
+        block(1, 'Side', 'What you get'),
+        block(2, 'Run', 'Qualify the bid'),
+        block(0, 'Section', 'Your criteria'),
+        block(1, 'Field', 'criteria'),
+      ]),
+      fields,
+    );
+    if (!assembly.ok) throw new Error(assembly.problems.join('\n'));
+    const { spec } = assembly;
+    expect(spec.elements.workspace?.children?.map((key) => spec.elements[key]?.type)).toEqual([
+      'Stack',
+      'Rail',
+    ]);
+    expect(spec.elements.work?.children).toEqual(['section-the-deck', 'section-your-criteria']);
+    expect(Object.values(spec.elements).some((element) => element.type === 'Grid')).toBe(false);
+    expect(validateAgainstCatalog(spec, catalog).ok).toBe(true);
+    expect(layoutProblems({ inputs: fields }, spec)).toEqual([]);
+  });
+
+  it('is lifted out of a Row that a Section holds, and a Row of two stays a Row', () => {
+    const assembly = sketchToSpec(
+      sketch([
+        block(0, 'Section', 'The deck'),
+        block(1, 'Row'),
+        block(2, 'Field', 'briefing'),
+        block(2, 'Field', 'briefing_date'),
+        block(2, 'Side', 'Your criteria'),
+        block(3, 'Field', 'criteria'),
+        block(0, 'Run', 'Qualify the bid'),
+      ]),
+      fields,
+    );
+    if (!assembly.ok) throw new Error(assembly.problems.join('\n'));
+    const { spec } = assembly;
+    expect(spec.elements['section-the-deck']?.children).toEqual(['row']);
+    expect(spec.elements.row?.children).toEqual(['field-briefing', 'field-briefing-date']);
+    expect(spec.elements.row?.props.columns).toBe(2);
+    expect(spec.elements.workspace?.type).toBe('Workspace');
+    expect(validateAgainstCatalog(spec, catalog).ok).toBe(true);
+  });
+
+  it('stays nested, and refused, in a Fold, a Step or a Tab, and a lifted second Side is refused', () => {
+    const problemsOf = (blocks: SketchBlock[]): string[] => {
+      const assembly = sketchToSpec(sketch(blocks), fields);
+      return assembly.ok ? [] : assembly.problems;
+    };
+    expect(
+      problemsOf([
+        block(0, 'Field', 'briefing'),
+        block(0, 'Field', 'criteria'),
+        block(0, 'Fold', 'When was it?'),
+        block(1, 'Row'),
+        block(2, 'Field', 'briefing_date'),
+        block(2, 'Side', 'Panel'),
+        block(3, 'Run', 'Qualify the bid'),
+      ]),
+    ).toEqual(['block 6 (Side "Panel") is nested; a Side sits at the margin']);
+    expect(
+      problemsOf([
+        block(0, 'Row'),
+        block(1, 'Field', 'briefing'),
+        block(1, 'Side', 'First'),
+        block(2, 'Field', 'criteria'),
+        block(0, 'Side', 'Second'),
+        block(1, 'Field', 'briefing_date'),
+        block(1, 'Run', 'Qualify the bid'),
+      ]),
+    ).toEqual(['the outline has more than one Side']);
+  });
 });
 
 describe('Steps and Tabs', () => {

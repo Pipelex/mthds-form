@@ -349,6 +349,37 @@ function treeOf(blocks: readonly SketchBlock[], problems: string[]): Node[] {
   return roots;
 }
 
+/**
+ * The tree with every Side the outline put in a Row moved to the margin. A
+ * model that wants a panel beside some blocks reaches for a Row to put it
+ * there, and a Side is already beside the whole page, so a Side in a Row has
+ * one reading. A Row left holding one block gives way to that block. Only a
+ * Side whose way up passes through Rows and Sections is moved: one in a Fold,
+ * a Step or a Tab would leave what holds it, so it stays where it is, to be
+ * refused as nested.
+ */
+function liftSides(roots: readonly Node[]): Node[] {
+  const lifted: Node[] = [];
+  const settle = (siblings: readonly Node[], liftable: boolean): Node[] =>
+    siblings.flatMap((node) => {
+      if (liftable && node.block === 'Row') {
+        const sides = node.children.filter((child) => child.block === 'Side');
+        if (sides.length > 0) {
+          lifted.push(...sides);
+          const kept = node.children.filter((child) => child.block !== 'Side');
+          if (kept.length <= 1) return settle(kept, liftable);
+          node.children = kept;
+        }
+      }
+      node.children = settle(
+        node.children,
+        liftable && (node.block === 'Row' || node.block === 'Section'),
+      );
+      return [node];
+    });
+  return [...settle(roots, true), ...lifted];
+}
+
 function walk(
   nodes: readonly Node[],
   visit: (node: Node, parent: Node | undefined) => void,
@@ -435,7 +466,8 @@ function keyMaker(): (base: string) => string {
  * The spec an outline describes, over the method's own fields, or why there is
  * none. A malformed outline is refused with every problem named rather than
  * repaired: the bench learns what the model got wrong, and the host falls back
- * to the plain form as it does for any refused layout.
+ * to the plain form as it does for any refused layout. A Side held by a Row is
+ * read, not repaired: it is the page's panel, and it moves to the margin.
  *
  * The page is a vertical column: the title (a `Hero`, the one h1), then the
  * blocks at the margin. A `Side` turns it into a `Workspace`: the other
@@ -448,7 +480,7 @@ export function sketchToSpec(sketch: PageSketch, fields: readonly RunField[]): S
   if (title === '') problems.push('the outline has no title');
   const blocks = Array.isArray(sketch?.blocks) ? sketch.blocks : [];
   if (blocks.length === 0) problems.push('the outline has no blocks');
-  const roots = treeOf(blocks, problems);
+  const roots = liftSides(treeOf(blocks, problems));
   treeProblems(roots, fields, problems);
   if (problems.length > 0) return { ok: false, problems };
 
