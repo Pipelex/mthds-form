@@ -60,7 +60,9 @@ function reread() {
 
 const args = process.argv.slice(2);
 const url = args.find((arg) => !arg.startsWith('--'));
-const run = args.includes('--reread') ? Promise.resolve(reread()) : url ? record(url) : null;
+// `then` runs the re-read inside the promise, so a throw in it reaches the
+// handler below rather than escaping as an uncaught exception.
+const run = args.includes('--reread') ? Promise.resolve().then(reread) : url ? record(url) : null;
 if (!run) {
   process.stderr.write('usage: record-site.ts <https-url> | --reread\n');
   process.exit(2);

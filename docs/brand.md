@@ -157,7 +157,7 @@ The reader is tested offline, over sites recorded as they were served. A recordi
 | `stylesheets/` | one file per stylesheet the page links, in document order |
 | `site-facts.json` | what `siteFacts` reads from the above |
 
-`make record-site URL=https://<site>/` fetches a site now, behind a guard (https only, on the page, every stylesheet and every redirect; a size cap per resource; a timeout), and writes a new recording. `make site-facts` re-reads every recording with the reader as it is and rewrites its `site-facts.json`, offline, so a change to the reader is reviewed as the diff it leaves in the record. `src/brand/__tests__/site-facts.test.ts` fails on a recording whose committed facts are not what the reader reads now.
+`make record-site URL=https://<site>/` fetches a site now, behind a guard (https only, on the page, every stylesheet and every redirect; a size cap per resource; a timeout; and a cap on how many stylesheets one page may have fetched, past which a sheet is recorded as not fetched), and writes a new recording, replacing one made the same day. `make site-facts` re-reads every recording with the reader as it is and rewrites its `site-facts.json`, offline, so a change to the reader is reviewed as the diff it leaves in the record. `src/brand/__tests__/site-facts.test.ts` fails on a recording whose committed facts are not what the reader reads now.
 
 **Only our own sites are recorded here**, because this repository is open source and a recording is a copy of a site's markup and stylesheets. Any other site a producer is tried on is recorded where that work happens, not in this package.
 

@@ -13,12 +13,14 @@
  * The fetch is here, in a script, because the brand entry never fetches: a
  * host fetches behind its own guard and hands the reader texts. This one's
  * guard is https only - on the page, on every stylesheet and on every
- * redirect - a size cap per resource and a timeout.
+ * redirect - a size cap per resource, a timeout, and a cap on how many
+ * stylesheets one page may have fetched.
  *
- * Only sites we own are recorded in the kernel, because this repository is
- * open source; any other site a test needs is recorded on the bench.
+ * Only sites we own are recorded here, because this repository is open
+ * source; any other site a producer is tried on is recorded where that work
+ * happens, outside this package.
  */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { type FetchedPage, type FetchedStylesheet, stylesheetUrls } from '../src/brand';
 
@@ -27,6 +29,8 @@ const USER_AGENT = 'Mozilla/5.0 (compatible; mthds-form-site-facts/1.0)';
 const MAX_BYTES = 5 * 1024 * 1024;
 const TIMEOUT_MS = 20_000;
 const MAX_REDIRECTS = 5;
+/** Per page: the stylesheets past this many are recorded as not fetched, so no page can make the guard fetch without end. */
+const MAX_STYLESHEETS = 40;
 
 export interface Recording {
   url: string;
@@ -82,7 +86,14 @@ export async function fetchText(url: string): Promise<{ url: string; text: strin
 export async function fetchPage(url: string, fetchedAt: string): Promise<FetchedPage> {
   const page = await fetchText(url);
   const stylesheets: FetchedStylesheet[] = [];
-  for (const sheetUrl of stylesheetUrls(page.text, page.url)) {
+  for (const [index, sheetUrl] of stylesheetUrls(page.text, page.url).entries()) {
+    if (index >= MAX_STYLESHEETS) {
+      stylesheets.push({
+        url: sheetUrl,
+        error: `not fetched: over ${MAX_STYLESHEETS} stylesheets`,
+      });
+      continue;
+    }
     try {
       stylesheets.push({ url: sheetUrl, css: (await fetchText(sheetUrl)).text });
     } catch (error) {
@@ -96,6 +107,9 @@ export async function fetchPage(url: string, fetchedAt: string): Promise<Fetched
 }
 
 export function writeRecording(dir: string, page: FetchedPage) {
+  // A site recorded again the same day may link fewer sheets: none of the
+  // last recording's may stay behind for a reader to mistake for this one's.
+  rmSync(path.join(dir, 'stylesheets'), { recursive: true, force: true });
   mkdirSync(path.join(dir, 'stylesheets'), { recursive: true });
   writeFileSync(path.join(dir, 'page.html'), page.html);
   const recording: Recording = {

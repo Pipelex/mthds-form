@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readRecording, recordingDirs } from '../../../scripts/site-recording';
+import { readRecording, recordingDirs, writeRecording } from '../../../scripts/site-recording';
 import { type FetchedPage, siteFacts, stylesheetUrls } from '../site-facts';
 import { REPO } from './corpus';
 
@@ -221,5 +222,23 @@ describe('reading a stylesheet the way a browser does', () => {
       'https://acme.example/_next/image?url=%E0%A4%A&w=1',
     );
     expect(facts.logos.candidates[0]?.original).toBeUndefined();
+  });
+});
+
+describe('recording a site', () => {
+  it('leaves no stylesheet of an earlier recording of the same day behind', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'site-recording-'));
+    const sheet = (name: string) => ({
+      url: `https://acme.example/${name}.css`,
+      css: `.${name}{}`,
+    });
+    try {
+      writeRecording(dir, page('<html>', [sheet('a'), sheet('b'), sheet('c')]));
+      writeRecording(dir, page('<html>', [sheet('a')]));
+      expect(readdirSync(path.join(dir, 'stylesheets'))).toEqual(['01.css']);
+      expect(readRecording(dir).stylesheets).toEqual([sheet('a')]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
