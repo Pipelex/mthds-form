@@ -130,6 +130,8 @@ export function generatedModuleText(brands: readonly AssembledBrand[]): string {
     producerId: brand.producerId,
     producer: brand.producer,
     model: brand.model,
+    // A seeded brand and its unseeded twin differ by this alone, so the label must carry it.
+    seed: brand.seed,
     date: brand.date,
     scope: brand.scope,
     manifest: brand.manifest,
@@ -146,6 +148,7 @@ export function generatedModuleText(brands: readonly AssembledBrand[]): string {
     '  producerId: string;',
     '  producer: BrandProducer;',
     '  model: string;',
+    '  seed?: string;',
     '  date: string;',
     '  scope: string;',
     '  manifest: BrandManifest;',

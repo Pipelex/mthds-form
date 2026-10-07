@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { describe, expect, it } from 'vitest';
+import { fixtureLabel } from '../../generative';
 import {
   brandDirs,
   buildCorpus,
@@ -65,6 +66,39 @@ describe('the story brands', () => {
       expect(readFileSync(target, 'utf8'), `${OUT_DIR}/${file}: run make brands`).toBe(
         await formatted(target, text),
       );
+    }
+  });
+});
+
+describe('a seeded brand beside its unseeded twin', () => {
+  it('carries its seed into the module, so the two stories are labelled apart', () => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'brands-'));
+    try {
+      const from = path.join(REPO, 'data/brands/pipelex/pipelex-method--claude-4.8-opus');
+      const seeded = path.join(repo, 'data/brands/pipelex/pipelex-method--claude-4.8-opus--seeded');
+      cpSync(from, path.join(repo, 'data/brands/pipelex/pipelex-method--claude-4.8-opus'), {
+        recursive: true,
+      });
+      cpSync(from, seeded, { recursive: true });
+      const provenance = JSON.parse(readFileSync(path.join(seeded, 'provenance.json'), 'utf8'));
+      writeFileSync(
+        path.join(seeded, 'provenance.json'),
+        JSON.stringify({ ...provenance, seed: 'warm' }),
+      );
+      const build = buildCorpus(repo);
+      if (!build.ok) throw new Error(JSON.stringify(build.failures));
+      // The entries as a story reads them: the module's array literal, which is JSON.
+      const text = generatedModuleText(build.brands);
+      const entries = JSON.parse(text.slice(text.indexOf('= [') + 2, text.lastIndexOf(';')));
+      const labels = entries.map((entry: Parameters<typeof fixtureLabel>[0]) =>
+        fixtureLabel(entry),
+      );
+      expect(labels).toEqual([
+        'Pipelex method · claude-4.8-opus',
+        'Pipelex method · claude-4.8-opus · with a seed',
+      ]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 });

@@ -9,6 +9,7 @@ export interface BrandBuild {
   producerId: string;
   producer: BrandProducer;
   model: string;
+  seed?: string;
   date: string;
   scope: string;
   manifest: BrandManifest;
