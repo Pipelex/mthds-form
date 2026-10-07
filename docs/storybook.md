@@ -85,7 +85,7 @@ The trip planner is the case with three layouts, because it is the widest input 
 
 Before rendering, the harness runs the two checks a host runs (`validateAgainstCatalog`, `layoutFits`) and throws on either. A story showing a layout a host would refuse would be showing a page nobody sees. And under every page, folded away, is the `/inputs` tree with the readiness the kernel computes from it — because what the story is really asserting is that what a person types through somebody else's layout arrives where the gate reads it.
 
-**Brands.** The same layout, painted from tokens that are not this package's, is what says whether the page reads on its own. Two of them live in `src/__stories__/generative/brands/` as story fixtures — carried over verbatim from the study branch, reproducible by no pass here, and shipped in nothing. See [theming.md](theming.md) § "Someone else's tokens".
+**Brands.** The same layout, painted from tokens that are not this package's, is what says whether the page reads on its own. The brands are the corpus under `data/brands/`, which the brand study produced from real sites, compiled by `make brands` with the brand entry's own `assembleBrand` into `src/__stories__/generative/brands/`: a stylesheet per brand, an `index.css` and a `generated.ts` naming each. Free and offline, committed, and shipped in nothing; `src/__stories__/__tests__/brands.test.ts` fails on a committed file the data no longer produces. A brand's stylesheet sets its typeface on its scope, so a branded story renders in the brand's type and the stock one in the Storybook's own. See [brand.md](brand.md).
 
 ## The harnesses upload
 
@@ -228,6 +228,6 @@ It carries three more that are about the output half specifically: every generat
 
 ## Where story code lives, and why it matters
 
-Stories live in `src/__stories__/`, **outside both entry trees**. `tsup.config.ts` globs `src/core/*.ts` and `src/react/index.ts`, and `scripts/assert-bundle.mjs` walks what those entries reach — so a story helper placed inside either tree would enter a shipped chunk and count against the [dependency budget](dependency-budget.md). Keeping story code in its own directory is what keeps the bundle invariants meaningful.
+Stories live in `src/__stories__/`, **outside every entry tree**. `tsup.config.ts` globs `src/core/*.ts` and each other entry's `index.ts`, and `scripts/assert-bundle.mjs` walks what those entries reach — so a story helper placed inside any of those trees would enter a shipped chunk and count against the [dependency budget](dependency-budget.md). Keeping story code in its own directory is what keeps the bundle invariants meaningful.
 
 Lint restates the two budget rules that must still hold for story code (`eslint.config.mjs`): the framework bans, and `mthds` staying types-only. The core-barrel rule deliberately does not apply — a story is a consumer, and a consumer imports from the entry point as published.

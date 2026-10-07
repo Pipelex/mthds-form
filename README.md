@@ -4,19 +4,22 @@ The input form for MTHDS methods, as a library: a headless kernel that maps the 
 
 It exists because "the form" is one problem that keeps being solved separately. A method declares its inputs; something has to decide what widget each input deserves, whether the Run button may light up, what shape the values take on the wire, and what a validation failure says to a person. That logic belongs in one place with tests around it, not copied into each surface that happens to need a form.
 
-## Three entry points
+## Four entry points
 
 ```ts
 import { buildRunFields, computeReadiness } from '@pipelex/mthds-form'; // headless
 import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
 import { GenerativePage } from '@pipelex/mthds-form/generative'; // a produced layout
+import { assembleBrand } from '@pipelex/mthds-form/brand'; // a brand, held to the theme contract
 ```
 
 `.` is the kernel: no React, no design system, no framework. Its only runtime dependency is `ajv`, which the gate validates through. It runs in a browser, in Node, in a worker.
 
 `./react` is the control set — one control per field kind behind a single dispatch point, styled with Tailwind classes over standard shadcn/ui tokens. `react` and `react-dom` are optional peer dependencies, so a consumer that only wants the kernel never installs them.
 
-`./generative` renders a **layout** — a data file a model wrote once for a method, naming paths in the same descriptor and restating nothing about what a field is. It is the only entry that carries json-render and zod, so a host that renders an ordinary form pays for neither. When there is no layout, or the one on file no longer fits the method, the page falls back to the kernel's own form. See [docs/generative-ui.md](docs/generative-ui.md).
+`./generative` renders a **layout** — a data file a model wrote once for a method, naming paths in the same descriptor and restating nothing about what a field is. It is the only entry that carries json-render, and with `./brand` the only one that carries zod, so a host that renders an ordinary form pays for neither. When there is no layout, or the one on file no longer fits the method, the page falls back to the kernel's own form. See [docs/generative-ui.md](docs/generative-ui.md).
+
+`./brand` holds a **brand** (a product's colours, radius, typefaces and logos, as a DTCG token file and a manifest) to the theme contract the controls are styled against, compiles it into a stylesheet scoped to one class, and reads a website's design facts for whatever produces one. It renders nothing, fetches nothing and depends on zod alone. See [docs/brand.md](docs/brand.md).
 
 `mthds` is an ordinary dependency rather than a peer, but it is **types only**: the wire types of `pipe_io_contracts` belong to the MTHDS standard, so this package re-exports the standard's declarations instead of restating them. Every import of it is an `import type` and is erased at build, so it costs an install entry and no shipped bytes. It is not a peer because pnpm does not install an unmet one, and an absent `mthds` degrades the re-exported types silently rather than failing. See [docs/dependency-budget.md](docs/dependency-budget.md).
 

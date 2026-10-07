@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`./brand`, a brand held to the theme contract**: a new entry that validates a brand's three files and compiles it. `assembleBrand({ brand, producerId, manifest, tokens, provenance })` returns the brand with its stylesheet, or every problem named by its file and path: the DTCG token file must set exactly the contract's tokens (`BRAND_CONTRACT`, the colours and radius of `theme.css` plus `--font-sans` and `--font-mono`) as sRGB colours with a dark value or an alias, reach WCAG AA on the contrast pairs in both modes as they render (an opaque canvas, the ink blended over it by its alpha, both as the compiler rounds them), and carry exactly the accent and logos a person stated (`StatedFacts`). `compileBrand` writes the stylesheet with no dependency: every token on the brand's scope class, every colour again under `.dark`, and `font-family: var(--font-sans)` on the scope so the brand's typeface reaches the page while an unbranded page keeps the host's. `validateBrandTokens`, `brandManifestSchema` (still re-exported from `./generative`), `brandProvenanceSchema`, `brandProducerId` and `brandScope` are exported beside it. The entry renders nothing, fetches nothing and depends on zod alone. See [docs/brand.md](docs/brand.md).
+- **`siteFacts` and `stylesheetUrls`, a website's design facts as data**: in `./brand`, pure functions over the page and stylesheets a host fetched behind its own guard. They read the colour custom properties with the value the page's content sees as served (set on every element, then on the body, then on the root, as a custom property inherits; then weighed by importance, cascade layer, specificity and source order, each sheet under the media its link names) and how often each is referenced, the colour literals and utilities by frequency with what each utility paints, the typefaces, the radii, the colour scheme and the logo candidates, for whatever produces a brand to judge. The page is read as a browser would read a stranger's: in document order with no link a comment or a script holds, each stylesheet on its own, truncated or nested or opening on `@charset`, and no page costs more to read than its length. See [docs/brand.md](docs/brand.md#reading-a-site).
+
 ## [v0.14.1] - 2026-10-06
 
 ### Changed

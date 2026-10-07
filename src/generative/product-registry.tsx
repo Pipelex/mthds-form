@@ -21,18 +21,20 @@ import { useControlId } from './ui/shadcn';
  * literal colour, no literal radius, no literal typeface. The rail's panel is
  * `bg-card` on `border-border`, a hairline is `border-border`, the call to
  * action's glow is the accent composed with `color-mix()`, the corners are
- * `--radius` and its multiples, the logo is the manifest's pair. That is what
- * lets one set of components render any brand the build produces - and what
- * makes anything the tokens cannot state absent from the page by
- * construction.
+ * `--radius` and its multiples, a tag is `font-mono`, the logo is the
+ * manifest's pair. The running text names no face at all: it inherits the
+ * page's, which a brand's compiled stylesheet sets on its scope from
+ * `--font-sans` (docs/brand.md). That is what lets one set of components
+ * render any brand the `./brand` entry compiles - and what makes anything the
+ * tokens cannot state absent from the page by construction.
  *
  * The layer's renderers are reused as they are; two of shadcn's are replaced
  * (`Input`, `Textarea`) so that every text field on the page is drawn on the
  * kernel's own control surface (`fieldControlClass`) and reads as one family
  * with the dates, the lists and the upload the kernel renders itself.
  *
- * Nothing here ships, and nothing here reads a schema - a brand component
- * takes copy and bound values, and that is all.
+ * Nothing here reads a schema - a brand component takes copy and bound values,
+ * and that is all.
  */
 
 const CONTAINER = 'mx-auto w-full max-w-6xl px-6 sm:px-8';

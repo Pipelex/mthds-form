@@ -1,6 +1,7 @@
-import type { BrandManifest } from '../../generative/manifest';
-import './brands/mthds.css';
-import './brands/pipelex.css';
+import type { BrandManifest } from '../../brand';
+import { fixtureLabel } from '../../generative';
+import { type BrandBuild, BRAND_BUILDS } from './brands/generated';
+import './brands/index.css';
 
 /**
  * The brands a generative story can paint a page in - STORY fixtures, not
@@ -8,27 +9,25 @@ import './brands/pipelex.css';
  *
  * A page with an app bar needs a brand whatever else is true: the bar reads
  * a logo pair and a name off the manifest, and nothing on the page names a
- * brand itself. So a story has to bring one, and the two here are the ones
- * the captured layouts were actually looked at under.
- *
- * Both came from the brand study on the `feature/Generative-ui` branch, where
- * a pipeline read a site and wrote its tokens; that pipeline did not come
- * with the layer, so nothing in this repo reproduces either the manifest or
- * the stylesheet, and neither is meant to be edited. What they are for is the
- * question a single palette cannot answer: whether a layout reads because of
- * the layout or because of the colours it was written against.
+ * brand itself. So a story has to bring one. Besides the stock palette, they
+ * are the corpus under `data/brands/`, which the brand study produced from
+ * real sites and which `make brands` compiles with the brand entry's own
+ * `assembleBrand` into `./brands/`. What they are for is the question a
+ * single palette cannot answer: whether a layout reads because of the layout
+ * or because of the colours it was written against.
  *
  * `scope` is the class the compiled stylesheet sets its custom properties on
- * (and their dark values under `.dark`). Everything below that class - the
- * catalog's own components, the kernel's controls - reads the tokens it
- * always reads, which is the whole of what a brand does to a page.
+ * (and their dark values under `.dark`, and the brand's typeface). Everything
+ * below that class - the catalog's own components, the kernel's controls -
+ * reads the tokens it always reads, which is the whole of what a brand does
+ * to a page.
  *
- * All of this is outside both entry trees, so it ships in nothing. See
- * docs/theming.md.
+ * All of this is outside every entry tree, so it ships in nothing. See
+ * docs/brand.md.
  */
 
 export interface BrandFixture {
-  /** The brand's key, for a story id. */
+  /** The brand's key, for a story's args. */
   key: string;
   /** What produced the tokens, for a story title. */
   producedBy: string;
@@ -58,35 +57,27 @@ export const STOCK: BrandFixture = {
   },
 };
 
-export const MTHDS: BrandFixture = {
-  key: 'mthds',
-  producedBy: 'Pipelex method · claude-4.8-opus',
-  scope: 'brand-mthds-pipelex-method--claude-4-8-opus',
-  manifest: {
-    name: 'MTHDS',
-    website: 'https://mthds.ai/',
-    logo: {
-      onLight: 'https://mthds.ai/latest/images/mthds-black_on_transparent.png',
-      onDark: 'https://mthds.ai/latest/images/mthds-white_on_transparent.png',
-    },
-    webfont: { provider: 'google-fonts', family: 'Roboto' },
-  },
-};
+function fixtureOf(build: BrandBuild): BrandFixture {
+  return {
+    key: `${build.brand}--${build.producerId}`,
+    producedBy: fixtureLabel(build),
+    scope: build.scope,
+    manifest: build.manifest,
+  };
+}
 
-export const PIPELEX: BrandFixture = {
-  key: 'pipelex',
-  producedBy: 'Pipelex method · claude-4.8-opus',
-  scope: 'brand-pipelex-pipelex-method--claude-4-8-opus',
-  manifest: {
-    name: 'Pipelex',
-    website: 'https://pipelex.com/',
-    logo: {
-      onLight: 'https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png',
-      onDark: 'https://pipelex.com/logo.png',
-    },
-    webfont: { provider: 'google-fonts', family: 'Inter' },
-  },
-};
+/** The corpus brand a story names, or a loud failure: a story must never paint in a brand it did not name. */
+function corpusBrand(brand: string, producerId: string): BrandFixture {
+  const found = BRAND_BUILDS.find(
+    (build) => build.brand === brand && build.producerId === producerId,
+  );
+  if (!found) throw new Error(`No brand ${brand}/${producerId} in data/brands/; run make brands.`);
+  return fixtureOf(found);
+}
+
+/** The two brands the captured layouts were looked at under. */
+export const MTHDS = corpusBrand('mthds', 'pipelex-method--claude-4.8-opus');
+export const PIPELEX = corpusBrand('pipelex', 'pipelex-method--claude-4.8-opus');
 
 /** Every brand a story may paint in, stock first. */
-export const BRANDS: readonly BrandFixture[] = [STOCK, MTHDS, PIPELEX];
+export const BRANDS: readonly BrandFixture[] = [STOCK, ...BRAND_BUILDS.map(fixtureOf)];

@@ -4,7 +4,7 @@ import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
 import { BrandProvider } from './brand-context';
-import type { BrandManifest } from './manifest';
+import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
 
