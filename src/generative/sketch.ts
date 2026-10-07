@@ -1,10 +1,11 @@
 import type { Spec, UIElement } from '@json-render/core';
 import type { RunField } from '../core';
 import { isNativeCompositeNode, isNativeDateNode, isNativeHtmlNode } from '../core/native-content';
+import { hasOwnProp } from '../core/own-property';
 import { INPUTS_ROOT, joinPath } from './paths';
 
 /**
- * The sketch designer's three halves in code: the brief it is handed, the
+ * The sketch designer's code: the brief it is handed, the
  * parse of the outline it returns, and the assembly of that outline into a
  * json-render spec.
  *
@@ -89,13 +90,16 @@ export interface PageSketch {
 /** What `sketchFromOutline` answers: the outline as data, or every line it could not read. */
 export type SketchParse = { ok: true; sketch: PageSketch } | { ok: false; problems: string[] };
 
-const PURPOSE_LINE = /^\**purpose:\**\s*(.*)$/i;
+/** `Purpose:`, with the bold closing before the colon or after it. */
+const PURPOSE_LINE = /^\**purpose\**:\**\s*(.*)$/i;
 const TITLE_LINE = /^#\s+(.+)$/;
 const HEADING_LINE = /^#+\s/;
 const BULLET_LINE = /^([ \t]*)[-*]\s+(.*)$/;
 const FENCE_LINE = /^```/;
 /** The block word, optionally in bold, then what follows it. */
 const BULLET_BODY = /^\*{0,2}([A-Za-z]+)\*{0,2}(.*)$/;
+/** The bold of `**Section:** …`, which closes after the colon. */
+const BOLD_AFTER_COLON = /^\*{1,2}/;
 /** The separator between a bullet's words and its optional line: an em or en dash between spaces. */
 const LINE_SEPARATOR = /\s+[—–]\s+/;
 
@@ -146,9 +150,15 @@ export function sketchFromOutline(outline: string): SketchParse {
         problems.push(`line ${number} is not a bullet, after the bullets began: "${bare}"`);
         return;
       }
+      // The prompt asks for the purpose before the title, but one written after
+      // it is still the purpose, never the line under the title.
+      const purposeMatch = PURPOSE_LINE.exec(bare);
+      if (purposeMatch !== null) {
+        if (purpose === '') purpose = purposeMatch[1]!.trim();
+        else problems.push(`line ${number} is a second Purpose line: "${bare}"`);
+        return;
+      }
       if (title === '') {
-        const purposeMatch = PURPOSE_LINE.exec(bare);
-        if (purposeMatch !== null) purpose = purposeMatch[1]!.trim();
         const titleMatch = TITLE_LINE.exec(bare);
         if (titleMatch !== null) title = titleMatch[1]!.trim();
         return;
@@ -171,7 +181,7 @@ export function sketchFromOutline(outline: string): SketchParse {
 
     const body = BULLET_BODY.exec(bullet[2]!.trim());
     const word = body?.[1];
-    if (body === null || word === undefined || !Object.hasOwn(SKETCH_BLOCKS, word)) {
+    if (body === null || word === undefined || !hasOwnProp(SKETCH_BLOCKS, word)) {
       const opening = bullet[2]!.trim().split(/\s/)[0];
       problems.push(
         `line ${number} starts with "${opening}", which is not a block the outline knows`,
@@ -184,7 +194,7 @@ export function sketchFromOutline(outline: string): SketchParse {
       problems.push(`line ${number} has no colon after "${block}": "${bare}"`);
       return;
     }
-    const rest = after.startsWith(':') ? after.slice(1).trim() : '';
+    const rest = after.startsWith(':') ? after.slice(1).replace(BOLD_AFTER_COLON, '').trim() : '';
     // A Text is one sentence, so a dash in it is part of it; every other block's
     // dash separates its words from its line.
     const [words = '', ...tail] = block === 'Text' ? [rest] : rest.split(LINE_SEPARATOR);
@@ -313,7 +323,7 @@ function treeOf(blocks: readonly SketchBlock[], problems: string[]): Node[] {
   blocks.forEach((raw, position) => {
     const index = position + 1;
     const block = raw?.block;
-    if (typeof block !== 'string' || !Object.hasOwn(SKETCH_BLOCKS, block)) {
+    if (typeof block !== 'string' || !hasOwnProp(SKETCH_BLOCKS, block)) {
       problems.push(
         `block ${index} is a "${String(block)}", which is not a block the outline knows`,
       );
@@ -433,6 +443,17 @@ function treeProblems(
     if (count > 1) problems.push(`the input "${name}" has ${count} Fields`);
   }
   if (runs !== 1) problems.push(`the outline has ${runs} Run blocks; it needs exactly one`);
+  // A Fold is built closed and a Tab shows one panel at a time, so a Run in
+  // either can be out of sight while the page is filled in.
+  const hiding = (nodes: readonly Node[], hider: Node | undefined): void => {
+    for (const node of nodes) {
+      if (node.block === 'Run' && hider !== undefined)
+        problems.push(`${describeNode(node)} is inside ${describeNode(hider)}, which can hide it`);
+      const hides = node.block === 'Fold' || node.block === 'Tab';
+      hiding(node.children, hider ?? (hides ? node : undefined));
+    }
+  };
+  hiding(roots, undefined);
   walk(roots, (node) => {
     if (node.block !== 'Steps') return;
     const earlier = node.children.slice(0, -1);
@@ -447,18 +468,25 @@ function treeProblems(
   });
 }
 
-/** A key for an element, unique in the spec: the block's name, then a counter when it repeats. */
+/**
+ * A key for an element, unique in the spec: the block's name, then the first
+ * counter that gives a key not yet issued. Counting per name is not enough,
+ * since a name can itself end in a counter: the inputs `a_b`, `a__b` and
+ * `a_b_2` would otherwise share `field-a-b-2`, and one element would replace
+ * another.
+ */
 function keyMaker(): (base: string) => string {
-  const used = new Map<string, number>();
+  const issued = new Set<string>();
   return (base) => {
     const slug =
       base
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '') || 'block';
-    const count = (used.get(slug) ?? 0) + 1;
-    used.set(slug, count);
-    return count === 1 ? slug : `${slug}-${count}`;
+    let key = slug;
+    for (let count = 2; issued.has(key); count += 1) key = `${slug}-${count}`;
+    issued.add(key);
+    return key;
   };
 }
 

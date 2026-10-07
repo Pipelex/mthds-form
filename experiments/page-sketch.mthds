@@ -81,7 +81,7 @@ The blocks:
 - Section: <title> — <optional short line>. A titled part of the page, holding blocks.
 - Side: <title>. A boxed panel beside the rest of the page that stays in view while it scrolls. At most one, at the margin, holding blocks.
 - Row. Lays the blocks it holds side by side.
-- Fold: <title> — <optional short line>. Folded away until the person opens it, holding blocks. Its line stays in view while it is folded.
+- Fold: <title> — <optional short line>. Folded away until the person opens it, holding blocks the person may leave alone: no required input. Its line stays in view while it is folded.
 - Steps. A journey shown one step at a time, holding only Step blocks.
 - Step: <label>. One step of the journey, holding blocks.
 - Tabs. One tab visible at a time, holding only Tab blocks.
@@ -92,7 +92,7 @@ The blocks:
 
 Rules:
 - Every input is one Field, exactly once.
-- There is exactly one Run, labelled with the job in a person's words ("Plan my trip"), never "Submit". Inside Steps, it is in the last step.
+- There is exactly one Run, labelled with the job in a person's words ("Plan my trip"), never "Submit". It is never inside a Fold or a Tab, and inside Steps, it is in the last step.
 - Say nothing the method does not say: no product or brand name, no promise about speed, storage or privacy, and nothing a Field already shows: its input's label, its description, a limit or a format.
 
 @?seed

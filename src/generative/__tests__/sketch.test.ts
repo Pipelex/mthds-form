@@ -262,7 +262,8 @@ describe('a Side', () => {
         block(1, 'Row'),
         block(2, 'Field', 'briefing_date'),
         block(2, 'Side', 'Panel'),
-        block(3, 'Run', 'Qualify the bid'),
+        block(3, 'Text', 'A go/no-go sheet.'),
+        block(0, 'Run', 'Qualify the bid'),
       ]),
     ).toEqual(['block 6 (Side "Panel") is nested; a Side sits at the margin']);
     expect(
@@ -296,6 +297,35 @@ describe('Steps and Tabs', () => {
     if (!assembly.ok) throw new Error(assembly.problems.join('\n'));
     expect(assembly.spec.elements.steps?.props.steps).toEqual(['The deck', 'The criteria']);
     expect(validateAgainstCatalog(assembly.spec, catalog).ok).toBe(true);
+  });
+});
+
+describe('element keys', () => {
+  it('never repeat, even where a name ends in what a counter would add', () => {
+    const optional = (name: string): RunField => ({ kind: 'text', name, required: false });
+    const named = [optional('a_b'), optional('a__b'), optional('a_b_2')];
+    const assembly = sketchToSpec(
+      sketch([
+        block(0, 'Section', 'Details'),
+        block(1, 'Field', 'a_b'),
+        block(0, 'Section', 'Details'),
+        block(1, 'Field', 'a__b'),
+        block(0, 'Section', 'Details 2'),
+        block(1, 'Field', 'a_b_2'),
+        block(0, 'Run', 'Go'),
+      ]),
+      named,
+    );
+    if (!assembly.ok) throw new Error(assembly.problems.join('\n'));
+    const { spec } = assembly;
+    const placed = Object.values(spec.elements)
+      .filter((element) => element.type === 'MthdsField')
+      .map((element) => element.props.path);
+    expect(placed).toEqual(['/inputs/a_b', '/inputs/a__b', '/inputs/a_b_2']);
+    const sections = Object.values(spec.elements).filter((element) => element.type === 'Section');
+    expect(sections).toHaveLength(3);
+    expect(validateAgainstCatalog(spec, catalog).ok).toBe(true);
+    expect(layoutProblems({ inputs: named }, spec)).toEqual([]);
   });
 });
 
@@ -360,6 +390,24 @@ describe('a malformed outline is refused, every problem named', () => {
         block(2, 'Field', 'briefing_date'),
       ]),
     ).toContain('block 1 (Steps) has its Run before the last step');
+  });
+
+  it('a Run in a Fold or a Tab, where it can be out of sight', () => {
+    expect(problemsOf([...complete, block(0, 'Fold', 'More'), block(1, 'Run', 'Go')])).toEqual([
+      'block 5 (Run "Go") is inside block 4 (Fold "More"), which can hide it',
+    ]);
+    expect(
+      problemsOf([
+        block(0, 'Tabs'),
+        block(1, 'Tab', 'The deck'),
+        block(2, 'Field', 'briefing'),
+        block(2, 'Field', 'briefing_date'),
+        block(1, 'Tab', 'The criteria'),
+        block(2, 'Section', 'Yours'),
+        block(3, 'Field', 'criteria'),
+        block(3, 'Run', 'Go'),
+      ]),
+    ).toEqual(['block 8 (Run "Go") is inside block 5 (Tab "The criteria"), which can hide it']);
   });
 
   it('a block the outline does not know', () => {
@@ -441,6 +489,41 @@ describe('the outline', () => {
       [1, 'Field'],
     ]);
     expect(parse.sketch).not.toHaveProperty('lede');
+  });
+
+  it('reads a block word in bold, whether the bold closes before the colon or after it', () => {
+    const parse = sketchFromOutline(
+      [
+        '# Qualify a bid',
+        '- **Section:** The deck — the briefing you were sent',
+        '  - **Field:** briefing',
+        '- **Fold**: More',
+        '  - Field: briefing_date',
+        '- Field: criteria',
+        '- **Run:** Go',
+      ].join('\n'),
+    );
+    if (!parse.ok) throw new Error(parse.problems.join('\n'));
+    expect(parse.sketch.blocks).toEqual([
+      block(0, 'Section', 'The deck', 'the briefing you were sent'),
+      block(1, 'Field', 'briefing'),
+      block(0, 'Fold', 'More'),
+      block(1, 'Field', 'briefing_date'),
+      block(0, 'Field', 'criteria'),
+      block(0, 'Run', 'Go'),
+    ]);
+  });
+
+  it('reads the purpose in bold, or after the title, and never as the line under it', () => {
+    const before = sketchFromOutline('**Purpose**: to decide.\n# Qualify a bid\n- Run: Go');
+    expect(before.ok && before.sketch.purpose).toBe('to decide.');
+    const after = sketchFromOutline('# Qualify a bid\nPurpose: to decide.\nA line.\n- Run: Go');
+    if (!after.ok) throw new Error(after.problems.join('\n'));
+    expect(after.sketch).toMatchObject({ purpose: 'to decide.', lede: 'A line.' });
+    expect(sketchFromOutline('Purpose: one.\n# Qualify a bid\nPurpose: two.\n- Run: Go')).toEqual({
+      ok: false,
+      problems: ['line 3 is a second Purpose line: "Purpose: two."'],
+    });
   });
 
   it('refuses what is not the grammar, every line named', () => {
