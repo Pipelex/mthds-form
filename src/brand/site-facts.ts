@@ -129,6 +129,15 @@ export interface SiteFacts {
 
 type Attrs = Record<string, string>;
 
+/** A percent-encoded value from the markup, or null when its escapes are malformed. */
+function decoded(text: string): string | null {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return null;
+  }
+}
+
 function resolveUrl(href: string, base: string): string | null {
   try {
     return new URL(href, base).toString();
@@ -184,13 +193,41 @@ function metaContent(metas: Attrs[], key: string): string | null {
  * in document order: what a host fetches before it calls `siteFacts`.
  */
 export function stylesheetUrls(html: string, finalUrl: string): string[] {
-  const urls: string[] = [];
-  for (const link of tagsOf(html, 'link')) {
-    if (!/\bstylesheet\b/i.test(link.rel ?? '') || !link.href) continue;
-    const url = resolveUrl(link.href, finalUrl);
-    if (url) urls.push(url);
+  return tagsOf(html, 'link')
+    .map((link) => linkedStylesheet(link, finalUrl))
+    .filter((url): url is string => url !== null);
+}
+
+/** The URL a `<link>` loads a stylesheet from, or null when it loads none. */
+function linkedStylesheet(link: Attrs, base: string): string | null {
+  if (!/\bstylesheet\b/i.test(link.rel ?? '') || !link.href) return null;
+  return resolveUrl(link.href, base);
+}
+
+/**
+ * The page's CSS in document order: each linked sheet where its `<link>` is,
+ * each `<style>` block where it is. Source order decides which of two equal
+ * rules wins, so an inline block that precedes a link must be read before it.
+ * `page.stylesheets` pairs with the links in order, as `stylesheetUrls` named
+ * them; a sheet the markup does not account for is read last.
+ */
+function cssInDocumentOrder(page: FetchedPage): { css: string; inlineBlocks: number } {
+  const texts: string[] = [];
+  let next = 0;
+  let inlineBlocks = 0;
+  const sheetText = (sheet: FetchedStylesheet | undefined) =>
+    sheet && 'css' in sheet ? sheet.css : '';
+  for (const match of page.html.matchAll(/<link\b([^>]*)>|<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
+    if (match[2] !== undefined) {
+      texts.push(match[2]);
+      inlineBlocks += 1;
+    } else if (linkedStylesheet(parseAttrs(match[1]!), page.finalUrl) !== null) {
+      texts.push(sheetText(page.stylesheets[next]));
+      next += 1;
+    }
   }
-  return urls;
+  for (const sheet of page.stylesheets.slice(next)) texts.push(sheetText(sheet));
+  return { css: texts.join('\n'), inlineBlocks };
 }
 
 // ─── CSS, by a small scanner ─────────────────────────────────────────────────
@@ -205,46 +242,67 @@ interface Rule {
   body: string;
 }
 
-/** Every leaf block as its selector chain and its body. */
+/**
+ * Every block's declarations as its selector chain and its body, in source
+ * order.
+ *
+ * A stylesheet here is a stranger's, possibly truncated by the host's size cap,
+ * so the scan reads it the way a browser's tokenizer would rather than trusting
+ * it to be well formed. A brace inside a string (`content:"{"`) or escaped in a
+ * selector is text. A `;` at the top level ends a statement (`@charset`,
+ * `@import`, `@layer a, b;`), so it never joins the next rule's selector. A
+ * block's declarations written before a nested rule are a rule of their own,
+ * placed before the nested one, so source order still decides which value
+ * wins. And the end of the input closes every block still open.
+ */
 function rulesOf(css: string): Rule[] {
   const rules: Rule[] = [];
   const stack: string[] = [];
-  let prelude = '';
+  // The text since the last `{`, `}` or `;`: a declaration, or the next rule's prelude.
+  let pending = '';
+  // The declarations of the innermost open block that are not yet a rule.
   let body = '';
-  let depth = 0;
+  let quote: string | null = null;
+  const emit = () => {
+    if (body.trim()) rules.push({ selectors: [...stack], body: body.trim() });
+    body = '';
+  };
   for (let i = 0; i < css.length; i += 1) {
     const char = css[i]!;
-    if (char === '{') {
-      stack.push(prelude.trim());
-      prelude = '';
-      body = '';
-      depth += 1;
+    if (char === '\\') {
+      pending += css.slice(i, i + 2);
+      i += 1;
+    } else if (quote) {
+      pending += char;
+      // A newline ends an unclosed string, as it does in CSS.
+      if (char === quote || char === '\n') quote = null;
+    } else if (char === '"' || char === "'") {
+      pending += char;
+      quote = char;
+    } else if (char === '{') {
+      emit();
+      stack.push(pending.trim());
+      pending = '';
     } else if (char === '}') {
-      if (body.trim()) rules.push({ selectors: [...stack], body: body.trim() });
-      stack.pop();
-      depth -= 1;
-      body = '';
-      prelude = '';
-    } else if (depth === 0) {
-      prelude += char;
-    } else {
-      // Inside a block: text before a nested `{` is a prelude, text otherwise is body.
-      const nextOpen = css.indexOf('{', i);
-      const nextClose = css.indexOf('}', i);
-      if (nextOpen !== -1 && nextOpen < nextClose) {
-        prelude = css.slice(i, nextOpen);
-        // Declarations before a nested rule belong to the enclosing block.
-        const semicolon = prelude.lastIndexOf(';');
-        if (semicolon !== -1) {
-          body += prelude.slice(0, semicolon + 1);
-          prelude = prelude.slice(semicolon + 1);
-        }
-        i = nextOpen - 1;
-      } else {
-        body = css.slice(i, nextClose);
-        i = nextClose - 1;
+      // A close with nothing open is a stray, and is dropped.
+      if (stack.length > 0) {
+        body += pending;
+        emit();
+        stack.pop();
       }
+      pending = '';
+    } else if (char === ';') {
+      if (stack.length > 0) body += `${pending};`;
+      pending = '';
+    } else {
+      pending += char;
     }
+  }
+  while (stack.length > 0) {
+    body += pending;
+    pending = '';
+    emit();
+    stack.pop();
   }
   return rules;
 }
@@ -514,19 +572,15 @@ export function siteFacts(page: FetchedPage): SiteFacts {
   const htmlAttrs = firstTag(html, 'html');
   const bodyAttrs = firstTag(html, 'body');
 
-  const inline = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(
-    (match) => match[1]!,
-  );
-  const css = stripComments(
-    [...page.stylesheets.map((sheet) => ('css' in sheet ? sheet.css : '')), ...inline].join('\n'),
-  );
-  const rules = rulesOf(css);
+  const inOrder = cssInDocumentOrder(page);
+  const rules = rulesOf(stripComments(inOrder.css));
 
   // Custom properties, with the selector chain they are declared under. A
   // site with two schemes declares the same name twice, under `:root` and
   // under `.dark` (or a `[data-…]` attribute), and the chain is what tells
   // them apart.
   const properties = new Map<string, PropertyEntry[]>();
+  const radiusProperties = new Map<string, PropertyEntry[]>();
   const literals = new Map<string, number>();
   const fontFamilies = new Map<string, number>();
   const fontFaces = new Set<string>();
@@ -552,11 +606,18 @@ export function siteFacts(page: FetchedPage): SiteFacts {
         // Tailwind's own internals (`--tw-ring-color`, `--tw-shadow`, the prose
         // palette) are the framework's, not the site's.
         if (property.startsWith('--tw-')) continue;
-        if (!looksLikeColorProperty(property, value)) continue;
-        let entries = properties.get(property);
+        // A radius is a length, whatever else its name says (`--border-radius`),
+        // so it is kept on its own rather than read as a colour.
+        const into = /radius/i.test(property)
+          ? radiusProperties
+          : looksLikeColorProperty(property, value)
+            ? properties
+            : null;
+        if (!into) continue;
+        let entries = into.get(property);
         if (!entries) {
           entries = [];
-          properties.set(property, entries);
+          into.set(property, entries);
         }
         entries.push({
           value,
@@ -609,9 +670,9 @@ export function siteFacts(page: FetchedPage): SiteFacts {
         ),
     );
   const googleFamilies = webfontLinks.flatMap((href) =>
-    [...href.matchAll(/family=([^&:]+)/g)].map((match) =>
-      decodeURIComponent(match[1]!).replace(/\+/g, ' '),
-    ),
+    [...href.matchAll(/family=([^&:]+)/g)]
+      .map((match) => decoded(match[1]!)?.replace(/\+/g, ' ') ?? null)
+      .filter((family): family is string => family !== null),
   );
   const fontPreloads = links
     .filter((link) => /\bpreload\b/i.test(link.rel ?? '') && link.as === 'font' && link.href)
@@ -645,7 +706,8 @@ export function siteFacts(page: FetchedPage): SiteFacts {
       class: img.class ?? null,
     };
     const nextImage = /\/_next\/image\?(?:.*&)?url=([^&]+)/.exec(src);
-    if (nextImage) candidate.original = resolveUrl(decodeURIComponent(nextImage[1]!), base);
+    const original = nextImage ? decoded(nextImage[1]!) : null;
+    if (original) candidate.original = resolveUrl(original, base);
     addLogo(candidate);
   }
   for (const link of links) {
@@ -699,7 +761,7 @@ export function siteFacts(page: FetchedPage): SiteFacts {
     stylesheets: page.stylesheets.map((sheet) =>
       'css' in sheet ? { url: sheet.url, bytes: sheet.css.length } : sheet,
     ),
-    inlineStyleBlocks: inline.length,
+    inlineStyleBlocks: inOrder.inlineBlocks,
     colors: {
       customProperties: [...properties.entries()]
         .slice(0, KEEP.properties)
@@ -721,9 +783,9 @@ export function siteFacts(page: FetchedPage): SiteFacts {
     shape: {
       radiiByFrequency: rank(radii, KEEP.radii),
       utilitiesByFrequency: rank(radiusUtilities, KEEP.radiusUtilities),
-      radiusProperties: [...properties.entries()]
-        .filter(([name]) => /radius/i.test(name))
-        .map(([name, values]) => propertyFacts(name, values)),
+      radiusProperties: [...radiusProperties.entries()].map(([name, values]) =>
+        propertyFacts(name, values),
+      ),
     },
     logos: { candidates: logos.slice(0, KEEP.logos), headerSvgs: headerSvgs.slice(0, 6) },
   };
