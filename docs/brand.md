@@ -42,10 +42,10 @@ The colour and radius rows are not a second list kept beside the theme. `src/bra
 
 - The file carries exactly the contract's tokens, in three groups (`color`, `radius`, `font`), each with its `$type`. A token the contract does not name is refused, and so is one the file omits.
 - Every token carries a `$description`: one sentence saying where on the site the value comes from, or how it was derived.
-- A colour is an object, `{ "colorSpace": "srgb", "components": [r, g, b], "alpha": a }`, each number in 0..1, with an optional `hex` that must agree with the components to the rounding a hex carries. The colour space is always sRGB.
+- A colour is an object, `{ "colorSpace": "srgb", "components": [r, g, b], "alpha": a }`, each number in 0..1, with an optional `hex` that must be exactly the hex the components compile to, each channel rounded to its byte. The colour space is always sRGB.
 - A colour token whose value is a colour object states its dark value in `$extensions.mode.dark`, and `dark` is the only mode. An alias, the string `"{color.<name>}"`, may stand for both modes, and then follows its target's dark value. An alias names a colour token of the contract and never forms a cycle.
 - `radius.base` is `{ "value": <number>, "unit": "rem" | "px" }`, and each font token is a list of family names, the site's own first and a generic family last.
-- The contrast pairs reach AA in both modes, read through the aliases and measured as they render: the canvas of a pair must be opaque, since a translucent one shows whatever the host paints beneath it, and the ink is blended over it by its alpha, so a translucent ink counts at the strength it actually has and a transparent one fails.
+- The contrast pairs reach AA in both modes, read through the aliases and measured as they render: the canvas of a pair must be opaque, since a translucent one shows whatever the host paints beneath it, and the ink is blended over it by its alpha, so a translucent ink counts at the strength it actually has and a transparent one fails. Both colours are measured as the compiler writes them, each channel rounded to its byte and the alpha to three decimals, because that is what a page renders: a grey that clears 4.5:1 at full precision can round below it.
 - A family name holds no control character, since a form feed would end the CSS string it is written into.
 
 A standard DTCG tool accepts far more than this, and the difference is not academic. The study that first built this chain compiled through Terrazzo 2.7.1, and found that it silently turned an unparseable string colour into black, crashed its build on a hex with no components, crashed its CSS plugin on a colour outside sRGB, and checked contrast in the light mode only. Each is a way a producer's file is wrong and a page is painted anyway, and the validator refuses every one of them.
@@ -75,7 +75,7 @@ Some things a site does not show, and no reading can supply them: the accent of 
 { "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" }, "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" } }
 ```
 
-A stated fact outranks every reading. `withStatedFacts(facts, stated)` places it in the facts a producer reads, right after the site's identity and ahead of every reading. The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must resolve to the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
+A stated fact outranks every reading. `withStatedFacts(facts, stated)` places it in the facts a producer reads, right after the site's identity and ahead of every reading, replacing whatever those facts were stated with before. The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
 
 ## Compiling
 

@@ -149,6 +149,29 @@ describe('the stated facts', () => {
     ]);
     expect(withStatedFacts(facts, null)).toBe(facts);
   });
+
+  it('replaces what the facts were stated with before', () => {
+    // Facts read back from disk already carry a statement; the new one is the
+    // person's latest word, and the old one once followed it in and won.
+    const facts = {
+      url: 'https://acme.example/',
+      finalUrl: 'https://acme.example/',
+      fetchedAt: '2026-10-06',
+      colors: { customProperties: [] },
+    };
+    const first = withStatedFacts(facts, { accent: { light: '#111111' } });
+    const second = withStatedFacts(first, { accent: { light: '#222222' } });
+    expect(second.stated).toEqual({ accent: { light: '#222222' } });
+    expect(Object.keys(second)).toEqual(['url', 'finalUrl', 'fetchedAt', 'stated', 'colors']);
+  });
+
+  it('refuses a primary one step from the stated accent: it would ship as its neighbour', () => {
+    const light = primaryHex('light');
+    const neighbour = `#${(parseInt(light.slice(1), 16) ^ 1).toString(16).padStart(6, '0')}`;
+    expect(problemsWith({ accent: { light: neighbour } })).toEqual([
+      `tokens.json: color.primary (light) resolves to ${light}, but the accent for light mode was stated as ${neighbour}`,
+    ]);
+  });
 });
 
 describe('naming a brand', () => {

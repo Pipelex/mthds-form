@@ -80,13 +80,23 @@ export function statedFactProblems(
 /**
  * The facts a producer reads, with what the person stated placed right after
  * the site's identity and ahead of every reading, because it outranks them.
+ * What they state replaces whatever the facts were stated with before.
  */
 export function withStatedFacts<Facts extends { url: string; finalUrl: string; fetchedAt: string }>(
   facts: Facts,
   stated: StatedFacts | null | undefined,
 ): Facts & { stated?: StatedFacts } {
   if (!stated) return facts;
-  const { url, finalUrl, fetchedAt, ...rest } = facts;
+  // The earlier statement is dropped, so it cannot follow the new one in and win.
+  const {
+    url,
+    finalUrl,
+    fetchedAt,
+    stated: _previous,
+    ...rest
+  } = facts as Facts & {
+    stated?: StatedFacts;
+  };
   const site = 'site' in rest ? { site: rest.site } : {};
   return { url, finalUrl, fetchedAt, ...site, stated, ...rest } as Facts & { stated: StatedFacts };
 }

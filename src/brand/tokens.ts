@@ -138,7 +138,7 @@ export function modeValue(token: ColorToken, mode: ColorMode): ColorValue {
   return mode === 'light' ? token.$value : darkValue(token);
 }
 
-/** `#rrggbb` for a colour, its alpha dropped. */
+/** `#rrggbb` for a colour, its alpha dropped: each channel the byte the compiler writes. */
 export function colorHex(color: SrgbColor): string {
   return `#${color.components
     .map((channel) =>
@@ -149,23 +149,32 @@ export function colorHex(color: SrgbColor): string {
     .join('')}`;
 }
 
-/** How far a component may sit from a hex channel and still be that channel: the rounding a hex carries. */
-const HEX_TOLERANCE = 1.5 / 255;
-
-/** Whether a colour is the hex, to the rounding a hex can carry. */
+/**
+ * Whether a colour compiles to the hex. The hex is what a brand ships for the
+ * colour, so any slack here would let a stated accent ship as its neighbour.
+ */
 export function colorIsHex(color: SrgbColor, hex: string): boolean {
-  const fromHex = hexChannels(hex);
-  return color.components.every(
-    (channel, index) => Math.abs(channel - fromHex[index]!) <= HEX_TOLERANCE,
-  );
+  return colorHex(color) === hex.toLowerCase();
 }
 
-function hexChannels(hex: string): [number, number, number] {
-  return [
-    parseInt(hex.slice(1, 3), 16) / 255,
-    parseInt(hex.slice(3, 5), 16) / 255,
-    parseInt(hex.slice(5, 7), 16) / 255,
-  ];
+/**
+ * A colour as the compiler writes it: each channel the byte a hex or `rgb()`
+ * carries, the alpha to the three decimals `rgb()` is given, and opaque once it
+ * rounds to 1. A page renders this colour, not the components it was produced
+ * as, so contrast is measured on it: a grey that passes at full precision can
+ * round below the bar.
+ */
+export function asWritten(color: SrgbColor): SrgbColor {
+  const alpha = Number(Math.min(color.alpha, 1).toFixed(3));
+  return {
+    colorSpace: 'srgb',
+    components: color.components.map((channel) => Math.round(channel * 255) / 255) as [
+      number,
+      number,
+      number,
+    ],
+    alpha,
+  };
 }
 
 function checkHexAgreement(name: string, mode: ColorMode, value: ColorValue, problems: string[]) {
@@ -246,7 +255,8 @@ export function composite(color: SrgbColor, over: SrgbColor): SrgbColor {
  * Each contrast pair as it renders. The canvas must be opaque, since a
  * translucent one shows whatever the host paints beneath it and its contrast is
  * nobody's to promise; the ink is blended over it, so a translucent ink is
- * measured at the strength it actually has, and a transparent one fails.
+ * measured at the strength it actually has, and a transparent one fails. Both
+ * are measured as the compiler writes them, which is what renders.
  */
 function checkContrast(tokens: BrandTokens, mode: ColorMode, problems: string[]) {
   for (const pair of CONTRAST_PAIRS) {
@@ -259,7 +269,8 @@ function checkContrast(tokens: BrandTokens, mode: ColorMode, problems: string[])
       );
       continue;
     }
-    const ratio = contrastRatio(composite(foreground, background), background);
+    const canvas = asWritten(background);
+    const ratio = contrastRatio(composite(asWritten(foreground), canvas), canvas);
     if (ratio < MIN_CONTRAST) {
       problems.push(
         `color.${pair.foreground} on color.${pair.background} (${mode}): contrast ${ratio.toFixed(2)}, expected ${MIN_CONTRAST} (WCAG AA)`,

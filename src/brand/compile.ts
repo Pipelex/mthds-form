@@ -1,6 +1,7 @@
 import { BRAND_CONTRACT, COLOR_TOKEN_NAMES, type ColorTokenName } from './contract';
 import {
   aliasTarget,
+  asWritten,
   type BrandTokens,
   colorHex,
   type ColorValue,
@@ -91,11 +92,15 @@ function colorCss(name: ColorTokenName, value: ColorValue): string {
   return srgbCss(value as SrgbColor);
 }
 
-/** An opaque colour as its hex, a translucent one as `rgb()` with its alpha. */
+/**
+ * An opaque colour as its hex, a translucent one as `rgb()` with its alpha,
+ * both as `asWritten` rounds them, which is the colour the validator measured.
+ */
 function srgbCss(color: SrgbColor): string {
-  if (color.alpha >= 1) return colorHex(color);
+  const { alpha } = asWritten(color);
+  if (alpha >= 1) return colorHex(color);
   const [r, g, b] = color.components.map((channel) => Math.round(channel * 255));
-  return `rgb(${r} ${g} ${b} / ${Number(color.alpha.toFixed(3))})`;
+  return `rgb(${r} ${g} ${b} / ${alpha})`;
 }
 
 /**

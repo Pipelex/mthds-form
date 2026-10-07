@@ -117,6 +117,45 @@ describe('the token validator', () => {
     expect(problemsOf(tokens).join('\n')).toMatch(/hex #ff0000 does not agree/);
   });
 
+  it('refuses a hex one step from what its components compile to', () => {
+    // 0.499 compiles to 7f; a hex of 7e was once let through as rounding, and
+    // the brand then shipped a colour other than the one its file named.
+    const tokens = base();
+    tokens.color.primary.$value = {
+      colorSpace: 'srgb',
+      components: [0.499, 0.499, 0.499],
+      alpha: 1,
+      hex: '#7e7e7e',
+    };
+    expect(problemsOf(tokens).join('\n')).toMatch(/hex #7e7e7e does not agree/);
+  });
+
+  it('measures contrast on the colours as compiled, so rounding cannot carry a pair below AA', () => {
+    // 0.465 on white is 4.505:1 at full precision, but it compiles to #777777,
+    // which renders at 4.478:1.
+    const grey = { colorSpace: 'srgb' as const, alpha: 1 };
+    const tokens = base();
+    tokens.color.background.$value = { ...grey, components: [1, 1, 1] };
+    tokens.color['muted-foreground'].$value = { ...grey, components: [0.465, 0.465, 0.465] };
+    expect(problemsOf(tokens).join('\n')).toMatch(
+      /color\.muted-foreground on color\.background \(light\): contrast 4\.48/,
+    );
+  });
+
+  it('measures a translucent ink at the alpha it compiles to', () => {
+    // Alpha 0.54105 clears 4.5:1, but rgb() is given 0.541, which does not.
+    const tokens = base();
+    tokens.color.background.$value = { colorSpace: 'srgb', components: [1, 1, 1], alpha: 1 };
+    tokens.color['muted-foreground'].$value = {
+      colorSpace: 'srgb',
+      components: [3 / 255, 3 / 255, 3 / 255],
+      alpha: 0.54105,
+    };
+    expect(problemsOf(tokens).join('\n')).toMatch(
+      /color\.muted-foreground on color\.background \(light\): contrast/,
+    );
+  });
+
   it('refuses a pair below AA in the dark mode as well as in the light one', () => {
     const tokens = base();
     tokens.color['muted-foreground'].$extensions!.mode.dark = {
