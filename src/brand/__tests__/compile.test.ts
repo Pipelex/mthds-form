@@ -93,6 +93,22 @@ describe('compiling a brand', () => {
     expect(css.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('color: red');
   });
 
+  it("writes a family name so that nothing in it can end its string or the page's style element", () => {
+    const tokens = tokensOf();
+    tokens.font.sans.$value = ['Evil\f} body { background: red } .z {', 'A</style><img>'];
+    const css = compileBrand(tokens, SCOPE);
+    expect(css).toContain(
+      "  --font-sans: 'Evil\\c } body { background: red } .z {', 'A\\3c /style\\3e \\3c img\\3e ';\n",
+    );
+    expect(css).not.toContain('</style');
+  });
+
+  it("keeps a description from closing the page's style element", () => {
+    const tokens = tokensOf();
+    tokens.color.primary.$description = 'Teal </style><script>alert(1)</script>';
+    expect(compileBrand(tokens, SCOPE)).not.toContain('</');
+  });
+
   it('refuses a scope that is not a class name', () => {
     expect(() => compileBrand(tokensOf(), 'brand x { }')).toThrow(/not a scope class/);
   });

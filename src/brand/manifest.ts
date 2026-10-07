@@ -17,7 +17,7 @@ import { z } from 'zod';
  * scheme is checked where the manifest is parsed rather than trusted at the
  * point it reaches the DOM.
  */
-const httpUrl = z.url({ protocol: /^https?$/ });
+export const httpUrl = z.url({ protocol: /^https?$/ });
 
 export const brandManifestSchema = z.strictObject({
   name: z.string().min(1),

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BrandManifest } from './manifest';
+import { type BrandManifest, httpUrl } from './manifest';
 import { type BrandTokens, colorHex, colorIsHex, resolveColor } from './tokens';
 
 /**
@@ -22,11 +22,15 @@ export const statedFactsSchema = z.strictObject({
       dark: statedHex.optional(),
     })
     .optional(),
-  /** The logo for a canvas, an absolute URL: `logo.onLight` or `logo.onDark` in the manifest. */
+  /**
+   * The logo for a canvas: `logo.onLight` or `logo.onDark` in the manifest,
+   * which the brand must carry exactly, so it obeys the manifest's rule (http
+   * or https) or no brand could ever honour it.
+   */
   logo: z
     .strictObject({
-      onLight: z.url().optional(),
-      onDark: z.url().optional(),
+      onLight: httpUrl.optional(),
+      onDark: httpUrl.optional(),
     })
     .optional(),
 });

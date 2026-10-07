@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type BrandTokens,
   colorHex,
+  composite,
   contrastRatio,
   resolveColor,
   validateBrandTokens,
@@ -128,6 +129,39 @@ describe('the token validator', () => {
     );
   });
 
+  it('measures a translucent ink at the strength it renders with, so a transparent one fails', () => {
+    const tokens = base();
+    tokens.color.foreground.$value = {
+      colorSpace: 'srgb',
+      components: [0.04, 0.04, 0.04],
+      alpha: 0,
+    };
+    tokens.color['muted-foreground'].$value = {
+      colorSpace: 'srgb',
+      components: [0.04, 0.04, 0.04],
+      alpha: 0.3,
+    };
+    const problems = problemsOf(tokens).join('\n');
+    expect(problems).toMatch(/color\.foreground on color\.background \(light\): contrast 1\.00/);
+    expect(problems).toMatch(/color\.muted-foreground on color\.background \(light\): contrast/);
+  });
+
+  it('refuses a translucent canvas, which nobody can promise a contrast on', () => {
+    const tokens = base();
+    tokens.color.background.$value = { colorSpace: 'srgb', components: [1, 1, 1], alpha: 0.9 };
+    expect(problemsOf(tokens).join('\n')).toMatch(
+      /color\.background \(light\): alpha 0\.9, but text is measured against it, so it must be opaque/,
+    );
+  });
+
+  it('refuses a family name holding a control character, which would end its string', () => {
+    const tokens = base();
+    tokens.font.sans.$value = ['Inter\f} body { background: red } .z {'];
+    expect(problemsOf(tokens).join('\n')).toMatch(
+      /font\.sans\.\$value\.0: a family name holds no control characters/,
+    );
+  });
+
   it('reports every problem at once', () => {
     const tokens = base();
     tokens.color.ring.$value = '{color.tertiary}';
@@ -152,6 +186,11 @@ describe('the colour arithmetic', () => {
   it('measures WCAG contrast', () => {
     expect(contrastRatio(black, white)).toBeCloseTo(21, 5);
     expect(contrastRatio(white, white)).toBe(1);
+  });
+
+  it('blends a translucent colour over an opaque one by its alpha', () => {
+    expect(composite({ ...black, alpha: 0.25 }, white).components).toEqual([0.75, 0.75, 0.75]);
+    expect(composite({ ...black, alpha: 0 }, white).components).toEqual([1, 1, 1]);
   });
 
   it('writes a hex without the alpha', () => {

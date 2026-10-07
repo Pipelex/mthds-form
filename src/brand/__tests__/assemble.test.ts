@@ -105,6 +105,13 @@ describe('the stated facts', () => {
     ]);
   });
 
+  it('refuses a stated logo that is not http(s), which no manifest could carry', () => {
+    const problems = problemsWith({ logo: { onLight: 'data:image/png;base64,AAAA' } });
+    expect(
+      problems.some((problem) => problem.startsWith('provenance.json: stated.logo.onLight')),
+    ).toBe(true);
+  });
+
   it('places what was stated ahead of every reading in the facts a producer reads', () => {
     const facts = {
       url: 'https://acme.example/',

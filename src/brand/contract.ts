@@ -111,7 +111,10 @@ export const BRAND_CONTRACT: readonly ContractToken[] = [
   },
 ];
 
-/** The pairs that must clear WCAG AA in both modes, computed on the opaque colours. */
+/**
+ * The pairs that must clear WCAG AA in both modes, as they render: the canvas
+ * opaque, the ink blended over it by its alpha.
+ */
 export const CONTRAST_PAIRS: readonly {
   foreground: ColorTokenName;
   background: ColorTokenName;

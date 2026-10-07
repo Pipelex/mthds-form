@@ -47,6 +47,16 @@ export type ColorValue = z.infer<typeof colorValueSchema>;
 
 const description = z.string().min(1, 'every token carries a $description');
 
+/**
+ * A C0 control or DEL. Written as a test on the code point rather than a
+ * character class, since that range is what a regex may not spell
+ * (`no-control-regex`).
+ */
+export function isControlCharacter(char: string): boolean {
+  const code = char.codePointAt(0)!;
+  return code < 0x20 || code === 0x7f;
+}
+
 const colorTokenSchema = z
   .strictObject({
     $value: colorValueSchema,
@@ -72,7 +82,17 @@ const dimensionTokenSchema = z.strictObject({
 export type DimensionToken = z.infer<typeof dimensionTokenSchema>;
 
 const fontFamilyTokenSchema = z.strictObject({
-  $value: z.array(z.string().min(1)).min(1),
+  $value: z
+    .array(
+      z
+        .string()
+        .min(1)
+        // A face's name never holds one, and a form feed ends a CSS string.
+        .refine((name) => ![...name].some(isControlCharacter), {
+          message: 'a family name holds no control characters',
+        }),
+    )
+    .min(1),
   $description: description,
 });
 
@@ -214,12 +234,32 @@ export function contrastRatio(a: SrgbColor, b: SrgbColor): number {
   return (light + 0.05) / (dark + 0.05);
 }
 
+/** A colour as it renders over an opaque one: the two blended by its alpha, as a browser does. */
+export function composite(color: SrgbColor, over: SrgbColor): SrgbColor {
+  const components = color.components.map(
+    (channel, index) => channel * color.alpha + over.components[index]! * (1 - color.alpha),
+  ) as [number, number, number];
+  return { colorSpace: 'srgb', components, alpha: 1 };
+}
+
+/**
+ * Each contrast pair as it renders. The canvas must be opaque, since a
+ * translucent one shows whatever the host paints beneath it and its contrast is
+ * nobody's to promise; the ink is blended over it, so a translucent ink is
+ * measured at the strength it actually has, and a transparent one fails.
+ */
 function checkContrast(tokens: BrandTokens, mode: ColorMode, problems: string[]) {
   for (const pair of CONTRAST_PAIRS) {
     const foreground = resolveColor(tokens, pair.foreground, mode);
     const background = resolveColor(tokens, pair.background, mode);
     if (!foreground || !background) continue;
-    const ratio = contrastRatio(foreground, background);
+    if (background.alpha < 1) {
+      problems.push(
+        `color.${pair.background} (${mode}): alpha ${background.alpha}, but text is measured against it, so it must be opaque (alpha 1)`,
+      );
+      continue;
+    }
+    const ratio = contrastRatio(composite(foreground, background), background);
     if (ratio < MIN_CONTRAST) {
       problems.push(
         `color.${pair.foreground} on color.${pair.background} (${mode}): contrast ${ratio.toFixed(2)}, expected ${MIN_CONTRAST} (WCAG AA)`,

@@ -4,6 +4,7 @@ import {
   type BrandTokens,
   colorHex,
   type ColorValue,
+  isControlCharacter,
   modeValue,
   type SrgbColor,
 } from './tokens';
@@ -69,9 +70,12 @@ function declaration(description: string, property: string, value: string): stri
   return [`  /* ${commentText(description)} */`, `  ${property}: ${value};`];
 }
 
-/** A description as comment text: one line, and nothing that could close the comment. */
+/**
+ * A description as comment text: one line, and nothing that could close the
+ * comment, nor the `<style>` element of a host that inlines the stylesheet.
+ */
 function commentText(text: string): string {
-  return text.replace(/\s+/g, ' ').replace(/\*\//g, '* /').trim();
+  return text.replace(/\s+/g, ' ').replace(/\*\//g, '* /').replace(/<\//g, '< /').trim();
 }
 
 function colorCss(name: ColorTokenName, value: ColorValue): string {
@@ -119,10 +123,23 @@ const KEYWORD_FAMILIES = new Set([
 
 function fontStack(families: readonly string[]): string {
   return families
-    .map((family) =>
-      KEYWORD_FAMILIES.has(family.toLowerCase())
-        ? family
-        : `'${family.replace(/[\\']/g, '\\$&').replace(/[\r\n]/g, ' ')}'`,
-    )
+    .map((family) => (KEYWORD_FAMILIES.has(family.toLowerCase()) ? family : cssString(family)))
     .join(', ');
+}
+
+/**
+ * A produced name as a CSS string that cannot end early. The quote and the
+ * backslash are escaped; a control character (a form feed ends a string) and
+ * `<` (which could close the `<style>` element of a host that inlines the
+ * stylesheet) are written as their code points.
+ */
+function cssString(text: string): string {
+  const escaped = [...text.replace(/[\\']/g, '\\$&')]
+    .map((char) =>
+      char === '<' || char === '>' || isControlCharacter(char)
+        ? `\\${char.codePointAt(0)!.toString(16)} `
+        : char,
+    )
+    .join('');
+  return `'${escaped}'`;
 }
