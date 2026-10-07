@@ -143,6 +143,151 @@ describe('reading a page', () => {
     ]);
     expect(facts.colors.customProperties).toHaveLength(1);
   });
+
+  it('measures a stylesheet in the bytes it was served as, not in characters', () => {
+    const css = '.a::before { content: "→"; }';
+    const facts = siteFacts(page('<html>', [{ url: 'https://acme.example/s.css', css }]));
+    expect(facts.stylesheets[0]?.bytes).toBe(css.length + 2);
+  });
+
+  it('decodes an entity once, and reads a class in single quotes', () => {
+    const facts = siteFacts(
+      page(
+        `<meta name="description" content="Tom &amp;amp; Jerry"><a class='text-accent-teal'>a</a>`,
+      ),
+    );
+    expect(facts.site.description).toBe('Tom &amp; Jerry');
+    expect(facts.colors.utilitiesByFrequency.map((entry) => entry.value)).toEqual([
+      'text-accent-teal',
+    ]);
+  });
+
+  it('breaks a tie in a ranking by code unit, the same on every machine', () => {
+    // `localeCompare` put these in another order under another collation.
+    const facts = siteFacts(page('<a class="text-b text-ä text-B text-a">a</a>'));
+    expect(facts.colors.utilitiesByFrequency.map((entry) => entry.value)).toEqual([
+      'text-B',
+      'text-a',
+      'text-b',
+      'text-ä',
+    ]);
+  });
+
+  it('counts no type size as a colour utility, whatever its name', () => {
+    const facts = siteFacts(
+      page(
+        '<p class="text-[30px] text-[11px] text-[1.5rem] text-2xs text-sm/6 text-xs-tight bg-gradient-to-r text-[#00bb95] text-brand">',
+        [
+          {
+            url: 'https://acme.example/s.css',
+            // A size the theme named itself is known by its own rule.
+            css: '.text-xs-tight { font-size: .75rem; line-height: 1rem; } .text-brand { color: #00bb95; }',
+          },
+        ],
+      ),
+    );
+    expect(facts.colors.utilitiesByFrequency).toEqual([
+      { value: 'text-[#00bb95]', count: 1, resolves: '#00bb95' },
+      { value: 'text-brand', count: 1, resolves: '#00bb95' },
+    ]);
+  });
+});
+
+describe('weighing the cascade as a browser does', () => {
+  const sheet = (css: string, html = '<html>') =>
+    siteFacts(page(html, [{ url: 'https://acme.example/s.css', css }]));
+  const property = (facts: ReturnType<typeof siteFacts>, name: string) =>
+    facts.colors.customProperties.find((entry) => entry.name === name);
+  const resolved = (css: string, utility: string) =>
+    sheet(css, `<a class="${utility}">a</a>`).colors.utilitiesByFrequency.find(
+      (entry) => entry.value === utility,
+    )?.resolves;
+
+  it('lets the last plain rule for a class paint, never a variant or a conditional one', () => {
+    expect(
+      resolved(
+        '.text-brand { color: #111111; } .text-brand { color: #00bb95; } .text-brand:hover { color: #222222; } @media (min-width: 1px) { .text-brand { color: #333333; } } .dark .text-brand { color: #444444; }',
+        'text-brand',
+      ),
+    ).toBe('#00bb95');
+    // A utility in a cascade layer is still the utility, as Tailwind v4 writes them.
+    expect(
+      resolved('@layer utilities { .bg-brand { background-color: #00bb95; } }', 'bg-brand'),
+    ).toBe('#00bb95');
+  });
+
+  it("takes a reference's fallback when its property has no value as served", () => {
+    const css = '.dark { --primary: #000000; } .text-primary { color: var(--primary, #ffffff); }';
+    expect(resolved(css, 'text-primary')).toBe('#ffffff');
+    expect(sheet(css).colors.literalsByFrequency).toEqual([{ value: '#ffffff', count: 1 }]);
+    // With no fallback either, the reference is left as written.
+    expect(resolved('.text-x { color: var(--nowhere); }', 'text-x')).toBe('var(--nowhere)');
+  });
+
+  it('reads a nested fallback whole, leaving no parenthesis behind', () => {
+    expect(
+      resolved(':root { --a: #000000; } .text-x { color: var(--a, var(--b, #ffffff)); }', 'text-x'),
+    ).toBe('#000000');
+    expect(resolved('.text-x { color: var(--a, var(--b, #ffffff)); }', 'text-x')).toBe('#ffffff');
+  });
+
+  it('knows every property before it reads the colours that use one', () => {
+    const facts = sheet('.a { color: var(--brand); } :root { --brand: #00bb95; }');
+    expect(facts.colors.literalsByFrequency).toEqual([{ value: '#00bb95', count: 1 }]);
+  });
+
+  it('lets an unlayered declaration beat a layered one, and orders the layers as declared', () => {
+    expect(
+      property(
+        sheet(':root { --primary: #111111; } @layer base { :root { --primary: #222222; } }'),
+        '--primary',
+      )?.asServed,
+    ).toBe('#111111');
+    // `base` is the later layer by the statement, though its block comes first.
+    expect(
+      property(
+        sheet(
+          '@layer theme, base; @layer base { :root { --primary: #222222; } } @layer theme { :root { --primary: #333333; } }',
+        ),
+        '--primary',
+      )?.asServed,
+    ).toBe('#222222');
+    // A layer's own declarations beat those of the layers inside it.
+    expect(
+      property(
+        sheet(
+          '@layer site { :root { --primary: #aaaaaa; } @layer inner { :root { --primary: #bbbbbb; } } }',
+        ),
+        '--primary',
+      )?.asServed,
+    ).toBe('#aaaaaa');
+  });
+
+  it('lets an important declaration win, reversing the layer order, and serves it without the flag', () => {
+    const facts = sheet(':root { --primary: #111111 !important; } :root { --primary: #222222; }');
+    expect(property(facts, '--primary')?.asServed).toBe('#111111');
+    expect(property(facts, '--primary')?.values[0]?.value).toBe('#111111 !important');
+    expect(
+      property(
+        sheet(
+          '@layer base { :root { --primary: #333333 !important; } } :root { --primary: #444444 !important; }',
+        ),
+        '--primary',
+      )?.asServed,
+    ).toBe('#333333');
+  });
+
+  it('keeps the most referenced properties when a site declares more than the record holds', () => {
+    const declared = Array.from({ length: 85 }, (_, i) => `--c-${i}: #000000;`).join(' ');
+    const used = [79, 80, 81, 82, 83, 84].map((i) => `.u-${i} { color: var(--c-${i}); }`);
+    const facts = sheet(`:root { ${declared} } ${used.join(' ')}`);
+    const names = facts.colors.customProperties.map((entry) => entry.name);
+    // The unreferenced ones that come last are cut, and the rest stay in source order.
+    expect(names).toEqual(
+      [...Array.from({ length: 74 }, (_, i) => i), 79, 80, 81, 82, 83, 84].map((i) => `--c-${i}`),
+    );
+    expect(property(facts, '--c-84')?.references).toBe(1);
+  });
 });
 
 /**
@@ -211,6 +356,48 @@ describe('reading a stylesheet the way a browser does', () => {
     expect(facts.colors.customProperties.map((entry) => entry.name)).toEqual(['--primary']);
   });
 
+  it('reads each stylesheet on its own, so one cut short leaves the next untouched', () => {
+    const facts = siteFacts(
+      page('<html>', [
+        { url: 'https://acme.example/print.css', css: '@media print { .a { color: red' },
+        { url: 'https://acme.example/s.css', css: ':root { --primary: #00bb95; }' },
+      ]),
+    );
+    expect(property(facts, '--primary')?.asServed).toBe('#00bb95');
+  });
+
+  it('reads the markup as a browser does: no link a comment or a script holds, an unclosed style to the end', () => {
+    const html =
+      '<!-- <link rel="stylesheet" href="/old.css"> --><script>document.write(\'<link rel="stylesheet" href="/js.css">\')</script><link rel="stylesheet" href="/s.css"><style>:root { --primary: #00bb95; }';
+    expect(stylesheetUrls(html, 'https://acme.example/')).toEqual(['https://acme.example/s.css']);
+    const facts = siteFacts(
+      page(html, [{ url: 'https://acme.example/s.css', css: ':root { --primary: #000000; }' }]),
+    );
+    expect(property(facts, '--primary')?.asServed).toBe('#00bb95');
+    expect(facts.inlineStyleBlocks).toBe(1);
+  });
+
+  it('reads a semicolon inside parentheses as part of the value', () => {
+    const facts = sheet('.a { background: url(data:image/png;base64,AAAA) #00bb95; }');
+    expect(facts.colors.literalsByFrequency).toEqual([{ value: '#00bb95', count: 1 }]);
+  });
+
+  it('skips blocks nested past its depth, and reads on after them', () => {
+    const facts = sheet(
+      `${'.a {'.repeat(40)} --deep: #000000; ${'}'.repeat(40)} :root { --primary: #00bb95; }`,
+    );
+    expect(property(facts, '--deep')).toBeUndefined();
+    expect(property(facts, '--primary')?.asServed).toBe('#00bb95');
+  });
+
+  it('cuts a selector chain it records at a readable length, and reads on under it', () => {
+    const facts = sheet(`@media (${'x'.repeat(1000)}) { :root { --primary: #00bb95; } }`);
+    const under = property(facts, '--primary')?.values[0]?.under ?? '';
+    expect(under.length).toBeLessThan(400);
+    expect(under.endsWith('…')).toBe(true);
+    expect(property(facts, '--primary')?.asServed).toBe('#00bb95');
+  });
+
   it('drops a malformed escape in the markup and reads the rest', () => {
     const facts = siteFacts(
       page(
@@ -222,6 +409,71 @@ describe('reading a stylesheet the way a browser does', () => {
       'https://acme.example/_next/image?url=%E0%A4%A&w=1',
     );
     expect(facts.logos.candidates[0]?.original).toBeUndefined();
+  });
+});
+
+/**
+ * A hostile page must not cost more than its length. Most of these inputs once
+ * took seconds, or ran out of memory, at a few hundred kilobytes - well under
+ * the fetch guard's cap - because a scan restarted at every position, a
+ * selector chain was copied for every rule beneath it, or a `var()` was
+ * substituted without bound. The others hold the readings added since
+ * (cascade layers, `var()` chains) to the same rule. The bound is far above
+ * what a linear reading takes, so it fails on the shape, not on a slow machine.
+ */
+describe('reading a hostile page in time proportional to its length', () => {
+  const SIZE = 400_000;
+  const fill = (unit: string) => unit.repeat(Math.ceil(SIZE / unit.length));
+  const chain = Array.from({ length: SIZE / 30 }, (_, i) => `--color-${i}:var(--color-${i + 1});`);
+  const cases: [string, { html?: string; css?: string }][] = [
+    ['unclosed <header> tags', { html: fill('<header>') }],
+    ['unclosed <style> elements', { html: fill('<style>') }],
+    ['unclosed <title> elements', { html: fill('<title>') }],
+    ['<meta tags with no >', { html: fill('<meta ') }],
+    ['<link tags with no >', { html: fill('<link ') }],
+    ['comments never closed in the markup', { html: fill('<!--<header>') }],
+    ['an attribute name with no =', { html: `<meta ${fill('a')}>` }],
+    [
+      'a Next.js image path repeated in a logo',
+      { html: `<img alt="logo" src="${fill('/_next/image?')}">` },
+    ],
+    ['comments never closed in a sheet', { css: fill('/* a') }],
+    ['colour functions never closed', { css: `.a { color: ${fill('rgb(')} }` }],
+    ['blocks nested without end', { css: fill('a{x:y;') }],
+    [
+      'a long prelude above many rules',
+      { css: `@media (${'x'.repeat(SIZE / 2)}) { ${fill('a{--a:#000}').slice(0, SIZE / 2)} }` },
+    ],
+    ['a selector whose brackets never close', { css: `:root${fill('[')} { --a: #000; }` }],
+    ['a selector whose :not( never closes', { css: `:root${fill(':not(')} { --a: #000; }` }],
+    ['a data attribute selector with no =', { css: `[data-${fill('theme')} { --a: #000; }` }],
+    ['var() fallbacks never closed', { css: `.a { color: ${fill('var(--x,')} }` }],
+    [
+      'var() references multiplying a value',
+      {
+        css: `:root { --color-b: ${'#000 '.repeat(SIZE / 10)}; --color-a: ${'var(--color-b) '.repeat(SIZE / 30)}; } ${'.x{color:var(--color-a)}'.repeat(SIZE / 100)}`,
+      },
+    ],
+    [
+      'a var() chain deeper than the stack',
+      { css: `:root { ${chain.join('')} } .x { color: var(--color-0); }` },
+    ],
+    [
+      'layer names nested without end',
+      {
+        css: `@layer ${'a.'.repeat(SIZE / 4)}a { ${'@layer b{:root{--color-a:#000}}'.repeat(SIZE / 60)} }`,
+      },
+    ],
+    [
+      'a value of whitespace and digits',
+      { css: `:root { --color-a: 1${' '.repeat(SIZE)}x; --color-b: 1.${'1'.repeat(SIZE)}x; }` },
+    ],
+  ];
+
+  it.each(cases)('reads %s', (_label, { html = '<html>', css }) => {
+    const started = performance.now();
+    siteFacts(page(html, css === undefined ? [] : [{ url: 'https://acme.example/s.css', css }]));
+    expect(performance.now() - started).toBeLessThan(2000);
   });
 });
 

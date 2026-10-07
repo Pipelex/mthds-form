@@ -28,7 +28,7 @@
   "stylesheets": [
     {
       "url": "https://pipelex.com/_next/static/immutable/chunks/2igm167y2jajj.css",
-      "bytes": 64015
+      "bytes": 64023
     }
   ],
   "inlineStyleBlocks": 0,
@@ -37,6 +37,7 @@
       {
         "name": "--foreground-rgb",
         "asServed": "255, 255, 255",
+        "references": 1,
         "values": [
           {
             "value": "255, 255, 255",
@@ -47,6 +48,7 @@
       {
         "name": "--background-start-rgb",
         "asServed": "8, 6, 14",
+        "references": 1,
         "values": [
           {
             "value": "8, 6, 14",
@@ -57,6 +59,7 @@
       {
         "name": "--background-end-rgb",
         "asServed": "12, 8, 20",
+        "references": 1,
         "values": [
           {
             "value": "12, 8, 20",
@@ -67,6 +70,7 @@
       {
         "name": "--accent-teal",
         "asServed": "#00bb95",
+        "references": 0,
         "values": [
           {
             "value": "#00bb95",
@@ -77,6 +81,7 @@
       {
         "name": "--accent-purple",
         "asServed": "#6b21a8",
+        "references": 0,
         "values": [
           {
             "value": "#6b21a8",
@@ -87,6 +92,7 @@
       {
         "name": "--orb-color",
         "asServed": null,
+        "references": 2,
         "values": [
           {
             "value": "#6b21a8b3",
@@ -287,24 +293,9 @@
         "resolves": "rgb(156 163 175/1)"
       },
       {
-        "value": "text-[15px]",
-        "count": 29,
-        "resolves": null
-      },
-      {
-        "value": "text-[13px]",
-        "count": 19,
-        "resolves": null
-      },
-      {
         "value": "border-white/[0.08]",
         "count": 18,
         "resolves": "#ffffff14"
-      },
-      {
-        "value": "text-[17px]",
-        "count": 16,
-        "resolves": null
       },
       {
         "value": "bg-white/[0.06]",
@@ -317,11 +308,6 @@
         "resolves": "#00bb951a"
       },
       {
-        "value": "text-xs-tight",
-        "count": 10,
-        "resolves": null
-      },
-      {
         "value": "bg-accent-teal",
         "count": 7,
         "resolves": "rgb(0 187 149/1)"
@@ -330,11 +316,6 @@
         "value": "border-accent-teal/20",
         "count": 6,
         "resolves": "#00bb9533"
-      },
-      {
-        "value": "text-[40px]",
-        "count": 6,
-        "resolves": null
       },
       {
         "value": "bg-teal-gradient",
@@ -370,31 +351,6 @@
         "value": "border-accent-teal/30",
         "count": 3,
         "resolves": "#00bb954d"
-      },
-      {
-        "value": "text-[12.5px]",
-        "count": 3,
-        "resolves": null
-      },
-      {
-        "value": "text-[21px]",
-        "count": 3,
-        "resolves": null
-      },
-      {
-        "value": "text-[22px]",
-        "count": 3,
-        "resolves": null
-      },
-      {
-        "value": "text-[26px]",
-        "count": 3,
-        "resolves": null
-      },
-      {
-        "value": "text-[44px]",
-        "count": 3,
-        "resolves": null
       },
       {
         "value": "text-gray-200",
@@ -438,16 +394,6 @@
       },
       {
         "value": "ring-white/10",
-        "count": 2,
-        "resolves": null
-      },
-      {
-        "value": "text-[30px]",
-        "count": 2,
-        "resolves": null
-      },
-      {
-        "value": "text-2xs",
         "count": 2,
         "resolves": null
       },
@@ -532,16 +478,6 @@
         "resolves": null
       },
       {
-        "value": "text-[32px]",
-        "count": 1,
-        "resolves": null
-      },
-      {
-        "value": "text-[66px]",
-        "count": 1,
-        "resolves": null
-      },
-      {
         "value": "text-emerald-400",
         "count": 1,
         "resolves": "rgb(52 211 153/1)"
@@ -616,6 +552,10 @@
         "count": 3
       },
       {
+        "value": ".75rem",
+        "count": 2
+      },
+      {
         "value": "16px",
         "count": 2
       },
@@ -629,14 +569,6 @@
       },
       {
         "value": ".3125rem",
-        "count": 1
-      },
-      {
-        "value": ".75rem",
-        "count": 1
-      },
-      {
-        "value": ".75rem!important",
         "count": 1
       },
       {
