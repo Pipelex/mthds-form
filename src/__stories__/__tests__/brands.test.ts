@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { describe, expect, it } from 'vitest';
@@ -64,6 +65,36 @@ describe('the story brands', () => {
       expect(readFileSync(target, 'utf8'), `${OUT_DIR}/${file}: run make brands`).toBe(
         await formatted(target, text),
       );
+    }
+  });
+});
+
+describe('a corpus whose brands fold onto one scope', () => {
+  it('is refused, rather than one brand silently standing in for the other', () => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'brands-'));
+    try {
+      const from = path.join(REPO, 'data/brands/pipelex/pipelex-method--claude-4.8-opus');
+      const twin = path.join(repo, 'data/brands/pipelex/pipelex-method--claude-4-8-opus');
+      cpSync(from, path.join(repo, 'data/brands/pipelex/pipelex-method--claude-4.8-opus'), {
+        recursive: true,
+      });
+      cpSync(from, twin, { recursive: true });
+      const provenance = JSON.parse(readFileSync(path.join(twin, 'provenance.json'), 'utf8'));
+      writeFileSync(
+        path.join(twin, 'provenance.json'),
+        JSON.stringify({ ...provenance, model: 'claude-4-8-opus' }),
+      );
+      const build = buildCorpus(repo);
+      expect(build.ok ? [] : build.failures).toEqual([
+        {
+          key: 'pipelex/pipelex-method--claude-4.8-opus',
+          problems: [
+            "scope .brand-pipelex-pipelex-method--claude-4-8-opus is already pipelex/pipelex-method--claude-4-8-opus's",
+          ],
+        },
+      ]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 });

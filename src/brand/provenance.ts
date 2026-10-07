@@ -60,6 +60,11 @@ export function brandProducerId(
  * The scope class a brand's stylesheet sets its tokens on: `brand-<brand>-<producerId>`,
  * with every character outside `[a-z0-9-]` replaced, because a model id
  * carries dots and a dot ends a class selector.
+ *
+ * The replacement folds: `claude-4.8-opus` and `claude-4-8-opus` share a
+ * scope, and so do two ids that differ only in case. A set of brands loaded on
+ * one page must therefore check its scopes are distinct, or the later
+ * stylesheet silently takes the earlier brand's place.
  */
 export function brandScope(brand: string, producerId: string): string {
   return `brand-${brand}-${producerId}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');

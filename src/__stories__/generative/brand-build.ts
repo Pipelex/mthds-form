@@ -81,8 +81,21 @@ export function buildCorpus(repo: string): CorpusBuild {
       tokens: read('tokens.json'),
       provenance: read('provenance.json'),
     });
-    if (result.ok) brands.push(result.brand);
-    else failures.push({ key: keyOf(entry), problems: result.problems });
+    if (!result.ok) {
+      failures.push({ key: keyOf(entry), problems: result.problems });
+      continue;
+    }
+    // Every brand's stylesheet is loaded at once, so two on one scope would
+    // leave the later silently standing in for the earlier (see brandScope).
+    const sharing = brands.find((brand) => brand.scope === result.brand.scope);
+    if (sharing) {
+      failures.push({
+        key: keyOf(entry),
+        problems: [`scope .${result.brand.scope} is already ${keyOf(sharing)}'s`],
+      });
+      continue;
+    }
+    brands.push(result.brand);
   }
   return failures.length > 0 ? { ok: false, failures } : { ok: true, brands };
 }
