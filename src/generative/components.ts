@@ -163,7 +163,18 @@ const components = {
   Stack: { ...shadcn.Stack, props: shadcn.Stack.props.omit({ className: true }) },
   Grid: { ...shadcn.Grid, props: shadcn.Grid.props.omit({ className: true }) },
   Separator: shadcn.Separator,
-  Collapsible: shadcn.Collapsible,
+  // A line under the title that stays in view while the section is closed,
+  // which upstream's Collapsible does not have.
+  Collapsible: {
+    ...shadcn.Collapsible,
+    props: z.object({
+      title: shadcn.Collapsible.props.shape.title,
+      description: z.string().nullable(),
+      defaultOpen: shadcn.Collapsible.props.shape.defaultOpen,
+    }),
+    description:
+      'Collapsible section with trigger. The description is a short line under the title that stays visible while the section is closed: say when to open it. Children render inside.',
+  },
   // ── Content (shadcn) ───────────────────────────────────────────────────
   Heading: shadcn.Heading,
   Text: shadcn.Text,
