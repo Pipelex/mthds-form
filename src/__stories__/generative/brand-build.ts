@@ -46,7 +46,8 @@ export function brandDirs(repo: string): BrandDir[] {
       });
     }
   }
-  return dirs.sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+  // By code unit, so the build writes the same order on every machine, whatever its locale.
+  return dirs.sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
 }
 
 export function keyOf(entry: { brand: string; producerId: string }): string {

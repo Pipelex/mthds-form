@@ -34,7 +34,7 @@ export function corpusSources(): BrandSource[] {
       if (producer.isDirectory()) sources.push(corpusSource(brand.name, producer.name));
     }
   }
-  return sources.sort((a, b) =>
-    `${a.brand}/${a.producerId}`.localeCompare(`${b.brand}/${b.producerId}`),
-  );
+  // By code unit, the same order on every machine, whatever its locale.
+  const key = (source: BrandSource) => `${source.brand}/${source.producerId}`;
+  return sources.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
