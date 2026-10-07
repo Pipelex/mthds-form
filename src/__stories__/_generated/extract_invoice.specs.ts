@@ -28,11 +28,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'invoice_extraction.process_invoice',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: '2b2325fd1231',
-    date: '2026-09-17',
+    promptHash: 'a4bced45bfd0',
+    date: '2026-10-07',
     brief: 'data/briefs/invoice_extraction.process_invoice.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"center"},"children":["hero","work"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"Invoice extraction","headline":"Read an invoice","lede":"Drop in an invoice and we\'ll pull out the figures that matter."},"children":[]}}\n{"op":"add","path":"/elements/work","value":{"type":"Card","props":{},"children":["document","run"]}}\n{"op":"add","path":"/elements/document","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Extract the invoice","hint":"We\'ll need the document before we can start."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["appbar","hero","input-card","run"]}}\n{"op":"add","path":"/elements/appbar","value":{"type":"AppBar","props":{"app":"Invoice extraction","tag":"process_invoice"},"children":[]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"eyebrow":"Invoice extraction","headline":"Read an invoice","lede":"Drop in an invoice and we\'ll pull out the details."},"children":[]}}\n{"op":"add","path":"/elements/input-card","value":{"type":"Card","props":{},"children":["document-field"]}}\n{"op":"add","path":"/elements/document-field","value":{"type":"MthdsField","props":{"path":"/inputs/document"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Extract the details","hint":"Add the invoice first; the run needs it."},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -41,25 +41,32 @@ export const SPECS: SpecFixture[] = [
           props: {
             direction: 'vertical',
             gap: 'lg',
-            align: 'center',
           },
-          children: ['hero', 'work'],
+          children: ['appbar', 'hero', 'input-card', 'run'],
+        },
+        appbar: {
+          type: 'AppBar',
+          props: {
+            app: 'Invoice extraction',
+            tag: 'process_invoice',
+          },
+          children: [],
         },
         hero: {
           type: 'Hero',
           props: {
             eyebrow: 'Invoice extraction',
             headline: 'Read an invoice',
-            lede: "Drop in an invoice and we'll pull out the figures that matter.",
+            lede: "Drop in an invoice and we'll pull out the details.",
           },
           children: [],
         },
-        work: {
+        'input-card': {
           type: 'Card',
           props: {},
-          children: ['document', 'run'],
+          children: ['document-field'],
         },
-        document: {
+        'document-field': {
           type: 'MthdsField',
           props: {
             path: '/inputs/document',
@@ -69,8 +76,8 @@ export const SPECS: SpecFixture[] = [
         run: {
           type: 'Cta',
           props: {
-            label: 'Extract the invoice',
-            hint: "We'll need the document before we can start.",
+            label: 'Extract the details',
+            hint: 'Add the invoice first; the run needs it.',
           },
           on: {
             press: [
@@ -88,31 +95,45 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'A single-purpose intake for someone who has an invoice in hand and wants its figures pulled out - drop the file, run it, done.',
+        'For someone with an invoice in hand who wants its details pulled out: drop the document in, run it, done — a single-task tool that gets out of the way.',
       title: 'Read an invoice',
       composition:
-        "A single centred column, calm and narrow, on an otherwise open page. It opens with a Hero that names the job and says in one muted line what will happen: hand over an invoice, get the figures back. Below it, one quiet Card holds the whole of the work - the document drop, delegated - because there is exactly one thing to do here and it deserves the full width of the reader's attention. The run sits directly under the drop as a full-width Cta, with a short hint that the run waits for the document. Nothing is staged or folded; with one input there is nothing to hide and no journey to walk.",
+        "One quiet, centred column — this page does exactly one thing, so there is nothing to divide. An AppBar across the top carries the app's name and the method tag. Below it, a Hero states what happens here in one line. Under the Hero, a single Card holds the one input: the document, delegated to MthdsField. The run sits directly beneath that card as a full-width Cta, with its one-line hint about waiting for the document. No panels, no steps, no tabs — a single file to drop and a single button to press.",
       regions: [
         {
           title: null,
           purpose:
-            'The opening: names the app and states plainly what the page does, so the reader knows in one glance this is where an invoice becomes data.',
+            "The page's banner: names the app and tags the method behind it, so the person knows where they are.",
+          container: 'AppBar',
+          elements: ['AppBar: app name "Invoice extraction", mono tag "process_invoice"'],
+        },
+        {
+          title: null,
+          purpose:
+            "The opening line: says in a person's words what this page does, so there is no need for a paragraph explaining the form.",
           container: 'Hero',
           elements: [
-            'Hero eyebrow: Invoice extraction',
-            'Hero headline: Read an invoice',
-            "Hero subline: Drop in an invoice and we'll pull out the figures that matter.",
+            'Hero: eyebrow "Invoice extraction", headline "Read an invoice", muted line "Drop in an invoice and we\'ll pull out the details."',
           ],
         },
         {
           title: null,
           purpose:
-            'The one thing to do: hand over the document. The file input is delegated, and the run sits directly beneath it so the whole act reads as a single gesture.',
+            'The one input the run waits for: the invoice document, delegated whole so the file control renders its own label and dropzone.',
           container: 'Card',
-          elements: ['MthdsField /inputs/document', 'Cta on.press validateForm then run'],
+          elements: ['MthdsField: path /inputs/document'],
+        },
+        {
+          title: null,
+          purpose:
+            'The single control that runs the method, directly under the input, with a brief note that the run needs the document.',
+          container: 'Cta',
+          elements: [
+            'Cta: label "Extract the details", hint "Add the invoice first; the run needs it.", on.press validateForm then run',
+          ],
         },
       ],
-      call_to_action: "Extract the invoice — hint: We'll need the document before we can start.",
+      call_to_action: 'Extract the details — hint: Add the invoice first; the run needs it.',
       defaults: null,
       delegated: [
         '/inputs/document — the brief marks it delegated; a file, rendered by MthdsField at its path.',

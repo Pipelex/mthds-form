@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A sketch designer for input pages, in the generative entry**: `sketchBrief`, `sketchFromOutline`, `sketchToSpec`, `SKETCH_BLOCKS` and `SKETCH_BRIEF_CONCEPT` let a host try `experiments/page-sketch.mthds`, an experimental designer that writes a short Markdown outline of blocks instead of JSON. `sketchBrief` builds the brief the method is handed, `sketchFromOutline` parses the outline and names every line outside its grammar, and `sketchToSpec` assembles a spec over the method's fields that the catalog and `layoutFits` judge like any layout, reading a Side the outline put in a Row as the page's side panel and refusing a malformed outline with every problem named. The method lives in the repository and is not shipped in the package.
+
+### Changed
+
+- **`Collapsible` shows a line while it is folded, and `PROMPT_HASH` moves (Breaking)**: the catalog's `Collapsible` takes a `description`, rendered in its summary under the title, so it stays in view while the section is closed. The catalog is part of the designer's prompt, so `PROMPT_HASH` is now `a4bced45bfd0`, and a layout produced against an earlier prompt fails the hash check, and falls back to the plain form, until the designer runs again.
+
 ## [v0.14.1] - 2026-10-06
 
 ### Changed
