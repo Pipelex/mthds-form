@@ -1,4 +1,12 @@
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { format, resolveConfig } from 'prettier';
@@ -66,6 +74,25 @@ describe('the story brands', () => {
       expect(readFileSync(target, 'utf8'), `${OUT_DIR}/${file}: run make brands`).toBe(
         await formatted(target, text),
       );
+    }
+  });
+});
+
+describe('a corpus holding a dot-directory', () => {
+  it('builds without it, at either level', () => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'brands-'));
+    try {
+      const brand = 'pipelex/pipelex-method--claude-4.8-opus';
+      cpSync(path.join(REPO, 'data/brands', brand), path.join(repo, 'data/brands', brand), {
+        recursive: true,
+      });
+      // An editor's or a tool's cache, holding none of a brand's three files.
+      mkdirSync(path.join(repo, 'data/brands/.cache/stale'), { recursive: true });
+      mkdirSync(path.join(repo, 'data/brands/pipelex/.tmp'));
+      const build = buildCorpus(repo);
+      expect(build.ok ? build.brands.map(keyOf) : build.failures).toEqual([brand]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 });
