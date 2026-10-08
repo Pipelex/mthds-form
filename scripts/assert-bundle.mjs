@@ -238,9 +238,9 @@ for (const { entry, match, why } of BANNED) {
  * else. It is the one entry whose dependency line can be stated exactly, so it
  * is - a new specifier anywhere in its graph fails here whatever it is.
  *
- * And it never fetches. The site reader is a pure function over texts the host
- * fetched behind its own guard; a `fetch(` reaching the entry's built graph
- * would put a network call in code a server runs on a URL a user typed.
+ * And it never fetches. The entry checks and compiles files a producer already
+ * wrote; a `fetch(` reaching its built graph would put a network call in code
+ * a build script, a browser and a server all import.
  */
 {
   const BRAND_ALLOWED = /^zod($|\/)/;
@@ -258,7 +258,7 @@ for (const { entry, match, why } of BANNED) {
   const fetching = [...files].filter((file) => /\bfetch\s*\(/.test(readFileSync(file, 'utf8')));
   if (fetching.length > 0) {
     failures.push(
-      `brand/index.js reaches a fetch( call in ${fetching.map((file) => relative(DIST, file)).join(', ')} - the brand entry never fetches; the host does, behind its own guard. See docs/brand.md.`,
+      `brand/index.js reaches a fetch( call in ${fetching.map((file) => relative(DIST, file)).join(', ')} - the brand entry never fetches. See docs/brand.md.`,
     );
   } else {
     console.log('ok  brand/index.js reaches no fetch( call');

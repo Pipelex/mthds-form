@@ -1,14 +1,14 @@
 # Brands
 
-A **brand** is someone else's filling of the theme contract: the custom properties [theming.md](theming.md) defines, set to a product's own colours, radius and typefaces, plus a manifest naming the product and its logos. The `./brand` entry is where a brand is held to that contract and compiled into a stylesheet, and where a website's design facts are read for whatever produces one.
+A **brand** is someone else's filling of the theme contract: the custom properties [theming.md](theming.md) defines, set to a product's own colours, radius and typefaces, plus a manifest naming the product and its logos. The `./brand` entry is where a brand is held to that contract and compiled into a stylesheet.
 
 ```ts
-import { assembleBrand, siteFacts, stylesheetUrls } from '@pipelex/mthds-form/brand';
+import { assembleBrand } from '@pipelex/mthds-form/brand';
 ```
 
-The entry is **isomorphic and network-free**. It carries no React and touches no DOM, so a build script, a test, a browser and a server import the same code. It never fetches: reading a site is a pure function over texts the host fetched. Its one dependency is zod. `scripts/assert-bundle.mjs` holds all three on the built graph: the entry may reach `zod` and no other specifier, it carries no `'use client'` prologue, and no `fetch(` call reaches it.
+The entry is **isomorphic and network-free**. It carries no React and touches no DOM, so a build script, a test, a browser and a server import the same code. It never fetches. Its one dependency is zod. `scripts/assert-bundle.mjs` holds all three on the built graph: the entry may reach `zod` and no other specifier, it carries no `'use client'` prologue, and no `fetch(` call reaches it.
 
-Nothing in the entry calls a model. Producing a brand, which means judging which colour is the accent and what a dark-only site's light mode should be, belongs to whatever runs a producer. This entry is what that producer's answer is checked and compiled by.
+Nothing in the entry calls a model or reads a site. Producing a brand, which means reading a site's design facts and judging from them which colour is the accent and what a dark-only site's light mode should be, belongs to whatever runs a producer (see [Where a brand comes from](#where-a-brand-comes-from)). This entry is what that producer's answer is checked and compiled by.
 
 ## What a brand is
 
@@ -75,7 +75,7 @@ Some things a site does not show, and no reading can supply them: the accent of 
 { "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" }, "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" } }
 ```
 
-A stated fact outranks every reading. `withStatedFacts(facts, stated)` places it in the facts a producer reads, right after the site's identity and ahead of every reading, replacing whatever those facts were stated with before. The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
+A stated fact outranks every reading, and whatever runs a producer tells it so, outside this package (see [Where a brand comes from](#where-a-brand-comes-from)). The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
 
 ## Compiling
 
@@ -119,56 +119,14 @@ import '../brands/acme.css';
 
 The tokens and the manifest are separate on purpose: the tokens are the palette, and the manifest is what the page says it is.
 
-## Reading a site
+## Where a brand comes from
 
-The facts a producer judges are read off the site by code, because what a site declares is a matter of fact: which class its `<html>` carries, which custom properties its stylesheets set, under which selector, and which declaration wins for the page as it is served; which colour utilities its markup uses most; which typefaces it loads; which radii it uses; which images could be its logo. Code reads facts exactly, every time, for nothing. What a model is for is the judgement that follows.
+A producer reads a site and writes its answer against this contract, and both happen outside this package. Reading what a site declares (which custom properties its stylesheets set and which declaration wins as served, which colour utilities its markup uses most, which typefaces it loads, which images could be its logo) is code over the page and stylesheets a producer fetched. Judging from those facts what the brand should be is a model's work. Neither belongs in a kernel that a browser and a server import, so neither is here.
 
-The reader is two pure functions. The host fetches in between, behind its own guard (a scheme, a size cap, a timeout), which is a policy this package has no business setting:
-
-```ts
-// `fetchGuarded` is the host's own fetch, behind its own guard.
-const html = await fetchGuarded(url);
-const stylesheets = [];
-for (const sheetUrl of stylesheetUrls(html, finalUrl)) {
-  try {
-    stylesheets.push({ url: sheetUrl, css: await fetchGuarded(sheetUrl) });
-  } catch (error) {
-    stylesheets.push({ url: sheetUrl, error: String(error) });
-  }
-}
-const facts = siteFacts({ url, finalUrl, fetchedAt: '2026-10-06', html, stylesheets });
-```
-
-- `stylesheetUrls(html, finalUrl)` names the stylesheets the page links, resolved against the URL it was served from, in document order.
-- `siteFacts(page)` reads the page, its inline `<style>` blocks and those stylesheets. A stylesheet the host could not fetch is passed as `{ url, error }` and recorded as such. The date is passed in, because a reader with no clock is told what day it is.
-
-What it reads, in order of the record: the site's identity; its colour scheme (the `<html>` and `<body>` classes and data attributes, `theme-color` metas, `color-scheme` declarations, how many rules sit under a dark selector or a dark media query); the colour custom properties; the colour literals and colour utilities by frequency, each utility with the colour it resolves to; the typefaces, font faces, webfont links and preloads; the radii; and the logo candidates, including the original file behind a Next.js image URL. Its ranked and repeated lists are capped so the record stays readable. The radius custom properties are kept on their own, as lengths. There is no browser and no script execution, so a site that paints itself from JavaScript alone yields fewer facts, and the record shows it.
-
-**Each custom property** carries `asServed`, the value the page's content sees as it is served, `references`, how many `var()` references name it across the stylesheets, and every declaration as written with its selector chain. The winner is weighed among the declarations whose selector applies at the root (`:root`, `html`, `body`, `*`, or a compound of classes, attributes and `:not()` the served `<html>` or `<body>` carries). A custom property inherits, so first comes what a declaration is set on: one set on every element (`*`) is the content's own and beats the rest, and one set on the body beats one set on the root whatever either's cascade, because the body's value is what its content inherits. Between declarations set on the same element, the cascade decides: an `!important` declaration beats a normal one, then the cascade layer decides (an unlayered declaration beats a layered one, a later layer beats an earlier one in the order a browser gives them, by an `@layer a, b;` statement or the first block naming each, and importance reverses that order), then specificity (`html.dark` beats a later `:root`, and a `:not()` counts as its most specific argument), then source order. That is what decides between a framework's default and the site's own override, whether the override comes later or sits outside the framework's layer. `asServed` is given without its `!important`; the declarations are recorded as written. When a site declares more colour properties than the record holds, the most referenced are kept, so a site's own palette is not cut for a plugin's that happens to come first, and they are listed in the order they first appear.
-
-**A colour utility** the markup uses resolves to what its own rule paints: the last plain rule for that one class (`.bg-white\/10 { … }`), at the top level or inside a cascade layer as Tailwind v4 writes them, weighed by the same cascade. A variant (`.text-brand:hover`) or a rule under a condition (`@media`, a `.dark` ancestor) is never taken for the utility itself. A `var()` in what it paints, or in a colour declaration, is substituted by the value its property has as served; a property with none takes the reference's own fallback, and a reference with neither is left as written. Every custom property is resolved, colour or not (`hsla(var(--md-hue), …)` reads `hsla(225deg, …)`), and the colours are read only once every property is known, so a declaration's place in the sheet does not change what it resolves to. A type size is not a colour utility, whether Tailwind names it (`text-2xs`, `text-[30px]`, `text-sm/6`) or the theme does: a utility whose own rule sets `font-size` and paints nothing is left out.
-
-**The page is a stranger's**, possibly cut short by the host's size cap or written to stall a reader, so the reader reads it the way a browser does rather than trusting it to be well formed. The markup's `<link>` and `<style>` elements are read in document order, and what an HTML comment or a `<script>` holds is neither, so `stylesheetUrls` never names a sheet a browser would not load. A sheet is read under the `media` its `<link>` or `<style>` names, as if a `@media` block held it, so a print sheet or a `prefers-color-scheme: dark` one is recorded under that condition and does not apply as served; a sheet linked as `print` that switches itself on once loaded (`onload="this.media='all'"`) applies everywhere, as it does in a browser. A disabled sheet and an alternate one are not in the cascade, and are not read. A selector list is cut only at its top-level commas, so one inside `:not(a, b)`, a quoted value or an escape separates nothing, and an attribute selector may hold a space or a tilde (`[class~=dark]`, `[data-theme="dark mode"]`). A boolean attribute (`disabled`, a bare `data-dark`) is read as set, and a selector never finds an attribute the markup did not set, so `[constructor]` matches nothing. Each stylesheet is read on its own, as a browser reads it, so a sheet cut short inside a block leaves the next one untouched, and an unclosed `<style>` or comment runs to the end of what holds it. A brace inside a string is text, and so is a semicolon inside parentheses (`url(data:image/png;base64,…)`); a statement such as `@charset` or `@import` ends at its semicolon instead of joining the next selector; the declarations a block makes before a nested rule are kept ahead of it; and the end of a sheet closes any block still open. A malformed percent-escape in the markup loses only its own entry.
-
-**No page costs more to read than its length.** Every scan moves forward and stops once nothing after it can close what it opened, since if no `>` follows one position, none follows any later one. The rest is bounded, by `LIMITS` in `src/brand/site-facts.ts`: blocks nested deeper than 32 levels are skipped whole, a selector chain is recorded up to 300 characters and then cut with an ellipsis, a colour function longer than 100 characters is not read as a colour, `var()` references are followed 16 levels deep with a cycle read as no value, substitution adds at most a million characters over the whole reading, and a root attribute longer than 10,000 characters is not searched for a substring (`*=`). A root's class list and every attribute matched word by word are split once, not once per selector. A site written for a browser reaches none of them, except now and then the cut on a long selector chain, which only shortens what the record shows. `src/brand/__tests__/site-facts.test.ts` times the reading of each shape that once took seconds or ran out of memory at a few hundred kilobytes, well under the guard's cap.
-
-## Recorded sites
-
-The reader is tested offline, over sites recorded as they were served. A recording is a directory, `data/sites/<host>/<YYYY-MM-DD>/`:
-
-| File | Holds |
-| --- | --- |
-| `recording.json` | `{ url, finalUrl, fetchedAt, stylesheets: [{ url, file } \| { url, error }] }` |
-| `page.html` | the page as served |
-| `stylesheets/` | one file per stylesheet the page links, in document order |
-| `site-facts.json` | what `siteFacts` reads from the above |
-
-`make record-site URL=https://<site>/` fetches a site now, behind a guard (https only, on the page, every stylesheet and every redirect; a size cap per resource; a timeout; and a cap on how many stylesheets one page may have fetched, past which a sheet is recorded as not fetched), and writes a new recording, replacing one made the same day. `make site-facts` re-reads every recording with the reader as it is and rewrites its `site-facts.json`, offline, so a change to the reader is reviewed as the diff it leaves in the record. `src/brand/__tests__/site-facts.test.ts` fails on a recording whose committed facts are not what the reader reads now.
-
-**Only our own sites are recorded here**, because this repository is open source and a recording is a copy of a site's markup and stylesheets. Any other site a producer is tried on is recorded where that work happens, not in this package.
+What reaches this entry is the producer's answer: the token file, the manifest and the provenance. `assembleBrand` holds them to the contract, and its problems, each named by its file and path, are what a producer's repair round is handed. The provenance's `siteFacts` field records where a brand's facts came from, as a path or a sentence; this package never reads it.
 
 ## The corpus and the story brands
 
-`data/brands/<brand>/<producer>/` holds the brands the brand study produced from real sites, as they were written, with their provenance, and `data/brands/<brand>/site-facts.json` holds the facts each was produced from. They are the reference corpus a producer is compared with.
+`data/brands/<brand>/<producer>/` holds the brands the brand study produced from real sites, as they were written, with their provenance. They are the reference corpus a producer is compared with. Each provenance says where its brand's facts came from: a brand the producer method made points at `data/brands/<brand>/site-facts.json`, the facts as that producer read and wrote them, and a brand read by hand says so in a sentence. Those files are kept as they were written: their shape is the producer's, and this package neither validates them nor exports a type for them.
 
 `make brands` validates and compiles every one with `assembleBrand` and writes the generative stories' brands under `src/__stories__/generative/brands/`: one stylesheet per brand, an `index.css` importing them all, and `generated.ts` naming each with its provenance, its scope and its manifest. It is all or nothing: one brand that does not validate writes nothing and prints its problems. `src/__stories__/__tests__/brands.test.ts` rebuilds the corpus and fails on a committed file that is not what the data produces. All of it is outside every entry tree and ships in nothing. See [storybook.md](storybook.md) § "Generative".

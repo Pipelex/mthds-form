@@ -7,8 +7,8 @@ import { type BrandTokens, colorHex, colorIsHex, resolveColor } from './tokens';
  * no reading can supply. The accent of a site with no button, per mode when its
  * dark canvas needs another, and the logo for a canvas the site draws none for.
  *
- * A stated fact enters the site facts as `stated` (`withStatedFacts`), a
- * producer is told it outranks every reading, the brand must honour it
+ * A stated fact outranks every reading, which whatever runs a producer tells
+ * it, outside this package. Here the brand is held to honour it
  * (`statedFactProblems`), and the provenance records it.
  */
 
@@ -75,28 +75,4 @@ export function statedFactProblems(
     }
   }
   return problems;
-}
-
-/**
- * The facts a producer reads, with what the person stated placed right after
- * the site's identity and ahead of every reading, because it outranks them.
- * What they state replaces whatever the facts were stated with before.
- */
-export function withStatedFacts<Facts extends { url: string; finalUrl: string; fetchedAt: string }>(
-  facts: Facts,
-  stated: StatedFacts | null | undefined,
-): Facts & { stated?: StatedFacts } {
-  if (!stated) return facts;
-  // The earlier statement is dropped, so it cannot follow the new one in and win.
-  const {
-    url,
-    finalUrl,
-    fetchedAt,
-    stated: _previous,
-    ...rest
-  } = facts as Facts & {
-    stated?: StatedFacts;
-  };
-  const site = 'site' in rest ? { site: rest.site } : {};
-  return { url, finalUrl, fetchedAt, ...site, stated, ...rest } as Facts & { stated: StatedFacts };
 }

@@ -4,13 +4,14 @@
  * A brand is two files a producer writes - `tokens.json`, a DTCG token file
  * setting the theme contract's custom properties in both modes, and
  * `brand.json`, the manifest the page's chrome reads - plus the provenance
- * that says who wrote them. This entry validates the three, compiles the
- * tokens into a stylesheet scoped to one class, and reads a website's design
- * facts for a producer to judge.
+ * that says who wrote them. This entry validates the three and compiles the
+ * tokens into a stylesheet scoped to one class. Reading a site and producing
+ * a brand from it happen elsewhere; this is what their answer is checked
+ * against.
  *
  * It is isomorphic and network-free: no React, no DOM, no fetch, and zod as
  * its one dependency, so the same code runs in a build script, a test, a
- * browser and a server's own guarded fetcher. Nothing here calls a model.
+ * browser and a server. Nothing here calls a model.
  *
  * The public API is this file. Deep paths are not exported and not stable.
  */
@@ -48,7 +49,7 @@ export {
 
 // The manifest, the stated facts, the provenance.
 export { brandManifestSchema, type BrandManifest } from './manifest';
-export { statedFactProblems, statedFactsSchema, withStatedFacts, type StatedFacts } from './stated';
+export { statedFactProblems, statedFactsSchema, type StatedFacts } from './stated';
 export {
   BRAND_PRODUCERS,
   brandProducerId,
@@ -66,15 +67,3 @@ export {
   type BrandSource,
 } from './assemble';
 export { BRAND_VARIABLES, compileBrand } from './compile';
-
-// The site reader: pure functions over texts the host fetched.
-export {
-  siteFacts,
-  stylesheetUrls,
-  type FetchedPage,
-  type FetchedStylesheet,
-  type LogoCandidate,
-  type PropertyFacts,
-  type Ranked,
-  type SiteFacts,
-} from './site-facts';
