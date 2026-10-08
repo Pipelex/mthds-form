@@ -127,6 +127,6 @@ What reaches this entry is the producer's answer: the token file, the manifest a
 
 ## The corpus and the story brands
 
-`data/brands/<brand>/<producer>/` holds the brands the brand study produced from real sites, as they were written, with their provenance, and `data/brands/<brand>/site-facts.json` holds the facts each was produced from, as the record of what its producer read. They are the reference corpus a producer is compared with.
+`data/brands/<brand>/<producer>/` holds the brands the brand study produced from real sites, as they were written, with their provenance, and `data/brands/<brand>/site-facts.json` holds the facts each was produced from, as the record of what its producer read. Those facts are kept as the producer wrote them: their shape is the producer's, and this package neither validates them nor exports a type for them. The brands are the reference corpus a producer is compared with.
 
 `make brands` validates and compiles every one with `assembleBrand` and writes the generative stories' brands under `src/__stories__/generative/brands/`: one stylesheet per brand, an `index.css` importing them all, and `generated.ts` naming each with its provenance, its scope and its manifest. It is all or nothing: one brand that does not validate writes nothing and prints its problems. `src/__stories__/__tests__/brands.test.ts` rebuilds the corpus and fails on a committed file that is not what the data produces. All of it is outside every entry tree and ships in nothing. See [storybook.md](storybook.md) § "Generative".
