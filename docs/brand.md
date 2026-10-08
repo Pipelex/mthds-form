@@ -75,7 +75,7 @@ Some things a site does not show, and no reading can supply them: the accent of 
 { "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" }, "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" } }
 ```
 
-A stated fact outranks every reading, and a producer is told so. The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
+A stated fact outranks every reading, and whatever runs a producer tells it so, outside this package (see [Where a brand comes from](#where-a-brand-comes-from)). The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
 
 ## Compiling
 
@@ -127,6 +127,6 @@ What reaches this entry is the producer's answer: the token file, the manifest a
 
 ## The corpus and the story brands
 
-`data/brands/<brand>/<producer>/` holds the brands the brand study produced from real sites, as they were written, with their provenance, and `data/brands/<brand>/site-facts.json` holds the facts each was produced from, as the record of what its producer read. Those facts are kept as the producer wrote them: their shape is the producer's, and this package neither validates them nor exports a type for them. The brands are the reference corpus a producer is compared with.
+`data/brands/<brand>/<producer>/` holds the brands the brand study produced from real sites, as they were written, with their provenance. They are the reference corpus a producer is compared with. Each provenance says where its brand's facts came from: a brand the producer method made points at `data/brands/<brand>/site-facts.json`, the facts as that producer read and wrote them, and a brand read by hand says so in a sentence. Those files are kept as they were written: their shape is the producer's, and this package neither validates them nor exports a type for them.
 
 `make brands` validates and compiles every one with `assembleBrand` and writes the generative stories' brands under `src/__stories__/generative/brands/`: one stylesheet per brand, an `index.css` importing them all, and `generated.ts` naming each with its provenance, its scope and its manifest. It is all or nothing: one brand that does not validate writes nothing and prints its problems. `src/__stories__/__tests__/brands.test.ts` rebuilds the corpus and fails on a committed file that is not what the data produces. All of it is outside every entry tree and ships in nothing. See [storybook.md](storybook.md) § "Generative".

@@ -7,8 +7,9 @@ import { type BrandTokens, colorHex, colorIsHex, resolveColor } from './tokens';
  * no reading can supply. The accent of a site with no button, per mode when its
  * dark canvas needs another, and the logo for a canvas the site draws none for.
  *
- * A producer is told a stated fact outranks every reading, the brand must
- * honour it (`statedFactProblems`), and the provenance records it.
+ * A stated fact outranks every reading, which whatever runs a producer tells
+ * it, outside this package. Here the brand is held to honour it
+ * (`statedFactProblems`), and the provenance records it.
  */
 
 const statedHex = z.string().regex(/^#[0-9a-f]{6}$/i, 'a stated accent is #rrggbb');
