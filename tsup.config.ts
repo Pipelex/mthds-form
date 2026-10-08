@@ -6,7 +6,7 @@ import { defineConfig } from "tsup";
  *   `.`            -> dist/core/index.js        (headless, no React)
  *   `./react`      -> dist/react/index.js       (the control set)
  *   `./generative` -> dist/generative/index.js  (the layer over a produced layout)
- *   `./brand`      -> dist/brand/index.js       (a brand as data: validated, compiled, read off a site)
+ *   `./brand`      -> dist/brand/index.js       (a brand as data: validated and compiled)
  *
  * The source tree is laid out the same way (`src/core/`, `src/react/`), so
  * every intra-package import is relative and nothing is rewritten at build

@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs prompt-hash brands record-site site-facts assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs prompt-hash brands assert-bundle clean pack
 
 install:
 	npm install
@@ -115,20 +115,6 @@ prompt-hash:
 # nothing and prints its problems. See docs/brand.md.
 brands:
 	npx tsx scripts/build-brands.ts
-
-# The SITES the brand entry's reader is tested over: a page and its stylesheets
-# fetched now (https only, size-capped, timed out) into data/sites/<host>/<date>/
-# with the facts the reader takes from them. Needs the network. Only sites we
-# own are recorded here, because this repository is open source.
-record-site:
-	@test -n "$(URL)" || (echo "usage: make record-site URL=https://<site>/" && exit 2)
-	npx tsx scripts/record-site.ts "$(URL)"
-
-# Re-read every recording under data/sites/ with the reader as it is now and
-# rewrite its site-facts.json. Offline; a change to the reader is reviewed as
-# the diff this leaves.
-site-facts:
-	npx tsx scripts/record-site.ts --reread
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

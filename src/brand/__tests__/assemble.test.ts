@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assembleBrand, type BrandSource } from '../assemble';
 import { brandProducerId, brandScope } from '../provenance';
-import { withStatedFacts } from '../stated';
 import { colorHex, resolveColor } from '../tokens';
 import { corpusSource, corpusSources } from './corpus';
 
@@ -128,41 +127,6 @@ describe('the stated facts', () => {
     expect(
       problems.some((problem) => problem.startsWith('provenance.json: stated.logo.onLight')),
     ).toBe(true);
-  });
-
-  it('places what was stated ahead of every reading in the facts a producer reads', () => {
-    const facts = {
-      url: 'https://acme.example/',
-      finalUrl: 'https://acme.example/',
-      fetchedAt: '2026-10-06',
-      site: { name: 'Acme' },
-      colors: { customProperties: [] },
-    };
-    const stated = { accent: { light: '#112233' } };
-    expect(Object.keys(withStatedFacts(facts, stated))).toEqual([
-      'url',
-      'finalUrl',
-      'fetchedAt',
-      'site',
-      'stated',
-      'colors',
-    ]);
-    expect(withStatedFacts(facts, null)).toBe(facts);
-  });
-
-  it('replaces what the facts were stated with before', () => {
-    // Facts read back from disk already carry a statement; the new one is the
-    // person's latest word, and the old one once followed it in and won.
-    const facts = {
-      url: 'https://acme.example/',
-      finalUrl: 'https://acme.example/',
-      fetchedAt: '2026-10-06',
-      colors: { customProperties: [] },
-    };
-    const first = withStatedFacts(facts, { accent: { light: '#111111' } });
-    const second = withStatedFacts(first, { accent: { light: '#222222' } });
-    expect(second.stated).toEqual({ accent: { light: '#222222' } });
-    expect(Object.keys(second)).toEqual(['url', 'finalUrl', 'fetchedAt', 'stated', 'colors']);
   });
 
   it('refuses a primary one step from the stated accent: it would ship as its neighbour', () => {

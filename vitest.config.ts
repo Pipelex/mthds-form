@@ -91,8 +91,8 @@ export default defineConfig({
       },
       {
         // The brand entry is isomorphic and network-free: its contract, its
-        // validator, its compiler and its site reader run in `node`, so a DOM or
-        // a network reference fails here as it would in a build script.
+        // validator and its compiler run in `node`, so a DOM reference fails
+        // here as it would in a build script.
         test: {
           name: 'brand',
           environment: 'node',

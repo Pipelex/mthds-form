@@ -1,6 +1,6 @@
 # mthds-form — repo guide
 
-`@pipelex/mthds-form`: the MTHDS input form as a library. Four entry points — `.` is the headless kernel, `./react` is the control set, `./generative` is the layer that renders a produced layout over the same descriptor, and `./brand` holds a brand to the theme contract, compiles it, and reads a site's design facts ([docs/brand.md](docs/brand.md)). Read [README.md](README.md) for what it is, then [docs/architecture.md](docs/architecture.md) before changing anything structural.
+`@pipelex/mthds-form`: the MTHDS input form as a library. Four entry points — `.` is the headless kernel, `./react` is the control set, `./generative` is the layer that renders a produced layout over the same descriptor, and `./brand` holds a brand to the theme contract and compiles it ([docs/brand.md](docs/brand.md)). Read [README.md](README.md) for what it is, then [docs/architecture.md](docs/architecture.md) before changing anything structural.
 
 ## The three rules that are not negotiable
 
