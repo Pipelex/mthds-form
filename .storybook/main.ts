@@ -7,10 +7,10 @@ import tailwindcss from '@tailwindcss/vite';
  * answer is whether a control renders correctly, in both themes, across every
  * input shape the standard can produce.
  *
- * Stories live in `src/__stories__/`, deliberately OUTSIDE both entry trees.
- * `tsup.config.ts` globs `src/core/*.ts` and `src/react/index.ts`, and
- * `scripts/assert-bundle.mjs` walks what those entries reach - so a story
- * helper placed inside either tree would enter a shipped chunk. Keeping story
+ * Stories live in `src/__stories__/`, deliberately OUTSIDE every entry tree.
+ * `tsup.config.ts` globs `src/core/*.ts` and each other entry's `index.ts`,
+ * and `scripts/assert-bundle.mjs` walks what those entries reach - so a story
+ * helper placed inside any entry tree would enter a shipped chunk. Keeping story
  * code in its own directory is what keeps the bundle invariants meaningful.
  */
 const config: StorybookConfig = {

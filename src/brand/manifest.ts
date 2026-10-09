@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
 /**
- * The brand manifest, `brand.json`: what the page needs from a brand that is
- * not a token - its name, its site, the logo pair, the web font to load. The
- * schema is rendered into the contract brief as JSON Schema, so a producer
- * reads exactly what the build will check.
+ * The brand manifest, `brand.json`: what a page needs from a brand that is not
+ * a token - its name, its site, the logo pair, the web font to load. The tokens
+ * are the palette; the manifest is what the page says it is. The generative
+ * layer's app bar reads it through `BrandProvider`, which also loads the web
+ * font, and `assembleBrand` validates it beside the tokens.
  */
+
 /**
  * Every URL in a manifest is http(s) and nothing else.
  *
@@ -15,7 +17,7 @@ import { z } from 'zod';
  * scheme is checked where the manifest is parsed rather than trusted at the
  * point it reaches the DOM.
  */
-const httpUrl = z.url({ protocol: /^https?$/ });
+export const httpUrl = z.url({ protocol: /^https?$/ });
 
 export const brandManifestSchema = z.strictObject({
   name: z.string().min(1),

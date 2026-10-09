@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.15.0] - 2026-10-08
+
+### Added
+
+- **`./brand`, a brand held to the theme contract**: a new entry that validates a brand's three files and compiles it. `assembleBrand({ brand, producerId, manifest, tokens, provenance })` returns the brand with its stylesheet, or every problem named by its file and path: the DTCG token file must set exactly the contract's tokens (`BRAND_CONTRACT`, the colours and radius of `theme.css` plus `--font-sans` and `--font-mono`) as sRGB colours with a dark value or an alias, reach WCAG AA on the contrast pairs in both modes as they render (an opaque canvas, the ink blended over it by its alpha, both as the compiler rounds them), and carry exactly the accent and logos a person stated (`StatedFacts`). `compileBrand` writes the stylesheet with no dependency: every token on the brand's scope class, every colour again under `.dark`, and `font-family: var(--font-sans)` on the scope so the brand's typeface reaches the page while an unbranded page keeps the host's. `validateBrandTokens`, `brandManifestSchema` (still re-exported from `./generative`), `brandProvenanceSchema`, `brandProducerId` and `brandScope` are exported beside it. The entry renders nothing, fetches nothing, reads no site and depends on zod alone: whatever produces a brand reads the site elsewhere and writes its answer against the contract. See [docs/brand.md](docs/brand.md).
+
 ## [v0.14.1] - 2026-10-06
 
 ### Changed

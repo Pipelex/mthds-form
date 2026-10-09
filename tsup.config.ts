@@ -2,10 +2,11 @@ import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
 /**
- * Three PUBLIC entry points, mirroring the package's three layers:
+ * Four PUBLIC entry points, mirroring the package's layers:
  *   `.`            -> dist/core/index.js        (headless, no React)
  *   `./react`      -> dist/react/index.js       (the control set)
  *   `./generative` -> dist/generative/index.js  (the layer over a produced layout)
+ *   `./brand`      -> dist/brand/index.js       (a brand as data: validated and compiled)
  *
  * The source tree is laid out the same way (`src/core/`, `src/react/`), so
  * every intra-package import is relative and nothing is rewritten at build
@@ -29,12 +30,12 @@ import { defineConfig } from "tsup";
  * of the property that is local to this build.
  *
  * The per-module `dist/core/*.js` files are BUILD ARTIFACTS, not API. The
- * `exports` map in `package.json` lists only the two entries above, so a deep
+ * `exports` map in `package.json` lists only the entries above, so a deep
  * path is unreachable to a consumer - see the third rule in CLAUDE.md.
  */
 export default defineConfig({
   // The glob is deliberate - see the note above before narrowing it.
-  entry: ["src/core/*.ts", "src/react/index.ts", "src/generative/index.ts"],
+  entry: ["src/core/*.ts", "src/react/index.ts", "src/generative/index.ts", "src/brand/index.ts"],
   format: ["esm"],
   dts: true,
   sourcemap: true,
@@ -56,8 +57,9 @@ export default defineConfig({
     // that every control file carries in source does NOT survive into the
     // bundle. Re-assert it on the two entries that render: a consumer bundler
     // treats each as a client boundary, which pulls the shared chunks it
-    // imports into the client graph with it. The core entry deliberately does
-    // NOT get one - it must stay usable from a server component.
+    // imports into the client graph with it. The core and brand entries
+    // deliberately do NOT get one - each must stay usable from a server
+    // component, and `./brand` from a plain node script as well.
     for (const entry of ["dist/react/index.js", "dist/generative/index.js"]) {
       const code = readFileSync(entry, "utf8");
       if (!/^\s*["']use client["'];?/.test(code)) {

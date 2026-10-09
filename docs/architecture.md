@@ -71,6 +71,8 @@ The third entry renders a **layout**: a data file, written once per method versi
 
 It is a separate entry point rather than part of `./react` because compiling and validating a layout costs json-render and zod, and a host rendering an ordinary form must not carry either. It reaches back into the control set for its two escape hatches (`MthdsField`, `MthdsResult`), which is why the three entries genuinely share chunks and why the [budget](dependency-budget.md) is enforced on the built graph rather than on imports.
 
+The fourth entry, `./brand`, holds a **brand** to the theme contract: it validates a brand's token file, manifest and provenance, and compiles the tokens into a stylesheet scoped to one class. It renders nothing and fetches nothing, and depends on zod alone, so it is imported alike by a build script, a server and a browser. The generative layer re-exports its manifest schema, because the app bar reads the manifest. See [brand.md](brand.md).
+
 Before rendering, a host asks three questions and falls back to the kernel's plain form on any no: does the layout's prompt hash match the one this entry ships, does it validate against the catalog, and does it still fit the descriptor — both that every path it mentions still exists and that every required path is offered somewhere. [generative-ui.md](generative-ui.md) is the whole of it.
 
 ## The gate
@@ -122,11 +124,11 @@ What the run makes of the value is the rule of the section above, unchanged. An 
 
 ## Public API and internal code
 
-`src/core/index.ts`, `src/react/index.ts` and `src/generative/index.ts` are the three entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
+`src/core/index.ts`, `src/react/index.ts`, `src/generative/index.ts` and `src/brand/index.ts` are the four entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
 
 `src/generated/layout-design/` is neither an entry nor public. It is the projection of `methods/layout-design.mthds` into zod schemas and types, written by `/pipelex-integrate` and never edited by hand; the generative entry reaches it type-only, so nothing of it ships, and the fixture harness's typed call site under `scripts/pipelex/` is its value consumer. See [generative-ui.md](generative-ui.md) § "The typed contract".
 
-`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only the three JavaScript entries, the two stylesheets and the designer method, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
+`dist/core/` holds a file per core module, and none of them is API. The build emits them so that `dist/core/index.js` comes out a pure re-export barrel, which is what a consumer's bundler needs in order to drop the chunks behind exports the host never uses — the difference between a browser form shipping ajv and not. The `exports` map in `package.json` lists only the four JavaScript entries, the two stylesheets and the designer method, so a deep path stays unreachable to a consumer; see [dependency-budget.md](dependency-budget.md) § "The chunk graph is part of the budget".
 
 ## Local development against a consumer
 
