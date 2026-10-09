@@ -16,10 +16,11 @@ import { type BrandTokens, validateBrandTokens } from './tokens';
  * This is the verdict on whether a brand is VALID under the contract as it is
  * now: the manifest, the tokens with their contrast, and the facts the person
  * stated. It is a hard verdict, and a brand that fails it is not compiled.
- * Whether a brand was produced against the current brief is a different
- * question and never a reason to refuse one - an older brand stays a valid
- * brand - so the provenance's contract hash is recorded here and judged by
- * the producer, not by this function.
+ * Whether a brand was produced against the current brief, and from the facts
+ * its recording holds now, is a different question and never a reason to
+ * refuse one - an older brand stays a valid brand - so the provenance's
+ * contract hash and facts hash are recorded here and judged by the producer,
+ * not by this function.
  *
  * The problems come in the order a producer would want to be told: the
  * manifest and the provenance first, because they are cheap and their errors

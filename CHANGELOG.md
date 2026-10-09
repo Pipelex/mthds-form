@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`siteFactsHash` in a brand's provenance**: `brandProvenanceSchema` accepts an optional `siteFactsHash`, the first twelve hex digits of the SHA-256 of the facts file `siteFacts` names, as the producer read it, so whatever re-reads that file can report a brand whose facts moved as stale, the way `contractHash` does for the brief. `assembleBrand` carries it through without judging it, and refuses one recorded without a `siteFacts` to name its file. See [docs/brand.md](docs/brand.md#where-a-brand-comes-from).
+
 ## [v0.15.0] - 2026-10-08
 
 ### Added
