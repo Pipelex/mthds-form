@@ -50,8 +50,10 @@ export const brandProvenanceSchema = z
      * names, its bytes as the producer read them. A path alone cannot say
      * whether the facts behind it moved since the brand was produced; whatever
      * re-reads them hashes the file again, and a mismatch makes the brand
-     * stale, never invalid. It is recorded only beside a `siteFacts` naming a
-     * file, never for a brand read by hand.
+     * stale, never invalid. The schema refuses one beside no `siteFacts`,
+     * but it cannot tell a path from a sentence: a brand read by hand records
+     * none by the producer's own rule, and a hash recorded beside a sentence
+     * anyway is caught where it is judged, since the sentence names no file.
      */
     siteFactsHash: hash12.optional(),
     /** How many repair rounds the producer ran before the files validated. */
