@@ -56,6 +56,33 @@ describe('assembling a brand', () => {
     const provenance = { ...(source.provenance as object), contractHash: '000000000000' };
     expect(problemsOf({ ...source, provenance })).toEqual([]);
   });
+
+  it('records the hash of the facts a brand was produced from, and never judges it', () => {
+    // Facts that moved since make a brand stale, which is the producer's
+    // reading; whether its recording still hashes to this is never read here.
+    const source = corpusSource('pipelex', 'pipelex-method--claude-4.8-opus');
+    const provenance = { ...(source.provenance as object), siteFactsHash: '000000000000' };
+    const result = assembleBrand({ ...source, provenance });
+    if (!result.ok) throw new Error(result.problems.join('; '));
+    expect(result.brand.siteFactsHash).toBe('000000000000');
+  });
+
+  it('refuses a facts hash that is not twelve hex digits', () => {
+    const source = corpusSource('pipelex', 'pipelex-method--claude-4.8-opus');
+    const provenance = { ...(source.provenance as object), siteFactsHash: 'sha256:abc' };
+    expect(problemsOf({ ...source, provenance })).toEqual([
+      'provenance.json: siteFactsHash: twelve hex digits',
+    ]);
+  });
+
+  it('refuses a facts hash beside no siteFacts, since nothing names the file it hashes', () => {
+    const source = corpusSource('pipelex', 'pipelex-method--claude-4.8-opus');
+    const { siteFacts: _named, ...unnamed } = source.provenance as { siteFacts: string };
+    const provenance = { ...unnamed, siteFactsHash: '27d1d3c2bc39' };
+    expect(problemsOf({ ...source, provenance })).toEqual([
+      'provenance.json: siteFactsHash: no siteFacts names the file it hashes',
+    ]);
+  });
 });
 
 describe('the stated facts', () => {
