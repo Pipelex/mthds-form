@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs prompt-hash brands assert-bundle clean pack
 
 install:
 	npm install
@@ -107,6 +107,14 @@ fixtures-specs:
 # stamps. See src/__stories__/__tests__/method-wip.ts.
 prompt-hash:
 	npx tsx scripts/generate-fixtures.mjs --prompt-hash
+
+# The BRANDS: every brand under data/brands/<brand>/<producer>/ validated and
+# compiled by the brand entry's own `assembleBrand` into the scoped stylesheets
+# the generative stories paint in, under src/__stories__/generative/brands/.
+# Free and offline. All or nothing: a brand that does not validate writes
+# nothing and prints its problems. See docs/brand.md.
+brands:
+	npx tsx scripts/build-brands.ts
 
 # The bundle invariants: what a consumer's bundler will actually pull from each
 # entry. They read `dist/`, so they run after a build, and they cannot be lint -

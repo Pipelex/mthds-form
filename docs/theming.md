@@ -16,6 +16,8 @@ Each is a whole CSS colour, in any syntax a browser accepts — `hsl(0 0% 100%)`
 
 `--input` is the control surface and is meaningfully distinct from `--background`: fields read as a family because they share it. Dark mode follows the `.dark` class convention.
 
+The typeface is not a token of this table, and on purpose. The controls inherit the host's typeface, and the two typography variables a brand sets, `--font-sans` and `--font-mono`, are Tailwind's own theme variables, which `theme.css` leaves alone: it is unlayered, so a value there would override every host's typeface. See [brand.md](brand.md) § "The contract".
+
 If your app is already a shadcn/ui codebase, you have all of these and there is nothing to do.
 
 The authoritative list is not this table: it is the `@theme inline` block in `src/styles/tailwind-entry.css`, which is the same list in executable form, and `scripts/assert-bundle.mjs` fails the build if it and `theme.css` ever disagree. The table restates it for reading, and the secondary pair went missing from it once.
@@ -73,13 +75,13 @@ One sheet covers both rendering entries: it is compiled from the utilities `src/
 
 `theme.css` is the stock shadcn/ui neutral palette, deliberately un-branded: this package renders MTHDS input specs and the surrounding product supplies the brand. Override any token in your own stylesheet after importing it, or skip it entirely and define all of them yourself — as whole colours. A triplet written in the old form still resolves to no colour at all rather than to a wrong one, and the fallback does not save you there: see “Fallbacks, and the host that defines nothing” above.
 
-## Someone else's tokens, and how a story wears them
+## Someone else's tokens: a brand
 
-The token contract is a contract in both directions: everything above defines it for a host, and a **brand** is what happens when something else fills it in. A brand stylesheet sets the same custom properties on a scope class — its dark values under `.dark`, exactly as `theme.css` does — and everything below that class reads the tokens it always reads. That is the entire mechanism; nothing in the package knows a brand exists.
+The token contract is a contract in both directions: everything above defines it for a host, and a **brand** is what happens when something else fills it in. A brand's stylesheet sets the same custom properties on a scope class, its dark values under `.dark` exactly as `theme.css` does, and its typeface with them; everything below that class reads the tokens it always reads. That is the entire mechanism, and no control knows a brand exists.
 
-`src/__stories__/generative/brands/` holds two of them, compiled from real sites' tokens. They are **story fixtures**: outside both entry trees, shipped in nothing, and not reproducible here — the pipeline that read a site and wrote them stayed on the study branch. They are kept for the one question a single palette cannot answer, which is whether a page reads because of how it is laid out or because of the colours it was laid out against. See [storybook.md](storybook.md) § "Generative".
+The `./brand` entry is where a brand is held to this contract and compiled: `assembleBrand` validates a brand's token file, its manifest and its provenance, and writes the scoped stylesheet. The generative layer's app bar additionally reads the brand's **manifest** (a name, a logo pair, an optional web font), which `assembleBrand` validates beside the tokens: the tokens are the palette, and the manifest is what the page says it is. [brand.md](brand.md) is the whole of it.
 
-The generative layer's app bar additionally reads a **manifest** — a name, a logo pair, an optional web font — which is a different artifact from the tokens and is validated by `brandManifestSchema`. Tokens are the palette; the manifest is what the page says it is.
+The generative stories paint every captured layout in the stock palette and again in brands compiled from real sites' tokens, built from the corpus under `data/brands/` by `make brands`. They are story fixtures, outside every entry tree and shipped in nothing, kept for the one question a single palette cannot answer: whether a page reads because of how it is laid out or because of the colours it was laid out against. See [storybook.md](storybook.md) § "Generative".
 
 ## Why Tailwind and not plain CSS
 

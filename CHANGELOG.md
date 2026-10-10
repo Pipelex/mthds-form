@@ -10,6 +10,22 @@
 
 - **`Collapsible` shows a line while it is folded, and `PROMPT_HASH` moves (Breaking)**: the catalog's `Collapsible` takes a `description`, rendered in its summary under the title, so it stays in view while the section is closed. The catalog is part of the designer's prompt, so `PROMPT_HASH` is now `a4bced45bfd0`, and a layout produced against an earlier prompt fails the hash check, and falls back to the plain form, until the designer runs again.
 
+## [v0.16.0] - 2026-10-10
+
+### Added
+
+- **`siteFactsHash` in a brand's provenance**: `brandProvenanceSchema` accepts an optional `siteFactsHash`, the first twelve hex digits of the SHA-256 of the facts file `siteFacts` names, as the producer read it, so whatever re-reads that file can report a brand whose facts moved as stale, the way `contractHash` does for the brief. `assembleBrand` carries it through without judging it, and refuses one recorded without a `siteFacts` to name its file. See [docs/brand.md](docs/brand.md#where-a-brand-comes-from).
+
+### Changed
+
+- **`mthds` ^0.30.1 (Breaking)**: the dependency's range moves from `^0.25.0`, which a caret on a `0.x` range keeps below 0.26, to `^0.30.1`, so a host on `mthds` 0.30 resolves one copy of the standard's types instead of two. A host still on an older `mthds` moves to 0.30 with it. The package reads only types from `mthds/protocol`, and none of the ones it uses changed.
+
+## [v0.15.0] - 2026-10-08
+
+### Added
+
+- **`./brand`, a brand held to the theme contract**: a new entry that validates a brand's three files and compiles it. `assembleBrand({ brand, producerId, manifest, tokens, provenance })` returns the brand with its stylesheet, or every problem named by its file and path: the DTCG token file must set exactly the contract's tokens (`BRAND_CONTRACT`, the colours and radius of `theme.css` plus `--font-sans` and `--font-mono`) as sRGB colours with a dark value or an alias, reach WCAG AA on the contrast pairs in both modes as they render (an opaque canvas, the ink blended over it by its alpha, both as the compiler rounds them), and carry exactly the accent and logos a person stated (`StatedFacts`). `compileBrand` writes the stylesheet with no dependency: every token on the brand's scope class, every colour again under `.dark`, and `font-family: var(--font-sans)` on the scope so the brand's typeface reaches the page while an unbranded page keeps the host's. `validateBrandTokens`, `brandManifestSchema` (still re-exported from `./generative`), `brandProvenanceSchema`, `brandProducerId` and `brandScope` are exported beside it. The entry renders nothing, fetches nothing, reads no site and depends on zod alone: whatever produces a brand reads the site elsewhere and writes its answer against the contract. See [docs/brand.md](docs/brand.md).
+
 ## [v0.14.1] - 2026-10-06
 
 ### Changed

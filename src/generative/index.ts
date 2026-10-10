@@ -98,7 +98,9 @@ export {
 export { generativeRegistry } from './product-registry';
 export { ResultSlotProvider, useResultSlot, type ResultSlot } from './result-slot';
 export { BrandProvider, useBrand } from './brand-context';
-export { brandManifestSchema, type BrandManifest } from './manifest';
+// The manifest lives with the rest of the brand in `./brand`, and is re-exported
+// here because the app bar reads it and `GenerativePage` takes it.
+export { brandManifestSchema, type BrandManifest } from '../brand/manifest';
 
 // The two state trees a layout binds to.
 export {

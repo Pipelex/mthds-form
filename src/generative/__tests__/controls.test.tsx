@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FileRunField, ObjectRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
-import type { BrandManifest } from '../manifest';
+import type { BrandManifest } from '../../brand/manifest';
 import { GenerativePage } from '../page';
 import { pick, pickKey } from '../ui/shadcn';
 

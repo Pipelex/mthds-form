@@ -29,9 +29,9 @@ import { BRANDS, type BrandFixture } from './brands';
  *
  * The brand's scope class sits on the root, which is the only place a brand
  * enters: its stylesheet sets the theme contract's custom properties on that
- * class, and everything below reads the tokens it always reads. `font-sans`
- * on the root is what makes Tailwind emit `--font-sans`, without which a
- * scoped typeface token has nothing to override.
+ * class, and the brand's typeface with them, and everything below reads the
+ * tokens it always reads. The stock palette sets no class, so the page keeps
+ * the Storybook's own typeface, as a host's page keeps the host's.
  *
  * It uploads the way a host does, too, in the one sense a story can: a file
  * dropped on a delegated file input is written back as a `blob:` URL at the
@@ -74,7 +74,7 @@ export function LayoutPage({ brand, fields, fixture, idPrefix }: LayoutPageProps
   );
 
   return (
-    <div className={brand.scope ? `${brand.scope} font-sans` : 'font-sans'}>
+    <div className={brand.scope ?? undefined}>
       <GenerativePage
         spec={fixture.spec}
         store={store}
