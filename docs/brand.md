@@ -16,7 +16,7 @@ A brand is three JSON files:
 
 - **`tokens.json`** is a [DTCG](https://www.designtokens.org/) token file (the Design Tokens Community Group format, 2025.10) setting exactly the contract's tokens, in both colour modes.
 - **`brand.json`** is the manifest: the product's name, its site, one logo for each canvas (`onLight` is the mark drawn on the light canvas, `onDark` the one drawn on the dark), and the web font to load, or `null`. The generative layer's app bar reads it through `BrandProvider`, which also loads the web font. `brandManifestSchema` is exported here and re-exported from `./generative`.
-- **`provenance.json`** says who produced the brand, on which model, on which day, against which brief and from which facts. It is a record, never rewritten to make a check pass.
+- **`provenance.json`** says who produced the brand, on which model, on which day, against which brief and from which facts, with the brief's hash and, when the facts are a file, that file's hash. It is a record, never rewritten to make a check pass.
 
 A brand's directory is named by `brandProducerId(provenance)`, which is `producer--model`, with `--seeded` added when a seed was given. That is the recipe a captured layout's id uses, so the tree and the record cannot disagree about who made a brand.
 
@@ -65,7 +65,7 @@ if (!result.ok) {
 
 That verdict is about **validity**: the manifest, the tokens with their contrast, and the facts the person stated, all judged against the contract as it is now. It is a hard verdict, and a brand that fails it is not compiled.
 
-Whether a brand was produced against the current brief is a different question, about **freshness**, and it never refuses a brand. The provenance records the brief's hash; a newer brief makes a brand old, never invalid, so a corpus produced last month keeps compiling. Freshness is held only where a brand is being produced, by the producer, in the same way the designer method's stamp is held to its prompt hash.
+Whether a brand was produced against the current brief, and from the facts its producer holds now, is a different question, about **freshness**, and it never refuses a brand. The provenance records the brief's hash as `contractHash` and, when its facts are a file, that file's hash as `siteFactsHash`; a newer brief or facts that moved make a brand old, never invalid, so a corpus produced last month keeps compiling. Freshness is held only where a brand is being produced, by the producer, in the same way the designer method's stamp is held to its prompt hash.
 
 ## The stated facts
 
@@ -123,7 +123,7 @@ The tokens and the manifest are separate on purpose: the tokens are the palette,
 
 A producer reads a site and writes its answer against this contract, and both happen outside this package. Reading what a site declares (which custom properties its stylesheets set and which declaration wins as served, which colour utilities its markup uses most, which typefaces it loads, which images could be its logo) is code over the page and stylesheets a producer fetched. Judging from those facts what the brand should be is a model's work. Neither belongs in a kernel that a browser and a server import, so neither is here.
 
-What reaches this entry is the producer's answer: the token file, the manifest and the provenance. `assembleBrand` holds them to the contract, and its problems, each named by its file and path, are what a producer's repair round is handed. The provenance's `siteFacts` field records where a brand's facts came from, as a path or a sentence; this package never reads it.
+What reaches this entry is the producer's answer: the token file, the manifest and the provenance. `assembleBrand` holds them to the contract, and its problems, each named by its file and path, are what a producer's repair round is handed. The provenance's `siteFacts` field records where a brand's facts came from, as a path or a sentence. When it names a file, `siteFactsHash` records the first twelve hex digits of the SHA-256 of that file's bytes as the producer read them, the recipe `contractHash` follows for the brief. A path alone cannot tell whether the facts behind it moved: a producer that re-reads its recordings with a newer reader rewrites the very file a committed brand names, and only the hash lets it report that brand as stale. The schema refuses a `siteFactsHash` with no `siteFacts` beside it, since nothing would name the file it hashes. It cannot tell a path from a sentence, both being one string, so a brand read by hand records no hash by the producer's own rule, and a hash recorded beside a sentence anyway is caught where it is judged, because the sentence names no file to hash. A brand produced before the field existed carries no hash and is not given one afterwards, because its provenance is a record. This package never reads the facts file, and never holds the hash to it.
 
 ## The corpus and the story brands
 
