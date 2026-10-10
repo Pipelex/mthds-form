@@ -6,6 +6,10 @@
 
 - **`siteFactsHash` in a brand's provenance**: `brandProvenanceSchema` accepts an optional `siteFactsHash`, the first twelve hex digits of the SHA-256 of the facts file `siteFacts` names, as the producer read it, so whatever re-reads that file can report a brand whose facts moved as stale, the way `contractHash` does for the brief. `assembleBrand` carries it through without judging it, and refuses one recorded without a `siteFacts` to name its file. See [docs/brand.md](docs/brand.md#where-a-brand-comes-from).
 
+### Changed
+
+- **`mthds` ^0.30.1 (Breaking)**: the dependency's range moves from `^0.25.0`, which a caret on a `0.x` range keeps below 0.26, to `^0.30.1`, so a host on `mthds` 0.30 resolves one copy of the standard's types instead of two. A host still on an older `mthds` moves to 0.30 with it. The package reads only types from `mthds/protocol`, and none of the ones it uses changed.
+
 ## [v0.15.0] - 2026-10-08
 
 ### Added
