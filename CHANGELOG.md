@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The fixture harness runs on `@pipelex/sdk` 0.38**: the devDependency moves from `^0.17.0`, which nested its own `mthds` 0.25 beside the package's `mthds` 0.30, to `^0.38.0`, so a contributor's tree resolves one copy of the standard's types and `make fixtures-runs` and `make fixtures-specs` talk to the API through a client built for the protocol the fixtures are typed against. Both passes now total a run's cost through the SDK's `summarizeUsage`, so a run that made no inference call prints `$0` and counts towards its case's total instead of hiding it, while a run with any unpriced call still prints no figure. The package itself is unchanged.
+
 ## [v0.16.0] - 2026-10-10
 
 ### Added

@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DictWorkingMemory, RunResults, WaitForResultOptions } from '@pipelex/sdk';
+import type { RunResults, WaitForResultOptions } from '@pipelex/sdk';
 import {
   parsePagePlan,
   parseText,
@@ -83,13 +83,6 @@ export interface DesignLayoutRun {
   results: RunResults;
 }
 
-/**
- * The hosted results payload carries the run's whole working memory beside
- * `main_stuff`, keyed by stuff name; the SDK's `RunResults` declares only the
- * bare runner's `pipe_output`, so the field is read through this narrowing.
- */
-type WithWorkingMemory = RunResults & { working_memory?: DictWorkingMemory | null };
-
 /** The stuffs the method's first two stages write, by the names the sequence gives them. */
 const BRIEF_STUFF = 'brief_text';
 const PLAN_STUFF = 'plan';
@@ -97,11 +90,13 @@ const PLAN_STUFF = 'plan';
 /**
  * One intermediate out of the run's working memory, or a loud failure: the
  * sequence always writes both, so an absence means the payload is not the
- * one this was written against.
+ * one this was written against. `RunResults.working_memory` holds every
+ * named stuff of the run, keyed by stuff name, whichever path ran: the hosted
+ * results payload relays it, and the SDK lifts it off a bare runner's
+ * `pipe_output`.
  */
-function stuffOf(results: WithWorkingMemory, name: string): unknown {
-  const memory = results.working_memory ?? results.pipe_output?.working_memory;
-  const stuff = memory?.root[name];
+function stuffOf(results: RunResults, name: string): unknown {
+  const stuff = results.working_memory?.root[name];
   if (!stuff) {
     throw new Error(
       `run ${results.pipeline_run_id} carries no '${name}' stuff in its working memory; ` +
@@ -116,7 +111,7 @@ function stuffOf(results: WithWorkingMemory, name: string): unknown {
  * generated binder, so a plan the bundle's `PagePlan` structure no longer
  * describes is refused here rather than stored.
  */
-function planOf(results: WithWorkingMemory): PagePlan {
+function planOf(results: RunResults): PagePlan {
   return parsePagePlan(stuffOf(results, PLAN_STUFF));
 }
 
@@ -126,7 +121,7 @@ function planOf(results: WithWorkingMemory): PagePlan {
  * The pass compares it with the brief it recorded, so the record on disk is
  * held to what the model actually saw.
  */
-function briefTextOf(results: WithWorkingMemory): string {
+function briefTextOf(results: RunResults): string {
   return parseText(stuffOf(results, BRIEF_STUFF)).text;
 }
 
