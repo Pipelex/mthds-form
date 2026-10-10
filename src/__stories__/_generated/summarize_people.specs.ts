@@ -28,11 +28,11 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'summarize_people.summarize_people',
     producer: 'pipelex-method',
     model: 'claude-4.8-opus',
-    promptHash: '2b2325fd1231',
-    date: '2026-09-17',
+    promptHash: 'a4bced45bfd0',
+    date: '2026-10-07',
     brief: 'data/briefs/summarize_people.summarize_people.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["hero","work"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"People summaries","lede":"Hand over your list of people and get a short summary written for each one."},"children":[]}}\n{"op":"add","path":"/elements/work","value":{"type":"Section","props":{"title":"The people"},"children":["people-field","run-cta"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/run-cta","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["hero","people","run"]}}\n{"op":"add","path":"/elements/hero","value":{"type":"Hero","props":{"headline":"People summaries","lede":"Drop in your people and get a short summary of each."},"children":[]}}\n{"op":"add","path":"/elements/people","value":{"type":"Section","props":{"title":"The people"},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}\n{"op":"add","path":"/elements/run","value":{"type":"Cta","props":{"label":"Summarize everyone"},"on":{"press":[{"action":"validateForm"},{"action":"run"}]},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -40,25 +40,25 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'lg',
+            gap: 'xl',
             align: 'stretch',
           },
-          children: ['hero', 'work'],
+          children: ['hero', 'people', 'run'],
         },
         hero: {
           type: 'Hero',
           props: {
             headline: 'People summaries',
-            lede: 'Hand over your list of people and get a short summary written for each one.',
+            lede: 'Drop in your people and get a short summary of each.',
           },
           children: [],
         },
-        work: {
+        people: {
           type: 'Section',
           props: {
             title: 'The people',
           },
-          children: ['people-field', 'run-cta'],
+          children: ['people-field'],
         },
         'people-field': {
           type: 'MthdsField',
@@ -67,7 +67,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'run-cta': {
+        run: {
           type: 'Cta',
           props: {
             label: 'Summarize everyone',
@@ -88,36 +88,40 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'A page for someone with a list of people from a CSV who wants a short summary written for each one, and needs only to hand over the list and run.',
+        'For someone who has a list of people from a CSV and wants a short summary of each — they drop the records in and run it, nothing more.',
       title: 'People summaries',
       composition:
-        'A single quiet column, centered and unhurried. It opens with a Hero that names the job in one bold line and sets one muted line beneath it, so a person knows at a glance what this page does. Below the Hero, one Section holds the whole of the work: the people list, delegated to its own control, given the full width because it is the only thing to attend to. The run sits at the foot of that Section as a full-width Cta, so the eye travels headline → the list → the one action, top to bottom, with nothing beside it and nothing folded away. There is only one input and it is delegated, so there is nothing to group or stage; restraint is the whole design here.',
+        "A single calm, centred column — this page has exactly one thing to collect, so it should feel spacious and unfussy rather than form-like. A Hero opens with the headline and one muted line that says what happens here. Below it, one Section holds the people records in the kernel's own control, taking the full width of the column so the list has room to breathe. The run sits at the foot of that same column as a full-width Cta, directly under the records it acts on. No rail, no tabs, no steps: there is one input and one action, and the layout says so.",
       regions: [
         {
           title: null,
           purpose:
-            'The opening: one headline naming what happens here, one muted line beneath it, so the person lands knowing exactly what this page is for.',
+            "The opening: states in a person's words that this turns a list of people into short summaries, so the single input below needs no explaining.",
           container: 'Hero',
           elements: [
-            'Hero headline: People summaries',
-            'Hero subline (muted): Hand over your list of people and get a short summary written for each one.',
+            'Hero headline: "People summaries"',
+            'Hero muted line: "Drop in your people and get a short summary of each."',
           ],
         },
         {
           title: 'The people',
           purpose:
-            'Holds the one input and the one action: the list of people, delegated whole, then the control that runs the method beneath it at full width.',
+            'Collects the list of person records read from CSV rows; delegated whole because the brief marks it so.',
           container: 'Section',
-          elements: [
-            'MthdsField path /inputs/people',
-            'Cta label "Summarize everyone", on.press bound to validateForm then run',
-          ],
+          elements: ['MthdsField path /inputs/people'],
+        },
+        {
+          title: null,
+          purpose:
+            'Runs the method, sitting at the foot of the column under the records it acts on.',
+          container: null,
+          elements: ['Cta on.press validateForm then run, label "Summarize everyone"'],
         },
       ],
       call_to_action: 'Summarize everyone',
       defaults: null,
       delegated: [
-        '/inputs/people — the brief marks it delegated: a list of Person structures read from CSV rows, rendered whole with MthdsField.',
+        '/inputs/people — the brief marks it delegated; a list of Person structures read from CSV, rendered whole by MthdsField',
       ],
     },
   },
