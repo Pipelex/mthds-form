@@ -124,7 +124,7 @@
 // `scripts/pipelex/client.ts`, imported by the passes that run pipes; the SDK is
 // a devDependency that ships in nothing and is banned from `src/` by lint
 // (docs/dependency-budget.md).
-import { ApiResponseError, RunFailedError, RunTimeoutError } from '@pipelex/sdk';
+import { ApiResponseError, RunFailedError, RunTimeoutError, summarizeUsage } from '@pipelex/sdk';
 
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -1356,19 +1356,22 @@ async function designPage(pipeRef, run) {
 }
 
 /**
- * What the run cost, in dollars, or `undefined` when any of it went unpriced.
+ * What the run cost, in dollars, or `undefined` when any of it went unpriced
+ * or the run relayed no usage at all.
  *
  * A `null` cost on a record and a `0` are different facts - no rate table at
  * all, against a table that priced the call at zero - so a run with an
  * unpriced record reports no figure rather than a confident sum of the rest:
  * the designer is two calls, and a total that priced the planner alone would
  * read as the run's. It is the rule the case total applies to its runs,
- * applied one level down.
+ * applied one level down. The fold is the SDK's `summarizeUsage`, which keeps
+ * the same distinction: its total is `null` when no call was priced and
+ * `cost_partial` when only some were, and a run that made no inference call
+ * totals `0`, which is what it cost.
  */
 function runCost(results) {
-  const costs = (results.tokens_usages ?? []).map((record) => record.cost);
-  if (costs.length === 0 || !costs.every((cost) => typeof cost === 'number')) return undefined;
-  return costs.reduce((total, cost) => total + cost, 0);
+  const { total_cost_usd: total, cost_partial: partial } = summarizeUsage(results);
+  return total === null || partial ? undefined : total;
 }
 
 /**

@@ -1,7 +1,13 @@
 import * as React from 'react';
 import type { OutputForm, PipeIOContracts, RunField } from '../core';
 import { buildResultField, getPipeIOContract, getPipeOutputForm } from '../core';
-import { FieldPresentationProvider, StuffViewer, type FieldPresentation } from '../react';
+import {
+  FieldPresentationProvider,
+  ResultEnvProvider,
+  StuffViewer,
+  type FieldPresentation,
+  type TableLayout,
+} from '../react';
 
 /**
  * The one harness every result story renders through — the output twin of
@@ -38,6 +44,16 @@ export interface ResultViewProps {
   /** Constrain the column the way a host panel would; results can be wide. */
   maxWidth?: number;
   /**
+   * The panel's exact width, for a story about one width: the 343px a 375px
+   * phone leaves, a 720px column. Unlike `maxWidth` it does not give way to a
+   * narrower pane, so a container query reads the same width in every runner.
+   */
+  width?: number;
+  /** The panel's table layout, passed to `StuffViewer` as a host passes it. */
+  tableLayout?: TableLayout;
+  /** The host's column budget, on `ResultEnvProvider`. Five when unset. */
+  tableColumns?: number;
+  /**
    * The same switch the input side carries, and it governs the same thing: in
    * `studio` a label is the identifier the method author wrote, shown verbatim
    * in mono beside its concept pill; in `app` it is a humanised sans label with
@@ -67,16 +83,26 @@ export function ResultView({
   pipeCode,
   value,
   maxWidth = 560,
+  width,
+  tableLayout,
+  tableColumns,
   presentation = 'studio',
 }: ResultViewProps) {
   const field = React.useMemo(
     () => resultFieldFor(contracts, outputForm, domain, pipeCode),
     [contracts, outputForm, domain, pipeCode],
   );
+  const panel = (
+    <StuffViewer field={field} value={value} {...(tableLayout ? { tableLayout } : {})} />
+  );
   return (
-    <div style={{ maxWidth }}>
+    <div style={width === undefined ? { maxWidth } : { width }}>
       <FieldPresentationProvider presentation={presentation}>
-        <StuffViewer field={field} value={value} />
+        {tableColumns === undefined ? (
+          panel
+        ) : (
+          <ResultEnvProvider tableColumns={tableColumns}>{panel}</ResultEnvProvider>
+        )}
       </FieldPresentationProvider>
     </div>
   );
