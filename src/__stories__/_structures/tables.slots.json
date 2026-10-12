@@ -1,5 +1,5 @@
 {
-  "description": "Record lists whose values press on the table's own rules rather than on the choice of a table. A link checker's report is a table whose name column holds web addresses: each one a single token, and some of them longer than any panel is wide, which is the value the name cell has to wrap without widening the table. Every pipe runs for real.",
+  "description": "Record lists whose values press on the table's own rules rather than on the choice of a table. A link checker's report is a table whose name column holds web addresses: each one a single token, and some of them longer than any panel is wide, which is the value the name cell has to wrap without widening the table. A services contract's clauses are a table of four columns of full sentences, run once in English and once in French, whose long words are what a column that wraps must still fit. Every pipe runs for real.",
   "pipes": [
     {
       "code": "links",
@@ -12,6 +12,32 @@
       ],
       "run": {
         "note": "Link check from this morning, 2026-09-20. Give me all five as records, copying each address exactly as written.\nhttps://en.wikipedia.org/wiki/Taumatawhakatangihangakoauauotamateaturipukakapikimaungahoronukupokaiwhenuakitanatahu answered in 412 ms, up.\nhttps://en.wikipedia.org/wiki/Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch answered in 388 ms, up.\nhttps://developer.mozilla.org/en-US/docs/Web/CSS/overflow-wrap answered in 97 ms, redirect.\nhttps://www.w3.org/TR/css-text-3/#overflow-wrap-property answered in 1204 ms, up.\nhttps://example.org/archive/2019/observatory-retrofit-plan-final-v2.pdf did not answer after 30000 ms, down."
+      }
+    },
+    {
+      "code": "clauses",
+      "output": "Clause[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Summarise the clauses of this services contract for the client, one record per clause, each part in one or two full sentences.\nConfidentiality: both parties keep each other's commercial information secret during the contract and for five years after it ends, except information that was already public or that a court orders disclosed; a breach entitles the other party to damages and to end the contract at once.\nDelivery: the provider delivers each milestone by the date in the schedule, unless the client is late supplying the data the milestone depends on; for each week of delay the client may withhold two percent of that milestone's fee, up to twenty percent.\nAcceptance: the client tests each delivery within ten working days and either accepts it or lists its defects in writing, except for a delivery the client has already put into production, which counts as accepted; defects listed in time are fixed free of charge within fifteen working days.\nLiability: each party's liability under the contract is capped at the total fees paid in the twelve months before the claim, except for fraud, wilful misconduct and breaches of confidentiality, which are uncapped; a claim above the cap is void.\nTermination: either party may end the contract with three months' written notice, except during the first six months, when only a material breach allows it; on termination the client pays for the work delivered and accepted up to the end date."
+      }
+    },
+    {
+      "code": "clauses_fr",
+      "output": "Clause[]",
+      "slots": [
+        {
+          "name": "note",
+          "concept": "Text"
+        }
+      ],
+      "run": {
+        "note": "Résume les clauses de ce contrat de prestation de services pour le client, une fiche par clause, chaque partie en une ou deux phrases complètes, en français.\nConfidentialité : les parties s'engagent réciproquement à préserver la confidentialité des informations commerciales échangées pendant toute la durée du contrat et pendant cinq ans après son terme, sauf pour les informations déjà publiques ou dont la communication est ordonnée par une juridiction ; tout manquement ouvre droit à des dommages-intérêts et à la résiliation immédiate du contrat.\nCalendrier de livraison : le prestataire livre chaque jalon à la date prévue au calendrier contractuel, sauf si le client tarde à fournir les données nécessaires à sa réalisation ; pour chaque semaine de retard, le client peut retenir deux pour cent du prix du jalon concerné, dans la limite de vingt pour cent.\nRecette : le client procède à la recette de chaque livraison dans un délai de dix jours ouvrés et l'accepte ou notifie par écrit les anomalies constatées, sauf pour une livraison déjà mise en production, qui est réputée acceptée ; les anomalies notifiées dans les délais sont corrigées gratuitement sous quinze jours ouvrés.\nResponsabilité : la responsabilité de chaque partie au titre du contrat est plafonnée au montant total des honoraires versés au cours des douze mois précédant la réclamation, sauf en cas de fraude, de faute intentionnelle ou de violation de la confidentialité ; toute réclamation excédant ce plafond est irrecevable.\nRésiliation : chaque partie peut résilier le contrat moyennant un préavis écrit de trois mois, sauf pendant les six premiers mois, où seule une inexécution grave le permet ; en cas de résiliation, le client règle les prestations livrées et recettées jusqu'à la date d'effet."
       }
     }
   ]

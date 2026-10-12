@@ -1,7 +1,7 @@
 /**
  * Generated from src/__stories__/_structures/tables.mthds - DO NOT EDIT.
  *
- * Record lists whose values press on the table's own rules rather than on the choice of a table. A link checker's report is a table whose name column holds web addresses: each one a single token, and some of them longer than any panel is wide, which is the value the name cell has to wrap without widening the table. Every pipe runs for real.
+ * Record lists whose values press on the table's own rules rather than on the choice of a table. A link checker's report is a table whose name column holds web addresses: each one a single token, and some of them longer than any panel is wide, which is the value the name cell has to wrap without widening the table. A services contract's clauses are a table of four columns of full sentences, run once in English and once in French, whose long words are what a column that wraps must still fit. Every pipe runs for real.
  *
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
@@ -9,9 +9,159 @@
 import type { InputForm, OutputForm, PipeIOContracts } from 'mthds/protocol';
 
 /** Every pipe_ref this case projects, in sorted order. */
-export const PIPE_REFS = ['tables.links'] as const;
+export const PIPE_REFS = ['tables.clauses', 'tables.clauses_fr', 'tables.links'] as const;
 
 export const CONTRACTS: PipeIOContracts = {
+  'tables.clauses': {
+    inputs: {
+      note: {
+        concept_ref: 'native.Text',
+        item_count: null,
+        json_schema: {
+          description: 'A text',
+          properties: {
+            text: {
+              description: 'The text',
+              title: 'Text',
+              type: 'string',
+            },
+          },
+          required: ['text'],
+          title: 'native.Text',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'tables.Clause',
+      item_count: null,
+      json_schema: {
+        $defs: {
+          tables__Clause: {
+            description:
+              'One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of\nwhich a cell can hold on one line',
+            properties: {
+              exception: {
+                description: 'When the obligation does not apply, in one full sentence',
+                title: 'Exception',
+                type: 'string',
+              },
+              obligation: {
+                description: 'What the clause obliges a party to do, in one or two full sentences',
+                title: 'Obligation',
+                type: 'string',
+              },
+              remedy: {
+                description:
+                  'What happens when the obligation is not met, in one or two full sentences',
+                title: 'Remedy',
+                type: 'string',
+              },
+              subject: {
+                description: 'What the clause is about, in a few words',
+                title: 'Subject',
+                type: 'string',
+              },
+            },
+            required: ['subject', 'obligation', 'exception', 'remedy'],
+            title: 'tables__Clause',
+            type: 'object',
+          },
+        },
+        properties: {
+          items: {
+            items: {
+              $ref: '#/$defs/tables__Clause',
+            },
+            title: 'Items',
+            type: 'array',
+          },
+        },
+        required: ['items'],
+        title: 'ListContent[tables__Clause]',
+        type: 'object',
+      },
+      multiplicity: 'variable',
+      optional: false,
+    },
+  },
+  'tables.clauses_fr': {
+    inputs: {
+      note: {
+        concept_ref: 'native.Text',
+        item_count: null,
+        json_schema: {
+          description: 'A text',
+          properties: {
+            text: {
+              description: 'The text',
+              title: 'Text',
+              type: 'string',
+            },
+          },
+          required: ['text'],
+          title: 'native.Text',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'tables.Clause',
+      item_count: null,
+      json_schema: {
+        $defs: {
+          tables__Clause: {
+            description:
+              'One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of\nwhich a cell can hold on one line',
+            properties: {
+              exception: {
+                description: 'When the obligation does not apply, in one full sentence',
+                title: 'Exception',
+                type: 'string',
+              },
+              obligation: {
+                description: 'What the clause obliges a party to do, in one or two full sentences',
+                title: 'Obligation',
+                type: 'string',
+              },
+              remedy: {
+                description:
+                  'What happens when the obligation is not met, in one or two full sentences',
+                title: 'Remedy',
+                type: 'string',
+              },
+              subject: {
+                description: 'What the clause is about, in a few words',
+                title: 'Subject',
+                type: 'string',
+              },
+            },
+            required: ['subject', 'obligation', 'exception', 'remedy'],
+            title: 'tables__Clause',
+            type: 'object',
+          },
+        },
+        properties: {
+          items: {
+            items: {
+              $ref: '#/$defs/tables__Clause',
+            },
+            title: 'Items',
+            type: 'array',
+          },
+        },
+        required: ['items'],
+        title: 'ListContent[tables__Clause]',
+        type: 'object',
+      },
+      multiplicity: 'variable',
+      optional: false,
+    },
+  },
   'tables.links': {
     inputs: {
       note: {
@@ -92,6 +242,32 @@ export const CONTRACTS: PipeIOContracts = {
 };
 
 export const INPUT_FORM: InputForm = {
+  'tables.clauses': {
+    fields: [
+      {
+        concept_ref: 'native.Text',
+        description: 'A text',
+        gating: true,
+        kind: 'prose',
+        name: 'note',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
+  'tables.clauses_fr': {
+    fields: [
+      {
+        concept_ref: 'native.Text',
+        description: 'A text',
+        gating: true,
+        kind: 'prose',
+        name: 'note',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
   'tables.links': {
     fields: [
       {
@@ -114,6 +290,94 @@ export const INPUT_FORM: InputForm = {
  * standard puts it, beside the input schemas.
  */
 export const OUTPUT_FORM: OutputForm = {
+  'tables.clauses': {
+    field: {
+      concept_ref: 'tables.Clause',
+      description:
+        'One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of which a cell can hold on one line',
+      item: {
+        concept_ref: 'tables.Clause',
+        description:
+          'One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of which a cell can hold on one line',
+        fields: [
+          {
+            description: 'What the clause is about, in a few words',
+            kind: 'text',
+            name: 'subject',
+            required: true,
+          },
+          {
+            description: 'What the clause obliges a party to do, in one or two full sentences',
+            kind: 'text',
+            name: 'obligation',
+            required: true,
+          },
+          {
+            description: 'When the obligation does not apply, in one full sentence',
+            kind: 'text',
+            name: 'exception',
+            required: true,
+          },
+          {
+            description:
+              'What happens when the obligation is not met, in one or two full sentences',
+            kind: 'text',
+            name: 'remedy',
+            required: true,
+          },
+        ],
+        kind: 'object',
+        required: true,
+      },
+      kind: 'list',
+      name: 'output',
+      required: true,
+    },
+  },
+  'tables.clauses_fr': {
+    field: {
+      concept_ref: 'tables.Clause',
+      description:
+        'One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of which a cell can hold on one line',
+      item: {
+        concept_ref: 'tables.Clause',
+        description:
+          'One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of which a cell can hold on one line',
+        fields: [
+          {
+            description: 'What the clause is about, in a few words',
+            kind: 'text',
+            name: 'subject',
+            required: true,
+          },
+          {
+            description: 'What the clause obliges a party to do, in one or two full sentences',
+            kind: 'text',
+            name: 'obligation',
+            required: true,
+          },
+          {
+            description: 'When the obligation does not apply, in one full sentence',
+            kind: 'text',
+            name: 'exception',
+            required: true,
+          },
+          {
+            description:
+              'What happens when the obligation is not met, in one or two full sentences',
+            kind: 'text',
+            name: 'remedy',
+            required: true,
+          },
+        ],
+        kind: 'object',
+        required: true,
+      },
+      kind: 'list',
+      name: 'output',
+      required: true,
+    },
+  },
   'tables.links': {
     field: {
       concept_ref: 'tables.Link',
@@ -169,6 +433,8 @@ export const OUTPUT_FORM: OutputForm = {
  * every entry is the synthesized carrier's line, and the hero states its own.
  */
 export const PIPE_DESCRIPTIONS: Record<string, string> = {
+  'tables.clauses': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'tables.clauses_fr': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'tables.links': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
 };
 

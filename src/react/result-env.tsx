@@ -132,6 +132,23 @@ export interface DownloadDisplay {
   askFileName?: boolean;
 }
 
+/**
+ * What a table of records does when its container is narrower than its
+ * columns.
+ *
+ * `'scroll'`, the default, keeps every column a column and lets the table
+ * scroll sideways, which suits a builder's panel where the columns are worth
+ * comparing. `'stack'` is for a reader on a phone, where nothing should scroll
+ * sideways: a table of up to three columns stays a table and wraps; one of four
+ * to six becomes, while its own box is narrower than 640px, one block of label
+ * and value pairs per row; one of more than six does so at every width. The
+ * count is the columns the table shows, after `tableColumns`, and the width is
+ * the table's own, read by a container query rather than off the viewport, so
+ * a result panel beside a sidebar stacks on a wide screen too. See
+ * `docs/result-view.md`.
+ */
+export type TableLayout = 'scroll' | 'stack';
+
 interface ResultEnv {
   resolveUrl?: ResolveUrl;
   /**
@@ -192,6 +209,12 @@ interface ResultEnv {
    * which is the record's name alone.
    */
   tableColumns?: number;
+  /**
+   * What a table of records does in a container narrower than its columns:
+   * scroll sideways (`'scroll'`, the default) or stack its rows (`'stack'`).
+   * See {@link TableLayout}.
+   */
+  tableLayout?: TableLayout;
 }
 
 const ResultEnvContext = createContext<ResultEnv>({});
@@ -202,6 +225,7 @@ export function ResultEnvProvider({
   resolveShareUrl,
   proseImages,
   tableColumns,
+  tableLayout,
   saveFiles,
   downloads,
   children,
@@ -213,24 +237,37 @@ export function ResultEnvProvider({
       resolveShareUrl,
       proseImages,
       tableColumns,
+      tableLayout,
       saveFiles,
       downloads,
     }),
-    [resolveUrl, resolveUrls, resolveShareUrl, proseImages, tableColumns, saveFiles, downloads],
+    [
+      resolveUrl,
+      resolveUrls,
+      resolveShareUrl,
+      proseImages,
+      tableColumns,
+      tableLayout,
+      saveFiles,
+      downloads,
+    ],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
 }
 
 /**
- * The provider's download display with one panel's own settings laid over it,
- * key by key, for everything beneath. Internal: it is how `StuffViewer`'s
- * `downloads` prop reaches the file buttons drawn deep inside its tree.
+ * The provider's settings with one panel's own laid over them, for everything
+ * beneath: its download display key by key, and its table layout. Internal: it
+ * is how `StuffViewer`'s `downloads` and `tableLayout` props reach the file
+ * buttons and the tables drawn deep inside its tree.
  */
-export function DownloadDisplayOverride({
+export function PanelEnvOverride({
   downloads,
+  tableLayout,
   children,
 }: {
   downloads: DownloadDisplay | undefined;
+  tableLayout: TableLayout | undefined;
   children: ReactNode;
 }) {
   const env = use(ResultEnvContext);
@@ -238,21 +275,25 @@ export function DownloadDisplayOverride({
   const files = downloads?.files;
   const pdf = downloads?.pdf;
   const askFileName = downloads?.askFileName;
-  const merged = useMemo(
-    () =>
-      result === undefined && files === undefined && pdf === undefined && askFileName === undefined
-        ? env
-        : {
-            ...env,
+  const merged = useMemo(() => {
+    const ownDownloads =
+      result !== undefined || files !== undefined || pdf !== undefined || askFileName !== undefined;
+    if (!ownDownloads && tableLayout === undefined) return env;
+    return {
+      ...env,
+      ...(tableLayout === undefined ? {} : { tableLayout }),
+      ...(ownDownloads
+        ? {
             downloads: {
               result: result ?? env.downloads?.result,
               files: files ?? env.downloads?.files,
               pdf: pdf ?? env.downloads?.pdf,
               askFileName: askFileName ?? env.downloads?.askFileName,
             },
-          },
-    [env, result, files, pdf, askFileName],
-  );
+          }
+        : {}),
+    };
+  }, [env, result, files, pdf, askFileName, tableLayout]);
   return <ResultEnvContext value={merged}>{children}</ResultEnvContext>;
 }
 
@@ -384,4 +425,9 @@ export function useTableColumns(): number {
   const budget = use(ResultEnvContext).tableColumns;
   if (budget === undefined || Number.isNaN(budget)) return DEFAULT_TABLE_COLUMNS;
   return Math.max(1, Math.floor(budget));
+}
+
+/** The table layout, defaulted to the scroller every host had before it was a choice. */
+export function useTableLayout(): TableLayout {
+  return use(ResultEnvContext).tableLayout ?? 'scroll';
 }
