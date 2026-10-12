@@ -17,7 +17,7 @@
  * stories measure the result in Chromium at 343px and 720px.
  */
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
   ListRunField,
@@ -205,6 +205,40 @@ describe('tableLayout="stack"', () => {
     const headers = [...container.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(labels).toEqual(['Reference', 'Unit price', 'Quantity', 'Total']);
     expect(labels).toEqual(headers);
+  });
+
+  it('puts the description on a stacked label when the row cannot open', async () => {
+    // Four bounded columns: nothing hidden, nothing clipped, so no row opens.
+    // The header that carries a description is hidden once the table stacks,
+    // so on a phone the label beside each value is the only place left to
+    // reach it.
+    const fields = [
+      text('reference'),
+      { ...number('unit_price'), description: 'Before tax' },
+      number('quantity'),
+      number('total'),
+    ];
+    const { container } = renderTable(fields, { layout: 'stack' });
+    expect(
+      screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeNull();
+    // Nothing at rest, as on the header.
+    expect(screen.queryByText('Before tax')).toBeNull();
+    // Through focus, as the header's own description is asserted: a fact
+    // reachable only by pointing is not reachable from a keyboard.
+    within(firstRow(container)).getByText('unit_price').focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Before tax');
+  });
+
+  it('keeps a stacked label plain when the row opens onto the described record', () => {
+    // Twelve fields under the default budget of five: the row opens, and the
+    // open record carries every description, so a label adds no tab stop.
+    const fields = columns(12).map((field) =>
+      field.name === 'v1' ? { ...field, description: 'Before tax' } : field,
+    );
+    const { container } = renderTable(fields, { layout: 'stack' });
+    const label = within(firstRow(container)).getByText('v1');
+    expect(label.closest('td')!.querySelector('[tabindex]')).toBeNull();
   });
 
   it('counts the columns the table shows, after the budget', () => {

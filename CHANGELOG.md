@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`tableLayout`, a result table that never scrolls sideways**: `StuffViewer` and `ResultEnvProvider` take `tableLayout`, typed as the exported `TableLayout`, the panel's setting winning; `'scroll'`, the default, renders tables exactly as before. Under `'stack'` a table of records showing up to three columns stays a table that wraps with no fixed width floor, one of four to six becomes one block of label and value pairs per row while its own box is narrower than 640px (a container query, not the viewport), and one of more than six does so at every width, a table nested in an open row included. See [docs/result-view.md](docs/result-view.md#a-table-that-never-scrolls-sideways-when-the-host-asks).
+- **`tableLayout`, a result table that never scrolls sideways**: `StuffViewer` and `ResultEnvProvider` take `tableLayout`, typed as the exported `TableLayout`, the panel's setting winning; `'scroll'`, the default, renders tables exactly as before. Under `'stack'` a table of records showing up to three columns stays a table that wraps with no fixed width floor, one of four to six becomes one block of label and value pairs per row while its own box is narrower than 640px (a container query, not the viewport), and one of more than six does so at every width, a table nested in an open row included. A stacked block labels each value with its column's header; when the row cannot open onto the record, the label also carries the column's description, which the hidden header can no longer show. See [docs/result-view.md](docs/result-view.md#a-table-that-never-scrolls-sideways-when-the-host-asks).
 
 ### Changed
 

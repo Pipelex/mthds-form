@@ -1690,16 +1690,26 @@ function ObjectTable({
                         typeof item === 'object' && item !== null
                           ? ownProp(item as Record<string, unknown>, column.name)
                           : undefined;
+                      const columnLabel = fieldLabel(column.title, column.name, presentation);
                       return (
                         <td
                           key={column.name}
                           className={cn('px-3 py-1.5 align-top', stacked?.cell)}
                         >
                           {/* The column's header, said again beside its value
-                              once the header row is gone. Plain text, where the
-                              header carries the description: a tooltip on every
-                              label of every row would be a tab stop per value.
-                              Hidden while the table is a table. */}
+                              once the header row is gone, and hidden while the
+                              table is a table.
+
+                              The header's description goes with it only when
+                              the row cannot open. A row that opens shows the
+                              record, which carries every description, so its
+                              label stays plain text: a tooltip there would be a
+                              tab stop per value for something one click away.
+                              A row that cannot open has no other way to it once
+                              the header is hidden, and a description nobody can
+                              reach on a phone is the worse failure. The hidden
+                              label takes no focus, so a table that is still a
+                              table gains no tab stop. */}
                           {stacked && (
                             <span
                               className={cn(
@@ -1708,7 +1718,13 @@ function ObjectTable({
                                 stacked.label,
                               )}
                             >
-                              {fieldLabel(column.title, column.name, presentation)}
+                              {canExpand ? (
+                                columnLabel
+                              ) : (
+                                <Described description={column.description}>
+                                  {columnLabel}
+                                </Described>
+                              )}
                             </span>
                           )}
                           {/* One line per cell, and a cap on how wide one may push

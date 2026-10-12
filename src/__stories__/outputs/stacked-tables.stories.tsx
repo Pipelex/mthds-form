@@ -263,6 +263,46 @@ export const SixColumnsColumn: Story = {
   },
 };
 
+/** What the wire says each column of the link checker means, in the order the table shows them. */
+function linkDescriptions(): string[] {
+  const { field } = TABLES_FORM['tables.links']!;
+  if (field.kind !== 'list' || field.item.kind !== 'object') {
+    throw new Error('tables.links is a list of records');
+  }
+  return field.item.fields.map((column) => column.description ?? '');
+}
+
+/**
+ * **A record whose rows cannot open, on a phone.** A link checker's four
+ * columns are an address, which wraps whole, and three values that fit a cell
+ * whole, so no row has more to show and no row opens. Four columns stack below
+ * 640px, which hides the header and the descriptions it carries, so each label
+ * in a block carries its column's description instead, on hover and on focus.
+ */
+export const DescribedLabelsPhone: Story = {
+  name: 'Rows that cannot open, 343px → descriptions on the labels',
+  args: { pipeCode: 'links', value: TABLE_RUNS['tables.links'], width: PHONE },
+  play: async ({ canvasElement }) => {
+    await expectNothingScrollsSideways(canvasElement);
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toHaveLength(0);
+    const [table] = tablesIn(canvasElement);
+    await expectStacked(table!, 4);
+    const descriptions = linkDescriptions();
+    await expect(descriptions.every((description) => description !== '')).toBe(true);
+    // The last label of the first block: focus reaches it, and the tooltip
+    // says what the column means.
+    const label = valueCells(table!.tBodies[0]!.rows[0]!)[3]!.firstElementChild!
+      .firstElementChild as HTMLElement;
+    label.focus();
+    await expect(document.activeElement).toBe(label);
+    const tooltip = await within(document.body).findByRole('tooltip');
+    await expect(tooltip).toHaveTextContent(descriptions[3]!);
+  },
+};
+
 // ─── More than six columns: blocks at every width ────────────────────────────
 
 /** Seven columns in a desktop column: about ninety pixels each would be a column of broken words. */
