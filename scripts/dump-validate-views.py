@@ -38,14 +38,15 @@ depend on a current local model deck — a bundle referencing a model handle the
 deck has not got would produce nothing, for reasons that have nothing to do with
 its inputs.
 
-**It does load the model specs, without inference.** Booting with inference off
-leaves only the local extractors in the deck, and the loader checks a pipe's
-pinned `model` handle against the deck at LOAD time — so an authored method that
+**It does load the model specs, without inference.** The loader checks a pipe's
+pinned `model` handle against the deck at LOAD time, so an authored method that
 pins an image model (`data/methods/design_slides` pins one on its `PipeImgGen`)
-failed to load at all, before any builder ran. `needs_model_specs=True` reads the
-cached remote config's model specs so a pinned handle resolves, and still needs
-no credentials: nothing is called. The structures cases pin nothing and are
-unaffected either way.
+loads only when the deck knows that handle. A boot with inference off loads every
+backend the checkout's config enables, with the models its own file lists, so a
+pinned handle resolves when an enabled backend serves it, and still needs no
+credentials: nothing is called. (The runtime used to take a `needs_model_specs`
+flag for this, which fetched a remote config; it fetches nothing now and the flag
+is gone.) The structures cases pin nothing and are unaffected either way.
 
 Beside the three artifacts it prints what the wire does not carry and an
 authored method's brief needs: the author's own `description` of each pipe
@@ -163,7 +164,7 @@ def main() -> int:
 
     # Model SPECS without inference: a pinned model handle must resolve at load time,
     # and nothing is ever called. See the module docstring.
-    make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(needs_inference=False)
     views = asyncio.run(views_for(bundle))
     json.dump(views, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

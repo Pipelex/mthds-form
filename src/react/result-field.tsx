@@ -27,6 +27,7 @@ import {
   useResolveUrl,
   useSaveFiles,
   useTableColumns,
+  useTableLayout,
   type ResolveUrl,
 } from './result-env';
 import { absoluteUrl } from './absolute-url';
@@ -1283,6 +1284,121 @@ const CELL_LENGTH_LIMIT = 80;
 const EXPAND_COLUMN = '2rem';
 
 /**
+ * When a table under `tableLayout="stack"` turns its rows into blocks of label
+ * and value pairs, counted in the columns it SHOWS (after the budget).
+ *
+ * - **Up to three: never.** Three columns that wrap, with no fixed width
+ *   floor, fit the 343px a 375px phone leaves, and a table is how three values
+ *   per row are read best.
+ * - **Four to six: while the table's own box is narrower than 640px**, a
+ *   container query rather than the viewport, so a narrow panel on a wide
+ *   screen stacks too. The 640 is written into the classes below rather than
+ *   here, because Tailwind finds a class only where it is spelled out whole.
+ * - **More than six: at every width.** Seven columns that wrap leave each about
+ *   ninety pixels in a 720px column, which is a column of broken words, not a
+ *   table.
+ */
+const STACK_NEVER_UP_TO = 3;
+const STACK_ALWAYS_BEYOND = 6;
+
+type Stacking = 'never' | 'narrow' | 'always';
+
+function stackingFor(columns: number): Stacking {
+  if (columns <= STACK_NEVER_UP_TO) return 'never';
+  return columns > STACK_ALWAYS_BEYOND ? 'always' : 'narrow';
+}
+
+/** What turns each part of a table into blocks, for one of the two ways it stacks. */
+interface StackClasses {
+  table: string;
+  head: string;
+  body: string;
+  /** Each row: one block, the rows divided by the hairline every row already carries. */
+  row: string;
+  /** A row that opens: its pairs start after the chevron, which sits in that margin. */
+  rowWithToggle: string;
+  toggle: string;
+  /** Each value cell: one line of the block, its label beside its value. */
+  cell: string;
+  label: string;
+  /** An open row's detail: the whole record, across the block. */
+  detail: string;
+  detailInner: string;
+}
+
+/**
+ * The same layout twice, once behind the container query and once without it.
+ * Spelled out in full both times, because Tailwind reads class names out of the
+ * source and would find no `@max-[640px]:block` assembled from parts.
+ *
+ * A label beside its value, not above it: one line per field keeps a row of
+ * five fields five lines tall, and one label column for every line of a block
+ * lines each value up under the one above it, whatever its label's length. The
+ * labels take two fifths of the block up to 10rem, so a block in a desktop
+ * column does not leave its values a long way from short labels.
+ */
+const STACKED: Record<'narrow' | 'always', StackClasses> = {
+  narrow: {
+    table: '@max-[640px]:block',
+    head: '@max-[640px]:hidden',
+    body: '@max-[640px]:block',
+    row: '@max-[640px]:relative @max-[640px]:block @max-[640px]:px-3 @max-[640px]:py-2',
+    rowWithToggle: '@max-[640px]:pl-8',
+    toggle: '@max-[640px]:absolute @max-[640px]:top-2 @max-[640px]:left-1 @max-[640px]:p-0',
+    cell: '@max-[640px]:grid @max-[640px]:grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] @max-[640px]:items-baseline @max-[640px]:gap-x-3 @max-[640px]:px-0 @max-[640px]:py-0.5',
+    label: '@max-[640px]:block',
+    detail: '@max-[640px]:block',
+    detailInner: '@max-[640px]:px-0 @max-[640px]:py-1',
+  },
+  always: {
+    table: 'block',
+    head: 'hidden',
+    body: 'block',
+    row: 'relative block px-3 py-2',
+    rowWithToggle: 'pl-8',
+    toggle: 'absolute top-2 left-1 p-0',
+    cell: 'grid grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] items-baseline gap-x-3 px-0 py-0.5',
+    label: 'block',
+    detail: 'block',
+    detailInner: 'px-0 py-1',
+  },
+};
+
+/**
+ * A cell under `tableLayout="stack"`, as a table or as a line of a block.
+ *
+ * It wraps anywhere, so no value can widen the table past its box: under
+ * `break-word` the browser breaks a long token on screen but still sizes the
+ * column to the whole token, and three French clauses at 343px scrolled by the
+ * width of their longest words. Breaking anywhere would let auto table layout
+ * squeeze a short column into a ribbon beside a long one, since it hands the
+ * spare width to the columns with the most to say, so each cell keeps a floor,
+ * and the floor is a share of the table's own box (`cqw`) as well as a length.
+ * The record's name gets the larger one, `16ch` as under the scroller, because
+ * it is what a reader finds a row by and a name broken mid-word reads worst;
+ * every other cell gets half. The shares keep three floors and their padding
+ * inside any box a phone leaves, where three fixed `16ch` floors did not fit;
+ * the lengths keep six of them inside the 640px from which six columns are a
+ * table, and keep a wide box from spending its width on short values.
+ *
+ * `[&>span]` reaches the value's own span, which is one line in every cell.
+ */
+const FIT_CELL = 'min-w-[min(8ch,14cqw)] wrap-anywhere [&>span]:whitespace-normal';
+const FIT_NAME = 'min-w-[min(16ch,28cqw)] wrap-anywhere [&>span]:whitespace-normal';
+
+/**
+ * Whether a cell under `tableLayout="stack"` shows the start of its value and
+ * leaves the rest to the open row, as a cell cut at one line does without the
+ * option. Text a cell can only start: prose, unbounded text, a record named by
+ * its text. Never the name, which is shown whole in every table, and never a
+ * list or a file, whose cells are chips, a count or a file's own line.
+ */
+function clampsInStack(column: RunField, name: RunField | undefined): boolean {
+  if (column === name || fitsACellWhole(column)) return false;
+  return column.kind !== 'list' && column.kind !== 'document' && column.kind !== 'image';
+}
+
+/**
  * Whether a column is GUARANTEED to fit its cell — a stronger question than
  * `isInlineColumn`, and the one the expand toggle is keyed on.
  *
@@ -1369,6 +1485,7 @@ function ObjectTable({
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const budget = useTableColumns();
+  const layout = useTableLayout();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const [viewportWidth, setViewportWidth] = useState<number>();
@@ -1380,6 +1497,12 @@ function ObjectTable({
   // show, and a chevron opening onto the same values is chrome, not a feature.
   const canExpand =
     hidden > 0 || shown.some((column) => column !== name && !fitsACellWhole(column));
+  // Under `tableLayout="stack"` the table fits its box, as a table that wraps
+  // or as blocks, so there is no scroll for any of the scroller's machinery to
+  // serve. `stacked` is what turns it into blocks, and when.
+  const fits = layout === 'stack';
+  const stacking = fits ? stackingFor(shown.length) : 'never';
+  const stacked = stacking === 'never' ? undefined : STACKED[stacking];
 
   // The width of what is VISIBLE, not of the table.
   //
@@ -1388,10 +1511,11 @@ function ObjectTable({
   // columns do not fit. Left alone, the detail then runs off into the scroll: a
   // paragraph readable only by scrolling sideways, which is the failure the
   // expansion exists to avoid. Measuring the scroller and pinning the detail to
-  // it makes the panel stay put while the columns above it scroll.
+  // it makes the panel stay put while the columns above it scroll. A table that
+  // fits its box is never wider than it, so it has nothing to measure.
   useEffect(() => {
     const scroller = scrollerRef.current;
-    if (!scroller) return;
+    if (!scroller || fits) return;
     const measure = () => setViewportWidth(scroller.clientWidth);
     measure();
     // Guarded rather than assumed: a host rendering on the server, or a test
@@ -1401,7 +1525,7 @@ function ObjectTable({
     const observer = new ResizeObserver(measure);
     observer.observe(scroller);
     return () => observer.disconnect();
-  }, []);
+  }, [fits]);
 
   const toggle = (index: number) =>
     setExpanded((current) => {
@@ -1428,12 +1552,18 @@ function ObjectTable({
     // of them with the same name - which is what a result rendered twice, or a
     // structure holding two lists, produces - is `landmark-unique`. A group is
     // named without claiming to be a section of the page.
+    //
+    // Under `tableLayout="stack"` the box is the SIZE CONTAINER its stacking
+    // rules query, so the table answers to its own width rather than the
+    // viewport's, and it takes no focus: nothing scrolls, so the stop would have
+    // nothing to do. It still clips to its rounded border, and should anything
+    // ever overflow it, the a11y gate names the scroll a keyboard cannot reach.
     <div
       ref={scrollerRef}
       role="group"
       aria-label={label}
-      tabIndex={0}
-      className="overflow-x-auto rounded-lg border border-border"
+      {...(fits ? {} : { tabIndex: 0 })}
+      className={cn('overflow-x-auto rounded-lg border border-border', fits && '@container')}
     >
       {/* `w-full` BESIDE `min-w-full`, not instead of it. `min-w-full` alone
           left the table content-sized whenever the columns were narrower than
@@ -1443,9 +1573,12 @@ function ObjectTable({
           for: `width` and `min-width` agree at 100% while the content is narrow,
           and once the columns need more than that, auto table layout grows past
           both rather than crushing them (headers are `whitespace-nowrap` and
-          cells `truncate`, so nothing wraps to buy the space back). */}
-      <table className="w-full min-w-full border-collapse text-[13px]">
-        <thead>
+          cells `truncate`, so nothing wraps to buy the space back). A table
+          that fits its box wraps instead, so it never grows past either. */}
+      <table className={cn('w-full min-w-full border-collapse text-[13px]', stacked?.table)}>
+        {/* Gone while the rows are blocks: each value then carries its own
+            label, so the header row would only repeat them out of place. */}
+        <thead className={stacked?.head}>
           {/* A filled band, not a hairline. The header is the one row that is
               not data, and on a long list the reader scrolls it out of sight and
               back; a rule alone leaves it reading as the first entry. `bg-muted`
@@ -1466,7 +1599,10 @@ function ObjectTable({
                 key={column.name}
                 scope="col"
                 className={cn(
-                  'whitespace-nowrap px-3 py-2 text-[12px] font-semibold text-foreground',
+                  // One line, or wrapped anywhere so a header is never what
+                  // widens a table that has to fit its box. See `FIT_CELL`.
+                  fits ? 'wrap-anywhere' : 'whitespace-nowrap',
+                  'px-3 py-2 text-[12px] font-semibold text-foreground',
                   presentation === 'app' ? undefined : 'font-mono',
                 )}
               >
@@ -1479,7 +1615,7 @@ function ObjectTable({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className={stacked?.body}>
           {items.map((item, index) => {
             // Open only while there is a toggle to close it with. The host may
             // raise the budget while a row is open, and a row whose columns
@@ -1487,9 +1623,15 @@ function ObjectTable({
             const isOpen = canExpand && expanded.has(index);
             return (
               <ResultAt key={index} segment={String(index)}>
-                <tr className="border-b border-border/60 last:border-b-0">
+                <tr
+                  className={cn(
+                    'border-b border-border/60 last:border-b-0',
+                    stacked?.row,
+                    canExpand && stacked?.rowWithToggle,
+                  )}
+                >
                   {canExpand && (
-                    <td className="px-1 pt-px align-top">
+                    <td className={cn('px-1 pt-px align-top', stacked?.toggle)}>
                       <button
                         type="button"
                         onClick={() => toggle(index)}
@@ -1516,10 +1658,14 @@ function ObjectTable({
                       is open: an open row is not being scanned against its
                       neighbours, it is being read. */}
                   {isOpen ? (
-                    <td colSpan={shown.length} className="bg-card/40 p-0">
+                    <td colSpan={shown.length} className={cn('bg-card/40 p-0', stacked?.detail)}>
                       <div
-                        className="sticky left-0 px-3.5 py-3"
-                        {...(viewportWidth
+                        className={cn(
+                          !fits && 'sticky left-0',
+                          'px-3.5 py-3',
+                          stacked?.detailInner,
+                        )}
+                        {...(viewportWidth && !fits
                           ? {
                               style: {
                                 // Minus the chevron column: this cell starts
@@ -1545,7 +1691,26 @@ function ObjectTable({
                           ? ownProp(item as Record<string, unknown>, column.name)
                           : undefined;
                       return (
-                        <td key={column.name} className="px-3 py-1.5 align-top">
+                        <td
+                          key={column.name}
+                          className={cn('px-3 py-1.5 align-top', stacked?.cell)}
+                        >
+                          {/* The column's header, said again beside its value
+                              once the header row is gone. Plain text, where the
+                              header carries the description: a tooltip on every
+                              label of every row would be a tab stop per value.
+                              Hidden while the table is a table. */}
+                          {stacked && (
+                            <span
+                              className={cn(
+                                'hidden text-[12px] text-muted-foreground wrap-anywhere',
+                                presentation === 'app' ? undefined : 'font-mono',
+                                stacked.label,
+                              )}
+                            >
+                              {fieldLabel(column.title, column.name, presentation)}
+                            </span>
+                          )}
                           {/* One line per cell, and a cap on how wide one may push
                             the column. Wrapping is what a `w-full` table does
                             instead of overflowing, and it is the worse failure: a
@@ -1574,16 +1739,28 @@ function ObjectTable({
                             the chip column's floor for the same reason.
                             `[&>span]` reaches the value's own span, which is
                             `whitespace-nowrap` in every cell: only this caller
-                            knows the name may wrap. */}
+                            knows the name may wrap.
+
+                            A table that fits its box gives every cell the
+                            name's treatment instead, with no cap and a floor
+                            that is a share of the box (`FIT_CELL`, the name's
+                            larger), and shows the start of a text it can only
+                            start in three lines rather than one. */}
                           <div
-                            className={cn(
-                              'max-w-[44ch]',
-                              column === name
-                                ? 'max-w-none min-w-[16ch] wrap-anywhere [&>span]:whitespace-normal'
-                                : column.kind === 'list' && isInlineColumn(column)
-                                  ? 'min-w-[16ch]'
-                                  : 'truncate',
-                            )}
+                            className={
+                              fits
+                                ? column === name
+                                  ? FIT_NAME
+                                  : cn(FIT_CELL, clampsInStack(column, name) && 'line-clamp-3')
+                                : cn(
+                                    'max-w-[44ch]',
+                                    column === name
+                                      ? 'max-w-none min-w-[16ch] wrap-anywhere [&>span]:whitespace-normal'
+                                      : column.kind === 'list' && isInlineColumn(column)
+                                        ? 'min-w-[16ch]'
+                                        : 'truncate',
+                                  )
+                            }
                             {...(typeof cell === 'string' || typeof cell === 'number'
                               ? { title: cellTitle(column, cell, presentation) }
                               : {})}

@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`tableLayout`, a result table that never scrolls sideways**: `StuffViewer` and `ResultEnvProvider` take `tableLayout`, typed as the exported `TableLayout`, the panel's setting winning; `'scroll'`, the default, renders tables exactly as before. Under `'stack'` a table of records showing up to three columns stays a table that wraps with no fixed width floor, one of four to six becomes one block of label and value pairs per row while its own box is narrower than 640px (a container query, not the viewport), and one of more than six does so at every width, a table nested in an open row included. See [docs/result-view.md](docs/result-view.md#a-table-that-never-scrolls-sideways-when-the-host-asks).
+
 ### Changed
 
 - **The fixture harness runs on `@pipelex/sdk` 0.38**: the devDependency moves from `^0.17.0`, which nested its own `mthds` 0.25 beside the package's `mthds` 0.30, to `^0.38.0`, so a contributor's tree resolves one copy of the standard's types and `make fixtures-runs` and `make fixtures-specs` talk to the API through a client built for the protocol the fixtures are typed against. Both passes now total a run's cost through the SDK's `summarizeUsage`, so a run that made no inference call prints `$0` and counts towards its case's total instead of hiding it, while a run with any unpriced call still prints no figure. The package itself is unchanged.
+
+### Fixed
+
+- **`make fixtures` and `make briefs` boot the current runtime**: the two scripts that load a bundle through the sibling pipelex checkout no longer pass `needs_model_specs`, which pipelex removed when it stopped fetching a remote config, so both passes run again against a current checkout, still without inference. The package itself is unchanged.
 
 ## [v0.16.0] - 2026-10-10
 

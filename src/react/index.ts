@@ -48,13 +48,15 @@ export { saveInBrowser } from './save-in-browser';
 // The host's seam for turning a stored reference into a fetchable URL. Without
 // it a result view paints whatever `public_url` the payload carries, which on a
 // hosted platform is a presigned URL that expires — see result-env.tsx. The same
-// provider takes the host's save function and which download controls to draw.
+// provider takes the host's save function, which download controls to draw, and
+// whether a table too wide for its box scrolls or stacks its rows.
 export type {
   DownloadDisplay,
   ProseImages,
   ResolveShareUrl,
   ResolveUrl,
   ResolveUrls,
+  TableLayout,
 } from './result-env';
 export {
   ResultEnvProvider,

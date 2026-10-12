@@ -14,3 +14,12 @@ url         = { type = "text", description = "The page's full address, exactly a
 status      = { type = "text", description = "What the check found", required = true, choices = ["up", "redirect", "down"] }
 checked_on  = { type = "date", description = "When it was checked", required = true }
 response_ms = { type = "integer", description = "How long the page took to answer, in milliseconds", required = true }
+
+[concept.Clause]
+description = "One clause of a services contract, summarised for the client who signs it — four columns of full sentences, none of which a cell can hold on one line"
+
+[concept.Clause.structure]
+subject    = { type = "text", description = "What the clause is about, in a few words", required = true }
+obligation = { type = "text", description = "What the clause obliges a party to do, in one or two full sentences", required = true }
+exception  = { type = "text", description = "When the obligation does not apply, in one full sentence", required = true }
+remedy     = { type = "text", description = "What happens when the obligation is not met, in one or two full sentences", required = true }

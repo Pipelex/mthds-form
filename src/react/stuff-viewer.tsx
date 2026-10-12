@@ -12,13 +12,14 @@ import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { HtmlPreview } from './html-preview';
 import {
-  DownloadDisplayOverride,
+  PanelEnvOverride,
   useFileDownloadShown,
   usePdfSaveShown,
   useResolveUrl,
   useResultDownloadShown,
   useSaveFiles,
   type DownloadDisplay,
+  type TableLayout,
 } from './result-env';
 import { PdfDownloadButton } from './pdf-download-button';
 import { useFileNamePrompt } from './file-name-dialog';
@@ -127,6 +128,17 @@ export interface StuffViewerProps {
    * both to `false`.
    */
   downloads?: DownloadDisplay;
+  /**
+   * What a table of records does in a box narrower than its columns, laid over
+   * what `ResultEnvProvider` says. Unset, it scrolls sideways, as it always
+   * has. `'stack'` is for a reader on a phone: a table of up to three columns
+   * stays a table and wraps, one of four to six becomes one block of label and
+   * value pairs per row while the table's own box is narrower than 640px, and
+   * one of more than six does so at every width. Nothing scrolls sideways
+   * either way. It reaches every table in the result, a table inside an open
+   * row included.
+   */
+  tableLayout?: TableLayout;
   className?: string;
 }
 
@@ -287,14 +299,14 @@ function resultKey(field: RunField, baseName: string, value: unknown): string | 
   }
 }
 
-export function StuffViewer({ downloads, ...props }: StuffViewerProps) {
-  // The panel's own display settings reach every file button in its tree, not
-  // only its header, so they are laid over the provider's before anything
-  // beneath reads them.
+export function StuffViewer({ downloads, tableLayout, ...props }: StuffViewerProps) {
+  // The panel's own settings reach every file button and every table in its
+  // tree, not only its header, so they are laid over the provider's before
+  // anything beneath reads them.
   return (
-    <DownloadDisplayOverride downloads={downloads}>
+    <PanelEnvOverride downloads={downloads} tableLayout={tableLayout}>
       <StuffPanel {...props} />
-    </DownloadDisplayOverride>
+    </PanelEnvOverride>
   );
 }
 
@@ -306,7 +318,7 @@ function StuffPanel({
   defaultView = 'rendered',
   downloadBaseName,
   className,
-}: Omit<StuffViewerProps, 'downloads'>) {
+}: Omit<StuffViewerProps, 'downloads' | 'tableLayout'>) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const offered =
