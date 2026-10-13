@@ -167,6 +167,42 @@ describe('tableLayout="stack"', () => {
     }
   });
 
+  it('floors each column beside the name at its longest word, up to its share of the box', () => {
+    const { container } = renderTable(columns(3), { layout: 'stack' });
+    // The share is set once, on the table: two columns split what the name's
+    // floor, the padding and the chevron leave.
+    expect(table(container).className).toContain(
+      '[--fit-share:calc((72cqw_-_4.5rem_-_var(--expand-column,2rem))/2)]',
+    );
+    const headers = [...container.querySelectorAll('thead th')].filter(
+      (header) => header.textContent !== DEFAULT_FIELD_STRINGS.rowDetailsColumn,
+    );
+    const [nameHeader, ...otherHeaders] = headers;
+    const [nameCell, ...otherCells] = [...firstRow(container).cells];
+    // The name keeps its own floor and nothing more.
+    for (const cell of [nameHeader!, nameCell!]) {
+      expect(cell.hasAttribute('data-fit')).toBe(false);
+      expect(cell.className).not.toContain('after:content-[attr(data-fit)]');
+    }
+    // Every other header and cell carries its own text for the floor to lay out.
+    expect(otherHeaders.map((header) => header.getAttribute('data-fit'))).toEqual(['v1', 'v2']);
+    expect(otherCells.map((cell) => cell.getAttribute('data-fit'))).toEqual(['1', '2']);
+    for (const cell of [...otherHeaders, ...otherCells]) {
+      expect(cell.className).toContain('after:content-[attr(data-fit)]');
+      expect(cell.className).toContain('after:max-w-[var(--fit-share,0px)]');
+    }
+  });
+
+  it('gives no word floor to a table that scrolls, or to one that is blocks at every width', () => {
+    const scrolled = renderTable(columns(3));
+    expect(scrolled.container.querySelector('[data-fit]')).toBeNull();
+    expect(table(scrolled.container).className).not.toContain('--fit-share');
+    scrolled.unmount();
+    const blocks = renderTable(columns(7), { layout: 'stack', budget: 7 });
+    expect(blocks.container.querySelector('[data-fit]')).toBeNull();
+    expect(table(blocks.container).className).not.toContain('--fit-share');
+  });
+
   it('stacks four to six columns while the container is narrower than 640px', () => {
     for (const count of [4, 6]) {
       const { container, unmount } = renderTable(columns(count), { layout: 'stack', budget: 6 });

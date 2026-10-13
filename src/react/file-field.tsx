@@ -628,7 +628,7 @@ function FileField({
             type="button"
             disabled={busy}
             onClick={() => setShowUrl(true)}
-            className="flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            className="flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11"
           >
             <Link2 className="h-3 w-3" />
             {s.pasteUrlInstead}
@@ -742,12 +742,19 @@ function FileChip({
     () => fileChipSubtitle(url, filename, formats, presentation, s),
     [url, filename, formats, presentation, s],
   );
+  // The name keeps a readable share of a narrow card. Its block never shrinks
+  // below `basis-32` (about eighteen characters before the ellipsis); when the
+  // row cannot hold that and the buttons, the buttons wrap under the name and
+  // keep to the right, rather than squeezing it to a letter. `contain:
+  // inline-size` keeps a long name out of the card's minimum width, so a form
+  // laid out in a grid or a flex column does not widen past its page to fit it.
+  // On a desktop the row holds all of it, and nothing moves.
   return (
-    <div className="flex items-center gap-3 rounded-md border border-border bg-input px-3 py-2.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-input px-3 py-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
         <FileText className="h-4 w-4 text-muted-foreground" />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-32 [contain:inline-size]">
         <p className="truncate text-[13px] font-medium text-foreground">
           {value?.filename ?? s.uploadedFile}
         </p>
@@ -755,17 +762,19 @@ function FileChip({
           <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
         )}
       </div>
-      {canPreview && (
-        <button
-          type="button"
-          onClick={onTogglePreview}
-          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {previewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          {s.preview}
-        </button>
-      )}
-      <ClearButton disabled={disabled} onClick={onClear} />
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        {canPreview && (
+          <button
+            type="button"
+            onClick={onTogglePreview}
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-11 max-sm:px-3"
+          >
+            {previewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {s.preview}
+          </button>
+        )}
+        <ClearButton disabled={disabled} onClick={onClear} />
+      </div>
     </div>
   );
 }
@@ -778,7 +787,7 @@ function ClearButton({ disabled, onClick }: { disabled?: boolean; onClick: () =>
       onClick={onClick}
       disabled={disabled}
       aria-label={s.removeFileAria}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 max-sm:size-11"
     >
       <X className="h-4 w-4" />
     </button>

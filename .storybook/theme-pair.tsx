@@ -77,10 +77,16 @@ function Pane({
  * rendered in a theme: the generative stories set it to zero, because a
  * product page's bar and footer reach the edges and a gutter would render
  * them as a card.
+ *
+ * A story pinned to a phone's viewport sets `themePairStacked`, and the two
+ * panes then sit one above the other instead of side by side. Side by side,
+ * each pane would be half a phone wide, and a story about what a control does
+ * at a phone's width would be measuring it at half of one.
  */
 export const ThemePair: Decorator = (Story, context) => {
   const view = (context.globals.themeView as ThemeView | undefined) ?? 'pair';
   const padding = (context.parameters.themePairPadding as number | undefined) ?? BODY_PADDING;
+  const stacked = (context.parameters.themePairStacked as boolean | undefined) ?? false;
   const story = <Story />;
 
   if (view === 'light' || view === 'dark') {
@@ -94,11 +100,24 @@ export const ThemePair: Decorator = (Story, context) => {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'stretch' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: stacked ? 'column' : 'row',
+        minHeight: '100vh',
+        alignItems: 'stretch',
+      }}
+    >
       <Pane theme="light" captioned padding={padding}>
         {story}
       </Pane>
-      <div style={{ width: 1, background: 'var(--border)', flex: '0 0 auto' }} />
+      <div
+        style={
+          stacked
+            ? { height: 1, background: 'var(--border)', flex: '0 0 auto' }
+            : { width: 1, background: 'var(--border)', flex: '0 0 auto' }
+        }
+      />
       <Pane theme="dark" captioned padding={padding}>
         {story}
       </Pane>

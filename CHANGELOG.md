@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.17.1] - 2026-10-13
+
+### Fixed
+
+- **A file card's name stays readable on a phone**: a long file name in a list of documents was squeezed to a single letter beside the card's Preview and remove buttons; the name now keeps at least `8rem` before its ellipsis and the buttons wrap under it when the row cannot hold both. A long name also no longer widens a form laid out in a grid or a flex column past its page, and a desktop card is unchanged. See [docs/upload-seam.md](docs/upload-seam.md#what-the-card-says-under-a-files-name).
+- **A stacked result table keeps short words whole**: under `tableLayout="stack"`, a column beside the record's name now keeps its longest word in its minimum width, up to an equal share of the table's box, so "Redirect" or a French clause's words no longer break mid-word at a phone's width, while a token wider than its share still wraps rather than overflowing. Column widths in a fitting table change at every width as a result. See [docs/result-view.md](docs/result-view.md#a-table-that-never-scrolls-sideways-when-the-host-asks).
+- **Every tapped control is 44 by 44 below `sm`**: the file card's buttons, "paste a URL instead", a list's remove and add buttons, the optional-fields disclosure, the switch, the copy and download buttons, a file's link, a document's Preview and a table row's chevron each grow to at least 44 by 44 pixels below the `sm` breakpoint, the switch through an invisible area inside its own row. The chevron column widens with its chevron, so an open row's panel still ends at the scroller's edge, and from `sm` up every control keeps its size. See [docs/architecture.md](docs/architecture.md).
+
 ## [v0.17.0] - 2026-10-13
 
 ### Added
