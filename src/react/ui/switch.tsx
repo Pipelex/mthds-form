@@ -3,6 +3,12 @@ import * as SwitchPrimitives from '@radix-ui/react-switch';
 
 import { cn } from '../utils';
 
+/**
+ * The track is 44 by 24. Below `sm` it keeps that look and reaches the 44 by
+ * 44 a finger is given through an invisible `::after`, 10px above and below
+ * it: a row holding a switch leaves that much room, so the area never covers
+ * the control beside it.
+ */
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
@@ -10,6 +16,7 @@ const Switch = React.forwardRef<
   <SwitchPrimitives.Root
     className={cn(
       'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input',
+      "max-sm:relative max-sm:after:absolute max-sm:after:-inset-x-0.5 max-sm:after:-inset-y-3 max-sm:after:content-['']",
       className,
     )}
     {...props}

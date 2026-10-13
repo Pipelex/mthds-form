@@ -197,7 +197,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               onClick={() => removeItem(index)}
               disabled={env?.disabled || busy}
               aria-label={s.removeItemAria(index + 1)}
-              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50"
+              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -209,7 +209,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
           onClick={addItem}
           disabled={env?.disabled || isFull}
           className={cn(
-            'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-[13px] text-muted-foreground transition-colors',
+            'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-[13px] text-muted-foreground transition-colors max-sm:h-11',
             'hover:border-primary/40 hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
           )}
         >

@@ -559,7 +559,8 @@ export function Switch({
   const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props);
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3">
+      {/* Room for the switch's 44px hit area below `sm`, inside its own row. */}
+      <div className="flex items-center gap-3 max-sm:py-2.5">
         <SwitchPrimitive
           id={id}
           name={props.name}

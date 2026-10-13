@@ -54,6 +54,8 @@ type Story = StoryObj<typeof meta>;
 const BOTH_THEMES = 2;
 /** What a 375px phone leaves inside 16px gutters. */
 const PHONE = 343;
+/** What a 375px phone leaves inside the 24px gutters a host's page may keep. */
+const NARROW_PHONE = 327;
 /** A result column on a desktop. */
 const COLUMN = 720;
 
@@ -104,6 +106,80 @@ async function expectTable(table: HTMLTableElement, columns: number) {
       }
     }
   }
+}
+
+/** One word of a rendered cell: its text, its width and whether it sits on one line. */
+interface RenderedWord {
+  text: string;
+  width: number;
+  whole: boolean;
+}
+
+/**
+ * The words of one cell as the browser laid them out. A word ends at a space, a
+ * hyphen or a slash, where a line may break without breaking a word, so a
+ * compound like "dommages-intérêts" wrapping after its hyphen is two whole
+ * words. A word is whole when every box the browser drew for it shares one line.
+ */
+function wordsIn(cell: Element): RenderedWord[] {
+  const words: RenderedWord[] = [];
+  const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    // A label hidden while the table is a table lays nothing out.
+    if (!parent || parent.getClientRects().length === 0) continue;
+    for (const match of (node.textContent ?? '').matchAll(/[^\s/-]+/g)) {
+      const range = document.createRange();
+      range.setStart(node, match.index);
+      range.setEnd(node, match.index + match[0].length);
+      const boxes = [...range.getClientRects()].filter((box) => box.width > 0);
+      words.push({
+        text: match[0],
+        width: boxes.reduce((sum, box) => sum + box.width, 0),
+        whole: new Set(boxes.map((box) => Math.round(box.top))).size <= 1,
+      });
+    }
+  }
+  return words;
+}
+
+/** The cells of one column, its header first: `index` counts the value columns. */
+function columnCells(table: HTMLTableElement, index: number): Element[] {
+  const header = [...table.tHead!.rows[0]!.cells].filter(
+    (cell) => cell.textContent !== DEFAULT_FIELD_STRINGS.rowDetailsColumn,
+  )[index]!;
+  return [header, ...[...table.tBodies[0]!.rows].map((row) => valueCells(row)[index]!)];
+}
+
+/**
+ * What each column beside the record's name is promised at the least: room for
+ * its longest word, up to an equal share of what the name's floor (`28cqw` at
+ * a phone's width), the cells' padding and the chevron column leave.
+ */
+function shareBesideName(table: HTMLTableElement, columns: number): number {
+  const box = table.parentElement as HTMLElement;
+  const padding = columns * 24 + 32;
+  return (0.72 * box.clientWidth - padding) / (columns - 1);
+}
+
+/**
+ * The words promise: beside the name, no word that fits its column's share is
+ * broken across two lines. The name column keeps its own floor and its own
+ * rule, so it is not read here.
+ */
+async function expectWordsWholeBesideName(table: HTMLTableElement, columns: number) {
+  const share = shareBesideName(table, columns);
+  const broken: string[] = [];
+  for (let index = 1; index < columns; index++) {
+    for (const cell of columnCells(table, index)) {
+      for (const word of wordsIn(cell)) {
+        if (!word.whole && word.width <= share) {
+          broken.push(`${word.text} (${word.width.toFixed(1)}px of ${share.toFixed(1)}px)`);
+        }
+      }
+    }
+  }
+  await expect(broken).toEqual([]);
 }
 
 async function expectStacked(table: HTMLTableElement, columns: number) {
@@ -219,6 +295,73 @@ export const EnglishPhone: Story = {
   play: async ({ canvasElement }) => {
     await expectNothingScrollsSideways(canvasElement);
     for (const table of tablesIn(canvasElement)) await expectStacked(table, 4);
+  },
+};
+
+// ─── Words on a phone ────────────────────────────────────────────────────────
+
+/**
+ * **Short words beside an over-long token, on a phone.** A link checker's
+ * report under a budget of three: the address, which is one token wider than
+ * any phone, then the status and the date it was checked. The address wraps
+ * inside its column rather than pushing the table wider, and it takes only
+ * what the short columns leave it: "Redirect" and "Checked on" stay whole
+ * words, where breaking anywhere let the address squeeze them into "Redire/ct".
+ */
+export const ShortWordsBesideALongTokenPhone: Story = {
+  name: 'Short words beside an over-long token, 327px → whole words',
+  args: {
+    pipeCode: 'links',
+    value: TABLE_RUNS['tables.links'],
+    tableColumns: 3,
+    width: NARROW_PHONE,
+  },
+  play: async ({ canvasElement }) => {
+    await expectNothingScrollsSideways(canvasElement);
+    const share = (table: HTMLTableElement) => shareBesideName(table, 3);
+    for (const table of tablesIn(canvasElement)) {
+      await expectTable(table, 3);
+      await expectWordsWholeBesideName(table, 3);
+      // Every word of the two short columns is narrower than its share, so
+      // every one of them is whole.
+      for (const index of [1, 2]) {
+        for (const cell of columnCells(table, index)) {
+          for (const word of wordsIn(cell)) await expect(word.width).toBeLessThan(share(table));
+        }
+      }
+      // The first address is one token many times wider than its column, and
+      // it wraps there instead.
+      const [address] = wordsIn(valueCells(table.tBodies[0]!.rows[0]!)[0]!).sort(
+        (a, b) => b.width - a.width,
+      );
+      await expect(address!.width).toBeGreaterThan(NARROW_PHONE);
+      await expect(address!.whole).toBe(false);
+    }
+  },
+};
+
+/**
+ * **French clauses, three columns, on a phone.** The contract's subject, then
+ * its obligation and its exception in full sentences. Two columns of sentences
+ * beside a name cannot hold every French word at 327px - "réciproquement" and
+ * "confidentialité" are wider than either column can be - so those break, and
+ * only those: a word that fits its column's share, such as "obligation",
+ * "publiques" or "s'applique", stays whole.
+ */
+export const FrenchWordsPhone: Story = {
+  name: 'French clauses, three columns, 327px → words whole where they fit',
+  args: {
+    pipeCode: 'clauses_fr',
+    value: TABLE_RUNS['tables.clauses_fr'],
+    tableColumns: 3,
+    width: NARROW_PHONE,
+  },
+  play: async ({ canvasElement }) => {
+    await expectNothingScrollsSideways(canvasElement);
+    for (const table of tablesIn(canvasElement)) {
+      await expectTable(table, 3);
+      await expectWordsWholeBesideName(table, 3);
+    }
   },
 };
 
