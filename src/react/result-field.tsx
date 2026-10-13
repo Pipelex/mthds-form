@@ -393,6 +393,13 @@ function pathLabel(url: string): string {
  * environment without the API). A button that silently fails is worse than one
  * that was never offered.
  */
+/**
+ * The copy and download buttons below `sm`: 44px square around their 14px
+ * icon, the area a finger is given. They grow where they stand rather than
+ * reaching past their box, because they sit side by side, two pixels apart.
+ */
+const FILE_BUTTON_ON_A_PHONE = 'max-sm:grid max-sm:size-11 max-sm:place-items-center';
+
 function CopyButton({
   value,
   provide,
@@ -446,7 +453,10 @@ function CopyButton({
       }}
       {...(title ? { title } : {})}
       aria-label={label}
-      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
+      className={cn(
+        'shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1',
+        FILE_BUTTON_ON_A_PHONE,
+      )}
     >
       {copied ? (
         <Check aria-hidden className="size-3.5" />
@@ -528,7 +538,8 @@ function FileRef({
           target="_blank"
           rel="noreferrer"
           title={title}
-          className="min-w-0 truncate font-mono text-[12px] text-foreground underline underline-offset-2"
+          // A line 44px tall below `sm`, so a finger can follow the link.
+          className="min-w-0 truncate font-mono text-[12px] text-foreground underline underline-offset-2 max-sm:min-w-11 max-sm:leading-11"
         >
           {label}
         </a>
@@ -661,6 +672,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
           'shrink-0 rounded p-0.5 hover:bg-card focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60',
+          FILE_BUTTON_ON_A_PHONE,
           failed ? 'text-destructive' : 'text-muted-foreground hover:text-foreground',
         )}
       >
@@ -892,7 +904,7 @@ function DocumentValue({ value }: { value: unknown }) {
             type="button"
             onClick={() => setOpen((current) => !current)}
             aria-expanded={open}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 max-sm:min-h-11 max-sm:px-3"
           >
             {open ? (
               <EyeOff aria-hidden className="size-3.5" />
@@ -1271,9 +1283,12 @@ function isInlineColumn(field: RunField): boolean {
 const CELL_LENGTH_LIMIT = 80;
 
 /**
- * The chevron column's width, stated ONCE because two places need to agree on
- * it: the header cell that reserves it, and the pinned width of an open row's
- * detail panel, which begins after it and must therefore be that much narrower.
+ * The chevron column's width, stated ONCE because three places need to agree
+ * on it: the header cell that reserves it, the pinned width of an open row's
+ * detail panel, which begins after it and must therefore be that much narrower,
+ * and the share of a fitting table's box its columns split (`FIT_SHARE_*`). It
+ * is a custom property because it changes with the viewport, which an inline
+ * width and a pixel sum cannot follow.
  *
  * They did not agree, and the failure was invisible until the detail's values
  * moved to the right edge. The panel spanned every column EXCEPT this one while
@@ -1281,7 +1296,21 @@ const CELL_LENGTH_LIMIT = 80;
  * this much - harmless while its content started at the left, and a clean cut
  * through the last characters of every value once they ended at the right.
  */
-const EXPAND_COLUMN = '2rem';
+const EXPAND_COLUMN = 'var(--expand-column,2rem)';
+
+/**
+ * Its width, set on the scroller: `2rem` around a 24px chevron, and below `sm`
+ * `3.25rem` around the 44px one a finger is given there (`TOGGLE`).
+ */
+const EXPAND_COLUMN_WIDTH = '[--expand-column:2rem] max-sm:[--expand-column:3.25rem]';
+
+/**
+ * A row's chevron: 24px, and 44px below `sm`, where it is tapped rather than
+ * clicked. It grows where it stands rather than reaching past its box, because
+ * the box is a table cell inside a scroller that clips.
+ */
+const TOGGLE =
+  'mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 max-sm:mt-0 max-sm:size-11';
 
 /**
  * When a table under `tableLayout="stack"` turns its rows into blocks of label
@@ -1315,10 +1344,20 @@ interface StackClasses {
   body: string;
   /** Each row: one block, the rows divided by the hairline every row already carries. */
   row: string;
-  /** A row that opens: its pairs start after the chevron, which sits in that margin. */
+  /**
+   * A row that opens: its pairs start after the chevron, which sits in that
+   * margin. Below `sm` the chevron is 44px (`TOGGLE`), so the margin widens to
+   * hold it and it moves to the block's corner. Under the container query those
+   * two are `max-sm:@max-[640px]:`, both conditions at once, which Tailwind
+   * emits after the container query's own rules, so they win over the row's
+   * `px-3` and the chevron's `top-2 left-1` where both apply.
+   */
   rowWithToggle: string;
   toggle: string;
-  /** Each value cell: one line of the block, its label beside its value. */
+  /**
+   * Each value cell: one line of the block, its label beside its value. A block
+   * has no columns to size, so the cell's word floor (`WORD_FLOOR`) is dropped.
+   */
   cell: string;
   label: string;
   /** An open row's detail: the whole record, across the block. */
@@ -1343,9 +1382,10 @@ const STACKED: Record<'narrow' | 'always', StackClasses> = {
     head: '@max-[640px]:hidden',
     body: '@max-[640px]:block',
     row: '@max-[640px]:relative @max-[640px]:block @max-[640px]:px-3 @max-[640px]:py-2',
-    rowWithToggle: '@max-[640px]:pl-8',
-    toggle: '@max-[640px]:absolute @max-[640px]:top-2 @max-[640px]:left-1 @max-[640px]:p-0',
-    cell: '@max-[640px]:grid @max-[640px]:grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] @max-[640px]:items-baseline @max-[640px]:gap-x-3 @max-[640px]:px-0 @max-[640px]:py-0.5',
+    rowWithToggle: '@max-[640px]:pl-8 max-sm:@max-[640px]:pl-12',
+    toggle:
+      '@max-[640px]:absolute @max-[640px]:top-2 @max-[640px]:left-1 @max-[640px]:p-0 max-sm:@max-[640px]:top-0 max-sm:@max-[640px]:left-0',
+    cell: '@max-[640px]:grid @max-[640px]:grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] @max-[640px]:items-baseline @max-[640px]:gap-x-3 @max-[640px]:px-0 @max-[640px]:py-0.5 @max-[640px]:after:hidden',
     label: '@max-[640px]:block',
     detail: '@max-[640px]:block',
     detailInner: '@max-[640px]:px-0 @max-[640px]:py-1',
@@ -1355,9 +1395,9 @@ const STACKED: Record<'narrow' | 'always', StackClasses> = {
     head: 'hidden',
     body: 'block',
     row: 'relative block px-3 py-2',
-    rowWithToggle: 'pl-8',
-    toggle: 'absolute top-2 left-1 p-0',
-    cell: 'grid grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] items-baseline gap-x-3 px-0 py-0.5',
+    rowWithToggle: 'pl-8 max-sm:pl-12',
+    toggle: 'absolute top-2 left-1 p-0 max-sm:top-0 max-sm:left-0',
+    cell: 'grid grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] items-baseline gap-x-3 px-0 py-0.5 after:hidden',
     label: 'block',
     detail: 'block',
     detailInner: 'px-0 py-1',
@@ -1381,10 +1421,73 @@ const STACKED: Record<'narrow' | 'always', StackClasses> = {
  * the lengths keep six of them inside the 640px from which six columns are a
  * table, and keep a wide box from spending its width on short values.
  *
+ * A floor alone still let a short column's words break: auto table layout gave
+ * "Status" the floor and little more beside a column of web addresses, so
+ * "Redirect" broke in the middle at a phone's width. So every column beside the
+ * name also gets `WORD_FLOOR`, which keeps the column as wide as its longest
+ * word, up to its share of the box. The name keeps its own floor and nothing
+ * more, as before.
+ *
  * `[&>span]` reaches the value's own span, which is one line in every cell.
  */
 const FIT_CELL = 'min-w-[min(8ch,14cqw)] wrap-anywhere [&>span]:whitespace-normal';
 const FIT_NAME = 'min-w-[min(16ch,28cqw)] wrap-anywhere [&>span]:whitespace-normal';
+
+/**
+ * A header or value cell's floor at its longest word, on a table that fits its
+ * box: an invisible, zero-height copy of the cell's text (`data-fit`), laid out
+ * where words do not break, and capped at the column's share (`--fit-share`).
+ *
+ * The cell itself still wraps anywhere, and that is what keeps an over-long
+ * token from widening the table. What it gives up is the column's width: a
+ * width that may break anywhere has a minimum of one letter, and auto table
+ * layout pays a short column its minimum and little more. The copy puts the
+ * longest word back into that minimum, but never past the share, so a token
+ * wider than its share still wraps instead of pushing the table out of its
+ * box. A copy rather than `overflow-wrap: break-word` on the cell, which would
+ * size the column to the whole token, and a pseudo-element rather than an
+ * element, so the text is in the page once: not read twice, not selectable
+ * twice, and not found twice by a test.
+ */
+const WORD_FLOOR =
+  'after:block after:h-0 after:max-w-[var(--fit-share,0px)] after:overflow-hidden after:invisible after:wrap-normal after:content-[attr(data-fit)]';
+
+/**
+ * `--fit-share`, set on a table that fits its box: an equal split, between the
+ * columns beside the name, of what the name's floor, the cells' padding
+ * (`1.5rem` each) and the chevron column (`EXPAND_COLUMN`, reserved whether or
+ * not the rows open) leave of the box. The name's floor is counted at `28cqw`, the
+ * larger it can be, so the shares and the floors never add up to more than the
+ * box. A table with no name splits the whole box. Spelled out per column count,
+ * because Tailwind finds a class only where it is written whole; a table of
+ * more than six columns is blocks at every width and has no columns to share.
+ */
+const FIT_SHARE_BESIDE_NAME: Readonly<Record<number, string>> = {
+  2: '[--fit-share:calc(72cqw_-_3rem_-_var(--expand-column,2rem))]',
+  3: '[--fit-share:calc((72cqw_-_4.5rem_-_var(--expand-column,2rem))/2)]',
+  4: '[--fit-share:calc((72cqw_-_6rem_-_var(--expand-column,2rem))/3)]',
+  5: '[--fit-share:calc((72cqw_-_7.5rem_-_var(--expand-column,2rem))/4)]',
+  6: '[--fit-share:calc((72cqw_-_9rem_-_var(--expand-column,2rem))/5)]',
+};
+const FIT_SHARE_WITHOUT_NAME: Readonly<Record<number, string>> = {
+  1: '[--fit-share:calc(100cqw_-_1.5rem_-_var(--expand-column,2rem))]',
+  2: '[--fit-share:calc((100cqw_-_3rem_-_var(--expand-column,2rem))/2)]',
+  3: '[--fit-share:calc((100cqw_-_4.5rem_-_var(--expand-column,2rem))/3)]',
+  4: '[--fit-share:calc((100cqw_-_6rem_-_var(--expand-column,2rem))/4)]',
+  5: '[--fit-share:calc((100cqw_-_7.5rem_-_var(--expand-column,2rem))/5)]',
+  6: '[--fit-share:calc((100cqw_-_9rem_-_var(--expand-column,2rem))/6)]',
+};
+
+/**
+ * The text a cell's word floor is laid out from: what a text or number cell
+ * shows, the same string its tooltip carries. Anything else - a date, a yes or
+ * no, a count, chips, a file - gets no floor beyond the cell's own.
+ */
+function cellWords(column: RunField, cell: unknown, presentation: FieldPresentation) {
+  return typeof cell === 'string' || typeof cell === 'number'
+    ? cellTitle(column, cell, presentation)
+    : undefined;
+}
 
 /**
  * Whether a cell under `tableLayout="stack"` shows the start of its value and
@@ -1503,6 +1606,14 @@ function ObjectTable({
   const fits = layout === 'stack';
   const stacking = fits ? stackingFor(shown.length) : 'never';
   const stacked = stacking === 'never' ? undefined : STACKED[stacking];
+  // The share a column beside the name may claim for its longest word, and
+  // whether a column has a word floor at all: only while it can be a table
+  // that fits, and never the name, which keeps its own floor.
+  const nameShown = name !== undefined && shown.includes(name);
+  const fitShare = fits
+    ? (nameShown ? FIT_SHARE_BESIDE_NAME : FIT_SHARE_WITHOUT_NAME)[shown.length]
+    : undefined;
+  const floorsWords = (column: RunField) => fitShare !== undefined && column !== name;
 
   // The width of what is VISIBLE, not of the table.
   //
@@ -1563,7 +1674,11 @@ function ObjectTable({
       role="group"
       aria-label={label}
       {...(fits ? {} : { tabIndex: 0 })}
-      className={cn('overflow-x-auto rounded-lg border border-border', fits && '@container')}
+      className={cn(
+        'overflow-x-auto rounded-lg border border-border',
+        EXPAND_COLUMN_WIDTH,
+        fits && '@container',
+      )}
     >
       {/* `w-full` BESIDE `min-w-full`, not instead of it. `min-w-full` alone
           left the table content-sized whenever the columns were narrower than
@@ -1575,7 +1690,9 @@ function ObjectTable({
           both rather than crushing them (headers are `whitespace-nowrap` and
           cells `truncate`, so nothing wraps to buy the space back). A table
           that fits its box wraps instead, so it never grows past either. */}
-      <table className={cn('w-full min-w-full border-collapse text-[13px]', stacked?.table)}>
+      <table
+        className={cn('w-full min-w-full border-collapse text-[13px]', stacked?.table, fitShare)}
+      >
         {/* Gone while the rows are blocks: each value then carries its own
             label, so the header row would only repeat them out of place. */}
         <thead className={stacked?.head}>
@@ -1598,12 +1715,16 @@ function ObjectTable({
               <th
                 key={column.name}
                 scope="col"
+                {...(floorsWords(column)
+                  ? { 'data-fit': fieldLabel(column.title, column.name, presentation) }
+                  : {})}
                 className={cn(
                   // One line, or wrapped anywhere so a header is never what
                   // widens a table that has to fit its box. See `FIT_CELL`.
                   fits ? 'wrap-anywhere' : 'whitespace-nowrap',
                   'px-3 py-2 text-[12px] font-semibold text-foreground',
                   presentation === 'app' ? undefined : 'font-mono',
+                  floorsWords(column) && WORD_FLOOR,
                 )}
               >
                 {/* The authored description, once, on the header - it is worth
@@ -1637,7 +1758,7 @@ function ObjectTable({
                         onClick={() => toggle(index)}
                         aria-expanded={isOpen}
                         aria-label={s.toggleRowDetails(index + 1)}
-                        className="mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
+                        className={TOGGLE}
                       >
                         {isOpen ? (
                           <ChevronDown aria-hidden className="size-3.5" />
@@ -1691,10 +1812,18 @@ function ObjectTable({
                           ? ownProp(item as Record<string, unknown>, column.name)
                           : undefined;
                       const columnLabel = fieldLabel(column.title, column.name, presentation);
+                      const words = floorsWords(column)
+                        ? cellWords(column, cell, presentation)
+                        : undefined;
                       return (
                         <td
                           key={column.name}
-                          className={cn('px-3 py-1.5 align-top', stacked?.cell)}
+                          {...(words === undefined ? {} : { 'data-fit': words })}
+                          className={cn(
+                            'px-3 py-1.5 align-top',
+                            floorsWords(column) && WORD_FLOOR,
+                            stacked?.cell,
+                          )}
                         >
                           {/* The column's header, said again beside its value
                               once the header row is gone, and hidden while the

@@ -142,7 +142,7 @@ A file is previewable when the **filename** or the **URL** says so, tested separ
 
 ## What the card says under a file's name
 
-Once a file is attached, the control shows a card: the filename as its title, or "Attached file" (`uploadedFile`) when the value carries none, and a subtitle under it. What the subtitle says depends on what the value holds, because each case means something different to the person looking at the card:
+Once a file is attached, the control shows a card: the filename as its title, or "Attached file" (`uploadedFile`) when the value carries none, and a subtitle under it. The name keeps a readable share of a narrow card: its block never shrinks below `8rem`, about eighteen characters before the ellipsis, and when the row cannot hold that beside the Preview and remove buttons, the buttons wrap under the name and keep to the right, where they used to squeeze the name to a single letter on a phone. The block also carries `contain: inline-size`, so a long name is never what sets the card's minimum width, and a form laid out in a grid or a flex column does not widen past its page to fit one ([`file-field.tsx`](../src/react/file-field.tsx), `FileChip`). What the subtitle says depends on what the value holds, because each case means something different to the person looking at the card:
 
 - **A `data:` URL** is the file itself, so the subtitle names its format and decoded size (`PDF · 36 KB`) rather than printing the base64.
 - **An `http` or `https` URL, or text with no scheme at all** (`example.com/brief.pdf`), is a link the person can read, usually one they typed or pasted, so it is shown back to them as it is.
