@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`renderPdf`, a host's own PDF maker**: `ResultEnvProvider` takes `renderPdf`, typed as the exported `RenderPdf` (`({ html, title }) => Promise<Blob>`), and "Download PDF" then hands it the page as the preview's standalone frame document, stored pictures resolved, instead of rasterising it in the browser. A host rendering that document with a print engine such as headless Chromium gets a PDF whose text can be selected, searched and edited; unset, nothing changes. See [docs/result-view.md](docs/result-view.md#downloading-a-page-as-pdf).
+
 ## [v0.17.1] - 2026-10-13
 
 ### Fixed

@@ -1,5 +1,5 @@
 import type { HtmlContentView } from '../core/native-content';
-import { DEFAULT_IMG_SRC, frameDocument, frameStyles, pageTypography } from './html-frame';
+import { DEFAULT_IMG_SRC, DEFAULT_PAGE_FONT, pageDocument } from './html-frame';
 import { FIXED_ATTRIBUTE, measureFlow } from './page-layout';
 import { paginate, type PageSlice } from './paginate';
 import { promotePrintRules, readPageBox, type PageBox } from './print-media';
@@ -84,7 +84,7 @@ export async function renderHtmlPdf(
   {
     imgSrc = DEFAULT_IMG_SRC,
     fontSrc,
-    fontFamily = 'system-ui, sans-serif',
+    fontFamily = DEFAULT_PAGE_FONT,
     title,
     scale = 3,
     quality = 0.92,
@@ -347,11 +347,7 @@ async function openCopy(
     opacity: '0',
     pointerEvents: 'none',
   });
-  frame.srcdoc = frameDocument(content, {
-    styles: frameStyles(pageTypography(fontFamily)),
-    imgSrc,
-    fontSrc,
-  });
+  frame.srcdoc = pageDocument(content, { imgSrc, fontSrc, fontFamily });
   const loaded = new Promise<void>((resolve) =>
     frame.addEventListener('load', () => resolve(), { once: true }),
   );
