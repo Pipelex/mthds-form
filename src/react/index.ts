@@ -49,10 +49,13 @@ export { saveInBrowser } from './save-in-browser';
 // it a result view paints whatever `public_url` the payload carries, which on a
 // hosted platform is a presigned URL that expires — see result-env.tsx. The same
 // provider takes the host's save function, which download controls to draw, and
-// whether a table too wide for its box scrolls or stacks its rows.
+// whether a table too wide for its box scrolls or stacks its rows, and the
+// host's own PDF maker for an HTML page.
 export type {
   DownloadDisplay,
+  PdfPage,
   ProseImages,
+  RenderPdf,
   ResolveShareUrl,
   ResolveUrl,
   ResolveUrls,

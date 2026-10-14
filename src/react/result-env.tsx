@@ -149,6 +149,27 @@ export interface DownloadDisplay {
  */
 export type TableLayout = 'scroll' | 'stack';
 
+/** An HTML page handed to a host's own PDF maker. */
+export interface PdfPage {
+  /**
+   * The page as one standalone document: the frame document the preview shows,
+   * under the same policy (no scripts, the same `img-src` and `font-src`), with
+   * the stored pictures it names already resolved.
+   */
+  html: string;
+  /** The PDF's document title, when the reader's file name gives one. */
+  title?: string;
+}
+
+/**
+ * How a host makes the PDF of an HTML page itself, typically on a server with
+ * a print engine, which keeps the text as text: selectable, searchable and
+ * editable. Resolve to the PDF's bytes; reject and the control shows its
+ * failure. Unset, the PDF is made in the browser (`renderHtmlPdf`), whose pages
+ * are pictures.
+ */
+export type RenderPdf = (page: PdfPage) => Promise<Blob>;
+
 interface ResultEnv {
   resolveUrl?: ResolveUrl;
   /**
@@ -215,6 +236,11 @@ interface ResultEnv {
    * See {@link TableLayout}.
    */
   tableLayout?: TableLayout;
+  /**
+   * The host's own PDF maker, which "Download PDF" calls instead of making the
+   * PDF in the browser. See {@link RenderPdf}.
+   */
+  renderPdf?: RenderPdf;
 }
 
 const ResultEnvContext = createContext<ResultEnv>({});
@@ -228,6 +254,7 @@ export function ResultEnvProvider({
   tableLayout,
   saveFiles,
   downloads,
+  renderPdf,
   children,
 }: ResultEnv & { children: ReactNode }) {
   const env = useMemo(
@@ -240,6 +267,7 @@ export function ResultEnvProvider({
       tableLayout,
       saveFiles,
       downloads,
+      renderPdf,
     }),
     [
       resolveUrl,
@@ -250,6 +278,7 @@ export function ResultEnvProvider({
       tableLayout,
       saveFiles,
       downloads,
+      renderPdf,
     ],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
@@ -395,6 +424,11 @@ export function useFileDownloadShown(kind: StuffFileKind): boolean {
 /** Whether an HTML page carries its "Download PDF" control. */
 export function usePdfSaveShown(): boolean {
   return use(ResultEnvContext).downloads?.pdf ?? true;
+}
+
+/** The host's own PDF maker, when it supplies one. */
+export function useRenderPdf(): RenderPdf | undefined {
+  return use(ResultEnvContext).renderPdf;
 }
 
 /** Whether a download asks the reader for the file's name first. */

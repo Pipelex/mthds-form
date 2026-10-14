@@ -1,7 +1,7 @@
 /**
  * "Download PDF" on an HTML page: where the control is drawn, the switch that
- * hides it, its words, what it asks `renderHtmlPdf` for and what it hands the
- * save delivery. Making the PDF itself (the copy, its print rules, the raster,
+ * hides it, its words, what it asks `renderHtmlPdf` or the host's `renderPdf`
+ * for and what it hands the save delivery. Making the PDF itself (the copy, its print rules, the raster,
  * the pages) needs a real browser, and `Outputs/Html page` drives it in
  * Chromium.
  */
@@ -177,6 +177,45 @@ describe('the control on a result that is one page', () => {
     }));
     render(
       <ResultEnvProvider saveFiles={saveFiles}>
+        <StuffViewer field={page('quote')} value={VALUE} />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(pdfButtons()[0]!);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: S.downloadPdf })).toHaveAttribute(
+        'title',
+        S.downloadPdfFailed,
+      ),
+    );
+  });
+});
+
+describe('a host that makes the PDF itself', () => {
+  it('hands its renderPdf the framed page and saves what it answers', async () => {
+    const { saved, saveFiles } = recorder();
+    const hostPdf = vi.fn(async () => PDF);
+    render(
+      <ResultEnvProvider saveFiles={saveFiles} renderPdf={hostPdf}>
+        <StuffViewer field={page('quote')} value={VALUE} downloadBaseName="Devis 42" />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(pdfButtons()[0]!);
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(renderPdf).not.toHaveBeenCalled();
+    expect(hostPdf).toHaveBeenCalledTimes(1);
+    const [handed] = hostPdf.mock.calls[0]! as unknown as [{ html: string; title?: string }];
+    expect(handed.title).toBe('Devis 42');
+    // The preview's frame document: its policy first, then the page.
+    expect(handed.html).toMatch(/^<!doctype html><html><head><meta charset="utf-8">/);
+    expect(handed.html).toContain("default-src 'none'");
+    expect(handed.html).toContain(QUOTE);
+    expect(saved[0]).toMatchObject({ name: 'Devis 42.pdf', mimeType: 'application/pdf' });
+  });
+
+  it('says so when the host makes no PDF', async () => {
+    const hostPdf = vi.fn(async () => new Blob([]));
+    render(
+      <ResultEnvProvider renderPdf={hostPdf}>
         <StuffViewer field={page('quote')} value={VALUE} />
       </ResultEnvProvider>,
     );
