@@ -138,3 +138,26 @@ export function frameDocument(
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
+
+/** The typeface a page is laid out in when its own CSS names none and the host gives none. */
+export const DEFAULT_PAGE_FONT = 'system-ui, sans-serif';
+
+/**
+ * The frame document of a page as it prints: ink on paper in `fontFamily`, under the policy the
+ * preview's frame holds. The in-browser PDF lays its copy out in it and a host's own `renderPdf`
+ * is handed it, so the two cannot drift apart. An empty `fontFamily` reads as none.
+ */
+export function pageDocument(
+  content: HtmlContentView,
+  {
+    imgSrc = DEFAULT_IMG_SRC,
+    fontSrc,
+    fontFamily,
+  }: { imgSrc?: string; fontSrc?: string; fontFamily?: string } = {},
+): string {
+  return frameDocument(content, {
+    styles: frameStyles(pageTypography(fontFamily || DEFAULT_PAGE_FONT)),
+    imgSrc,
+    fontSrc: fontSrc ?? imgSrc,
+  });
+}

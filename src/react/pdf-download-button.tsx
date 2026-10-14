@@ -5,9 +5,10 @@ import { FileDown, Loader2, TriangleAlert } from 'lucide-react';
 import type { HtmlContentView } from '../core/native-content';
 import { useFieldStrings } from './field-strings';
 import { useFileNamePrompt } from './file-name-dialog';
+import { pageDocument } from './html-frame';
 import { renderHtmlPdf } from './html-pdf';
 import { resolveHtmlStorageUrls } from './markup-storage';
-import { useMarkupResolvers, useSaveFiles } from './result-env';
+import { useMarkupResolvers, useRenderPdf, useSaveFiles, type RenderPdf } from './result-env';
 import { cn } from './utils';
 
 export interface PdfDownloadButtonProps {
@@ -28,8 +29,9 @@ export interface PdfDownloadButtonProps {
 
 /**
  * "Download PDF" for an HTML page: one click, and the browser saves
- * `<fileName>.pdf`. The PDF is made in the browser (`renderHtmlPdf`) from a
- * script-free copy of the page laid out with its print rules, and handed to the
+ * `<fileName>.pdf`. The PDF is made by the host's `renderPdf` when the result
+ * environment supplies one, and otherwise in the browser (`renderHtmlPdf`) from
+ * a script-free copy of the page laid out with its print rules; it is handed to the
  * result environment's `saveFiles` like every other download, so a host that
  * delivers files its own way delivers this one too. The stored pictures the
  * page names are resolved through the environment's resolvers first, as its
@@ -51,6 +53,7 @@ export function PdfDownloadButton({
   const s = useFieldStrings();
   const save = useSaveFiles();
   const resolvers = useMarkupResolvers();
+  const hostPdf = useRenderPdf();
   const ref = useRef<HTMLButtonElement>(null);
   const statusId = useId();
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
@@ -75,12 +78,16 @@ export function PdfDownloadButton({
       // from a preview that may have outlived it.
       const innerHtml = await resolveHtmlStorageUrls(content.innerHtml, resolvers);
       const page = innerHtml === content.innerHtml ? content : { ...content, innerHtml };
-      const { blob } = await renderHtmlPdf(page, {
-        ...(title ? { title } : {}),
-        ...(imgSrc === undefined ? {} : { imgSrc }),
-        ...(fontSrc === undefined ? {} : { fontSrc }),
-        ...(fontFamily ? { fontFamily } : {}),
-      });
+      const blob = hostPdf
+        ? await makeOnHost(hostPdf, page, { title, imgSrc, fontSrc, fontFamily })
+        : (
+            await renderHtmlPdf(page, {
+              ...(title ? { title } : {}),
+              ...(imgSrc === undefined ? {} : { imgSrc }),
+              ...(fontSrc === undefined ? {} : { fontSrc }),
+              ...(fontFamily ? { fontFamily } : {}),
+            })
+          ).blob;
       const { failed: missed } = await save([
         {
           name: chosen,
@@ -132,6 +139,21 @@ export function PdfDownloadButton({
       {dialog}
     </>
   );
+}
+
+/**
+ * The PDF from the host's own maker, handed the page as the document the in-browser PDF lays out:
+ * the preview's policy, ink on paper. `blob:` pictures do not reach a host that prints elsewhere,
+ * so a host resolving stored pictures for `renderPdf` answers fetchable URLs.
+ */
+async function makeOnHost(
+  render: RenderPdf,
+  page: HtmlContentView,
+  { title, ...frame }: { title?: string; imgSrc?: string; fontSrc?: string; fontFamily?: string },
+): Promise<Blob> {
+  const blob = await render({ html: pageDocument(page, frame), ...(title ? { title } : {}) });
+  if (!(blob instanceof Blob) || blob.size === 0) throw new Error('The host made no PDF');
+  return blob;
 }
 
 /** The name without a `.pdf` the button adds itself, trimmed. */
