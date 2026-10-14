@@ -10,6 +10,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ObjectRunField, RunField, SaveFile, TextRunField } from '../../core';
 import { DEFAULT_FIELD_STRINGS as S, FieldStringsProvider } from '../field-strings';
+import { pageDocument } from '../html-frame';
 import { HtmlPreview } from '../html-preview';
 import { renderHtmlPdf } from '../html-pdf';
 import { FR_FIELD_STRINGS } from '../locales/fr';
@@ -210,6 +211,13 @@ describe('a host that makes the PDF itself', () => {
     expect(handed.html).toContain("default-src 'none'");
     expect(handed.html).toContain(QUOTE);
     expect(saved[0]).toMatchObject({ name: 'Devis 42.pdf', mimeType: 'application/pdf' });
+  });
+
+  it('lays the page out in the default face when the control reads none', () => {
+    // `getComputedStyle` answers '' for a detached control; that is no face, not an empty one.
+    expect(pageDocument({ innerHtml: '<p>x</p>' }, { fontFamily: '' })).toContain(
+      'font-family: system-ui, sans-serif;',
+    );
   });
 
   it('says so when the host makes no PDF', async () => {

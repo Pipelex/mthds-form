@@ -154,7 +154,9 @@ export interface PdfPage {
   /**
    * The page as one standalone document: the frame document the preview shows,
    * under the same policy (no scripts, the same `img-src` and `font-src`), with
-   * the stored pictures it names already resolved.
+   * the stored pictures it names already resolved. A host that prints it
+   * elsewhere, on a server, can fetch only what those resolvers answered as a
+   * real URL or inline data: a `blob:` URL belongs to the reader's tab.
    */
   html: string;
   /** The PDF's document title, when the reader's file name gives one. */

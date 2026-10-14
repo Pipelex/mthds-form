@@ -5,7 +5,7 @@ import { FileDown, Loader2, TriangleAlert } from 'lucide-react';
 import type { HtmlContentView } from '../core/native-content';
 import { useFieldStrings } from './field-strings';
 import { useFileNamePrompt } from './file-name-dialog';
-import { DEFAULT_IMG_SRC, frameDocument, frameStyles, pageTypography } from './html-frame';
+import { pageDocument } from './html-frame';
 import { renderHtmlPdf } from './html-pdf';
 import { resolveHtmlStorageUrls } from './markup-storage';
 import { useMarkupResolvers, useRenderPdf, useSaveFiles, type RenderPdf } from './result-env';
@@ -142,25 +142,16 @@ export function PdfDownloadButton({
 }
 
 /**
- * The PDF from the host's own maker, handed the page as the frame document the
- * preview shows: the same policy, the same page typography.
+ * The PDF from the host's own maker, handed the page as the document the in-browser PDF lays out:
+ * the preview's policy, ink on paper. `blob:` pictures do not reach a host that prints elsewhere,
+ * so a host resolving stored pictures for `renderPdf` answers fetchable URLs.
  */
 async function makeOnHost(
   render: RenderPdf,
   page: HtmlContentView,
-  {
-    title,
-    imgSrc = DEFAULT_IMG_SRC,
-    fontSrc,
-    fontFamily = 'system-ui, sans-serif',
-  }: { title?: string; imgSrc?: string; fontSrc?: string; fontFamily?: string },
+  { title, ...frame }: { title?: string; imgSrc?: string; fontSrc?: string; fontFamily?: string },
 ): Promise<Blob> {
-  const html = frameDocument(page, {
-    styles: frameStyles(pageTypography(fontFamily)),
-    imgSrc,
-    fontSrc: fontSrc ?? imgSrc,
-  });
-  const blob = await render({ html, ...(title ? { title } : {}) });
+  const blob = await render({ html: pageDocument(page, frame), ...(title ? { title } : {}) });
   if (!(blob instanceof Blob) || blob.size === 0) throw new Error('The host made no PDF');
   return blob;
 }
