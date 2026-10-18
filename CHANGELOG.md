@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.19.0] - 2026-10-19
+
+### Changed
+
+- **`mthds` ^0.32.1 (Breaking)**: the dependency's range moves from `^0.30.1`, which a caret on a `0.x` range keeps below 0.31, to `^0.32.1`, so a host on `mthds` 0.32 shares its copy of the standard's types with this package, while a host still on an older `mthds` gets a second copy nested under this package until it moves to 0.32 (`@pipelex/sdk`, which still asks for 0.30, keeps a copy of its own either way). The package reads only types from `mthds/protocol`, and none of the ones it uses changed, so the copies agree.
+
 ## [v0.18.0] - 2026-10-14
 
 ### Added
