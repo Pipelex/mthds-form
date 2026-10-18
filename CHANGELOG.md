@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`mthds` ^0.32.1 (Breaking)**: the dependency's range moves from `^0.30.1`, which a caret on a `0.x` range keeps below 0.31, to `^0.32.1`, so a host on `mthds` 0.32 resolves one copy of the standard's types instead of two, and a host still on an older `mthds` moves to 0.32 with it. The package reads only types from `mthds/protocol`, and none of the ones it uses changed.
+
 ## [v0.18.0] - 2026-10-14
 
 ### Added
