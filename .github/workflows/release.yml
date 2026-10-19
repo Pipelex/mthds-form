@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+# No CI run sends usage telemetry. Storybook ignores this variable, so its own
+# switch is `core.disableTelemetry` in `.storybook/main.ts`; this covers every
+# other tool that honours the convention.
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   publish:
     runs-on: ubuntu-latest

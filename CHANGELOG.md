@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **This repository's Storybook sends no telemetry**: `make test`, `make storybook` and `make build-storybook` no longer report usage to Storybook's telemetry service, because `.storybook/main.ts` sets `core.disableTelemetry`, and every CI workflow sets `DO_NOT_TRACK=1` for the other tools that honour it. The package itself is unchanged. See [docs/storybook.md](docs/storybook.md).
+
 ## [v0.19.0] - 2026-10-19
 
 ### Changed
