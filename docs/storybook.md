@@ -2,6 +2,8 @@
 
 `make storybook` (or `make st`) serves the stories on port 6006; `make build-storybook` produces the static build. The stories also run as tests — `make test` executes them in headless Chromium as a third vitest project — so a story is regression coverage whether or not anyone opens it.
 
+None of the three reports to Storybook's telemetry service: `.storybook/main.ts` sets `core.disableTelemetry`, because no test or CI run of this repository sends usage telemetry, and Storybook ignores the `DO_NOT_TRACK` variable that CI sets for every other tool. Without the flag, the story project alone would report a `test-run` event on every `make test`. `src/__stories__/__tests__/storybook-config.test.ts` fails if the flag is dropped.
+
 ## What it is for, and what it is not
 
 The `src/react/__tests__/` suites already assert the DOM facts: an input has an accessible name, a button is disabled mid-upload, a value round-trips. Those are the assertions that belong in jsdom, and Storybook does not repeat them.
