@@ -3,11 +3,14 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type PointerEvent,
   type ReactNode,
+  type Ref,
+  type RefObject,
 } from 'react';
 import { Check, FileText, Folder, ImageIcon, Search, X } from 'lucide-react';
 import type { FileSource, FileSourceScope, SourceFile } from '../core';
@@ -22,6 +25,7 @@ import {
   MoreFooter,
   useSourcePages,
   type LoadSourcePage,
+  type SourcePages,
 } from './source-list';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
@@ -47,16 +51,22 @@ export interface FilePickerEntryProps {
   /** The field's label as the form shows it, which names the row for assistive technology. */
   label: string;
   disabled?: boolean;
+  /** The row's button, which the sheet hands focus back to (`FilePicker`'s `returnFocusTo`). */
+  ref?: Ref<HTMLButtonElement>;
+  /** The button's id, for a field whose label names this row, when it is the field's only way in. */
+  id?: string;
 }
 
 /**
  * "Choose from your team's files": a full-width row with a folder icon, under
  * the field's own controls.
  */
-export function FilePickerEntry({ onOpen, label, disabled }: FilePickerEntryProps) {
+export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePickerEntryProps) {
   const s = useFieldStrings();
   return (
     <button
+      ref={ref}
+      id={id}
       type="button"
       onClick={onOpen}
       disabled={disabled}
@@ -89,8 +99,14 @@ export interface FilePickerProps {
    */
   onUpload?: () => void;
   /**
-   * Where focus goes when the sheet closes; by default, back to what opened it.
-   * `preventDefault()` on the event and focus something else.
+   * What focus goes back to when the sheet closes: the row that opened it, as
+   * a rule. Without it, focus goes back to whatever held it as the sheet
+   * opened, which a browser that does not focus a clicked button leaves unset.
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
+  /**
+   * Runs as the sheet closes, before focus goes back: `preventDefault()` on the
+   * event and focus something else, as a field does with the file it now holds.
    */
   onCloseAutoFocus?: (event: Event) => void;
 }
@@ -104,14 +120,29 @@ export interface FilePickerProps {
  * the field as it was: only Use writes. The sheet's state lives in its body,
  * which mounts when it opens, so it always opens on a fresh choice.
  */
-export function FilePicker({ open, onOpenChange, onCloseAutoFocus, ...props }: FilePickerProps) {
+export function FilePicker({
+  open,
+  onOpenChange,
+  returnFocusTo,
+  onCloseAutoFocus,
+  ...props
+}: FilePickerProps) {
   const [drag, setDrag] = useState(0);
+  // What held focus as the sheet opened, for a host that names no opener.
+  // Read in a layout effect, before the sheet's own effects move focus in.
+  const heldFocus = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    heldFocus.current = active instanceof HTMLElement && active !== document.body ? active : null;
+  }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open && (
         <DialogContent
           layout="sheet"
           onCloseAutoFocus={onCloseAutoFocus}
+          returnFocus={() => returnFocusTo?.current ?? heldFocus.current}
           // A drag translates the panel while it lasts; at rest it has no
           // transform, which would make it the containing block of anything
           // `fixed` inside it.
@@ -187,7 +218,7 @@ function FilePickerBody({
     setQuery('');
   };
 
-  const status = pickerStatus(s, pages.status, pages.items.length, query, scope, labels);
+  const status = pickerStatus(s, pages, query, scope, labels);
 
   return (
     <>
@@ -251,7 +282,7 @@ function FilePickerBody({
           <ListMessage text={s.filePickerFailed}>
             <ListAction onClick={pages.retry}>{s.tryAgain}</ListAction>
           </ListMessage>
-        ) : pages.items.length === 0 ? (
+        ) : pages.empty ? (
           query !== '' ? (
             <ListMessage text={s.filePickerNoMatch}>
               <ListAction onClick={clearSearch}>{s.filePickerClearSearch}</ListAction>
@@ -277,26 +308,28 @@ function FilePickerBody({
           )
         ) : (
           <>
-            <div
-              role={multiple ? 'group' : 'radiogroup'}
-              aria-label={s.filePickerTitle}
-              className="divide-y divide-border"
-            >
-              {pages.items.map((file) => {
-                const isChosen = chosen.has(file.id);
-                return (
-                  <FileRow
-                    key={file.id}
-                    file={file}
-                    formats={formats}
-                    role={multiple ? 'checkbox' : 'radio'}
-                    chosen={isChosen}
-                    disabled={!isChosen && full}
-                    onToggle={() => toggle(file)}
-                  />
-                );
-              })}
-            </div>
+            {pages.items.length > 0 && (
+              <div
+                role={multiple ? 'group' : 'radiogroup'}
+                aria-label={s.filePickerTitle}
+                className="divide-y divide-border"
+              >
+                {pages.items.map((file) => {
+                  const isChosen = chosen.has(file.id);
+                  return (
+                    <FileRow
+                      key={file.id}
+                      file={file}
+                      formats={formats}
+                      role={multiple ? 'checkbox' : 'radio'}
+                      chosen={isChosen}
+                      disabled={!isChosen && full}
+                      onToggle={() => toggle(file)}
+                    />
+                  );
+                })}
+              </div>
+            )}
             <MoreFooter pages={pages} />
           </>
         )}
@@ -319,15 +352,15 @@ function FilePickerBody({
 /** What the sheet's one status line announces about the list. */
 function pickerStatus(
   s: FieldStrings,
-  status: 'idle' | 'loading' | 'ready' | 'failed',
-  count: number,
+  pages: SourcePages<SourceFile>,
   query: string,
   scope: FileSourceScope,
   labels: readonly string[],
 ): string {
-  if (status === 'idle' || status === 'loading') return s.filePickerLoading;
-  if (status === 'failed') return s.filePickerFailed;
-  if (count > 0) return s.filePickerShown(count);
+  if (pages.status === 'idle' || pages.status === 'loading') return s.filePickerLoading;
+  if (pages.status === 'failed') return s.filePickerFailed;
+  if (pages.items.length > 0) return s.filePickerShown(pages.items.length);
+  if (!pages.empty) return pages.more === 'failed' ? s.loadMoreFailed : s.filePickerLoading;
   if (query !== '') return s.filePickerNoMatch;
   return scope === 'mine' ? s.filePickerNoneMine(labels) : s.filePickerNoneTeam(labels);
 }

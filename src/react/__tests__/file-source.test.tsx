@@ -30,13 +30,13 @@ const ONE_DOCUMENT = artifacts('one_document');
 const MANY_FILES = artifacts('many_files');
 
 type HarnessProps = Partial<UseMethodFormOptions> &
-  Pick<UseMethodFormOptions, 'descriptor' | 'contract'>;
+  Pick<UseMethodFormOptions, 'descriptor' | 'contract'> & { allowUrl?: boolean };
 
-function Harness(options: HarnessProps) {
+function Harness({ allowUrl, ...options }: HarnessProps) {
   const form = useMethodForm(options);
   return (
     <>
-      <MethodForm form={form} presentation="app" />
+      <MethodForm form={form} presentation="app" allowUrl={allowUrl} />
       <output data-testid="state">{JSON.stringify({ values: form.values })}</output>
     </>
   );
@@ -351,5 +351,113 @@ describe('the list’s states', () => {
     expect(
       within(dialog).queryByText(S.filePickerNoneTeam(['PDF', 'JPG', 'PNG']), SHOWN),
     ).toBeNull();
+  });
+});
+
+describe('a field whose only way in is the team’s files', () => {
+  it('renders, offers the team’s files, and claims no link can be pasted', async () => {
+    const user = userEvent.setup();
+    render(<Harness {...ONE_DOCUMENT} allowUrl={false} fileSource={sourceOf([INVOICE])} />);
+    expect(screen.queryByText(S.uploadUnavailable)).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    const dialog = await openPicker(user);
+    await user.click(await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
+    expect(values().attachment).toEqual({ url: INVOICE.url, filename: 'INV-2291.pdf' });
+  });
+});
+
+describe('a list holding empty rows', () => {
+  /** The list of attachments, bounded to two. */
+  const boundedToTwo = (fields: RunField[]) =>
+    fields.map((field) => (field.name === 'attachments' ? { ...field, maxItemCount: 2 } : field));
+
+  it('fills its empty rows first, and counts its room by the files it holds', async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        {...MANY_FILES}
+        prepareFields={boundedToTwo}
+        initialValues={{ attachments: [undefined, undefined] }}
+        fileSource={sourceOf([INVOICE, OLDER, DRAFT])}
+      />,
+    );
+    const entry = screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') });
+    expect(entry).toBeEnabled();
+    await user.click(entry);
+    const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
+    await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
+    await user.click(within(dialog).getByRole('checkbox', { name: /INV-2288\.pdf/ }));
+    // Two rows of room, both taken: the third file cannot be chosen.
+    expect(within(dialog).getByRole('checkbox', { name: /contract-acme-draft/ })).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: S.filePickerUse(2, undefined) }));
+    expect(values().attachments).toEqual([
+      { url: INVOICE.url, filename: 'INV-2291.pdf' },
+      { url: OLDER.url, filename: 'INV-2288.pdf' },
+    ]);
+  });
+});
+
+describe('a host whose cursors go round in a circle', () => {
+  it('stops following empty pages at a cursor it has already followed', async () => {
+    const user = userEvent.setup();
+    let calls = 0;
+    const list = vi.fn(async (query: FileSourceQuery): Promise<FileSourcePage> => {
+      calls += 1;
+      // A guard for the test itself: a list that never stops would starve the
+      // event loop, so the twentieth call fails instead.
+      if (calls > 20) throw new Error('followed forever');
+      return { files: [], nextCursor: query.cursor === 'a' ? 'b' : 'a' };
+    });
+    render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([], { list })} />);
+    const dialog = await openPicker(user);
+    await within(dialog).findByText(S.filePickerNoneTeam(['PDF', 'JPG', 'PNG']), SHOWN);
+    expect(list).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('focus, when the sheet closes', () => {
+  it('returns to the field’s row on Escape and on the close button', async () => {
+    const user = userEvent.setup();
+    render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([INVOICE])} />);
+    const entry = screen.getByRole('button', { name: S.chooseFromSourceAria('Attachment') });
+    await openPicker(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(entry).toHaveFocus());
+    const dialog = await openPicker(user);
+    await user.click(within(dialog).getByRole('button', { name: S.close }));
+    await waitFor(() => expect(entry).toHaveFocus());
+  });
+
+  it('returns to the list’s row when the list’s sheet closes', async () => {
+    const user = userEvent.setup();
+    render(<Harness {...MANY_FILES} fileSource={sourceOf([INVOICE])} />);
+    const entry = screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') });
+    await user.click(entry);
+    await screen.findByRole('dialog', { name: S.filePickerTitle });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(entry).toHaveFocus());
+  });
+});
+
+describe('a source the host builds inline', () => {
+  /** A host that builds its file source anew on every render, as docs/sources.md allows. */
+  function InlineSource({ list }: { list: FileSource['list']; render: number }) {
+    const form = useMethodForm({ ...ONE_DOCUMENT, fileSource: { initialScope: 'everyone', list } });
+    return <MethodForm form={form} presentation="app" />;
+  }
+
+  it('is read only when the sheet asks for a page, however often the host renders', async () => {
+    const user = userEvent.setup();
+    const list = vi.fn(async () => ({ files: [INVOICE] }));
+    const { rerender } = render(<InlineSource list={list} render={0} />);
+    rerender(<InlineSource list={list} render={1} />);
+    expect(list).not.toHaveBeenCalled();
+    const dialog = await openPicker(user);
+    await within(dialog).findByText('INV-2291.pdf');
+    rerender(<InlineSource list={list} render={2} />);
+    rerender(<InlineSource list={list} render={3} />);
+    expect(within(dialog).getByText('INV-2291.pdf')).toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(1);
   });
 });

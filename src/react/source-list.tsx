@@ -35,6 +35,12 @@ export interface SourcePages<T> {
   items: T[];
   /** Whether the host has said there is more to read. */
   hasMore: boolean;
+  /**
+   * Whether the list is known to hold nothing: read to its end with no row
+   * left. Rows a delete took away do not make a list empty while the host has
+   * more to read, which is read at once instead.
+   */
+  empty: boolean;
   /** The read of the next page: `failed` keeps the rows shown and offers Try again. */
   more: 'idle' | 'loading' | 'failed';
   /** Reads the next page. Does nothing while one is being read or none is left. */
@@ -64,9 +70,11 @@ const LOADING: PagesState<never> = { status: 'loading', items: [], cursor: null,
  * page that is not the end; showing "No files match" over it would say
  * something false, and a Show more under no rows asks the person to do the
  * list's work. So an empty page that carries a cursor is followed at once,
- * and an empty list is reported only once its cursor has ended. A cursor
- * answered back unchanged stops the following, so a host that repeats itself
- * cannot keep the list asking forever.
+ * and an empty list is reported only once its cursor has ended. The same
+ * holds when the person empties the rows read so far, by deleting them: the
+ * next page is read at once rather than "nothing" said over a list that has
+ * more. A cursor the list has already read from ends it, so a host whose
+ * cursors go round in a circle cannot keep the list asking forever.
  *
  * A newer key, a retry and an unmount each abort the read in flight, through
  * the signal the host was handed, and its answer is dropped if it lands anyway.
@@ -77,6 +85,10 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
   const [state, setState] = useState<PagesState<T>>(() => (key === null ? IDLE : LOADING));
   const loadRef = useRef(load);
   const inFlight = useRef<AbortController | null>(null);
+  // The cursors this list has read from since its first page. Taken over from
+  // a read only once it succeeds, so a failed read leaves nothing behind that
+  // would stop its retry.
+  const followed = useRef<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     loadRef.current = load;
@@ -86,7 +98,9 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
     inFlight.current?.abort();
     const controller = new AbortController();
     inFlight.current = controller;
+    const seen = new Set(phase === 'first' ? [] : followed.current);
     const follow = (from: string | undefined) => {
+      if (from !== undefined) seen.add(from);
       let page: Promise<SourcePage<T>>;
       try {
         page = Promise.resolve(loadRef.current(from, controller.signal));
@@ -96,17 +110,19 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
       page.then(
         (answer) => {
           if (inFlight.current !== controller) return;
-          const next = answer.nextCursor || null;
+          const offered = answer.nextCursor || null;
+          const next = offered !== null && seen.has(offered) ? null : offered;
           const items = [...answer.items];
-          if (items.length === 0 && next !== null && next !== (from ?? null)) {
+          if (items.length === 0 && next !== null) {
             follow(next);
             return;
           }
           inFlight.current = null;
+          followed.current = seen;
           setState((previous) => ({
             status: 'ready',
             items: phase === 'first' ? items : [...previous.items, ...items],
-            cursor: next === (from ?? null) ? null : next,
+            cursor: next,
             more: 'idle',
           }));
         },
@@ -162,10 +178,22 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
     setState((previous) => ({ ...previous, items: update(previous.items) }));
   }, []);
 
+  // Rows taken away down to none, with more to read: read it rather than say
+  // the list is empty, or leave Show more under nothing.
+  const drained =
+    state.status === 'ready' &&
+    state.items.length === 0 &&
+    state.cursor !== null &&
+    state.more === 'idle';
+  useEffect(() => {
+    if (drained) loadMore();
+  }, [drained, loadMore]);
+
   return {
     status: state.status,
     items: state.items,
     hasMore: state.cursor !== null,
+    empty: state.status === 'ready' && state.items.length === 0 && state.cursor === null,
     more: state.more,
     loadMore,
     retry,

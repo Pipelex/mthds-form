@@ -78,7 +78,8 @@ const state = () => JSON.parse(screen.getByTestId('state').textContent ?? '{}');
 const SHOWN = { ignore: '[role="status"], script, style' };
 
 const openExamples = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.click(screen.getByRole('button', { name: S.fillWithExample }));
+  // Found rather than got: under `hideWhenEmpty` the control waits for its probe.
+  await user.click(await screen.findByRole('button', { name: S.fillWithExample }));
   return screen.findByRole('dialog', { name: S.examplesTitle });
 };
 
@@ -307,5 +308,187 @@ describe('the row menu', () => {
     await user.click(within(question).getByRole('button', { name: S.deleteExample }));
     expect(await within(question).findByRole('alert')).toHaveTextContent(S.deleteFailed);
     expect(within(question).getByRole('button', { name: S.tryAgain })).toBeInTheDocument();
+  });
+});
+
+/**
+ * A host listing one example a page, each page after the id the last one ended
+ * on, and deleting for real: what a host paging by key does.
+ */
+function onePerPage(initial: readonly FormExample[]) {
+  let examples = [...initial];
+  const list = vi.fn(async ({ cursor }: { cursor?: string }) => {
+    const after = cursor === undefined ? examples : examples.filter((item) => item.id > cursor);
+    const page = after.slice(0, 1);
+    return { examples: page, nextCursor: after.length > 1 ? (page[0]?.id ?? null) : null };
+  });
+  const remove = vi.fn(async (example: FormExample) => {
+    examples = examples.filter((item) => item.id !== example.id);
+  });
+  return { list, delete: remove };
+}
+
+describe('a delete that empties what was read', () => {
+  it('reads the next page when deleting empties the rows read so far', async () => {
+    const user = userEvent.setup();
+    const { list, delete: remove } = onePerPage([PARIS, LYON]);
+    render(<Harness exampleSource={{ list, delete: remove }} />);
+    const dialog = await openExamples(user);
+    await user.click(
+      await within(dialog).findByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    const question = await screen.findByRole('alertdialog');
+    await user.click(within(question).getByRole('button', { name: S.deleteExample }));
+    await within(dialog).findByRole('button', { name: 'Lyon office' });
+    expect(within(dialog).queryByText(S.examplesNone, SHOWN)).toBeNull();
+  });
+
+  it('keeps the list open under hideWhenEmpty when its only example is deleted, and leaves the control out once closed', async () => {
+    const user = userEvent.setup();
+    let examples = [PARIS];
+    const list = vi.fn(async () => ({ examples }));
+    const remove = vi.fn(async (example: FormExample) => {
+      examples = examples.filter((item) => item.id !== example.id);
+    });
+    render(<Harness exampleSource={{ list, delete: remove, hideWhenEmpty: true }} />);
+    const dialog = await openExamples(user);
+    await user.click(
+      await within(dialog).findByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    const question = await screen.findByRole('alertdialog');
+    await user.click(within(question).getByRole('button', { name: S.deleteExample }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    // The list the person is looking at stays, and says there is none left.
+    const still = screen.getByRole('dialog', { name: S.examplesTitle });
+    await within(still).findByText(S.examplesNone, SHOWN);
+    await user.click(within(still).getByRole('button', { name: S.close }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: S.fillWithExample })).toBeNull(),
+    );
+  });
+
+  it('keeps offering the control under hideWhenEmpty while a later page still holds one', async () => {
+    const user = userEvent.setup();
+    const { list, delete: remove } = onePerPage([PARIS, LYON]);
+    render(<Harness exampleSource={{ list, delete: remove, hideWhenEmpty: true }} />);
+    const dialog = await openExamples(user);
+    await user.click(
+      await within(dialog).findByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: S.deleteExample }),
+    );
+    await within(dialog).findByRole('button', { name: 'Lyon office' });
+    await user.click(within(dialog).getByRole('button', { name: S.close }));
+    // Read again on closing: the method still has an example, so the control stays.
+    await waitFor(() => expect(list.mock.calls.length).toBeGreaterThanOrEqual(4));
+    expect(screen.getByRole('button', { name: S.fillWithExample })).toBeInTheDocument();
+  });
+});
+
+describe('a rename the host answers under a new id', () => {
+  it('replaces the row it renamed, matched by the id it had', async () => {
+    const user = userEvent.setup();
+    const rename = vi.fn(async (example: FormExample, name: string) => ({
+      ...example,
+      id: `${example.id}-v2`,
+      name,
+    }));
+    render(<Harness exampleSource={sourceOf([PARIS, LYON], { rename })} />);
+    const dialog = await openExamples(user);
+    await user.click(
+      await within(dialog).findByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.renameExample }));
+    const renaming = await screen.findByRole('dialog', { name: S.renameExampleTitle });
+    const field = within(renaming).getByLabelText(S.exampleName);
+    await user.clear(field);
+    await user.type(field, 'Head office{Enter}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: S.renameExampleTitle })).toBeNull(),
+    );
+    expect(within(dialog).getByRole('button', { name: 'Head office' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Paris office' })).toBeNull();
+  });
+});
+
+describe('focus, when a surface closes', () => {
+  it('returns to "Fill with an example" when the list closes', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS])} />);
+    await openExamples(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: S.fillWithExample })).toHaveFocus(),
+    );
+  });
+
+  it('returns to the row that asked, when the person keeps what they entered', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS])} />);
+    await user.type(screen.getByLabelText('street'), 'x');
+    const dialog = await openExamples(user);
+    const row = await within(dialog).findByRole('button', { name: 'Paris office' });
+    await user.click(row);
+    const question = await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+    await user.click(within(question).getByRole('button', { name: S.cancel }));
+    await waitFor(() => expect(row).toHaveFocus());
+  });
+
+  it('returns to "Fill with an example" once an example replaced what was entered', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS])} />);
+    await user.type(screen.getByLabelText('street'), 'x');
+    const dialog = await openExamples(user);
+    await user.click(await within(dialog).findByRole('button', { name: 'Paris office' }));
+    const question = await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+    await user.click(within(question).getByRole('button', { name: S.replaceEnteredConfirm }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: S.fillWithExample })).toHaveFocus(),
+    );
+  });
+
+  it('returns to the row’s menu button when a rename or a delete is cancelled', async () => {
+    const user = userEvent.setup();
+    const source = sourceOf([PARIS], {
+      rename: async (example, name) => ({ ...example, name }),
+      delete: async () => undefined,
+    });
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    const menu = await within(dialog).findByRole('button', {
+      name: S.exampleActions('Paris office'),
+    });
+
+    await user.click(menu);
+    await user.click(await screen.findByRole('menuitem', { name: S.renameExample }));
+    const renaming = await screen.findByRole('dialog', { name: S.renameExampleTitle });
+    await user.click(within(renaming).getByRole('button', { name: S.cancel }));
+    await waitFor(() => expect(menu).toHaveFocus());
+
+    await user.click(menu);
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    const question = await screen.findByRole('alertdialog');
+    await user.click(within(question).getByRole('button', { name: S.cancel }));
+    await waitFor(() => expect(menu).toHaveFocus());
+  });
+
+  it('moves to the row that took a deleted one’s place', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS, LYON], { delete: async () => undefined })} />);
+    const dialog = await openExamples(user);
+    await user.click(
+      await within(dialog).findByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: S.deleteExample }),
+    );
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Lyon office' })).toHaveFocus(),
+    );
   });
 });

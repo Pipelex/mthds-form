@@ -7,8 +7,15 @@ import { cn } from '../utils';
 
 /*
  * The vendored dialog, over `@radix-ui/react-dialog`, which is the behaviour:
- * the focus trap, Escape, focus returned to what opened it, the rest of the
- * page hidden from assistive technology and its scroll held.
+ * the focus trap, Escape, the rest of the page hidden from assistive
+ * technology and its scroll held.
+ *
+ * Focus going back on close is the one part that needs a hand. Radix returns it
+ * to the dialog's own `Trigger` and to nothing else, and none of the surfaces
+ * here is opened by one: a sheet opens from a row in a field, a question from
+ * a row in a list. So a panel takes `returnFocus`, which names the element at
+ * the moment it closes, since the element that opened it may be gone by then
+ * (the row a choice replaced, the example a delete removed).
  *
  * Drawn in place rather than in a portal, as the file-name dialog is, so it
  * reads the theme and brand tokens of the scope the control sits in; its
@@ -21,6 +28,28 @@ import { cn } from '../utils';
 
 const Dialog = DialogPrimitive.Root;
 const DialogClose = DialogPrimitive.Close;
+
+/** Names where focus goes as a panel closes; nothing leaves it to Radix. */
+export type ReturnFocus = () => HTMLElement | null | undefined;
+
+/**
+ * A panel's `onCloseAutoFocus`: the caller's own handler first, which may send
+ * focus elsewhere by calling `preventDefault()`, then `returnFocus`'s element
+ * when it is still in the document.
+ */
+export function closeAutoFocus(
+  onCloseAutoFocus: ((event: Event) => void) | undefined,
+  returnFocus: ReturnFocus | undefined,
+): (event: Event) => void {
+  return (event) => {
+    onCloseAutoFocus?.(event);
+    if (event.defaultPrevented || !returnFocus) return;
+    const target = returnFocus();
+    if (!target?.isConnected) return;
+    event.preventDefault();
+    target.focus();
+  };
+}
 
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
@@ -44,8 +73,10 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     layout?: 'sheet' | 'dialog';
+    /** Where focus goes when the panel closes. See `closeAutoFocus`. */
+    returnFocus?: ReturnFocus;
   }
->(({ className, layout = 'dialog', children, ...props }, ref) => (
+>(({ className, layout = 'dialog', returnFocus, onCloseAutoFocus, children, ...props }, ref) => (
   <>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -60,6 +91,7 @@ const DialogContent = React.forwardRef<
           : 'inset-0 m-auto h-fit w-[calc(100%-2rem)] max-w-sm gap-3 rounded-lg border p-4',
         className,
       )}
+      onCloseAutoFocus={closeAutoFocus(onCloseAutoFocus, returnFocus)}
       {...props}
     >
       {children}

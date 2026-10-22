@@ -69,7 +69,7 @@ interface FileSource {
 
 ### What it answers
 
-A page is `{ files, nextCursor }`, the files newest first. `nextCursor` absent or `null` means the page is the last. A page may be empty and still carry a cursor, as a host filtering after paging can produce: the sheet then asks for the next page by itself, and stops if a cursor ever repeats.
+A page is `{ files, nextCursor }`, the files newest first. `nextCursor` absent or `null` means the page is the last. A page may be empty and still carry a cursor, as a host filtering after paging can produce: the sheet then asks for the next page by itself, and stops at a cursor it has already read from, so a host whose cursors go round in a circle cannot keep it asking.
 
 | Row field | What it is |
 | --- | --- |
@@ -87,7 +87,8 @@ The row's second line joins what is known, in that order: "Test file · PDF · 3
 ### Where the form offers it
 
 - **An empty file field** shows "Choose from your team's files" as a full-width row under its own controls, the dropzone and the link. Like the dropzone it is there only while the field holds no file, and it is shut while a file is arriving. Its accessible name carries the field's label.
-- **A list of files** (a list whose item is a document or an image) also shows the row under Add item, and its sheet takes several files at once, up to the room the list has left when it is bounded. Each empty row of the list still offers its own, which fills that row. A list of structures that hold files has no list-level row, because a file is not a structure: each nested file field offers its own.
+- **A field whose only way in is the team's files.** A file source is a way into a file value of its own, so a host may offer only the files it stores: no `onDropFile` and `allowUrl` set to `false`. The field then shows its format hint and the row, which its label names, and nothing about uploading or pasting. Without a file source, that configuration is still a host's error, and the field throws ([upload-seam.md](upload-seam.md)).
+- **A list of files** (a list whose item is a document or an image) also shows the row under Add item, and its sheet takes several files at once. The files fill the rows the person added and left empty first, then follow the last row, so a bounded list's room is its bound less the files it holds (`roomForChosenFiles`), not less its rows. The row is shut while a file is arriving anywhere in the list, as the remove buttons are, since the row that file will be written back to is still empty. Each empty row of the list still offers its own, which fills that row. A list of structures that hold files has no list-level row, because a file is not a structure: each nested file field offers its own.
 - **Upload a file**, offered when the person has no file of the field's formats, closes the sheet and opens the field's own file dialog. It is offered only where the field can upload, so the list-level sheet, which has no single field to upload into, never offers it.
 
 ### The sheet
@@ -96,11 +97,11 @@ The row's second line joins what is known, in that order: "Test file · PDF · 3
 
 A row is chosen by a tap: a single field's rows are radio buttons, a list's are check boxes. A chosen row shows a faint fill and a check and says so with `aria-checked`. The choice is kept across searches and across the switch, so a person can search for one file, then another, and use both. The button is disabled until something is chosen, and names what it will do: "Use INV-2291.pdf", or "Use 3 files".
 
-Use writes the choice and closes the sheet. Closing it any other way (the close button, Escape, the backdrop, a swipe) changes nothing, and each opening starts on a fresh choice. After a file is used, focus moves to the file's card, since the row that opened the sheet is gone.
+Use writes the choice and closes the sheet. Closing it any other way (the close button, Escape, the backdrop, a swipe) changes nothing, and each opening starts on a fresh choice. Focus goes back to the row that opened the sheet, which `FilePicker` takes as `returnFocusTo` (without it, to whatever held focus as the sheet opened). After a file is used in a single field, focus moves to the file's card instead, since the row is gone with the empty state.
 
 ### What a choice writes
 
-A single field is written `{ url, filename }` through its own `onChange`, the value an upload's result writes, and a typed link or the preview of an earlier dropped file is left behind as it would be by an upload. A list gains one row per chosen file, after what it holds, through `addChosenFiles`, which never adds an address the list already holds and never adds one address twice. Both functions are the kernel's (`sourceFileValue`, `addChosenFiles`), so the rule is tested in node and a host rendering its own control can apply the same one.
+A single field is written `{ url, filename }` through its own `onChange`, the value an upload's result writes, and a typed link or the preview of an earlier dropped file is left behind as it would be by an upload. A list takes one row per chosen file through `addChosenFiles`: its empty rows first, in order, then new rows after the last. It never writes an address the list already holds and never writes one address twice. These functions are the kernel's (`sourceFileValue`, `addChosenFiles`, `roomForChosenFiles`), so the rules are tested in node and a host rendering its own control can apply the same ones.
 
 ## The example source
 
@@ -129,11 +130,13 @@ A form the person has worked on is asked first: "Replace what you entered?", wit
 
 ### The examples list
 
-The list is read again each time it opens, since an example may have been saved since. The rows are in the order the host gives them.
+The list is read again each time it opens, since an example may have been saved since. The rows are in the order the host gives them. When deletes empty the rows read so far while the host has more, the next page is read at once, so the list says it has none only once it has been read to its end.
 
-`rename` and `delete` are capabilities: each is offered on a row's menu only when given. Rename opens a dialog on the example's name; Save is disabled while the name is empty once trimmed, reads "Renaming…" while the host works, and a failure keeps the dialog open with the new name, says so, and turns Save into Try again. Resolving to the example as stored replaces the row; resolving to nothing keeps it under the new name. Delete asks first, and only Delete in that question calls the host; a failure keeps the question open with Try again, and success removes the row.
+`rename` and `delete` are capabilities: each is offered on a row's menu only when given. Rename opens a dialog on the example's name; Save is disabled while the name is empty once trimmed, reads "Renaming…" while the host works, and a failure keeps the dialog open with the new name, says so, and turns Save into Try again. Resolving to the example as stored replaces the row, matched by the id it had, so a host that answers a renamed example under a new id still updates it; resolving to nothing keeps it under the new name. Delete asks first, and only Delete in that question calls the host; a failure keeps the question open with Try again, and success removes the row.
 
-With no example, the list says how to make one: "No examples yet. Run it, then save the run as an example." That suits a person who can save one. For a person who cannot, a host sets `hideWhenEmpty`: the form then asks for the first page as it mounts and offers "Fill with an example" only once the method is known to have one. A failure to read that page still offers the control, so the failure is shown rather than hidden.
+With no example, the list says how to make one: "No examples yet. Run it, then save the run as an example." That suits a person who can save one. For a person who cannot, a host sets `hideWhenEmpty`: the form then reads the list as it mounts, following it past empty pages, and offers "Fill with an example" only once the method is known to have one. It reads the list again each time the examples close, so a delete that took the last one takes the control with it, and while that read is under way the control keeps its last answer rather than blinking out. The open list never vanishes under the person, whatever they delete in it. A failure to read still offers the control, so the failure is shown rather than hidden.
+
+Focus goes back where the person was. Closing the examples returns it to "Fill with an example"; keeping what was entered at "Replace what you entered?" returns it to the example that asked; cancelling a rename or a delete returns it to that row's menu button, a rename to the renamed row's, and a delete to the row that took the deleted one's place, or to the close button when none is left.
 
 ## The states
 

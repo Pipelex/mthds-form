@@ -191,8 +191,10 @@ function FileField({
   const [resolved, setResolved] = useState<{ uri: string; src: string | null } | null>(null);
   const localUrlRef = useRef<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The attached file's card, where focus goes after a file is chosen.
+  // The attached file's card, where focus goes after a file is chosen, and the
+  // row that opened the sheet, where it goes back otherwise.
   const cardRef = useRef<HTMLDivElement>(null);
+  const pickerEntryRef = useRef<HTMLButtonElement>(null);
 
   const setLocal = useCallback((next: LocalPreview | null) => {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
@@ -473,18 +475,24 @@ function FileField({
   // message to an end user and, on a required field, keep the run shut in
   // silence - the failure this rule exists to remove. It fires per rendered
   // file field, so a host that switches links off and never uploads can still
-  // render every method with no file input.
-  if (!canUpload && !allowUrl) {
+  // render every method with no file input. A file source is a way in of its
+  // own: a host may offer only the files it already stores.
+  const canChoose = fileSource !== undefined;
+  if (!canUpload && !allowUrl && !canChoose) {
     throw new Error(
-      `The file field at "${id}" has no way in: the form's environment supplies no onDropFile and sets allowUrl to false. Supply onDropFile so the file can be uploaded, or leave allowUrl unset so a link can be pasted.`,
+      `The file field at "${id}" has no way in: the form's environment supplies no onDropFile and no fileSource, and sets allowUrl to false. Supply onDropFile so the file can be uploaded, leave allowUrl unset so a link can be pasted, or supply a fileSource so a stored file can be chosen.`,
     );
   }
 
   // Open from the start when a link is the only way in; behind the toggle when
   // it is the second way beside an upload; never when the host switched it off.
   const linkOpen = allowUrl && (!canUpload || showUrl);
-  // The line that stands where the dropzone would, for as long as it would.
-  const noUploadLineShown = !canUpload && !hasFile && !uploading;
+  // The line that stands where the dropzone would, for as long as it would. It
+  // says a link may be pasted instead, so it stands only where one may be.
+  const noUploadLineShown = !canUpload && allowUrl && !hasFile && !uploading;
+  // With neither an upload nor a link, the team's files are the only way in,
+  // and the field's label names their row.
+  const choosingOnly = !canUpload && !allowUrl;
   const noUploadLineId = `${domId}-no-upload`;
 
   return (
@@ -546,9 +554,11 @@ function FileField({
             </p>
           ) : (
             <>
-              <p id={noUploadLineId} className="text-[12px] text-muted-foreground">
-                {s.uploadUnavailable}
-              </p>
+              {noUploadLineShown && (
+                <p id={noUploadLineId} className="text-[12px] text-muted-foreground">
+                  {s.uploadUnavailable}
+                </p>
+              )}
               {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
             </>
           )}
@@ -673,6 +683,8 @@ function FileField({
           file is arriving, as every other way in is. */}
       {fileSource && !hasFile && (
         <FilePickerEntry
+          ref={pickerEntryRef}
+          id={choosingOnly ? domId : undefined}
           label={fieldLabel(field.title, field.name, presentation)}
           disabled={busy}
           onOpen={() => setPickerOpen(true)}
@@ -689,6 +701,7 @@ function FileField({
             if (file) chooseFromSource(file);
           }}
           onUpload={canUpload ? openFileDialog : undefined}
+          returnFocusTo={pickerEntryRef}
           // The row that opened the sheet is gone once a file is chosen, so
           // focus lands on the card that replaced it rather than on nothing.
           onCloseAutoFocus={(event) => {
