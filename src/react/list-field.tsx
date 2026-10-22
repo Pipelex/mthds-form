@@ -1,6 +1,7 @@
 'use client';
 
 import { shownAsOptional } from '../core/readiness';
+import { addChosenFiles } from '../core/sources';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from './utils';
@@ -9,6 +10,7 @@ import { ConceptPill } from './concept-pill';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
+import { FilePicker, FilePickerEntry } from './file-picker';
 
 interface ListFieldProps {
   field: ListRunField;
@@ -52,6 +54,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const isApp = presentation === 'app';
   const items = value ?? [];
   const [rowKeys, setRowKeys] = useRowKeys(items.length);
+  const [pickerOpen, setPickerOpen] = useState(false);
   // Upload failures a removal left at the wrong position; see `rowEnv` below.
   const [staleErrors, setStaleErrors] = useState<ReadonlyMap<string, string>>(NO_ERRORS);
 
@@ -127,6 +130,15 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // bound: a schema stating "at least two" would otherwise be presented as a
   // list of exactly two, with Add dead over a list the method lets you grow.
   const isFull = field.maxItemCount !== undefined && items.length >= field.maxItemCount;
+
+  // A list of files takes several of the host's files at once, one row each,
+  // added after what it holds. A list of structures holding a file does not:
+  // a file is not a structure, so each nested file field offers its own.
+  // Like Add, it stays open while a row's file is arriving, since appending
+  // moves no row an upload will write back to.
+  const fileSource = env?.fileSource;
+  const fileItem =
+    field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
 
   return (
     <div className="space-y-2">
@@ -216,6 +228,28 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
           <Plus className="h-4 w-4" />
           {s.addItem}
         </button>
+        {fileSource && fileItem && (
+          <>
+            <FilePickerEntry
+              label={fieldLabel(field.title, field.name, presentation)}
+              disabled={env?.disabled || isFull}
+              onOpen={() => setPickerOpen(true)}
+            />
+            <FilePicker
+              source={fileSource}
+              formats={fileItem.formats}
+              multiple
+              maxChoices={
+                field.maxItemCount === undefined
+                  ? undefined
+                  : Math.max(0, field.maxItemCount - items.length)
+              }
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              onUse={(files) => onChange(addChosenFiles(items, files))}
+            />
+          </>
+        )}
       </div>
       {error && (
         <p className="text-[11px] text-destructive" role="alert">

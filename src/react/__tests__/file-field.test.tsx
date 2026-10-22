@@ -367,9 +367,15 @@ describe('the default strings name no storage scheme', () => {
   });
 
   it('holds for every default string, not only those two', () => {
-    // A string that takes a list of names is called with one; every other
-    // function takes the word-and-count pair.
-    const argumentsFor: Partial<Record<string, unknown[]>> = { downloadIncomplete: [['x']] };
+    // A string that takes a list of names is called with one, and a date with
+    // one; every other function takes the word-and-count pair.
+    const argumentsFor: Partial<Record<string, unknown[]>> = {
+      downloadIncomplete: [['x']],
+      filePickerTakes: [['x']],
+      filePickerNoneTeam: [['x']],
+      filePickerNoneMine: [['x']],
+      fileDate: [new Date()],
+    };
     const texts = Object.entries(DEFAULT_FIELD_STRINGS).map(([key, entry]) =>
       typeof entry === 'function'
         ? String((entry as (...args: unknown[]) => unknown)(...(argumentsFor[key] ?? ['x', 2])))
