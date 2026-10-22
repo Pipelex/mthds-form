@@ -199,10 +199,29 @@ export {
   inputDataFromWorkingMemory,
   outputsFromPipeOutput,
   rjsfDataFromRunValues,
+  runValuesFromInputs,
   runValuesFromStore,
+  sameRunValues,
   setValueAtPath,
   storeInputDataFromRunValues,
 } from './values';
+
+// The two optional host seams beside the upload: where a file field takes a
+// file the host already stores, and where a form takes a saved example. The
+// shapes a host answers with, and the rules that write an answer into a value.
+// The controls are `./react`'s. See ./sources and docs/sources.md.
+export type {
+  ExampleSource,
+  ExampleSourcePage,
+  ExampleSourceQuery,
+  FileSource,
+  FileSourcePage,
+  FileSourceQuery,
+  FileSourceScope,
+  FormExample,
+  SourceFile,
+} from './sources';
+export { addChosenFiles, sourceFileValue } from './sources';
 
 // Wire format - deflate/inflate and the exactly-one-wrapper invariant.
 export {
