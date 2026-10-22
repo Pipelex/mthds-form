@@ -38,6 +38,23 @@ What follows is worth reading before relying on the fallbacks:
 
 Two rules make those checks worth trusting. A check that compared nothing fails, rather than printing no line — a `@theme inline` block that was commented out once shipped a sheet with no colour utilities at all while every check reported success. And the blocks are located by counting braces over comment-stripped CSS, never by a regex: a regex reads a commented-out block as live configuration, and a lazy match to the first `}` stops inside a nested at-rule, which folds the dark values into the light palette until the guard starts demanding the dark value as the light fallback.
 
+## Brand ink
+
+Anything that wants the brand's colour without being a solid button reads one of three more tokens, all optional and outside the table above. `theme.css` defines none of them, on purpose.
+
+| Token | What reads it | Falls back to |
+| --- | --- | --- |
+| `--brand` | Brand-coloured text on the page (a produced page's eyebrow and section number) and a field's focus border and ring | `--primary` |
+| `--brand-muted` | The pale fill behind brand-coloured text: a selected enum pill, a produced page's tag, a completed step | The `--primary` tint it replaced: `bg-primary/10`, or `bg-primary/15` for a completed step |
+| `--brand-muted-foreground` | Text and icons on that fill: the pill's checkmark, the tag, the step's number | `--brand`, then `--primary` |
+
+- **Why they exist.** `--primary` is the button colour, and a page branded by a person can carry any button colour they picked: an amber or a pale yellow is a good fill and unreadable as text, and a faint outline. So the button colour is only ever a solid fill (with the text on it in `--primary-foreground`), and everything else that wants the brand reads these. The `./brand` entry derives all three from a team's seed colours ([brand.md](brand.md) § "Three seed colours"): `--brand` and `--brand-muted-foreground` are its `accentInk`, which reads at 4.5:1 on the page and on the pale fill, and `--brand-muted` is its `accentFill`. `--brand` also paints a field's focus border, and its focus ring at 40%, so the button colour never outlines a field. What the derivation guarantees there is only the ink's contrast with the page it was derived for, at least 4.5:1, so the border reads at 3:1 or more against that page around the field. It does not measure the field's own surface (`--input`) where that differs from the page, nor the translucent ring: those are the host's to check.
+- **What a host defines.** Set each to its role for each theme, on the same scope as the other tokens and restated under `.dark`: the roles `deriveBrandRoles` returns for the light page, and under `.dark` the ones it returns for the dark page. Each is a whole colour, like every token. A host may define some and not others: an undefined one falls back as the table says.
+- **A host that defines none renders as it did.** Each class carries the expression it replaced as its fallback, `var(--brand, var(--primary, hsl(240 5.9% 10%)))` for text and the focus border, and `var(--brand-muted, color-mix(in oklab, var(--primary, hsl(240 5.9% 10%)) 10%, transparent))` for a fill, the tint Tailwind writes for `bg-primary/10`. Defining one of them in `theme.css` would win over that fallback for every host loading the file, which is why none is there.
+- **They need nothing from a Tailwind host's theme.** The classes are arbitrary values (`text-[color:var(--brand,var(--primary,…))]`, `bg-[color:var(--brand-muted,color-mix(…))]`), not `text-brand` or `bg-brand-muted` utilities, so any Tailwind v4 build that scans the package's `dist` generates them, whatever `--color-*` keys that build's theme maps.
+
+A selected pill keeps the button colour in its border (`border-primary/40`), so the selected state still carries it, while its fill and checkmark are the accent's pair. `scripts/assert-bundle.mjs` lists the three as optional tokens: every read of one must fall back to what its row says, in source and in the built sheet, the chain must end at a token `theme.css` defines, `theme.css` must not define any of them, and this page must name each.
+
 ## Host setup
 
 ### A host that runs Tailwind (the common case)
