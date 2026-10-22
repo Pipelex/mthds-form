@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [v0.20.0] - 2026-10-22
+
+### Highlights
+
+- **A file field can take a file the team already has.** Given a file source, every empty file field offers "Choose from your team's files", which writes the chosen file exactly as an upload would.
+- **A form can be filled from one of the method's examples.** Given an example source, `MethodForm` offers "Fill with an example", which sets every value at once, asks before replacing what the person entered, and never starts a run.
 
 ### Added
 
