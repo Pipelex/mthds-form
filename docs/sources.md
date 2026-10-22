@@ -10,41 +10,44 @@ The kernel states the shapes (`src/core/sources.ts`, exported from `.` and re-ex
 ```tsx
 import { MethodForm, useMethodForm, type ExampleSource, type FileSource } from '@pipelex/mthds-form/react';
 
-const fileSource: FileSource = {
-  initialScope: 'mine',
-  list: async ({ search, scope, mediaTypes, cursor, signal }) => {
-    const page = await host.listFiles({ search, scope, mediaTypes, cursor }, { signal });
-    return {
-      files: page.items.map((item) => ({
-        id: item.id,
-        url: item.uri,
-        name: item.filename,
-        mediaType: item.media_type,
-        size: item.size,
-        kind: item.is_test ? 'test' : item.kind,
-        createdAt: item.created_at,
-        origin: item.origin_label,
-      })),
-      nextCursor: page.next_cursor,
-    };
-  },
-};
+function RunForm({ descriptor, contract, methodId, canEdit }: RunFormProps) {
+  const fileSource: FileSource = {
+    initialScope: 'mine',
+    list: async ({ search, scope, mediaTypes, cursor, signal }) => {
+      const page = await host.listFiles({ search, scope, mediaTypes, cursor }, { signal });
+      return {
+        files: page.items.map((item) => ({
+          id: item.id,
+          url: item.uri,
+          name: item.filename,
+          mediaType: item.media_type,
+          size: item.size,
+          kind: item.is_test ? 'test' : item.kind,
+          createdAt: item.created_at,
+          origin: item.origin_label,
+        })),
+        nextCursor: page.next_cursor,
+      };
+    },
+  };
 
-const exampleSource: ExampleSource = {
-  list: async ({ cursor, signal }) => {
-    const page = await host.listExamples(methodId, { cursor }, { signal });
-    return { examples: page.items, nextCursor: page.next_cursor };
-  },
-  // Given only to a person allowed to change the method's examples.
-  rename: canEdit ? (example, name) => host.renameExample(example.id, name) : undefined,
-  delete: canEdit ? (example) => host.deleteExample(example.id) : undefined,
-  hideWhenEmpty: !canEdit,
-};
+  const exampleSource: ExampleSource = {
+    list: async ({ cursor, signal }) => {
+      const page = await host.listExamples(methodId, { cursor }, { signal });
+      return { examples: page.items, nextCursor: page.next_cursor };
+    },
+    // Given only to a person allowed to change the method's examples.
+    rename: canEdit ? (example, name) => host.renameExample(example.id, name) : undefined,
+    delete: canEdit ? (example) => host.deleteExample(example.id) : undefined,
+    hideWhenEmpty: !canEdit,
+  };
 
-const form = useMethodForm({ descriptor, contract, uploadFile, fileSource, exampleSource });
+  const form = useMethodForm({ descriptor, contract, uploadFile, fileSource, exampleSource });
+  return <MethodForm form={form} />;
+}
 ```
 
-Both are read on every render, so a host may build them inline; a `list` is called again only when the sheet asks for a page.
+Both are read on every render, so a host may build them inline. A file source's `list` is called only when its sheet asks for a page. So is an example source's, except under `hideWhenEmpty`: the form then also reads the first page in the background, as it mounts and again each time the examples close, to learn whether there is an example to offer (see "The example source" below).
 
 ## The file source
 
@@ -88,7 +91,7 @@ The row's second line joins what is known, in that order: "Test file · PDF · 3
 
 - **An empty file field** shows "Choose from your team's files" as a full-width row under its own controls, the dropzone and the link. Like the dropzone it is there only while the field holds no file, and it is shut while a file is arriving. Its accessible name carries the field's label.
 - **A field whose only way in is the team's files.** A file source is a way into a file value of its own, so a host may offer only the files it stores: no `onDropFile` and `allowUrl` set to `false`. The field then shows its format hint and the row, which its label names, and nothing about uploading or pasting. Without a file source, that configuration is still a host's error, and the field throws ([upload-seam.md](upload-seam.md)).
-- **A list of files** (a list whose item is a document or an image) also shows the row under Add item, and its sheet takes several files at once. The files fill the rows the person added and left empty first, then follow the last row, so a bounded list's room is its bound less the files it holds (`roomForChosenFiles`), not less its rows. The row is shut while a file is arriving anywhere in the list, as the remove buttons are, since the row that file will be written back to is still empty. Each empty row of the list still offers its own, which fills that row with whatever is chosen: the duplicate check belongs to the list's sheet, so a row's own sheet may put in a file the list already holds, as dropping or pasting the same file twice may. A list of structures that hold files has no list-level row, because a file is not a structure: each nested file field offers its own.
+- **A list of files** (a list whose item is a document or an image) also shows the row under Add item, and its sheet takes several files at once. The files fill the rows the person added and left empty first, then follow the last row, so a bounded list's room is its bound less the files it holds (`roomForChosenFiles`), not less its rows. A choice spends that room only on the files it adds (`chosenFilesAdded`): a file the list already holds, chosen again, takes none, and neither does a second row naming a file already chosen. The row is shut while a file is arriving anywhere in the list, as the remove buttons are, since the row that file will be written back to is still empty. Each empty row of the list still offers its own, which fills that row with whatever is chosen: the duplicate check belongs to the list's sheet, so a row's own sheet may put in a file the list already holds, as dropping or pasting the same file twice may. A list of structures that hold files has no list-level row, because a file is not a structure: each nested file field offers its own.
 - **Upload a file**, offered when the person has no file of the field's formats, closes the sheet and opens the field's own file dialog. It is offered only where the field can upload, so the list-level sheet, which has no single field to upload into, never offers it.
 
 ### The sheet
@@ -101,7 +104,7 @@ Use writes the choice and closes the sheet. Closing it any other way (the close 
 
 ### What a choice writes
 
-A single field is written `{ url, filename }` through its own `onChange`, the value an upload's result writes, and a typed link or the preview of an earlier dropped file is left behind as it would be by an upload. A list takes one row per chosen file through `addChosenFiles`: its empty rows first, in order, then new rows after the last. It never writes an address the list already holds and never writes one address twice. These functions are the kernel's (`sourceFileValue`, `addChosenFiles`, `roomForChosenFiles`), so the rules are tested in node and a host rendering its own control can apply the same ones.
+A single field is written `{ url, filename }` through its own `onChange`, the value an upload's result writes, and a typed link or the preview of an earlier dropped file is left behind as it would be by an upload. A list takes one row per chosen file through `addChosenFiles`: its empty rows first, in order, then new rows after the last. It never writes an address the list already holds and never writes one address twice. These functions are the kernel's (`sourceFileValue`, `addChosenFiles`, `roomForChosenFiles`, `chosenFilesAdded`), so the rules are tested in node and a host rendering its own control can apply the same ones.
 
 ## The example source
 

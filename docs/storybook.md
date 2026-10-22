@@ -63,7 +63,7 @@ The gallery pins an image model explicitly (`options = { model = "$gen-image-tes
 
 ### The host's rows
 
-`Inputs/Team Files and Examples` renders the corpus's descriptors with a file source and an example source answering from rows written in the story file. Those rows are not a fixture of the standard: they are a host's own records (a team's files, a method's saved examples), which no projection of a method produces, so there is nothing to generate them from. Everything the form derives still comes from the corpus. A sheet covers the whole page, so each story that opens one opens it in the light pane only, and leaves it open so the accessibility check reads it.
+`Inputs/Team Files and Examples` renders the corpus's descriptors with a file source and an example source answering from rows written in the story file. Those rows are not a fixture of the standard: they are a host's own records (a team's files, a method's saved examples), which no projection of a method produces, so there is nothing to generate them from. Everything the form derives still comes from the corpus. A sheet covers the whole page, so each story that opens one opens it in the light pane only, and most leave it open so the accessibility check reads it. These end elsewhere, and the check reads what they end on: `Use a team file` and `Fill an untouched form` close their sheet by using what they chose, so the check reads the form holding it, and `Replace what you entered?` ends on its question, so the check reads that alert dialog over the sheet.
 
 ### Files, and the one payload the corpus cannot produce
 

@@ -25,17 +25,18 @@ A third way into a file value sits beside these two: a file the host already sto
 
 ## Which ways into a file value a host offers
 
-A file value has two ways in, and each is offered exactly when the host can honour it:
+Each way into a file value is offered exactly when the host can honour it, and each is independent of the others:
 
 - **An upload**, offered exactly when the host supplies `onDropFile`. The presence of the callback is the capability; there is no second flag to keep in agreement with it.
 - **A link**, offered unless the host sets `allowUrl` to `false`.
+- **A stored file**, offered exactly when the form has a file source (`FieldEnv.fileSource`, [sources.md](sources.md)): "Choose from your team's files", a row under whatever else the empty field shows. It changes nothing about the upload or the link beside it.
 
-| `onDropFile` | `allowUrl` | What the control renders |
-| --- | --- | --- |
-| supplied | absent or `true` | The dropzone, and the "paste a URL instead" toggle under it. |
-| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. |
-| absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. |
-| absent | `false` | **A host's configuration error**, unless the form has a file source ([sources.md](sources.md)), which is a way in of its own: the field then offers only the team's files. Without one, the control throws while rendering, naming the field's id path. |
+| `onDropFile` | `allowUrl` | What the control renders | With a `fileSource` as well |
+| --- | --- | --- | --- |
+| supplied | absent or `true` | The dropzone, and the "paste a URL instead" toggle under it. | The same, and the team's files under them. |
+| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. | The dropzone, and the team's files under it. |
+| absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. | The same, and the team's files under them. |
+| absent | `false` | **A host's configuration error**: the control throws while rendering, naming the field's id path. | **The team's files only**, the one way in left, which is not an error. |
 
 The link-only row is a fix. A file field used to render an armed dropzone whatever the host supplied, so a host with no upload path got a control that opened the file picker, took the file, handed it to a callback that did nothing and stayed empty with nothing said; a required field then kept the run shut with no reason given. A disabled dropzone with a message was the other option and was rejected, because a disabled dropzone reads as "busy, try again", which is what the control shows during an upload, and it would still advertise a way in that does not exist.
 
