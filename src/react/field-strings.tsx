@@ -180,6 +180,105 @@ export interface FieldStrings {
   incompleteField: string;
   /** What a file field says when the host's `uploadFile` rejected its file. */
   uploadFailed: string;
+
+  // The file source (docs/sources.md): the row under a file field's controls
+  // and the sheet it opens.
+  /** The row under a file field's own controls that opens the team's files. */
+  chooseFromSource: string;
+  /**
+   * That row's accessible name, given the field's label as the form shows it,
+   * so each file field's row says which field it fills. It must contain the
+   * row's visible words, which a voice-control user says to press it.
+   */
+  chooseFromSourceAria: (label: string) => string;
+  /** The sheet's title. */
+  filePickerTitle: string;
+  /** The line under the title, given the field's formats as the hint names them (`PDF`, `JPG`). */
+  filePickerTakes: (formats: readonly string[]) => string;
+  /** The search's visually hidden label, and its placeholder. */
+  filePickerSearch: string;
+  filePickerSearchPlaceholder: string;
+  /** The Mine and Everyone switch: its accessible name and its two choices. */
+  filePickerScope: string;
+  filePickerMine: string;
+  filePickerEveryone: string;
+  /**
+   * The sheet's one primary button, given how many files are chosen and, when
+   * one is, its name: "Use INV-2291.pdf", "Use 3 files", and with none chosen,
+   * the words it shows while it is disabled.
+   */
+  filePickerUse: (count: number, name: string | undefined) => string;
+  /** Announced while the first page is read. */
+  filePickerLoading: string;
+  /** The first page could not be read. Try again follows it. */
+  filePickerFailed: string;
+  /** The search matched nothing, said once the list has ended. Clear search follows it. */
+  filePickerNoMatch: string;
+  filePickerClearSearch: string;
+  /** The whole team holds no file of the field's formats. */
+  filePickerNoneTeam: (formats: readonly string[]) => string;
+  /** The person holds no file of the field's formats. Show everyone's follows it. */
+  filePickerNoneMine: (formats: readonly string[]) => string;
+  filePickerShowEveryone: string;
+  /** Closes the picker on the field's own upload, from an empty list. */
+  filePickerUpload: string;
+  /** Announced once rows are shown: how many. */
+  filePickerShown: (count: number) => string;
+  /** What leads a test file's second line, in place of a chip. */
+  testFile: string;
+  /** A file's size on its row: `340 KB`. */
+  fileSize: (bytes: number) => string;
+  /** When a file was stored, on its row: "Today, 10:42", "Yesterday", "17 Oct". */
+  fileDate: (date: Date) => string;
+
+  // The example source (docs/sources.md): "Fill with an example" and its list.
+  /** The control that opens the method's examples. */
+  fillWithExample: string;
+  /** The examples sheet's title, and the line under it. */
+  examplesTitle: string;
+  examplesHint: string;
+  /** Announced while the first page is read. */
+  examplesLoading: string;
+  /** The examples could not be read. Try again follows it. */
+  examplesFailed: string;
+  /** The method has no example yet. */
+  examplesNone: string;
+  /** Announced once rows are shown: how many. */
+  examplesShown: (count: number) => string;
+  /** The question asked before an example replaces what the person entered. */
+  replaceEnteredTitle: string;
+  /** What it says under the question, given the example's name. */
+  replaceEnteredDescription: (name: string) => string;
+  replaceEnteredConfirm: string;
+  /** The accessible name of an example row's menu, given the example's name. */
+  exampleActions: (name: string) => string;
+  renameExample: string;
+  deleteExample: string;
+  /** The rename dialog: its title, the name field's label, and its button while it works. */
+  renameExampleTitle: string;
+  exampleName: string;
+  renaming: string;
+  /** The rename failed; the dialog stays open with the new name, and Save becomes Try again. */
+  renameFailed: string;
+  /** The question asked before deleting, given the example's name, and what it says under it. */
+  deleteExampleTitle: (name: string) => string;
+  deleteExampleDescription: string;
+  deleting: string;
+  /** The delete failed; the question stays open, and Delete becomes Try again. */
+  deleteFailed: string;
+
+  // What both lists share.
+  /** Closes a sheet or a dialog. */
+  close: string;
+  cancel: string;
+  save: string;
+  tryAgain: string;
+  /** Reads the next page of a list. */
+  showMore: string;
+  /** Said beside the wait for the next page. */
+  loadingMore: string;
+  /** The next page could not be read; the rows already shown stay. Try again follows it. */
+  loadMoreFailed: string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

@@ -2,6 +2,8 @@
 
 `make storybook` (or `make st`) serves the stories on port 6006; `make build-storybook` produces the static build. The stories also run as tests — `make test` executes them in headless Chromium as a third vitest project — so a story is regression coverage whether or not anyone opens it.
 
+None of the three reports to Storybook's telemetry service: `.storybook/main.ts` sets `core.disableTelemetry`, because no test or CI run of this repository sends usage telemetry, and Storybook ignores the `DO_NOT_TRACK` variable that CI sets for every other tool. Without the flag, the story project alone would report a `test-run` event on every `make test`. `src/__stories__/__tests__/storybook-config.test.ts` fails if the flag is dropped.
+
 ## What it is for, and what it is not
 
 The `src/react/__tests__/` suites already assert the DOM facts: an input has an accessible name, a button is disabled mid-upload, a value round-trips. Those are the assertions that belong in jsdom, and Storybook does not repeat them.
@@ -14,7 +16,7 @@ Four, mirroring what the package is:
 
 | Section        | What is in it                                                                                                                                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Inputs**     | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). The controls a finger taps, at a phone's width and a desktop's (`On a Phone`). |
+| **Inputs**     | Every input kind in isolation (`Scalars`, `Files`, `Unknown`), the state axis on a representative concept (`Field States`), and composition — deep nesting, lists of objects, files in a list (`Nesting`). The controls a finger taps, at a phone's width and a desktop's (`On a Phone`). The host's sources, a team's files and a method's examples, in each of their states and as a bottom sheet on a phone and a dialog on a desktop (`Team Files and Examples`). |
 | **Outputs**    | A pipe's result, rendered read-only from its output descriptor: a scalar, a flat structure, a nested one, a plural result, and an absent one. The controls a finger taps, at a phone's width and a desktop's (`On a Phone`). |
 | **Generative** | Every captured layout, rendered through `./generative` over the descriptor it was written for — and the pinned one again under each brand's tokens.                                                        |
 | **Toolchain**  | The pieces that need no descriptor — currently the concept pill across all nine categories.                                                                                                                |
@@ -58,6 +60,10 @@ The gallery pins an image model explicitly (`options = { model = "$gen-image-tes
 `Outputs/Stacked tables` renders tables under `tableLayout="stack"`, at an exact 343px (what a 375px phone leaves) and an exact 720px, since the layout answers to the table's own width. It draws on three corpora, the clauses and links here, the checklist, readings and empty list of `lists`, and the long plan, nested company and media report of `results`, and raises the budget on the readings to reach six, seven and twelve columns. Its assertions read computed styles, because whether a table stacked is what the container query answered, not what a class asked for. See [result-view.md](result-view.md) § "A table that never scrolls sideways".
 
 `Inputs/On a Phone` and `Outputs/On a Phone` hold every control a finger taps to 44 by 44 pixels below `sm`: a list of documents with long names, a structure's optional fields and a switch, a report with a document and figures, a text, and rows that open, both as blocks and in a table that scrolls. They pin the VIEWPORT, not a panel's width, because the controls grow at a viewport breakpoint, through the helpers in `src/__stories__/touch-target.ts`: `pinnedTo('phone')` sets a 375px viewport and `pinnedTo('desktop')` a 1280px one, and `expectTouchTarget` measures a control's hit area (its box, joined with an absolutely placed `::after` when it has one) and taps just inside each edge with `document.elementFromPoint`, so an area something covers or clips fails. `expectClearOf` shows an area stops short of the control or input beside it. Each phone story has a desktop twin asserting the sizes the controls had before, since the phone rules must not reach a desktop.
+
+### The host's rows
+
+`Inputs/Team Files and Examples` renders the corpus's descriptors with a file source and an example source answering from rows written in the story file. Those rows are not a fixture of the standard: they are a host's own records (a team's files, a method's saved examples), which no projection of a method produces, so there is nothing to generate them from. Everything the form derives still comes from the corpus. A sheet covers the whole page, so each story that opens one opens it in the light pane only, and most leave it open so the accessibility check reads it. These end elsewhere, and the check reads what they end on: `Use a team file` and `Fill an untouched form` close their sheet by using what they chose, so the check reads the form holding it, and `Replace what you entered?` ends on its question, so the check reads that alert dialog over the sheet.
 
 ### Files, and the one payload the corpus cannot produce
 

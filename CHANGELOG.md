@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.20.0] - 2026-10-22
+
+### Highlights
+
+- **A file field can take a file the team already has.** Given a file source, every empty file field offers "Choose from your team's files", which writes the chosen file exactly as an upload would.
+- **A form can be filled from one of the method's examples.** Given an example source, `MethodForm` offers "Fill with an example", which sets every value at once, asks before replacing what the person entered, and never starts a run.
+
+### Added
+
+- **A team's files, chosen into a file field**: `useMethodForm` takes an optional `fileSource`, and `FieldEnv` carries it as `fileSource` for a host rendering its own form. With one, every empty file field offers "Choose from your team's files" under its own controls, opening "Your team's files", a bottom sheet below 1280px and a dialog from 1280px, with a search, a Mine and Everyone switch whose starting side the host chooses, the field's accepted media types as the query's filter, and pages the host cuts. A chosen file is written as `{ url, filename }`, exactly as an upload's result is; a list of files takes several at once, into its empty rows first, and never the same file twice. A host may offer the team's files as a field's only way in. The source's shapes (`FileSource`, `SourceFile` and their query and page) and the write rules (`sourceFileValue`, `addChosenFiles`, `roomForChosenFiles`, `chosenFilesAdded`) are exported from `.`, and the sheet as `FilePicker` and `FilePickerEntry` from `./react`. Without a file source nothing changes. See [docs/sources.md](docs/sources.md).
+- **A method's examples, filled into the whole form**: `useMethodForm` takes an optional `exampleSource`, and `MethodForm` then offers "Fill with an example" above the fields, which sets every value from an example's inputs and never starts a run. A form the person has worked on is asked "Replace what you entered?" first. A row's menu renames and deletes an example when the host gives those capabilities, and `hideWhenEmpty` leaves the control out while the method has none. The control is exported as `FillWithExample` for a host holding its own values. See [docs/sources.md](docs/sources.md).
+- **`touched`, `resets`, `runValuesFromInputs` and `sameRunValues`**: `useMethodForm` reports `touched`, whether the form holds values that would send a different run from the ones it was last given or a file still arriving. `runValuesFromInputs` reads a run's inputs back into the controls' shape, and `sameRunValues` compares two sets of values by the run they would send. It also reports `resets`, how many times `reset` has run, and `MethodForm` remounts its fields on each, so nothing a control kept for the values a reset replaced (the preview of a file still arriving, a failed drop) outlives them. See [docs/method-form.md](docs/method-form.md).
+
+### Changed
+
+- **`FieldStrings` gains the keys of the file and example sources (Breaking)**: the team's files' row and sheet, `chooseFromSource`, `chooseFromSourceAria`, `filePickerTitle`, `filePickerTakes`, `filePickerSearch`, `filePickerSearchPlaceholder`, `filePickerScope`, `filePickerMine`, `filePickerEveryone`, `filePickerUse`, `filePickerLoading`, `filePickerFailed`, `filePickerNoMatch`, `filePickerClearSearch`, `filePickerNoneTeam`, `filePickerNoneMine`, `filePickerShowEveryone`, `filePickerUpload`, `filePickerShown`, `testFile`, `fileSize` and `fileDate`; the examples, `fillWithExample`, `examplesTitle`, `examplesHint`, `examplesLoading`, `examplesFailed`, `examplesNone`, `examplesShown`, `replaceEnteredTitle`, `replaceEnteredDescription`, `replaceEnteredConfirm`, `exampleActions`, `renameExample`, `deleteExample`, `renameExampleTitle`, `exampleName`, `renaming`, `renameFailed`, `deleteExampleTitle`, `deleteExampleDescription`, `deleting` and `deleteFailed`; and the words both share, `close`, `cancel`, `save`, `tryAgain`, `showMore`, `loadingMore` and `loadMoreFailed`. English and French are supplied; a host that supplies a complete `FieldStrings` rather than a partial override adds them.
+- **This repository's Storybook sends no telemetry**: `make test`, `make storybook` and `make build-storybook` no longer report usage to Storybook's telemetry service, because `.storybook/main.ts` sets `core.disableTelemetry`, and every CI workflow sets `DO_NOT_TRACK=1` for the other tools that honour it. The package itself is unchanged. See [docs/storybook.md](docs/storybook.md).
+
 ## [v0.19.0] - 2026-10-19
 
 ### Changed

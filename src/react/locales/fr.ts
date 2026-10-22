@@ -15,6 +15,7 @@
  * fails the build here until it is translated.
  */
 import type { FieldStrings } from '../field-strings';
+import { calendarDaysBefore, inCurrentYear } from './calendar';
 
 // Plurals and sizes come from the platform's `Intl`, not from hand-written rules: it knows French
 // (zero and one take the singular, `ko` and `Mo`, a decimal comma, a narrow no-break space before
@@ -33,6 +34,25 @@ const MEGABYTES = new Intl.NumberFormat('fr-FR', {
   unitDisplay: 'short',
   maximumFractionDigits: 1,
 });
+
+// Lists and dates come from `Intl` too: "PDF, JPG et PNG", "17 oct.", a time on the 24-hour clock.
+const AND = new Intl.ListFormat('fr', { type: 'conjunction' });
+const OR = new Intl.ListFormat('fr', { type: 'disjunction' });
+const TIME = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+const DAY_YEAR = new Intl.DateTimeFormat('fr-FR', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/** « Aujourd’hui, 10:42 », « Hier », « 17 oct. », or « 17 oct. 2025 » for another year. */
+function formatFileDate(date: Date): string {
+  const days = calendarDaysBefore(date);
+  if (days === 0) return `Aujourd’hui, ${TIME.format(date)}`;
+  if (days === 1) return 'Hier';
+  return inCurrentYear(date) ? DAY.format(date) : DAY_YEAR.format(date);
+}
 
 /** The noun agreeing with `count`, by French plural rules. */
 function plural(count: number, one: string, other: string): string {
@@ -115,4 +135,65 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   requiredField: 'Obligatoire',
   incompleteField: 'Incomplet\u00a0: remplissez ses champs obligatoires',
   uploadFailed: 'Ce fichier n’a pas pu être envoyé. Réessayez.',
+  chooseFromSource: 'Choisir parmi les fichiers de l’équipe',
+  chooseFromSourceAria: (label) =>
+    label
+      ? `Choisir parmi les fichiers de l’équipe pour ${label}`
+      : 'Choisir parmi les fichiers de l’équipe',
+  filePickerTitle: 'Les fichiers de l’équipe',
+  filePickerTakes: (formats) =>
+    `Fichiers ${AND.format(formats)} uniquement, ceux que cette entrée accepte`,
+  filePickerSearch: 'Rechercher des fichiers',
+  filePickerSearchPlaceholder: 'Rechercher par nom',
+  filePickerScope: 'Quels fichiers',
+  filePickerMine: 'Les miens',
+  filePickerEveryone: 'Toute l’équipe',
+  filePickerUse: (count, name) => {
+    if (count === 0) return 'Choisissez un fichier';
+    if (count === 1 && name) return `Utiliser ${name}`;
+    return `Utiliser ${count} ${plural(count, 'fichier', 'fichiers')}`;
+  },
+  filePickerLoading: 'Chargement de vos fichiers…',
+  filePickerFailed: 'Impossible de charger vos fichiers.',
+  filePickerNoMatch: 'Aucun fichier ne correspond.',
+  filePickerClearSearch: 'Effacer la recherche',
+  filePickerNoneTeam: (formats) => `L’équipe n’a encore aucun fichier ${OR.format(formats)}.`,
+  filePickerNoneMine: (formats) =>
+    `Vous n’avez encore ni ajouté ni créé de fichier ${OR.format(formats)}.`,
+  filePickerShowEveryone: 'Voir ceux de l’équipe',
+  filePickerUpload: 'Envoyer un fichier',
+  filePickerShown: (count) => `${count} ${plural(count, 'fichier', 'fichiers')}`,
+  testFile: 'Fichier de test',
+  fileSize: formatBytes,
+  fileDate: formatFileDate,
+  fillWithExample: 'Remplir avec un exemple',
+  examplesTitle: 'Exemples',
+  examplesHint: 'En choisir un remplit le formulaire. Rien ne s’exécute avant que vous le lanciez.',
+  examplesLoading: 'Chargement des exemples…',
+  examplesFailed: 'Impossible de charger les exemples.',
+  examplesNone:
+    'Aucun exemple pour le moment. Lancez-le, puis enregistrez l’exécution comme exemple.',
+  examplesShown: (count) => `${count} ${plural(count, 'exemple', 'exemples')}`,
+  replaceEnteredTitle: 'Remplacer ce que vous avez saisi\u00a0?',
+  replaceEnteredDescription: (name) =>
+    `Remplir le formulaire avec «\u00a0${name}\u00a0» remplace toutes ses valeurs.`,
+  replaceEnteredConfirm: 'Remplacer',
+  exampleActions: (name) => `Actions pour ${name}`,
+  renameExample: 'Renommer',
+  deleteExample: 'Supprimer',
+  renameExampleTitle: 'Renommer l’exemple',
+  exampleName: 'Nom',
+  renaming: 'Renommage…',
+  renameFailed: 'Impossible de renommer l’exemple.',
+  deleteExampleTitle: (name) => `Supprimer «\u00a0${name}\u00a0»\u00a0?`,
+  deleteExampleDescription: 'Cette action est irréversible.',
+  deleting: 'Suppression…',
+  deleteFailed: 'Impossible de supprimer l’exemple.',
+  close: 'Fermer',
+  cancel: 'Annuler',
+  save: 'Enregistrer',
+  tryAgain: 'Réessayer',
+  showMore: 'Afficher plus',
+  loadingMore: 'Chargement de la suite…',
+  loadMoreFailed: 'Impossible de charger la suite.',
 };

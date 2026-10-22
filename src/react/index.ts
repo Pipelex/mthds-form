@@ -33,6 +33,29 @@ export type {
 } from './method-form';
 export { MethodForm, useMethodForm } from './method-form';
 
+// The two optional host seams beside the upload, as controls. A form given a
+// file source offers the team's files on every file field (`FieldEnv.fileSource`
+// carries it to each), and one given an example source offers "Fill with an
+// example". `MethodForm` mounts both from `useMethodForm`'s options; these are
+// for a host that renders its own form around `FieldRenderer`. The seams'
+// shapes are re-exported from the core entry, where a host's server reads them
+// too. See docs/sources.md.
+export type {
+  ExampleSource,
+  ExampleSourcePage,
+  ExampleSourceQuery,
+  FileSource,
+  FileSourcePage,
+  FileSourceQuery,
+  FileSourceScope,
+  FormExample,
+  SourceFile,
+} from '../core';
+export type { FilePickerEntryProps, FilePickerProps } from './file-picker';
+export { FilePicker, FilePickerEntry } from './file-picker';
+export type { FillWithExampleProps } from './example-fill';
+export { FillWithExample } from './example-fill';
+
 export type { ResultFieldProps } from './result-field';
 export { ResultField } from './result-field';
 

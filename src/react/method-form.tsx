@@ -1,7 +1,14 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { PipeIOContract, PipeInputFormDescriptor, Readiness, RunField } from '../core';
+import type {
+  ExampleSource,
+  FileSource,
+  PipeIOContract,
+  PipeInputFormDescriptor,
+  Readiness,
+  RunField,
+} from '../core';
 import { buildRunFields } from '../core/derive';
 import { ownProp } from '../core/own-property';
 import {
@@ -15,7 +22,8 @@ import {
   optionalStructureOpen,
 } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures, seedInputs } from '../core/seed';
-import { apiInputsFromRunValues, setValueAtPath } from '../core/values';
+import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/values';
+import { FillWithExample } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
@@ -84,6 +92,21 @@ export interface UseMethodFormOptions {
    * it resolves to a bare URL, or omits the name, the file's own name is kept.
    */
   uploadFile?: (file: File, context: MethodFormUploadContext) => Promise<UploadedFile>;
+  /**
+   * Where a file field can take a file the host already stores. Its presence
+   * is the capability, as `uploadFile`'s is: every empty file field then offers
+   * "Choose from your team's files", and a list of files offers it for several
+   * at once. The choice is written as `{ url, filename }`, as an upload's
+   * result is. See docs/sources.md.
+   */
+  fileSource?: FileSource;
+  /**
+   * Where the form can take a saved example of the method. When given,
+   * `MethodForm` offers "Fill with an example" above the fields, which sets
+   * every value at once (as `reset` does) and never starts a run; a touched
+   * form asks before it replaces what was entered. See docs/sources.md.
+   */
+  exampleSource?: ExampleSource;
 }
 
 /** What the form says to its consumer: the values, the run inputs, the gate. */
@@ -106,6 +129,14 @@ export interface MethodFormState {
   ready: boolean;
   /** Whether `attempt` has been called since the last reset: required marks show. */
   attempted: boolean;
+  /**
+   * Whether the form holds work of the person's own: a value that sends a
+   * different run from the one it was given (its initial values as they stood
+   * at the first edit, or the last `reset`), or a file still arriving. A value typed and erased again, or an
+   * optional structure opened and left empty, sends the same run and does not
+   * count. "Fill with an example" asks before replacing a touched form.
+   */
+  touched: boolean;
 }
 
 /** The handle `useMethodForm` returns, and `MethodForm` renders. */
@@ -123,12 +154,23 @@ export interface MethodFormController extends MethodFormState {
    * empty shows its required mark, and answers whether the run may start.
    */
   attempt: () => boolean;
+  /**
+   * How many times `reset` has run. `MethodForm` keys its fields by it, so a
+   * reset remounts them and nothing a control kept for the values it replaced
+   * outlives them: the preview of a file still arriving, a refused drop, an
+   * open preview. A host rendering its own fields keys them the same way.
+   */
+  resets: number;
   /** Ids (value paths) with an upload in flight. Read by `MethodForm`. */
   uploadingIds: ReadonlySet<string>;
   /** Ids whose last upload failed. Read by `MethodForm`. */
   failedUploadIds: ReadonlySet<string>;
   /** The upload seam `MethodForm` hands its file fields, when the host uploads. */
   dropFile: ((id: string, file: File) => void) | undefined;
+  /** The host's file source, which `MethodForm` hands its file fields. */
+  fileSource: FileSource | undefined;
+  /** The host's example source, which `MethodForm` offers above the fields. */
+  exampleSource: ExampleSource | undefined;
 }
 
 const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
@@ -178,6 +220,8 @@ export function useMethodForm({
   order,
   initialValues,
   uploadFile,
+  fileSource,
+  exampleSource,
 }: UseMethodFormOptions): MethodFormController {
   // A joined key rather than the array, so an inline `order` literal does not
   // re-derive the fields on every render.
@@ -194,9 +238,16 @@ export function useMethodForm({
   }, [initialValues, fields]);
 
   const [edited, setEdited] = useState<MethodFormValues | null>(null);
+  // What the person's edits are measured against: the values of the last
+  // `reset`, or the initial values as they stood at the first edit since.
+  // `null` while nothing is edited, when the form shows the live initial
+  // values. Taken once, so a host changing its initial values later does not
+  // move it, and an edit stays the person's own. `touched` compares with it.
+  const [given, setGiven] = useState<MethodFormValues | null>(null);
   const [uploadingIds, setUploadingIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [failedUploadIds, setFailedUploadIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [attempted, setAttempted] = useState(false);
+  const [resets, setResets] = useState(0);
   // The upload each id is waiting on. A newer drop at the same id, or a reset,
   // replaces or forgets the entry, and the older upload's result is dropped.
   // Touched only from event handlers and upload callbacks, never in render.
@@ -206,17 +257,21 @@ export function useMethodForm({
   const values = edited ?? initial;
 
   const setValues = useCallback<MethodFormController['setValues']>(
-    (next) =>
-      setEdited((previous) => (typeof next === 'function' ? next(previous ?? initial) : next)),
+    (next) => {
+      setGiven((previous) => previous ?? initial);
+      setEdited((previous) => (typeof next === 'function' ? next(previous ?? initial) : next));
+    },
     [initial],
   );
 
   const reset = useCallback<MethodFormController['reset']>((next) => {
     pendingUploads.current.clear();
     setEdited(next ?? null);
+    setGiven(next ?? null);
     setUploadingIds(EMPTY_IDS);
     setFailedUploadIds(EMPTY_IDS);
     setAttempted(false);
+    setResets((count) => count + 1);
   }, []);
 
   const dropFile = useMemo(() => {
@@ -242,6 +297,7 @@ export function useMethodForm({
               typeof stored === 'string'
                 ? { url: stored, filename: file.name }
                 : { url: stored.url, filename: stored.filename ?? file.name };
+            setGiven((previous) => previous ?? initial);
             setEdited((previous) => setValueAtPath(previous ?? initial, path, value));
           },
           () => {
@@ -263,6 +319,10 @@ export function useMethodForm({
   );
   const uploading = uploadingIds.size > 0;
   const ready = readiness.ready === readiness.total && !uploading;
+  const touched = useMemo(
+    () => uploading || (edited !== null && given !== null && !sameRunValues(edited, given, fields)),
+    [uploading, edited, given, fields],
+  );
 
   const attempt = useCallback(() => {
     setAttempted(true);
@@ -277,12 +337,16 @@ export function useMethodForm({
     uploading,
     ready,
     attempted,
+    touched,
     setValues,
     reset,
     attempt,
+    resets,
     uploadingIds,
     failedUploadIds,
     dropFile,
+    fileSource,
+    exampleSource,
   };
 }
 
@@ -357,15 +421,36 @@ function MethodFormFields({
 }: MethodFormFieldsProps) {
   const s = useFieldStrings();
   const [showOptional, setShowOptional] = useState(false);
-  const { fields, values, setValues, attempted, uploadingIds, failedUploadIds, dropFile } = form;
+  const {
+    fields,
+    values,
+    setValues,
+    reset,
+    attempted,
+    touched,
+    resets,
+    uploadingIds,
+    failedUploadIds,
+    dropFile,
+    fileSource,
+    exampleSource,
+  } = form;
 
   const uploadErrors = useMemo(
     () => new Map([...failedUploadIds].map((id) => [id, s.uploadFailed] as const)),
     [failedUploadIds, s.uploadFailed],
   );
   const env = useMemo<FieldEnv>(
-    () => ({ disabled, onDropFile: dropFile, uploadingIds, uploadErrors, allowUrl, resolveUrl }),
-    [disabled, dropFile, uploadingIds, uploadErrors, allowUrl, resolveUrl],
+    () => ({
+      disabled,
+      onDropFile: dropFile,
+      uploadingIds,
+      uploadErrors,
+      allowUrl,
+      resolveUrl,
+      fileSource,
+    }),
+    [disabled, dropFile, uploadingIds, uploadErrors, allowUrl, resolveUrl, fileSource],
   );
 
   // The same disclosure the object control draws inside a structure, at the
@@ -405,9 +490,22 @@ function MethodFormFields({
 
   return (
     <div className={cn('space-y-6', className)}>
+      {exampleSource && (
+        <FillWithExample
+          source={exampleSource}
+          fields={fields}
+          touched={touched}
+          // Filling is a reset to the example's values: the attempt, the
+          // failed uploads and any upload in flight go with what was there.
+          onFill={(next) => reset(next)}
+          disabled={disabled}
+        />
+      )}
       {visible.map((field) => (
         <FieldRenderer
-          key={field.name}
+          // Remounted on each reset, so no control keeps what it held for the
+          // values the reset replaced (a file still arriving, a failed drop).
+          key={`${field.name}:${resets}`}
           field={field}
           id={field.name}
           value={ownProp(values, field.name)}

@@ -33,6 +33,14 @@ const config: StorybookConfig = {
   ],
   addons: ['@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-vitest'],
   framework: '@storybook/react-vite',
+  // No run of this Storybook reports to Storybook's telemetry service: not
+  // `make storybook`, not `make build-storybook`, and not `make test`, whose
+  // story project sends a `test-run` event on every vitest run unless this flag
+  // is set. Storybook ignores `DO_NOT_TRACK`, so the flag is the only switch
+  // that covers a contributor's machine as well as CI. It stays a plain object:
+  // the CLI reads `core.disableTelemetry` straight off this file, and
+  // `src/__stories__/__tests__/storybook-config.test.ts` holds it there.
+  core: { disableTelemetry: true },
   viteFinal: async (viteConfig) => {
     /**
      * Tailwind runs from the SOURCE entry here, not from the prebuilt

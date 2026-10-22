@@ -1,6 +1,6 @@
 'use client';
 
-import type { RunField } from '../core';
+import type { FileSource, RunField } from '../core';
 import { BooleanField } from './boolean-field';
 import { DateField } from './date-field';
 import { DocumentField, ImageField, type FileValue } from './file-field';
@@ -55,6 +55,14 @@ export interface FieldEnv {
   /** Resolve a `pipelex-storage://` URI to a browser-viewable URL (for previews
    *  of already-stored files). */
   resolveUrl?: (uri: string) => Promise<string | null>;
+  /**
+   * Where a file field can take a file the host already stores. Its presence
+   * is the capability, as `onDropFile`'s is: every empty file field then
+   * offers "Choose from your team's files", and a list of files offers it for
+   * several at once. The choice is written as `{ url, filename }`, exactly as
+   * an upload's result is. See docs/sources.md.
+   */
+  fileSource?: FileSource;
 }
 
 export interface FieldRendererProps {
@@ -157,6 +165,7 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           uploading={env?.uploadingIds?.has(id)}
           uploadError={env?.uploadErrors?.get(id)}
           resolveUrl={env?.resolveUrl}
+          fileSource={env?.fileSource}
           id={id}
           error={error}
           disabled={disabled}
@@ -173,6 +182,7 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           uploading={env?.uploadingIds?.has(id)}
           uploadError={env?.uploadErrors?.get(id)}
           resolveUrl={env?.resolveUrl}
+          fileSource={env?.fileSource}
           id={id}
           error={error}
           disabled={disabled}

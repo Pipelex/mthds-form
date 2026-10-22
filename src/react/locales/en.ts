@@ -3,12 +3,33 @@
  * locale falls back to (see `fieldStringsFor` in `./index.ts`).
  */
 import type { FieldStrings } from '../field-strings';
+import { calendarDaysBefore, inCurrentYear } from './calendar';
 
 /** `512 bytes`, `36 KB`, `1.4 MB` — binary multiples, as a file manager counts them. */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return bytes === 1 ? '1 byte' : `${bytes} bytes`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Lists and dates come from the platform's `Intl`, in British English, which
+// writes a date day first ("17 Oct") and a time on the 24-hour clock.
+const AND = new Intl.ListFormat('en-GB', { type: 'conjunction' });
+const OR = new Intl.ListFormat('en-GB', { type: 'disjunction' });
+const TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+const DAY_YEAR = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/** "Today, 10:42", "Yesterday", "17 Oct", or "17 Oct 2025" for another year. */
+function formatFileDate(date: Date): string {
+  const days = calendarDaysBefore(date);
+  if (days === 0) return `Today, ${TIME.format(date)}`;
+  if (days === 1) return 'Yesterday';
+  return inCurrentYear(date) ? DAY.format(date) : DAY_YEAR.format(date);
 }
 
 export const EN_FIELD_STRINGS: FieldStrings = {
@@ -74,4 +95,60 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   requiredField: 'Required',
   incompleteField: 'Incomplete: fill in its required fields',
   uploadFailed: 'This file could not be uploaded. Try again.',
+  chooseFromSource: "Choose from your team's files",
+  chooseFromSourceAria: (label) =>
+    label ? `Choose from your team's files for ${label}` : "Choose from your team's files",
+  filePickerTitle: "Your team's files",
+  filePickerTakes: (formats) => `Showing ${AND.format(formats)} files, which this input takes`,
+  filePickerSearch: 'Search files',
+  filePickerSearchPlaceholder: 'Search by name',
+  filePickerScope: 'Whose files',
+  filePickerMine: 'Mine',
+  filePickerEveryone: 'Everyone',
+  filePickerUse: (count, name) => {
+    if (count === 0) return 'Choose a file';
+    if (count === 1 && name) return `Use ${name}`;
+    return count === 1 ? 'Use 1 file' : `Use ${count} files`;
+  },
+  filePickerLoading: 'Loading your files…',
+  filePickerFailed: "Couldn't load your files.",
+  filePickerNoMatch: 'No files match.',
+  filePickerClearSearch: 'Clear search',
+  filePickerNoneTeam: (formats) => `Your team has no ${OR.format(formats)} files yet.`,
+  filePickerNoneMine: (formats) => `You haven't added or made any ${OR.format(formats)} files yet.`,
+  filePickerShowEveryone: "Show everyone's",
+  filePickerUpload: 'Upload a file',
+  filePickerShown: (count) => (count === 1 ? '1 file' : `${count} files`),
+  testFile: 'Test file',
+  fileSize: formatBytes,
+  fileDate: formatFileDate,
+  fillWithExample: 'Fill with an example',
+  examplesTitle: 'Examples',
+  examplesHint: 'Choosing one fills the form. Nothing runs until you run it.',
+  examplesLoading: 'Loading the examples…',
+  examplesFailed: "Couldn't load the examples.",
+  examplesNone: 'No examples yet. Run it, then save the run as an example.',
+  examplesShown: (count) => (count === 1 ? '1 example' : `${count} examples`),
+  replaceEnteredTitle: 'Replace what you entered?',
+  replaceEnteredDescription: (name) =>
+    `Filling the form with “${name}” replaces every value in it.`,
+  replaceEnteredConfirm: 'Replace',
+  exampleActions: (name) => `Actions for ${name}`,
+  renameExample: 'Rename',
+  deleteExample: 'Delete',
+  renameExampleTitle: 'Rename the example',
+  exampleName: 'Name',
+  renaming: 'Renaming…',
+  renameFailed: "Couldn't rename the example.",
+  deleteExampleTitle: (name) => `Delete “${name}”?`,
+  deleteExampleDescription: 'This cannot be undone.',
+  deleting: 'Deleting…',
+  deleteFailed: "Couldn't delete the example.",
+  close: 'Close',
+  cancel: 'Cancel',
+  save: 'Save',
+  tryAgain: 'Try again',
+  showMore: 'Show more',
+  loadingMore: 'Loading more…',
+  loadMoreFailed: "Couldn't load more.",
 };

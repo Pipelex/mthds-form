@@ -34,6 +34,20 @@ describe('FR_FIELD_STRINGS', () => {
       s.unsupportedFileType('PDF, PNG'),
       s.optionalFieldsCount(2),
       s.optionalInputsCount(2),
+      s.chooseFromSourceAria('Devis'),
+      s.filePickerTakes(['PDF', 'PNG']),
+      s.filePickerUse(0, undefined),
+      s.filePickerUse(1, 'a.pdf'),
+      s.filePickerUse(3, undefined),
+      s.filePickerNoneTeam(['PDF']),
+      s.filePickerNoneMine(['PDF', 'PNG']),
+      s.filePickerShown(2),
+      s.fileSize(2048),
+      s.fileDate(new Date('2025-03-14T10:00:00Z')),
+      s.examplesShown(2),
+      s.replaceEnteredDescription('Bureau de Paris'),
+      s.exampleActions('Bureau de Paris'),
+      s.deleteExampleTitle('Bureau de Paris'),
     ];
     for (const answer of answers) expect(answer.trim()).not.toBe('');
   });

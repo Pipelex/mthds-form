@@ -71,6 +71,8 @@ Submitting goes through the gate: `buildRunInputsSchema` → `prepareRunInputs` 
 
 A file field (`document` or `image`) carries `formats`, the formats its slot accepts, and the control's hint, file-picker filter and check all read that one list. A host whose upload path takes fewer types narrows the whole tree once with `narrowFileFormats(fields, mimeTypes)` and has its server check uploads against the same list. [docs/upload-seam.md](docs/upload-seam.md) is everything a file control and its host owe each other.
 
+Two more ways in are optional, and the host answers both: a **file source** lists files it already stores, so every empty file field offers "Choose from your team's files", and an **example source** lists the method's saved examples, so the form offers "Fill with an example". `useMethodForm` takes them beside `uploadFile`. See [docs/sources.md](docs/sources.md).
+
 The controls' own copy comes through `FieldStringsProvider`: `locale` picks a language pack (`fr`, `fr-FR`, `en`…, English when unknown) and `strings` overrides single keys on top. The field labels, helper lines and enum choices come from the method's own names and descriptions, never from the host:
 
 ```tsx
@@ -93,6 +95,7 @@ The controls carry Tailwind classes over the standard shadcn/ui semantic tokens 
 | [docs/wire-correspondence.md](docs/wire-correspondence.md) | the name-for-name wire ↔ `RunField` mapping |
 | [docs/method-form.md](docs/method-form.md) | the whole form of one method: `useMethodForm` and `MethodForm`, what they cover and what stays the host's |
 | [docs/upload-seam.md](docs/upload-seam.md) | what a file control and its host owe each other: accepted formats and narrowing them, write-back paths, previews, the file card |
+| [docs/sources.md](docs/sources.md) | the two optional host sources: a team's files, chosen into a file field, and a method's examples, filled into the whole form |
 | [docs/i18n.md](docs/i18n.md) | wording a form for its reader: the controls' strings, the French set and the locale switch |
 | [docs/derivation-swap.md](docs/derivation-swap.md) | the record of the swap to the wire descriptor — what changed, what survived |
 

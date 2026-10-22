@@ -34,6 +34,8 @@ function RunPanel() {
 | `order` | Input names to show first, in that order. The rest keep their descriptor order after them, and a name no input has is ignored. |
 | `initialValues` | What the form holds until its first edit. Absent, the method's seed (`seedInputs`). A function receives the seed and returns the values, for something the method cannot know, such as today's date. |
 | `uploadFile` | `(file, { id, path }) => Promise<string \| { url, filename? }>`: stores a file and resolves to its URL. Its presence is the capability; without it every file field is link-only, as [upload-seam.md](upload-seam.md) describes. |
+| `fileSource` | The host's stored files, listed a page at a time. Its presence is the capability: every empty file field then offers "Choose from your team's files", and a list of files offers it for several at once. See [sources.md](sources.md). |
+| `exampleSource` | The method's saved examples, with an optional rename and delete. Its presence is the capability: `MethodForm` then offers "Fill with an example" above the fields. See [sources.md](sources.md). |
 
 `initialValues` is read on every render until the first edit, and from the first edit the form owns its values. That is what lets a statically prerendered page seed today's date from the browser: the server render has no date, hydration supplies one, and the form shows the seed for that day until the person types. A restored run is the other common case: pass its values (from `runValuesFromStore`) and the form opens on them.
 
@@ -50,9 +52,12 @@ A different method is a different form. When the descriptor changes, remount wit
 | `uploading` | Whether an upload is still in flight. |
 | `ready` | Whether the run may start: every gating input filled and no upload in flight. |
 | `attempted` | Whether `attempt()` has been called since the last reset. |
+| `touched` | Whether the form holds work of the person's own: values that would send a different run from the ones it was last given (its initial values as they stood at the person's first edit, or the last `reset`), or a file still arriving. Initial values the host changes after that first edit move no baseline, so an edit stays the person's own even when the new initial values happen to match it. A value typed and erased again does not count. "Fill with an example" asks before replacing a touched form. Since `setValues` is how the person's edits arrive, a value a host writes through it counts as the person's too: a host that prefills the form gives the values through `initialValues` or `reset`, which are what the form was given. |
 | `setValues(next \| updater)` | Replaces the values, or updates them from the previous ones. |
 | `reset(values?)` | Goes back to `values`, or to the initial values, and forgets the attempt, the failed uploads and any upload still in flight, whose result is then dropped. |
+| `resets` | How many times `reset` has run. `MethodForm` keys its fields by it, so a reset remounts them and nothing a control kept for the values it replaced survives (the preview of a file still arriving, a refused drop, an open preview). A host rendering its own fields keys them the same way. |
 | `attempt()` | The run button's press: it marks the attempt and returns `ready`. |
+| `fileSource`, `exampleSource` | The sources the hook was given, which `MethodForm` hands its fields and mounts above them. |
 
 `ready` is the browser half of the run gate ([run-gate.md](run-gate.md)): readiness, the same predicates the server gate re-applies, plus the uploads, which only a browser has. The schema half, `gateRunInputs`, stays where it belongs, on the server: it carries ajv, which the `./react` entry never ships ([dependency-budget.md](dependency-budget.md)). A host that wants the schema verdict in the browser anyway calls it from the core entry over `rjsfDataFromRunValues(form.values, form.fields)`, and can show what it refuses through `MethodForm`'s `errors`.
 
@@ -64,13 +69,14 @@ A run button need not be greyed out until `ready`. A pressed button with somethi
 
 - **The top-level optional disclosure.** The empty optional inputs fold behind "+ N optional inputs", exactly as the empty optional fields of a structure fold behind "+ N optional fields", and closed optional structures fold with them. Expanding opens every closed optional structure with its seed; collapsing closes every one, so it leaves the run inputs ([architecture.md](architecture.md#optional-structures)). `foldOptional={false}` shows every input from the start; a closed optional structure still folds, because it has no control of its own and the disclosure is what opens it.
 - **The marks.** After `attempt()`, a gating input still empty is marked `requiredField` ("Required"), and an optional input that was started but is incomplete is marked `incompleteField`: a started structure owes its concept every required field. A message in `errors`, keyed by input name, replaces either.
+- **The host's sources.** With a file source, each empty file field offers the team's files under its own controls, and a chosen file is written as an upload's result is. With an example source, "Fill with an example" sits above the fields; filling is a `reset` to the example's values, asked about first when the form is `touched`, and never starts a run ([sources.md](sources.md)).
 - **The uploads.** A file dropped on a field goes to `uploadFile`; the field shows its busy state while the upload is in flight, then the stored file, or `uploadFailed` when the upload rejects. Dropping another file at the same field clears the failure, and the newest file at a field wins over an older one still in flight.
 
 Its props are the form's environment: `disabled` (while a run is in flight), `allowUrl` and `resolveUrl` (the upload seam's), `errors`, `foldOptional`, `className` for the stack the fields sit in, and three optional providers it mounts around the fields when given, `locale` and `strings` (`FieldStringsProvider`, [i18n.md](i18n.md)) and `presentation` (`FieldPresentationProvider`). Without them it reads the nearest providers above it.
 
 ## What stays the consumer's
 
-The run button and what it does, the panel and its layout, the run history, a heading or an introduction, the choice of method, where files are stored (`uploadFile`), how a stored reference previews (`resolveUrl`), and anything specific to one method: which slot takes only PDFs, which child is never sent, what order a team fills the inputs in. Those last three are `prepareFields` and `order`, so a host states them as data and the form applies them.
+The run button and what it does, the panel and its layout, the run history, a heading or an introduction, the choice of method, where files are stored (`uploadFile`), which stored files a person may choose from (`fileSource`, which only lists them: choosing one writes its reference into the form and changes no stored file), which examples a person may see, and whether they may rename or delete them (`exampleSource`), how a stored reference previews (`resolveUrl`), and anything specific to one method: which slot takes only PDFs, which child is never sent, what order a team fills the inputs in. Those last three are `prepareFields` and `order`, so a host states them as data and the form applies them.
 
 ## Relation to the story harness
 

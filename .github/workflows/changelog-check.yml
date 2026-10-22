@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+# No CI run sends usage telemetry.
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   check-changelog:
     name: Changelog Version Check
