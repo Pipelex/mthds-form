@@ -5,7 +5,7 @@
  * Close changing nothing, a list's choices added without duplicates and kept
  * through a search, and every state of the list.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
@@ -30,19 +30,32 @@ const ONE_DOCUMENT = artifacts('one_document');
 const MANY_FILES = artifacts('many_files');
 
 type HarnessProps = Partial<UseMethodFormOptions> &
-  Pick<UseMethodFormOptions, 'descriptor' | 'contract'> & { allowUrl?: boolean };
+  Pick<UseMethodFormOptions, 'descriptor' | 'contract'> & {
+    allowUrl?: boolean;
+    disabled?: boolean;
+  };
 
-function Harness({ allowUrl, ...options }: HarnessProps) {
+function Harness({ allowUrl, disabled, ...options }: HarnessProps) {
   const form = useMethodForm(options);
   return (
     <>
-      <MethodForm form={form} presentation="app" allowUrl={allowUrl} />
+      <MethodForm form={form} presentation="app" allowUrl={allowUrl} disabled={disabled} />
       <output data-testid="state">{JSON.stringify({ values: form.values })}</output>
     </>
   );
 }
 
 const values = () => JSON.parse(screen.getByTestId('state').textContent ?? '{}').values;
+
+beforeAll(() => {
+  // A dropped file's preview is an object URL, which jsdom does not make.
+  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
+  URL.revokeObjectURL = vi.fn();
+});
+
+/** Whether anything on the page paints the dropped file's local preview. */
+const paintsLocalPreview = (container: HTMLElement) =>
+  container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
 
 const INVOICE: SourceFile = {
   id: 'fl_1',
@@ -216,8 +229,9 @@ describe('the sheet over a list of files', () => {
     await waitFor(() =>
       expect(within(dialog).queryByRole('checkbox', { name: /INV-2291/ })).not.toBeInTheDocument(),
     );
+    // Found rather than got: the new search's rows arrive after its dim rows.
+    await user.click(await within(dialog).findByRole('checkbox', { name: /contract-acme-draft/ }));
     expect(source.queries.at(-1)?.search).toBe('contract');
-    await user.click(within(dialog).getByRole('checkbox', { name: /contract-acme-draft/ }));
     await user.click(within(dialog).getByRole('button', { name: S.filePickerUse(2, undefined) }));
     expect(values().attachments).toEqual([
       { url: INVOICE.url, filename: 'INV-2291.pdf' },
@@ -459,5 +473,48 @@ describe('a source the host builds inline', () => {
     rerender(<InlineSource list={list} render={3} />);
     expect(within(dialog).getByText('INV-2291.pdf')).toBeInTheDocument();
     expect(list).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a file written into a row whose own upload failed', () => {
+  it('leaves the failed upload behind: neither its preview nor its failure stays', async () => {
+    const user = userEvent.setup();
+    const uploadFile = vi.fn(async () => {
+      throw new Error('down');
+    });
+    const { container } = render(
+      <Harness {...MANY_FILES} uploadFile={uploadFile} fileSource={sourceOf([INVOICE])} />,
+    );
+    // The first list is the attachments; the fixture's other list is a gallery.
+    const [addAttachment] = screen.getAllByRole('button', { name: S.addItem });
+    if (!addAttachment) throw new Error('No Add item');
+    await user.click(addAttachment);
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error('No file input in the row');
+    await user.upload(input, new File(['%PDF-1.4'], 'mine.pdf', { type: 'application/pdf' }));
+    await screen.findByText(S.uploadFailed);
+
+    await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') }));
+    const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
+    await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
+    expect(values().attachments).toEqual([{ url: INVOICE.url, filename: 'INV-2291.pdf' }]);
+
+    expect(screen.queryByText(S.uploadFailed)).toBeNull();
+    await user.click(screen.getByRole('button', { name: S.preview }));
+    expect(paintsLocalPreview(container)).toBe(false);
+  });
+});
+
+describe('a form held shut while the sheet is open', () => {
+  it('closes the sheet and writes nothing', async () => {
+    const user = userEvent.setup();
+    const source = sourceOf([INVOICE]);
+    const { rerender } = render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
+    const dialog = await openPicker(user);
+    await user.click(await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ }));
+    rerender(<Harness {...ONE_DOCUMENT} fileSource={source} disabled />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(values().attachment).toBeUndefined();
   });
 });

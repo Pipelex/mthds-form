@@ -52,14 +52,18 @@ export interface SourcePages<T> {
 }
 
 interface PagesState<T> {
+  /** The key this state was read for. */
+  key: string | null;
   status: SourcePages<T>['status'];
   items: T[];
   cursor: string | null;
   more: SourcePages<T>['more'];
 }
 
-const IDLE: PagesState<never> = { status: 'idle', items: [], cursor: null, more: 'idle' };
-const LOADING: PagesState<never> = { status: 'loading', items: [], cursor: null, more: 'idle' };
+/** Where a list stands before its first page for `key` has arrived. */
+function startFor(key: string | null): PagesState<never> {
+  return { key, status: key === null ? 'idle' : 'loading', items: [], cursor: null, more: 'idle' };
+}
 
 /**
  * A host's list read one page at a time, restarted whenever `key` changes and
@@ -76,13 +80,19 @@ const LOADING: PagesState<never> = { status: 'loading', items: [], cursor: null,
  * more. A cursor the list has already read from ends it, so a host whose
  * cursors go round in a circle cannot keep the list asking forever.
  *
+ * A new key is a new list from the render that names it: the rows read for the
+ * old key are never reported under the new one, not even for the frame before
+ * the new read starts.
+ *
  * A newer key, a retry and an unmount each abort the read in flight, through
  * the signal the host was handed, and its answer is dropped if it lands anyway.
  * `load` is read when a read starts, so a host may pass a new function on every
  * render without restarting the list.
  */
 export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): SourcePages<T> {
-  const [state, setState] = useState<PagesState<T>>(() => (key === null ? IDLE : LOADING));
+  const [stored, setState] = useState<PagesState<T>>(() => startFor(key));
+  if (stored.key !== key) setState(startFor(key));
+  const state: PagesState<T> = stored.key === key ? stored : startFor(key);
   const loadRef = useRef(load);
   const inFlight = useRef<AbortController | null>(null);
   // The cursors this list has read from since its first page. Taken over from
@@ -94,61 +104,71 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
     loadRef.current = load;
   });
 
-  const read = useCallback((cursor: string | undefined, phase: 'first' | 'more') => {
-    inFlight.current?.abort();
-    const controller = new AbortController();
-    inFlight.current = controller;
-    const seen = new Set(phase === 'first' ? [] : followed.current);
-    const follow = (from: string | undefined) => {
-      if (from !== undefined) seen.add(from);
-      let page: Promise<SourcePage<T>>;
-      try {
-        page = Promise.resolve(loadRef.current(from, controller.signal));
-      } catch (error) {
-        page = Promise.reject(error);
-      }
-      page.then(
-        (answer) => {
-          if (inFlight.current !== controller) return;
-          const offered = answer.nextCursor || null;
-          const next = offered !== null && seen.has(offered) ? null : offered;
-          const items = [...answer.items];
-          if (items.length === 0 && next !== null) {
-            follow(next);
-            return;
-          }
-          inFlight.current = null;
-          followed.current = seen;
-          setState((previous) => ({
-            status: 'ready',
-            items: phase === 'first' ? items : [...previous.items, ...items],
-            cursor: next,
-            more: 'idle',
-          }));
-        },
-        () => {
-          if (inFlight.current !== controller) return;
-          inFlight.current = null;
-          setState((previous) =>
-            phase === 'first'
-              ? { status: 'failed', items: [], cursor: null, more: 'idle' }
-              : { ...previous, more: 'failed' },
-          );
-        },
-      );
-    };
-    follow(cursor);
-  }, []);
+  const read = useCallback(
+    (forKey: string | null, cursor: string | undefined, phase: 'first' | 'more') => {
+      inFlight.current?.abort();
+      const controller = new AbortController();
+      inFlight.current = controller;
+      const seen = new Set(phase === 'first' ? [] : followed.current);
+      const follow = (from: string | undefined) => {
+        if (from !== undefined) seen.add(from);
+        let page: Promise<SourcePage<T>>;
+        try {
+          page = Promise.resolve(loadRef.current(from, controller.signal));
+        } catch (error) {
+          page = Promise.reject(error);
+        }
+        page.then(
+          (answer) => {
+            if (inFlight.current !== controller) return;
+            const offered = answer.nextCursor || null;
+            const next = offered !== null && seen.has(offered) ? null : offered;
+            const items = [...answer.items];
+            if (items.length === 0 && next !== null) {
+              follow(next);
+              return;
+            }
+            inFlight.current = null;
+            followed.current = seen;
+            // Dropped when the list has moved to another key since the read
+            // started, which can land before the effect that aborts it runs.
+            setState((previous) =>
+              previous.key !== forKey
+                ? previous
+                : {
+                    key: forKey,
+                    status: 'ready',
+                    items: phase === 'first' ? items : [...previous.items, ...items],
+                    cursor: next,
+                    more: 'idle',
+                  },
+            );
+          },
+          () => {
+            if (inFlight.current !== controller) return;
+            inFlight.current = null;
+            setState((previous) =>
+              previous.key !== forKey
+                ? previous
+                : phase === 'first'
+                  ? { key: forKey, status: 'failed', items: [], cursor: null, more: 'idle' }
+                  : { ...previous, more: 'failed' },
+            );
+          },
+        );
+      };
+      follow(cursor);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (key === null) {
       inFlight.current?.abort();
       inFlight.current = null;
-      setState(IDLE);
       return;
     }
-    setState(LOADING);
-    read(undefined, 'first');
+    read(key, undefined, 'first');
   }, [key, read]);
 
   useEffect(
@@ -162,17 +182,17 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
   const loadMore = useCallback(() => {
     if (state.status !== 'ready' || state.cursor === null || state.more === 'loading') return;
     setState((previous) => ({ ...previous, more: 'loading' }));
-    read(state.cursor, 'more');
-  }, [state.status, state.cursor, state.more, read]);
+    read(state.key, state.cursor, 'more');
+  }, [state.key, state.status, state.cursor, state.more, read]);
 
   const retry = useCallback(() => {
     if (state.status === 'failed') {
-      setState(LOADING);
-      read(undefined, 'first');
+      setState((previous) => startFor(previous.key));
+      read(state.key, undefined, 'first');
     } else if (state.more === 'failed') {
       loadMore();
     }
-  }, [state.status, state.more, read, loadMore]);
+  }, [state.key, state.status, state.more, read, loadMore]);
 
   const updateItems = useCallback((update: (items: T[]) => T[]) => {
     setState((previous) => ({ ...previous, items: update(previous.items) }));

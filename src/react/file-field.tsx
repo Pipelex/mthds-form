@@ -143,7 +143,10 @@ interface LocalPreview {
    * upload it came from has not landed yet. The control cannot know the URL at
    * drop time - the host assigns it - so the first value that appears after the
    * upload stops being in flight is adopted as this preview's own, and any
-   * later change to a different one retires it.
+   * later change to a different one retires it. An upload that stops without
+   * one, by failing or by being forgotten, retires it too: nothing will arrive
+   * for it to describe, and the next file written here by anyone else (a pick
+   * from a list's sheet, an example) must not be painted with it.
    */
   boundUrl?: string;
 }
@@ -346,6 +349,27 @@ function FileField({
   // writes a different file does not show the old one.
   const localIsCurrent =
     !!localPreview && (localPreview.boundUrl === undefined || localPreview.boundUrl === value?.url);
+
+  // An upload over without a value: it failed, or the form forgot it. Read
+  // against the render before, since only the fall of `uploading` says so.
+  const wasUploading = useRef(!!uploading);
+  useEffect(() => {
+    const ended = wasUploading.current && !uploading;
+    wasUploading.current = !!uploading;
+    if (!localPreview || localPreview.boundUrl !== undefined) return;
+    if (failure !== null || (ended && !value?.url)) setLocal(null);
+  }, [uploading, failure, localPreview, value?.url, setLocal]);
+
+  // A file written into the value after a failure is a newer answer than the
+  // failure, whoever wrote it: the list's sheet filling this row, an example
+  // filling the form. The field's own ways in dismiss it themselves; this is
+  // the same for every other writer.
+  const lastUrl = useRef(value?.url);
+  useEffect(() => {
+    if (lastUrl.current === value?.url) return;
+    lastUrl.current = value?.url;
+    if (uploadError !== undefined) setDismissedUploadError(uploadError);
+  }, [value?.url, uploadError]);
 
   useEffect(() => {
     if (!localPreview) return;
@@ -701,6 +725,7 @@ function FileField({
             if (file) chooseFromSource(file);
           }}
           onUpload={canUpload ? openFileDialog : undefined}
+          disabled={busy}
           returnFocusTo={pickerEntryRef}
           // The row that opened the sheet is gone once a file is chosen, so
           // focus lands on the card that replaced it rather than on nothing.

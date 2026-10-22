@@ -247,6 +247,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               maxChoices={room}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
+              disabled={env?.disabled || busy}
               returnFocusTo={pickerEntryRef}
               onUse={(files) => onChange(addChosenFiles(items, files))}
             />

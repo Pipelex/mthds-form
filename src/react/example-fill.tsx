@@ -115,6 +115,10 @@ export function FillWithExample({
   // trigger, so each names its element: the control, a row, a row's menu.
   const control = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const sheet = useRef<HTMLDivElement>(null);
+  // Where focus goes when the list closes on the method's last example, taking
+  // the control with it: what follows the control on the page.
+  const afterControl = useRef<HTMLElement | null>(null);
   const rows = useRef(new Map<string, HTMLButtonElement>());
   const menus = useRef(new Map<string, HTMLButtonElement>());
   // The row a rename or a delete hands focus to as its dialog closes, by id.
@@ -147,13 +151,35 @@ export function FillWithExample({
   const [hasExamples, setHasExamples] = useState<boolean | null>(null);
   if (answer !== null && answer !== hasExamples) setHasExamples(answer);
 
+  // A form held shut, as a host holds it while a run is in flight, closes
+  // everything the control opened: nothing in it may write to the form then.
+  if (disabled && (open || replacing || renaming || deleting)) {
+    if (open) setClosing((count) => count + 1);
+    setOpen(false);
+    setReplacing(null);
+    setRenaming(null);
+    setDeleting(null);
+  }
+
   if (source.hideWhenEmpty && !open && (answer ?? hasExamples) !== true) return null;
 
   const closeList = () => {
+    // The list just read is the freshest answer there is: a list read to its
+    // end with nothing left (its last example deleted) takes the control away
+    // as it closes, and focus moves on to what follows it rather than to a
+    // control that is gone. The read that follows the closing confirms it.
+    if (source.hideWhenEmpty && pages.status === 'ready') {
+      if (pages.items.length > 0) setHasExamples(true);
+      else if (pages.empty) {
+        afterControl.current = followingFocusable(control.current, sheet.current);
+        setHasExamples(false);
+      }
+    }
     setOpen(false);
     setClosing((count) => count + 1);
   };
   const fill = (example: FormExample) => {
+    if (disabled) return;
     onFill(runValuesFromInputs(example.inputs, fields), example);
     setReplacing(null);
     closeList();
@@ -217,7 +243,8 @@ export function FillWithExample({
             layout="sheet"
             // Below 1280px the sheet is as tall as its rows, up to the viewport.
             className="top-auto max-h-[calc(100dvh-1.5rem)]"
-            returnFocus={() => control.current}
+            ref={sheet}
+            returnFocus={() => control.current ?? afterControl.current}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="px-4 pt-4 pb-3">
@@ -547,4 +574,26 @@ function DeleteExampleDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]';
+
+/**
+ * The first element after `from` in the document that takes focus from the
+ * keyboard, leaving out anything inside `skip`: where focus goes when `from`
+ * is about to leave the page.
+ */
+function followingFocusable(
+  from: HTMLElement | null,
+  skip: HTMLElement | null,
+): HTMLElement | null {
+  if (!from) return null;
+  for (const element of from.ownerDocument.querySelectorAll<HTMLElement>(FOCUSABLE)) {
+    if (!(from.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+    if (skip?.contains(element)) continue;
+    if (element.tabIndex < 0 || element.matches(':disabled')) continue;
+    if (element.closest('[hidden], [inert]')) continue;
+    return element;
+  }
+  return null;
 }

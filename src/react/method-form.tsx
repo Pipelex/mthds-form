@@ -154,6 +154,13 @@ export interface MethodFormController extends MethodFormState {
    * empty shows its required mark, and answers whether the run may start.
    */
   attempt: () => boolean;
+  /**
+   * How many times `reset` has run. `MethodForm` keys its fields by it, so a
+   * reset remounts them and nothing a control kept for the values it replaced
+   * outlives them: the preview of a file still arriving, a refused drop, an
+   * open preview. A host rendering its own fields keys them the same way.
+   */
+  resets: number;
   /** Ids (value paths) with an upload in flight. Read by `MethodForm`. */
   uploadingIds: ReadonlySet<string>;
   /** Ids whose last upload failed. Read by `MethodForm`. */
@@ -238,6 +245,7 @@ export function useMethodForm({
   const [uploadingIds, setUploadingIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [failedUploadIds, setFailedUploadIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [attempted, setAttempted] = useState(false);
+  const [resets, setResets] = useState(0);
   // The upload each id is waiting on. A newer drop at the same id, or a reset,
   // replaces or forgets the entry, and the older upload's result is dropped.
   // Touched only from event handlers and upload callbacks, never in render.
@@ -259,6 +267,7 @@ export function useMethodForm({
     setUploadingIds(EMPTY_IDS);
     setFailedUploadIds(EMPTY_IDS);
     setAttempted(false);
+    setResets((count) => count + 1);
   }, []);
 
   const dropFile = useMemo(() => {
@@ -327,6 +336,7 @@ export function useMethodForm({
     setValues,
     reset,
     attempt,
+    resets,
     uploadingIds,
     failedUploadIds,
     dropFile,
@@ -413,6 +423,7 @@ function MethodFormFields({
     reset,
     attempted,
     touched,
+    resets,
     uploadingIds,
     failedUploadIds,
     dropFile,
@@ -487,7 +498,9 @@ function MethodFormFields({
       )}
       {visible.map((field) => (
         <FieldRenderer
-          key={field.name}
+          // Remounted on each reset, so no control keeps what it held for the
+          // values the reset replaced (a file still arriving, a failed drop).
+          key={`${field.name}:${resets}`}
           field={field}
           id={field.name}
           value={ownProp(values, field.name)}

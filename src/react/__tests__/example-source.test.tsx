@@ -13,9 +13,15 @@ import userEvent from '@testing-library/user-event';
 import { getPipeIOContract } from '../../core/contracts';
 import { getPipeInputForm } from '../../core/derive';
 import type { ExampleSource, ExampleSourcePage, FormExample } from '../../core/sources';
+import { buildRunFields } from '../../core/derive';
+import { apiInputsFromRunValues } from '../../core/values';
 import { MethodForm, useMethodForm, type UseMethodFormOptions } from '../method-form';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/structured';
+import {
+  CONTRACTS as FILE_CONTRACTS,
+  INPUT_FORM as FILE_INPUT_FORM,
+} from '../../__stories__/_generated/files';
 
 const contract = getPipeIOContract(CONTRACTS, 'structured', 'flat_object');
 const descriptor = getPipeInputForm(INPUT_FORM, 'structured', 'flat_object');
@@ -23,6 +29,9 @@ if (!contract || !descriptor) throw new Error('No fixture for structured.flat_ob
 const FLAT = { contract, descriptor };
 
 beforeAll(() => {
+  // A dropped file's preview is an object URL, which jsdom does not make.
+  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
+  URL.revokeObjectURL = vi.fn();
   // The row menu's popper measures its content; jsdom has no ResizeObserver.
   globalThis.ResizeObserver ??= class {
     observe() {}
@@ -57,13 +66,13 @@ const sourceOf = (
   overrides: Partial<ExampleSource> = {},
 ): ExampleSource => ({ list: async () => ({ examples }), ...overrides });
 
-type HarnessProps = Partial<UseMethodFormOptions> & { onRun?: () => void };
+type HarnessProps = Partial<UseMethodFormOptions> & { onRun?: () => void; disabled?: boolean };
 
-function Harness({ onRun, ...options }: HarnessProps) {
+function Harness({ onRun, disabled, ...options }: HarnessProps) {
   const form = useMethodForm({ ...FLAT, ...options });
   return (
     <>
-      <MethodForm form={form} />
+      <MethodForm form={form} disabled={disabled} />
       <button type="button" onClick={() => form.attempt() && onRun?.()}>
         Run
       </button>
@@ -490,5 +499,127 @@ describe('focus, when a surface closes', () => {
     await waitFor(() =>
       expect(within(dialog).getByRole('button', { name: 'Lyon office' })).toHaveFocus(),
     );
+  });
+});
+
+describe('a form held shut while the examples are open', () => {
+  it('closes the list, and fills nothing', async () => {
+    const user = userEvent.setup();
+    const source = sourceOf([PARIS]);
+    const { rerender } = render(<Harness exampleSource={source} />);
+    await openExamples(user);
+    rerender(<Harness exampleSource={source} disabled />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(state().values).toEqual({});
+  });
+
+  it('closes the question before a replace, and keeps what was entered', async () => {
+    const user = userEvent.setup();
+    const source = sourceOf([PARIS]);
+    const { rerender } = render(<Harness exampleSource={source} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    const dialog = await openExamples(user);
+    await user.click(await within(dialog).findByRole('button', { name: 'Paris office' }));
+    await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+    rerender(<Harness exampleSource={source} disabled />);
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+  });
+});
+
+describe('focus, when the last example goes with the control', () => {
+  it('moves on to the form under it rather than to the page', async () => {
+    const user = userEvent.setup();
+    let examples = [PARIS];
+    const list = vi.fn(async () => ({ examples }));
+    const remove = vi.fn(async (example: FormExample) => {
+      examples = examples.filter((item) => item.id !== example.id);
+    });
+    render(<Harness exampleSource={{ list, delete: remove, hideWhenEmpty: true }} />);
+    const dialog = await openExamples(user);
+    await user.click(
+      await within(dialog).findByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: S.deleteExample,
+      }),
+    );
+    // While the list is open, the close button, since no row is left.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: S.close })).toHaveFocus(),
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByRole('button', { name: S.fillWithExample })).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText('street')).toHaveFocus());
+  });
+});
+
+describe('an example filled over a file of the person’s own', () => {
+  const contract = getPipeIOContract(FILE_CONTRACTS, 'files', 'one_document');
+  const descriptor = getPipeInputForm(FILE_INPUT_FORM, 'files', 'one_document');
+  if (!contract || !descriptor) throw new Error('No fixture for files.one_document');
+  const ONE_DOCUMENT = { contract, descriptor };
+  const STORED: FormExample = {
+    id: 'ex_doc',
+    name: 'Stored contract',
+    inputs: apiInputsFromRunValues(
+      {
+        attachment: { url: 'pipelex-storage://org/assets/contract.pdf', filename: 'contract.pdf' },
+      },
+      buildRunFields(descriptor, contract.inputs),
+      contract.inputs,
+    ),
+  };
+  const paintsLocalPreview = (container: HTMLElement) =>
+    container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
+  const drop = async (user: ReturnType<typeof userEvent.setup>, container: HTMLElement) => {
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error('No file input');
+    await user.upload(input, new File(['%PDF-1.4'], 'mine.pdf', { type: 'application/pdf' }));
+  };
+
+  it('shows the example’s file, not the preview of one still uploading', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Harness
+        {...ONE_DOCUMENT}
+        uploadFile={() => new Promise<string>(() => undefined)}
+        exampleSource={sourceOf([STORED])}
+      />,
+    );
+    await drop(user, container);
+    const dialog = await openExamples(user);
+    await user.click(await within(dialog).findByRole('button', { name: 'Stored contract' }));
+    const question = await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+    await user.click(within(question).getByRole('button', { name: S.replaceEnteredConfirm }));
+    await screen.findByText('contract.pdf');
+    await user.click(screen.getByRole('button', { name: S.preview }));
+    expect(paintsLocalPreview(container)).toBe(false);
+  });
+
+  it('shows the example’s file, not the preview of one whose upload failed', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Harness
+        {...ONE_DOCUMENT}
+        uploadFile={async () => {
+          throw new Error('down');
+        }}
+        exampleSource={sourceOf([STORED])}
+      />,
+    );
+    await drop(user, container);
+    await screen.findByText(S.uploadFailed);
+    const dialog = await openExamples(user);
+    await user.click(await within(dialog).findByRole('button', { name: 'Stored contract' }));
+    await screen.findByText('contract.pdf');
+    expect(screen.queryByText(S.uploadFailed)).toBeNull();
+    await user.click(screen.getByRole('button', { name: S.preview }));
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 });

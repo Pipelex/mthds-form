@@ -109,6 +109,12 @@ export interface FilePickerProps {
    * event and focus something else, as a field does with the file it now holds.
    */
   onCloseAutoFocus?: (event: Event) => void;
+  /**
+   * Holds the sheet shut, as the field is while it is disabled or a file is
+   * arriving: an open sheet closes, writing nothing, and `onOpenChange` is
+   * told so.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -125,9 +131,16 @@ export function FilePicker({
   onOpenChange,
   returnFocusTo,
   onCloseAutoFocus,
+  disabled = false,
   ...props
 }: FilePickerProps) {
   const [drag, setDrag] = useState(0);
+  // Shut from the render that holds it so, before the owner hears of it, so
+  // nothing in the sheet can write in between.
+  const shown = open && !disabled;
+  useEffect(() => {
+    if (open && disabled) onOpenChange(false);
+  }, [open, disabled, onOpenChange]);
   // What held focus as the sheet opened, for a host that names no opener.
   // Read in a layout effect, before the sheet's own effects move focus in.
   const heldFocus = useRef<HTMLElement | null>(null);
@@ -137,8 +150,8 @@ export function FilePicker({
     heldFocus.current = active instanceof HTMLElement && active !== document.body ? active : null;
   }, [open]);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && (
+    <Dialog open={shown} onOpenChange={onOpenChange}>
+      {shown && (
         <DialogContent
           layout="sheet"
           onCloseAutoFocus={onCloseAutoFocus}
@@ -158,7 +171,10 @@ export function FilePicker({
   );
 }
 
-type FilePickerBodyProps = Omit<FilePickerProps, 'open' | 'onOpenChange'> & {
+type FilePickerBodyProps = Omit<
+  FilePickerProps,
+  'open' | 'onOpenChange' | 'returnFocusTo' | 'onCloseAutoFocus' | 'disabled'
+> & {
   onDrag: (offset: number) => void;
   onClose: () => void;
 };
