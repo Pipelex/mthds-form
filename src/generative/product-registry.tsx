@@ -7,7 +7,7 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
-import { brandInkClass } from '../react/brand-ink';
+import { brandFillClass, brandFillInkClass, brandInkClass } from '../react/brand-ink';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
@@ -102,8 +102,9 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
           {props.tag ? (
             <span
               className={cn(
-                'min-w-0 truncate rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px]',
-                brandInkClass,
+                'min-w-0 truncate rounded-lg border border-primary/40 px-2.5 py-1 font-mono text-[11px]',
+                brandFillClass,
+                brandFillInkClass,
               )}
             >
               {props.tag}

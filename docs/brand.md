@@ -168,7 +168,7 @@ A team may set a second, optional set of colours for the dark theme. `resolveDar
 
 ### Mapping the roles onto tokens
 
-A host maps each role onto the tokens it paints with. On this package's theme contract, the natural mapping is `action` onto `--primary` and `onAction` onto `--primary-foreground`, and `accentInk` onto `--brand`, the optional token every brand-coloured text in the controls reads ([theming.md](theming.md) § "Brand ink"), so that the button colour stays a fill and brand-coloured text is always ink. A host with its own brand tokens maps `accentFill` behind its accent labels and `header` and `onHeader` onto its band.
+A host maps each role onto the tokens it paints with. On this package's theme contract, the mapping is `action` onto `--primary` and `onAction` onto `--primary-foreground`, then the three optional brand tokens the controls read ([theming.md](theming.md) § "Brand ink"): `accentInk` onto `--brand` (brand-coloured text on the page and a field's focus border), `accentFill` onto `--brand-muted` (the pale fill of a selected pill, a tag, a completed step) and `accentInk` again onto `--brand-muted-foreground` (the text and icons on that fill). The button colour then stays a solid fill, and everything else brand-coloured reads on what it sits on. `header` and `onHeader` paint a host's own band, which the controls do not draw.
 
 **The accent never maps onto the contract's `--accent`.** Despite its name, `--accent` is shadcn's neutral hover fill, the colour of a menu item under the pointer. A team's accent painted there would tint every hovered row. The seed keeps the word `accent` because it is what a person setting colours calls it; the token it maps onto is a brand token.
 
