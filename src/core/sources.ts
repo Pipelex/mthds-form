@@ -152,6 +152,11 @@ function heldUrl(item: unknown): string | undefined {
   return typeof url === 'string' && url !== '' ? url : undefined;
 }
 
+/** The addresses a list's items hold, each once. */
+function heldUrls(items: readonly unknown[]): Set<string> {
+  return new Set(items.map(heldUrl).filter((url): url is string => url !== undefined));
+}
+
 /**
  * A list of files with the chosen files written into it, in the order they
  * were chosen: first into the rows that hold no file yet (a row the person
@@ -165,7 +170,7 @@ export function addChosenFiles(
   chosen: readonly SourceFile[],
 ): unknown[] {
   const items = [...(held ?? [])];
-  const urls = new Set(items.map(heldUrl).filter((url): url is string => url !== undefined));
+  const urls = heldUrls(items);
   let free = 0;
   for (const file of chosen) {
     if (urls.has(file.url)) continue;
@@ -183,6 +188,22 @@ export function addChosenFiles(
  * it holds, since `addChosenFiles` writes into its empty rows before adding
  * any. `undefined` when the list has no bound.
  */
+/**
+ * How many files `addChosenFiles` writes for `chosen` into `held`: the choices
+ * whose address the list does not hold yet, each address once. This is what a
+ * choice spends of `roomForChosenFiles`, so a held file chosen again, or a
+ * second row naming a chosen file, takes no room.
+ */
+export function chosenFilesAdded(
+  held: readonly unknown[] | undefined,
+  chosen: readonly SourceFile[],
+): number {
+  const urls = heldUrls(held ?? []);
+  const before = urls.size;
+  for (const file of chosen) urls.add(file.url);
+  return urls.size - before;
+}
+
 export function roomForChosenFiles(
   held: readonly unknown[] | undefined,
   maxItemCount: number | undefined,

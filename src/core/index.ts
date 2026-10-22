@@ -221,7 +221,7 @@ export type {
   FormExample,
   SourceFile,
 } from './sources';
-export { addChosenFiles, roomForChosenFiles, sourceFileValue } from './sources';
+export { addChosenFiles, chosenFilesAdded, roomForChosenFiles, sourceFileValue } from './sources';
 
 // Wire format - deflate/inflate and the exactly-one-wrapper invariant.
 export {

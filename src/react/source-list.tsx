@@ -121,7 +121,9 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
         page.then(
           (answer) => {
             if (inFlight.current !== controller) return;
-            const offered = answer.nextCursor || null;
+            // Only an absent cursor ends the list: an empty string is a cursor
+            // like any other, and a host may page with one.
+            const offered = answer.nextCursor ?? null;
             const next = offered !== null && seen.has(offered) ? null : offered;
             const items = [...answer.items];
             if (items.length === 0 && next !== null) {

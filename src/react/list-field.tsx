@@ -11,6 +11,7 @@ import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
+import { firstFocusable } from './focus';
 
 interface ListFieldProps {
   field: ListRunField;
@@ -56,6 +57,10 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const [rowKeys, setRowKeys] = useRowKeys(items.length);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
+  // The row the sheet's last chosen file was written into, set as the sheet
+  // closes on Use and read once as focus goes back.
+  const landedRow = useRef<number | null>(null);
   // Upload failures a removal left at the wrong position; see `rowEnv` below.
   const [staleErrors, setStaleErrors] = useState<ReadonlyMap<string, string>>(NO_ERRORS);
 
@@ -177,7 +182,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
       )}
 
-      <div className="space-y-2">
+      <div ref={rowsRef} className="space-y-2">
         {items.length === 0 && (
           <p className="rounded-md border border-dashed border-border bg-input/50 px-3 py-4 text-center text-[12px] text-muted-foreground">
             {s.noItemsYet}
@@ -186,6 +191,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         {items.map((item, index) => (
           <div
             key={rowKeys[index] ?? index}
+            data-list-row
             className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
           >
             <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
@@ -245,11 +251,29 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               formats={fileItem.formats}
               multiple
               maxChoices={room}
+              held={items}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               disabled={env?.disabled || busy}
               returnFocusTo={pickerEntryRef}
-              onUse={(files) => onChange(addChosenFiles(items, files))}
+              onCloseAutoFocus={(event) => {
+                // Focus goes back to the row that opened the sheet, unless the
+                // choice filled the list and shut that row: then to the row
+                // the last chosen file was written into.
+                const landed = landedRow.current;
+                landedRow.current = null;
+                if (landed === null || !pickerEntryRef.current?.disabled) return;
+                const rows = rowsRef.current?.querySelectorAll(':scope > [data-list-row]');
+                const target = firstFocusable(rows?.[landed]);
+                if (!target) return;
+                event.preventDefault();
+                target.focus();
+              }}
+              onUse={(files) => {
+                const next = addChosenFiles(items, files);
+                landedRow.current = lastWrittenRow(items, next);
+                onChange(next);
+              }}
             />
           </>
         )}
@@ -261,6 +285,16 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
       )}
     </div>
   );
+}
+
+/**
+ * The last row `addChosenFiles` wrote into, or `null` when it wrote none. It
+ * copies the rows it leaves alone, so a written row is one that changed.
+ */
+function lastWrittenRow(before: readonly unknown[], after: readonly unknown[]): number | null {
+  let index = after.length - 1;
+  while (index >= 0 && after[index] === before[index]) index -= 1;
+  return index >= 0 ? index : null;
 }
 
 /**

@@ -131,8 +131,8 @@ export interface MethodFormState {
   attempted: boolean;
   /**
    * Whether the form holds work of the person's own: a value that sends a
-   * different run from the one it was given (its initial values, or the last
-   * `reset`), or a file still arriving. A value typed and erased again, or an
+   * different run from the one it was given (its initial values as they stood
+   * at the first edit, or the last `reset`), or a file still arriving. A value typed and erased again, or an
    * optional structure opened and left empty, sends the same run and does not
    * count. "Fill with an example" asks before replacing a touched form.
    */
@@ -238,9 +238,11 @@ export function useMethodForm({
   }, [initialValues, fields]);
 
   const [edited, setEdited] = useState<MethodFormValues | null>(null);
-  // What the form was last given rather than typed: `null` while that is its
-  // initial values, otherwise the values of the last `reset`. `touched`
-  // compares the values with it.
+  // What the person's edits are measured against: the values of the last
+  // `reset`, or the initial values as they stood at the first edit since.
+  // `null` while nothing is edited, when the form shows the live initial
+  // values. Taken once, so a host changing its initial values later does not
+  // move it, and an edit stays the person's own. `touched` compares with it.
   const [given, setGiven] = useState<MethodFormValues | null>(null);
   const [uploadingIds, setUploadingIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [failedUploadIds, setFailedUploadIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
@@ -255,8 +257,10 @@ export function useMethodForm({
   const values = edited ?? initial;
 
   const setValues = useCallback<MethodFormController['setValues']>(
-    (next) =>
-      setEdited((previous) => (typeof next === 'function' ? next(previous ?? initial) : next)),
+    (next) => {
+      setGiven((previous) => previous ?? initial);
+      setEdited((previous) => (typeof next === 'function' ? next(previous ?? initial) : next));
+    },
     [initial],
   );
 
@@ -293,6 +297,7 @@ export function useMethodForm({
               typeof stored === 'string'
                 ? { url: stored, filename: file.name }
                 : { url: stored.url, filename: stored.filename ?? file.name };
+            setGiven((previous) => previous ?? initial);
             setEdited((previous) => setValueAtPath(previous ?? initial, path, value));
           },
           () => {
@@ -315,8 +320,8 @@ export function useMethodForm({
   const uploading = uploadingIds.size > 0;
   const ready = readiness.ready === readiness.total && !uploading;
   const touched = useMemo(
-    () => uploading || (edited !== null && !sameRunValues(values, given ?? initial, fields)),
-    [uploading, edited, values, given, initial, fields],
+    () => uploading || (edited !== null && given !== null && !sameRunValues(edited, given, fields)),
+    [uploading, edited, given, fields],
   );
 
   const attempt = useCallback(() => {

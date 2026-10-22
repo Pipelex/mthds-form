@@ -623,3 +623,34 @@ describe('an example filled over a file of the person’s own', () => {
     expect(paintsLocalPreview(container)).toBe(false);
   });
 });
+
+describe('what the form was given, once the person edits it', () => {
+  it('stays what it was when the host’s initial values later change to match the edit', async () => {
+    const user = userEvent.setup();
+    const source = sourceOf([PARIS]);
+    const { rerender } = render(<Harness exampleSource={source} initialValues={{}} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    rerender(<Harness exampleSource={source} initialValues={typed} />);
+    expect(state().touched).toBe(true);
+    const dialog = await openExamples(user);
+    await user.click(await within(dialog).findByRole('button', { name: 'Paris office' }));
+    await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+  });
+});
+
+describe('a later page that fails', () => {
+  it('is what the status line says, rather than the rows still shown', async () => {
+    const user = userEvent.setup();
+    const list = vi.fn(async ({ cursor }: { cursor?: string }) => {
+      if (cursor === undefined) return { examples: [PARIS], nextCursor: 'next' };
+      throw new Error('down');
+    });
+    render(<Harness exampleSource={{ list }} />);
+    const dialog = await openExamples(user);
+    await within(dialog).findByRole('button', { name: 'Paris office' });
+    await user.click(within(dialog).getByRole('button', { name: S.showMore }));
+    await within(dialog).findByText(S.loadMoreFailed, SHOWN);
+    expect(within(dialog).getByRole('status')).toHaveTextContent(S.loadMoreFailed);
+  });
+});

@@ -9,6 +9,7 @@ import {
   addChosenFiles,
   apiInputsFromRunValues,
   buildRunFields,
+  chosenFilesAdded,
   roomForChosenFiles,
   runValuesFromInputs,
   sameRunValues,
@@ -83,6 +84,22 @@ describe('addChosenFiles', () => {
     expect(addChosenFiles(undefined, [file('a', 'u1')])).toEqual([
       { url: 'u1', filename: 'a.pdf' },
     ]);
+  });
+});
+
+describe('chosenFilesAdded', () => {
+  it('counts the files a choice adds, as addChosenFiles writes them', () => {
+    const held = [{ url: 'u1' }, undefined];
+    const chosen = [file('a', 'u1'), file('b', 'u2'), file('c', 'u2'), file('d', 'u3')];
+    // The held address and the second row naming u2 add nothing.
+    expect(chosenFilesAdded(held, chosen)).toBe(2);
+    const written = addChosenFiles(held, chosen).length - held.filter(Boolean).length;
+    expect(chosenFilesAdded(held, chosen)).toBe(written);
+  });
+
+  it('counts every distinct address when the list holds nothing', () => {
+    expect(chosenFilesAdded(undefined, [file('a', 'u1'), file('b', 'u2')])).toBe(2);
+    expect(chosenFilesAdded([], [])).toBe(0);
   });
 });
 

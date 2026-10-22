@@ -7,6 +7,7 @@ import type { ExampleSource, FormExample, RunField } from '../core';
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { runValuesFromInputs } from '../core/values';
 import { useFieldStrings } from './field-strings';
+import { followingFocusable } from './focus';
 import {
   DimRows,
   ListAction,
@@ -190,17 +191,19 @@ export function FillWithExample({
   };
   const manages = source.rename !== undefined || source.delete !== undefined;
 
+  // A later page that failed is said before the rows still shown: the footer
+  // that shows it is not a live region, so this line is what announces it.
   const status =
     pages.status === 'idle' || pages.status === 'loading'
       ? s.examplesLoading
       : pages.status === 'failed'
         ? s.examplesFailed
-        : pages.items.length > 0
-          ? s.examplesShown(pages.items.length)
-          : pages.empty
-            ? s.examplesNone
-            : pages.more === 'failed'
-              ? s.loadMoreFailed
+        : pages.more === 'failed'
+          ? s.loadMoreFailed
+          : pages.items.length > 0
+            ? s.examplesShown(pages.items.length)
+            : pages.empty
+              ? s.examplesNone
               : s.examplesLoading;
 
   // After a rename or a delete: the row's menu, the row that took a deleted
@@ -574,26 +577,4 @@ function DeleteExampleDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
-}
-
-const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]';
-
-/**
- * The first element after `from` in the document that takes focus from the
- * keyboard, leaving out anything inside `skip`: where focus goes when `from`
- * is about to leave the page.
- */
-function followingFocusable(
-  from: HTMLElement | null,
-  skip: HTMLElement | null,
-): HTMLElement | null {
-  if (!from) return null;
-  for (const element of from.ownerDocument.querySelectorAll<HTMLElement>(FOCUSABLE)) {
-    if (!(from.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
-    if (skip?.contains(element)) continue;
-    if (element.tabIndex < 0 || element.matches(':disabled')) continue;
-    if (element.closest('[hidden], [inert]')) continue;
-    return element;
-  }
-  return null;
 }

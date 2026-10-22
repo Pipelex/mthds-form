@@ -17,6 +17,7 @@ import type { FileSource, FileSourceScope, SourceFile } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { formatOfFilename, normalizeMimeType, type FileFormat } from '../core/file-formats';
+import { chosenFilesAdded } from '../core/sources';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import {
   DimRows,
@@ -87,8 +88,17 @@ export interface FilePickerProps {
   formats: readonly FileFormat[];
   /** A list field's picker: several rows may be chosen. One otherwise. */
   multiple?: boolean;
-  /** The most rows a choice may hold, a list's remaining room; unbounded when absent. */
+  /**
+   * The most files a choice may add, a list's remaining room; unbounded when
+   * absent. Counted as `chosenFilesAdded` counts them, against `held`.
+   */
   maxChoices?: number;
+  /**
+   * The list's items. A chosen file whose address they hold adds nothing to
+   * the list, nor does a second row naming a chosen file, so neither takes
+   * any of `maxChoices`.
+   */
+  held?: readonly unknown[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** What was chosen, in the order it was chosen. The sheet closes after. */
@@ -184,6 +194,7 @@ function FilePickerBody({
   formats,
   multiple = false,
   maxChoices,
+  held,
   onUse,
   onUpload,
   onDrag,
@@ -213,13 +224,15 @@ function FilePickerBody({
       .then((page) => ({ items: page.files, nextCursor: page.nextCursor }));
   const pages = useSourcePages(load, JSON.stringify([query, scope, mediaTypes]));
 
-  const full = maxChoices !== undefined && chosen.size >= maxChoices;
+  // Whether `files` fit the list's room, counted in the files they would add.
+  const fits = (files: readonly SourceFile[]) =>
+    maxChoices === undefined || chosenFilesAdded(held, files) <= maxChoices;
   const toggle = (file: SourceFile) =>
     setChosen((previous) => {
       if (!multiple) return previous.has(file.id) ? previous : new Map([[file.id, file]]);
       const next = new Map(previous);
       if (next.has(file.id)) next.delete(file.id);
-      else if (maxChoices === undefined || next.size < maxChoices) next.set(file.id, file);
+      else if (fits([...next.values(), file])) next.set(file.id, file);
       return next;
     });
 
@@ -339,7 +352,7 @@ function FilePickerBody({
                       formats={formats}
                       role={multiple ? 'checkbox' : 'radio'}
                       chosen={isChosen}
-                      disabled={!isChosen && full}
+                      disabled={!isChosen && !fits([...choices, file])}
                       onToggle={() => toggle(file)}
                     />
                   );
@@ -375,8 +388,11 @@ function pickerStatus(
 ): string {
   if (pages.status === 'idle' || pages.status === 'loading') return s.filePickerLoading;
   if (pages.status === 'failed') return s.filePickerFailed;
+  // Said before the rows still shown: the footer that shows it is not a live
+  // region, so this line is what announces it.
+  if (pages.more === 'failed') return s.loadMoreFailed;
   if (pages.items.length > 0) return s.filePickerShown(pages.items.length);
-  if (!pages.empty) return pages.more === 'failed' ? s.loadMoreFailed : s.filePickerLoading;
+  if (!pages.empty) return s.filePickerLoading;
   if (query !== '') return s.filePickerNoMatch;
   return scope === 'mine' ? s.filePickerNoneMine(labels) : s.filePickerNoneTeam(labels);
 }

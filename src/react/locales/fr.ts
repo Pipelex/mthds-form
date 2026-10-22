@@ -159,7 +159,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   filePickerClearSearch: 'Effacer la recherche',
   filePickerNoneTeam: (formats) => `L’équipe n’a encore aucun fichier ${OR.format(formats)}.`,
   filePickerNoneMine: (formats) =>
-    `Vous n’avez encore ajouté ni produit aucun fichier ${OR.format(formats)}.`,
+    `Vous n’avez encore ni ajouté ni créé de fichier ${OR.format(formats)}.`,
   filePickerShowEveryone: 'Voir ceux de l’équipe',
   filePickerUpload: 'Envoyer un fichier',
   filePickerShown: (count) => `${count} ${plural(count, 'fichier', 'fichiers')}`,

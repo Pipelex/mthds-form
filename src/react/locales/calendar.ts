@@ -5,18 +5,23 @@
  * two packs disagree about which day was yesterday.
  */
 
-/** Midnight at the start of `date`'s day, in local time. */
-function startOfDay(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+/**
+ * `date`'s local calendar date as a day number: its local year, month and day
+ * placed on the UTC calendar, where every day is exactly as long as the next.
+ */
+function dayNumber(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
 }
 
 /**
  * How many calendar days before `now`'s day `date` falls: 0 for today, 1 for
- * yesterday, negative for a day after today. Counted on local calendar days,
- * rounded, so a daylight-saving change in between does not shift it.
+ * yesterday, negative for a day after today. Counted on the local calendar
+ * dates rather than on the time between their midnights, so no change of
+ * offset in between shifts it: not a daylight-saving hour, and not a whole
+ * day skipped, as Samoa's move across the date line skipped one.
  */
 export function calendarDaysBefore(date: Date, now: Date = new Date()): number {
-  return Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
+  return dayNumber(now) - dayNumber(date);
 }
 
 /** Whether `date` falls in `now`'s calendar year. */

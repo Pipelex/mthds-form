@@ -65,7 +65,8 @@ const INVOICE: SourceFile = {
   size: 348_160,
   kind: 'uploaded',
   origin: 'Uploaded by Ana',
-  createdAt: '2025-03-14T10:00:00Z',
+  // A year no run of this suite can be in, so the date is written with its year.
+  createdAt: '2001-03-14T10:00:00Z',
 };
 const OLDER: SourceFile = {
   id: 'fl_2',
@@ -181,7 +182,7 @@ describe('the sheet over a single file field', () => {
     const draft = await within(dialog).findByRole('radio', { name: /contract-acme-draft\.pdf/ });
     expect(draft).toHaveTextContent('Test file · PDF · Made by the build assistant');
     const invoice = within(dialog).getByRole('radio', { name: /INV-2291\.pdf/ });
-    expect(invoice).toHaveTextContent('PDF · 340 KB · Uploaded by Ana · 14 Mar 2025');
+    expect(invoice).toHaveTextContent('PDF · 340 KB · Uploaded by Ana · 14 Mar 2001');
     expect(invoice).not.toHaveTextContent(S.testFile);
   });
 
@@ -342,7 +343,9 @@ describe('the list’s states', () => {
     const dialog = await openPicker(user);
     await within(dialog).findByText('INV-2291.pdf');
     await user.click(within(dialog).getByRole('button', { name: S.showMore }));
-    await within(dialog).findByText(S.loadMoreFailed);
+    await within(dialog).findByText(S.loadMoreFailed, SHOWN);
+    // The status line says why the list stopped, not how many rows it shows.
+    expect(within(dialog).getByRole('status')).toHaveTextContent(S.loadMoreFailed);
     expect(within(dialog).getByText('INV-2291.pdf')).toBeInTheDocument();
     failSecond = false;
     await user.click(within(dialog).getByRole('button', { name: S.tryAgain }));
@@ -381,11 +384,11 @@ describe('a field whose only way in is the team’s files', () => {
   });
 });
 
-describe('a list holding empty rows', () => {
-  /** The list of attachments, bounded to two. */
-  const boundedToTwo = (fields: RunField[]) =>
-    fields.map((field) => (field.name === 'attachments' ? { ...field, maxItemCount: 2 } : field));
+/** The list of attachments, bounded to two. */
+const boundedToTwo = (fields: RunField[]) =>
+  fields.map((field) => (field.name === 'attachments' ? { ...field, maxItemCount: 2 } : field));
 
+describe('a list holding empty rows', () => {
   it('fills its empty rows first, and counts its room by the files it holds', async () => {
     const user = userEvent.setup();
     render(
@@ -516,5 +519,75 @@ describe('a form held shut while the sheet is open', () => {
     rerender(<Harness {...ONE_DOCUMENT} fileSource={source} disabled />);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(values().attachment).toBeUndefined();
+  });
+});
+
+describe('a host whose cursor is an empty string', () => {
+  it('reads on past it, since only an absent cursor ends the list', async () => {
+    const user = userEvent.setup();
+    const list = vi.fn(async (query: FileSourceQuery): Promise<FileSourcePage> =>
+      query.cursor === undefined
+        ? { files: [INVOICE], nextCursor: '' }
+        : { files: [OLDER], nextCursor: null },
+    );
+    render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([], { list })} />);
+    const dialog = await openPicker(user);
+    await within(dialog).findByText('INV-2291.pdf');
+    await user.click(within(dialog).getByRole('button', { name: S.showMore }));
+    await within(dialog).findByText('INV-2288.pdf');
+    expect(list.mock.calls.at(-1)?.[0].cursor).toBe('');
+  });
+});
+
+describe('a bounded list’s room, counted in files it does not hold yet', () => {
+  /** A second row of the source naming the same stored file as `OLDER`. */
+  const OLDER_AGAIN: SourceFile = { ...OLDER, id: 'fl_2b', name: 'INV-2288 (copy).pdf' };
+
+  it('takes no room for a file the list holds, or for a second row naming a chosen file', async () => {
+    const user = userEvent.setup();
+    const held = { url: INVOICE.url, filename: 'INV-2291.pdf' };
+    render(
+      <Harness
+        {...MANY_FILES}
+        prepareFields={boundedToTwo}
+        initialValues={{ attachments: [held] }}
+        fileSource={sourceOf([INVOICE, OLDER, OLDER_AGAIN, DRAFT])}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') }));
+    const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
+    await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
+    // The held invoice adds nothing, so the list's one room is still free.
+    const older = within(dialog).getByRole('checkbox', { name: /^INV-2288\.pdf/ });
+    expect(older).toBeEnabled();
+    await user.click(older);
+    // Now it is taken: another file cannot be chosen, a copy of the chosen one can.
+    expect(within(dialog).getByRole('checkbox', { name: /contract-acme-draft/ })).toBeDisabled();
+    const copy = within(dialog).getByRole('checkbox', { name: /INV-2288 \(copy\)/ });
+    expect(copy).toBeEnabled();
+    await user.click(copy);
+    await user.click(within(dialog).getByRole('button', { name: S.filePickerUse(3, undefined) }));
+    expect(values().attachments).toEqual([held, { url: OLDER.url, filename: 'INV-2288.pdf' }]);
+  });
+
+  it('sends focus to the file it wrote when filling the last room shuts the row that opened the sheet', async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        {...MANY_FILES}
+        prepareFields={boundedToTwo}
+        initialValues={{ attachments: [{ url: INVOICE.url, filename: 'INV-2291.pdf' }] }}
+        fileSource={sourceOf([OLDER])}
+      />,
+    );
+    const entry = screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') });
+    await user.click(entry);
+    const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
+    await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2288\.pdf/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Use INV-2288.pdf' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(entry).toBeDisabled();
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(document.activeElement?.closest('[data-list-row]')).toHaveTextContent('INV-2288.pdf');
   });
 });
