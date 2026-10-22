@@ -52,9 +52,10 @@ A different method is a different form. When the descriptor changes, remount wit
 | `uploading` | Whether an upload is still in flight. |
 | `ready` | Whether the run may start: every gating input filled and no upload in flight. |
 | `attempted` | Whether `attempt()` has been called since the last reset. |
-| `touched` | Whether the form holds work of the person's own: values that would send a different run from the ones it was last given (its initial values, or the last `reset`), or a file still arriving. A value typed and erased again does not count. "Fill with an example" asks before replacing a touched form. |
+| `touched` | Whether the form holds work of the person's own: values that would send a different run from the ones it was last given (its initial values, or the last `reset`), or a file still arriving. A value typed and erased again does not count. "Fill with an example" asks before replacing a touched form. Since `setValues` is how the person's edits arrive, a value a host writes through it counts as the person's too: a host that prefills the form gives the values through `initialValues` or `reset`, which are what the form was given. |
 | `setValues(next \| updater)` | Replaces the values, or updates them from the previous ones. |
 | `reset(values?)` | Goes back to `values`, or to the initial values, and forgets the attempt, the failed uploads and any upload still in flight, whose result is then dropped. |
+| `resets` | How many times `reset` has run. `MethodForm` keys its fields by it, so a reset remounts them and nothing a control kept for the values it replaced survives (the preview of a file still arriving, a refused drop, an open preview). A host rendering its own fields keys them the same way. |
 | `attempt()` | The run button's press: it marks the attempt and returns `ready`. |
 | `fileSource`, `exampleSource` | The sources the hook was given, which `MethodForm` hands its fields and mounts above them. |
 
