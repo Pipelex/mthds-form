@@ -720,25 +720,30 @@ function unescapeArbitrary(value) {
 /**
  * Whether an optional token's fallback is what its rule allows: exactly one
  * `var()` read of the token it stands for, or - for a `tint` rule - exactly
- * one `color-mix(in <space>, <that read> N%, transparent)` as well. Either way
- * the read resolves to what the control painted before when the host leaves
- * the optional token undefined. A `tint` rule still accepts the bare read
- * because the built sheet carries one: lightningcss writes every `color-mix()`
- * declaration twice, a solid line for a browser without `color-mix()` and the
- * mix under `@supports`, exactly as it does for `bg-primary/10`. A literal
- * colour there would be a second, frozen value of the contract token, and an
- * empty or missing one fails as any bare read does. Source spells the fallback
- * in Tailwind's escaped form, so it is unescaped first; the built sheet's is
- * already plain.
+ * one `color-mix(in <space>, <that read> N%, transparent)`. Either way the read
+ * resolves to what the control painted before when the host leaves the
+ * optional token undefined. A literal colour there would be a second, frozen
+ * value of the contract token, and an empty or missing one fails as any bare
+ * read does.
+ *
+ * `built` says the fallback was read from `dist/styles.css` rather than from
+ * source, and it matters for a `tint` rule only. Source must spell the mix: a
+ * class that fell back to the bare `var(--primary, …)` would paint the button
+ * colour SOLID behind the text, and nothing else would notice. The built sheet
+ * also carries that bare read on purpose: lightningcss writes every
+ * `color-mix()` declaration twice, a solid line for a browser without
+ * `color-mix()` and the mix under `@supports`, exactly as it does for
+ * `bg-primary/10` - so there, and only there, the bare read is accepted beside
+ * the mix. Source spells the fallback in Tailwind's escaped form, so it is
+ * unescaped first; the built sheet's is already plain.
  */
-function fallsBackTo(fallback, { stand, tint }) {
+function fallsBackTo(fallback, { stand, tint }, { built }) {
   if (!fallback) return false;
   const value = unescapeArbitrary(fallback).trim();
-  if (tint) {
-    const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
-    if (mix !== null) return isWholeRead(mix[1].trim(), stand);
-  }
-  return isWholeRead(value, stand);
+  if (!tint) return isWholeRead(value, stand);
+  const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
+  if (mix !== null) return isWholeRead(mix[1].trim(), stand);
+  return built && isWholeRead(value, stand);
 }
 
 /** Whether a value is one `var()` read of the token, closing at its very end. */
@@ -757,8 +762,11 @@ function isWholeRead(value, token) {
 }
 
 /** How an optional token's fallback must read, in words, for a failure message. */
-function fallbackRule({ stand, tint }) {
-  return tint ? `\`var(${stand}, …)\` or a \`color-mix()\` tint of it` : `\`var(${stand}, …)\``;
+function fallbackRule({ stand, tint }, { built }) {
+  if (!tint) return `\`var(${stand}, …)\``;
+  return built
+    ? `a \`color-mix()\` tint of \`var(${stand}, …)\`, or that read alone on lightningcss's pre-\`color-mix()\` line`
+    : `a \`color-mix()\` tint of \`var(${stand}, …)\``;
 }
 
 const themeCss = withoutComments(readFileSync(resolve('src/styles/theme.css'), 'utf8'));
@@ -874,8 +882,8 @@ for (const dir of ARBITRARY_SOURCES) {
       const rule = OPTIONAL_TOKENS.get(name);
       if (rule !== undefined) {
         optionalReads.set(name, optionalReads.get(name) + 1);
-        if (!fallsBackTo(fallback, rule)) {
-          arbitraryProblems.push(`${relative} reads ${name} without falling back to ${fallbackRule(rule)}`);
+        if (!fallsBackTo(fallback, rule, { built: false })) {
+          arbitraryProblems.push(`${relative} reads ${name} without falling back to ${fallbackRule(rule, { built: false })}`);
         }
         continue;
       }
@@ -960,7 +968,7 @@ const optionalShipped = shippedReads.filter(({ name }) => OPTIONAL_TOKENS.has(na
 const optionalBare = [
   ...new Set(
     optionalShipped
-      .filter(({ name, fallback }) => !fallsBackTo(fallback, OPTIONAL_TOKENS.get(name)))
+      .filter(({ name, fallback }) => !fallsBackTo(fallback, OPTIONAL_TOKENS.get(name), { built: true }))
       .map(({ name }) => name),
   ),
 ].sort();
@@ -979,7 +987,7 @@ if (optionalUnshipped.length > 0) {
 }
 if (optionalBare.length > 0) {
   failures.push(
-    `dist/styles.css reads ${optionalBare.map((name) => `${name} without falling back to ${fallbackRule(OPTIONAL_TOKENS.get(name))}`).join('; ')}, so a host that defines none of them no longer renders what the control painted before.`,
+    `dist/styles.css reads ${optionalBare.map((name) => `${name} without falling back to ${fallbackRule(OPTIONAL_TOKENS.get(name), { built: true })}`).join('; ')}, so a host that defines none of them no longer renders what the control painted before.`,
   );
 }
 const shipped = shippedReads.filter(

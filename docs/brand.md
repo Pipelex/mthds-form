@@ -177,7 +177,7 @@ A host maps each role onto the tokens it paints with. On this package's theme co
 Two checks serve a settings screen that previews the colours and warns without refusing anything. Each takes the seeds and one page colour, so a screen runs them for each theme and names the theme a colour is weak in.
 
 - `isActionFaint(seeds, page)` is true when the button colour sits below 3:1 against the page (`MIN_CONTROL_CONTRAST`, WCAG's level for a control's outline), so a button may be hard to see in that theme.
-- `isAccentAdjusted(seeds, page)` is true when the accent had to move to become ink there, so links will read in a darker (light theme) or lighter (dark theme) shade of it. It is exactly `accentInk !== accent`.
+- `isAccentAdjusted(seeds, page)` is true when the accent had to move to become ink there, so links will read in a darker (light theme) or lighter (dark theme) shade of it. When the accent or the button colour is set, it is exactly `accentInk !== accent`.
 
 Both judge only a colour the person set: with no button colour, `isActionFaint` is false, although Pipelex green measures below 3:1 on a white page; with neither an accent nor a button colour, so is `isAccentAdjusted`. An unset accent that follows a button colour the person set counts as set.
 
