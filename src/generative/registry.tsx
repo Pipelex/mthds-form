@@ -80,6 +80,7 @@ import {
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
+import { brandInkClass } from '../react/brand-ink';
 import { fieldControlClass } from '../react/field-styles';
 import { ResultRoot } from '../react/result-location';
 import {
@@ -551,7 +552,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums',
                 position < index
-                  ? 'bg-primary/15 text-primary'
+                  ? cn('bg-primary/15', brandInkClass)
                   : position === index
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground',

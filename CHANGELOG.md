@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`deriveBrandRoles`, three seed colours into readable roles**: `./brand` exports `deriveBrandRoles(seeds, page)`, which takes up to three optional `#rrggbb` seeds (`action`, `accent`, `header`) and the page colour they render on, and returns the roles `action`, `onAction`, `accent`, `accentFill`, `accentInk`, `header` and `onHeader` in lower case. The fills are the seeds as set, an unset button colour is Pipelex green (`PIPELEX_GREEN`), an unset accent follows the button colour, and an unset header is the page; text on a fill is pure black or white, and the ink is the accent darkened on a light page or lightened on a dark one until it reads at 4.5:1 on the page and on the pale accent fill. `resolveDarkSeeds` resolves a dark set colour by colour from the light one, `isActionFaint` and `isAccentAdjusted` are the two warnings a settings screen shows per theme, and `readableTextOn` is the black-or-white rule alone. See [docs/brand.md](docs/brand.md#three-seed-colours).
+
+### Changed
+
+- **Brand-coloured text reads `--brand`**: the enum pill's checkmark, a completed step's number, and a produced page's eyebrow, section number and tag take their colour from an optional `--brand` token, falling back to `--primary`, so a host can keep its button colour a fill and give text a readable ink. A host that defines no `--brand` renders exactly as before, and no Tailwind theme mapping is needed. See [docs/theming.md](docs/theming.md#brand-ink).
+
 ## [v0.20.0] - 2026-10-22
 
 ### Highlights
