@@ -8,7 +8,7 @@
 
 ### Changed
 
-- **The brand's colours beyond the button read `--brand`, `--brand-muted` and `--brand-muted-foreground`**: a produced page's eyebrow and section number and a field's focus border take `--brand`; the pale fill of a selected enum pill, a produced page's tag and a completed step takes `--brand-muted`; and the checkmark, tag and step number on that fill take `--brand-muted-foreground`. Each falls back to the `--primary` expression it replaced, so a host that defines none of them renders exactly as before, and a branding host keeps its button colour a solid fill while everything else reads on what it sits on; no Tailwind theme mapping is needed. See [docs/theming.md](docs/theming.md#brand-ink).
+- **The brand's colours beyond the button read `--brand`, `--brand-muted` and `--brand-muted-foreground`**: a produced page's eyebrow and section number and a field's focus border take `--brand`; the pale fill of a selected enum pill, a produced page's tag and a completed step takes `--brand-muted`; and the checkmark, tag and step number on that fill take `--brand-muted-foreground`. Each falls back to the `--primary` expression it replaced, so a host that defines none of them renders exactly as before, and a branding host keeps its button colour a solid fill while brand-coloured text reads on what it sits on; no Tailwind theme mapping is needed. See [docs/theming.md](docs/theming.md#brand-ink).
 
 ## [v0.20.0] - 2026-10-22
 

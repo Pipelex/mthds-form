@@ -11,8 +11,11 @@
  * it sits on (the `./brand` entry's `deriveBrandRoles` returns them):
  *
  * - `--brand`, the accent as text on the page (`accentInk`), which also paints
- *   a field's focus border: it reads at 4.5:1 on the page, so it always clears
- *   the 3:1 a focus indicator needs.
+ *   a field's focus border and, at 40%, its focus ring. The ink reads at 4.5:1
+ *   against the page it was derived for, so the border reads at 3:1 or more
+ *   against that page; the field's own surface, where it differs from the
+ *   page, and the translucent ring are not measured, and are the host's to
+ *   check.
  * - `--brand-muted`, the pale accent fill (`accentFill`) behind a selected
  *   pill, a tag or a completed step.
  * - `--brand-muted-foreground`, the text or icon on that fill (`accentInk`,
