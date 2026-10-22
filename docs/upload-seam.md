@@ -21,19 +21,22 @@ The package never uploads anything. A file control takes a file from the user an
 
 A host rendering a method's whole form with `MethodForm` writes none of this by hand: it hands `useMethodForm` an `uploadFile` that stores a file and resolves to its URL, and the hook supplies `onDropFile`, tracks `uploadingIds` and `uploadErrors`, and writes the result back at the field's path. See [method-form.md](method-form.md).
 
+A third way into a file value sits beside these two: a file the host already stores, chosen from its list through `FieldEnv.fileSource` and written exactly as an upload's result is. It is optional, it is offered under the field's own controls while the field is empty, and [sources.md](sources.md) is its contract.
+
 ## Which ways into a file value a host offers
 
-A file value has two ways in, and each is offered exactly when the host can honour it:
+Each way into a file value is offered exactly when the host can honour it, and each is independent of the others:
 
 - **An upload**, offered exactly when the host supplies `onDropFile`. The presence of the callback is the capability; there is no second flag to keep in agreement with it.
 - **A link**, offered unless the host sets `allowUrl` to `false`.
+- **A stored file**, offered exactly when the form has a file source (`FieldEnv.fileSource`, [sources.md](sources.md)): "Choose from your team's files", a row under whatever else the empty field shows. It changes nothing about the upload or the link beside it.
 
-| `onDropFile` | `allowUrl` | What the control renders |
-| --- | --- | --- |
-| supplied | absent or `true` | The dropzone, and the "paste a URL instead" toggle under it. |
-| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. |
-| absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. |
-| absent | `false` | **A host's configuration error.** The control throws while rendering, naming the field's id path. |
+| `onDropFile` | `allowUrl` | What the control renders | With a `fileSource` as well |
+| --- | --- | --- | --- |
+| supplied | absent or `true` | The dropzone, and the "paste a URL instead" toggle under it. | The same, and the team's files under them. |
+| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. | The dropzone, and the team's files under it. |
+| absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. | The same, and the team's files under them. |
+| absent | `false` | **A host's configuration error**: the control throws while rendering, naming the field's id path. | **The team's files only**, the one way in left, which is not an error. |
 
 The link-only row is a fix. A file field used to render an armed dropzone whatever the host supplied, so a host with no upload path got a control that opened the file picker, took the file, handed it to a callback that did nothing and stayed empty with nothing said; a required field then kept the run shut with no reason given. A disabled dropzone with a message was the other option and was rejected, because a disabled dropzone reads as "busy, try again", which is what the control shows during an upload, and it would still advertise a way in that does not exist.
 
@@ -48,7 +51,7 @@ The details of the link-only control are where its accessibility is decided:
 
 **It is form-wide, like the upload.** Both ways in are capabilities of the host rather than facts about a slot. A per-slot switch, if one is ever needed, would be a `RunField` transform in the manner of `narrowFileFormats`, and adding it later breaks nothing.
 
-**A host that offers neither way in gets a thrown error, not a rendered one**, the way `narrowFileFormats` reports a slot left accepting nothing: `The file field at "cvs.1" has no way in: …`, naming the id path the host would write back to. Rendering a field that can never be filled instead would ship a developer's message to an end user, and on a required field it would keep the run shut in silence, which is the failure this rule exists to remove. The check runs per rendered file field rather than once per form, so a host that switches links off and never uploads can still render every method that has no file input.
+**A host that offers no way in gets a thrown error, not a rendered one** (a file source counts as a way in), the way `narrowFileFormats` reports a slot left accepting nothing: `The file field at "cvs.1" has no way in: …`, naming the id path the host would write back to. Rendering a field that can never be filled instead would ship a developer's message to an end user, and on a required field it would keep the run shut in silence, which is the failure this rule exists to remove. The check runs per rendered file field rather than once per form, so a host that switches links off and never uploads can still render every method that has no file input.
 
 **The rule is `FieldRenderer`'s, so it holds everywhere a file field renders**: in a record, in every row of a list, on a produced layout through `MthdsField`, and in a `DocumentField` or `ImageField` a host composes directly, which takes `onDropFile` and `allowUrl` as props with the same meaning.
 
@@ -71,7 +74,7 @@ const fields = narrowFileFormats(buildRunFields(descriptor, contract.inputs), AL
 
 - **One list serves every slot.** It is intersected with each slot's own formats, so the list above leaves a document slot with PDF, JPG and PNG and an image slot with PNG and JPG. A host never writes a list per slot, and narrowing never widens one: a MIME type the slot's kind cannot take is not in the intersection. Each slot keeps its table's order, and MIME types are compared without parameters and case-insensitively, as the check compares them.
 - **It walks the whole tree**, into records and list items, so a file three levels down is narrowed like one at the top.
-- **It throws when a slot would be left accepting nothing**, naming the field by its path (`cvs[].portrait`). A dropzone that refuses every file is a host's configuration error, and the form should fail where the host can see it rather than render a control that cannot be used. A file field left with no way in at all, with no `onDropFile` and `allowUrl` set to `false`, is the other configuration error a host can make with a file field, and it is reported the same way (see above).
+- **It throws when a slot would be left accepting nothing**, naming the field by its path (`cvs[].portrait`). A dropzone that refuses every file is a host's configuration error, and the form should fail where the host can see it rather than render a control that cannot be used. A file field left with no way in at all, with no `onDropFile`, `allowUrl` set to `false` and no file source, is the other configuration error a host can make with a file field, and it is reported the same way (see above).
 - **It never mutates what it is given.** File slots, records and lists come back as copies, and every other field as the same object.
 
 It lives in the core entry rather than on `FieldEnv` so that a host's server, which renders no control, can import the list's one definition and hold the same answer as its form. A server that has the narrowed field can apply the control's exact check with `isAcceptedFile(field.formats, file)`. It reads `RunField`, the kernel's own output, and never touches JSON Schema, so the two schema walks [architecture.md](architecture.md) allows stay the only two. Nothing on the wire changes, and neither does the value a file field holds.
@@ -108,6 +111,7 @@ The package never uploads, so it never learns that an upload failed unless the h
 
 - **The map is the host's truth about each attempt.** A file dropped on the field is a new attempt whose outcome only the host knows, so the field shows whatever the map says about it: the host removes the entry when the next file is dropped at that id, and sets it again if that upload fails too, even in the same words. Hiding a message on the next pick by remembering its text was considered and rejected, because it cannot tell an old failure from an identical new one: a host that overwrites its entry on each failure, or whose removal on the drop and re-send on a quick failure land in one render, would get a retry that failed in silence.
 - **Leaving the upload behind hides it.** A clear or a typed link on the field hides the message on screen until the host sends a different one or removes the entry, and a refused pick shows its refusal in the same slot instead, since a refused file never reaches the host. A failure that arrives after a refusal takes the slot back.
+- **So does a file written by anyone else.** A value written into the field after the failure is a newer answer than the failure, whoever wrote it: a list's sheet filling the row whose upload failed, an example filling the form, the host's own `setValues`. The field hides the message then, as it does for its own ways in, so an upload failure is never announced beside a file that is fine.
 - **A list does not move a failure onto another row.** An entry is keyed by position, and removing a row renumbers every row after it while the host, handed only the shorter array, cannot re-key its map. So the list holds back each entry at a renumbered position, the removed row's own included, until the host removes or changes it or a new file is dropped at that position. This is the same place the busy rule above pays for renumbering, and for the same reason.
 - **The field never writes to the map**, which stays the host's, as `uploadingIds` does. While the field's id is in `uploadingIds`, the slot shows nothing, as it shows no refusal.
 - **The message is the host's own words**, shown as it is. It names no file, because the host knows which failure it was and the field does not.
@@ -160,6 +164,8 @@ One limit is accepted. A scheme-less value with a port, such as `localhost:3000/
 ## The local preview belongs to the value it was made for
 
 Dropping a file shows it immediately, from an object URL, because the value the host writes is not something a browser can render. That preview is **bound** to a value: the control cannot know the URL at drop time — the host assigns it — so it adopts the first URL to appear once the upload is no longer in flight, and retires itself when the value changes to a different one.
+
+An upload that ends without a value retires the preview as well: when the failure arrives, or when the upload stops being in flight with nothing written (the form forgot it). Nothing will arrive for it to describe, and without this the next file written there by anyone else, a pick from a list's sheet or an example, was adopted as its value and painted with the failed file. A reset that writes a file while an upload is still in flight is the one case the field cannot tell from that upload's success, so `MethodForm` remounts its fields on every reset ([method-form.md](method-form.md)), and a host rendering its own fields keys them by `resets` the same way.
 
 Without that binding the object URL won unconditionally and was cleared only by the control's own clear button, so a host writing a different file at the same path (a "use this sample" shortcut, a reset, a value restored from elsewhere) got a chip naming the new file over a preview showing the old one. `uploadingIds` is what makes the adoption exact; a host that does not report it falls back to "the first URL to appear", which for an empty field dropped into is the same moment.
 

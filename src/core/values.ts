@@ -22,7 +22,7 @@ import { buildRunFields } from './derive';
 import { ownProp } from './own-property';
 import { isFilled, isOptionalStructure, optionalStructureOpen } from './readiness';
 import { isOptionalInput, isPluralInput } from './contracts';
-import { deflateAllInputs, inflateAllInputs } from './wire-format';
+import { deflateAllInputs, inflateAllInputs, isWrappedForm } from './wire-format';
 import type { PipeIOContract, PipeInputContract } from './contracts';
 
 type Dict = Record<string, unknown>;
@@ -311,6 +311,45 @@ export function apiInputsFromRunValues(
     out[field.name] = { concept: schema.concept_ref, content: toRjsf(field, value) };
   }
   return out;
+}
+
+/**
+ * The form values a set of run inputs stands for: the inverse of
+ * `apiInputsFromRunValues`, for inputs saved from a form (an example) and
+ * handed back to one.
+ *
+ * Each input is read as a run sends it, `{ concept, content }`, or as its bare
+ * content (the empty plural `[]`), and its content is turned back into the
+ * control's own shape. Only an object naming its concept is read as that
+ * envelope: a structure sent bare may well have a property called `content`. An input the inputs do not hold is left empty, and an
+ * optional structure they do not hold stays closed: the inputs are the whole
+ * run, so an input they left out was left out of the run too. An input no
+ * field takes is ignored.
+ */
+export function runValuesFromInputs(inputs: Readonly<Dict> | undefined, fields: RunField[]): Dict {
+  const out: Dict = {};
+  for (const field of fields) {
+    const entry = ownProp(inputs ?? {}, field.name);
+    const content = isWrappedForm(entry) ? entry.content : entry;
+    out[field.name] = fromRjsf(field, content);
+  }
+  return out;
+}
+
+/**
+ * Whether two sets of form values send the same run.
+ *
+ * Compared in the shape a run takes, so the differences a run cannot see do
+ * not count: a text typed and then erased is the blank it started as, and an
+ * optional structure opened and left empty is the closed one it was. What
+ * "Fill with an example" asks before replacing is the work a person did, and
+ * a value that sends nothing is no work to lose.
+ */
+export function sameRunValues(a: Dict, b: Dict, fields: RunField[]): boolean {
+  return (
+    JSON.stringify(rjsfDataFromRunValues(a, fields)) ===
+    JSON.stringify(rjsfDataFromRunValues(b, fields))
+  );
 }
 
 // ─── Pipe output → result entries ────────────────────────────────────────────

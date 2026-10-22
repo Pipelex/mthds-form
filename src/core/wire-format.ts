@@ -197,7 +197,7 @@ function looksLikeDocument(obj: Record<string, unknown>): boolean {
  * agent skill writes it by default for disambiguation. We unwrap before applying
  * concept-specific inflation so the form populates correctly.
  */
-function isWrappedForm(value: unknown): value is { concept: string; content: unknown } {
+export function isWrappedForm(value: unknown): value is { concept: string; content: unknown } {
   return (
     !!value &&
     typeof value === 'object' &&

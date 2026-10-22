@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
 import { cn } from './utils';
-import type { FileRunField } from '../core';
+import type { FileRunField, FileSource } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import {
@@ -16,12 +16,14 @@ import {
   type FileFormat,
 } from '../core/file-formats';
 import { viewableUrl } from '../core/native-content';
+import { sourceFileValue } from '../core/sources';
 import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
 import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
+import { FilePicker, FilePickerEntry } from './file-picker';
 
 /** The serializable value of a file field. URL is what the runner sends. */
 export interface FileValue {
@@ -60,6 +62,13 @@ interface FileFieldProps {
   uploadError?: string;
   /** Resolve a `pipelex-storage://` URI to a viewable URL (stored-file preview). */
   resolveUrl?: (uri: string) => Promise<string | null>;
+  /**
+   * Where the field can take a file the host already stores. When given, the
+   * empty field offers "Choose from your team's files" under its own controls,
+   * and the chosen file is written through `onChange` as `{ url, filename }`,
+   * the value an upload writes. See docs/sources.md.
+   */
+  fileSource?: FileSource;
   error?: string;
   disabled?: boolean;
 }
@@ -134,7 +143,10 @@ interface LocalPreview {
    * upload it came from has not landed yet. The control cannot know the URL at
    * drop time - the host assigns it - so the first value that appears after the
    * upload stops being in flight is adopted as this preview's own, and any
-   * later change to a different one retires it.
+   * later change to a different one retires it. An upload that stops without
+   * one, by failing or by being forgotten, retires it too: nothing will arrive
+   * for it to describe, and the next file written here by anyone else (a pick
+   * from a list's sheet, an example) must not be painted with it.
    */
   boundUrl?: string;
 }
@@ -159,6 +171,7 @@ function FileField({
   uploading,
   uploadError,
   resolveUrl,
+  fileSource,
   error,
   disabled,
   category,
@@ -180,6 +193,11 @@ function FileField({
   // no URL for that URI - declined or failed - which is an answer, not a wait.
   const [resolved, setResolved] = useState<{ uri: string; src: string | null } | null>(null);
   const localUrlRef = useRef<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // The attached file's card, where focus goes after a file is chosen, and the
+  // row that opened the sheet, where it goes back otherwise.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const pickerEntryRef = useRef<HTMLButtonElement>(null);
 
   const setLocal = useCallback((next: LocalPreview | null) => {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
@@ -267,7 +285,12 @@ function FileField({
 
   const busy = disabled || uploading;
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    open: openFileDialog,
+  } = useDropzone({
     maxFiles: 1,
     multiple: false,
     // Disabled, not merely unrendered, when there is no upload path: the hook
@@ -307,11 +330,46 @@ function FileField({
     onChange(undefined);
   }, [setLocal, onChange, dismissUploadError]);
 
+  // A file chosen from the host's files is written as an upload's result is,
+  // and like a typed link it leaves any earlier upload behind: the preview of a
+  // dropped file, a refusal, a failure on screen.
+  const chooseFromSource = useCallback(
+    (file: Parameters<typeof sourceFileValue>[0]) => {
+      setLocal(null);
+      setResolved(null);
+      setRejected(null);
+      dismissUploadError();
+      onChange(sourceFileValue(file));
+    },
+    [setLocal, onChange, dismissUploadError],
+  );
+
   // Whether the local preview still describes the value on screen. Computed in
   // render rather than left to the effect below, so the frame in which the host
   // writes a different file does not show the old one.
   const localIsCurrent =
     !!localPreview && (localPreview.boundUrl === undefined || localPreview.boundUrl === value?.url);
+
+  // An upload over without a value: it failed, or the form forgot it. Read
+  // against the render before, since only the fall of `uploading` says so.
+  const wasUploading = useRef(!!uploading);
+  useEffect(() => {
+    const ended = wasUploading.current && !uploading;
+    wasUploading.current = !!uploading;
+    if (!localPreview || localPreview.boundUrl !== undefined) return;
+    if (failure !== null || (ended && !value?.url)) setLocal(null);
+  }, [uploading, failure, localPreview, value?.url, setLocal]);
+
+  // A file written into the value after a failure is a newer answer than the
+  // failure, whoever wrote it: the list's sheet filling this row, an example
+  // filling the form. The field's own ways in dismiss it themselves; this is
+  // the same for every other writer.
+  const lastUrl = useRef(value?.url);
+  useEffect(() => {
+    if (lastUrl.current === value?.url) return;
+    lastUrl.current = value?.url;
+    if (uploadError !== undefined) setDismissedUploadError(uploadError);
+  }, [value?.url, uploadError]);
 
   useEffect(() => {
     if (!localPreview) return;
@@ -441,18 +499,24 @@ function FileField({
   // message to an end user and, on a required field, keep the run shut in
   // silence - the failure this rule exists to remove. It fires per rendered
   // file field, so a host that switches links off and never uploads can still
-  // render every method with no file input.
-  if (!canUpload && !allowUrl) {
+  // render every method with no file input. A file source is a way in of its
+  // own: a host may offer only the files it already stores.
+  const canChoose = fileSource !== undefined;
+  if (!canUpload && !allowUrl && !canChoose) {
     throw new Error(
-      `The file field at "${id}" has no way in: the form's environment supplies no onDropFile and sets allowUrl to false. Supply onDropFile so the file can be uploaded, or leave allowUrl unset so a link can be pasted.`,
+      `The file field at "${id}" has no way in: the form's environment supplies no onDropFile and no fileSource, and sets allowUrl to false. Supply onDropFile so the file can be uploaded, leave allowUrl unset so a link can be pasted, or supply a fileSource so a stored file can be chosen.`,
     );
   }
 
   // Open from the start when a link is the only way in; behind the toggle when
   // it is the second way beside an upload; never when the host switched it off.
   const linkOpen = allowUrl && (!canUpload || showUrl);
-  // The line that stands where the dropzone would, for as long as it would.
-  const noUploadLineShown = !canUpload && !hasFile && !uploading;
+  // The line that stands where the dropzone would, for as long as it would. It
+  // says a link may be pasted instead, so it stands only where one may be.
+  const noUploadLineShown = !canUpload && allowUrl && !hasFile && !uploading;
+  // With neither an upload nor a link, the team's files are the only way in,
+  // and the field's label names their row.
+  const choosingOnly = !canUpload && !allowUrl;
   const noUploadLineId = `${domId}-no-upload`;
 
   return (
@@ -471,7 +535,7 @@ function FileField({
       htmlFor={domId}
     >
       {hasFile && !uploading ? (
-        <div className="space-y-2">
+        <div ref={cardRef} tabIndex={-1} className="space-y-2 outline-none">
           <FileChip
             value={value}
             formats={formats}
@@ -514,9 +578,11 @@ function FileField({
             </p>
           ) : (
             <>
-              <p id={noUploadLineId} className="text-[12px] text-muted-foreground">
-                {s.uploadUnavailable}
-              </p>
+              {noUploadLineShown && (
+                <p id={noUploadLineId} className="text-[12px] text-muted-foreground">
+                  {s.uploadUnavailable}
+                </p>
+              )}
               {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
             </>
           )}
@@ -634,6 +700,41 @@ function FileField({
             {s.pasteUrlInstead}
           </button>
         )
+      )}
+
+      {/* The host's files: a way in beside the upload and the link, offered
+          while the field holds no file, as the dropzone is, and shut while a
+          file is arriving, as every other way in is. */}
+      {fileSource && !hasFile && (
+        <FilePickerEntry
+          ref={pickerEntryRef}
+          id={choosingOnly ? domId : undefined}
+          label={fieldLabel(field.title, field.name, presentation)}
+          disabled={busy}
+          onOpen={() => setPickerOpen(true)}
+        />
+      )}
+      {fileSource && (
+        <FilePicker
+          source={fileSource}
+          formats={formats}
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onUse={(files) => {
+            const file = files[0];
+            if (file) chooseFromSource(file);
+          }}
+          onUpload={canUpload ? openFileDialog : undefined}
+          disabled={busy}
+          returnFocusTo={pickerEntryRef}
+          // The row that opened the sheet is gone once a file is chosen, so
+          // focus lands on the card that replaced it rather than on nothing.
+          onCloseAutoFocus={(event) => {
+            if (!cardRef.current) return;
+            event.preventDefault();
+            cardRef.current.focus();
+          }}
+        />
       )}
     </FieldShell>
   );
