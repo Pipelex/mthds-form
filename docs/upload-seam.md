@@ -21,6 +21,8 @@ The package never uploads anything. A file control takes a file from the user an
 
 A host rendering a method's whole form with `MethodForm` writes none of this by hand: it hands `useMethodForm` an `uploadFile` that stores a file and resolves to its URL, and the hook supplies `onDropFile`, tracks `uploadingIds` and `uploadErrors`, and writes the result back at the field's path. See [method-form.md](method-form.md).
 
+A third way into a file value sits beside these two: a file the host already stores, chosen from its list through `FieldEnv.fileSource` and written exactly as an upload's result is. It is optional, it is offered under the field's own controls while the field is empty, and [sources.md](sources.md) is its contract.
+
 ## Which ways into a file value a host offers
 
 A file value has two ways in, and each is offered exactly when the host can honour it:
