@@ -153,11 +153,12 @@ function heldUrl(item: unknown): string | undefined {
 }
 
 /**
- * A list of files with the chosen files added after what it holds, one row
- * each, in the order they were chosen. A file whose address the list already
- * holds is not added again, and neither is a second choice of one address:
- * two rows of a source may name the same stored file. Returns a new array and
- * leaves `held` as it was.
+ * A list of files with the chosen files written into it, in the order they
+ * were chosen: first into the rows that hold no file yet (a row the person
+ * added and left empty), then as new rows after the last. A file whose address
+ * the list already holds is not written again, and neither is a second choice
+ * of one address: two rows of a source may name the same stored file. Returns
+ * a new array and leaves `held` as it was.
  */
 export function addChosenFiles(
   held: readonly unknown[] | undefined,
@@ -165,10 +166,28 @@ export function addChosenFiles(
 ): unknown[] {
   const items = [...(held ?? [])];
   const urls = new Set(items.map(heldUrl).filter((url): url is string => url !== undefined));
+  let free = 0;
   for (const file of chosen) {
     if (urls.has(file.url)) continue;
     urls.add(file.url);
-    items.push(sourceFileValue(file));
+    while (free < items.length && heldUrl(items[free]) !== undefined) free += 1;
+    if (free < items.length) items[free] = sourceFileValue(file);
+    else items.push(sourceFileValue(file));
+    free += 1;
   }
   return items;
+}
+
+/**
+ * How many files a list may still take from a source: its bound less the files
+ * it holds, since `addChosenFiles` writes into its empty rows before adding
+ * any. `undefined` when the list has no bound.
+ */
+export function roomForChosenFiles(
+  held: readonly unknown[] | undefined,
+  maxItemCount: number | undefined,
+): number | undefined {
+  if (maxItemCount === undefined) return undefined;
+  const files = (held ?? []).filter((item) => heldUrl(item) !== undefined).length;
+  return Math.max(0, maxItemCount - files);
 }

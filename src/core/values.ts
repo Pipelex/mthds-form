@@ -22,7 +22,7 @@ import { buildRunFields } from './derive';
 import { ownProp } from './own-property';
 import { isFilled, isOptionalStructure, optionalStructureOpen } from './readiness';
 import { isOptionalInput, isPluralInput } from './contracts';
-import { deflateAllInputs, inflateAllInputs } from './wire-format';
+import { deflateAllInputs, inflateAllInputs, isWrappedForm } from './wire-format';
 import type { PipeIOContract, PipeInputContract } from './contracts';
 
 type Dict = Record<string, unknown>;
@@ -320,7 +320,8 @@ export function apiInputsFromRunValues(
  *
  * Each input is read as a run sends it, `{ concept, content }`, or as its bare
  * content (the empty plural `[]`), and its content is turned back into the
- * control's own shape. An input the inputs do not hold is left empty, and an
+ * control's own shape. Only an object naming its concept is read as that
+ * envelope: a structure sent bare may well have a property called `content`. An input the inputs do not hold is left empty, and an
  * optional structure they do not hold stays closed: the inputs are the whole
  * run, so an input they left out was left out of the run too. An input no
  * field takes is ignored.
@@ -329,10 +330,7 @@ export function runValuesFromInputs(inputs: Readonly<Dict> | undefined, fields: 
   const out: Dict = {};
   for (const field of fields) {
     const entry = ownProp(inputs ?? {}, field.name);
-    const content =
-      entry && typeof entry === 'object' && !Array.isArray(entry) && 'content' in entry
-        ? (entry as { content: unknown }).content
-        : entry;
+    const content = isWrappedForm(entry) ? entry.content : entry;
     out[field.name] = fromRjsf(field, content);
   }
   return out;

@@ -9,6 +9,7 @@ import {
   addChosenFiles,
   apiInputsFromRunValues,
   buildRunFields,
+  roomForChosenFiles,
   runValuesFromInputs,
   sameRunValues,
   sourceFileValue,
@@ -59,10 +60,22 @@ describe('addChosenFiles', () => {
     ]);
   });
 
-  it('keeps the rows the list holds as they are, empty ones included, and never mutates them', () => {
+  it('fills the rows that hold no file first, in order, then adds the rest after', () => {
+    const held: unknown[] = [undefined, { url: 'u1' }, null];
+    const next = addChosenFiles(held, [file('a', 'u2'), file('b', 'u3'), file('c', 'u4')]);
+    expect(next).toEqual([
+      { url: 'u2', filename: 'a.pdf' },
+      { url: 'u1' },
+      { url: 'u3', filename: 'b.pdf' },
+      { url: 'u4', filename: 'c.pdf' },
+    ]);
+  });
+
+  it('leaves an empty row empty when every choice was already held, and never mutates the list', () => {
     const held: unknown[] = [undefined, { url: 'u1' }];
-    const next = addChosenFiles(held, [file('a', 'u2')]);
-    expect(next).toEqual([undefined, { url: 'u1' }, { url: 'u2', filename: 'a.pdf' }]);
+    const next = addChosenFiles(held, [file('a', 'u1')]);
+    expect(next).toEqual([undefined, { url: 'u1' }]);
+    expect(next).not.toBe(held);
     expect(held).toEqual([undefined, { url: 'u1' }]);
   });
 
@@ -70,6 +83,19 @@ describe('addChosenFiles', () => {
     expect(addChosenFiles(undefined, [file('a', 'u1')])).toEqual([
       { url: 'u1', filename: 'a.pdf' },
     ]);
+  });
+});
+
+describe('roomForChosenFiles', () => {
+  it('counts the room a bounded list has left by the files it holds, not by its rows', () => {
+    expect(roomForChosenFiles([undefined, undefined], 2)).toBe(2);
+    expect(roomForChosenFiles([{ url: 'u1' }, undefined], 2)).toBe(1);
+    expect(roomForChosenFiles([{ url: 'u1' }, { url: 'u2' }], 2)).toBe(0);
+  });
+
+  it('has no bound when the list has none, and never goes below nothing', () => {
+    expect(roomForChosenFiles([{ url: 'u1' }], undefined)).toBeUndefined();
+    expect(roomForChosenFiles([{ url: 'u1' }, { url: 'u2' }, { url: 'u3' }], 2)).toBe(0);
   });
 });
 
@@ -153,6 +179,38 @@ describe('runValuesFromInputs', () => {
     expect(values['brief']).toBe('Only this');
     expect(values['comments']).toBeUndefined();
     expect(values['photos']).toEqual([]);
+  });
+
+  it('reads a structure sent bare, and keeps its own "content" property as a property', () => {
+    const contract: Record<string, PipeInputContract> = {
+      note: {
+        ...PLAIN_SINGLE,
+        concept_ref: 'demo.Note',
+        json_schema: {
+          type: 'object',
+          properties: { title: { type: 'string' }, content: { type: 'string' } },
+        },
+      },
+    };
+    const fields = buildRunFields(
+      descriptorOf({
+        ...WIRE_PLAIN,
+        kind: 'object',
+        name: 'note',
+        concept_ref: 'demo.Note',
+        fields: [
+          { kind: 'text', name: 'title', required: true },
+          { kind: 'text', name: 'content', required: true },
+        ],
+      }),
+      contract,
+    );
+    const note = { title: 'Minutes', content: 'Agreed on the budget' };
+    expect(runValuesFromInputs({ note }, fields)).toEqual({ note });
+    // The envelope a run sends is still read through.
+    expect(runValuesFromInputs({ note: { concept: 'demo.Note', content: note } }, fields)).toEqual({
+      note,
+    });
   });
 
   it('ignores an input no field takes', () => {
