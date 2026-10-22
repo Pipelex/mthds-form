@@ -7,6 +7,7 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
+import { brandFillClass, brandFillInkClass, brandInkClass } from '../react/brand-ink';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
@@ -99,7 +100,13 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
             </nav>
           ) : null}
           {props.tag ? (
-            <span className="min-w-0 truncate rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] text-primary">
+            <span
+              className={cn(
+                'min-w-0 truncate rounded-lg border border-primary/40 px-2.5 py-1 font-mono text-[11px]',
+                brandFillClass,
+                brandFillInkClass,
+              )}
+            >
               {props.tag}
             </span>
           ) : null}
@@ -119,7 +126,9 @@ function Hero({ props }: BaseComponentProps<HeroProps>) {
   return (
     <section className="pt-12 pb-10 sm:pt-14 sm:pb-12">
       {props.eyebrow ? (
-        <p className="mb-4 text-[11px] font-medium tracking-[0.15em] text-primary uppercase">
+        <p
+          className={cn('mb-4 text-[11px] font-medium tracking-[0.15em] uppercase', brandInkClass)}
+        >
           {props.eyebrow}
         </p>
       ) : null}
@@ -194,7 +203,7 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
       <div className="mb-6">
         <div className="flex items-baseline gap-3">
           {props.number ? (
-            <span className="font-mono text-[12px] text-primary">{props.number}</span>
+            <span className={cn('font-mono text-[12px]', brandInkClass)}>{props.number}</span>
           ) : null}
           <h2 className="text-xl font-semibold tracking-tight text-foreground">{props.title}</h2>
         </div>

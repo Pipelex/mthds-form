@@ -514,6 +514,32 @@ const UNUSED_BY_CONTROLS = [
 ];
 
 /**
+ * Tokens a host MAY define and `theme.css` deliberately does not, each with the
+ * token it falls back to. A control reads one as
+ * `var(--brand, var(--primary, <theme.css's light --primary>))`, so a host that
+ * leaves it undefined renders exactly as what it replaced - which is the whole
+ * promise, and the reason `theme.css` must never define one: a value there
+ * would win over the fallback for every host that loads the file.
+ *
+ * - `--brand` is the brand's ink: text on the page, and a field's focus
+ *   border. It falls back to `--primary`.
+ * - `--brand-muted` is the pale brand fill behind brand-coloured text. It falls
+ *   back to a TINT of `--primary` (`tint: true`): the
+ *   `color-mix(in oklab, var(--primary, …) N%, transparent)` Tailwind writes
+ *   for `bg-primary/N`, which is what that fill was before.
+ * - `--brand-muted-foreground` is the text on that fill. It falls back to
+ *   `--brand`, itself optional, so the chain still ends at `--primary`.
+ *
+ * They exist because the button colour (`--primary`) may be a fill no text
+ * can be read on. See docs/theming.md § "Brand ink".
+ */
+const OPTIONAL_TOKENS = new Map([
+  ['--brand', { stand: '--primary', tint: false }],
+  ['--brand-muted', { stand: '--primary', tint: true }],
+  ['--brand-muted-foreground', { stand: '--brand', tint: false }],
+]);
+
+/**
  * CSS with its comments removed, newlines kept so error messages stay readable.
  *
  * Quote-aware, because `content: "/*"` is a string and not the start of a
@@ -691,6 +717,58 @@ function unescapeArbitrary(value) {
   return value.replace(/\\?_/g, (m) => (m === '\\_' ? '_' : ' '));
 }
 
+/**
+ * Whether an optional token's fallback is what its rule allows: exactly one
+ * `var()` read of the token it stands for, or - for a `tint` rule - exactly
+ * one `color-mix(in <space>, <that read> N%, transparent)`. Either way the read
+ * resolves to what the control painted before when the host leaves the
+ * optional token undefined. A literal colour there would be a second, frozen
+ * value of the contract token, and an empty or missing one fails as any bare
+ * read does.
+ *
+ * `built` says the fallback was read from `dist/styles.css` rather than from
+ * source, and it matters for a `tint` rule only. Source must spell the mix: a
+ * class that fell back to the bare `var(--primary, …)` would paint the button
+ * colour SOLID behind the text, and nothing else would notice. The built sheet
+ * also carries that bare read on purpose: lightningcss writes every
+ * `color-mix()` declaration twice, a solid line for a browser without
+ * `color-mix()` and the mix under `@supports`, exactly as it does for
+ * `bg-primary/10` - so there, and only there, the bare read is accepted beside
+ * the mix. Source spells the fallback in Tailwind's escaped form, so it is
+ * unescaped first; the built sheet's is already plain.
+ */
+function fallsBackTo(fallback, { stand, tint }, { built }) {
+  if (!fallback) return false;
+  const value = unescapeArbitrary(fallback).trim();
+  if (!tint) return isWholeRead(value, stand);
+  const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
+  if (mix !== null) return isWholeRead(mix[1].trim(), stand);
+  return built && isWholeRead(value, stand);
+}
+
+/** Whether a value is one `var()` read of the token, closing at its very end. */
+function isWholeRead(value, token) {
+  const head = new RegExp(`^var\\(\\s*${token}\\s*[,)]`, 'i');
+  if (!head.test(value) || !value.endsWith(')')) return false;
+  let depth = 0;
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === '(') depth += 1;
+    else if (value[i] === ')') {
+      depth -= 1;
+      if (depth === 0 && i !== value.length - 1) return false;
+    }
+  }
+  return depth === 0;
+}
+
+/** How an optional token's fallback must read, in words, for a failure message. */
+function fallbackRule({ stand, tint }, { built }) {
+  if (!tint) return `\`var(${stand}, …)\``;
+  return built
+    ? `a \`color-mix()\` tint of \`var(${stand}, …)\`, or that read alone on lightningcss's pre-\`color-mix()\` line`
+    : `a \`color-mix()\` tint of \`var(${stand}, …)\``;
+}
+
 const themeCss = withoutComments(readFileSync(resolve('src/styles/theme.css'), 'utf8'));
 const lightBody = soleBlock(themeCss, /(?:^|[}\s;])(?::root)\s*\{/g, ':root', 'src/styles/theme.css');
 const darkBody = soleBlock(themeCss, /(?:^|[}\s;])(?:\.dark)\s*\{/g, '.dark', 'src/styles/theme.css');
@@ -785,6 +863,7 @@ if (armProblems.length === 0 && arms.length > 0 && lightPalette.size > 0) {
 const ARBITRARY_SOURCES = ['src/react', 'src/generative', 'src/styles'];
 const arbitraryProblems = [];
 let arbitraryReads = 0;
+const optionalReads = new Map([...OPTIONAL_TOKENS.keys()].map((name) => [name, 0]));
 for (const dir of ARBITRARY_SOURCES) {
   for (const file of readdirSync(resolve(dir), { recursive: true, withFileTypes: true })) {
     if (!file.isFile() || !/\.(tsx?|css)$/.test(file.name)) continue;
@@ -796,6 +875,18 @@ for (const dir of ARBITRARY_SOURCES) {
     let source = withoutComments(readFileSync(path, 'utf8'));
     if (themeBody !== null && source.includes(themeBody)) source = source.replace(themeBody, '');
     for (const { name, fallback } of readsOf(source, relative)) {
+      // An optional token falls back to its contract token, and to nothing else.
+      // The contract token's own read sits nested inside that fallback, and the
+      // scanner finds it there too, so its light value is judged below as any
+      // other read's is.
+      const rule = OPTIONAL_TOKENS.get(name);
+      if (rule !== undefined) {
+        optionalReads.set(name, optionalReads.get(name) + 1);
+        if (!fallsBackTo(fallback, rule, { built: false })) {
+          arbitraryProblems.push(`${relative} reads ${name} without falling back to ${fallbackRule(rule, { built: false })}`);
+        }
+        continue;
+      }
       const light = lightPalette.get(name);
       if (light === undefined) continue; // not a design token
       arbitraryReads += 1;
@@ -811,6 +902,44 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
   failures.push(
     `${arbitraryProblems.join('; ')}. A token read through an arbitrary value never passes through the \`@theme inline\` mapping, so it inherits no fallback and has to spell the light value itself.`,
   );
+}
+
+// 2c. The optional tokens: each is read somewhere (a stated exception nothing
+//     uses is a stale one), `theme.css` defines none of them (a value there
+//     would make the fallback dead for every host loading it), and the doc a
+//     host reads names each one.
+{
+  const optionalProblems = [];
+  const themingText = readFileSync(resolve('docs/theming.md'), 'utf8');
+  for (const [name, { stand }] of OPTIONAL_TOKENS) {
+    // The chain of stand-ins must end at a token theme.css defines, and never
+    // loop back on itself.
+    const chain = [name];
+    let last = stand;
+    while (OPTIONAL_TOKENS.has(last) && !chain.includes(last)) {
+      chain.push(last);
+      last = OPTIONAL_TOKENS.get(last).stand;
+    }
+    if (!lightPalette.has(last)) {
+      optionalProblems.push(`${name} falls back through ${chain.join(' → ')} to ${last}, which theme.css does not define`);
+    }
+    if (lightPalette.has(name) || darkPalette.has(name)) {
+      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${stand} never fires for a host that loads the file`);
+    }
+    if (optionalReads.get(name) === 0) {
+      optionalProblems.push(`nothing under ${ARBITRARY_SOURCES.join(', ')} reads ${name}, so listing it in OPTIONAL_TOKENS is stale`);
+    }
+    if (!themingText.includes(`\`${name}\``)) {
+      optionalProblems.push(`docs/theming.md never names ${name}, so no host is told it may define it`);
+    }
+  }
+  if (optionalProblems.length === 0) {
+    console.log(
+      `ok  optional tokens are read, fall back toward the contract and are documented: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
+    );
+  } else {
+    failures.push(`${optionalProblems.join('; ')}. See OPTIONAL_TOKENS in scripts/assert-bundle.mjs.`);
+  }
 }
 
 // 3. Nothing in the SHIPPED sheet reads a design token without a fallback, every
@@ -830,10 +959,43 @@ const selfDefined = new Set([
 // fallback-less read of it anywhere in the sheet invisible to this check. The
 // exemption exists for Tailwind's own machinery (`--text-*`, `--font-*`), which
 // is what it still covers.
-const shipped = readsOf(stylesCss, 'dist/styles.css').filter(
+const shippedReads = readsOf(stylesCss, 'dist/styles.css');
+// An optional token is judged on its own: it is read on purpose although
+// theme.css does not define it, and what must hold of it is that its fallback
+// is what its rule allows. The contract token's read nested in that fallback is
+// one of the `shipped` reads below, so its own fallback is held there.
+const optionalShipped = shippedReads.filter(({ name }) => OPTIONAL_TOKENS.has(name));
+const optionalBare = [
+  ...new Set(
+    optionalShipped
+      .filter(({ name, fallback }) => !fallsBackTo(fallback, OPTIONAL_TOKENS.get(name), { built: true }))
+      .map(({ name }) => name),
+  ),
+].sort();
+const optionalUnshipped = [...OPTIONAL_TOKENS.keys()].filter(
+  (name) => !optionalShipped.some((read) => read.name === name),
+);
+if (optionalUnshipped.length === 0 && optionalBare.length === 0) {
+  console.log(
+    `ok  dist/styles.css reads every optional token only with its fallback: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
+  );
+}
+if (optionalUnshipped.length > 0) {
+  failures.push(
+    `dist/styles.css reads none of ${optionalUnshipped.join(', ')}, though the source reads them - the utilities that read them were dropped from the sheet, so what was meant to take the brand's colours takes whatever it inherits.`,
+  );
+}
+if (optionalBare.length > 0) {
+  failures.push(
+    `dist/styles.css reads ${optionalBare.map((name) => `${name} without falling back to ${fallbackRule(OPTIONAL_TOKENS.get(name), { built: true })}`).join('; ')}, so a host that defines none of them no longer renders what the control painted before.`,
+  );
+}
+const shipped = shippedReads.filter(
   ({ name }) =>
     lightPalette.has(name) ||
-    (!selfDefined.has(name) && !RESERVED_NAMESPACES.some((prefix) => name.startsWith(prefix))),
+    (!OPTIONAL_TOKENS.has(name) &&
+      !selfDefined.has(name) &&
+      !RESERVED_NAMESPACES.some((prefix) => name.startsWith(prefix))),
 );
 const shippedNames = new Set(shipped.map((r) => r.name));
 const undocumented = [...shippedNames].filter((n) => !lightPalette.has(n)).sort();

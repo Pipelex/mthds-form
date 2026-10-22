@@ -2,6 +2,7 @@
 
 import { shownAsOptional } from '../core/readiness';
 import { Check } from 'lucide-react';
+import { brandFillInkClass, brandFillSelectedClass } from './brand-ink';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import type { EnumRunField } from '../core';
@@ -9,6 +10,7 @@ import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { useFieldDomId } from './field-dom-id';
 import { enumLabeler, fieldLabel, useFieldPresentation } from './field-presentation';
+import { cn } from './utils';
 
 interface EnumFieldProps {
   field: EnumRunField;
@@ -79,10 +81,17 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
               key={option}
               value={option}
               variant="outline"
-              className="h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:border-primary/40 data-[state=on]:bg-primary/10 data-[state=on]:font-medium data-[state=on]:text-foreground"
+              className={cn(
+                'h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:border-primary/40 data-[state=on]:font-medium data-[state=on]:text-foreground',
+                brandFillSelectedClass,
+              )}
             >
               {value === option && (
-                <Check className="size-3.5 text-primary" strokeWidth={2.5} aria-hidden="true" />
+                <Check
+                  className={cn('size-3.5', brandFillInkClass)}
+                  strokeWidth={2.5}
+                  aria-hidden="true"
+                />
               )}
               {labelOf(option)}
             </ToggleGroupItem>

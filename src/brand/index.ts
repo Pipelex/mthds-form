@@ -7,7 +7,8 @@
  * that says who wrote them. This entry validates the three and compiles the
  * tokens into a stylesheet scoped to one class. Reading a site and producing
  * a brand from it happen elsewhere; this is what their answer is checked
- * against.
+ * against. A lighter brand - up to three seed colours a person picked - is
+ * turned into readable colour roles by `deriveBrandRoles`.
  *
  * It is isomorphic and network-free: no React, no DOM, no fetch, and zod as
  * its one dependency, so the same code runs in a build script, a test, a
@@ -67,3 +68,17 @@ export {
   type BrandSource,
 } from './assemble';
 export { BRAND_VARIABLES, compileBrand } from './compile';
+
+// Up to three seed colours in, the colour roles a page paints with out.
+export {
+  MIN_CONTROL_CONTRAST,
+  PIPELEX_GREEN,
+  deriveBrandRoles,
+  isAccentAdjusted,
+  isActionFaint,
+  readableTextOn,
+  resolveDarkSeeds,
+  type BrandRoles,
+  type BrandSeeds,
+  type TextOnFill,
+} from './seed-roles';

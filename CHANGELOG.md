@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`deriveBrandRoles`, three seed colours into readable roles**: `./brand` exports `deriveBrandRoles(seeds, page)`, which takes up to three optional `#rrggbb` seeds (`action`, `accent`, `header`) and the page colour they render on, and returns the roles `action`, `onAction`, `accent`, `accentFill`, `accentInk`, `header` and `onHeader` in lower case. The fills are the seeds as set, an unset button colour is Pipelex green (`PIPELEX_GREEN`), an unset accent follows the button colour, and an unset header is the page; text on a fill is pure black or white, and the ink is the accent darkened on a light page or lightened on a dark one until it reads at 4.5:1 on the page and on the pale accent fill. `resolveDarkSeeds` resolves a dark set colour by colour from the light one, `isActionFaint` and `isAccentAdjusted` are the two warnings a settings screen shows per theme, and `readableTextOn` is the black-or-white rule alone. See [docs/brand.md](docs/brand.md#three-seed-colours).
+
+### Changed
+
+- **The brand's colours beyond the button read `--brand`, `--brand-muted` and `--brand-muted-foreground`**: a produced page's eyebrow and section number and a field's focus border take `--brand`; the pale fill of a selected enum pill, a produced page's tag and a completed step takes `--brand-muted`; and the checkmark, tag and step number on that fill take `--brand-muted-foreground`. Each falls back to the `--primary` expression it replaced, so a host that defines none of them renders exactly as before, and a branding host keeps its button colour a solid fill while brand-coloured text reads on what it sits on; no Tailwind theme mapping is needed. See [docs/theming.md](docs/theming.md#brand-ink).
+
 ## [v0.20.0] - 2026-10-22
 
 ### Highlights
