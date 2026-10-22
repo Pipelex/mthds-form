@@ -9,7 +9,13 @@ import type {
   RunField,
   SourceFile,
 } from '../../core';
-import { getPipeInputForm, getPipeIOContract, narrowFileFormats } from '../../core';
+import {
+  apiInputsFromRunValues,
+  buildRunFields,
+  getPipeInputForm,
+  getPipeIOContract,
+  narrowFileFormats,
+} from '../../core';
 import { DEFAULT_FIELD_STRINGS as S, MethodForm, useMethodForm } from '../../react';
 import { CONTRACTS, INPUT_FORM } from '../_generated/files';
 import {
@@ -140,29 +146,36 @@ function fileSourceOf(answer: FilesAnswer, initialScope: 'mine' | 'everyone'): F
   };
 }
 
-/** Two saved runs of the address form, in the run-input shape a host stores. */
-const EXAMPLES: FormExample[] = [
-  {
-    id: 'ex_1',
-    name: 'Paris office',
-    inputs: {
-      address: {
-        concept: 'structured.Address',
-        content: { street: '1 rue de la Paix', city: 'Paris', country: 'France' },
-      },
-    },
-  },
-  {
-    id: 'ex_2',
-    name: 'Berlin office',
-    inputs: {
-      address: {
-        concept: 'structured.Address',
-        content: { street: 'Unter den Linden 5', city: 'Berlin', country: 'Germany' },
-      },
-    },
-  },
-];
+/**
+ * Two saved runs of the address form. A host stores an example as the inputs a
+ * run was started with, so these are made the way a form makes them, by
+ * `apiInputsFromRunValues` over the generated contract, from values a person
+ * could have typed. Writing the run-input envelopes out by hand would be
+ * writing a payload the standard owns.
+ */
+const EXAMPLES: FormExample[] = (() => {
+  const contract = getPipeIOContract(STRUCTURED_CONTRACTS, 'structured', 'flat_object');
+  const descriptor = getPipeInputForm(STRUCTURED_INPUT_FORM, 'structured', 'flat_object');
+  if (!contract || !descriptor) throw new Error('No fixture entry for structured.flat_object.');
+  const fields = buildRunFields(descriptor, contract.inputs);
+  const example = (id: string, name: string, address: Record<string, string>): FormExample => ({
+    id,
+    name,
+    inputs: apiInputsFromRunValues({ address }, fields, contract.inputs),
+  });
+  return [
+    example('ex_1', 'Paris office', {
+      street: '1 rue de la Paix',
+      city: 'Paris',
+      country: 'France',
+    }),
+    example('ex_2', 'Berlin office', {
+      street: 'Unter den Linden 5',
+      city: 'Berlin',
+      country: 'Germany',
+    }),
+  ];
+})();
 
 /** What the example source answers: two examples, none, or a failure. */
 type ExamplesAnswer = 'two' | 'none' | 'failure';
@@ -476,6 +489,23 @@ export const ExamplesOpen: Story = {
     await expect(
       dialog.getByRole('button', { name: S.exampleActions('Paris office') }),
     ).toBeVisible();
+  },
+};
+
+/**
+ * **Filling an untouched form.** Choosing an example fills every value at once,
+ * closes the list and starts nothing.
+ */
+export const FillAnUntouchedForm: Story = {
+  name: 'Fill an untouched form',
+  args: { ...FormWithExamples.args, examples: 'two' },
+  play: async ({ canvasElement }) => {
+    const dialog = within(await openExamples(canvasElement));
+    await userEvent.click(await dialog.findByRole('button', { name: 'Berlin office' }));
+    await waitFor(() =>
+      expect(pane(canvasElement).getByLabelText('Street')).toHaveValue('Unter den Linden 5'),
+    );
+    await expect(pane(canvasElement).getByLabelText('City')).toHaveValue('Berlin');
   },
 };
 
