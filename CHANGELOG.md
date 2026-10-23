@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A file put where an upload failed ends the failure in `useMethodForm`**: choosing a file from the host's files, typing a link, clearing the field, a list's sheet filling the row and a host's `setValues` now take the field's id out of `failedUploadIds` whenever they change the file at that path, where before only a new drop or a reset did. The controller no longer reports a field as failed once another file stands in its place, and a field mounted again over that id no longer shows "upload failed" under the chosen file; a host that filtered `failedUploadIds` itself to get this can drop the filter. See [docs/upload-seam.md](docs/upload-seam.md#a-failed-upload-is-shown-on-the-field-that-took-the-file).
+
 ## [v0.21.0] - 2026-10-22
 
 ### Added

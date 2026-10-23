@@ -49,7 +49,10 @@ export interface FieldEnv {
    * entry when the next file is dropped at that id, and sets it again if that
    * upload fails too. A clear or a typed link on the field hides the message
    * until the host sends a different one or removes it, and a list holds back
-   * the entries a row removal left at a renumbered position.
+   * the entries a row removal left at a renumbered position. A host should
+   * also remove an entry once another file, or none, is written at its id, so
+   * that a control mounted there later shows no failure under it:
+   * `useMethodForm` does this for every write of its values.
    */
   uploadErrors?: ReadonlyMap<string, string>;
   /** Resolve a `pipelex-storage://` URI to a browser-viewable URL (for previews
