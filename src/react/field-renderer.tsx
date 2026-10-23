@@ -9,6 +9,7 @@ import { NumberField } from './number-field';
 import { ProseField, TextField } from './text-field';
 import { ObjectField } from './object-field';
 import { ListField } from './list-field';
+import type { RowMove } from './row-moves';
 import { UnknownField } from './unknown-field';
 
 /**
@@ -47,6 +48,41 @@ export interface FieldEnv {
    * way in at all, and the field throws, naming its path, when it renders.
    */
   allowUrl?: boolean;
+  /**
+   * Removes a list's row on the host's side: `listId` is the list's id, the
+   * one its rows' ids extend (`cvs` for `cvs.1`), and `index` the row's.
+   *
+   * Its presence is the capability, and it is the host saying it follows
+   * rows. A list hands each removal to it instead of writing the shorter list
+   * through `onChange`, so the host removes the row and, in the same update,
+   * moves to its new id whatever it keeps by the id of a later row (an entry
+   * of `uploadErrors`, an upload in flight) and drops what it kept for the
+   * removed one. The list then holds back none of the host's `uploadErrors`,
+   * which it does for a host without this callback, since that host is
+   * handed only the shorter list and cannot re-key them. A host that also
+   * gives `rowMoves` records the removal there, and the list moves its rows'
+   * identities from that record alone. `useMethodForm`'s `removeItem` is this
+   * callback. See docs/upload-seam.md, "A list does not move a failure onto
+   * another row".
+   */
+  onRemoveItem?: (listId: string, index: number) => void;
+  /**
+   * Every move the host has made to a list's rows, oldest first, each
+   * numbered above the one before it (`RowMove`).
+   *
+   * A list keys each row's controls by an identity of its own, so that a row
+   * keeps them (a caret, a dropped file's preview, a dismissed failure) when
+   * an earlier row goes. It moves those identities itself for a removal it
+   * writes through `onChange`; for everything else a host does to the rows it
+   * would see only a new list, and match rows by position. Given this, a list
+   * replays every move made to it since it last rendered, the ones made to an
+   * outer list's rows included, which rename it, and moves no identity of its
+   * own accord: a host giving it records every move it makes here, a removal
+   * handed to `onRemoveItem` included. `useMethodForm`'s `rowMoves` is this
+   * log. See docs/upload-seam.md, "What the form keeps by id moves with the
+   * rows it moves".
+   */
+  rowMoves?: readonly RowMove[];
   /** Ids currently mid-upload. */
   uploadingIds?: ReadonlySet<string>;
   /**
@@ -58,7 +94,8 @@ export interface FieldEnv {
    * entry when the next file is dropped at that id, and sets it again if that
    * upload fails too. A clear or a typed link on the field hides the message
    * until the host sends a different one or removes it, and a list holds back
-   * the entries a row removal left at a renumbered position. A host should
+   * the entries a row removal left at a renumbered position, unless the host
+   * re-keys them itself through `onRemoveItem`. A host should
    * also remove an entry once another file, or none, is written at its id, so
    * that a control mounted there later shows no failure under it:
    * `useMethodForm` does this for every write of its values.
