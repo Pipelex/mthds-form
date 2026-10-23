@@ -5,6 +5,7 @@
 ### Changed
 
 - **`onDropFile` may return the upload (Breaking)**: `FieldEnv.onDropFile`, and the `onDropFile` prop of `DocumentField` and `ImageField`, may return a promise of what the upload stored (`UploadedFile`), and the field then keeps the dropped file's preview for the value holding that URL and for nothing else, whichever render the host writes it in, before, with or after taking the id out of `uploadingIds`; a rejection retires the preview at once. `useMethodForm`'s `dropFile` returns its upload, resolving to the file it wrote and rejecting when it wrote nothing, so a host passing it to its own fields gets this unchanged. A host whose `onDropFile` returns nothing must write the uploaded value in the render it ends the flight, since one written a render earlier is now read as another writer's file, and one whose `onDropFile` returned any other value now returns nothing or the upload. See [docs/upload-seam.md](docs/upload-seam.md#the-local-preview-belongs-to-the-value-it-was-made-for).
+- **`mthds` ^0.33.0 (Breaking)**: the dependency's range moves from `^0.32.1`, which a caret on a `0.x` range keeps below 0.33, to `^0.33.0`, so a host on `mthds` 0.33, as every host on `@pipelex/sdk` 0.50 is, shares its copy of the standard's types with this package instead of installing a second one, while a host still on `mthds` 0.32 gets a second copy nested under this package until it moves to 0.33. The package reads only types from `mthds/protocol`, and none of the ones it uses changed, so the copies agree.
 
 ### Fixed
 
