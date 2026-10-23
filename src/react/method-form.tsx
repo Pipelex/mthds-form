@@ -88,8 +88,11 @@ export interface UseMethodFormOptions {
    * Stores a dropped or picked file and resolves to what the field holds. Its
    * presence is the capability: without it every file field is link-only (see
    * docs/upload-seam.md). A rejection marks the field's upload as failed with
-   * `FieldStrings.uploadFailed`; the next file dropped there clears it. When
-   * it resolves to a bare URL, or omits the name, the file's own name is kept.
+   * `FieldStrings.uploadFailed`, unless another file was written in its place
+   * while it was in flight. The next file dropped there clears the mark, and
+   * so does any write that changes the file at that path: a file chosen from
+   * `fileSource`, a typed link, a clear, a `setValues`. When it resolves to a
+   * bare URL, or omits the name, the file's own name is kept.
    */
   uploadFile?: (file: File, context: MethodFormUploadContext) => Promise<UploadedFile>;
   /**
@@ -141,7 +144,10 @@ export interface MethodFormState {
 
 /** The handle `useMethodForm` returns, and `MethodForm` renders. */
 export interface MethodFormController extends MethodFormState {
-  /** Replace the values, or update them from the previous ones. */
+  /**
+   * Replace the values, or update them from the previous ones. A write that
+   * changes the file at an id in `failedUploadIds` ends that failure.
+   */
   setValues: (next: MethodFormValues | ((previous: MethodFormValues) => MethodFormValues)) => void;
   /**
    * Back to `values` (a past run's inputs, say), or to the initial values when
@@ -163,7 +169,13 @@ export interface MethodFormController extends MethodFormState {
   resets: number;
   /** Ids (value paths) with an upload in flight. Read by `MethodForm`. */
   uploadingIds: ReadonlySet<string>;
-  /** Ids whose last upload failed. Read by `MethodForm`. */
+  /**
+   * Ids whose last upload failed, and whose file nothing has replaced since:
+   * an upload marks its id only if its place still holds the file it was
+   * dropped over, and an id leaves the set when a new file is dropped there,
+   * when a write changes the file at its path (to another file or to none),
+   * and on a reset. Read by `MethodForm`.
+   */
   failedUploadIds: ReadonlySet<string>;
   /** The upload seam `MethodForm` hands its file fields, when the host uploads. */
   dropFile: ((id: string, file: File) => void) | undefined;
@@ -187,6 +199,125 @@ function withoutId(ids: ReadonlySet<string>, id: string): ReadonlySet<string> {
   const next = new Set(ids);
   next.delete(id);
   return next;
+}
+
+/**
+ * What the form holds of its own: the values since the first edit, the
+ * uploads that failed, and what each upload in flight was dropped over. One
+ * state rather than three, because one write changes them together: a file
+ * put where an upload failed ends that failure (`written`), an upload's
+ * failure counts only while its place holds what it was dropped over
+ * (`uploadFailed`), and an updater only sees the state it is handed.
+ */
+interface HeldState {
+  /** `null` while nothing is edited, when the form shows the live initial values. */
+  edited: MethodFormValues | null;
+  /** Ids whose last upload failed, and whose file nothing has replaced since. */
+  failed: ReadonlySet<string>;
+  /**
+   * For each upload in flight, by id, the address of the file its place held
+   * when it was dropped (`undefined` for none): the file a failure of that
+   * upload would be about.
+   */
+  droppedOver: ReadonlyMap<string, string | undefined>;
+}
+
+const NOTHING_DROPPED: ReadonlyMap<string, string | undefined> = new Map();
+const NOTHING_HELD: HeldState = { edited: null, failed: EMPTY_IDS, droppedOver: NOTHING_DROPPED };
+
+/** `entries` without `id`, the same map when it held none. */
+function withoutEntry<V>(entries: ReadonlyMap<string, V>, id: string): ReadonlyMap<string, V> {
+  if (!entries.has(id)) return entries;
+  const next = new Map(entries);
+  next.delete(id);
+  return next;
+}
+
+/**
+ * The address of the file the values hold at a field id (a dotted value path,
+ * `photos.1` or `invoice.source`), or `undefined` when there is none. The URL
+ * is the file's identity, as everywhere a file value is compared: it is what
+ * the run sends, and what the file field itself watches to tell that another
+ * file was written in.
+ */
+function fileUrlAt(values: MethodFormValues, id: string): string | undefined {
+  let node: unknown = values;
+  for (const key of id.split('.')) {
+    if (node === null || typeof node !== 'object') return undefined;
+    node = ownProp(node as Record<string, unknown>, key);
+  }
+  if (node === null || typeof node !== 'object') return undefined;
+  const url = ownProp(node as Record<string, unknown>, 'url');
+  return typeof url === 'string' && url !== '' ? url : undefined;
+}
+
+/**
+ * The form after a write of its values, with every failed upload whose file
+ * the write replaced left out of the failed ids.
+ *
+ * A failure is about a file that never arrived, so whatever stands in its
+ * place afterwards is a newer answer than it, whoever wrote it: a file chosen
+ * from the host's files, a typed link, a list's sheet filling the row, the
+ * host's own `setValues`. A clear counts too: the field's own controls take
+ * every one of these, the clear included, as the person moving past the
+ * failure, and a mark the kernel kept after the control had dismissed it came
+ * back as "upload failed" on the next control mounted over that id. A write
+ * that leaves the file at that path as it was (another input, a row added
+ * after the failed one) keeps the failure.
+ *
+ * A write that hands back the values it was given returns `held` itself, so
+ * React skips the render, as it did when the values were a state of their own.
+ */
+function written(
+  held: HeldState,
+  initial: MethodFormValues,
+  update: (before: MethodFormValues) => MethodFormValues,
+): HeldState {
+  const before = held.edited ?? initial;
+  const after = update(before);
+  // While nothing is edited, even the initial values handed back are a first
+  // edit: the form owns its values from then on.
+  if (after === held.edited) return held;
+  const replaced = [...held.failed].filter((id) => fileUrlAt(before, id) !== fileUrlAt(after, id));
+  if (replaced.length === 0) return { ...held, edited: after };
+  const failed = new Set(held.failed);
+  for (const id of replaced) failed.delete(id);
+  return { ...held, edited: after, failed };
+}
+
+/** The form as a file is dropped at `id`: a new attempt, which no failure is about yet. */
+function uploadDropped(held: HeldState, initial: MethodFormValues, id: string): HeldState {
+  const droppedOver = new Map(held.droppedOver);
+  droppedOver.set(id, fileUrlAt(held.edited ?? initial, id));
+  return { ...held, failed: withoutId(held.failed, id), droppedOver };
+}
+
+/**
+ * The form as the upload at `id` fails: marked failed only while its place
+ * still holds the file it was dropped over. A file written there while it was
+ * in flight (a host's `setValues`, a list's sheet) is a newer answer than the
+ * failure, exactly as one written after it would be, so it marks nothing.
+ */
+function uploadFailed(held: HeldState, initial: MethodFormValues, id: string): HeldState {
+  const droppedOver = withoutEntry(held.droppedOver, id);
+  const stillThere =
+    held.droppedOver.has(id) && fileUrlAt(held.edited ?? initial, id) === held.droppedOver.get(id);
+  return { ...held, failed: stillThere ? withId(held.failed, id) : held.failed, droppedOver };
+}
+
+/**
+ * The form as the upload at `id` lands: its file written at its path, over
+ * whatever was written there while it was in flight, since the newest file
+ * dropped at a field wins.
+ */
+function uploadLanded(
+  held: HeldState,
+  initial: MethodFormValues,
+  id: string,
+  value: { url: string; filename: string },
+): HeldState {
+  const next = written(held, initial, (before) => setValueAtPath(before, id.split('.'), value));
+  return { ...next, droppedOver: withoutEntry(next.droppedOver, id) };
 }
 
 /**
@@ -237,7 +368,10 @@ export function useMethodForm({
     return initialValues ?? seedInputs(fields);
   }, [initialValues, fields]);
 
-  const [edited, setEdited] = useState<MethodFormValues | null>(null);
+  const [held, setHeld] = useState<HeldState>(NOTHING_HELD);
+  const edited = held.edited;
+  const failedUploadIds = held.failed;
+
   // What the person's edits are measured against: the values of the last
   // `reset`, or the initial values as they stood at the first edit since.
   // `null` while nothing is edited, when the form shows the live initial
@@ -245,7 +379,6 @@ export function useMethodForm({
   // move it, and an edit stays the person's own. `touched` compares with it.
   const [given, setGiven] = useState<MethodFormValues | null>(null);
   const [uploadingIds, setUploadingIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
-  const [failedUploadIds, setFailedUploadIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [attempted, setAttempted] = useState(false);
   const [resets, setResets] = useState(0);
   // The upload each id is waiting on. A newer drop at the same id, or a reset,
@@ -259,17 +392,18 @@ export function useMethodForm({
   const setValues = useCallback<MethodFormController['setValues']>(
     (next) => {
       setGiven((previous) => previous ?? initial);
-      setEdited((previous) => (typeof next === 'function' ? next(previous ?? initial) : next));
+      setHeld((previous) =>
+        written(previous, initial, (before) => (typeof next === 'function' ? next(before) : next)),
+      );
     },
     [initial],
   );
 
   const reset = useCallback<MethodFormController['reset']>((next) => {
     pendingUploads.current.clear();
-    setEdited(next ?? null);
+    setHeld({ edited: next ?? null, failed: EMPTY_IDS, droppedOver: NOTHING_DROPPED });
     setGiven(next ?? null);
     setUploadingIds(EMPTY_IDS);
-    setFailedUploadIds(EMPTY_IDS);
     setAttempted(false);
     setResets((count) => count + 1);
   }, []);
@@ -281,7 +415,7 @@ export function useMethodForm({
       pendingUploads.current.set(id, token);
       const current = () => pendingUploads.current.get(id) === token;
       setUploadingIds((previous) => withId(previous, id));
-      setFailedUploadIds((previous) => withoutId(previous, id));
+      setHeld((previous) => uploadDropped(previous, initial, id));
       const path = id.split('.');
       let upload: Promise<UploadedFile>;
       try {
@@ -298,10 +432,10 @@ export function useMethodForm({
                 ? { url: stored, filename: file.name }
                 : { url: stored.url, filename: stored.filename ?? file.name };
             setGiven((previous) => previous ?? initial);
-            setEdited((previous) => setValueAtPath(previous ?? initial, path, value));
+            setHeld((previous) => uploadLanded(previous, initial, id, value));
           },
           () => {
-            if (current()) setFailedUploadIds((previous) => withId(previous, id));
+            if (current()) setHeld((previous) => uploadFailed(previous, initial, id));
           },
         )
         .finally(() => {
