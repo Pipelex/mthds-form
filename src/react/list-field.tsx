@@ -125,7 +125,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               next.delete(dropId);
               return next;
             });
-            drop(dropId, file);
+            return drop(dropId, file);
           }
         : undefined,
     };
