@@ -9,7 +9,7 @@
  * away.
  */
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField, TextRunField } from '../../core';
@@ -191,5 +191,56 @@ describe('a row keeps its own DOM when a sibling is removed', () => {
 
     expect(removeButtons()).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Remove item 1' })).toBeInTheDocument();
+  });
+});
+
+describe('a host that removes rows itself', () => {
+  it('is handed each removal instead of the shorter list', async () => {
+    const user = userEvent.setup();
+    const onRemoveItem = vi.fn();
+    const onChange = vi.fn();
+    render(
+      <ListField
+        field={listOf(textItem)}
+        value={['alpha', 'beta', 'gamma']}
+        onChange={onChange}
+        id="cvs"
+        env={{ onRemoveItem }}
+      />,
+    );
+
+    await user.click(removeButtons()[1] as HTMLElement);
+    expect(onRemoveItem).toHaveBeenCalledExactlyOnceWith('cvs', 1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('still moves the surviving rows when the host writes the shorter list', async () => {
+    function RemovingHost() {
+      const [value, setValue] = useState<unknown[]>(['alpha', 'beta', 'gamma']);
+      return (
+        <ListField
+          field={listOf(textItem)}
+          value={value}
+          onChange={setValue}
+          id="cvs"
+          env={{
+            onRemoveItem: (_, index) => setValue((rows) => rows.filter((__, i) => i !== index)),
+          }}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    render(<RemovingHost />);
+    const [first, , third] = screen.getAllByRole('textbox') as [
+      HTMLInputElement,
+      HTMLInputElement,
+      HTMLInputElement,
+    ];
+
+    await user.click(removeButtons()[0] as HTMLElement);
+    const remaining = screen.getAllByRole('textbox') as HTMLInputElement[];
+    expect(remaining.map((input) => input.value)).toEqual(['beta', 'gamma']);
+    expect(remaining[1]).toBe(third);
+    expect(first.isConnected).toBe(false);
   });
 });

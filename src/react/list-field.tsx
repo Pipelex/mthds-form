@@ -74,6 +74,13 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     // reconciliation lop one off the end, or every row below this one would
     // take its neighbour's key and remount holding its neighbour's state.
     setRowKeys((prev) => prev.filter((_, i) => i !== index));
+    // A host that follows rows removes this one itself, moving what it keeps
+    // by a later row's id along with the row, so there is nothing to hold back.
+    const hostRemoves = env?.onRemoveItem;
+    if (hostRemoves) {
+      hostRemoves(id, index);
+      return;
+    }
     setStaleErrors((prev) => withRenumberedErrors(prev, id, index, env?.uploadErrors));
     onChange(items.filter((_, i) => i !== index));
   };
@@ -95,10 +102,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // outlives its upload, so the busy rule above cannot cover it: removing a row
   // renumbers every row after it, and the host's message for `cvs.1` would then
   // show on whichever row moved into `cvs.1`, while the row that failed showed
-  // nothing. The host is handed only the shorter array and cannot re-key its
-  // map, so the list pays for the staleness where it creates it: each failure
-  // at a renumbered position is held back from the rows until the host removes
-  // or changes it, or a new file is dropped at that position.
+  // nothing. A host handed only the shorter array cannot re-key its map, so
+  // the list pays for the staleness where it creates it: each failure at a
+  // renumbered position is held back from the rows until the host removes or
+  // changes it, or a new file is dropped at that position. A host that takes
+  // removals through `onRemoveItem` re-keys its map itself, and nothing is held
+  // back from it (see `removeItem`).
   const hostErrors = env?.uploadErrors;
   useEffect(() => {
     setStaleErrors((prev) => {
