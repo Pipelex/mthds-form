@@ -102,10 +102,16 @@ import { pathFromDomId } from '@pipelex/mthds-form/generative';
 env = {
   onDropFile: (id, file) => {
     const path = pathFromDomId(idPrefix, id);
-    if (path) upload(file).then((value) => store.set(path, value));
+    if (!path) return;
+    return upload(file).then((value) => {
+      store.set(path, value);
+      return value;
+    });
   },
 };
 ```
+
+It returns the upload, a promise of the value it writes, so the field keeps the dropped file's preview for that value whenever the store's write lands ([the upload seam](upload-seam.md#the-local-preview-belongs-to-the-value-it-was-made-for)). A scope that takes a list's removals through `env.onRemoveItem` is handed the list's id minted the same way, and recovers the list's path with `pathFromDomId` as well.
 
 Kept beside `domIdFor` in the same module so the two cannot drift, and exact for any name: the id escapes its own separator, so `/inputs/a-b` and `/inputs/a/b` do not mint the same one. That used to rest on an assumption about MTHDS names, which nothing in this package can enforce — a name reaches the descriptor from a JSON Schema property — and the cost of it being wrong was an upload written to a different, plausible-looking path with no error anywhere.
 

@@ -31,17 +31,27 @@ export interface FileValue {
   filename?: string;
 }
 
+/** What a host's upload resolves to: the stored file's URL, or its URL and name. */
+export type UploadedFile = string | { url: string; filename?: string };
+
 interface FileFieldProps {
   field: FileRunField;
   value: FileValue | undefined;
   /**
    * Called when a file is dropped/picked - the parent uploads and sets value.
    *
+   * It may return the upload: a promise of what it stored, whose URL is the
+   * one the host writes into the value. The control then knows its upload's
+   * own result by that URL, so the dropped file's preview is kept for it
+   * whichever render the host writes it in, and a rejection retires the
+   * preview at once. Returning nothing leaves the control to judge the upload
+   * by when its value lands (docs/upload-seam.md).
+   *
    * Absent means the host cannot store a file, and the control then offers no
    * dropzone and no picker: the link input is open from the start, with a line
    * saying a file cannot be uploaded here.
    */
-  onDropFile?: (file: File) => void;
+  onDropFile?: (file: File) => void | PromiseLike<UploadedFile | void>;
   /**
    * Whether the link input is offered, `true` when absent. `false` removes the
    * "paste a URL instead" toggle and the input behind it, and says nothing about
@@ -124,6 +134,27 @@ function dataUrlMime(url: string): string | undefined {
   return DATA_URL_MIME_RE.exec(url)?.[1]?.toLowerCase();
 }
 
+/** Whether a host's `onDropFile` handed back its upload, rather than nothing. */
+function isThenable(answer: unknown): answer is PromiseLike<unknown> {
+  return (
+    (typeof answer === 'object' || typeof answer === 'function') &&
+    answer !== null &&
+    typeof (answer as { then?: unknown }).then === 'function'
+  );
+}
+
+/**
+ * The URL an upload's answer names, or `undefined` when it names none: read
+ * defensively, because a host's `onDropFile` is typed loosely enough to hand
+ * back a promise of anything, and only a URL can be matched to the value.
+ */
+function storedUrlOf(stored: unknown): string | undefined {
+  if (typeof stored === 'string') return stored === '' ? undefined : stored;
+  if (stored === null || typeof stored !== 'object') return undefined;
+  const url = (stored as { url?: unknown }).url;
+  return typeof url === 'string' && url !== '' ? url : undefined;
+}
+
 /**
  * A preview of the file this control's own dropzone just took, held until the
  * host writes the uploaded value back.
@@ -139,16 +170,44 @@ interface LocalPreview {
   objectUrl: string;
   type: string;
   /**
+   * Whether the host's `onDropFile` handed back its upload and that promise
+   * has not settled yet. While it has not, the control waits for its answer
+   * rather than judging the upload by when a value lands.
+   */
+  awaitingUpload: boolean;
+  /**
+   * The URL the upload answered it stored the file at: the value this
+   * preview's upload writes, whichever render the host writes it in. Absent
+   * until the answer, and for good when the host handed back no upload or one
+   * that named no URL.
+   */
+  storedUrl?: string;
+  /**
    * The `value.url` this preview is the preview OF, or `undefined` while the
    * upload it came from has not landed yet. The control cannot know the URL at
-   * drop time - the host assigns it - so the first value that appears after the
-   * upload stops being in flight is adopted as this preview's own, and any
-   * later change to a different one retires it. An upload that stops without
-   * one, by failing or by being forgotten, retires it too: nothing will arrive
-   * for it to describe, and the next file written here by anyone else (a pick
-   * from a list's sheet, an example) must not be painted with it.
+   * drop time - the host assigns it. When the upload answers with it
+   * (`storedUrl`), the value holding that URL is adopted, and only that one.
+   * When it does not, the first value that appears after the upload stops
+   * being in flight is adopted instead. Either way any later change to a
+   * different one retires it. An upload that ends without one, by failing or
+   * by being forgotten, retires it too: nothing will arrive for it to
+   * describe, and the next file written here by anyone else (a pick from a
+   * list's sheet, an example) must not be painted with it. So does an upload
+   * with no answer that stops under a value someone else wrote while it was in
+   * flight (see `urlInFlight`).
    */
   boundUrl?: string;
+}
+
+/**
+ * Whether a local preview describes the value whose URL is `url`: the value it
+ * was adopted for, the one its upload answered it stored, or, while an upload
+ * with no answer to give has not landed, whatever arrives.
+ */
+function describesValue(local: LocalPreview, url: string | undefined): boolean {
+  if (local.boundUrl !== undefined) return local.boundUrl === url;
+  if (local.storedUrl !== undefined) return local.storedUrl === url;
+  return !local.awaitingUpload;
 }
 
 /** Document variant: a file shown as a PDF preview (or chip for other docs). */
@@ -185,6 +244,25 @@ function FileField({
   // The preview is collapsed by default - opened on demand via a "Preview" button.
   const [previewOpen, setPreviewOpen] = useState(false);
   const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
+  // How a preview whose upload gave no answer (`storedUrl`) tells the upload's
+  // own result from another writer's file: by when the value lands. This is the
+  // value's URL as last seen while the upload was in flight, and whether it was
+  // seen in flight at all. Such an upload's result is taken to land as the
+  // upload stops, so a URL that was already there before it stopped, and is
+  // still there after, was written by someone else while the file was arriving
+  // - a host's `setValues`, say - and the upload has nothing for the preview to
+  // describe. Without this the preview of a failed file was adopted as that
+  // other file's, once its failure stopped being reported over a file that
+  // replaced it. It is also why a host that hands back no upload must write
+  // its result in the render it ends the flight: a render early, the result
+  // reads as another writer's file; a render late, as an upload that stopped
+  // with nothing. An upload that answers needs none of this.
+  const urlInFlight = useRef<string | undefined>(undefined);
+  const flightSeen = useRef(false);
+  // Which local preview is current, counted by every change `setLocal` makes:
+  // an upload's answer that arrives after its preview was replaced, cleared or
+  // retired is about a preview that no longer exists, and touches nothing.
+  const localGeneration = useRef(0);
   // Resolved lazily, only when the user opens the preview, so a closed field
   // never fetches a presigned URL. Keyed by the URI it was resolved FROM, the
   // way `LocalPreview` is bound to the value it is the preview OF - a cached
@@ -202,6 +280,7 @@ function FileField({
   const setLocal = useCallback((next: LocalPreview | null) => {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
     localUrlRef.current = next?.objectUrl ?? null;
+    localGeneration.current += 1;
     setLocalPreview(next);
   }, []);
   useEffect(() => () => setLocal(null), [setLocal]);
@@ -277,10 +356,32 @@ function FileField({
       }
       setRejected(null);
       setDismissedUploadError(null);
-      setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
-      onDropFile(file);
+      const upload = onDropFile(file);
+      const awaitingUpload = isThenable(upload);
+      setLocal({ objectUrl: URL.createObjectURL(file), type: file.type, awaitingUpload });
+      urlInFlight.current = value?.url;
+      flightSeen.current = false;
+      if (!awaitingUpload) return;
+      // The upload's own word on what it stored, which is what tells its result
+      // from another writer's file whichever render the host writes it in. A
+      // rejection is an upload that will write nothing, so its preview goes
+      // now, rather than waiting for a failure the host may never report: one
+      // whose place another file took meanwhile is not marked as failed.
+      const generation = localGeneration.current;
+      Promise.resolve(upload).then(
+        (stored) => {
+          if (localGeneration.current !== generation) return;
+          const storedUrl = storedUrlOf(stored);
+          setLocalPreview((current) =>
+            current ? { ...current, awaitingUpload: false, storedUrl } : current,
+          );
+        },
+        () => {
+          if (localGeneration.current === generation) setLocal(null);
+        },
+      );
     },
-    [formats, setLocal, onDropFile],
+    [formats, setLocal, onDropFile, value?.url],
   );
 
   const busy = disabled || uploading;
@@ -347,18 +448,13 @@ function FileField({
   // Whether the local preview still describes the value on screen. Computed in
   // render rather than left to the effect below, so the frame in which the host
   // writes a different file does not show the old one.
-  const localIsCurrent =
-    !!localPreview && (localPreview.boundUrl === undefined || localPreview.boundUrl === value?.url);
+  const localIsCurrent = !!localPreview && describesValue(localPreview, value?.url);
 
-  // An upload over without a value: it failed, or the form forgot it. Read
-  // against the render before, since only the fall of `uploading` says so.
-  const wasUploading = useRef(!!uploading);
+  // An upload the host says failed: nothing will arrive for the preview.
   useEffect(() => {
-    const ended = wasUploading.current && !uploading;
-    wasUploading.current = !!uploading;
     if (!localPreview || localPreview.boundUrl !== undefined) return;
-    if (failure !== null || (ended && !value?.url)) setLocal(null);
-  }, [uploading, failure, localPreview, value?.url, setLocal]);
+    if (failure !== null) setLocal(null);
+  }, [failure, localPreview, setLocal]);
 
   // A file written into the value after a failure is a newer answer than the
   // failure, whoever wrote it: the list's sheet filling this row, an example
@@ -373,16 +469,42 @@ function FileField({
 
   useEffect(() => {
     if (!localPreview) return;
-    if (localPreview.boundUrl === undefined) {
-      // Still waiting for the host's write. `uploading` is the honest signal
-      // that it has not happened yet; a host that does not report it falls back
-      // to "the first URL to appear", which for the ordinary case - an empty
-      // field the user drops into - is the same moment.
-      if (uploading || !value?.url) return;
-      setLocalPreview({ ...localPreview, boundUrl: value.url });
+    if (localPreview.boundUrl !== undefined) {
+      if (value?.url !== localPreview.boundUrl) setLocal(null);
       return;
     }
-    if (value?.url !== localPreview.boundUrl) setLocal(null);
+    if (uploading) {
+      urlInFlight.current = value?.url;
+      flightSeen.current = true;
+    }
+    // The upload said where it stored the file, so its result is the value
+    // holding that URL, whenever the host writes it: before the flight ends,
+    // in the same render, or after. Nothing else is adopted, and until it
+    // lands the preview describes nothing on screen.
+    if (localPreview.storedUrl !== undefined) {
+      if (value?.url === localPreview.storedUrl) {
+        setLocalPreview({ ...localPreview, boundUrl: localPreview.storedUrl });
+      }
+      return;
+    }
+    // Still waiting: on the upload's answer, or on the host's write, for which
+    // `uploading` is the honest signal. A host that reports neither falls back
+    // to "the first URL to appear", which for the ordinary case - an empty
+    // field the user drops into - is the same moment.
+    if (uploading || localPreview.awaitingUpload) return;
+    // No answer to match, so the upload's result is told by when it lands.
+    if (!value?.url) {
+      // An upload over without a value: it failed, or the form forgot it.
+      if (flightSeen.current) setLocal(null);
+      return;
+    }
+    // Someone else's file, written while the upload was in flight, and left
+    // standing as it stopped: not this upload's result.
+    if (value.url === urlInFlight.current) {
+      setLocal(null);
+      return;
+    }
+    setLocalPreview({ ...localPreview, boundUrl: value.url });
   }, [localPreview, value?.url, uploading, setLocal]);
 
   const hasFile = !!value?.url;

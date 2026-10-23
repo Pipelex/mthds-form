@@ -12,6 +12,7 @@ import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
 import { firstFocusable } from './focus';
+import { destinationOf, movedId, type RowMove } from './row-moves';
 
 interface ListFieldProps {
   field: ListRunField;
@@ -45,7 +46,9 @@ interface ListFieldProps {
  * control's state and not in the value, so a host that replaces `values`
  * wholesale reconciles by length just as positions do. What a stable identity
  * buys over a position is exactly the reorderings the KERNEL performs, and it
- * performs one.
+ * performs one, plus those a host tells it of: a host that moves rows itself
+ * logs each move in `FieldEnv.rowMoves`, as `useMethodForm` does, and the list
+ * replays the log on its keys (see `useRowKeys`).
  */
 export function ListField({ field, value, onChange, id, error, env }: ListFieldProps) {
   const s = useFieldStrings();
@@ -54,7 +57,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
   const items = value ?? [];
-  const [rowKeys, setRowKeys] = useRowKeys(items.length);
+  const [rowKeys, setRowKeys] = useRowKeys(items.length, id, env?.rowMoves);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
@@ -72,8 +75,17 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const removeItem = (index: number) => {
     // Drop the identity WITH the row rather than letting the length
     // reconciliation lop one off the end, or every row below this one would
-    // take its neighbour's key and remount holding its neighbour's state.
-    setRowKeys((prev) => prev.filter((_, i) => i !== index));
+    // take its neighbour's key and remount holding its neighbour's state. A
+    // host that logs its moves records this one too, and the identities move
+    // when the list replays it, on the one path every other move takes.
+    if (!env?.rowMoves) setRowKeys((prev) => prev.filter((_, i) => i !== index));
+    // A host that follows rows removes this one itself, moving what it keeps
+    // by a later row's id along with the row, so there is nothing to hold back.
+    const hostRemoves = env?.onRemoveItem;
+    if (hostRemoves) {
+      hostRemoves(id, index);
+      return;
+    }
     setStaleErrors((prev) => withRenumberedErrors(prev, id, index, env?.uploadErrors));
     onChange(items.filter((_, i) => i !== index));
   };
@@ -95,10 +107,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // outlives its upload, so the busy rule above cannot cover it: removing a row
   // renumbers every row after it, and the host's message for `cvs.1` would then
   // show on whichever row moved into `cvs.1`, while the row that failed showed
-  // nothing. The host is handed only the shorter array and cannot re-key its
-  // map, so the list pays for the staleness where it creates it: each failure
-  // at a renumbered position is held back from the rows until the host removes
-  // or changes it, or a new file is dropped at that position.
+  // nothing. A host handed only the shorter array cannot re-key its map, so
+  // the list pays for the staleness where it creates it: each failure at a
+  // renumbered position is held back from the rows until the host removes or
+  // changes it, or a new file is dropped at that position. A host that takes
+  // removals through `onRemoveItem` re-keys its map itself, and nothing is held
+  // back from it (see `removeItem`).
   const hostErrors = env?.uploadErrors;
   useEffect(() => {
     setStaleErrors((prev) => {
@@ -125,7 +139,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               next.delete(dropId);
               return next;
             });
-            drop(dropId, file);
+            return drop(dropId, file);
           }
         : undefined,
     };
@@ -341,6 +355,10 @@ function withRenumberedErrors(
 interface RowKeyState {
   keys: number[];
   next: number;
+  /** The `seq` of the last of the host's row moves this list has replayed. */
+  seq: number;
+  /** The list's id as it stood after that move: an outer list's move renames it. */
+  id: string;
 }
 
 /**
@@ -351,34 +369,84 @@ interface RowKeyState {
  * state rather than in a module, and a server render and its hydration can
  * disagree about the numbers without disagreeing about the markup.
  *
- * The length reconciliation runs during render, which is the supported way to
- * adjust state when props change: React re-renders immediately without
- * committing the first pass. It is the fallback for a value that changed from
- * OUTSIDE the control (a host seeding or replacing `values`), where there is
- * nothing to match rows by and length is the only honest answer. Removals go
- * through `removeItem`, which drops the right key instead.
+ * A row moves its identity in one of two ways. A host that logs its row moves
+ * (`FieldEnv.rowMoves`, as `useMethodForm` does) is replayed: every move made
+ * to this list since it last rendered permutes the keys as it permuted the
+ * rows, and a move of an outer list's rows renames this list on the way, so a
+ * move made under its new id is still recognised. Without a log, `removeItem`
+ * drops the right key itself.
+ *
+ * Both adjustments run during render, which is the supported way to adjust
+ * state when props change: React re-renders immediately without committing the
+ * first pass. The length reconciliation after them is the fallback for a value
+ * that changed from OUTSIDE the control with nothing said about it (a host
+ * seeding or replacing `values`), where there is nothing to match rows by and
+ * length is the only honest answer.
  */
-function useRowKeys(length: number): [number[], (update: (prev: number[]) => number[]) => void] {
+function useRowKeys(
+  length: number,
+  id: string,
+  moves: readonly RowMove[] | undefined,
+): [number[], (update: (prev: number[]) => number[]) => void] {
+  const latest = moves?.[moves.length - 1]?.seq ?? 0;
   const [state, setState] = useState<RowKeyState>(() => ({
     keys: Array.from({ length }, (_, i) => i),
     next: length,
+    seq: latest,
+    id,
   }));
 
-  if (state.keys.length !== length) {
-    setState((prev) => {
-      if (length <= prev.keys.length) return { keys: prev.keys.slice(0, length), next: prev.next };
-      const added = length - prev.keys.length;
-      return {
-        keys: [...prev.keys, ...Array.from({ length: added }, (_, i) => prev.next + i)],
-        next: prev.next + added,
-      };
-    });
+  if (state.seq !== latest || state.id !== id || state.keys.length !== length) {
+    setState((prev) => withLength(replayed(prev, moves, latest, id), length));
   }
 
   const update = (fn: (prev: number[]) => number[]) =>
-    setState((prev) => ({ keys: fn(prev.keys), next: prev.next }));
+    setState((prev) => ({ ...prev, keys: fn(prev.keys) }));
 
   return [state.keys, update];
+}
+
+/**
+ * The row keys once every move in `moves` newer than the last one replayed is
+ * replayed: a move of this list's rows permutes them, a key for a row that was
+ * not known yet being minted, and a move of an outer list's rows only renames
+ * the list. The state then records `latest` and the list's id as it is now.
+ */
+function replayed(
+  state: RowKeyState,
+  moves: readonly RowMove[] | undefined,
+  latest: number,
+  id: string,
+): RowKeyState {
+  let { keys, next } = state;
+  let tracked: string | undefined = state.id;
+  for (const move of moves ?? []) {
+    if (move.seq <= state.seq || tracked === undefined) continue;
+    if (move.listId === tracked) {
+      const before = keys;
+      keys = [];
+      for (const source of move.order) {
+        const key = before[source];
+        if (key === undefined) keys.push(next++);
+        else keys.push(key);
+      }
+    } else {
+      tracked = movedId(tracked, move.listId, destinationOf(move.order));
+    }
+  }
+  return { keys, next, seq: latest, id };
+}
+
+/** The row keys cut or extended to `length`, extended ones minted fresh. */
+function withLength(state: RowKeyState, length: number): RowKeyState {
+  if (state.keys.length === length) return state;
+  if (length < state.keys.length) return { ...state, keys: state.keys.slice(0, length) };
+  const added = length - state.keys.length;
+  return {
+    ...state,
+    keys: [...state.keys, ...Array.from({ length: added }, (_, i) => state.next + i)],
+    next: state.next + added,
+  };
 }
 
 /** A sensible empty starting value for a freshly added list item. */
