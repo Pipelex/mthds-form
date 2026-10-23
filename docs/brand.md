@@ -121,7 +121,7 @@ The tokens and the manifest are separate on purpose: the tokens are the palette,
 
 ## Three seed colours
 
-A full brand is a token file a producer wrote. A lighter one is what a team sets for itself: up to three colours, each optional, each a `#rrggbb` a person picked for how it looks. `deriveBrandRoles(seeds, page)` turns them into the colours a page paints with, and every text colour it returns reads at WCAG AA, whatever was picked.
+A full brand is a token file a producer wrote. A lighter one is what a team sets for itself: up to three colours, each optional, each a `#rrggbb` a person picked for how it looks. `deriveBrandRoles(seeds, page)` turns them into the colours a page paints with, and every text colour it returns reads at WCAG AA, whatever was picked. It returns only what the team's colours produce: a colour left unset produces no role, so the host keeps its own token there, and a page reads as the team's colours where it chose some and as the host's palette everywhere else.
 
 ```ts
 import { deriveBrandRoles, resolveDarkSeeds } from '@pipelex/mthds-form/brand';
@@ -134,25 +134,25 @@ const dark = deriveBrandRoles(resolveDarkSeeds(colors, darkColors), '#0d0d0d');
 
 | Seed | What it paints | When it is not set |
 | --- | --- | --- |
-| `action` | The button colour: the run button, every main button, the selected state of a pill | Pipelex green, `PIPELEX_GREEN` (`#45bf9f`) |
-| `accent` | Secondary highlights: links, the active tab, the upload area on hover, progress | The button colour, so a red button never sits beside green links; Pipelex green when that is unset too |
-| `header` | The band across the top of the page, behind the logo | The page colour, so no band shows |
+| `action` | The button colour: the run button, every main button, the selected state of a pill | No role: the host's own button colour stays |
+| `accent` | Secondary highlights: links, the active tab, the upload area on hover, progress | The button colour, so a red button never sits beside links in another hue; no role when that is unset too |
+| `header` | The band across the top of the page, behind the logo | No role: the host draws its own band, or none |
 
 A seed is `#rrggbb` in any case, or `null` or `undefined` for unset, so a host passes a team's stored colours as they arrive. Anything else, the page colour included, throws an error naming it: a host validates what a person typed before it reaches here.
 
 ### The roles
 
-| Role | What it is | What is guaranteed |
-| --- | --- | --- |
-| `action` | The button colour, as a fill | The seed itself |
-| `onAction` | Text and icons on the button colour | `#000000` or `#ffffff`, whichever contrasts more |
-| `accent` | The accent, as a fill: an active tab's underline, a progress bar | The seed itself |
-| `accentFill` | A pale accent fill behind accent text: a pill, a badge | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page |
-| `accentInk` | The accent as text | At least 4.5:1 on the page and on `accentFill` |
-| `header` | The header band, as a fill | The seed itself |
-| `onHeader` | Text on the band: the back link, a wordmark | `#000000` or `#ffffff`, whichever contrasts more |
+| Role | What it is | What is guaranteed | Present when |
+| --- | --- | --- | --- |
+| `action` | The button colour, as a fill | The seed itself | `action` is set |
+| `onAction` | Text and icons on the button colour | `#000000` or `#ffffff`, whichever contrasts more | `action` is set |
+| `accent` | The accent, as a fill: an active tab's underline, a progress bar | The seed itself | `accent` or `action` is set |
+| `accentFill` | A pale accent fill behind accent text: a pill, a badge | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page | `accent` or `action` is set |
+| `accentInk` | The accent as text | At least 4.5:1 on the page and on `accentFill` | `accent` or `action` is set |
+| `header` | The header band, as a fill | The seed itself | `header` is set |
+| `onHeader` | Text on the band: the back link, a wordmark | `#000000` or `#ffffff`, whichever contrasts more | `header` is set |
 
-Every role is `#rrggbb` in lower case. The function returns roles, never custom property names, because each host maps them onto its own tokens.
+Every role is `#rrggbb` in lower case, and an absent role is not a key of the result at all, so with no seed the result is `{}`. The roles come in three groups (the button colour's pair, the accent's three, the band's pair), each present whole or absent whole, and the type says so: checking one role of a group, `roles.action !== undefined`, narrows the rest of it. The function returns roles, never custom property names, because each host maps them onto its own tokens.
 
 - **The fills are the person's own.** The button, the accent and the band come back exactly as they were set, so nothing a person chose is quietly corrected. A fill carries no text guarantee, which is why the button colour and the raw accent are never used for text.
 - **Text on a fill is pure black or pure white.** One of the two reaches at least 4.58:1 on any colour, so every label clears AA. Only the extremes carry that guarantee: a warm near-black or an off-white falls below 4.5:1 on some mid-tone, so no other colour is returned for text.
@@ -164,13 +164,13 @@ Every role is `#rrggbb` in lower case. The function returns roles, never custom 
 
 Every text role is measured against the page colour it is given, so a host that renders a light and a dark theme calls `deriveBrandRoles` once per theme, with that theme's page colour and that theme's seeds. The function knows nothing of themes beyond the page colour.
 
-A team may set a second, optional set of colours for the dark theme. `resolveDarkSeeds(colors, darkColors)` is its rule: each dark colour where it is set, and the light one where it is not, colour by colour, before `deriveBrandRoles` applies its own fallbacks. So a light accent the person set outranks the dark button colour the accent would otherwise follow, and a colour set in neither theme falls back to Pipelex's as it does in light. Either argument may be absent.
+A team may set a second, optional set of colours for the dark theme. `resolveDarkSeeds(colors, darkColors)` is its rule: each dark colour where it is set, and the light one where it is not, colour by colour, before `deriveBrandRoles` lets the accent follow the button colour. So a light accent the person set outranks the dark button colour the accent would otherwise follow, and a colour set in neither theme stays unset, producing no role in dark as in light. Either argument may be absent.
 
 ### Mapping the roles onto tokens
 
-A host maps each role onto the tokens it paints with. On this package's theme contract, the mapping is `action` onto `--primary` and `onAction` onto `--primary-foreground`, then the three optional brand tokens the controls read ([theming.md](theming.md) § "Brand ink"): `accentInk` onto `--brand` (brand-coloured text on the page and a field's focus border), `accentFill` onto `--brand-muted` (the pale fill of a selected pill, a tag, a completed step) and `accentInk` again onto `--brand-muted-foreground` (the text and icons on that fill). The button colour then stays a solid fill, and brand-coloured text reads on what it sits on. The focus border's guarantee is narrower: the ink reads at 4.5:1 against the page it was derived for, so the border clears 3:1 against that page, while a field surface that differs from the page and the translucent focus ring are the host's to check ([theming.md](theming.md) § "Brand ink"). `header` and `onHeader` paint a host's own band, which the controls do not draw.
+A host maps each role onto the tokens it paints with, and leaves its own value on every token whose role is absent. On this package's theme contract, the mapping is `action` onto `--primary` and `onAction` onto `--primary-foreground`, then the accent's roles onto the two optional tokens the controls read and the contract's focus token ([theming.md](theming.md) § "Link, selected and focus"): `accentInk` onto `--link` (the accent as text, on the page and on the selected fill), `accentFill` onto `--selected` (the pale fill of a selected pill, a tag, a completed step) and `accentInk` again onto `--ring` (every control's focus). The button colour then stays a solid fill, and accent text reads on what it sits on. The focus border's guarantee is narrower: the ink reads at 4.5:1 against the page it was derived for, so the border clears 3:1 against that page, while a field surface that differs from the page and a translucent focus ring are the host's to check. `header` and `onHeader` paint a host's own band, which the controls do not draw.
 
-**The accent never maps onto the contract's `--accent`.** Despite its name, `--accent` is shadcn's neutral hover fill, the colour of a menu item under the pointer. A team's accent painted there would tint every hovered row. The seed keeps the word `accent` because it is what a person setting colours calls it; the token it maps onto is a brand token.
+**The accent never maps onto the contract's `--accent`.** Despite its name, `--accent` is shadcn's neutral hover fill, the colour of a menu item under the pointer. A team's accent painted there would tint every hovered row. The seed keeps the word `accent` because it is what a person setting colours calls it; the tokens it maps onto are named after the roles they paint, `--link` and `--selected`.
 
 ### Warning a person who sets colours
 
@@ -179,11 +179,11 @@ Two checks serve a settings screen that previews the colours and warns without r
 - `isActionFaint(seeds, page)` is true when the button colour sits below 3:1 against the page (`MIN_CONTROL_CONTRAST`, WCAG's level for a control's outline), so a button may be hard to see in that theme.
 - `isAccentAdjusted(seeds, page)` is true when the accent had to move to become ink there, so links will read in a darker (light theme) or lighter (dark theme) shade of it. When the accent or the button colour is set, it is exactly `accentInk !== accent`.
 
-Both judge only a colour the person set: with no button colour, `isActionFaint` is false, although Pipelex green measures below 3:1 on a white page; with neither an accent nor a button colour, so is `isAccentAdjusted`. An unset accent that follows a button colour the person set counts as set.
+Both judge only a colour the person set: with no button colour, `isActionFaint` is false, since the button is then the host's own; with neither an accent nor a button colour, so is `isAccentAdjusted`. An unset accent that follows a button colour the person set counts as set.
 
 `readableTextOn(fill)` is the black-or-white rule on its own, for a host that paints text on a fill it derives itself, such as text on the ink.
 
-`src/brand/__tests__/seed-roles.test.ts` pins all of it across a deterministic sweep of seeds (a grid over hue, saturation and lightness, plus near white, near black, amber, pale yellow and navy) on light pages, dark pages and a mid-grey one: every text role at 4.5:1 or more on its background, the ink adjusted no further than it must be, the fallbacks, lower-case output, and no set seed ever answered with Pipelex's palette.
+`src/brand/__tests__/seed-roles.test.ts` pins all of it across a deterministic sweep of seeds (a grid over hue, saturation and lightness, plus near white, near black, amber, pale yellow and navy) on light pages, dark pages and a mid-grey one: every text role at 4.5:1 or more on its background, the ink adjusted no further than it must be, exactly the roles each set of seeds produces and none for an unset one, the accent following a set button colour, lower-case output, and every set seed returned as its own fill.
 
 ## Where a brand comes from
 

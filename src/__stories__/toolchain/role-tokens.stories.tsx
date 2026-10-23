@@ -8,26 +8,28 @@ import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
 import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../generative/layout-page';
 
 /**
- * The brand's colours, as rendered facts: what the controls paint with the
- * optional `--brand`, `--brand-muted` and `--brand-muted-foreground` tokens a
- * branding host defines, and what they paint without them.
+ * The colour roles beyond the button, as rendered facts: what the controls
+ * paint with the optional `--link` and `--selected` tokens a branding host
+ * defines, and with the `--ring` it sets, and what they paint without them.
  *
- * Each class is an arbitrary value carrying its own `var()` chain, and
- * `scripts/assert-bundle.mjs` proves every chain is SPELLED, in source and in
- * the built sheet. Whether Tailwind generates those utilities at all, and
- * whether the browser resolves each chain to the colour it names, are browser
- * questions, answered here on every element that reads them: an enum pill's
- * fill and checkmark, a produced page's tag, a completed step's chip, and a
- * field's focus border.
+ * Each `--link` and `--selected` class is an arbitrary value carrying its own
+ * `var()` chain, and `scripts/assert-bundle.mjs` proves every chain is
+ * SPELLED, in source and in the built sheet. Whether Tailwind generates those
+ * utilities at all, and whether the browser resolves each chain to the colour
+ * it names, are browser questions, answered here on every element that reads
+ * them: an enum pill's fill and checkmark, a produced page's tag, and a
+ * completed step's chip. A field's focus border is asserted beside them: it
+ * reads `--ring`, as every control's focus does, so a branding host colours
+ * every focus at once by setting that one contract token.
  *
  * Without the tokens, each must compute to exactly what the `--primary`
- * expression it replaced computes to, measured on a probe beside it in the
- * same pane. Both panes of the theme pair are asserted, because a fallback
- * follows each theme's `--primary`.
+ * expression it replaced computes to, and the focus border to `--ring`,
+ * measured on a probe beside it in the same pane. Both panes of the theme pair
+ * are asserted, because a fallback follows each theme's `--primary`.
  */
 
 const meta = {
-  title: 'Toolchain/Brand Ink',
+  title: 'Toolchain/Role Tokens',
   component: CaseForm,
   args: {
     contracts: CONTRACTS,
@@ -43,20 +45,21 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * An amber team's ink and pale fill on a white page, as `deriveBrandRoles`
- * derives them. The ink on the fill is set a shade apart from the ink on the
- * page, so a story can tell which of the two tokens an element read.
+ * derives them. A branding host writes the same ink onto `--ring`; here the
+ * ring is set a shade apart, so a story can tell which of the two tokens a
+ * focus border read.
  */
-const BRAND = { ink: '#9c6406', fill: '#fef3e2', fillInk: '#8a5a05' };
-const RGB = { ink: 'rgb(156, 100, 6)', fill: 'rgb(254, 243, 226)', fillInk: 'rgb(138, 90, 5)' };
+const BRAND = { link: '#9c6406', selected: '#fef3e2', ring: '#8a5a05' };
+const RGB = { link: 'rgb(156, 100, 6)', selected: 'rgb(254, 243, 226)', ring: 'rgb(138, 90, 5)' };
 
 function Branded({ children }: { children: React.ReactNode }) {
   return (
     <div
       style={
         {
-          '--brand': BRAND.ink,
-          '--brand-muted': BRAND.fill,
-          '--brand-muted-foreground': BRAND.fillInk,
+          '--link': BRAND.link,
+          '--selected': BRAND.selected,
+          '--ring': BRAND.ring,
         } as React.CSSProperties
       }
     >
@@ -80,6 +83,7 @@ function computed(beside: Element, property: 'color' | 'backgroundColor', value:
 }
 
 const PRIMARY = 'var(--primary)';
+const RING = 'var(--ring)';
 const tint = (percent: number) => `color-mix(in oklab, var(--primary) ${percent}%, transparent)`;
 
 /** Every selected pill on the canvas, one per pane, with its checkmark. */
@@ -101,7 +105,7 @@ export const PillWithoutBrand: Story = {
   },
 };
 
-/** A host's tokens: the pill takes the pale accent fill, and its checkmark the ink on it. */
+/** A host's tokens: the pill takes the selected fill, and its checkmark the link ink on it. */
 export const PillWithBrand: Story = {
   decorators: [
     (Story) => (
@@ -112,8 +116,8 @@ export const PillWithBrand: Story = {
   ],
   play: async ({ canvasElement }) => {
     for (const [pill, mark] of selectedPills(canvasElement)) {
-      expect(getComputedStyle(pill).backgroundColor).toBe(RGB.fill);
-      expect(getComputedStyle(mark).color).toBe(RGB.fillInk);
+      expect(getComputedStyle(pill).backgroundColor).toBe(RGB.selected);
+      expect(getComputedStyle(mark).color).toBe(RGB.link);
     }
   },
 };
@@ -177,9 +181,9 @@ async function tabTo(field: HTMLInputElement) {
 }
 
 /**
- * No tokens: the tag, the completed step and a field's focus border paint
- * what `bg-primary/10`, `bg-primary/15`, `text-primary` and `border-primary`
- * did.
+ * No tokens: the tag and the completed step paint what `bg-primary/10`,
+ * `bg-primary/15` and `text-primary` did, and a field's focus border is
+ * `--ring`'s.
  */
 export const ChipsWithoutBrand: Story = {
   parameters: GENERATIVE_STORY_PARAMETERS,
@@ -187,7 +191,7 @@ export const ChipsWithoutBrand: Story = {
   play: async ({ canvasElement }) => {
     for (const field of titleFields(canvasElement)) {
       await tabTo(field);
-      expect(getComputedStyle(field).borderTopColor).toBe(computed(field, 'color', PRIMARY));
+      expect(getComputedStyle(field).borderTopColor).toBe(computed(field, 'color', RING));
     }
     for (const tag of tags(canvasElement)) {
       expect(getComputedStyle(tag).backgroundColor).toBe(
@@ -206,8 +210,8 @@ export const ChipsWithoutBrand: Story = {
 };
 
 /**
- * A host's tokens: the tag and the completed step take the pale accent fill
- * and the ink on it, and a focused field's border takes the ink.
+ * A host's tokens: the tag and the completed step take the selected fill and
+ * the link ink on it, and a focused field's border takes the ring.
  */
 export const ChipsWithBrand: Story = {
   parameters: GENERATIVE_STORY_PARAMETERS,
@@ -219,15 +223,15 @@ export const ChipsWithBrand: Story = {
   play: async ({ canvasElement }) => {
     for (const field of titleFields(canvasElement)) {
       await tabTo(field);
-      expect(getComputedStyle(field).borderTopColor).toBe(RGB.ink);
+      expect(getComputedStyle(field).borderTopColor).toBe(RGB.ring);
     }
     for (const tag of tags(canvasElement)) {
-      expect(getComputedStyle(tag).backgroundColor).toBe(RGB.fill);
-      expect(getComputedStyle(tag).color).toBe(RGB.fillInk);
+      expect(getComputedStyle(tag).backgroundColor).toBe(RGB.selected);
+      expect(getComputedStyle(tag).color).toBe(RGB.link);
     }
     for (const chip of await completedSteps(canvasElement)) {
-      expect(getComputedStyle(chip).backgroundColor).toBe(RGB.fill);
-      expect(getComputedStyle(chip).color).toBe(RGB.fillInk);
+      expect(getComputedStyle(chip).backgroundColor).toBe(RGB.selected);
+      expect(getComputedStyle(chip).color).toBe(RGB.link);
     }
   },
 };

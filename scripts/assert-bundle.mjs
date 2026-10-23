@@ -516,27 +516,25 @@ const UNUSED_BY_CONTROLS = [
 /**
  * Tokens a host MAY define and `theme.css` deliberately does not, each with the
  * token it falls back to. A control reads one as
- * `var(--brand, var(--primary, <theme.css's light --primary>))`, so a host that
+ * `var(--link, var(--primary, <theme.css's light --primary>))`, so a host that
  * leaves it undefined renders exactly as what it replaced - which is the whole
  * promise, and the reason `theme.css` must never define one: a value there
  * would win over the fallback for every host that loads the file.
  *
- * - `--brand` is the brand's ink: text on the page, and a field's focus
- *   border. It falls back to `--primary`.
- * - `--brand-muted` is the pale brand fill behind brand-coloured text. It falls
- *   back to a TINT of `--primary` (`tint: true`): the
+ * - `--link` is the accent as text: on the page, and on the selected fill. It
+ *   falls back to `--primary`.
+ * - `--selected` is the pale accent fill of something selected, behind
+ *   `--link` text. It falls back to a TINT of `--primary` (`tint: true`): the
  *   `color-mix(in oklab, var(--primary, …) N%, transparent)` Tailwind writes
  *   for `bg-primary/N`, which is what that fill was before.
- * - `--brand-muted-foreground` is the text on that fill. It falls back to
- *   `--brand`, itself optional, so the chain still ends at `--primary`.
  *
  * They exist because the button colour (`--primary`) may be a fill no text
- * can be read on. See docs/theming.md § "Brand ink".
+ * can be read on. Focus is not among them: every control focuses on the
+ * contract's own `--ring`. See docs/theming.md § "Link, selected and focus".
  */
 const OPTIONAL_TOKENS = new Map([
-  ['--brand', { stand: '--primary', tint: false }],
-  ['--brand-muted', { stand: '--primary', tint: true }],
-  ['--brand-muted-foreground', { stand: '--brand', tint: false }],
+  ['--link', { stand: '--primary', tint: false }],
+  ['--selected', { stand: '--primary', tint: true }],
 ]);
 
 /**
@@ -982,7 +980,7 @@ if (optionalUnshipped.length === 0 && optionalBare.length === 0) {
 }
 if (optionalUnshipped.length > 0) {
   failures.push(
-    `dist/styles.css reads none of ${optionalUnshipped.join(', ')}, though the source reads them - the utilities that read them were dropped from the sheet, so what was meant to take the brand's colours takes whatever it inherits.`,
+    `dist/styles.css reads none of ${optionalUnshipped.join(', ')}, though the source reads them - the utilities that read them were dropped from the sheet, so what was meant to take the team's colours takes whatever it inherits.`,
   );
 }
 if (optionalBare.length > 0) {
