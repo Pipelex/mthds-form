@@ -146,7 +146,9 @@ interface LocalPreview {
    * later change to a different one retires it. An upload that stops without
    * one, by failing or by being forgotten, retires it too: nothing will arrive
    * for it to describe, and the next file written here by anyone else (a pick
-   * from a list's sheet, an example) must not be painted with it.
+   * from a list's sheet, an example) must not be painted with it. So does an
+   * upload that stops under a value someone else wrote while it was in flight
+   * (see `urlInFlight`).
    */
   boundUrl?: string;
 }
@@ -185,6 +187,15 @@ function FileField({
   // The preview is collapsed by default - opened on demand via a "Preview" button.
   const [previewOpen, setPreviewOpen] = useState(false);
   const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
+  // The value's URL as last seen while the upload behind the local preview was
+  // in flight. An upload's own result lands as the upload stops (the form
+  // writes both in one render), so a URL that was already there before it
+  // stopped, and is still there after, was written by someone else while the
+  // file was arriving - a host's `setValues`, say - and the upload, which then
+  // wrote nothing, has nothing for the preview to describe. Without this the
+  // preview of a failed file was adopted as that other file's, once its failure
+  // stopped being reported over a file that replaced it.
+  const urlInFlight = useRef<string | undefined>(undefined);
   // Resolved lazily, only when the user opens the preview, so a closed field
   // never fetches a presigned URL. Keyed by the URI it was resolved FROM, the
   // way `LocalPreview` is bound to the value it is the preview OF - a cached
@@ -278,9 +289,10 @@ function FileField({
       setRejected(null);
       setDismissedUploadError(null);
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type });
+      urlInFlight.current = value?.url;
       onDropFile(file);
     },
-    [formats, setLocal, onDropFile],
+    [formats, setLocal, onDropFile, value?.url],
   );
 
   const busy = disabled || uploading;
@@ -378,7 +390,17 @@ function FileField({
       // that it has not happened yet; a host that does not report it falls back
       // to "the first URL to appear", which for the ordinary case - an empty
       // field the user drops into - is the same moment.
-      if (uploading || !value?.url) return;
+      if (uploading) {
+        urlInFlight.current = value?.url;
+        return;
+      }
+      if (!value?.url) return;
+      // Someone else's file, written while the upload was in flight, and left
+      // standing as it stopped: not this upload's result.
+      if (value.url === urlInFlight.current) {
+        setLocal(null);
+        return;
+      }
       setLocalPreview({ ...localPreview, boundUrl: value.url });
       return;
     }

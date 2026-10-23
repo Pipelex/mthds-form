@@ -88,10 +88,11 @@ export interface UseMethodFormOptions {
    * Stores a dropped or picked file and resolves to what the field holds. Its
    * presence is the capability: without it every file field is link-only (see
    * docs/upload-seam.md). A rejection marks the field's upload as failed with
-   * `FieldStrings.uploadFailed`. The next file dropped there clears the mark,
-   * and so does any write that changes the file at that path: a file chosen
-   * from `fileSource`, a typed link, a clear, a `setValues`. When it resolves
-   * to a bare URL, or omits the name, the file's own name is kept.
+   * `FieldStrings.uploadFailed`, unless another file was written in its place
+   * while it was in flight. The next file dropped there clears the mark, and
+   * so does any write that changes the file at that path: a file chosen from
+   * `fileSource`, a typed link, a clear, a `setValues`. When it resolves to a
+   * bare URL, or omits the name, the file's own name is kept.
    */
   uploadFile?: (file: File, context: MethodFormUploadContext) => Promise<UploadedFile>;
   /**
@@ -170,9 +171,10 @@ export interface MethodFormController extends MethodFormState {
   uploadingIds: ReadonlySet<string>;
   /**
    * Ids whose last upload failed, and whose file nothing has replaced since:
-   * an id leaves the set when a new file is dropped there, when a write
-   * changes the file at its path (to another file or to none), and on a
-   * reset. Read by `MethodForm`.
+   * an upload marks its id only if its place still holds the file it was
+   * dropped over, and an id leaves the set when a new file is dropped there,
+   * when a write changes the file at its path (to another file or to none),
+   * and on a reset. Read by `MethodForm`.
    */
   failedUploadIds: ReadonlySet<string>;
   /** The upload seam `MethodForm` hands its file fields, when the host uploads. */
@@ -200,23 +202,35 @@ function withoutId(ids: ReadonlySet<string>, id: string): ReadonlySet<string> {
 }
 
 /**
- * What the form holds of its own: the values since the first edit, and the
- * uploads that failed. One state rather than two, because one write changes
- * both: a file put where an upload failed ends that failure (`written`), and
- * an updater only sees the values it is handed.
+ * What the form holds of its own: the values since the first edit, the
+ * uploads that failed, and what each upload in flight was dropped over. One
+ * state rather than three, because one write changes them together: a file
+ * put where an upload failed ends that failure (`written`), an upload's
+ * failure counts only while its place holds what it was dropped over
+ * (`uploadFailed`), and an updater only sees the state it is handed.
  */
 interface HeldState {
   /** `null` while nothing is edited, when the form shows the live initial values. */
   edited: MethodFormValues | null;
   /** Ids whose last upload failed, and whose file nothing has replaced since. */
   failed: ReadonlySet<string>;
+  /**
+   * For each upload in flight, by id, the address of the file its place held
+   * when it was dropped (`undefined` for none): the file a failure of that
+   * upload would be about.
+   */
+  droppedOver: ReadonlyMap<string, string | undefined>;
 }
 
-const NOTHING_HELD: HeldState = { edited: null, failed: EMPTY_IDS };
+const NOTHING_DROPPED: ReadonlyMap<string, string | undefined> = new Map();
+const NOTHING_HELD: HeldState = { edited: null, failed: EMPTY_IDS, droppedOver: NOTHING_DROPPED };
 
-/** `held` with `failed` as its failed ids, the same object when they did not change. */
-function withFailed(held: HeldState, failed: ReadonlySet<string>): HeldState {
-  return failed === held.failed ? held : { ...held, failed };
+/** `entries` without `id`, the same map when it held none. */
+function withoutEntry<V>(entries: ReadonlyMap<string, V>, id: string): ReadonlyMap<string, V> {
+  if (!entries.has(id)) return entries;
+  const next = new Map(entries);
+  next.delete(id);
+  return next;
 }
 
 /**
@@ -250,6 +264,9 @@ function fileUrlAt(values: MethodFormValues, id: string): string | undefined {
  * back as "upload failed" on the next control mounted over that id. A write
  * that leaves the file at that path as it was (another input, a row added
  * after the failed one) keeps the failure.
+ *
+ * A write that hands back the values it was given returns `held` itself, so
+ * React skips the render, as it did when the values were a state of their own.
  */
 function written(
   held: HeldState,
@@ -258,12 +275,49 @@ function written(
 ): HeldState {
   const before = held.edited ?? initial;
   const after = update(before);
-  if (held.failed.size === 0 || after === before) return { edited: after, failed: held.failed };
+  // While nothing is edited, even the initial values handed back are a first
+  // edit: the form owns its values from then on.
+  if (after === held.edited) return held;
   const replaced = [...held.failed].filter((id) => fileUrlAt(before, id) !== fileUrlAt(after, id));
-  if (replaced.length === 0) return { edited: after, failed: held.failed };
+  if (replaced.length === 0) return { ...held, edited: after };
   const failed = new Set(held.failed);
   for (const id of replaced) failed.delete(id);
-  return { edited: after, failed };
+  return { ...held, edited: after, failed };
+}
+
+/** The form as a file is dropped at `id`: a new attempt, which no failure is about yet. */
+function uploadDropped(held: HeldState, initial: MethodFormValues, id: string): HeldState {
+  const droppedOver = new Map(held.droppedOver);
+  droppedOver.set(id, fileUrlAt(held.edited ?? initial, id));
+  return { ...held, failed: withoutId(held.failed, id), droppedOver };
+}
+
+/**
+ * The form as the upload at `id` fails: marked failed only while its place
+ * still holds the file it was dropped over. A file written there while it was
+ * in flight (a host's `setValues`, a list's sheet) is a newer answer than the
+ * failure, exactly as one written after it would be, so it marks nothing.
+ */
+function uploadFailed(held: HeldState, initial: MethodFormValues, id: string): HeldState {
+  const droppedOver = withoutEntry(held.droppedOver, id);
+  const stillThere =
+    held.droppedOver.has(id) && fileUrlAt(held.edited ?? initial, id) === held.droppedOver.get(id);
+  return { ...held, failed: stillThere ? withId(held.failed, id) : held.failed, droppedOver };
+}
+
+/**
+ * The form as the upload at `id` lands: its file written at its path, over
+ * whatever was written there while it was in flight, since the newest file
+ * dropped at a field wins.
+ */
+function uploadLanded(
+  held: HeldState,
+  initial: MethodFormValues,
+  id: string,
+  value: { url: string; filename: string },
+): HeldState {
+  const next = written(held, initial, (before) => setValueAtPath(before, id.split('.'), value));
+  return { ...next, droppedOver: withoutEntry(next.droppedOver, id) };
 }
 
 /**
@@ -347,7 +401,7 @@ export function useMethodForm({
 
   const reset = useCallback<MethodFormController['reset']>((next) => {
     pendingUploads.current.clear();
-    setHeld({ edited: next ?? null, failed: EMPTY_IDS });
+    setHeld({ edited: next ?? null, failed: EMPTY_IDS, droppedOver: NOTHING_DROPPED });
     setGiven(next ?? null);
     setUploadingIds(EMPTY_IDS);
     setAttempted(false);
@@ -361,7 +415,7 @@ export function useMethodForm({
       pendingUploads.current.set(id, token);
       const current = () => pendingUploads.current.get(id) === token;
       setUploadingIds((previous) => withId(previous, id));
-      setHeld((previous) => withFailed(previous, withoutId(previous.failed, id)));
+      setHeld((previous) => uploadDropped(previous, initial, id));
       const path = id.split('.');
       let upload: Promise<UploadedFile>;
       try {
@@ -378,13 +432,10 @@ export function useMethodForm({
                 ? { url: stored, filename: file.name }
                 : { url: stored.url, filename: stored.filename ?? file.name };
             setGiven((previous) => previous ?? initial);
-            setHeld((previous) =>
-              written(previous, initial, (before) => setValueAtPath(before, path, value)),
-            );
+            setHeld((previous) => uploadLanded(previous, initial, id, value));
           },
           () => {
-            if (!current()) return;
-            setHeld((previous) => withFailed(previous, withId(previous.failed, id)));
+            if (current()) setHeld((previous) => uploadFailed(previous, initial, id));
           },
         )
         .finally(() => {
