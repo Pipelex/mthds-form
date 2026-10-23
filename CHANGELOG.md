@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`onDropFile` may return the upload (Breaking)**: `FieldEnv.onDropFile`, and the `onDropFile` prop of `DocumentField` and `ImageField`, may return a promise of what the upload stored (`UploadedFile`), and the field then keeps the dropped file's preview for the value holding that URL and for nothing else, whichever render the host writes it in, before, with or after taking the id out of `uploadingIds`; a rejection retires the preview at once. `useMethodForm`'s `dropFile` returns its upload, resolving to the file it wrote and rejecting when it wrote nothing, so a host passing it to its own fields gets this unchanged. A host whose `onDropFile` returns nothing must write the uploaded value in the render it ends the flight, since one written a render earlier is now read as another writer's file, and one whose `onDropFile` returned any other value now returns nothing or the upload. See [docs/upload-seam.md](docs/upload-seam.md#the-local-preview-belongs-to-the-value-it-was-made-for).
+
 ### Fixed
 
 - **A file put where an upload failed ends the failure in `useMethodForm`**: choosing a file from the host's files, typing a link, clearing the field, a list's sheet filling the row and a host's `setValues` now take the field's id out of `failedUploadIds` whenever they change the file at that path, where before only a new drop or a reset did, and an upload that fails after one of them wrote another file in its place while it was in flight no longer marks the field at all. The controller no longer reports a field as failed once another file stands in its place, and a field mounted again over that id no longer shows "upload failed" under the chosen file; a host that filtered `failedUploadIds` itself to get this can drop the filter. See [docs/upload-seam.md](docs/upload-seam.md#a-failed-upload-is-shown-on-the-field-that-took-the-file).

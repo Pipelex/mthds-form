@@ -25,6 +25,7 @@ import { closeOptionalStructures, openOptionalStructures, seedInputs } from '../
 import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/values';
 import { FillWithExample } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
+import type { UploadedFile } from './file-field';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
@@ -46,9 +47,6 @@ import { cn } from './utils';
 
 /** The form's values, keyed by input name, in the controls' own shape. */
 export type MethodFormValues = Record<string, unknown>;
-
-/** What a host's upload resolves to: the stored file's URL, or its URL and name. */
-export type UploadedFile = string | { url: string; filename?: string };
 
 /** Where a dropped file goes: its field's id, which is its value path, split. */
 export interface MethodFormUploadContext {
@@ -177,8 +175,17 @@ export interface MethodFormController extends MethodFormState {
    * and on a reset. Read by `MethodForm`.
    */
   failedUploadIds: ReadonlySet<string>;
-  /** The upload seam `MethodForm` hands its file fields, when the host uploads. */
-  dropFile: ((id: string, file: File) => void) | undefined;
+  /**
+   * The upload seam `MethodForm` hands its file fields, when the host uploads:
+   * stores the file through `uploadFile` and writes it at the id's path. It
+   * returns the upload, which resolves to the file it wrote there once it
+   * lands, and rejects when it writes nothing: when it fails, or when a newer
+   * file dropped at the same id or a reset replaces it. A file field matches
+   * that answer to its value, so a host rendering its own fields passes this
+   * as `FieldEnv.onDropFile` unchanged. Ignoring the promise is safe: the
+   * form handles its rejection itself.
+   */
+  dropFile: ((id: string, file: File) => Promise<{ url: string; filename: string }>) | undefined;
   /** The host's file source, which `MethodForm` hands its file fields. */
   fileSource: FileSource | undefined;
   /** The host's example source, which `MethodForm` offers above the fields. */
@@ -423,26 +430,35 @@ export function useMethodForm({
       } catch (error) {
         upload = Promise.reject(error);
       }
-      upload
-        .then(
-          (stored) => {
-            if (!current()) return;
-            const value =
-              typeof stored === 'string'
-                ? { url: stored, filename: file.name }
-                : { url: stored.url, filename: stored.filename ?? file.name };
-            setGiven((previous) => previous ?? initial);
-            setHeld((previous) => uploadLanded(previous, initial, id, value));
-          },
-          () => {
-            if (current()) setHeld((previous) => uploadFailed(previous, initial, id));
-          },
-        )
+      // What this upload wrote, handed back to whoever dropped the file: the
+      // field matches its URL to the value, which is how it knows its upload's
+      // own result whatever render the result lands in. An upload that writes
+      // nothing rejects, the one a newer drop or a reset replaced included,
+      // since the field must not wait on a file that will never arrive.
+      const landed = upload.then((stored) => {
+        if (!current()) {
+          throw new Error(`A newer file or a reset replaced the upload at "${id}".`);
+        }
+        const value =
+          typeof stored === 'string'
+            ? { url: stored, filename: file.name }
+            : { url: stored.url, filename: stored.filename ?? file.name };
+        setGiven((previous) => previous ?? initial);
+        setHeld((previous) => uploadLanded(previous, initial, id, value));
+        return value;
+      });
+      // The form handles the rejection itself, so a caller that ignores the
+      // promise leaves no unhandled rejection behind.
+      landed
+        .then(undefined, () => {
+          if (current()) setHeld((previous) => uploadFailed(previous, initial, id));
+        })
         .finally(() => {
           if (!current()) return;
           pendingUploads.current.delete(id);
           setUploadingIds((previous) => withoutId(previous, id));
         });
+      return landed;
     };
   }, [uploadFile, initial]);
 

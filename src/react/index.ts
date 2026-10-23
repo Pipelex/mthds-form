@@ -10,7 +10,7 @@ export { FieldRenderer } from './field-renderer';
 export { BooleanField } from './boolean-field';
 export { DateField } from './date-field';
 export { EnumField } from './enum-field';
-export type { FileValue } from './file-field';
+export type { FileValue, UploadedFile } from './file-field';
 export { DocumentField, ImageField } from './file-field';
 export { ListField } from './list-field';
 export { NumberField } from './number-field';
@@ -28,7 +28,6 @@ export type {
   MethodFormState,
   MethodFormUploadContext,
   MethodFormValues,
-  UploadedFile,
   UseMethodFormOptions,
 } from './method-form';
 export { MethodForm, useMethodForm } from './method-form';

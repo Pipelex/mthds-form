@@ -3,7 +3,7 @@
 import type { FileSource, RunField } from '../core';
 import { BooleanField } from './boolean-field';
 import { DateField } from './date-field';
-import { DocumentField, ImageField, type FileValue } from './file-field';
+import { DocumentField, ImageField, type FileValue, type UploadedFile } from './file-field';
 import { EnumField } from './enum-field';
 import { NumberField } from './number-field';
 import { ProseField, TextField } from './text-field';
@@ -20,12 +20,21 @@ export interface FieldEnv {
   /**
    * A file field asks its parent to upload; the parent sets the value later.
    *
+   * It may return the upload: a promise of what it stored (`UploadedFile`),
+   * whose URL is the one the host writes at the id, rejected when the upload
+   * writes nothing. The field then knows its upload's own result by that URL,
+   * so the dropped file's preview is kept for it whichever render the host
+   * writes it in. A host that returns nothing must write the result in the
+   * render it takes the id out of `uploadingIds`. `useMethodForm`'s `dropFile`
+   * returns its upload. See docs/upload-seam.md, "The local preview belongs to
+   * the value it was made for".
+   *
    * Its presence is the capability. A host that supplies it gets a dropzone on
    * every file field; a host that does not gets no dropzone and no file picker,
    * because a file taken with nowhere to go used to be dropped without a word.
    * See docs/upload-seam.md, "Which ways into a file value a host offers".
    */
-  onDropFile?: (id: string, file: File) => void;
+  onDropFile?: (id: string, file: File) => void | PromiseLike<UploadedFile | void>;
   /**
    * Whether a file field offers a link input, the way in that needs no upload.
    * `true` when absent; `false` hides the "paste a URL instead" toggle and the
