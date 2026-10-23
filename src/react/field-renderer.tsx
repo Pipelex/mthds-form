@@ -9,6 +9,7 @@ import { NumberField } from './number-field';
 import { ProseField, TextField } from './text-field';
 import { ObjectField } from './object-field';
 import { ListField } from './list-field';
+import type { RowMove } from './row-moves';
 import { UnknownField } from './unknown-field';
 
 /**
@@ -58,11 +59,30 @@ export interface FieldEnv {
    * of `uploadErrors`, an upload in flight) and drops what it kept for the
    * removed one. The list then holds back none of the host's `uploadErrors`,
    * which it does for a host without this callback, since that host is
-   * handed only the shorter list and cannot re-key them. `useMethodForm`'s
-   * `removeItem` is this callback. See docs/upload-seam.md, "A list does not
-   * move a failure onto another row".
+   * handed only the shorter list and cannot re-key them. A host that also
+   * gives `rowMoves` records the removal there, and the list moves its rows'
+   * identities from that record alone. `useMethodForm`'s `removeItem` is this
+   * callback. See docs/upload-seam.md, "A list does not move a failure onto
+   * another row".
    */
   onRemoveItem?: (listId: string, index: number) => void;
+  /**
+   * Every move the host has made to a list's rows, oldest first, each
+   * numbered above the one before it (`RowMove`).
+   *
+   * A list keys each row's controls by an identity of its own, so that a row
+   * keeps them (a caret, a dropped file's preview, a dismissed failure) when
+   * an earlier row goes. It moves those identities itself for a removal it
+   * writes through `onChange`; for everything else a host does to the rows it
+   * would see only a new list, and match rows by position. Given this, a list
+   * replays every move made to it since it last rendered, the ones made to an
+   * outer list's rows included, which rename it, and moves no identity of its
+   * own accord: a host giving it records every move it makes here, a removal
+   * handed to `onRemoveItem` included. `useMethodForm`'s `rowMoves` is this
+   * log. See docs/upload-seam.md, "What the form keeps by id moves with the
+   * rows it moves".
+   */
+  rowMoves?: readonly RowMove[];
   /** Ids currently mid-upload. */
   uploadingIds?: ReadonlySet<string>;
   /**

@@ -29,6 +29,7 @@ import type { UploadedFile } from './file-field';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
+import { destinationOf, movedId, type RowMove } from './row-moves';
 import { cn } from './utils';
 
 /**
@@ -179,6 +180,14 @@ export interface MethodFormController extends MethodFormState {
    */
   moveItem: (listId: string, from: number, to: number) => void;
   /**
+   * Every move `removeItem` and `moveItem` have made since the last reset,
+   * oldest first. `MethodForm` hands it to its lists as `FieldEnv.rowMoves`,
+   * and a list replays it on the identities of its rows, so a row's controls
+   * move with the row whoever moved it; a host rendering its own fields passes
+   * it the same way, beside `removeItem`.
+   */
+  rowMoves: readonly RowMove[];
+  /**
    * Back to `values` (a past run's inputs, say), or to the initial values when
    * none is given. Forgets the edits, the attempt, the failed uploads and any
    * upload still in flight, whose result is then dropped.
@@ -258,8 +267,8 @@ interface InFlight {
 
 /**
  * What the form holds of its own: the values since the first edit, the
- * uploads that failed, and the uploads in flight. One state rather than
- * three, because one write changes them together: a file put where an upload
+ * uploads that failed, the uploads in flight and the rows it has moved. One
+ * state rather than several, because one write changes them together: a file put where an upload
  * failed ends that failure (`written`), an upload's failure counts only while
  * its place holds what it was dropped over (`uploadFailed`), and a row moved
  * in a list carries both with it (`rowsMoved`).
@@ -277,10 +286,21 @@ interface HeldState {
   failed: ReadonlySet<string>;
   /** The uploads in flight, by the id each one writes back to. */
   uploads: ReadonlyMap<string, InFlight>;
+  /**
+   * The rows moved since the last reset, oldest first: what the lists replay
+   * on the identities of their rows, so they agree with the ids above.
+   */
+  moves: readonly RowMove[];
 }
 
 const NO_UPLOADS: ReadonlyMap<string, InFlight> = new Map();
-const NOTHING_HELD: HeldState = { edited: null, failed: EMPTY_IDS, uploads: NO_UPLOADS };
+const NO_MOVES: readonly RowMove[] = [];
+const NOTHING_HELD: HeldState = {
+  edited: null,
+  failed: EMPTY_IDS,
+  uploads: NO_UPLOADS,
+  moves: NO_MOVES,
+};
 
 /** `entries` without `id`, the same map when it held none. */
 function withoutEntry<V>(entries: ReadonlyMap<string, V>, id: string): ReadonlyMap<string, V> {
@@ -426,13 +446,15 @@ function uploadLanded(
  *
  * This is the one write the form reads by row rather than by position, and it
  * can because it makes the move itself: a value cannot say that a row moved,
- * so a write handed to `written` could only be guessed at.
+ * so a write handed to `written` could only be guessed at. The move joins the
+ * log under `seq`, for the lists to move their rows' identities the same way.
  */
 function rowsMoved(
   held: HeldState,
   initial: MethodFormValues,
   listId: string,
   order: (rows: readonly unknown[]) => readonly number[] | null,
+  seq: number,
 ): HeldState {
   const before = held.edited ?? initial;
   const rows = valueAt(before, listId);
@@ -444,42 +466,19 @@ function rowsMoved(
     listId.split('.'),
     sources.map((source) => rows[source]),
   );
-  const destination = new Map(sources.map((source, index) => [source, index]));
-  const prefix = `${listId}.`;
+  const destination = destinationOf(sources);
   const failed = new Set<string>();
   for (const id of held.failed) {
-    const moved = movedId(id, prefix, destination);
+    const moved = movedId(id, listId, destination);
     if (moved !== undefined) failed.add(moved);
   }
   const uploads = new Map<string, InFlight>();
   for (const [id, upload] of held.uploads) {
-    const moved = movedId(id, prefix, destination);
+    const moved = movedId(id, listId, destination);
     if (moved !== undefined) uploads.set(moved, upload);
   }
-  return { edited: after, failed, uploads };
-}
-
-/**
- * `id` once the rows of the list whose ids start with `prefix` (the list's id
- * and a dot) have moved, each from its old index to `destination`'s entry for
- * it: the same id outside that list, the id under the row's new index inside
- * it, and `undefined` for an id under a row that is gone. The dot keeps a
- * sibling input called `cvs_extra` out of a list called `cvs`, as in the list
- * control's own busy test.
- */
-function movedId(
-  id: string,
-  prefix: string,
-  destination: ReadonlyMap<number, number>,
-): string | undefined {
-  if (!id.startsWith(prefix)) return id;
-  const rest = id.slice(prefix.length);
-  const dot = rest.indexOf('.');
-  const row = dot === -1 ? rest : rest.slice(0, dot);
-  if (!/^\d+$/.test(row)) return id;
-  const index = destination.get(Number(row));
-  if (index === undefined) return undefined;
-  return `${prefix}${index}${dot === -1 ? '' : rest.slice(dot)}`;
+  const moves = [...held.moves, { seq, listId, order: sources }];
+  return { edited: after, failed, uploads, moves };
 }
 
 /** Whether `index` names a row of `rows`. */
@@ -580,6 +579,9 @@ export function useMethodForm({
   const [attempted, setAttempted] = useState(false);
   const [resets, setResets] = useState(0);
   const uploadCounter = useRef(0);
+  // Numbers the row moves, and is never reset: a list mounted before a reset
+  // must not mistake a move made after it for one it has already replayed.
+  const moveCounter = useRef(0);
 
   const values = edited ?? initial;
 
@@ -597,8 +599,10 @@ export function useMethodForm({
 
   const moveRows = useCallback(
     (listId: string, order: (rows: readonly unknown[]) => readonly number[] | null) => {
-      const next = rowsMoved(store.current, initial, listId, order);
+      const seq = moveCounter.current + 1;
+      const next = rowsMoved(store.current, initial, listId, order, seq);
       if (next === store.current) return;
+      moveCounter.current = seq;
       setGiven((previous) => previous ?? initial);
       commit(next);
     },
@@ -615,7 +619,7 @@ export function useMethodForm({
 
   const reset = useCallback<MethodFormController['reset']>(
     (next) => {
-      commit({ edited: next ?? null, failed: EMPTY_IDS, uploads: NO_UPLOADS });
+      commit({ edited: next ?? null, failed: EMPTY_IDS, uploads: NO_UPLOADS, moves: NO_MOVES });
       setGiven(next ?? null);
       setAttempted(false);
       setResets((count) => count + 1);
@@ -694,6 +698,7 @@ export function useMethodForm({
     setValues,
     removeItem,
     moveItem,
+    rowMoves: held.moves,
     reset,
     attempt,
     resets,
@@ -781,6 +786,7 @@ function MethodFormFields({
     values,
     setValues,
     removeItem,
+    rowMoves,
     reset,
     attempted,
     touched,
@@ -803,13 +809,26 @@ function MethodFormFields({
       uploadingIds,
       uploadErrors,
       // A list's remove button goes through the form, which carries a failed
-      // upload, or one in flight, along with the rows it renumbers.
+      // upload, or one in flight, along with the rows it renumbers, and logs
+      // the move for every list to move its rows' identities the same way,
+      // whether the button or the host moved them.
       onRemoveItem: removeItem,
+      rowMoves,
       allowUrl,
       resolveUrl,
       fileSource,
     }),
-    [disabled, dropFile, uploadingIds, uploadErrors, removeItem, allowUrl, resolveUrl, fileSource],
+    [
+      disabled,
+      dropFile,
+      uploadingIds,
+      uploadErrors,
+      removeItem,
+      rowMoves,
+      allowUrl,
+      resolveUrl,
+      fileSource,
+    ],
   );
 
   // The same disclosure the object control draws inside a structure, at the

@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField, TextRunField } from '../../core';
 import { DOCUMENT_FORMATS } from '../../core/file-formats';
 import { ListField } from '../list-field';
+import type { RowMove } from '../row-moves';
 
 const textItem: TextRunField = {
   kind: 'text',
@@ -242,5 +243,65 @@ describe('a host that removes rows itself', () => {
     expect(remaining.map((input) => input.value)).toEqual(['beta', 'gamma']);
     expect(remaining[1]).toBe(third);
     expect(first.isConnected).toBe(false);
+  });
+});
+
+describe('a host that reports the moves it makes', () => {
+  /** Keeps a log of its own moves, as `useMethodForm` does, and hands it to the list. */
+  function LoggingHost() {
+    const [value, setValue] = useState<unknown[]>(['alpha', 'beta', 'gamma']);
+    const [moves, setMoves] = useState<readonly RowMove[]>([]);
+    const move = (order: number[]) => {
+      setValue((rows) => order.map((i) => rows[i]));
+      setMoves((log) => [...log, { seq: log.length + 1, listId: 'cvs', order }]);
+    };
+    return (
+      <>
+        <ListField
+          field={listOf(textItem)}
+          value={value}
+          onChange={setValue}
+          id="cvs"
+          env={{
+            rowMoves: moves,
+            onRemoveItem: (_, index) => move(value.map((__, i) => i).filter((i) => i !== index)),
+          }}
+        />
+        <button type="button" onClick={() => move([2, 0, 1])}>
+          Rotate
+        </button>
+      </>
+    );
+  }
+
+  const textboxes = () => screen.getAllByRole('textbox') as HTMLInputElement[];
+  /** Asserts that `actual` holds exactly the `expected` DOM nodes, by identity, in order. */
+  const expectSameNodes = (
+    actual: readonly Element[],
+    expected: readonly (Element | undefined)[],
+  ) => {
+    expect(actual).toHaveLength(expected.length);
+    expected.forEach((node, index) => expect(actual[index]).toBe(node));
+  };
+
+  it('moves its rows with a move the host made on its own', async () => {
+    const user = userEvent.setup();
+    render(<LoggingHost />);
+    const [first, second, third] = textboxes();
+
+    await user.click(screen.getByRole('button', { name: 'Rotate' }));
+    expect(textboxes().map((input) => input.value)).toEqual(['gamma', 'alpha', 'beta']);
+    expectSameNodes(textboxes(), [third, first, second]);
+  });
+
+  it('moves them once for its own remove button, through the host’s log', async () => {
+    const user = userEvent.setup();
+    render(<LoggingHost />);
+    const [first, second, third] = textboxes();
+
+    await user.click(removeButtons()[1] as HTMLElement);
+    expect(textboxes().map((input) => input.value)).toEqual(['alpha', 'gamma']);
+    expectSameNodes(textboxes(), [first, third]);
+    expect(second?.isConnected).toBe(false);
   });
 });

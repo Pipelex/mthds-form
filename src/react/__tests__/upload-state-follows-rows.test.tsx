@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, render, renderHook, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FileRunField, ListRunField, ObjectRunField } from '../../core';
+import type { FileRunField, ListRunField, ObjectRunField, TextRunField } from '../../core';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
 // drags the gate and ajv into a suite that tests the control set.
 import { getPipeIOContract } from '../../core/contracts';
@@ -98,6 +98,12 @@ function Harness(options: HarnessProps) {
       >
         Host writes the first row
       </button>
+      <button type="button" onClick={() => form.moveItem('attachments', 1, 0)}>
+        Host moves the second row first
+      </button>
+      <button type="button" onClick={() => form.removeItem('attachments', 0)}>
+        Host removes the first row
+      </button>
       <output data-testid="state">
         {JSON.stringify({ values: form.values, failed: [...form.failedUploadIds] })}
       </output>
@@ -118,6 +124,12 @@ const fileInputs = (container: HTMLElement) =>
 /** Which rows show the upload failure, by position. */
 const failedRows = (container: HTMLElement) =>
   rows(container).flatMap((row, index) => (within(row).queryByText(S.uploadFailed) ? [index] : []));
+
+/** Asserts that `actual` holds exactly the `expected` DOM nodes, by identity, in order. */
+function expectSameNodes(actual: readonly Element[], expected: readonly Element[]) {
+  expect(actual).toHaveLength(expected.length);
+  expected.forEach((node, index) => expect(actual[index]).toBe(node));
+}
 
 /** Drops a file on the `nth` empty file field, and waits for its upload to fail. */
 async function failAt(user: User, container: HTMLElement, nth: number, id: string) {
@@ -204,6 +216,53 @@ describe('a failed upload’s mark follows its row when the list’s remove butt
     await press(user, 'Mount again');
     expect(screen.queryByText(S.uploadFailed)).toBeNull();
     expect(screen.getByText('host.pdf')).toBeInTheDocument();
+  });
+});
+
+/**
+ * A list's rows are React elements keyed by an identity the list keeps, and a
+ * row's controls hold state of their own (a dismissed failure, a dropped
+ * file's preview). When the host moves rows through the controller rather
+ * than through the list's own remove button, the list has to move those
+ * identities too, or a row's controls stay at the position and take on its
+ * neighbour's value.
+ */
+describe('rows the host moves through the controller keep their controls', () => {
+  it('keeps the mark on a failed empty row moved ahead of a filled one', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Harness uploadFile={rejected} initialValues={withAttachments([A, undefined])} />,
+    );
+    await failAt(user, container, 0, 'attachments.1');
+    const [filled, failedRow] = rows(container) as [HTMLElement, HTMLElement];
+
+    await press(user, 'Host moves the second row first');
+    expect(state().values.attachments).toEqual([null, A]);
+    expect(failed()).toEqual(['attachments.0']);
+    expect(failedRows(container)).toEqual([0]);
+    expectSameNodes(rows(container), [failedRow, filled]);
+  });
+
+  it('keeps the surviving rows’ DOM when an earlier row is removed', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Harness initialValues={withAttachments([A, B, C])} />);
+    const [first, second, third] = rows(container) as [HTMLElement, HTMLElement, HTMLElement];
+
+    await press(user, 'Host removes the first row');
+    expect(state().values.attachments).toEqual([B, C]);
+    expectSameNodes(rows(container), [second, third]);
+    expect(first.isConnected).toBe(false);
+  });
+
+  it('keeps them when the list’s own remove button goes through the controller', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Harness initialValues={withAttachments([A, B, C])} />);
+    const [first, second, third] = rows(container) as [HTMLElement, HTMLElement, HTMLElement];
+
+    await removeRow(user, 2);
+    expect(state().values.attachments).toEqual([A, C]);
+    expectSameNodes(rows(container), [first, third]);
+    expect(second.isConnected).toBe(false);
   });
 });
 
@@ -454,6 +513,105 @@ describe('rows of nested lists', () => {
     await removeRow(user, 1);
     expect(failed()).toEqual(['candidates.0.resume']);
     expect(failedRows(container)).toEqual([0]);
+  });
+});
+
+describe('a list inside a row the host moves', () => {
+  const name: TextRunField = {
+    kind: 'text',
+    name: 'name',
+    conceptRef: 'native.Text',
+    required: true,
+  };
+  const letter: TextRunField = {
+    kind: 'text',
+    name: 'letter',
+    conceptRef: 'native.Text',
+    required: true,
+  };
+  const letters: ListRunField = {
+    kind: 'list',
+    name: 'letters',
+    conceptRef: 'native.Text[]',
+    required: true,
+    item: letter,
+  };
+  const candidate: ObjectRunField = {
+    kind: 'object',
+    name: 'candidate',
+    conceptRef: 'hiring.Candidate',
+    required: true,
+    fields: [name, letters],
+  };
+  const candidates: ListRunField = {
+    kind: 'list',
+    name: 'candidates',
+    conceptRef: 'hiring.Candidate[]',
+    required: true,
+    item: candidate,
+  };
+
+  /** A host rendering its own field over the controller, handing it what `MethodForm` would. */
+  function Nested({ moves }: { moves: (form: Form) => void }) {
+    const form = useMethodForm({
+      ...MANY_FILES,
+      initialValues: (seed) => ({
+        ...seed,
+        candidates: [
+          { name: 'x', letters: ['a', 'b'] },
+          { name: 'y', letters: ['c', 'd', 'e'] },
+        ],
+      }),
+    });
+    return (
+      <>
+        <FieldRenderer
+          field={candidates}
+          id="candidates"
+          value={form.values.candidates}
+          onChange={(next) => form.setValues((previous) => ({ ...previous, candidates: next }))}
+          env={{ onRemoveItem: form.removeItem, rowMoves: form.rowMoves }}
+        />
+        <button type="button" onClick={() => moves(form)}>
+          Move
+        </button>
+      </>
+    );
+  }
+
+  const inputHolding = (text: string) =>
+    (screen.getAllByRole('textbox') as HTMLInputElement[]).find((input) => input.value === text);
+
+  it.each([
+    [
+      'the outer row first, then the inner one at its new id',
+      (form: Form) => {
+        form.removeItem('candidates', 0);
+        form.removeItem('candidates.0.letters', 0);
+      },
+    ],
+    [
+      'the inner row first, then the outer one',
+      (form: Form) => {
+        form.removeItem('candidates.1.letters', 0);
+        form.removeItem('candidates', 0);
+      },
+    ],
+  ])('keeps each row’s DOM when both move in one update, %s', async (_, moves) => {
+    const user = userEvent.setup();
+    render(<Nested moves={moves} />);
+    const [y, c, d, e] = ['y', 'c', 'd', 'e'].map(inputHolding);
+
+    await press(user, 'Move');
+    expect((screen.getAllByRole('textbox') as HTMLInputElement[]).map((i) => i.value)).toEqual([
+      'y',
+      'd',
+      'e',
+    ]);
+    expect(inputHolding('y')).toBe(y);
+    expect(inputHolding('d')).toBe(d);
+    expect(inputHolding('e')).toBe(e);
+    expect(c?.isConnected).toBe(false);
   });
 });
 

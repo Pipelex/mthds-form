@@ -5,6 +5,7 @@
  */
 
 export type { FieldEnv, FieldRendererProps } from './field-renderer';
+export type { RowMove } from './row-moves';
 export { FieldRenderer } from './field-renderer';
 
 export { BooleanField } from './boolean-field';
