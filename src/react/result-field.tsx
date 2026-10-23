@@ -454,7 +454,7 @@ function CopyButton({
       {...(title ? { title } : {})}
       aria-label={label}
       className={cn(
-        'shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1',
+        'shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
         FILE_BUTTON_ON_A_PHONE,
       )}
     >
@@ -671,7 +671,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         title={failed ? s.downloadFileFailed : label}
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
-          'shrink-0 rounded p-0.5 hover:bg-card focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 disabled:opacity-60',
+          'shrink-0 rounded p-0.5 hover:bg-card focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-60',
           FILE_BUTTON_ON_A_PHONE,
           failed ? 'text-destructive' : 'text-muted-foreground hover:text-foreground',
         )}
@@ -904,7 +904,7 @@ function DocumentValue({ value }: { value: unknown }) {
             type="button"
             onClick={() => setOpen((current) => !current)}
             aria-expanded={open}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 max-sm:min-h-11 max-sm:px-3"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:min-h-11 max-sm:px-3"
           >
             {open ? (
               <EyeOff aria-hidden className="size-3.5" />
@@ -1310,7 +1310,7 @@ const EXPAND_COLUMN_WIDTH = '[--expand-column:2rem] max-sm:[--expand-column:3.25
  * the box is a table cell inside a scroller that clips.
  */
 const TOGGLE =
-  'mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 max-sm:mt-0 max-sm:size-11';
+  'mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:mt-0 max-sm:size-11';
 
 /**
  * When a table under `tableLayout="stack"` turns its rows into blocks of label

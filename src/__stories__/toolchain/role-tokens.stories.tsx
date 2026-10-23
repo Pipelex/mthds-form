@@ -19,8 +19,8 @@ import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../gene
  * it names, are browser questions, answered here on every element that reads
  * them: an enum pill's fill and checkmark, a produced page's tag, and a
  * completed step's chip. A field's focus border is asserted beside them: it
- * reads `--ring`, as every control's focus does, so a branding host colours
- * every focus at once by setting that one contract token.
+ * reads `--ring`, as every focus the controls draw does, so a branding host
+ * colours them all at once by setting that one contract token.
  *
  * Without the tokens, each must compute to exactly what the `--primary`
  * expression it replaced computes to, and the focus border to `--ring`,

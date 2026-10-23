@@ -1,7 +1,7 @@
 /**
  * Shared control styling for the run form. One comfortable, theme-aware input
  * surface (the dedicated `--input` token, hairline border, a focus border in
- * the contract's `--ring`, which every other control focuses on too)
+ * the contract's `--ring`, as every focus the other controls draw is)
  * so every field type reads as the same family - generous enough for touch
  * (≥44px tall) and never the cramped `text-xs` of the old playground panel.
  *

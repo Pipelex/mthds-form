@@ -17,8 +17,9 @@
  * - `--selected`, the pale accent fill (`accentFill`) behind a selected pill
  *   or toggle, a tag or a completed step.
  *
- * Focus is not one of them: every control focuses on the contract's `--ring`,
- * which a branding host sets to the accent ink as well (see `./field-styles`).
+ * Focus is not one of them: every focus the controls draw is the contract's
+ * `--ring`, which a branding host sets to the accent ink as well (see
+ * `./field-styles`).
  *
  * A host that defines neither gets exactly what these elements painted before
  * the tokens were read: each falls back to the `--primary` expression it

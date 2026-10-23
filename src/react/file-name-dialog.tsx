@@ -189,14 +189,14 @@ export function FileNameDialog({ stem, extension, onConfirm, onCancel }: FileNam
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
+            className="rounded-md border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
           >
             {s.fileNameCancel}
           </button>
           <button
             type="button"
             onClick={() => onConfirm(value)}
-            className="rounded-md bg-primary px-3 py-1 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1"
+            className="rounded-md bg-primary px-3 py-1 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
           >
             {s.fileNameConfirm}
           </button>

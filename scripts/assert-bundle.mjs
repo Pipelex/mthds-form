@@ -529,7 +529,7 @@ const UNUSED_BY_CONTROLS = [
  *   for `bg-primary/N`, which is what that fill was before.
  *
  * They exist because the button colour (`--primary`) may be a fill no text
- * can be read on. Focus is not among them: every control focuses on the
+ * can be read on. Focus is not among them: every focus the controls draw is the
  * contract's own `--ring`. See docs/theming.md § "Link, selected and focus".
  */
 const OPTIONAL_TOKENS = new Map([
