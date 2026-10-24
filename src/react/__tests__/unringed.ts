@@ -12,7 +12,7 @@
 const NATIVELY_FOCUSABLE = [
   'a[href]',
   'button',
-  'input',
+  'input:not([type="hidden"])',
   'select',
   'textarea',
   'summary',
@@ -23,11 +23,14 @@ const NATIVELY_FOCUSABLE = [
 ].join(', ');
 const FOCUSABLE = `${NATIVELY_FOCUSABLE}, [tabindex]`;
 
+/** A width that draws something: a step other than 0, or an arbitrary length other than zero. */
+const WIDTH = String.raw`(?:[1-9]\d*|\[(?!0[a-z]*\])[^\]]+\])`;
+
 /**
  * Whether `classes` draw a focus in `--ring` under `variant`: an outline with
  * a style, a width and the colour (what `focusOutlineClass` spells), a ring
  * with a width and the colour, or a border in the colour on an element that
- * has a border to colour.
+ * has a border to colour. A zero width draws nothing, so it counts as none.
  */
 function drawsUnder(classes: readonly string[], variant: string): boolean {
   const under = (pattern: RegExp) =>
@@ -37,11 +40,12 @@ function drawsUnder(classes: readonly string[], variant: string): boolean {
   const outline =
     under(/^outline-ring(?:\/\d+)?$/) &&
     under(/^outline-(?:solid|dashed|dotted|double)$/) &&
-    under(/^outline-(?:\d+|\[[^\]]+\])$/);
-  const ring = under(/^ring-ring(?:\/\d+)?$/) && under(/^ring(?:-\d+|-\[[^\]]+\])?$/);
+    under(new RegExp(`^outline-${WIDTH}$`));
+  const ring = under(/^ring-ring(?:\/\d+)?$/) && under(new RegExp(`^ring(?:-${WIDTH})?$`));
+  const borderWidth = new RegExp(`^border(?:-${WIDTH})?$`);
   const border =
     under(/^border-ring(?:\/\d+)?$/) &&
-    (classes.some((name) => /^border(?:-\d+)?$/.test(name)) || under(/^border(?:-\d+)?$/));
+    (classes.some((name) => borderWidth.test(name)) || under(borderWidth));
   return outline || ring || border;
 }
 
@@ -80,12 +84,15 @@ function drawnByDropTarget(element: Element): boolean {
  * panel or a menu's item, whose focus is the highlight its primitive paints)
  * is not a stop, and nor are Radix's focus guards, what an open dialog hides,
  * or a Radix roving group's own box, which turns its outline off and hands its
- * focus to its active item at once.
+ * focus to its active item at once. Nor is a disabled control that is also
+ * read-only, such as a result's task-list check box: shown for reading, it is
+ * never enabled.
  */
 export function unringed(root: ParentNode): string[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)]
     .filter((element) => {
       if (element.hasAttribute('data-radix-focus-guard')) return false;
+      if (element.matches('input[disabled][readonly]')) return false;
       if (element.closest('[aria-hidden="true"]')) return false;
       if (
         element.matches('[role="radiogroup"], [role="toolbar"]') &&

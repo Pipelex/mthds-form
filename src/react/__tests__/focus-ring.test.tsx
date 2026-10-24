@@ -13,7 +13,7 @@
  * produced page's controls are judged in `src/generative/__tests__/`.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
 // drags the gate and ajv into a suite that tests the control set.
@@ -29,6 +29,7 @@ import type {
 } from '../../core/descriptor';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import type { ExampleSource, FileSource, FormExample, SourceFile } from '../../core/sources';
+import { FocusFrame } from '../focus-frame';
 import { MethodForm, useMethodForm } from '../method-form';
 import { focusOutlineClass, focusOutlineInsetClass, frameFocusOutlineClass } from '../role-tokens';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
@@ -317,12 +318,41 @@ describe('a frame in the result view', () => {
     expect(frame).not.toHaveAttribute('data-focus-visible');
   });
 
-  it('draws nothing when a pointer brought focus into it', async () => {
+  it('draws its focus when a pointer brought focus into it, as a text field does', async () => {
     const { toggle, frame } = await openPreview();
     fireEvent.keyDown(toggle, { key: 'Tab' });
     fireEvent.pointerDown(frame);
     enter(frame);
+    expect(frame).toHaveAttribute('data-focus-visible');
+    act(() => toggle.focus());
     expect(frame).not.toHaveAttribute('data-focus-visible');
+  });
+
+  it('marks only the frame focus settles on when it passes from one frame to another', async () => {
+    render(
+      <>
+        <FocusFrame title="First" />
+        <FocusFrame title="Second" />
+      </>,
+    );
+    const first = screen.getByTitle('First');
+    const second = screen.getByTitle('Second');
+    enter(first);
+    expect(first).toHaveAttribute('data-focus-visible');
+    // The first frame's window blurs while the page still names it active, and
+    // focus then lands on the second without an event the page hears.
+    const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(first);
+    try {
+      act(() => {
+        fireEvent.blur((first as HTMLIFrameElement).contentWindow!);
+      });
+      expect(second).not.toHaveAttribute('data-focus-visible');
+      active.mockReturnValue(second);
+      await waitFor(() => expect(second).toHaveAttribute('data-focus-visible'));
+      expect(first).not.toHaveAttribute('data-focus-visible');
+    } finally {
+      active.mockRestore();
+    }
   });
 });
 
@@ -351,6 +381,27 @@ describe('the check', () => {
     expect(judged('<input class="focus-visible:border-ring" aria-label="Name">')).toEqual([
       '<input> "Name"',
     ]);
+  });
+
+  it('refuses a zero width, which draws nothing', () => {
+    expect(
+      judged(
+        '<button class="focus-visible:outline-solid focus-visible:outline-0 focus-visible:outline-ring">Go</button>' +
+          '<button class="focus-visible:ring-0 focus-visible:ring-ring">Go</button>' +
+          '<button class="focus-visible:ring-[0px] focus-visible:ring-ring">Go</button>' +
+          '<input class="border-0 focus-visible:border-ring" aria-label="Name">',
+      ),
+    ).toEqual(['<button> "Go"', '<button> "Go"', '<button> "Go"', '<input> "Name"']);
+  });
+
+  it('judges a disabled control, but neither a hidden input nor a read-only disabled check box', () => {
+    expect(
+      judged(
+        '<input type="hidden" name="id" value="1">' +
+          '<input type="checkbox" disabled readonly aria-label="Done">' +
+          '<input type="checkbox" disabled aria-label="Agree">',
+      ),
+    ).toEqual(['<input> "Agree"']);
   });
 
   it('accepts the kernel’s outline, a ring with a width and a border with one', () => {

@@ -421,15 +421,16 @@ function MediaResult() {
 }
 
 /**
- * Each pane's page frame, focused as a keyboard focuses it: a key, then focus
- * entering the frame's document. user-event's Tab steps over a frame, so the
- * move is the frame's `focus()`, which Chromium reports exactly as it reports
- * a Tab onto the frame: the page's window blurs with the frame as its active
- * element. From the second frame on, focus passes from one frame straight to
- * the next, which only the two frames' own windows hear. Each frame is handed
- * to `check` once it is marked, and the one before must have lost its mark.
+ * Each pane's page frame, focused: a frame is marked whatever brought focus
+ * into its document, a key or a pointer. user-event's Tab steps over a frame,
+ * so the move is the frame's `focus()`, which Chromium reports exactly as it
+ * reports a Tab onto the frame: the page's window blurs with the frame as its
+ * active element. From the second frame on, focus passes from one frame
+ * straight to the next, which only the two frames' own windows hear. Each frame
+ * is handed to `check` once it is marked, and the one before must have lost its
+ * mark.
  */
-async function eachKeyboardFocusedFrame(
+async function eachFocusedFrame(
   canvasElement: HTMLElement,
   check: (frame: HTMLIFrameElement) => void,
 ) {
@@ -439,7 +440,6 @@ async function eachKeyboardFocusedFrame(
   expect(frames.length).toBeGreaterThan(0);
   let previous: HTMLIFrameElement | undefined;
   for (const frame of frames) {
-    await userEvent.keyboard('{Shift}');
     frame.focus();
     await waitFor(() => expect(frame).toHaveAttribute('data-focus-visible'));
     if (previous) expect(previous).not.toHaveAttribute('data-focus-visible');
@@ -450,17 +450,17 @@ async function eachKeyboardFocusedFrame(
   }
 }
 
-/** No tokens: a page frame's keyboard focus is a solid inset outline in `--ring`. */
+/** No tokens: a page frame's focus is a solid inset outline in `--ring`. */
 export const FrameFocusWithoutBrand: Story = {
   render: () => <MediaResult />,
   play: async ({ canvasElement }) => {
-    await eachKeyboardFocusedFrame(canvasElement, (frame) => {
+    await eachFocusedFrame(canvasElement, (frame) => {
       expect(getComputedStyle(frame).outlineColor).toBe(computed(frame, 'color', RING));
     });
   },
 };
 
-/** A host's `--ring`: a page frame's keyboard focus takes it. */
+/** A host's `--ring`: a page frame's focus takes it. */
 export const FrameFocusWithBrand: Story = {
   render: () => (
     <Branded>
@@ -468,7 +468,7 @@ export const FrameFocusWithBrand: Story = {
     </Branded>
   ),
   play: async ({ canvasElement }) => {
-    await eachKeyboardFocusedFrame(canvasElement, (frame) => {
+    await eachFocusedFrame(canvasElement, (frame) => {
       expect(getComputedStyle(frame).outlineColor).toBe(RGB.ring);
     });
   },
