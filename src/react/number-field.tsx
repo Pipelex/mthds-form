@@ -2,6 +2,7 @@
 
 import { shownAsOptional } from '../core/readiness';
 import { Minus, Plus } from 'lucide-react';
+import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
 import type { NumberRunField } from '../core';
 import { FieldShell } from './field-shell';
@@ -98,7 +99,7 @@ function StepButton({
       className={cn(
         'flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-input text-muted-foreground transition-colors',
         'hover:border-border hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-        'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+        focusOutlineClass,
       )}
     >
       {children}

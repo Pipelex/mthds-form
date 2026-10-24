@@ -4,6 +4,7 @@ import * as React from 'react';
 import { type BaseComponentProps, useBoundProp, useFieldValidation } from '@json-render/react';
 import { hasOwnProp } from '../../core/own-property';
 import { fieldControlClass } from '../../react/field-styles';
+import { checkedAccentClass, focusOutlineClass } from '../../react/role-tokens';
 import { cn } from '../../react/utils';
 import { Switch as SwitchPrimitive } from '../../react/ui/switch';
 
@@ -480,6 +481,13 @@ export function Textarea({
   );
 }
 
+/**
+ * A native radio or check box: checked in the accent ink, as every selection
+ * reads the accent rather than the button colour, and focused in `--ring`, as
+ * everything in the tab order is, never in the browser's own ring.
+ */
+const NATIVE_CHECK = cn('size-4', checkedAccentClass, focusOutlineClass);
+
 export function Radio({
   props,
   bindings,
@@ -500,7 +508,7 @@ export function Radio({
               name={id}
               value={option}
               checked={field.value === option}
-              className="size-4 accent-primary"
+              className={NATIVE_CHECK}
               onChange={() => {
                 field.setValue(option);
                 field.validateOnChange();
@@ -532,7 +540,7 @@ export function Checkbox({
           id={id}
           name={props.name}
           type="checkbox"
-          className="size-4 accent-primary"
+          className={NATIVE_CHECK}
           checked={field.value}
           aria-invalid={field.error ? true : undefined}
           onChange={(event) => {

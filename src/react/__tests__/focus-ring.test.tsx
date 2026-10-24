@@ -5,13 +5,15 @@
  * how "Fill with an example", "Add item" and the optional fields' disclosure
  * focused in the browser's blue under an orange brand.
  *
- * jsdom computes no Tailwind, so this reads the focus utility each element
- * carries, across the form, every sheet and dialog it opens, a file card and
- * the result view. `Toolchain/Role Tokens` is where Chromium shows the outline
- * those utilities draw in `--ring`.
+ * jsdom computes no Tailwind, so this reads the focus utilities each element
+ * carries (`./unringed` asks for a focus that is drawn, not only coloured),
+ * across the form, every sheet and dialog it opens, a file card and the result
+ * view, a document's preview and an HTML page included. `Toolchain/Role Tokens`
+ * is where Chromium shows the outline those utilities draw in `--ring`. A
+ * produced page's controls are judged in `src/generative/__tests__/`.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
 // drags the gate and ajv into a suite that tests the control set.
@@ -28,50 +30,11 @@ import type {
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import type { ExampleSource, FileSource, FormExample, SourceFile } from '../../core/sources';
 import { MethodForm, useMethodForm } from '../method-form';
+import { focusOutlineClass, focusOutlineInsetClass, frameFocusOutlineClass } from '../role-tokens';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 import { StuffViewer } from '../stuff-viewer';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/structured';
-
-/** What a keyboard can land on. */
-const FOCUSABLE = 'a[href], button, input, select, textarea, summary, [tabindex]';
-const NATIVELY_FOCUSABLE = 'a[href], button, input, select, textarea, summary';
-
-/** A focus style of the element's own that reads `--ring`: an outline, a ring or a border. */
-const RING_FOCUS = /(?:^|\s)focus(?:-visible)?:(?:outline|ring|border)-ring(?:\/\d+)?(?=\s|$)/;
-
-/**
- * Every element under `root` a keyboard can focus whose focus is not drawn in
- * `--ring`, named for the failure message. A disabled control is judged too,
- * since it is enabled at some point. The clip-hidden file input counts as drawn
- * when its drop target rings with `focus-within`, which is where the dropzone
- * draws it. An element only a script focuses (`tabindex="-1"` on something not
- * focusable by nature, such as a dialog's panel or a menu's item, whose focus
- * is the highlight its primitive paints) is not a stop, and nor are Radix's
- * focus guards, what an open dialog hides, or a Radix roving group's own box,
- * which turns its outline off and hands its focus to its active item at once.
- */
-function unringed(root: ParentNode): string[] {
-  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)]
-    .filter((element) => {
-      if (element.hasAttribute('data-radix-focus-guard')) return false;
-      if (element.closest('[aria-hidden="true"]')) return false;
-      if (
-        element.matches('[role="radiogroup"], [role="toolbar"]') &&
-        element.style.outline === 'none'
-      ) {
-        return false;
-      }
-      if (element.getAttribute('tabindex') === '-1' && !element.matches(NATIVELY_FOCUSABLE)) {
-        return false;
-      }
-      if (RING_FOCUS.test(element.getAttribute('class') ?? '')) return false;
-      return element.closest('[class~="focus-within:ring-ring"]') === null;
-    })
-    .map((element) => {
-      const name = element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '';
-      return `<${element.tagName.toLowerCase()}> "${name}"`;
-    });
-}
+import { unringed } from './unringed';
 
 beforeAll(() => {
   // A dropped file's preview is an object URL, which jsdom does not make.
@@ -145,7 +108,7 @@ describe('the form', () => {
   it('draws every focus in --ring, its buttons included', async () => {
     const user = userEvent.setup();
     const { container } = await openForm(user);
-    // The three that once drew none are there to be judged.
+    // The buttons that once drew none are there to be judged.
     for (const name of [S.fillWithExample, S.addItem]) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
@@ -277,6 +240,15 @@ describe('the result view', () => {
     ],
   };
 
+  /** A `native.Html` result: its page is drawn in a frame. */
+  const page: ObjectRunField = {
+    kind: 'object',
+    name: 'quote',
+    conceptRef: 'native.Html',
+    required: true,
+    fields: [text('inner_html'), text('css_class')],
+  };
+
   it('draws every focus in --ring: its buttons, its links and a table’s scroll region', () => {
     // A clipboard, so the copy buttons are drawn.
     userEvent.setup();
@@ -284,5 +256,133 @@ describe('the result view', () => {
     expect(container.querySelector('a[href="https://example.com/report"]')).not.toBeNull();
     expect(container.querySelector('[role="group"][tabindex="0"]')).not.toBeNull();
     expect(unringed(container)).toEqual([]);
+  });
+
+  it('draws a document preview’s focus in --ring', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<StuffViewer field={report} value={value} />);
+    await user.click(screen.getByRole('button', { name: S.preview }));
+    expect(screen.getByTitle('q3.pdf').tagName).toBe('IFRAME');
+    expect(unringed(container)).toEqual([]);
+  });
+
+  it('draws an HTML page’s focus in --ring', async () => {
+    userEvent.setup();
+    const { container } = render(
+      <StuffViewer field={page} value={{ inner_html: '<p>Devis</p>', css_class: null }} />,
+    );
+    expect((await screen.findByTitle('HTML result')).tagName).toBe('IFRAME');
+    expect(unringed(container)).toEqual([]);
+  });
+});
+
+/**
+ * A frame's focus is drawn on the attribute `FocusFrame` sets, because no focus
+ * selector matches a frame whose document holds focus. jsdom does not move
+ * focus into a frame's document, so this plays what Chromium reports when it
+ * does: the frame becomes the page's active element and the page's window
+ * blurs.
+ */
+describe('a frame in the result view', () => {
+  const document_: FileRunField = {
+    kind: 'document',
+    name: 'source',
+    conceptRef: 'native.Document',
+    required: true,
+    formats: DOCUMENT_FORMATS,
+  };
+  const value = { url: 'https://cdn.example/q3.pdf', filename: 'q3.pdf' };
+
+  async function openPreview() {
+    const user = userEvent.setup();
+    render(<StuffViewer field={document_} value={value} />);
+    const toggle = screen.getByRole('button', { name: S.preview });
+    await user.click(toggle);
+    return { toggle, frame: screen.getByTitle('q3.pdf') };
+  }
+
+  function enter(frame: HTMLElement) {
+    act(() => frame.focus());
+    act(() => {
+      fireEvent.blur(window);
+    });
+  }
+
+  it('draws its focus when a keyboard brings focus into it, and drops it when focus leaves', async () => {
+    const { toggle, frame } = await openPreview();
+    fireEvent.keyDown(toggle, { key: 'Tab' });
+    enter(frame);
+    expect(frame).toHaveAttribute('data-focus-visible');
+    act(() => toggle.focus());
+    expect(frame).not.toHaveAttribute('data-focus-visible');
+  });
+
+  it('draws nothing when a pointer brought focus into it', async () => {
+    const { toggle, frame } = await openPreview();
+    fireEvent.keyDown(toggle, { key: 'Tab' });
+    fireEvent.pointerDown(frame);
+    enter(frame);
+    expect(frame).not.toHaveAttribute('data-focus-visible');
+  });
+});
+
+/**
+ * The check itself, on elements written to fail it: a colour with no width or
+ * style draws nothing, and only the clip-hidden file input may leave its focus
+ * to the drop target around it.
+ */
+describe('the check', () => {
+  function judged(html: string): string[] {
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    return unringed(root);
+  }
+
+  it('refuses a focus colour that draws nothing', () => {
+    expect(judged('<button class="focus-visible:outline-ring">Go</button>')).toEqual([
+      '<button> "Go"',
+    ]);
+    expect(
+      judged('<button class="focus-visible:outline-2 focus-visible:outline-ring">Go</button>'),
+    ).toEqual(['<button> "Go"']);
+    expect(judged('<button class="focus-visible:ring-ring">Go</button>')).toEqual([
+      '<button> "Go"',
+    ]);
+    expect(judged('<input class="focus-visible:border-ring" aria-label="Name">')).toEqual([
+      '<input> "Name"',
+    ]);
+  });
+
+  it('accepts the kernel’s outline, a ring with a width and a border with one', () => {
+    expect(
+      judged(
+        `<button class="${focusOutlineClass}">Go</button>` +
+          `<a href="#" class="${focusOutlineInsetClass}">Row</a>` +
+          '<button class="focus-visible:ring-2 focus-visible:ring-ring">Go</button>' +
+          '<input class="border focus-visible:border-ring" aria-label="Name">',
+      ),
+    ).toEqual([]);
+  });
+
+  it('lets only the clip-hidden file input leave its focus to a ringed ancestor', () => {
+    const target = 'class="focus-within:ring-2 focus-within:ring-ring"';
+    expect(
+      judged(
+        `<div ${target}><input type="file" style="clip: rect(0, 0, 0, 0)" aria-label="File"></div>`,
+      ),
+    ).toEqual([]);
+    expect(
+      judged(`<div ${target}><button>Inside</button><input type="file" aria-label="File"></div>`),
+    ).toEqual(['<button> "Inside"', '<input> "File"']);
+  });
+
+  it('judges frames, media with controls and editable regions as stops', () => {
+    expect(
+      judged(
+        '<iframe title="Page"></iframe><video controls aria-label="Clip"></video>' +
+          '<div contenteditable="true" aria-label="Notes"></div>',
+      ),
+    ).toEqual(['<iframe> "Page"', '<video> "Clip"', '<div> "Notes"']);
+    expect(judged(`<iframe title="Page" class="${frameFocusOutlineClass}"></iframe>`)).toEqual([]);
   });
 });

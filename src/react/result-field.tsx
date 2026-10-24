@@ -47,6 +47,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
+import { FocusFrame } from './focus-frame';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
 import { PdfDownloadButton } from './pdf-download-button';
@@ -61,6 +62,7 @@ import {
   useFieldPresentation,
   type FieldPresentation,
 } from './field-presentation';
+import { focusOutlineClass, focusOutlineInsetClass } from './role-tokens';
 import { cn } from './utils';
 
 /**
@@ -454,7 +456,8 @@ function CopyButton({
       {...(title ? { title } : {})}
       aria-label={label}
       className={cn(
-        'shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+        'shrink-0 rounded p-0.5 text-muted-foreground hover:bg-card hover:text-foreground',
+        focusOutlineClass,
         FILE_BUTTON_ON_A_PHONE,
       )}
     >
@@ -539,7 +542,10 @@ function FileRef({
           rel="noreferrer"
           title={title}
           // A line 44px tall below `sm`, so a finger can follow the link.
-          className="min-w-0 truncate rounded-sm font-mono text-[12px] text-foreground underline underline-offset-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:min-w-11 max-sm:leading-11"
+          className={cn(
+            'min-w-0 truncate rounded-sm font-mono text-[12px] text-foreground underline underline-offset-2 max-sm:min-w-11 max-sm:leading-11',
+            focusOutlineClass,
+          )}
         >
           {label}
         </a>
@@ -671,7 +677,8 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         title={failed ? s.downloadFileFailed : label}
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
-          'shrink-0 rounded p-0.5 hover:bg-card focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-60',
+          'shrink-0 rounded p-0.5 hover:bg-card disabled:opacity-60',
+          focusOutlineClass,
           FILE_BUTTON_ON_A_PHONE,
           failed ? 'text-destructive' : 'text-muted-foreground hover:text-foreground',
         )}
@@ -855,10 +862,13 @@ function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): str
  *
  * `no-referrer` stays: a result view has no business telling a third party where
  * it was opened from.
+ *
+ * The frame is a tab stop, and `FocusFrame` draws its keyboard focus, which no
+ * focus selector can (see `./focus-frame`).
  */
 function DocumentPreview({ url, name }: { url: string; name: string }) {
   return (
-    <iframe
+    <FocusFrame
       src={url}
       title={name}
       loading="lazy"
@@ -904,7 +914,10 @@ function DocumentValue({ value }: { value: unknown }) {
             type="button"
             onClick={() => setOpen((current) => !current)}
             aria-expanded={open}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:min-h-11 max-sm:px-3"
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground max-sm:min-h-11 max-sm:px-3',
+              focusOutlineClass,
+            )}
           >
             {open ? (
               <EyeOff aria-hidden className="size-3.5" />
@@ -959,7 +972,7 @@ function ImageValue({
           // themselves, so they keep the inline box.
           className={cn(
             inGallery || compact ? 'inline-block' : 'block w-full',
-            'focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+            focusOutlineInsetClass,
           )}
         >
           <LoadingImage
@@ -1312,8 +1325,10 @@ const EXPAND_COLUMN_WIDTH = '[--expand-column:2rem] max-sm:[--expand-column:3.25
  * clicked. It grows where it stands rather than reaching past its box, because
  * the box is a table cell inside a scroller that clips.
  */
-const TOGGLE =
-  'mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:mt-0 max-sm:size-11';
+const TOGGLE = cn(
+  'mt-0.5 flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-card hover:text-foreground max-sm:mt-0 max-sm:size-11',
+  focusOutlineClass,
+);
 
 /**
  * When a table under `tableLayout="stack"` turns its rows into blocks of label
@@ -1678,7 +1693,8 @@ function ObjectTable({
       aria-label={label}
       {...(fits ? {} : { tabIndex: 0 })}
       className={cn(
-        'overflow-x-auto rounded-lg border border-border focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+        'overflow-x-auto rounded-lg border border-border',
+        focusOutlineInsetClass,
         EXPAND_COLUMN_WIDTH,
         fits && '@container',
       )}

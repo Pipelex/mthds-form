@@ -4,6 +4,7 @@ import { shownAsOptional } from '../core/readiness';
 import { addChosenFiles, roomForChosenFiles } from '../core/sources';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { focusOutlineClass, selectedHoverBorderClass } from './role-tokens';
 import { cn } from './utils';
 import type { ListRunField, RunField } from '../core';
 import { ConceptPill } from './concept-pill';
@@ -233,7 +234,10 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               onClick={() => removeItem(index)}
               disabled={env?.disabled || busy}
               aria-label={s.removeItemAria(index + 1)}
-              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-50 max-sm:mt-0 max-sm:size-11"
+              className={cn(
+                'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11',
+                focusOutlineClass,
+              )}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -246,8 +250,11 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
           disabled={env?.disabled || isFull}
           className={cn(
             'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-[13px] text-muted-foreground transition-colors max-sm:h-11',
-            'hover:border-primary/40 hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-            'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+            // The edge under the pointer is the accent's, as a selected pill's
+            // is; the fill under it stays neutral.
+            'hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+            selectedHoverBorderClass,
+            focusOutlineClass,
           )}
         >
           <Plus className="h-4 w-4" />

@@ -38,6 +38,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { focusOutlineClass, focusOutlineInsetClass } from './role-tokens';
 import { cn } from './utils';
 
 /*
@@ -70,8 +71,10 @@ export interface FillWithExampleProps {
   className?: string;
 }
 
-const buttonClass =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9';
+const buttonClass = cn(
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-[14px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9',
+  focusOutlineClass,
+);
 const secondaryClass = cn(buttonClass, 'border border-border text-foreground hover:bg-muted');
 const primaryClass = cn(
   buttonClass,
@@ -259,7 +262,10 @@ export function FillWithExample({
                 <DialogClose
                   ref={closeButton}
                   aria-label={s.close}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                  className={cn(
+                    'flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                    focusOutlineClass,
+                  )}
                 >
                   <X className="size-5" aria-hidden="true" />
                 </DialogClose>
@@ -289,7 +295,10 @@ export function FillWithExample({
                             ref={register(rows.current, example.id)}
                             type="button"
                             onClick={() => choose(example)}
-                            className="flex min-h-16 min-w-0 flex-1 items-center px-4 py-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                            className={cn(
+                              'flex min-h-16 min-w-0 flex-1 items-center px-4 py-2.5 text-left transition-colors hover:bg-muted/60',
+                              focusOutlineInsetClass,
+                            )}
                           >
                             <span className="truncate text-[16px] font-medium text-foreground">
                               {example.name}
@@ -302,7 +311,10 @@ export function FillWithExample({
                               <DropdownMenuTrigger
                                 ref={register(menus.current, example.id)}
                                 aria-label={s.exampleActions(example.name)}
-                                className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                className={cn(
+                                  'flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                                  focusOutlineInsetClass,
+                                )}
                               >
                                 <MoreHorizontal className="size-5" aria-hidden="true" />
                               </DropdownMenuTrigger>
@@ -477,7 +489,10 @@ function RenameExampleDialog({
             onKeyDown={onKeyDown}
             disabled={state === 'busy'}
             autoComplete="off"
-            className="h-11 w-full rounded-md border border-border bg-input px-3 text-[16px] text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+            className={cn(
+              'h-11 w-full rounded-md border border-border bg-input px-3 text-[16px] text-foreground',
+              focusOutlineClass,
+            )}
           />
         </div>
         {state === 'failed' && (

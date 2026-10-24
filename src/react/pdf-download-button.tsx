@@ -9,6 +9,7 @@ import { pageDocument } from './html-frame';
 import { renderHtmlPdf } from './html-pdf';
 import { resolveHtmlStorageUrls } from './markup-storage';
 import { useMarkupResolvers, useRenderPdf, useSaveFiles, type RenderPdf } from './result-env';
+import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
 
 export interface PdfDownloadButtonProps {
@@ -115,7 +116,8 @@ export function PdfDownloadButton({
         title={failed ? s.downloadPdfFailed : name}
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-70',
+          'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium disabled:opacity-70',
+          focusOutlineClass,
           primary
             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
             : 'border border-border text-muted-foreground hover:text-foreground',

@@ -12,6 +12,8 @@ import {
 import { typedFileStem } from '../core/save-plan';
 import { useFieldStrings } from './field-strings';
 import { useAskFileName } from './result-env';
+import { focusOutlineClass } from './role-tokens';
+import { cn } from './utils';
 
 /**
  * The name a download should be saved under: the planned one when the host has
@@ -189,14 +191,20 @@ export function FileNameDialog({ stem, extension, onConfirm, onCancel }: FileNam
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+            className={cn(
+              'rounded-md border border-border px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground',
+              focusOutlineClass,
+            )}
           >
             {s.fileNameCancel}
           </button>
           <button
             type="button"
             onClick={() => onConfirm(value)}
-            className="rounded-md bg-primary px-3 py-1 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+            className={cn(
+              'rounded-md bg-primary px-3 py-1 text-[12px] font-medium text-primary-foreground hover:bg-primary/90',
+              focusOutlineClass,
+            )}
           >
             {s.fileNameConfirm}
           </button>

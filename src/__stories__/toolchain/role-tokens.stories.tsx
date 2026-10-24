@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
-import type { ExampleSource, FileSource } from '../../core';
 import { getPipeInputForm, getPipeIOContract } from '../../core';
 import { DEFAULT_FIELD_STRINGS as S, MethodForm, useMethodForm } from '../../react';
 import { CaseForm } from '../case-form';
 import { CONTRACTS as FILES_CONTRACTS, INPUT_FORM as FILES_INPUT_FORM } from '../_generated/files';
+import {
+  CONTRACTS as RESULTS_CONTRACTS,
+  OUTPUT_FORM as RESULTS_OUTPUT_FORM,
+} from '../_generated/results';
 import { CONTRACTS, INPUT_FORM } from '../_generated/scalars';
 import {
   CONTRACTS as STRUCTURED_CONTRACTS,
@@ -14,6 +17,9 @@ import {
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../_generated/trips';
 import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
 import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../generative/layout-page';
+import { exampleSourceOf, fileSourceOf } from '../host-sources';
+import { REPORT } from '../outputs/media-payloads';
+import { ResultView } from '../result-view';
 
 /**
  * The colour roles beyond the button, as rendered facts: what the controls
@@ -28,10 +34,11 @@ import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../gene
  * them: an enum pill's fill, checkmark and edge, a chosen file's row in the
  * team's files, a produced page's tag and its edge, and a completed step's
  * chip. A field's focus border is asserted beside
- * them, and the focus outline of three buttons that once drew none and so
- * focused in the browser's own colour: each reads `--ring`, as every focus the
- * controls draw does, so a branding host colours them all at once by setting
- * that one contract token.
+ * them, the focus outline of the buttons that once drew none and so focused in
+ * the browser's own colour, and the outline of a result's page frame, which no
+ * focus selector can draw: each reads `--ring`, as every focus the controls
+ * draw does, so a branding host colours them all at once by setting that one
+ * contract token.
  *
  * Without the tokens, each must compute to exactly what the `--primary`
  * expression it replaced computes to, and the focus border to `--ring`,
@@ -143,33 +150,16 @@ export const PillWithBrand: Story = {
   },
 };
 
-/**
- * A team's one file, as a host keeps it. It is a host's own record, which no
- * projection of a method produces, so it is written here in the shape the
- * file source declares.
- */
-const TEAM_FILES: FileSource = {
-  initialScope: 'everyone',
-  list: async () => ({
-    files: [
-      {
-        id: 'fl_7',
-        url: 'pipelex-storage://team/assets/inv-2291.pdf',
-        name: 'INV-2291.pdf',
-        mediaType: 'application/pdf',
-        size: 348_160,
-        origin: 'Uploaded by you',
-      },
-    ],
-  }),
-};
-
 /** A single document field offering the team's files. */
 function TeamFilesForm() {
   const contract = getPipeIOContract(FILES_CONTRACTS, 'files', 'one_document');
   const descriptor = getPipeInputForm(FILES_INPUT_FORM, 'files', 'one_document');
   if (!contract || !descriptor) throw new Error('No fixture entry for files.one_document.');
-  const form = useMethodForm({ descriptor, contract, fileSource: TEAM_FILES });
+  const form = useMethodForm({
+    descriptor,
+    contract,
+    fileSource: fileSourceOf('team', 'everyone'),
+  });
   return <MethodForm form={form} presentation="app" />;
 }
 
@@ -358,9 +348,6 @@ export const ChipsWithBrand: Story = {
   },
 };
 
-/** An example source with nothing in it: the form offers "Fill with an example" all the same. */
-const NO_EXAMPLES: ExampleSource = { list: async () => ({ examples: [] }) };
-
 /**
  * An invoice's whole form, as a host mounts it with an example source: it
  * offers "Fill with an example", "Add item" under the invoice's lines, and
@@ -370,29 +357,26 @@ function InvoiceForm() {
   const contract = getPipeIOContract(STRUCTURED_CONTRACTS, 'structured', 'one_invoice');
   const descriptor = getPipeInputForm(STRUCTURED_INPUT_FORM, 'structured', 'one_invoice');
   if (!contract || !descriptor) throw new Error('No fixture entry for structured.one_invoice.');
-  const form = useMethodForm({ descriptor, contract, exampleSource: NO_EXAMPLES });
+  // An example source with nothing in it: the form offers "Fill with an example" all the same.
+  const form = useMethodForm({ descriptor, contract, exampleSource: exampleSourceOf('none') });
   return <MethodForm form={form} />;
 }
 
 /**
- * Each pane's "Fill with an example", "Add item" and "1 optional field", the
- * three buttons that drew no focus of their own until each was given the
- * kernel's outline, so a keyboard focus showed the browser's ring, which no
- * token reaches.
+ * Each pane's "Fill with an example", "Add item" and "1 optional field",
+ * buttons that drew no focus of their own until each was given the kernel's
+ * outline, so a keyboard focus showed the browser's ring, which no token
+ * reaches.
  */
 function unringedButtons(canvasElement: HTMLElement): HTMLElement[] {
   const named = (name: string) =>
     [...canvasElement.querySelectorAll<HTMLElement>('button')].filter(
       (button) => button.textContent === name,
     );
-  const buttons = [
-    ...named(S.fillWithExample),
-    ...named(S.addItem),
-    ...named(S.optionalFieldsCount(1)),
-  ];
-  // Three per pane, two panes.
-  expect(buttons).toHaveLength(6);
-  return buttons;
+  const names = [S.fillWithExample, S.addItem, S.optionalFieldsCount(1)];
+  // Each of them once in each theme pane.
+  for (const name of names) expect(named(name)).toHaveLength(2);
+  return names.flatMap(named);
 }
 
 /** No tokens: each button's keyboard focus is a solid outline in `--ring`. */
@@ -420,5 +404,72 @@ export const FocusWithBrand: Story = {
       expect(getComputedStyle(button).outlineStyle).toBe('solid');
       expect(getComputedStyle(button).outlineColor).toBe(RGB.ring);
     }
+  },
+};
+
+/** A result whose summary is an HTML page, which the result view draws in a frame. */
+function MediaResult() {
+  return (
+    <ResultView
+      contracts={RESULTS_CONTRACTS}
+      outputForm={RESULTS_OUTPUT_FORM}
+      domain="results"
+      pipeCode="nested_media_result"
+      value={REPORT}
+    />
+  );
+}
+
+/**
+ * Each pane's page frame, focused as a keyboard focuses it: a key, then focus
+ * entering the frame's document. user-event's Tab steps over a frame, so the
+ * move is the frame's `focus()`, which Chromium reports exactly as it reports
+ * a Tab onto the frame: the page's window blurs with the frame as its active
+ * element. From the second frame on, focus passes from one frame straight to
+ * the next, which only the two frames' own windows hear. Each frame is handed
+ * to `check` once it is marked, and the one before must have lost its mark.
+ */
+async function eachKeyboardFocusedFrame(
+  canvasElement: HTMLElement,
+  check: (frame: HTMLIFrameElement) => void,
+) {
+  const frames = [
+    ...canvasElement.querySelectorAll<HTMLIFrameElement>('iframe[title="HTML result"]'),
+  ];
+  expect(frames.length).toBeGreaterThan(0);
+  let previous: HTMLIFrameElement | undefined;
+  for (const frame of frames) {
+    await userEvent.keyboard('{Shift}');
+    frame.focus();
+    await waitFor(() => expect(frame).toHaveAttribute('data-focus-visible'));
+    if (previous) expect(previous).not.toHaveAttribute('data-focus-visible');
+    expect(getComputedStyle(frame).outlineStyle).toBe('solid');
+    expect(getComputedStyle(frame).outlineWidth).toBe('2px');
+    check(frame);
+    previous = frame;
+  }
+}
+
+/** No tokens: a page frame's keyboard focus is a solid inset outline in `--ring`. */
+export const FrameFocusWithoutBrand: Story = {
+  render: () => <MediaResult />,
+  play: async ({ canvasElement }) => {
+    await eachKeyboardFocusedFrame(canvasElement, (frame) => {
+      expect(getComputedStyle(frame).outlineColor).toBe(computed(frame, 'color', RING));
+    });
+  },
+};
+
+/** A host's `--ring`: a page frame's keyboard focus takes it. */
+export const FrameFocusWithBrand: Story = {
+  render: () => (
+    <Branded>
+      <MediaResult />
+    </Branded>
+  ),
+  play: async ({ canvasElement }) => {
+    await eachKeyboardFocusedFrame(canvasElement, (frame) => {
+      expect(getComputedStyle(frame).outlineColor).toBe(RGB.ring);
+    });
   },
 };

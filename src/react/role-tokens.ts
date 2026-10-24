@@ -18,11 +18,16 @@
  *   or toggle, a chosen file, a tag or a completed step.
  *
  * A selected pill and a tag are also outlined in the accent: their border is
- * `--link` at 40%, so nothing selected keeps the button colour in its edge.
+ * `--link` at 40%, so nothing selected keeps the button colour in its edge,
+ * and a native radio or check box is checked in the accent ink.
  *
  * Focus is not one of them: every focus the controls draw is the contract's
  * `--ring`, which a branding host sets to the accent ink as well (see
- * `./field-styles`).
+ * `./field-styles`). A form's field draws it as its border and a vendored
+ * primitive as a ring; everything else in the tab order draws
+ * `focusOutlineClass` below, or `focusOutlineInsetClass` where the element
+ * fills its container, or, on a frame, the same inset outline as
+ * `frameFocusOutlineClass`, so the outline is spelled in one place.
  *
  * A host that defines neither gets exactly what these elements painted before
  * the tokens were read: each falls back to the `--primary` expression it
@@ -70,3 +75,36 @@ export const selectedBorderClass =
 /** The same edge on a pressed item (`data-state="on"`), as `data-[state=on]:border-primary/40` drew it. */
 export const selectedStateBorderClass =
   'data-[state=on]:border-[color:color-mix(in_oklab,var(--link,var(--primary,hsl(240_5.9%_10%)))_40%,transparent)]';
+
+/** The same edge under the pointer, around a list's "Add item", which drew the button colour at 40% there. */
+export const selectedHoverBorderClass =
+  'hover:border-[color:color-mix(in_oklab,var(--link,var(--primary,hsl(240_5.9%_10%)))_40%,transparent)]';
+
+/** The checked colour of a native radio or check box: the accent ink, falling back to the button colour it was checked in. */
+export const checkedAccentClass = 'accent-[color:var(--link,var(--primary,hsl(240_5.9%_10%)))]';
+
+/**
+ * The keyboard focus of everything in the tab order that draws it neither as a
+ * field's border nor as a primitive's ring: a solid 2px outline in `--ring`,
+ * 1px clear of the element. The style is
+ * stated, not left to Tailwind's `--tw-outline-style` default, so the outline
+ * is drawn whatever else sets that variable.
+ */
+export const focusOutlineClass =
+  'focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
+
+/**
+ * The same outline drawn 2px inside the element's edge, for a row, a frame or
+ * a scroll region that fills its container, where an outline outside it would
+ * be clipped or would cross its neighbour.
+ */
+export const focusOutlineInsetClass =
+  'focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring';
+
+/**
+ * The inset outline on a frame, drawn on the `data-focus-visible` that
+ * `FocusFrame` sets, because no focus selector matches a frame whose document
+ * holds focus (see `./focus-frame`).
+ */
+export const frameFocusOutlineClass =
+  'data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:-outline-offset-2 data-focus-visible:outline-ring';
