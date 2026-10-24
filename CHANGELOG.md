@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.23.1] - 2026-10-24
+
+### Fixed
+
+- **`styles.css` no longer compiles classes only the package's tests write**: the prebuilt sheet scanned the test files beside the controls, so it carried utilities no control uses and that a Tailwind host compiling the package's `dist` never produces. Its scan now leaves the test directories out, so `border-0`, `focus-visible:ring-0`, `focus-visible:ring-[0px]`, `focus-visible:outline-0`, `contents` and `lowercase` leave the sheet, and since no control used any of them nothing renders differently. See [docs/theming.md](docs/theming.md).
+
 ## [v0.23.0] - 2026-10-24
 
 ### Changed

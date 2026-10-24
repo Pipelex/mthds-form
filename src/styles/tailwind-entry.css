@@ -35,10 +35,18 @@
  * exactly what happened when `./generative` was added as an entry and this file
  * still scanned `../react` alone; `scripts/assert-bundle.mjs` now refuses a
  * build whose rendering entries and `@source` lines disagree.
+ *
+ * Test files are NOT sources. Each tree holds a `__tests__/` directory, and a
+ * test writes class names no component uses (a refused value, a fixture's
+ * markup), which a plain scan would compile into the sheet. A host compiling
+ * the package's shipped `dist` never produces them, so they would be selectors
+ * only this sheet carries. The `@source not` lines keep them out.
  */
 @import 'tailwindcss' source(none);
 @source '../react';
 @source '../generative';
+@source not '../react/__tests__';
+@source not '../generative/__tests__';
 
 /* The select popover's and tooltip's enter and exit transitions. */
 @import 'tw-animate-css';
