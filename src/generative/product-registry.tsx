@@ -7,7 +7,7 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
-import { brandFillClass, brandFillInkClass, brandInkClass } from '../react/brand-ink';
+import { linkTextClass, selectedBorderClass, selectedFillClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
@@ -92,7 +92,7 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
                   key={link}
                   href="#"
                   onClick={(event) => event.preventDefault()}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden"
                 >
                   {link}
                 </a>
@@ -102,9 +102,10 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
           {props.tag ? (
             <span
               className={cn(
-                'min-w-0 truncate rounded-lg border border-primary/40 px-2.5 py-1 font-mono text-[11px]',
-                brandFillClass,
-                brandFillInkClass,
+                'min-w-0 truncate rounded-lg border px-2.5 py-1 font-mono text-[11px]',
+                selectedBorderClass,
+                selectedFillClass,
+                linkTextClass,
               )}
             >
               {props.tag}
@@ -127,7 +128,7 @@ function Hero({ props }: BaseComponentProps<HeroProps>) {
     <section className="pt-12 pb-10 sm:pt-14 sm:pb-12">
       {props.eyebrow ? (
         <p
-          className={cn('mb-4 text-[11px] font-medium tracking-[0.15em] uppercase', brandInkClass)}
+          className={cn('mb-4 text-[11px] font-medium tracking-[0.15em] uppercase', linkTextClass)}
         >
           {props.eyebrow}
         </p>
@@ -203,7 +204,7 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
       <div className="mb-6">
         <div className="flex items-baseline gap-3">
           {props.number ? (
-            <span className={cn('font-mono text-[12px]', brandInkClass)}>{props.number}</span>
+            <span className={cn('font-mono text-[12px]', linkTextClass)}>{props.number}</span>
           ) : null}
           <h2 className="text-xl font-semibold tracking-tight text-foreground">{props.title}</h2>
         </div>

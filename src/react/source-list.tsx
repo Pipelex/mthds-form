@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useFieldStrings } from './field-strings';
+import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
 
 /*
@@ -260,6 +261,7 @@ export function ListAction({
       onClick={onClick}
       className={cn(
         'inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 text-[14px] text-foreground transition-colors hover:bg-muted sm:min-h-9',
+        focusOutlineClass,
         className,
       )}
     >

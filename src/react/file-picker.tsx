@@ -19,6 +19,7 @@ import type { FileSource, FileSourceScope, SourceFile } from '../core';
 import { formatOfFilename, normalizeMimeType, type FileFormat } from '../core/file-formats';
 import { chosenFilesAdded } from '../core/sources';
 import { useFieldStrings, type FieldStrings } from './field-strings';
+import { focusOutlineClass, focusOutlineInsetClass, selectedCheckedFillClass } from './role-tokens';
 import {
   DimRows,
   ListAction,
@@ -73,7 +74,10 @@ export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePicker
       disabled={disabled}
       aria-haspopup="dialog"
       aria-label={s.chooseFromSourceAria(label)}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-border px-3 text-[14px] text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
+      className={cn(
+        'flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-border px-3 text-[14px] text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9',
+        focusOutlineClass,
+      )}
     >
       <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       {s.chooseFromSource}
@@ -277,7 +281,10 @@ function FilePickerBody({
             }}
             placeholder={s.filePickerSearchPlaceholder}
             autoComplete="off"
-            className="h-11 w-full rounded-md border border-border bg-input pr-3 pl-9 text-[16px] text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+            className={cn(
+              'h-11 w-full rounded-md border border-border bg-input pr-3 pl-9 text-[16px] text-foreground placeholder:text-muted-foreground',
+              focusOutlineClass,
+            )}
           />
         </div>
         <ToggleGroup
@@ -369,7 +376,10 @@ function FilePickerBody({
           type="button"
           onClick={use}
           disabled={choices.length === 0}
-          className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-[16px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            'flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-[16px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50',
+            focusOutlineClass,
+          )}
         >
           <span className="truncate">{s.filePickerUse(choices.length, choices[0]?.name)}</span>
         </button>
@@ -455,7 +465,10 @@ function SheetHeader({
         <div className="min-w-0 flex-1 space-y-1 pt-1">{children}</div>
         <DialogClose
           aria-label={s.close}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+            focusOutlineClass,
+          )}
         >
           <X className="size-5" aria-hidden="true" />
         </DialogClose>
@@ -488,8 +501,14 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
 
 /**
  * One file: a tap target of at least 64px holding the file's glyph, its name
- * and its second line. A chosen row shows a faint fill and a check, and says
- * so with `aria-checked`, so the choice is never shown by the fill alone.
+ * and its second line. A chosen row shows the kernel's selected fill
+ * (`--selected`) and a check, and says so with `aria-checked`, so the choice is
+ * never shown by the fill alone. The fill, the check and the second line all
+ * key on that one attribute (the row is the `group` its children read), so
+ * none of them can disagree with what the row says: the fill outranks the
+ * neutral hover fill and stays under the pointer that chose it, and the second
+ * line turns to `--foreground` on it, as a pressed toggle's text does, where
+ * `--muted-foreground` would fall below 4.5:1.
  */
 function FileRow({
   file,
@@ -519,9 +538,9 @@ function FileRow({
       disabled={disabled}
       onClick={onToggle}
       className={cn(
-        'flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50',
-        'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-        chosen && 'bg-muted',
+        'group flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50',
+        focusOutlineInsetClass,
+        selectedCheckedFillClass,
       )}
     >
       <Glyph
@@ -532,7 +551,7 @@ function FileRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] font-medium text-foreground">{file.name}</span>
         {(file.kind === 'test' || meta) && (
-          <span className="block truncate text-[13px] text-muted-foreground">
+          <span className="block truncate text-[13px] text-muted-foreground group-aria-checked:text-foreground">
             {file.kind === 'test' && (
               <span className="text-foreground">
                 {s.testFile}
@@ -544,7 +563,7 @@ function FileRow({
         )}
       </span>
       <Check
-        className={cn('size-5 shrink-0 text-foreground', !chosen && 'invisible')}
+        className="invisible size-5 shrink-0 text-foreground group-aria-checked:visible"
         aria-hidden="true"
       />
     </button>

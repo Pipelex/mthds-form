@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { HtmlContentView } from '../core/native-content';
 import { useFieldStrings } from './field-strings';
+import { FocusFrame } from './focus-frame';
 import {
   DEFAULT_IMG_SRC,
   frameDocument,
@@ -277,7 +278,8 @@ export function HtmlPreview({
           <span>{s.pageLoading}</span>
         </div>
       ) : doc === null ? null : (
-        <iframe
+        // A tab stop, whose keyboard focus `FocusFrame` draws.
+        <FocusFrame
           ref={frameRef}
           title={content.cssClass ? `HTML result (${content.cssClass})` : 'HTML result'}
           srcDoc={doc}

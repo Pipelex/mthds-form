@@ -5,6 +5,7 @@ import { marked, type Token, type Tokens } from 'marked';
 
 import { viewableUrl } from '../core/native-content';
 import { useProseImages, type ProseImages } from './result-env';
+import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
 
 /**
@@ -314,7 +315,7 @@ function InlineToken({ token }: { token: Token }) {
             // `noreferrer` as well as `noopener`: a result view has no business
             // telling a third party which page it was opened from.
             rel="noreferrer noopener"
-            className="underline underline-offset-2"
+            className={cn('rounded-sm underline underline-offset-2', focusOutlineClass)}
           >
             <Inline tokens={link.tokens} />
           </a>
@@ -375,7 +376,7 @@ function ProseImage({ token }: { token: Tokens.Image }) {
       href={src}
       target="_blank"
       rel="noreferrer noopener"
-      className="underline underline-offset-2"
+      className={cn('rounded-sm underline underline-offset-2', focusOutlineClass)}
     >
       {token.text || src}
     </a>
