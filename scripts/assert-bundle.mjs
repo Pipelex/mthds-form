@@ -442,6 +442,45 @@ if (unscanned.length === 0) {
   );
 }
 
+/**
+ * ...and it scans nothing but what ships. A test writes class names no
+ * component uses (a refused value, a fixture's markup, a word in a test's
+ * title), and a scanned test file compiles each one into the sheet: a selector
+ * that a host compiling the package's `dist` never produces, which a host's
+ * packaging check comparing the two then refuses. v0.23.0 shipped four that
+ * way. So every test or story file inside a scanned tree must sit under a
+ * `@source not` line, read with comments stripped so a commented-out exclusion
+ * does not count. Finding no test file at all means the walk compared nothing,
+ * and that fails too.
+ */
+const excludedTrees = [
+  ...withoutComments(tailwindEntry).matchAll(/@source\s+not\s+['"]\.\.\/([^'"]+?)\/?['"]/g),
+].map((match) => `src/${match[1]}/`);
+const testOnlyFiles = scanned.flatMap((tree) =>
+  readdirSync(resolve(`src/${tree}`), { recursive: true, withFileTypes: true })
+    .filter((file) => file.isFile())
+    .map((file) => relative(resolve('.'), `${file.parentPath ?? file.path}/${file.name}`))
+    .filter(
+      (path) => path.includes('/__tests__/') || /\.(test|spec|stories)\.[cm]?[jt]sx?$/.test(path),
+    ),
+);
+const scannedTestFiles = testOnlyFiles.filter(
+  (path) => !excludedTrees.some((tree) => path.startsWith(tree)),
+);
+if (testOnlyFiles.length === 0) {
+  failures.push(
+    `found no test or story file under ${scanned.map((tree) => `src/${tree}`).join(', ')}, so the check that the stylesheet scans none compared nothing.`,
+  );
+} else if (scannedTestFiles.length === 0) {
+  console.log(
+    `ok  styles.css scans none of the ${testOnlyFiles.length} test and story files in its trees`,
+  );
+} else {
+  failures.push(
+    `src/styles/tailwind-entry.css scans ${scannedTestFiles.slice(0, 5).join(', ')}${scannedTestFiles.length > 5 ? ', ...' : ''}, so dist/styles.css compiles classes only tests or stories write. Add a \`@source not\` line for their directory beside the others.`,
+  );
+}
+
 
 /**
  * The token contract: what the sheet READS, what `theme.css` DEFINES, and the
