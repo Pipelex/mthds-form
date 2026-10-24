@@ -27,9 +27,13 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  * - **The pale accent fill** (`accentFill`) is the accent laid over the page
  *   at a low strength: a pale tint on a light page, a deep one on a dark page.
  *
- * Unset seeds fall back on their own. An unset button colour is Pipelex green.
- * An unset accent follows the button colour, so a red button never sits beside
- * green links. An unset header is the page colour, so the band disappears.
+ * **An unset seed produces no role.** The roles a seed paints are present
+ * when it is set and absent when it is not, so a host keeps its own token for
+ * whatever the team left unset: the team's colours where it chose some, and
+ * the host's palette everywhere else. The one seed that reaches further is the
+ * button colour, which the accent follows when the accent is unset, so a red
+ * button never sits beside links in another hue. With no seed at all, there
+ * is no colour role to return.
  *
  * The page colour is an argument because every text role is measured against
  * it: a host renders a light and a dark theme, and it calls this once per
@@ -40,9 +44,6 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  * It returns roles, never custom property names: each host maps the roles onto
  * its own tokens. See docs/brand.md § "Three seed colours".
  */
-
-/** Pipelex green, the colour an unset button colour and an unset accent fall back to, in both themes. */
-export const PIPELEX_GREEN = '#45bf9f';
 
 /**
  * The contrast a control's outline needs against what surrounds it: WCAG 2's
@@ -81,23 +82,43 @@ export interface BrandSeeds {
 /** Text on a fill: only the two colours that read on every fill. */
 export type TextOnFill = '#000000' | '#ffffff';
 
-/** The colours a page paints with, each `#rrggbb` in lower case. */
-export interface BrandRoles {
+/** The button colour's roles, present when the button colour is set. */
+interface ActionRoles {
   /** The button colour, as a fill. Never text. */
   action: string;
   /** Text and icons on the button colour. */
   onAction: TextOnFill;
+}
+
+/** The accent's roles, present when the accent or the button colour it follows is set. */
+interface AccentRoles {
   /** The accent, as a fill: an active tab's underline, a progress bar. Never text. */
   accent: string;
   /** A pale accent fill (deep on a dark page), behind accent ink: a pill, a badge. */
   accentFill: string;
   /** The accent as text, reading at 4.5:1 or more on the page and on `accentFill`. */
   accentInk: string;
+}
+
+/** The header band's roles, present when the header is set. */
+interface HeaderRoles {
   /** The header band, as a fill. */
   header: string;
   /** Text on the header band: the back link, a wordmark. */
   onHeader: TextOnFill;
 }
+
+/** A group of roles that is either all there or not there at all. */
+type Absent<Roles> = { [Role in keyof Roles]?: never };
+
+/**
+ * The colours a page paints with, each `#rrggbb` in lower case. The roles come
+ * in groups, each present whole or absent whole: checking one role of a group
+ * (`roles.action !== undefined`) narrows the rest of it.
+ */
+export type BrandRoles = (ActionRoles | Absent<ActionRoles>) &
+  (AccentRoles | Absent<AccentRoles>) &
+  (HeaderRoles | Absent<HeaderRoles>);
 
 /**
  * The roles a page paints with, from up to three seeds and the colour of the
@@ -106,37 +127,39 @@ export interface BrandRoles {
  */
 export function deriveBrandRoles(seeds: BrandSeeds | null | undefined, page: string): BrandRoles {
   const canvas = parseHex(page, 'The page colour');
-  const action =
-    seeds?.action == null
-      ? parseHex(PIPELEX_GREEN, 'Pipelex green')
-      : parseHex(seeds.action, 'The action seed');
-  // An unset accent follows the button colour, which is itself Pipelex green
-  // when unset - exactly "the button colour if one is set, otherwise green".
+  const action = seeds?.action == null ? null : parseHex(seeds.action, 'The action seed');
+  // An unset accent follows the button colour, and is unset too when that is.
   const accent = seeds?.accent == null ? action : parseHex(seeds.accent, 'The accent seed');
-  const header = seeds?.header == null ? canvas : parseHex(seeds.header, 'The header seed');
+  const header = seeds?.header == null ? null : parseHex(seeds.header, 'The header seed');
 
+  const actionRoles: ActionRoles | Absent<ActionRoles> =
+    action === null ? {} : { action: colorHex(action), onAction: textOn(action) };
+  const accentRoles: AccentRoles | Absent<AccentRoles> =
+    accent === null ? {} : accentRolesOf(accent, canvas);
+  const headerRoles: HeaderRoles | Absent<HeaderRoles> =
+    header === null ? {} : { header: colorHex(header), onHeader: textOn(header) };
+  return { ...actionRoles, ...accentRoles, ...headerRoles };
+}
+
+/** The accent as a fill, its pale fill on the page, and its ink on both. */
+function accentRolesOf(accent: SrgbColor, canvas: SrgbColor): AccentRoles {
   // The way accent text moves is the way text on the page moves: toward
   // whichever of black and white reads better there, which always reaches
   // 4.58:1 on the page itself, so the ink's search always has an end.
   const extreme = textOn(canvas) === '#000000' ? BLACK : WHITE;
   const accentFill = paleFill(accent, canvas, extreme);
   const accentInk = inkFor(accent, [canvas, accentFill], extreme);
-
   return {
-    action: colorHex(action),
-    onAction: textOn(action),
     accent: colorHex(accent),
     accentFill: colorHex(accentFill),
     accentInk: colorHex(accentInk),
-    header: colorHex(header),
-    onHeader: textOn(header),
   };
 }
 
 /**
  * Whether the button colour sits below 3:1 against the page, so a button may
  * be hard to see in that theme. Only a colour the person set is judged: with
- * no button colour the answer is `false`, whatever Pipelex green measures.
+ * no button colour the button is the host's own, and the answer is `false`.
  */
 export function isActionFaint(seeds: BrandSeeds | null | undefined, page: string): boolean {
   const canvas = parseHex(page, 'The page colour');
@@ -152,15 +175,15 @@ export function isActionFaint(seeds: BrandSeeds | null | undefined, page: string
  */
 export function isAccentAdjusted(seeds: BrandSeeds | null | undefined, page: string): boolean {
   const roles = deriveBrandRoles(seeds, page);
-  if (seeds?.accent == null && seeds?.action == null) return false;
-  return roles.accentInk !== roles.accent;
+  return roles.accentInk !== undefined && roles.accentInk !== roles.accent;
 }
 
 /**
  * The seeds a dark theme uses: each dark colour where one is set, and the
- * light one where it is not. Colour by colour, before the fallbacks of
- * `deriveBrandRoles` apply, so a light accent the person set outranks a dark
- * button colour the accent would otherwise follow. Either set may be absent.
+ * light one where it is not. Colour by colour, before the accent follows the
+ * button colour in `deriveBrandRoles`, so a light accent the person set
+ * outranks a dark button colour the accent would otherwise follow. A colour
+ * set in neither stays unset. Either set may be absent.
  */
 export function resolveDarkSeeds(
   colors: BrandSeeds | null | undefined,
