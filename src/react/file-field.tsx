@@ -4,6 +4,7 @@ import { shownAsOptional } from '../core/readiness';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
+import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
 import type { FileRunField, FileSource } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
@@ -816,7 +817,11 @@ function FileField({
             type="button"
             disabled={busy}
             onClick={() => setShowUrl(true)}
-            className="flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11"
+            className={cn(
+              'flex w-fit items-center gap-1 rounded-sm font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
+              focusOutlineClass,
+              'focus-visible:outline-offset-2',
+            )}
           >
             <Link2 className="h-3 w-3" />
             {s.pasteUrlInstead}
@@ -990,7 +995,10 @@ function FileChip({
           <button
             type="button"
             onClick={onTogglePreview}
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-11 max-sm:px-3"
+            className={cn(
+              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-11 max-sm:px-3',
+              focusOutlineClass,
+            )}
           >
             {previewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {s.preview}
@@ -1010,7 +1018,10 @@ function ClearButton({ disabled, onClick }: { disabled?: boolean; onClick: () =>
       onClick={onClick}
       disabled={disabled}
       aria-label={s.removeFileAria}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 max-sm:size-11"
+      className={cn(
+        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 max-sm:size-11',
+        focusOutlineClass,
+      )}
     >
       <X className="h-4 w-4" />
     </button>

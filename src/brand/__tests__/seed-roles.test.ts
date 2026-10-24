@@ -6,7 +6,6 @@ import {
   isAccentAdjusted,
   isActionFaint,
   MIN_CONTROL_CONTRAST,
-  PIPELEX_GREEN,
   readableTextOn,
   resolveDarkSeeds,
 } from '../index';
@@ -84,7 +83,6 @@ const SEEDS: readonly string[] = [
     '#14213d', // navy
     '#2563eb', // a link blue that reads on white by a hair
     '#dc2626', // red
-    PIPELEX_GREEN,
   ]),
 ];
 
@@ -108,13 +106,31 @@ function seedSets(seed: string, index: number): BrandSeeds[] {
   ];
 }
 
+/** Every text role the roles carry, paired with the background it is read on. */
 function textRoles(roles: BrandRoles, page: string): [string, string, string][] {
+  const pairs: [string, string, string][] = [];
+  if (roles.action !== undefined) pairs.push(['onAction on action', roles.onAction, roles.action]);
+  if (roles.header !== undefined) pairs.push(['onHeader on header', roles.onHeader, roles.header]);
+  if (roles.accent !== undefined) {
+    pairs.push(['accentInk on the page', roles.accentInk, page]);
+    pairs.push(['accentInk on accentFill', roles.accentInk, roles.accentFill]);
+  }
+  return pairs;
+}
+
+/** The roles a set of seeds must produce, and no others. */
+function expectedRoles(seeds: BrandSeeds): string[] {
   return [
-    ['onAction on action', roles.onAction, roles.action],
-    ['onHeader on header', roles.onHeader, roles.header],
-    ['accentInk on the page', roles.accentInk, page],
-    ['accentInk on accentFill', roles.accentInk, roles.accentFill],
-  ];
+    ...(seeds.action == null ? [] : ['action', 'onAction']),
+    ...(seeds.accent == null && seeds.action == null ? [] : ['accent', 'accentFill', 'accentInk']),
+    ...(seeds.header == null ? [] : ['header', 'onHeader']),
+  ].sort();
+}
+
+/** The accent's roles, which seeds naming an accent or a button colour always produce. */
+function accentOf(roles: BrandRoles): { accent: string; accentFill: string; accentInk: string } {
+  if (roles.accent === undefined) throw new Error('These seeds produced no accent roles.');
+  return { accent: roles.accent, accentFill: roles.accentFill, accentInk: roles.accentInk };
 }
 
 describe('deriveBrandRoles across a sweep of seeds', () => {
@@ -123,6 +139,15 @@ describe('deriveBrandRoles across a sweep of seeds', () => {
   });
 
   for (const page of PAGES) {
+    it(`returns exactly the roles its seeds produce, on ${page}`, () => {
+      SEEDS.forEach((seed, index) => {
+        for (const seeds of seedSets(seed, index)) {
+          const roles = deriveBrandRoles(seeds, page);
+          expect(Object.keys(roles).sort(), JSON.stringify(seeds)).toEqual(expectedRoles(seeds));
+        }
+      });
+    });
+
     it(`reads every text role at 4.5:1 or more on its background, on ${page}`, () => {
       const failures: string[] = [];
       SEEDS.forEach((seed, index) => {
@@ -148,26 +173,16 @@ describe('deriveBrandRoles across a sweep of seeds', () => {
       });
     });
 
-    it(`returns each set seed as its own fill, never Pipelex's palette, on ${page}`, () => {
-      const unbranded = deriveBrandRoles({}, page);
+    it(`returns each set seed as its own fill, on ${page}`, () => {
       SEEDS.forEach((seed, index) => {
-        if (seed === PIPELEX_GREEN) return;
         for (const seeds of seedSets(seed, index)) {
           const roles = deriveBrandRoles(seeds, page);
           if (seeds.header) expect(roles.header).toBe(seeds.header);
-          if (seeds.action && seeds.action !== PIPELEX_GREEN) {
-            expect(roles.action).toBe(seeds.action);
-            expect(roles.action).not.toBe(unbranded.action);
-          }
+          if (seeds.action) expect(roles.action).toBe(seeds.action);
           // Whichever seed colours the accent - its own, or the button colour it
-          // follows - the accent, its fill and its ink all come from that seed,
-          // and none of them is the green's.
+          // follows - the accent is that seed, as it was set.
           const accentSeed = seeds.accent ?? seeds.action;
-          if (accentSeed && accentSeed !== PIPELEX_GREEN) {
-            expect(roles.accent).toBe(accentSeed);
-            expect(roles.accentFill).not.toBe(unbranded.accentFill);
-            expect(roles.accentInk).not.toBe(unbranded.accentInk);
-          }
+          if (accentSeed) expect(roles.accent).toBe(accentSeed);
         }
       });
     });
@@ -175,13 +190,13 @@ describe('deriveBrandRoles across a sweep of seeds', () => {
 
   it('makes the accent its own ink when it already reads', () => {
     const roles = deriveBrandRoles({ accent: '#14213d' }, '#ffffff');
-    expect(roles.accentInk).toBe('#14213d');
+    expect(accentOf(roles).accentInk).toBe('#14213d');
   });
 
   it('adjusts the ink only as far as it has to: one step short of the bar, not past it', () => {
     for (const page of [...LIGHT_PAGES, ...DARK_PAGES]) {
       for (const seed of SEEDS) {
-        const roles = deriveBrandRoles({ accent: seed }, page);
+        const roles = accentOf(deriveBrandRoles({ accent: seed }, page));
         if (roles.accentInk === roles.accent) continue;
         const weakest = Math.min(
           contrast(roles.accentInk, page),
@@ -196,8 +211,8 @@ describe('deriveBrandRoles across a sweep of seeds', () => {
 
   it('darkens the accent on a light page and lightens it on a dark one, keeping its hue', () => {
     const amber = '#f59e0b';
-    const onLight = deriveBrandRoles({ accent: amber }, '#ffffff').accentInk;
-    const onDark = deriveBrandRoles({ accent: '#14213d' }, '#0d0d0d').accentInk;
+    const onLight = accentOf(deriveBrandRoles({ accent: amber }, '#ffffff')).accentInk;
+    const onDark = accentOf(deriveBrandRoles({ accent: '#14213d' }, '#0d0d0d')).accentInk;
     const luminanceOrder = (a: string, b: string) =>
       contrast(a, '#000000') - contrast(b, '#000000');
     expect(luminanceOrder(onLight, amber)).toBeLessThan(0);
@@ -211,46 +226,60 @@ describe('deriveBrandRoles across a sweep of seeds', () => {
   it('keeps a pale fill pale on a light page and deep on a dark one', () => {
     for (const seed of SEEDS) {
       for (const page of LIGHT_PAGES) {
-        const { accentFill } = deriveBrandRoles({ accent: seed }, page);
+        const { accentFill } = accentOf(deriveBrandRoles({ accent: seed }, page));
         expect(readableTextOn(accentFill), `${seed} on ${page}`).toBe('#000000');
       }
       for (const page of DARK_PAGES) {
-        const { accentFill } = deriveBrandRoles({ accent: seed }, page);
+        const { accentFill } = accentOf(deriveBrandRoles({ accent: seed }, page));
         expect(readableTextOn(accentFill), `${seed} on ${page}`).toBe('#ffffff');
       }
     }
   });
 });
 
-describe('deriveBrandRoles fallbacks', () => {
+describe('deriveBrandRoles leaves what the team did not set to the host', () => {
   for (const page of PAGES) {
-    it(`falls back to Pipelex green and the page colour with no seeds, on ${page}`, () => {
+    it(`returns no colour role with no seeds, on ${page}`, () => {
       for (const seeds of [undefined, null, {}, { action: null, accent: null, header: null }]) {
-        const roles = deriveBrandRoles(seeds, page);
-        expect(roles.action).toBe(PIPELEX_GREEN);
-        expect(roles.accent).toBe(PIPELEX_GREEN);
-        expect(roles.header).toBe(page);
-        expect(roles.onAction).toBe('#000000');
+        expect(Object.keys(deriveBrandRoles(seeds, page))).toEqual([]);
       }
     });
   }
 
-  it('makes an unset accent follow a set button colour', () => {
+  it('makes an unset accent follow a set button colour, and sets no header', () => {
     const roles = deriveBrandRoles({ action: '#DC2626' }, '#ffffff');
+    expect(Object.keys(roles).sort()).toEqual(
+      ['accent', 'accentFill', 'accentInk', 'action', 'onAction'].sort(),
+    );
     expect(roles.action).toBe('#dc2626');
+    expect(roles.onAction).toBe('#ffffff');
     expect(roles.accent).toBe('#dc2626');
+    expect(accentOf(roles)).toEqual(accentOf(deriveBrandRoles({ accent: '#dc2626' }, '#ffffff')));
   });
 
-  it('keeps the button on Pipelex green when only the accent is set', () => {
+  it('leaves the button to the host when only the accent is set', () => {
     const roles = deriveBrandRoles({ accent: '#2563eb' }, '#ffffff');
-    expect(roles.action).toBe(PIPELEX_GREEN);
+    expect(Object.keys(roles).sort()).toEqual(['accent', 'accentFill', 'accentInk']);
+    expect(roles.action).toBeUndefined();
+    expect(roles.onAction).toBeUndefined();
     expect(roles.accent).toBe('#2563eb');
   });
 
-  it('turns an unset header into the page, so no band shows', () => {
-    const roles = deriveBrandRoles({ action: '#dc2626' }, '#0D0D0D');
-    expect(roles.header).toBe('#0d0d0d');
-    expect(roles.onHeader).toBe('#ffffff');
+  it('leaves the header band absent when no header is set', () => {
+    for (const seeds of [
+      { action: '#dc2626' },
+      { accent: '#2563eb' },
+      { action: '#dc2626', accent: '#2563eb' },
+    ]) {
+      const roles = deriveBrandRoles(seeds, '#0D0D0D');
+      expect(roles.header).toBeUndefined();
+      expect(roles.onHeader).toBeUndefined();
+    }
+  });
+
+  it('paints the header band alone when only the header is set', () => {
+    const roles = deriveBrandRoles({ header: '#14213D' }, '#ffffff');
+    expect(roles).toStrictEqual({ header: '#14213d', onHeader: '#ffffff' });
   });
 
   it('paints the text on a fill pure black or pure white', () => {
@@ -282,10 +311,10 @@ describe('the settings screen checks', () => {
     }
   });
 
-  it('never calls Pipelex green faint when the button colour is unset', () => {
-    expect(contrast(PIPELEX_GREEN, '#ffffff')).toBeLessThan(MIN_CONTROL_CONTRAST);
+  it("never calls an unset button colour faint, since the button is then the host's own", () => {
     expect(isActionFaint({}, '#ffffff')).toBe(false);
     expect(isActionFaint(null, '#ffffff')).toBe(false);
+    expect(isActionFaint({ accent: '#fefefe', header: '#fefefe' }, '#ffffff')).toBe(false);
   });
 
   it('says the accent was adjusted exactly when its ink differs from it', () => {
@@ -293,7 +322,7 @@ describe('the settings screen checks', () => {
       SEEDS.forEach((seed, index) => {
         for (const seeds of seedSets(seed, index)) {
           if (seeds.accent == null && seeds.action == null) continue;
-          const roles = deriveBrandRoles(seeds, page);
+          const roles = accentOf(deriveBrandRoles(seeds, page));
           expect(isAccentAdjusted(seeds, page)).toBe(roles.accentInk !== roles.accent);
         }
       });
@@ -303,11 +332,11 @@ describe('the settings screen checks', () => {
     expect(isAccentAdjusted({ accent: '#14213d' }, '#0d0d0d')).toBe(true);
   });
 
-  it('judges an unset accent through the button colour it follows, and never Pipelex green', () => {
+  it('judges an unset accent through the button colour it follows, and nothing with neither', () => {
     expect(isAccentAdjusted({ action: '#fef9c3' }, '#ffffff')).toBe(true);
     expect(isAccentAdjusted({ header: '#14213d' }, '#ffffff')).toBe(false);
     expect(isAccentAdjusted({}, '#ffffff')).toBe(false);
-    expect(deriveBrandRoles({}, '#ffffff').accentInk).not.toBe(PIPELEX_GREEN);
+    expect(deriveBrandRoles({}, '#ffffff').accentInk).toBeUndefined();
   });
 });
 
@@ -326,8 +355,11 @@ describe('resolveDarkSeeds', () => {
     expect(deriveBrandRoles(dark, '#0d0d0d').accent).toBe('#2563eb');
   });
 
-  it('leaves a colour set in neither unset, for deriveBrandRoles to fall back', () => {
+  it('leaves a colour set in neither unset, so its roles stay absent', () => {
     expect(resolveDarkSeeds(null, undefined)).toEqual({ action: null, accent: null, header: null });
-    expect(deriveBrandRoles(resolveDarkSeeds(null, null), '#0d0d0d').action).toBe(PIPELEX_GREEN);
+    expect(Object.keys(deriveBrandRoles(resolveDarkSeeds(null, null), '#0d0d0d'))).toEqual([]);
+    const dark = deriveBrandRoles(resolveDarkSeeds({ header: '#14213d' }, null), '#0d0d0d');
+    expect(dark.action).toBeUndefined();
+    expect(dark.header).toBe('#14213d');
   });
 });

@@ -72,7 +72,6 @@ export { BRAND_VARIABLES, compileBrand } from './compile';
 // Up to three seed colours in, the colour roles a page paints with out.
 export {
   MIN_CONTROL_CONTRAST,
-  PIPELEX_GREEN,
   deriveBrandRoles,
   isAccentAdjusted,
   isActionFaint,

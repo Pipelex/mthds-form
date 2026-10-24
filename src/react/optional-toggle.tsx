@@ -2,6 +2,8 @@
 
 import { Minus, Plus } from 'lucide-react';
 import { useFieldStrings } from './field-strings';
+import { focusOutlineClass } from './role-tokens';
+import { cn } from './utils';
 
 interface OptionalToggleProps {
   /** How many empty optional entries are currently hidden. */
@@ -27,7 +29,11 @@ export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: Op
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
-      className="flex w-fit items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground max-sm:min-h-11"
+      className={cn(
+        'flex w-fit items-center gap-1.5 rounded-sm text-[11px] text-muted-foreground transition-colors hover:text-foreground max-sm:min-h-11',
+        focusOutlineClass,
+        'focus-visible:outline-offset-2',
+      )}
     >
       {expanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
       {expanded
