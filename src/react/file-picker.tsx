@@ -19,6 +19,7 @@ import type { FileSource, FileSourceScope, SourceFile } from '../core';
 import { formatOfFilename, normalizeMimeType, type FileFormat } from '../core/file-formats';
 import { chosenFilesAdded } from '../core/sources';
 import { useFieldStrings, type FieldStrings } from './field-strings';
+import { selectedCheckedFillClass } from './role-tokens';
 import {
   DimRows,
   ListAction,
@@ -488,8 +489,12 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
 
 /**
  * One file: a tap target of at least 64px holding the file's glyph, its name
- * and its second line. A chosen row shows a faint fill and a check, and says
- * so with `aria-checked`, so the choice is never shown by the fill alone.
+ * and its second line. A chosen row shows the kernel's selected fill
+ * (`--selected`) and a check, and says so with `aria-checked`, so the choice is
+ * never shown by the fill alone. The fill keys on that attribute, so it
+ * outranks the neutral hover fill and stays under the pointer that chose it,
+ * and the second line turns to `--foreground` on it, as a pressed toggle's
+ * text does, where `--muted-foreground` would fall below 4.5:1.
  */
 function FileRow({
   file,
@@ -521,7 +526,7 @@ function FileRow({
       className={cn(
         'flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50',
         'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-        chosen && 'bg-muted',
+        selectedCheckedFillClass,
       )}
     >
       <Glyph
@@ -532,7 +537,12 @@ function FileRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] font-medium text-foreground">{file.name}</span>
         {(file.kind === 'test' || meta) && (
-          <span className="block truncate text-[13px] text-muted-foreground">
+          <span
+            className={cn(
+              'block truncate text-[13px]',
+              chosen ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
             {file.kind === 'test' && (
               <span className="text-foreground">
                 {s.testFile}

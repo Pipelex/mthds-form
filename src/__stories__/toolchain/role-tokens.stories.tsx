@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
-import { expect, userEvent } from 'storybook/test';
-import type { ExampleSource } from '../../core';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
+import type { ExampleSource, FileSource } from '../../core';
 import { getPipeInputForm, getPipeIOContract } from '../../core';
 import { DEFAULT_FIELD_STRINGS as S, MethodForm, useMethodForm } from '../../react';
 import { CaseForm } from '../case-form';
+import { CONTRACTS as FILES_CONTRACTS, INPUT_FORM as FILES_INPUT_FORM } from '../_generated/files';
 import { CONTRACTS, INPUT_FORM } from '../_generated/scalars';
 import {
   CONTRACTS as STRUCTURED_CONTRACTS,
@@ -24,8 +25,9 @@ import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../gene
  * SPELLED, in source and in the built sheet. Whether Tailwind generates those
  * utilities at all, and whether the browser resolves each chain to the colour
  * it names, are browser questions, answered here on every element that reads
- * them: an enum pill's fill, checkmark and edge, a produced page's tag and its
- * edge, and a completed step's chip. A field's focus border is asserted beside
+ * them: an enum pill's fill, checkmark and edge, a chosen file's row in the
+ * team's files, a produced page's tag and its edge, and a completed step's
+ * chip. A field's focus border is asserted beside
  * them, and the focus outline of three buttons that once drew none and so
  * focused in the browser's own colour: each reads `--ring`, as every focus the
  * controls draw does, so a branding host colours them all at once by setting
@@ -138,6 +140,104 @@ export const PillWithBrand: Story = {
       expect(getComputedStyle(mark).color).toBe(RGB.link);
       expect(getComputedStyle(pill).borderTopColor).toBe(computed(pill, 'color', LINK_EDGE));
     }
+  },
+};
+
+/**
+ * A team's one file, as a host keeps it. It is a host's own record, which no
+ * projection of a method produces, so it is written here in the shape the
+ * file source declares.
+ */
+const TEAM_FILES: FileSource = {
+  initialScope: 'everyone',
+  list: async () => ({
+    files: [
+      {
+        id: 'fl_7',
+        url: 'pipelex-storage://team/assets/inv-2291.pdf',
+        name: 'INV-2291.pdf',
+        mediaType: 'application/pdf',
+        size: 348_160,
+        origin: 'Uploaded by you',
+      },
+    ],
+  }),
+};
+
+/** A single document field offering the team's files. */
+function TeamFilesForm() {
+  const contract = getPipeIOContract(FILES_CONTRACTS, 'files', 'one_document');
+  const descriptor = getPipeInputForm(FILES_INPUT_FORM, 'files', 'one_document');
+  if (!contract || !descriptor) throw new Error('No fixture entry for files.one_document.');
+  const form = useMethodForm({ descriptor, contract, fileSource: TEAM_FILES });
+  return <MethodForm form={form} presentation="app" />;
+}
+
+/**
+ * Chooses the file in each pane's sheet in turn, hands its row and the row's
+ * second line to `check` once the fill has eased in, and closes the sheet
+ * again, so the next pane's can open. Each sheet is drawn in place, under its
+ * pane's theme and the brand around it.
+ */
+async function eachChosenRow(
+  canvasElement: HTMLElement,
+  check: (row: HTMLElement, secondLine: HTMLElement) => void,
+) {
+  const canvas = within(canvasElement);
+  const page = within(canvasElement.ownerDocument.body);
+  const opener = () =>
+    canvas.getAllByRole('button', { name: S.chooseFromSourceAria('Attachment') });
+  expect(opener()).toHaveLength(2);
+  for (let index = 0; index < 2; index++) {
+    await userEvent.click(opener()[index]!);
+    const sheet = within(await page.findByRole('dialog', { name: S.filePickerTitle }));
+    const row = await sheet.findByRole('radio', { name: /INV-2291\.pdf/ });
+    await userEvent.click(row);
+    expect(row).toHaveAttribute('aria-checked', 'true');
+    // `transition-colors` eases the row into its fill, and a computed style
+    // read mid-transition is the colour it started from.
+    await Promise.all(row.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    const secondLine = row.querySelector<HTMLElement>('span.min-w-0 > span:nth-child(2)')!;
+    expect(secondLine.textContent).toContain('Uploaded by you');
+    check(row, secondLine);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
+  }
+}
+
+/**
+ * No tokens: the chosen file's row paints what a pressed pill does without
+ * them, the `bg-primary/10` tint, never the neutral `--muted` it once drew,
+ * and its second line turns to `--foreground` on that fill.
+ */
+export const ChosenFileWithoutBrand: Story = {
+  render: () => <TeamFilesForm />,
+  play: async ({ canvasElement }) => {
+    await eachChosenRow(canvasElement, (row, secondLine) => {
+      expect(getComputedStyle(row).backgroundColor).toBe(
+        computed(row, 'backgroundColor', tint(10)),
+      );
+      expect(getComputedStyle(secondLine).color).toBe(
+        computed(secondLine, 'color', 'var(--foreground)'),
+      );
+    });
+  },
+};
+
+/** A host's tokens: the chosen file's row takes the selected fill, as a pressed pill does. */
+export const ChosenFileWithBrand: Story = {
+  render: () => (
+    <Branded>
+      <TeamFilesForm />
+    </Branded>
+  ),
+  play: async ({ canvasElement }) => {
+    await eachChosenRow(canvasElement, (row, secondLine) => {
+      expect(getComputedStyle(row).backgroundColor).toBe(RGB.selected);
+      expect(getComputedStyle(secondLine).color).toBe(
+        computed(secondLine, 'color', 'var(--foreground)'),
+      );
+    });
   },
 };
 

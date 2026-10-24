@@ -15,7 +15,7 @@
  *   `deriveBrandRoles` measures that ink against the page and against the
  *   fill, so one token serves both.
  * - `--selected`, the pale accent fill (`accentFill`) behind a selected pill
- *   or toggle, a tag or a completed step.
+ *   or toggle, a chosen file, a tag or a completed step.
  *
  * A selected pill and a tag are also outlined in the accent: their border is
  * `--link` at 40%, so nothing selected keeps the button colour in its edge.
@@ -54,6 +54,10 @@ export const selectedFillClass =
 /** The same fill on a pressed item (`data-state="on"`), so it outranks the item's hover fill as `data-[state=on]:bg-primary/10` did. */
 export const selectedStateFillClass =
   'data-[state=on]:bg-[color:var(--selected,color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_10%,transparent))]';
+
+/** The same fill on a chosen row (`aria-checked="true"`), so it outranks the row's neutral hover fill as a pressed item's does. */
+export const selectedCheckedFillClass =
+  'aria-checked:bg-[color:var(--selected,color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_10%,transparent))]';
 
 /** The pale accent fill of a completed step, falling back to `bg-primary/15`. */
 export const selectedFillStrongClass =

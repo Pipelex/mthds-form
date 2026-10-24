@@ -303,7 +303,7 @@ export const FileFieldWithTeamFiles: Story = {
 /**
  * **The team's files, open on a PDF-only field, one file chosen.** The line
  * under the title names what the field takes, so the list holds no image. The
- * chosen row has a faint fill and a check, and the button names the file.
+ * chosen row has the selected fill and a check, and the button names the file.
  * Left open so the accessibility check reads the sheet.
  */
 export const TeamFilesOpen: Story = {
