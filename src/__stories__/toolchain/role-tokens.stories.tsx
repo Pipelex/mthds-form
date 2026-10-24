@@ -1,8 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
 import { expect, userEvent } from 'storybook/test';
+import type { ExampleSource } from '../../core';
+import { getPipeInputForm, getPipeIOContract } from '../../core';
+import { DEFAULT_FIELD_STRINGS as S, MethodForm, useMethodForm } from '../../react';
 import { CaseForm } from '../case-form';
 import { CONTRACTS, INPUT_FORM } from '../_generated/scalars';
+import {
+  CONTRACTS as STRUCTURED_CONTRACTS,
+  INPUT_FORM as STRUCTURED_INPUT_FORM,
+} from '../_generated/structured';
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../_generated/trips';
 import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
 import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../generative/layout-page';
@@ -17,10 +24,12 @@ import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../gene
  * SPELLED, in source and in the built sheet. Whether Tailwind generates those
  * utilities at all, and whether the browser resolves each chain to the colour
  * it names, are browser questions, answered here on every element that reads
- * them: an enum pill's fill and checkmark, a produced page's tag, and a
- * completed step's chip. A field's focus border is asserted beside them: it
- * reads `--ring`, as every focus the controls draw does, so a branding host
- * colours them all at once by setting that one contract token.
+ * them: an enum pill's fill, checkmark and edge, a produced page's tag and its
+ * edge, and a completed step's chip. A field's focus border is asserted beside
+ * them, and the focus outline of three buttons that once drew none and so
+ * focused in the browser's own colour: each reads `--ring`, as every focus the
+ * controls draw does, so a branding host colours them all at once by setting
+ * that one contract token.
  *
  * Without the tokens, each must compute to exactly what the `--primary`
  * expression it replaced computes to, and the focus border to `--ring`,
@@ -85,6 +94,8 @@ function computed(beside: Element, property: 'color' | 'backgroundColor', value:
 const PRIMARY = 'var(--primary)';
 const RING = 'var(--ring)';
 const tint = (percent: number) => `color-mix(in oklab, var(--primary) ${percent}%, transparent)`;
+/** The edge of something selected under the brand: the link ink at 40%. */
+const LINK_EDGE = `color-mix(in oklab, ${BRAND.link} 40%, transparent)`;
 
 /** Every selected pill on the canvas, one per pane, with its checkmark. */
 function selectedPills(canvasElement: HTMLElement): [HTMLElement, SVGElement][] {
@@ -93,7 +104,10 @@ function selectedPills(canvasElement: HTMLElement): [HTMLElement, SVGElement][] 
   return pills.map((pill) => [pill, pill.querySelector('svg')!]);
 }
 
-/** No tokens: the pill and its checkmark paint what `bg-primary/10` and `text-primary` did. */
+/**
+ * No tokens: the pill, its checkmark and its edge paint what `bg-primary/10`,
+ * `text-primary` and `border-primary/40` did.
+ */
 export const PillWithoutBrand: Story = {
   play: async ({ canvasElement }) => {
     for (const [pill, mark] of selectedPills(canvasElement)) {
@@ -101,11 +115,15 @@ export const PillWithoutBrand: Story = {
         computed(pill, 'backgroundColor', tint(10)),
       );
       expect(getComputedStyle(mark).color).toBe(computed(mark, 'color', PRIMARY));
+      expect(getComputedStyle(pill).borderTopColor).toBe(computed(pill, 'color', tint(40)));
     }
   },
 };
 
-/** A host's tokens: the pill takes the selected fill, and its checkmark the link ink on it. */
+/**
+ * A host's tokens: the pill takes the selected fill, its checkmark the link ink
+ * on it, and its edge the link ink at 40%, never the button colour.
+ */
 export const PillWithBrand: Story = {
   decorators: [
     (Story) => (
@@ -118,6 +136,7 @@ export const PillWithBrand: Story = {
     for (const [pill, mark] of selectedPills(canvasElement)) {
       expect(getComputedStyle(pill).backgroundColor).toBe(RGB.selected);
       expect(getComputedStyle(mark).color).toBe(RGB.link);
+      expect(getComputedStyle(pill).borderTopColor).toBe(computed(pill, 'color', LINK_EDGE));
     }
   },
 };
@@ -171,19 +190,19 @@ function titleFields(canvasElement: HTMLElement): HTMLInputElement[] {
  * `:focus-visible` answers to; a scripted `focus()` after a click would not
  * match it.
  */
-async function tabTo(field: HTMLInputElement) {
+async function tabTo(field: HTMLElement) {
   for (let step = 0; step < 400 && document.activeElement !== field; step++) await userEvent.tab();
   expect(document.activeElement).toBe(field);
   expect(field.matches(':focus-visible')).toBe(true);
-  // The field's `transition-colors` eases its border into the focus colour, and
+  // `transition-colors` eases a border or an outline into the focus colour, and
   // a computed style read mid-transition is the colour it started from.
   await Promise.all(field.getAnimations().map((animation) => animation.finished));
 }
 
 /**
  * No tokens: the tag and the completed step paint what `bg-primary/10`,
- * `bg-primary/15` and `text-primary` did, and a field's focus border is
- * `--ring`'s.
+ * `bg-primary/15`, `text-primary` and the tag's `border-primary/40` did, and a
+ * field's focus border is `--ring`'s.
  */
 export const ChipsWithoutBrand: Story = {
   parameters: GENERATIVE_STORY_PARAMETERS,
@@ -198,6 +217,7 @@ export const ChipsWithoutBrand: Story = {
         computed(tag, 'backgroundColor', tint(10)),
       );
       expect(getComputedStyle(tag).color).toBe(computed(tag, 'color', PRIMARY));
+      expect(getComputedStyle(tag).borderTopColor).toBe(computed(tag, 'color', tint(40)));
     }
     for (const chip of await completedSteps(canvasElement)) {
       expect(chip.textContent).toBe('1');
@@ -211,7 +231,8 @@ export const ChipsWithoutBrand: Story = {
 
 /**
  * A host's tokens: the tag and the completed step take the selected fill and
- * the link ink on it, and a focused field's border takes the ring.
+ * the link ink on it, the tag's edge the link ink at 40%, and a focused field's
+ * border takes the ring.
  */
 export const ChipsWithBrand: Story = {
   parameters: GENERATIVE_STORY_PARAMETERS,
@@ -228,10 +249,76 @@ export const ChipsWithBrand: Story = {
     for (const tag of tags(canvasElement)) {
       expect(getComputedStyle(tag).backgroundColor).toBe(RGB.selected);
       expect(getComputedStyle(tag).color).toBe(RGB.link);
+      expect(getComputedStyle(tag).borderTopColor).toBe(computed(tag, 'color', LINK_EDGE));
     }
     for (const chip of await completedSteps(canvasElement)) {
       expect(getComputedStyle(chip).backgroundColor).toBe(RGB.selected);
       expect(getComputedStyle(chip).color).toBe(RGB.link);
+    }
+  },
+};
+
+/** An example source with nothing in it: the form offers "Fill with an example" all the same. */
+const NO_EXAMPLES: ExampleSource = { list: async () => ({ examples: [] }) };
+
+/**
+ * An invoice's whole form, as a host mounts it with an example source: it
+ * offers "Fill with an example", "Add item" under the invoice's lines, and
+ * "1 optional field" inside the billed-to address.
+ */
+function InvoiceForm() {
+  const contract = getPipeIOContract(STRUCTURED_CONTRACTS, 'structured', 'one_invoice');
+  const descriptor = getPipeInputForm(STRUCTURED_INPUT_FORM, 'structured', 'one_invoice');
+  if (!contract || !descriptor) throw new Error('No fixture entry for structured.one_invoice.');
+  const form = useMethodForm({ descriptor, contract, exampleSource: NO_EXAMPLES });
+  return <MethodForm form={form} />;
+}
+
+/**
+ * Each pane's "Fill with an example", "Add item" and "1 optional field", the
+ * three buttons that drew no focus of their own until each was given the
+ * kernel's outline, so a keyboard focus showed the browser's ring, which no
+ * token reaches.
+ */
+function unringedButtons(canvasElement: HTMLElement): HTMLElement[] {
+  const named = (name: string) =>
+    [...canvasElement.querySelectorAll<HTMLElement>('button')].filter(
+      (button) => button.textContent === name,
+    );
+  const buttons = [
+    ...named(S.fillWithExample),
+    ...named(S.addItem),
+    ...named(S.optionalFieldsCount(1)),
+  ];
+  // Three per pane, two panes.
+  expect(buttons).toHaveLength(6);
+  return buttons;
+}
+
+/** No tokens: each button's keyboard focus is a solid outline in `--ring`. */
+export const FocusWithoutBrand: Story = {
+  render: () => <InvoiceForm />,
+  play: async ({ canvasElement }) => {
+    for (const button of unringedButtons(canvasElement)) {
+      await tabTo(button);
+      expect(getComputedStyle(button).outlineStyle).toBe('solid');
+      expect(getComputedStyle(button).outlineColor).toBe(computed(button, 'color', RING));
+    }
+  },
+};
+
+/** A host's `--ring`: each button's keyboard focus takes it. */
+export const FocusWithBrand: Story = {
+  render: () => (
+    <Branded>
+      <InvoiceForm />
+    </Branded>
+  ),
+  play: async ({ canvasElement }) => {
+    for (const button of unringedButtons(canvasElement)) {
+      await tabTo(button);
+      expect(getComputedStyle(button).outlineStyle).toBe('solid');
+      expect(getComputedStyle(button).outlineColor).toBe(RGB.ring);
     }
   },
 };

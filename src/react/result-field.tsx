@@ -539,7 +539,7 @@ function FileRef({
           rel="noreferrer"
           title={title}
           // A line 44px tall below `sm`, so a finger can follow the link.
-          className="min-w-0 truncate font-mono text-[12px] text-foreground underline underline-offset-2 max-sm:min-w-11 max-sm:leading-11"
+          className="min-w-0 truncate rounded-sm font-mono text-[12px] text-foreground underline underline-offset-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:min-w-11 max-sm:leading-11"
         >
           {label}
         </a>
@@ -957,7 +957,10 @@ function ImageValue({
           // resolves to zero width — the panel showed a tall empty sliver with
           // the spinner clipped inside it. A gallery tile and a table cell size
           // themselves, so they keep the inline box.
-          className={inGallery || compact ? 'inline-block' : 'block w-full'}
+          className={cn(
+            inGallery || compact ? 'inline-block' : 'block w-full',
+            'focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+          )}
         >
           <LoadingImage
             src={src}
@@ -1675,7 +1678,7 @@ function ObjectTable({
       aria-label={label}
       {...(fits ? {} : { tabIndex: 0 })}
       className={cn(
-        'overflow-x-auto rounded-lg border border-border',
+        'overflow-x-auto rounded-lg border border-border focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
         EXPAND_COLUMN_WIDTH,
         fits && '@container',
       )}

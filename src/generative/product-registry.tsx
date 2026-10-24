@@ -7,7 +7,7 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
-import { linkTextClass, selectedFillClass } from '../react/role-tokens';
+import { linkTextClass, selectedBorderClass, selectedFillClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
@@ -92,7 +92,7 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
                   key={link}
                   href="#"
                   onClick={(event) => event.preventDefault()}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden"
                 >
                   {link}
                 </a>
@@ -102,7 +102,8 @@ function AppBar({ props }: BaseComponentProps<AppBarProps>) {
           {props.tag ? (
             <span
               className={cn(
-                'min-w-0 truncate rounded-lg border border-primary/40 px-2.5 py-1 font-mono text-[11px]',
+                'min-w-0 truncate rounded-lg border px-2.5 py-1 font-mono text-[11px]',
+                selectedBorderClass,
                 selectedFillClass,
                 linkTextClass,
               )}

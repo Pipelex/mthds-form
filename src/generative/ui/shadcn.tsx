@@ -226,7 +226,7 @@ export function Collapsible({
       open={props.defaultOpen ?? false}
       data-slot="collapsible"
     >
-      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium select-none">
+      <summary className="cursor-pointer list-none rounded-md px-4 py-3 text-sm font-medium select-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
         {props.title}
       </summary>
       <div className="border-t border-border px-4 py-3">{children}</div>

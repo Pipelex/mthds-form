@@ -816,7 +816,7 @@ function FileField({
             type="button"
             disabled={busy}
             onClick={() => setShowUrl(true)}
-            className="flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11"
+            className="flex w-fit items-center gap-1 rounded-sm font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50 max-sm:min-h-11"
           >
             <Link2 className="h-3 w-3" />
             {s.pasteUrlInstead}
@@ -990,7 +990,7 @@ function FileChip({
           <button
             type="button"
             onClick={onTogglePreview}
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-11 max-sm:px-3"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-sm:h-11 max-sm:px-3"
           >
             {previewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {s.preview}
@@ -1010,7 +1010,7 @@ function ClearButton({ disabled, onClick }: { disabled?: boolean; onClick: () =>
       onClick={onClick}
       disabled={disabled}
       aria-label={s.removeFileAria}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 max-sm:size-11"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-50 max-sm:size-11"
     >
       <X className="h-4 w-4" />
     </button>

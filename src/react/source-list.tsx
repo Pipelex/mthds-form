@@ -259,7 +259,7 @@ export function ListAction({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 text-[14px] text-foreground transition-colors hover:bg-muted sm:min-h-9',
+        'inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 text-[14px] text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring sm:min-h-9',
         className,
       )}
     >

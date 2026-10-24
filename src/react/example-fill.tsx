@@ -71,7 +71,7 @@ export interface FillWithExampleProps {
 }
 
 const buttonClass =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-[14px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9';
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9';
 const secondaryClass = cn(buttonClass, 'border border-border text-foreground hover:bg-muted');
 const primaryClass = cn(
   buttonClass,
@@ -259,7 +259,7 @@ export function FillWithExample({
                 <DialogClose
                   ref={closeButton}
                   aria-label={s.close}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
                 >
                   <X className="size-5" aria-hidden="true" />
                 </DialogClose>
@@ -302,7 +302,7 @@ export function FillWithExample({
                               <DropdownMenuTrigger
                                 ref={register(menus.current, example.id)}
                                 aria-label={s.exampleActions(example.name)}
-                                className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                               >
                                 <MoreHorizontal className="size-5" aria-hidden="true" />
                               </DropdownMenuTrigger>

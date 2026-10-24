@@ -27,7 +27,7 @@ export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: Op
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
-      className="flex w-fit items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground max-sm:min-h-11"
+      className="flex w-fit items-center gap-1.5 rounded-sm text-[11px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:min-h-11"
     >
       {expanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
       {expanded

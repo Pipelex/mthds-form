@@ -2,7 +2,7 @@
 
 import { shownAsOptional } from '../core/readiness';
 import { Check } from 'lucide-react';
-import { linkTextClass } from './role-tokens';
+import { linkTextClass, selectedStateBorderClass } from './role-tokens';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import type { EnumRunField } from '../core';
@@ -81,8 +81,12 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
               key={option}
               value={option}
               variant="outline"
-              // The pressed fill and its text are the toggle's own selected state.
-              className="h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:border-primary/40 data-[state=on]:font-medium"
+              // The pressed fill and its text are the toggle's own selected state,
+              // and the pressed edge is the accent's, as a tag's is.
+              className={cn(
+                'h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:font-medium',
+                selectedStateBorderClass,
+              )}
             >
               {value === option && (
                 <Check

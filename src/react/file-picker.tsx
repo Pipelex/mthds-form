@@ -73,7 +73,7 @@ export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePicker
       disabled={disabled}
       aria-haspopup="dialog"
       aria-label={s.chooseFromSourceAria(label)}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-border px-3 text-[14px] text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-border px-3 text-[14px] text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
     >
       <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       {s.chooseFromSource}
@@ -369,7 +369,7 @@ function FilePickerBody({
           type="button"
           onClick={use}
           disabled={choices.length === 0}
-          className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-[16px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-[16px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="truncate">{s.filePickerUse(choices.length, choices[0]?.name)}</span>
         </button>
@@ -455,7 +455,7 @@ function SheetHeader({
         <div className="min-w-0 flex-1 space-y-1 pt-1">{children}</div>
         <DialogClose
           aria-label={s.close}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
         >
           <X className="size-5" aria-hidden="true" />
         </DialogClose>

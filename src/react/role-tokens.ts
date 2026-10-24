@@ -17,6 +17,9 @@
  * - `--selected`, the pale accent fill (`accentFill`) behind a selected pill
  *   or toggle, a tag or a completed step.
  *
+ * A selected pill and a tag are also outlined in the accent: their border is
+ * `--link` at 40%, so nothing selected keeps the button colour in its edge.
+ *
  * Focus is not one of them: every focus the controls draw is the contract's
  * `--ring`, which a branding host sets to the accent ink as well (see
  * `./field-styles`).
@@ -24,8 +27,9 @@
  * A host that defines neither gets exactly what these elements painted before
  * the tokens were read: each falls back to the `--primary` expression it
  * replaced - the token itself for text, the same `color-mix()` tint Tailwind
- * writes for `bg-primary/10` for a fill - so an unbranded page renders as it
- * always did.
+ * writes for `bg-primary/10` for a fill, and the same mix at 40% for an edge,
+ * which was `border-primary/40` - so an unbranded page renders as it always
+ * did.
  *
  * They are arbitrary values rather than named utilities on purpose. A Tailwind
  * host compiles the package's classes against its OWN theme, so a `text-link`
@@ -54,3 +58,11 @@ export const selectedStateFillClass =
 /** The pale accent fill of a completed step, falling back to `bg-primary/15`. */
 export const selectedFillStrongClass =
   'bg-[color:var(--selected,color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_15%,transparent))]';
+
+/** The accent's edge around something selected, `--link` at 40%, falling back to `border-primary/40`. */
+export const selectedBorderClass =
+  'border-[color:color-mix(in_oklab,var(--link,var(--primary,hsl(240_5.9%_10%)))_40%,transparent)]';
+
+/** The same edge on a pressed item (`data-state="on"`), as `data-[state=on]:border-primary/40` drew it. */
+export const selectedStateBorderClass =
+  'data-[state=on]:border-[color:color-mix(in_oklab,var(--link,var(--primary,hsl(240_5.9%_10%)))_40%,transparent)]';
