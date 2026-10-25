@@ -1,10 +1,11 @@
-import type { ExampleSource, FileSource, FormExample, SourceFile } from '../core';
+import type { ExampleSource, FormExample, SourceFile } from '../core';
 import {
   apiInputsFromRunValues,
   buildRunFields,
   getPipeInputForm,
   getPipeIOContract,
 } from '../core';
+import type { FilePickerSource } from '../react';
 import {
   CONTRACTS as STRUCTURED_CONTRACTS,
   INPUT_FORM as STRUCTURED_INPUT_FORM,
@@ -18,19 +19,27 @@ import {
  * They are not a fixture of the standard. No projection of a method produces
  * a host's file record or its list of examples, so there is nothing to
  * generate them from, and they are written once, here, in the shapes the seams
- * declare (`src/core/sources.ts`), for every story that opens a sheet:
- * `Inputs/Team Files and Examples` and `Toolchain/Role Tokens`. What an example
- * holds is not written by hand: it is made the way a form makes it, from the
- * generated contract.
+ * declare (`src/core/sources.ts`, and `./react`'s `FilePickerSource` for a
+ * source whose rows carry the host's own fields), for every story that opens a
+ * sheet: `Inputs/Team Files and Examples` and `Toolchain/Role Tokens`. What an
+ * example holds is not written by hand: it is made the way a form makes it,
+ * from the generated contract.
  */
 
+/**
+ * A host's own row: the kernel's `SourceFile`, with whether the person made
+ * the file and the host's own key for its type, which its glyphs are chosen by.
+ */
+export type TeamFile = SourceFile & { mine: boolean; format: 'pdf' | 'image' };
+
 /** A team's files, newest first, as a host keeps them. */
-const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
+const TEAM_FILES: TeamFile[] = [
   {
     id: 'fl_7',
     url: 'pipelex-storage://team/assets/inv-2291.pdf',
     name: 'INV-2291.pdf',
     mediaType: 'application/pdf',
+    format: 'pdf',
     size: 348_160,
     kind: 'uploaded',
     origin: 'Uploaded by you',
@@ -42,6 +51,7 @@ const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
     url: 'pipelex-storage://team/assets/contract-acme-draft.pdf',
     name: 'contract-acme-draft.pdf',
     mediaType: 'application/pdf',
+    format: 'pdf',
     size: 1_258_291,
     kind: 'test',
     origin: 'Made by the build assistant',
@@ -53,6 +63,7 @@ const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
     url: 'pipelex-storage://team/assets/receipt-scan.png',
     name: 'receipt-scan.png',
     mediaType: 'image/png',
+    format: 'image',
     size: 912_384,
     kind: 'uploaded',
     origin: 'Uploaded by Ana',
@@ -64,6 +75,7 @@ const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
     url: 'pipelex-storage://team/assets/summary-q3.pdf',
     name: 'summary-q3.pdf',
     mediaType: 'application/pdf',
+    format: 'pdf',
     size: 88_064,
     kind: 'generated',
     origin: 'Made by Invoice check',
@@ -75,6 +87,7 @@ const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
     url: 'pipelex-storage://team/assets/inv-2288.pdf',
     name: 'INV-2288.pdf',
     mediaType: 'application/pdf',
+    format: 'pdf',
     size: 301_056,
     kind: 'uploaded',
     origin: 'Uploaded by Ana',
@@ -86,6 +99,7 @@ const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
     url: 'pipelex-storage://team/assets/storefront.jpg',
     name: 'storefront.jpg',
     mediaType: 'image/jpeg',
+    format: 'image',
     size: 2_411_725,
     kind: 'uploaded',
     origin: 'Uploaded by you',
@@ -97,6 +111,7 @@ const TEAM_FILES: (SourceFile & { mine: boolean })[] = [
     url: 'pipelex-storage://team/assets/inv-2101.pdf',
     name: 'INV-2101.pdf',
     mediaType: 'application/pdf',
+    format: 'pdf',
     size: 296_960,
     kind: 'uploaded',
     origin: 'Uploaded by Ana',
@@ -111,7 +126,23 @@ const PAGE_SIZE = 4;
 /** What the file source answers: the team's files, nothing, a failure, or no answer yet. */
 export type FilesAnswer = 'team' | 'none' | 'failure' | 'waiting';
 
-export function fileSourceOf(answer: FilesAnswer, initialScope: 'mine' | 'everyone'): FileSource {
+/** The host's word for each of its types, as its own list of files says it. */
+const TYPE_WORDS: Record<TeamFile['format'], string> = {
+  pdf: 'PDF document',
+  image: 'Picture',
+};
+
+/**
+ * The team's files as a source answers with them. `words` is whose words say
+ * a row's type: the kernel's (the format's label, "PDF") or the host's own
+ * (`typeLabel`, "PDF document"). The glyph a host draws is a rendering, so a
+ * story adds `renderGlyph` itself.
+ */
+export function fileSourceOf(
+  answer: FilesAnswer,
+  initialScope: 'mine' | 'everyone',
+  words: 'kernel' | 'host' = 'kernel',
+): FilePickerSource<TeamFile> {
   return {
     initialScope,
     list: async ({ search, scope, mediaTypes, cursor }) => {
@@ -126,8 +157,12 @@ export function fileSourceOf(answer: FilesAnswer, initialScope: 'mine' | 'everyo
       );
       const start = cursor === undefined ? 0 : Number(cursor);
       const end = start + PAGE_SIZE;
+      const page = matching.slice(start, end);
       return {
-        files: matching.slice(start, end),
+        files:
+          words === 'host'
+            ? page.map((file) => ({ ...file, typeLabel: TYPE_WORDS[file.format] }))
+            : page,
         nextCursor: end < matching.length ? String(end) : null,
       };
     },

@@ -3,7 +3,8 @@
  * when the host gives a source and only then, the sheet's query narrowed to
  * what the field accepts, a choice written exactly as an upload writes it,
  * Close changing nothing, a list's choices added without duplicates and kept
- * through a search, and every state of the list.
+ * through a search, every state of the list, and a row in the host's own words
+ * and glyph.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -15,6 +16,7 @@ import { getPipeInputForm } from '../../core/derive';
 import { narrowFileFormats } from '../../core/narrow-file-formats';
 import type { RunField } from '../../core/descriptor';
 import type { FileSource, FileSourcePage, FileSourceQuery, SourceFile } from '../../core/sources';
+import type { FilePickerSource } from '../file-picker';
 import { MethodForm, useMethodForm, type UseMethodFormOptions } from '../method-form';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/files';
@@ -589,5 +591,77 @@ describe('a bounded list’s room, counted in files it does not hold yet', () =>
     expect(entry).toBeDisabled();
     await waitFor(() => expect(document.activeElement).not.toBe(document.body));
     expect(document.activeElement?.closest('[data-list-row]')).toHaveTextContent('INV-2288.pdf');
+  });
+});
+
+describe('a row in the host’s words and glyph', () => {
+  /** A host's own row: the format key its glyphs are chosen by rides on the row. */
+  type HostRow = SourceFile & { format: string };
+
+  /**
+   * A source over the host's own rows, typed over them, which draws a 40px tile
+   * for a PDF and nothing for any other format, and records every row it drew.
+   */
+  function hostSource(rows: readonly HostRow[]): FilePickerSource<HostRow> & { drawn: HostRow[] } {
+    const drawn: HostRow[] = [];
+    return {
+      initialScope: 'everyone',
+      drawn,
+      list: async () => ({ files: rows }),
+      renderGlyph: (file) => {
+        drawn.push(file);
+        return file.format === 'pdf' ? (
+          <span data-testid={`glyph-${file.id}`} className="size-10">
+            PDF
+          </span>
+        ) : null;
+      },
+    };
+  }
+
+  it('says the format’s label and draws the kernel’s glyph when the host gives neither', async () => {
+    const user = userEvent.setup();
+    render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([INVOICE])} />);
+    const dialog = await openPicker(user);
+    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
+    expect(row).toHaveTextContent('PDF · 340 KB · Uploaded by Ana · 14 Mar 2001');
+    expect(row.querySelector('svg.lucide-file-text')).not.toBeNull();
+    expect(row.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
+  });
+
+  it('says the host’s word for the type in place of the format’s label', async () => {
+    const user = userEvent.setup();
+    const worded: SourceFile = { ...INVOICE, typeLabel: 'PDF document' };
+    // An empty word is no word: the format's label stands.
+    const unworded: SourceFile = { ...OLDER, size: 301_056, typeLabel: '' };
+    render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([worded, unworded])} />);
+    const dialog = await openPicker(user);
+    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
+    expect(row).toHaveTextContent('PDF document · 340 KB · Uploaded by Ana · 14 Mar 2001');
+    expect(within(dialog).getByRole('radio', { name: /INV-2288\.pdf/ })).toHaveTextContent(
+      'PDF · 294 KB',
+    );
+  });
+
+  it('draws the host’s glyph, decoratively, from the row exactly as the host returned it', async () => {
+    const user = userEvent.setup();
+    const pdf: HostRow = { ...INVOICE, format: 'pdf' };
+    const scan: HostRow = { ...OLDER, format: 'scan' };
+    const source = hostSource([pdf, scan]);
+    render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
+    const dialog = await openPicker(user);
+    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
+    const glyph = within(row).getByTestId('glyph-fl_1');
+    // Its own size, inside a wrapper that sets none, and hidden from assistive
+    // technology: the row is still named by its file, not by the tile's "PDF".
+    expect(glyph).toHaveClass('size-10');
+    expect(glyph.closest('[data-slot="file-row-glyph"]')).toHaveAttribute('aria-hidden', 'true');
+    expect(row).toHaveAccessibleName(/^INV-2291\.pdf/);
+    expect(row.querySelector('svg.lucide-file-text')).toBeNull();
+    expect(source.drawn).toContain(pdf);
+    // A row the host draws nothing for keeps the kernel's glyph.
+    const other = within(dialog).getByRole('radio', { name: /INV-2288\.pdf/ });
+    expect(other.querySelector('svg.lucide-file-text')).not.toBeNull();
+    expect(other.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
   });
 });

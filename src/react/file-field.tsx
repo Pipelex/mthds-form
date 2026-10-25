@@ -6,7 +6,7 @@ import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
 import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
-import type { FileRunField, FileSource } from '../core';
+import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import {
@@ -24,7 +24,7 @@ import { fieldLabel, useFieldPresentation, type FieldPresentation } from './fiel
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
-import { FilePicker, FilePickerEntry } from './file-picker';
+import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 
 /** The serializable value of a file field. URL is what the runner sends. */
 export interface FileValue {
@@ -79,7 +79,7 @@ interface FileFieldProps {
    * and the chosen file is written through `onChange` as `{ url, filename }`,
    * the value an upload writes. See docs/sources.md.
    */
-  fileSource?: FileSource;
+  fileSource?: FilePickerSource;
   error?: string;
   disabled?: boolean;
 }
