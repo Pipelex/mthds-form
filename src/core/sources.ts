@@ -11,7 +11,10 @@
  *
  * Shapes and pure functions only, so a host's server can import the types it
  * answers with, and the rules that write an answer into a value are tested in
- * node. No React, no fetch.
+ * node. No React, no fetch. What a row SAYS is data here (`SourceFile`'s
+ * `typeLabel` and `origin` are the host's words); how a row DRAWS is a
+ * rendering, so the glyph a host draws on a row is `./react`'s
+ * (`FilePickerSource.renderGlyph`), never a field of these shapes.
  */
 
 /** Whose files a file source lists: the person's own, or the whole team's. */
@@ -48,8 +51,19 @@ export interface SourceFile {
   url: string;
   /** The file's name, shown on the row and written into the field as its `filename`. */
   name: string;
-  /** The file's MIME type, which names its format on the row. */
+  /**
+   * The file's MIME type, which picks the field's format the row's file is:
+   * the row names that format's label ("PNG") unless `typeLabel` words the
+   * type, and draws an image's glyph or a document's from it unless the
+   * host draws its own.
+   */
   mediaType?: string;
+  /**
+   * The file's type in the host's own words ("Picture", "PDF document"), said
+   * on the row's second line in place of the format's label, so a row reads
+   * as the host's own list of files does. An empty string counts as none.
+   */
+  typeLabel?: string;
   /** The file's size in bytes. */
   size?: number;
   /** How the file came to be. A `test` file is marked "Test file" at the head of its row's second line. */
@@ -184,11 +198,6 @@ export function addChosenFiles(
 }
 
 /**
- * How many files a list may still take from a source: its bound less the files
- * it holds, since `addChosenFiles` writes into its empty rows before adding
- * any. `undefined` when the list has no bound.
- */
-/**
  * How many files `addChosenFiles` writes for `chosen` into `held`: the choices
  * whose address the list does not hold yet, each address once. This is what a
  * choice spends of `roomForChosenFiles`, so a held file chosen again, or a
@@ -204,6 +213,11 @@ export function chosenFilesAdded(
   return urls.size - before;
 }
 
+/**
+ * How many files a list may still take from a source: its bound less the files
+ * it holds, since `addChosenFiles` writes into its empty rows before adding
+ * any. `undefined` when the list has no bound.
+ */
 export function roomForChosenFiles(
   held: readonly unknown[] | undefined,
   maxItemCount: number | undefined,

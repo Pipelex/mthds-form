@@ -5,7 +5,7 @@ Beside the upload ([upload-seam.md](upload-seam.md)), a form has two more option
 - **A file source** lists files the host already stores. Every empty file field then offers "Choose from your team's files", and the file chosen is written into the field exactly as an upload's result is.
 - **An example source** lists saved examples of the method. The form then offers "Fill with an example", which sets every value at once and never starts a run.
 
-The kernel states the shapes (`src/core/sources.ts`, exported from `.` and re-exported as types from `./react`) and applies the answers; the controls are `./react`'s. Neither knows any platform's routes, records or permissions: a host maps its own lists onto these shapes. A host that gives neither seam gets the form it had before, with nothing added.
+The kernel states the shapes (`src/core/sources.ts`, exported from `.` and re-exported as types from `./react`) and applies the answers; the controls are `./react`'s, and so is `FilePickerSource`, a file source with the glyph its rows draw, since a rendering has no place in the headless core. Neither knows any platform's routes, records or permissions: a host maps its own lists onto these shapes. A host that gives neither seam gets the form it had before, with nothing added.
 
 ```tsx
 import { MethodForm, useMethodForm, type ExampleSource, type FileSource } from '@pipelex/mthds-form/react';
@@ -79,13 +79,50 @@ A page is `{ files, nextCursor }`, the files newest first. `nextCursor` absent o
 | `id` | The row's identity in the host's list. A choice is kept by it, so it must be unique within the list. |
 | `url` | The stored file's address (a `pipelex-storage://` URI, or any URL the runtime reads), written into the field as the value's `url`. Several rows may share one. |
 | `name` | Shown on the row, and written into the field as the value's `filename`. |
-| `mediaType` | Names the row's format the way the field's hint names it. Without it, the format is read from the name's extension. |
+| `mediaType` | Picks which of the field's formats the file is: the row names that format the way the field's hint names it ("PNG") unless `typeLabel` words the type, and draws a picture's outline or a document's from it unless the host draws its own glyph. Without it, the format is read from the name's extension. |
+| `typeLabel` | The file's type in the host's own words ("Picture", "PDF document"), said in place of the format's label, so a row reads as the host's own list of files does. An empty string counts as none. |
 | `size` | Bytes, shown as a size. |
 | `kind` | `'uploaded'`, `'generated'` or `'test'`. A test file's second line starts with "Test file", so a person never mistakes a file made to try a method for a real one. |
 | `createdAt` | An ISO 8601 timestamp, shown as a date ("Today, 10:42", "Yesterday", "17 Oct", or with the year when it is not this one). |
 | `origin` | Where the file came from, in the host's words ("Uploaded by Ana", "Made by Invoice check"), shown as it is. |
 
-The row's second line joins what is known, in that order: "Test file · PDF · 340 KB · Uploaded by Ana · 14 Mar 2025". A rejected `list` shows the failure with Try again.
+The row's second line joins what is known, in that order: "Test file · PDF · 340 KB · Uploaded by Ana · 14 Mar 2025", where "PDF" is the host's `typeLabel` when it gives one. A rejected `list` shows the failure with Try again.
+
+### A row in the host's words and glyph
+
+By default a row says the file's type with the label of the field's format ("PNG", "JPEG") and draws a 24px outline of a picture or a document. A host whose own list of files says and draws a type differently can make the picker's rows read the same way, with two seams that change nothing when left out:
+
+- **The type word is data on the row.** `typeLabel` is the host's word for the file's type, said where the format's label would be, exactly as `origin` is the host's word for where the file came from. It belongs on the row rather than among the `FieldStrings`, because a host words its own notion of a type (a format key its records carry), which the row's media type cannot always recover, and a host's server can answer with it.
+- **The glyph is a rendering, so it is the control set's.** `FilePickerSource`, exported from `./react`, is the kernel's `FileSource` with an optional `renderGlyph(file)`, which returns the row's glyph as a React node. What it returns replaces the kernel's outline at the row's start, at the glyph's own size: the row is at least 64px tall, so a 40px tile fits without growing it, and a larger glyph grows the row. The kernel wraps it in an element hidden from assistive technology, so the row stays named by its file and its second line, which says the type in words; a glyph that spells the format ("PDF") is therefore not read twice. A row it returns what React renders nothing for keeps the kernel's outline: `null`, `undefined`, `true`, `false` or an empty string, so a `cond && <Tile />` whose condition is false falls back rather than leaving an empty slot. A number is drawn, `0` included, because React draws it as text, so a host whose condition is a count turns it into a boolean first.
+
+Every `FileSource` is a `FilePickerSource`, so a host that draws nothing passes its source as it is, and `useMethodForm`, `FieldEnv.fileSource` and `FilePicker`'s `source` all take one. `renderGlyph` receives each row exactly as `list` returned it, and `FilePickerSource<F>` is typed over the host's own row, so a host can carry the key its glyphs are chosen by on the rows it answers with and read it back without a cast:
+
+```tsx
+import type { FilePickerSource, SourceFile } from '@pipelex/mthds-form/react';
+
+type TeamFile = SourceFile & { format: string };
+
+const fileSource: FilePickerSource<TeamFile> = {
+  initialScope: 'mine',
+  list: async ({ search, scope, mediaTypes, cursor, signal }) => {
+    const page = await host.listFiles({ search, scope, mediaTypes, cursor }, { signal });
+    return {
+      files: page.items.map((item) => ({
+        id: item.id,
+        url: item.uri,
+        name: item.filename,
+        mediaType: item.media_type,
+        format: item.format,
+        typeLabel: typeWordOf(item.format), // "Picture", "PDF document"
+      })),
+      nextCursor: page.next_cursor,
+    };
+  },
+  renderGlyph: (file) => <FileTypeGlyph format={file.format} />, // the host's own 40px tile
+};
+```
+
+A source typed over its own row is accepted wherever a `FilePickerSource` is because `renderGlyph` is declared as a method, whose parameter TypeScript compares in both directions; the type's own comment says so, since redeclaring it as a function-typed property would stop such a source from compiling.
 
 ### Where the form offers it
 
@@ -163,10 +200,10 @@ Each list has one polite status line (`role="status"`) that announces what it sh
 
 `MethodForm` mounts both from `useMethodForm`'s options. A host that renders the fields itself, around `FieldRenderer` and its own values, threads them through the same pieces:
 
-- **`FieldEnv.fileSource`** carries the file source to every file field and list `FieldRenderer` renders, as `onDropFile` carries the upload.
+- **`FieldEnv.fileSource`** carries the file source, a `FilePickerSource` with its glyphs when the host draws them, to every file field and list `FieldRenderer` renders, as `onDropFile` carries the upload.
 - **`<FillWithExample source fields touched onFill />`** is the example control on its own. `onFill(values, example)` receives the example's values already in the controls' shape; the host sets its values to them, and passes `touched` from its own comparison (`!sameRunValues(values, lastGiven, fields)`).
 - **`FilePicker` and `FilePickerEntry`** are the sheet and its row, for a host drawing a file control of its own.
 
 ## What stays the host's
 
-Which files and examples exist and who may see them, what "mine" means, which scope a person starts on, which files are test files, how pages are cut, saving an example (from a run's inputs) and who may rename or delete one. The package lists, chooses, writes and asks; it never fetches, stores or decides who may.
+Which files and examples exist and who may see them, what "mine" means, which scope a person starts on, which files are test files, how a file's type is worded and drawn on a row when the host wants its own look, how pages are cut, saving an example (from a run's inputs) and who may rename or delete one. The package lists, chooses, writes and asks; it never fetches, stores or decides who may.

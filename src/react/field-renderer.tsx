@@ -1,9 +1,10 @@
 'use client';
 
-import type { FileSource, RunField } from '../core';
+import type { RunField } from '../core';
 import { BooleanField } from './boolean-field';
 import { DateField } from './date-field';
 import { DocumentField, ImageField, type FileValue, type UploadedFile } from './file-field';
+import type { FilePickerSource } from './file-picker';
 import { EnumField } from './enum-field';
 import { NumberField } from './number-field';
 import { ProseField, TextField } from './text-field';
@@ -109,9 +110,10 @@ export interface FieldEnv {
    * is the capability, as `onDropFile`'s is: every empty file field then
    * offers "Choose from your team's files", and a list of files offers it for
    * several at once. The choice is written as `{ url, filename }`, exactly as
-   * an upload's result is. See docs/sources.md.
+   * an upload's result is. Its `renderGlyph`, when given, draws each row's
+   * glyph in the sheet. See docs/sources.md.
    */
-  fileSource?: FileSource;
+  fileSource?: FilePickerSource;
 }
 
 export interface FieldRendererProps {

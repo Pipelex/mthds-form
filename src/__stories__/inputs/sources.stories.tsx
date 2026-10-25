@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { FileImage } from 'lucide-react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import type { InputForm, PipeIOContracts, RunField } from '../../core';
 import { getPipeInputForm, getPipeIOContract, narrowFileFormats } from '../../core';
@@ -13,6 +14,7 @@ import {
   fileSourceOf,
   type ExamplesAnswer,
   type FilesAnswer,
+  type TeamFile,
 } from '../host-sources';
 import { atWidth, pinnedTo } from '../touch-target';
 
@@ -39,8 +41,34 @@ interface SourcesStoryProps {
   initialScope?: 'mine' | 'everyone';
   /** The media types a host narrows the form's files to. */
   narrowTo?: string[];
+  /**
+   * How the team's files' rows read: the kernel's own type label and glyph,
+   * or the host's type word and its 40px tile.
+   */
+  rows?: 'kernel' | 'host';
   /** The example source's answer; no example source when absent. */
   examples?: ExamplesAnswer;
+}
+
+/**
+ * A host's own glyph for a row, as a host's list of files draws it: a 40px
+ * tile holding the format's short name for a document and a picture outline
+ * for a picture. Chosen by the host's own key on the row (`format`), which the
+ * kernel never reads and hands back to `renderGlyph` with the row.
+ */
+function HostGlyph({ format }: { format: TeamFile['format'] }) {
+  return (
+    <span
+      data-host-glyph
+      className="inline-flex size-10 items-center justify-center rounded-md bg-muted text-foreground"
+    >
+      {format === 'image' ? (
+        <FileImage className="size-5" />
+      ) : (
+        <span className="text-[12px] font-semibold">PDF</span>
+      )}
+    </span>
+  );
 }
 
 function SourcesStory({
@@ -51,6 +79,7 @@ function SourcesStory({
   files,
   initialScope = 'everyone',
   narrowTo,
+  rows = 'kernel',
   examples,
 }: SourcesStoryProps) {
   const contract = getPipeIOContract(contracts, domain, pipeCode);
@@ -66,7 +95,13 @@ function SourcesStory({
     prepareFields: narrowTo
       ? (fields: RunField[]) => narrowFileFormats(fields, narrowTo)
       : undefined,
-    fileSource: files ? fileSourceOf(files, initialScope) : undefined,
+    fileSource: files
+      ? {
+          ...fileSourceOf(files, initialScope, rows),
+          renderGlyph:
+            rows === 'host' ? (file: TeamFile) => <HostGlyph format={file.format} /> : undefined,
+        }
+      : undefined,
     exampleSource: examples ? exampleSourceOf(examples) : undefined,
   });
   return (
@@ -148,6 +183,28 @@ export const TeamFilesOpen: Story = {
     await userEvent.click(row);
     await expect(row).toHaveAttribute('aria-checked', 'true');
     await expect(dialog.getByRole('button', { name: 'Use INV-2291.pdf' })).toBeEnabled();
+  },
+};
+
+/**
+ * **The team's files in the host's words and glyphs.** The host says each
+ * row's type in its own words (`typeLabel`: "PDF document", "Picture") where
+ * the kernel says the format's label, and draws each row's glyph
+ * (`renderGlyph`) as its own list of files does, a 40px tile, where the kernel
+ * draws a 24px outline. The glyph is hidden from assistive technology, so a
+ * row is still named by its file. Left open so the accessibility check reads
+ * the sheet.
+ */
+export const TeamFilesInTheHostsLook: Story = {
+  name: 'The team’s files, in the host’s words and glyphs',
+  args: { pipeCode: 'one_document', files: 'team', narrowTo: ['application/pdf'], rows: 'host' },
+  play: async ({ canvasElement }) => {
+    const dialog = within(await openTeamFiles(canvasElement, 'Attachment'));
+    const row = await dialog.findByRole('radio', { name: /^INV-2291\.pdf/ });
+    await expect(row).toHaveTextContent('PDF document · 340 KB');
+    const glyph = row.querySelector<HTMLElement>('[data-host-glyph]');
+    await expect(glyph).not.toBeNull();
+    await expect(Math.round(glyph?.getBoundingClientRect().width ?? 0)).toBe(40);
   },
 };
 
