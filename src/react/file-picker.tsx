@@ -13,7 +13,13 @@ import {
   type RefObject,
 } from 'react';
 import { Check, FileText, Folder, ImageIcon, Search, X } from 'lucide-react';
-import type { FileSource, FileSourceScope, SourceFile } from '../core';
+import type {
+  FileSource,
+  FileSourcePage,
+  FileSourceQuery,
+  FileSourceScope,
+  SourceFile,
+} from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { formatOfFilename, normalizeMimeType, type FileFormat } from '../core/file-formats';
@@ -46,6 +52,36 @@ const SEARCH_PAUSE_MS = 250;
 
 /** How far down a bottom sheet is dragged before letting go closes it. */
 const SWIPE_CLOSE_PX = 96;
+
+/**
+ * A file source as the control set takes it: the kernel's `FileSource`, which
+ * lists the files, and how a row draws, which only a renderer can say. Every
+ * `FileSource` is one, so a host that draws nothing passes its source as it is.
+ *
+ * `F` is the host's own row: a host may carry its own fields on the rows its
+ * `list` answers with (the format key its glyphs are chosen by, for instance)
+ * and read them back in `renderGlyph`, which receives each row exactly as
+ * `list` returned it. A source typed over its own row is accepted wherever a
+ * `FilePickerSource` is, because `renderGlyph` is declared as a method, whose
+ * parameter TypeScript compares both ways. Declared as a function-typed
+ * property it would be compared strictly, and a host's typed source would
+ * stop being accepted by `useMethodForm`, `FieldEnv` and `FilePicker`.
+ */
+export interface FilePickerSource<F extends SourceFile = SourceFile> extends FileSource {
+  list: (query: FileSourceQuery) => Promise<FileSourcePage & { files: readonly F[] }>;
+  /**
+   * Draws a row's glyph in place of the kernel's own, a 24px document or
+   * picture outline. What it returns sits at the row's start at its own size
+   * (the row is at least 64px tall and grows with a larger glyph), and is
+   * hidden from assistive technology, since the row's second line says the
+   * type. A row it returns what React renders nothing for keeps the kernel's
+   * glyph: `null`, `undefined`, `true`, `false` or `''`, so a
+   * `cond && <Tile />` whose condition is false falls back as it reads. A
+   * number is drawn, `0` included, because React draws it as text, so a
+   * condition that is a count is the host's to turn into a boolean.
+   */
+  renderGlyph?(file: F): ReactNode;
+}
 
 export interface FilePickerEntryProps {
   /** Opens the sheet. */
@@ -86,8 +122,8 @@ export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePicker
 }
 
 export interface FilePickerProps {
-  /** The host's list. */
-  source: FileSource;
+  /** The host's list, and how its rows draw. */
+  source: FilePickerSource;
   /** What the field accepts: the list is narrowed to these types, and the sheet names them. */
   formats: readonly FileFormat[];
   /** A list field's picker: several rows may be chosen. One otherwise. */
@@ -357,6 +393,7 @@ function FilePickerBody({
                       key={file.id}
                       file={file}
                       formats={formats}
+                      glyph={source.renderGlyph?.(file)}
                       role={multiple ? 'checkbox' : 'radio'}
                       chosen={isChosen}
                       disabled={!isChosen && !fits([...choices, file])}
@@ -484,12 +521,14 @@ function rowFormat(file: SourceFile, formats: readonly FileFormat[]): FileFormat
 }
 
 /**
- * The row's second line: "Test file" first for a test file, then the format,
- * the size, where the file came from and when, each part only when known.
+ * The row's second line: "Test file" first for a test file, then the type (the
+ * host's word for it, else the format's label), the size, where the file came
+ * from and when, each part only when known.
  */
 function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefined): string {
   const parts: string[] = [];
-  if (format) parts.push(format.label);
+  const type = file.typeLabel || format?.label;
+  if (type) parts.push(type);
   if (file.size !== undefined) parts.push(s.fileSize(file.size));
   if (file.origin) parts.push(file.origin);
   if (file.createdAt) {
@@ -500,8 +539,22 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
 }
 
 /**
+ * Whether a host's glyph draws nothing, by React's own rule: React renders
+ * nothing for `null`, `undefined`, a boolean or an empty string, so a row given
+ * one keeps the kernel's outline rather than an empty slot. A number, `0`
+ * included, is not here, because React renders it as text, and drawing what
+ * React draws keeps a host's glyph meaning in the row what it means anywhere.
+ */
+function drawsNothing(glyph: ReactNode): boolean {
+  return glyph === null || glyph === undefined || typeof glyph === 'boolean' || glyph === '';
+}
+
+/**
  * One file: a tap target of at least 64px holding the file's glyph, its name
- * and its second line. A chosen row shows the kernel's selected fill
+ * and its second line. The glyph is the host's when its source draws one
+ * (`glyph`), wrapped so it keeps its own size and stays decorative, and
+ * otherwise the kernel's outline of a picture or a document, chosen by the
+ * row's format. A chosen row shows the kernel's selected fill
  * (`--selected`) and a check, and says so with `aria-checked`, so the choice is
  * never shown by the fill alone. The fill, the check and the second line all
  * key on that one attribute (the row is the `group` its children read), so
@@ -513,6 +566,7 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
 function FileRow({
   file,
   formats,
+  glyph,
   role,
   chosen,
   disabled,
@@ -520,6 +574,8 @@ function FileRow({
 }: {
   file: SourceFile;
   formats: readonly FileFormat[];
+  /** What the host's `renderGlyph` drew for the row; what draws nothing keeps the kernel's glyph. */
+  glyph: ReactNode;
   role: 'radio' | 'checkbox';
   chosen: boolean;
   disabled: boolean;
@@ -543,11 +599,19 @@ function FileRow({
         selectedCheckedFillClass,
       )}
     >
-      <Glyph
-        className="size-6 shrink-0 text-muted-foreground"
-        strokeWidth={1.5}
-        aria-hidden="true"
-      />
+      {drawsNothing(glyph) ? (
+        <Glyph
+          className="size-6 shrink-0 text-muted-foreground"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+      ) : (
+        // `flex` so an inline glyph sits on no text baseline, `shrink-0` so a
+        // long name never narrows it; the size is the glyph's own.
+        <span aria-hidden="true" data-slot="file-row-glyph" className="flex shrink-0">
+          {glyph}
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] font-medium text-foreground">{file.name}</span>
         {(file.kind === 'test' || meta) && (

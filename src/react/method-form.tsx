@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   ExampleSource,
-  FileSource,
   PipeIOContract,
   PipeInputFormDescriptor,
   Readiness,
@@ -26,6 +25,7 @@ import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/v
 import { FillWithExample } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { UploadedFile } from './file-field';
+import type { FilePickerSource } from './file-picker';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
@@ -104,9 +104,10 @@ export interface UseMethodFormOptions {
    * is the capability, as `uploadFile`'s is: every empty file field then offers
    * "Choose from your team's files", and a list of files offers it for several
    * at once. The choice is written as `{ url, filename }`, as an upload's
-   * result is. See docs/sources.md.
+   * result is. Its `renderGlyph`, when given, draws each row's glyph in the
+   * sheet. See docs/sources.md.
    */
-  fileSource?: FileSource;
+  fileSource?: FilePickerSource;
   /**
    * Where the form can take a saved example of the method. When given,
    * `MethodForm` offers "Fill with an example" above the fields, which sets
@@ -233,7 +234,7 @@ export interface MethodFormController extends MethodFormState {
    */
   dropFile: ((id: string, file: File) => Promise<{ url: string; filename: string }>) | undefined;
   /** The host's file source, which `MethodForm` hands its file fields. */
-  fileSource: FileSource | undefined;
+  fileSource: FilePickerSource | undefined;
   /** The host's example source, which `MethodForm` offers above the fields. */
   exampleSource: ExampleSource | undefined;
 }
