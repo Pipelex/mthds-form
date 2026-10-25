@@ -74,7 +74,11 @@ export interface FilePickerSource<F extends SourceFile = SourceFile> extends Fil
    * picture outline. What it returns sits at the row's start at its own size
    * (the row is at least 64px tall and grows with a larger glyph), and is
    * hidden from assistive technology, since the row's second line says the
-   * type. A row it returns `null` or `undefined` for keeps the kernel's glyph.
+   * type. A row it returns what React renders nothing for keeps the kernel's
+   * glyph: `null`, `undefined`, `true`, `false` or `''`, so a
+   * `cond && <Tile />` whose condition is false falls back as it reads. A
+   * number is drawn, `0` included, because React draws it as text, so a
+   * condition that is a count is the host's to turn into a boolean.
    */
   renderGlyph?(file: F): ReactNode;
 }
@@ -535,6 +539,17 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
 }
 
 /**
+ * Whether a host's glyph draws nothing, by React's own rule: React renders
+ * nothing for `null`, `undefined`, a boolean or an empty string, so a row given
+ * one keeps the kernel's outline rather than an empty slot. A number, `0`
+ * included, is not here, because React renders it as text, and drawing what
+ * React draws keeps a host's glyph meaning in the row what it means anywhere.
+ */
+function drawsNothing(glyph: ReactNode): boolean {
+  return glyph === null || glyph === undefined || typeof glyph === 'boolean' || glyph === '';
+}
+
+/**
  * One file: a tap target of at least 64px holding the file's glyph, its name
  * and its second line. The glyph is the host's when its source draws one
  * (`glyph`), wrapped so it keeps its own size and stays decorative, and
@@ -559,7 +574,7 @@ function FileRow({
 }: {
   file: SourceFile;
   formats: readonly FileFormat[];
-  /** What the host's `renderGlyph` drew for the row; nothing keeps the kernel's glyph. */
+  /** What the host's `renderGlyph` drew for the row; what draws nothing keeps the kernel's glyph. */
   glyph: ReactNode;
   role: 'radio' | 'checkbox';
   chosen: boolean;
@@ -584,7 +599,7 @@ function FileRow({
         selectedCheckedFillClass,
       )}
     >
-      {glyph === null || glyph === undefined ? (
+      {drawsNothing(glyph) ? (
         <Glyph
           className="size-6 shrink-0 text-muted-foreground"
           strokeWidth={1.5}

@@ -600,7 +600,10 @@ describe('a row in the host’s words and glyph', () => {
 
   /**
    * A source over the host's own rows, typed over them, which draws a 40px tile
-   * for a PDF and nothing for any other format, and records every row it drew.
+   * for a PDF and, for any other format, one of the values a host's glyph code
+   * returns when it draws nothing: `null`, the `false` of a `cond && <Tile />`,
+   * an empty string. A `count` row returns `0`, which React draws as text. It
+   * records every row it drew.
    */
   function hostSource(rows: readonly HostRow[]): FilePickerSource<HostRow> & { drawn: HostRow[] } {
     const drawn: HostRow[] = [];
@@ -610,11 +613,16 @@ describe('a row in the host’s words and glyph', () => {
       list: async () => ({ files: rows }),
       renderGlyph: (file) => {
         drawn.push(file);
-        return file.format === 'pdf' ? (
-          <span data-testid={`glyph-${file.id}`} className="size-10">
-            PDF
-          </span>
-        ) : null;
+        if (file.format === 'scan') return null;
+        if (file.format === 'note') return '';
+        if (file.format === 'count') return 0;
+        return (
+          file.format === 'pdf' && (
+            <span data-testid={`glyph-${file.id}`} className="size-10">
+              PDF
+            </span>
+          )
+        );
       },
     };
   }
@@ -647,7 +655,10 @@ describe('a row in the host’s words and glyph', () => {
     const user = userEvent.setup();
     const pdf: HostRow = { ...INVOICE, format: 'pdf' };
     const scan: HostRow = { ...OLDER, format: 'scan' };
-    const source = hostSource([pdf, scan]);
+    const draft: HostRow = { ...DRAFT, format: 'draft' };
+    const note: HostRow = { ...OLDER, id: 'fl_4', name: 'notes.pdf', format: 'note' };
+    const count: HostRow = { ...OLDER, id: 'fl_5', name: 'tally.pdf', format: 'count' };
+    const source = hostSource([pdf, scan, draft, note, count]);
     render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
     const dialog = await openPicker(user);
     const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
@@ -659,9 +670,16 @@ describe('a row in the host’s words and glyph', () => {
     expect(row).toHaveAccessibleName(/^INV-2291\.pdf/);
     expect(row.querySelector('svg.lucide-file-text')).toBeNull();
     expect(source.drawn).toContain(pdf);
-    // A row the host draws nothing for keeps the kernel's glyph.
-    const other = within(dialog).getByRole('radio', { name: /INV-2288\.pdf/ });
-    expect(other.querySelector('svg.lucide-file-text')).not.toBeNull();
-    expect(other.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
+    // A row the host draws nothing for keeps the kernel's glyph, whatever the
+    // nothing is: `null`, the `false` of a `cond && <Tile />`, or `''`.
+    for (const name of [/INV-2288\.pdf/, /contract-acme-draft\.pdf/, /notes\.pdf/]) {
+      const other = within(dialog).getByRole('radio', { name });
+      expect(other.querySelector('svg.lucide-file-text')).not.toBeNull();
+      expect(other.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
+    }
+    // `0` is drawn, as React draws it, so it is the host's glyph and not a fallback.
+    const tally = within(dialog).getByRole('radio', { name: /tally\.pdf/ });
+    expect(tally.querySelector('[data-slot="file-row-glyph"]')).toHaveTextContent('0');
+    expect(tally.querySelector('svg.lucide-file-text')).toBeNull();
   });
 });

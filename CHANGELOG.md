@@ -4,7 +4,7 @@
 
 ### Added
 
-- **A team file's row in the host's words and glyph**: `SourceFile` takes an optional `typeLabel`, the file's type in the host's own words ("Picture", "PDF document"), which the row in "Your team's files" says in place of the format's label ("PNG"), and `./react` exports `FilePickerSource`, a `FileSource` with an optional `renderGlyph(file)` whose React node replaces the row's 24px outline at its own size, hidden from assistive technology, and which receives each row exactly as `list` returned it, typed over the host's own row. `useMethodForm`'s `fileSource`, `FieldEnv.fileSource` and `FilePicker`'s `source` take one and every `FileSource` is one, so a host that gives neither sees its rows unchanged. See [docs/sources.md](docs/sources.md#a-row-in-the-hosts-words-and-glyph).
+- **A team file's row in the host's words and glyph**: `SourceFile` takes an optional `typeLabel`, the file's type in the host's own words ("Picture", "PDF document"), which the row in "Your team's files" says in place of the format's label ("PNG"), and `./react` exports `FilePickerSource`, a `FileSource` with an optional `renderGlyph(file)` whose React node replaces the row's 24px outline at its own size, hidden from assistive technology, unless it is one React renders nothing for (`null`, `undefined`, a boolean or `''`), and which receives each row exactly as `list` returned it, typed over the host's own row. `useMethodForm`'s `fileSource`, `FieldEnv.fileSource` and `FilePicker`'s `source` take one and every `FileSource` is one, so a host that gives neither sees its rows unchanged. See [docs/sources.md](docs/sources.md#a-row-in-the-hosts-words-and-glyph).
 
 ## [v0.23.1] - 2026-10-24
 
