@@ -393,3 +393,113 @@ describe('a row the drop area fills takes the file as its own', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+/**
+ * A host that writes each file's result into its row as it is handed the file,
+ * and returns nothing: the value lands in the same render as the drop.
+ */
+function WritingHost({ field, initial }: { field: ListRunField; initial: unknown[] }) {
+  const [value, setValue] = useState<unknown[]>(initial);
+  const onDropFile = (rowId: string, file: File) => {
+    const index = Number(rowId.split('.').pop());
+    setValue((rows) =>
+      rows.map((row, at) => (at === index ? { url: STORED, filename: file.name } : row)),
+    );
+  };
+  return (
+    <ListField field={field} value={value} onChange={setValue} id="receipts" env={{ onDropFile }} />
+  );
+}
+
+describe('a row the area fills, under a host that writes as it is handed the file', () => {
+  it('keeps the local preview, in a row the person left empty and in a new one', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<WritingHost field={listOf(imageItem)} initial={[undefined]} />);
+    dropOnZone([png('a.png'), png('b.png')]);
+    expect(await screen.findByText('a.png')).toBeInTheDocument();
+    expect(screen.getByText('b.png')).toBeInTheDocument();
+    for (const button of screen.getAllByRole('button', { name: /^preview$/i })) {
+      await user.click(button);
+    }
+    expect(container.querySelectorAll('[src^="blob:"]')).toHaveLength(2);
+  });
+});
+
+describe('the uploads the area handed over, before they answer', () => {
+  type DropFile = NonNullable<FieldEnv['onDropFile']>;
+
+  it('keeps their rows from the next batch when the host reports no uploadingIds', async () => {
+    const onDropFile = vi.fn<DropFile>(() => new Promise<void>(() => {}));
+    render(<Harness field={listOf(imageItem)} env={{ onDropFile }} />);
+    dropOnZone([png('a.png'), png('b.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(2));
+    dropOnZone([png('c.png'), png('d.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(4));
+    expect(onDropFile.mock.calls.map(([id]) => id)).toEqual([
+      'receipts.0',
+      'receipts.1',
+      'receipts.2',
+      'receipts.3',
+    ]);
+  });
+
+  it('keeps the rows from being removed until the uploads answer', async () => {
+    const upload = settledUpload();
+    render(<Harness field={listOf(imageItem)} env={{ onDropFile: () => upload.promise }} />);
+    dropOnZone([png('a.png')]);
+    const remove = await screen.findByRole('button', { name: S.removeItemAria(1) });
+    expect(remove).toBeDisabled();
+    await act(async () => upload.resolve());
+    expect(remove).toBeEnabled();
+  });
+
+  it('hands the rest of the batch over when the host throws on one file', async () => {
+    const onDropFile = vi.fn<DropFile>((rowId) => {
+      if (rowId === 'receipts.1') throw new Error('over quota');
+    });
+    render(<Harness field={listOf(imageItem)} env={{ onDropFile }} />);
+    dropOnZone([png('a.png'), png('b.png'), png('c.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(3));
+    expect(onDropFile.mock.calls.map(([id]) => id)).toEqual([
+      'receipts.0',
+      'receipts.1',
+      'receipts.2',
+    ]);
+  });
+});
+
+describe('a bounded list the area fills', () => {
+  it('takes focus to the last row filled when a pick from the keyboard fills it', async () => {
+    const user = userEvent.setup();
+    // Uploads that have not answered, so the rows they go to are taken.
+    const onDropFile = () => new Promise<void>(() => {});
+    render(<Harness field={listOf(imageItem, { maxItemCount: 2 })} env={{ onDropFile }} />);
+    const input = zoneInput();
+    input.focus();
+    await user.upload(input, [png('a.png'), png('b.png')]);
+    await waitFor(() => expect(input).toBeDisabled());
+    const rows = document.querySelectorAll('[data-list-row]');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]?.contains(document.activeElement)).toBe(true);
+  });
+
+  it('does not point a batch dropped on a row to the area once the area is shut', async () => {
+    render(
+      <Harness
+        field={listOf(imageItem, { maxItemCount: 2 })}
+        initial={[HELD, undefined]}
+        env={{ onDropFile: vi.fn(), uploadErrors: new Map([['receipts.1', 'Upload failed']]) }}
+      />,
+    );
+    expect(zoneInput()).toBeDisabled();
+    const rowZone = document
+      .querySelectorAll('[data-list-row]')[1]
+      ?.querySelector('[role="presentation"]');
+    if (!rowZone) throw new Error('no row dropzone');
+    fireEvent.drop(rowZone, {
+      dataTransfer: { files: [png('a.png'), png('b.png')], types: ['Files'] },
+    });
+    expect(await screen.findByText(S.oneFileOnly)).toBeInTheDocument();
+    expect(screen.queryByText(S.oneFileOnlyInList)).toBeNull();
+  });
+});

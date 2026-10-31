@@ -21,16 +21,28 @@ export interface PlacedFile {
  * the local preview once it lands, and a refusal on screen giving way to the
  * new file.
  *
- * The list gives it a new identity each time it places files, which is what
- * tells a row that is already mounted to look for one. The upload is the
- * list's, never the row's, so nothing a row does can upload a file twice.
- * React's strict mode, which runs a new row's effects twice in development,
- * therefore costs that row its local preview there and nothing else.
+ * The upload is the list's, never the row's, so nothing a row does can upload
+ * a file twice. React's strict mode, which runs a new row's effects twice in
+ * development, therefore costs that row its local preview there and nothing
+ * else.
  *
  * Internal, and kept off `FieldEnv` on purpose: a member there would be public
  * API, and this is a fact one control tells another inside the package.
  */
 export interface ListDropArea {
+  /**
+   * How many times the area has placed files. A new count gives the context a
+   * new identity, which is what tells a row that is already mounted to look
+   * for a file: a row the area fills is often one the person added and left
+   * empty, mounted long before the drop.
+   */
+  generation: number;
+  /**
+   * Whether the area takes files now: it is shut while the form is disabled
+   * and when a bounded list has no room left. A row handed a batch points to
+   * the area only when it is open.
+   */
+  open: boolean;
   /**
    * The file the area placed in the row with this id, handed over once: a
    * second call for the same placement returns nothing.

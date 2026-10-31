@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
 import { focusOutlineClass } from './role-tokens';
-import { cn } from './utils';
+import { cn, isThenable } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
@@ -145,15 +145,6 @@ function isReadableLink(url: string): boolean {
 /** The MIME type a `data:` URL declares, which is the only type it carries. */
 function dataUrlMime(url: string): string | undefined {
   return DATA_URL_MIME_RE.exec(url)?.[1]?.toLowerCase();
-}
-
-/** Whether a host's `onDropFile` handed back its upload, rather than nothing. */
-function isThenable(answer: unknown): answer is PromiseLike<unknown> {
-  return (
-    (typeof answer === 'object' || typeof answer === 'function') &&
-    answer !== null &&
-    typeof (answer as { then?: unknown }).then === 'function'
-  );
 }
 
 /**
@@ -312,7 +303,6 @@ function FileField({
   // The drop area of the list this field is a row of: where a batch goes, and
   // where a file it placed here comes from.
   const dropArea = useListDropArea();
-  const inListWithDropArea = dropArea !== null;
 
   /**
    * The host's upload failure the user has since moved past without uploading,
@@ -361,12 +351,14 @@ function FileField({
   const canUpload = onDropFile !== undefined;
 
   // A file on its way to the host, from the moment it is handed over: its local
-  // preview, and the watch on what its upload answers.
+  // preview, and the watch on what its upload answers. `heldUrl` is the URL the
+  // value held when the file was handed over, which is what a URL already there
+  // as the upload stops is told apart from (see `urlInFlight`).
   const track = useCallback(
-    (file: File, upload: unknown) => {
+    (file: File, upload: unknown, heldUrl: string | undefined) => {
       const awaitingUpload = isThenable(upload);
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type, awaitingUpload });
-      urlInFlight.current = value?.url;
+      urlInFlight.current = heldUrl;
       flightSeen.current = false;
       if (!awaitingUpload) return;
       // The upload's own word on what it stored, which is what tells its result
@@ -388,7 +380,7 @@ function FileField({
         },
       );
     },
-    [setLocal, value?.url],
+    [setLocal],
   );
 
   const handleFile = useCallback(
@@ -406,19 +398,23 @@ function FileField({
       }
       setRejected(null);
       setDismissedUploadError(null);
-      track(file, onDropFile(file));
+      track(file, onDropFile(file), value?.url);
     },
     [formats, onDropFile, track, value?.url],
   );
 
   // A file the list's drop area placed in this row: handed to the host by the
-  // list, and from here on the row's own, as if it had been dropped on it.
+  // list, and from here on the row's own, as if it had been dropped on it. The
+  // row held no file when it was handed over, since the area fills only a row
+  // that holds none, and that is what the watch is given: by the time this
+  // effect runs, a host that writes as it is handed the file has already
+  // written, and the URL the row holds now is the upload's own result.
   useEffect(() => {
     const placed = dropArea?.takePlaced(id);
     if (!placed) return;
     setRejected(null);
     setDismissedUploadError(null);
-    track(placed.file, placed.upload);
+    track(placed.file, placed.upload, undefined);
   }, [dropArea, id, track]);
 
   const busy = disabled || uploading;
@@ -822,7 +818,9 @@ function FileField({
               <>
                 <span className="font-mono">{refusal.name}</span> — {s.unsupportedFileType(hint)}
               </>
-            ) : inListWithDropArea ? (
+            ) : dropArea?.open ? (
+              // Pointed to only while it takes files: a full list's area is
+              // shut, and would refuse the very drop this sends there.
               s.oneFileOnlyInList
             ) : (
               s.oneFileOnly
