@@ -26,3 +26,12 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
   if (aKeys.length !== bKeys.length) return false;
   return aKeys.every((k) => hasOwnProp(bObj, k) && isDeepEqual(aObj[k], bObj[k]));
 }
+
+/** Whether a host's `onDropFile` handed back its upload, rather than nothing. */
+export function isThenable(answer: unknown): answer is PromiseLike<unknown> {
+  return (
+    (typeof answer === 'object' || typeof answer === 'function') &&
+    answer !== null &&
+    typeof (answer as { then?: unknown }).then === 'function'
+  );
+}

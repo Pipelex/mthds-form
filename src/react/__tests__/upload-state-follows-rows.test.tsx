@@ -632,3 +632,178 @@ describe('a host’s own setValues is read by position', () => {
     expect([...result.current.failedUploadIds]).toEqual([]);
   });
 });
+
+describe('a batch dropped on a list of files, through the form', () => {
+  /** The attachments' drop area: its file input, named by the list. */
+  const attachmentsDrop = () =>
+    screen.getByLabelText(S.addFilesAria('Attachments')) as HTMLInputElement;
+  const named = (name: string) => new File(['%PDF-1.4'], name, { type: 'application/pdf' });
+
+  /** An `uploadFile` whose uploads the test settles by file name, in any order. */
+  function uploadsByName() {
+    const pending = new Map<string, ReturnType<typeof deferredUpload>>();
+    const uploadFile = vi.fn<NonNullable<UseMethodFormOptions['uploadFile']>>((file) => {
+      const upload = deferredUpload();
+      pending.set(file.name, upload);
+      return upload.promise;
+    });
+    const settle = (name: string) => {
+      const upload = pending.get(name);
+      if (!upload) throw new Error(`No upload of ${name}`);
+      return upload;
+    };
+    return { uploadFile, settle };
+  }
+  const stored = (name: string) => ({ url: `https://example.com/${name}`, filename: name });
+
+  it('lands each file in its own row, whatever order the uploads finish in', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    render(<Harness uploadFile={uploadFile} />);
+    await user.upload(attachmentsDrop(), [named('a.pdf'), named('b.pdf'), named('c.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+    expect(uploadFile.mock.calls.map(([, context]) => context?.id)).toEqual([
+      'attachments.0',
+      'attachments.1',
+      'attachments.2',
+    ]);
+
+    await act(async () => settle('c.pdf').resolve(stored('c.pdf')));
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    await act(async () => settle('b.pdf').resolve(stored('b.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), stored('b.pdf'), stored('c.pdf')]);
+    expect(failed()).toEqual([]);
+  });
+
+  it('marks only the row whose upload failed', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    const { container } = render(<Harness uploadFile={uploadFile} />);
+    await user.upload(attachmentsDrop(), [named('a.pdf'), named('b.pdf'), named('c.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    await act(async () => settle('b.pdf').reject(new Error('storage is down')));
+    await act(async () => settle('c.pdf').resolve(stored('c.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), null, stored('c.pdf')]);
+    expect(failed()).toEqual(['attachments.1']);
+    expect(failedRows(container)).toEqual([1]);
+  });
+
+  it('appends a second batch after the first while the first is still arriving', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    render(<Harness uploadFile={uploadFile} />);
+    await user.upload(attachmentsDrop(), [named('a.pdf'), named('b.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(2));
+
+    // The rows of the first batch are empty and in flight, so not free.
+    expect(attachmentsDrop()).not.toBeDisabled();
+    await user.upload(attachmentsDrop(), [named('c.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+    expect(uploadFile.mock.calls[2]?.[1]?.id).toBe('attachments.2');
+
+    await act(async () => settle('c.pdf').resolve(stored('c.pdf')));
+    await act(async () => settle('b.pdf').resolve(stored('b.pdf')));
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), stored('b.pdf'), stored('c.pdf')]);
+  });
+
+  it('follows an upload to the row the host moves it to', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    const { container } = render(
+      <Harness uploadFile={uploadFile} initialValues={withAttachments([undefined, undefined])} />,
+    );
+    const secondRow = fileInputs(container)[1];
+    if (!secondRow) throw new Error('No second row');
+    await user.upload(secondRow, named('a.pdf'));
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    await press(user, 'Host moves the second row first');
+
+    // a.pdf now arrives at the first row, so the second one is the free one.
+    await user.upload(attachmentsDrop(), [named('b.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(2));
+    expect(uploadFile.mock.calls[1]?.[1]?.id).toBe('attachments.1');
+
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    await act(async () => settle('b.pdf').resolve(stored('b.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), stored('b.pdf')]);
+  });
+
+  it('lets go of an upload whose row the host removes', async () => {
+    const user = userEvent.setup();
+    const { uploadFile } = uploadsByName();
+    const { container } = render(
+      <Harness uploadFile={uploadFile} initialValues={withAttachments([undefined, A])} />,
+    );
+    const firstRow = fileInputs(container)[0];
+    if (!firstRow) throw new Error('No first row');
+    await user.upload(firstRow, named('a.pdf'));
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: S.removeItemAria(2) })).toBeDisabled();
+
+    // The upload never answers, and the form has cancelled its write-back.
+    await press(user, 'Host removes the first row');
+    expect(state().values.attachments).toEqual([A]);
+    expect(screen.getByRole('button', { name: S.removeItemAria(1) })).toBeEnabled();
+  });
+
+  /** A host rendering the list itself that follows rows and reports no `uploadingIds`. */
+  function RowFollowingHost({
+    uploadFile,
+  }: {
+    uploadFile: NonNullable<UseMethodFormOptions['uploadFile']>;
+  }) {
+    const form = useMethodForm({
+      ...MANY_FILES,
+      uploadFile,
+      initialValues: withAttachments([undefined, undefined]),
+    });
+    const attachments = form.fields.find((field) => field.name === 'attachments');
+    if (attachments?.kind !== 'list') throw new Error('No attachments list');
+    return (
+      <>
+        <FieldRenderer
+          field={attachments}
+          id="attachments"
+          value={form.values.attachments}
+          onChange={(next) => form.setValues((previous) => ({ ...previous, attachments: next }))}
+          env={{
+            onDropFile: form.dropFile,
+            onRemoveItem: form.removeItem,
+            rowMoves: form.rowMoves,
+          }}
+        />
+        <button type="button" onClick={() => form.moveItem('attachments', 1, 0)}>
+          Host moves the second row first
+        </button>
+        <output data-testid="state">
+          {JSON.stringify({ values: form.values, failed: [...form.failedUploadIds] })}
+        </output>
+      </>
+    );
+  }
+
+  it('keeps a file off the row a moved upload is arriving at, for a host that reports no uploadingIds', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    const { container } = render(<RowFollowingHost uploadFile={uploadFile} />);
+    const secondRow = fileInputs(container)[1];
+    if (!secondRow) throw new Error('No second row');
+    await user.upload(secondRow, named('a.pdf'));
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    await press(user, 'Host moves the second row first');
+
+    // The only list on the page, so its drop area's input is the only one there.
+    const area = container.querySelector<HTMLInputElement>('[data-list-file-drop] input');
+    if (!area) throw new Error('No drop area');
+    await user.upload(area, [named('b.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(2));
+    expect(uploadFile.mock.calls[1]?.[1]?.id).toBe('attachments.1');
+
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    await act(async () => settle('b.pdf').resolve(stored('b.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), stored('b.pdf')]);
+  });
+});

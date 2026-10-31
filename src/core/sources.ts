@@ -197,6 +197,78 @@ export function addChosenFiles(
   return items;
 }
 
+/** Where `placeDroppedFiles` puts a batch of files, and what it leaves out. */
+export interface DroppedFilesPlacement {
+  /**
+   * The list once the rows the batch needs are appended: `held` as it was,
+   * then one empty row (`undefined`) per file that did not go into a free row.
+   * A new array whenever rows are appended, and a copy of `held` otherwise.
+   */
+  items: unknown[];
+  /** How many rows were appended, so a caller writes the list only when it grew. */
+  appended: number;
+  /** The row each placed file goes to, in the order the files were given. */
+  targets: number[];
+  /** How many files, from the end of the batch, found no room. */
+  leftOut: number;
+}
+
+/**
+ * Where a batch of `count` files dropped on a list of files goes: first into
+ * the rows that are free, in index order, then into new rows after the last,
+ * as far as `maxItemCount` allows. The files keep the order they were given,
+ * and those beyond the room are left out from the end of the batch.
+ *
+ * A row is free when it holds no file (its value carries no `url`) and
+ * `isFree` says so too. The caller's predicate is where it adds what only it
+ * knows of a row: that a file is still arriving there, whose write-back the row
+ * must be kept for, or that the host reports a failure there, the only record
+ * that one of the person's files did not arrive. Without one, every row holding
+ * no file is free.
+ *
+ * It mirrors `addChosenFiles`, so the two ways several files enter a list fill
+ * it alike, and it knows nothing of `File`: the caller judges each file and
+ * hands over how many it accepted.
+ */
+export function placeDroppedFiles(
+  held: readonly unknown[] | undefined,
+  count: number,
+  maxItemCount: number | undefined,
+  isFree: (index: number) => boolean = () => true,
+): DroppedFilesPlacement {
+  const items = [...(held ?? [])];
+  const targets: number[] = [];
+  for (let index = 0; index < items.length && targets.length < count; index += 1) {
+    if (heldUrl(items[index]) === undefined && isFree(index)) targets.push(index);
+  }
+  let appended = 0;
+  while (targets.length < count && (maxItemCount === undefined || items.length < maxItemCount)) {
+    targets.push(items.length);
+    items.push(undefined);
+    appended += 1;
+  }
+  return { items, appended, targets, leftOut: count - targets.length };
+}
+
+/**
+ * How many files `placeDroppedFiles` can place in `held`: its free rows, by the
+ * same test, and the rows its bound still allows after the last. `undefined`
+ * when the list has no bound, since appending then never runs out.
+ */
+export function roomForDroppedFiles(
+  held: readonly unknown[] | undefined,
+  maxItemCount: number | undefined,
+  isFree: (index: number) => boolean = () => true,
+): number | undefined {
+  if (maxItemCount === undefined) return undefined;
+  const items = held ?? [];
+  let free = 0;
+  for (let index = 0; index < items.length; index += 1) {
+    if (heldUrl(items[index]) === undefined && isFree(index)) free += 1;
+  }
+  return free + Math.max(0, maxItemCount - items.length);
+}
+
 /**
  * How many files `addChosenFiles` writes for `chosen` into `held`: the choices
  * whose address the list does not hold yet, each address once. This is what a

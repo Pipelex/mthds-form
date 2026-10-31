@@ -36,6 +36,10 @@
         { "name": "attachments", "concept": "Document", "multiplicity": "variable" },
         { "name": "gallery", "concept": "Image", "multiplicity": "variable" }
       ]
+    },
+    {
+      "code": "three_images",
+      "slots": [{ "name": "receipts", "concept": "Image", "multiplicity": "fixed", "itemCount": 3 }]
     }
   ]
 }
