@@ -122,6 +122,24 @@ export const DocumentListPhone: Story = {
   },
 };
 
+/**
+ * **A list's drop area on a phone**: under each list of files, a target as
+ * wide as the list and at least 44 pixels high, whose whole area a tap reaches.
+ */
+export const DropAreaPhone: Story = {
+  name: "A list's drop area for several files, phone",
+  ...pinnedTo('phone'),
+  args: { pipeCode: 'many_files' },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNoSidewaysScroll(canvasElement);
+    const areas = canvasElement.querySelectorAll('[data-list-file-drop]');
+    // Two lists, two theme panes.
+    await expect(areas).toHaveLength(4);
+    for (const area of areas) await expectTouchTarget(area);
+  },
+};
+
 /** The same list on a desktop: one line per card, and every control its usual size. */
 export const DocumentListDesktop: Story = {
   name: 'A list of documents with long names, desktop',
