@@ -18,7 +18,7 @@ import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
 import { firstFocusable } from './focus';
-import { ListDropAreaContext } from './list-drop-area';
+import { ListDropAreaContext, type ListDropArea, type PlacedFile } from './list-drop-area';
 import { ListFileDrop } from './list-file-drop';
 import { destinationOf, movedId, type RowMove } from './row-moves';
 
@@ -189,6 +189,23 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     return !env?.uploadingIds?.has(rowId) && !rowEnv?.uploadErrors?.has(rowId);
   };
   const dropRoom = dropOffered ? roomForDroppedFiles(items, field.maxItemCount, isFreeRow) : 0;
+  // The files placed and not yet taken by their row's field, by row id; see
+  // `ListDropArea`.
+  const placed = useRef(new Map<string, PlacedFile>());
+  const [placements, setPlacements] = useState(0);
+  const dropArea = useMemo<ListDropArea | null>(() => {
+    if (!dropOffered) return null;
+    // Read only to give the context a new identity on each placement, which is
+    // what sends a row that is already mounted to look for its file.
+    void placements;
+    return {
+      takePlaced: (rowId) => {
+        const file = placed.current.get(rowId);
+        placed.current.delete(rowId);
+        return file;
+      },
+    };
+  }, [dropOffered, placements]);
   const placeFiles = (files: readonly File[]): number => {
     if (!dropFile) return 0;
     const placement = placeDroppedFiles(items, files.length, field.maxItemCount, isFreeRow);
@@ -198,11 +215,15 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     placement.targets.forEach((index, order) => {
       const file = files[order];
       if (!file) return;
+      const rowId = `${id}.${index}`;
+      const upload = dropFile(rowId, file);
+      placed.current.set(rowId, { file, upload });
       // The host reports a failure through `uploadErrors`, on the row. Nothing
       // here waits on the upload, so its rejection is handled, not left to
       // surface as an unhandled one.
-      void Promise.resolve(dropFile(`${id}.${index}`, file)).catch(() => {});
+      void Promise.resolve(upload).catch(() => {});
     });
+    if (placement.targets.length > 0) setPlacements((count) => count + 1);
     return placement.targets.length;
   };
 
@@ -248,7 +269,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             {s.noItemsYet}
           </p>
         )}
-        <ListDropAreaContext.Provider value={dropOffered}>
+        <ListDropAreaContext.Provider value={dropArea}>
           {items.map((item, index) => (
             <div
               key={rowKeys[index] ?? index}

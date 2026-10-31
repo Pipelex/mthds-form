@@ -519,6 +519,23 @@ describe('the local preview belongs to the value it was made for', () => {
   });
 });
 
+describe('a refusal on screen', () => {
+  it('gives way to a file another writer puts in the field', async () => {
+    const user = userEvent.setup();
+    render(<HostOwnedField />);
+    const root = document.querySelector('[role="presentation"]');
+    if (!root) throw new Error('no dropzone');
+    const zip = new File(['zip'], 'archive.zip', { type: 'application/zip' });
+    fireEvent.drop(root, { dataTransfer: { files: [zip], types: ['Files'] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('archive.zip');
+    // An example, the list's sheet or a host's `setValues`: the refusal stayed
+    // under the new file and read as that file being unsupported.
+    await user.click(screen.getByRole('button', { name: 'host writes A' }));
+    expect(screen.getByText('a.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
 /** A host that owns the value and resolves storage URIs on demand. */
 function ResolvingField({
   initial,

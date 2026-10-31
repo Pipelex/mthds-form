@@ -25,13 +25,18 @@ import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
-import { useInListWithDropArea } from './list-drop-area';
+import { useListDropArea } from './list-drop-area';
 
 /**
  * What the control refused: a file of a type the slot does not accept, or a
- * batch of several files dropped on a field that takes one.
+ * batch of several files dropped on a field that takes one. `over` is the
+ * value's URL when it was refused, so a refusal describes that value only: a
+ * file another writer puts in the field is a newer answer, and the refusal is
+ * not shown beside it even for the one frame before an effect forgets it.
  */
-type Refusal = { kind: 'type'; name: string } | { kind: 'batch' };
+type Refusal = ({ kind: 'type'; name: string } | { kind: 'batch' }) & {
+  over: string | undefined;
+};
 
 /** The serializable value of a file field. URL is what the runner sends. */
 export interface FileValue {
@@ -304,8 +309,10 @@ function FileField({
    * there is nothing for a host to be told about yet.
    */
   const [rejected, setRejected] = useState<Refusal | null>(null);
-  // A row of a list that takes several files at once says where a batch goes.
-  const inListWithDropArea = useInListWithDropArea();
+  // The drop area of the list this field is a row of: where a batch goes, and
+  // where a file it placed here comes from.
+  const dropArea = useListDropArea();
+  const inListWithDropArea = dropArea !== null;
 
   /**
    * The host's upload failure the user has since moved past without uploading,
@@ -353,22 +360,10 @@ function FileField({
   // flag to keep in agreement with it.
   const canUpload = onDropFile !== undefined;
 
-  const handleFile = useCallback(
-    (file: File) => {
-      // Unreachable while the dropzone is disabled below, and kept so that a
-      // file can never be taken with nowhere to go - the bug this guards is a
-      // picked file handed to a callback that did nothing, in silence.
-      if (!onDropFile) return;
-      if (!isAcceptedFile(formats, file)) {
-        // Refuse BEFORE the object URL and before `onDropFile`: a host's
-        // uploader is a network call and often a billed one, and a file the
-        // runtime cannot decode has no business reaching it.
-        setRejected({ kind: 'type', name: file.name });
-        return;
-      }
-      setRejected(null);
-      setDismissedUploadError(null);
-      const upload = onDropFile(file);
+  // A file on its way to the host, from the moment it is handed over: its local
+  // preview, and the watch on what its upload answers.
+  const track = useCallback(
+    (file: File, upload: unknown) => {
       const awaitingUpload = isThenable(upload);
       setLocal({ objectUrl: URL.createObjectURL(file), type: file.type, awaitingUpload });
       urlInFlight.current = value?.url;
@@ -393,8 +388,38 @@ function FileField({
         },
       );
     },
-    [formats, setLocal, onDropFile, value?.url],
+    [setLocal, value?.url],
   );
+
+  const handleFile = useCallback(
+    (file: File) => {
+      // Unreachable while the dropzone is disabled below, and kept so that a
+      // file can never be taken with nowhere to go - the bug this guards is a
+      // picked file handed to a callback that did nothing, in silence.
+      if (!onDropFile) return;
+      if (!isAcceptedFile(formats, file)) {
+        // Refuse BEFORE the object URL and before `onDropFile`: a host's
+        // uploader is a network call and often a billed one, and a file the
+        // runtime cannot decode has no business reaching it.
+        setRejected({ kind: 'type', name: file.name, over: value?.url });
+        return;
+      }
+      setRejected(null);
+      setDismissedUploadError(null);
+      track(file, onDropFile(file));
+    },
+    [formats, onDropFile, track, value?.url],
+  );
+
+  // A file the list's drop area placed in this row: handed to the host by the
+  // list, and from here on the row's own, as if it had been dropped on it.
+  useEffect(() => {
+    const placed = dropArea?.takePlaced(id);
+    if (!placed) return;
+    setRejected(null);
+    setDismissedUploadError(null);
+    track(placed.file, placed.upload);
+  }, [dropArea, id, track]);
 
   const busy = disabled || uploading;
 
@@ -432,7 +457,7 @@ function FileField({
       // acceptable file out of a batch whose others it refuses by type, which
       // uploaded one file of a batch with nothing said about the choice.
       if (accepted.length + rejections.length > 1) {
-        setRejected({ kind: 'batch' });
+        setRejected({ kind: 'batch', over: value?.url });
         return;
       }
       const file = accepted[0];
@@ -441,7 +466,7 @@ function FileField({
         return;
       }
       const name = rejections[0]?.file.name;
-      if (name) setRejected({ kind: 'type', name });
+      if (name) setRejected({ kind: 'type', name, over: value?.url });
     },
   });
 
@@ -479,15 +504,22 @@ function FileField({
     if (failure !== null) setLocal(null);
   }, [failure, localPreview, setLocal]);
 
-  // A file written into the value after a failure is a newer answer than the
-  // failure, whoever wrote it: the list's sheet filling this row, an example
-  // filling the form. The field's own ways in dismiss it themselves; this is
-  // the same for every other writer.
+  // The refusal on screen: only over the value it was made for. See `Refusal`.
+  const refusal = rejected !== null && rejected.over === value?.url ? rejected : null;
+
+  // A file written into the value after a failure or a refusal is a newer
+  // answer than either, whoever wrote it: the list's sheet or its drop area
+  // filling this row, an example filling the form. The field's own ways in
+  // dismiss both themselves; this is the same for every other writer. A
+  // refusal used to stay, and once the new file was in, it read as that file
+  // being unsupported. Forgotten here rather than only hidden by `refusal`, so
+  // a writer that empties the field again does not bring it back.
   const lastUrl = useRef(value?.url);
   useEffect(() => {
     if (lastUrl.current === value?.url) return;
     lastUrl.current = value?.url;
     if (uploadError !== undefined) setDismissedUploadError(uploadError);
+    setRejected(null);
   }, [value?.url, uploadError]);
 
   useEffect(() => {
@@ -784,11 +816,11 @@ function FileField({
           about the thing they picked, not a generic complaint; a failure is the
           host's own words, shown on the field that took the file. */}
       {!busy &&
-        (rejected ? (
+        (refusal ? (
           <p role="alert" className="text-[12px] text-destructive">
-            {rejected.kind === 'type' ? (
+            {refusal.kind === 'type' ? (
               <>
-                <span className="font-mono">{rejected.name}</span> — {s.unsupportedFileType(hint)}
+                <span className="font-mono">{refusal.name}</span> — {s.unsupportedFileType(hint)}
               </>
             ) : inListWithDropArea ? (
               s.oneFileOnlyInList

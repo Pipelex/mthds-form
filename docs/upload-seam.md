@@ -9,7 +9,13 @@ The package never uploads anything. A file control takes a file from the user an
   onChange={(v) => setValues(setValueAtPath(values, [field.name], v))}
   id={field.name}
   env={{
-    onDropFile: (id, file) => upload(id, file), // returns the upload: a promise of what it stored
+    // Returns the upload, and writes its result over the values as they are when it
+    // lands, never over the values held at the drop: several may be in flight at once.
+    onDropFile: (id, file) =>
+      upload(file).then((stored) => {
+        setValues((current) => setValueAtPath(current, id.split('.'), stored));
+        return stored;
+      }),
     uploadingIds,          // ids currently in flight
     uploadErrors,          // id -> why that id's upload failed
     onRemoveItem,          // optional: the host removes a list's row and re-keys what it keeps by id
@@ -32,6 +38,7 @@ Each way into a file value is offered exactly when the host can honour it, and e
 - **An upload**, offered exactly when the host supplies `onDropFile`. The presence of the callback is the capability; there is no second flag to keep in agreement with it.
 - **A link**, offered unless the host sets `allowUrl` to `false`.
 - **A stored file**, offered exactly when the form has a file source (`FieldEnv.fileSource`, [sources.md](sources.md)): "Choose from your team's files", a row under whatever else the empty field shows. It changes nothing about the upload or the link beside it.
+- **Several files at once**, on a list of files, offered exactly when the host supplies `onDropFile`: a drop area of the list's own, under its rows, which hands each file to the host as if it had been dropped on its row ([below](#a-list-of-files-takes-several-files-at-once)). It is the upload, taken several files at a time, so it asks nothing more of the host.
 
 | `onDropFile` | `allowUrl` | What the control renders | With a `fileSource` as well |
 | --- | --- | --- | --- |
@@ -109,6 +116,8 @@ The rule holds whoever the host is, one that follows rows through `onRemoveItem`
 
 **Add stays available during an upload, on purpose.** Appending leaves every existing index where it is, so an in-flight write-back is unaffected, and freezing it would make filling a list of files needlessly serial.
 
+**So does a list's drop area for several files**, for the same reason: it appends rows or fills rows that are free, and a row whose file is still arriving is never free ([below](#a-list-of-files-takes-several-files-at-once)). A person can drop a second batch while the first is still uploading.
+
 ## A failed upload is shown on the field that took the file
 
 The package never uploads, so it never learns that an upload failed unless the host says so. `uploadErrors` is where the host says it: a message keyed by the same id `onDropFile` was handed, which the field shows in the `role="alert"` slot it already uses for a refused format. Without it a host had nowhere to put the message but under the whole form, and on a form with two file inputs only the message's wording said which one had failed.
@@ -146,6 +155,28 @@ Moving the form's records is half of a move. The other half is the row's control
 So every move the form makes joins a log, `rowMoves` on the controller, which `MethodForm` hands its lists as `FieldEnv.rowMoves`. Each entry (`RowMove`) names the list, numbers the move above the one before it, and gives, for each row after the move, the index it held before; the form clears the log on a reset but never reuses a number. A list replays every move made to it since it last rendered, in the same render as the values it moved, and permutes its rows' identities as the move permuted the rows. A move of an outer list's rows renames the lists inside them on the way, so a list inside a moved row recognises a later move made under its new id, in whichever order the two were made. Given a log, a list never moves an identity of its own accord: its own remove button goes through `onRemoveItem` and comes back as an entry like any other move, which keeps one path for the list's moves and the host's.
 
 A host that removes rows through `onRemoveItem` without keeping a log still has its rows keep their controls for the list's own removals, which the list then moves itself; a move it makes in any other way reaches the list as a new array, matched by position.
+
+## A list of files takes several files at once
+
+A list whose item is a document or an image offers a drop area of its own, under its rows and above Add item, whenever the host supplies `onDropFile`. The person drops several files on it, or clicks it and picks several in the device's file dialog, which it opens with `multiple` and the item's formats, so a phone's photo picker offers several photos at once. On an empty list the area stands in place of the "No items yet" line, since its own words say what to do. A list of structures that hold a file has no area, because a file is not a structure and each nested file field keeps its own dropzone, and neither does a list of lists.
+
+**Where the files go.** Each file goes into a free row first, in the order the drop or the picker hands them over, then into a new row after the last. A row is free when it holds no file, no file is arriving at its id (`uploadingIds`) and the host shows no failure there (`uploadErrors`): a row whose file is still arriving is that upload's write-back target, and a failed row's message is the only record that one of the person's files did not arrive, so the person retries that one on the row itself. When the files need new rows, the list writes the grown array once through `onChange`, before it hands over the first file, so a host that records the value each upload was dropped over sees the rows the files go into. It then hands each file to the host through `onDropFile` with its row's id (`attachments.2`), in order and in the same event handler, exactly as if the file had been dropped on that row.
+
+**What a row shows.** A row the area filled shows what a file dropped on it shows: the uploading state its id gets from `uploadingIds`, the file's card once the value lands, and the local preview made from the file itself rather than asked of `resolveUrl` ([below](#the-local-preview-belongs-to-the-value-it-was-made-for)). A refusal the row was showing gives way to the new file. A failure goes on the row, through `uploadErrors`, as for any other upload; nothing in the list waits on the upload, so a promise that rejects is handled there and never surfaces as an unhandled rejection.
+
+**What is refused.** Each file is judged by the check its row would apply, against the item's formats, and a file the slot does not take reaches no host. The accepted files of a mixed drop are placed, and the refused ones are named in the area's own alert with the accepted formats. A bounded list takes as many files as it has room for, its free rows plus what its bound leaves, and names the files left out with the number that fitted. A long list of names is cut to the first three and a count of the rest. The message stays until the next drop or pick on the area.
+
+**When it is shut.** The area is shut while the form is disabled, and when a bounded list has no room left. It stays open while files are arriving, as Add does ([above](#while-a-file-is-arriving-nothing-else-may-touch-that-value)).
+
+**A batch dropped on a field that takes one file** is refused whole: no file reaches the host, and the field says it takes one file. In a row of a list that offers the area, it also says that several files go on the list's drop area. It used to report the first file as unsupported when every file was acceptable, and to upload the one acceptable file of a batch whose others it refused by type, with nothing said about the choice.
+
+**Accessibility.** The area follows the file field's dropzone ([below](#accessibility-of-the-dropzone)). Its root is the drop target, with `role="presentation"` and no tab stop, and the file input inside it takes the tab stop and a name of its own (`addFilesAria`, "Add files to Receipts"), with the focus ring drawn on the area while the input has focus. Refused and left-out files go in a `role="alert"` paragraph. An accepted batch is announced in a visually hidden `role="status"` region ("3 files added"), because a person who picked files in the device's dialog otherwise hears nothing while the rows appear. On a phone the area is at least 44 pixels high, as Add item is.
+
+Its words are `FieldStrings` keys: `dropFilesOrBrowse`, `dropFilesToAdd`, `addFilesAria`, `filesAdded`, `filesRefused`, `filesLeftOut`, `oneFileOnly` and `oneFileOnlyInList` ([i18n.md](i18n.md)).
+
+## Several uploads in flight: a host writes over the values as they are
+
+The seam always let several uploads be in flight at once, and a list's drop area makes that the ordinary case. So one obligation that was implicit becomes load-bearing: **a host writes each upload's result over its values as they are when the upload lands, never over the values it held when the file was dropped.** A host that captured `values` at the drop and writes `setValueAtPath(values, path, stored)` when the upload lands writes that snapshot back: it erases every row of the batch that landed meanwhile, and the rows the drop appended as well, since they were added after it. The opening example writes through an updater for this reason. `useMethodForm` writes over its own store, so a host on it owes nothing here.
 
 ## `resolveUrl`, and when it is not needed
 

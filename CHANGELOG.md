@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A list of files takes several files at once**: a list whose item is a document or an image offers a drop area under its rows whenever the host supplies `onDropFile`. It takes several files dropped together or picked together in the device's file dialog, fills the rows left empty before appending new ones, names the files of a format the slot does not take and, on a bounded list, the files it had no room for, and hands each file to the host through `onDropFile` at its row's id, as if it had been dropped on that row. A host on `useMethodForm` gets it with nothing to wire; a host writing its own uploads back must write each result over its values as they are when the upload lands, never over the values it held at the drop. See [docs/upload-seam.md](docs/upload-seam.md#a-list-of-files-takes-several-files-at-once).
+
+### Changed
+
+- **`FieldStrings` gains the keys of the drop area for several files (Breaking)**: `dropFilesOrBrowse`, `dropFilesToAdd`, `addFilesAria`, `filesAdded`, `filesRefused`, `filesLeftOut`, `oneFileOnly` and `oneFileOnlyInList`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/i18n.md](docs/i18n.md).
+
+### Fixed
+
+- **A batch dropped on a field that takes one file**: the field refuses it whole and says it takes one file, adding, in a row of a list of files, that several files go on the list's drop area. It used to report the first file as unsupported when every file was acceptable, and to upload the one acceptable file of a batch whose other files it refused by type, with nothing said about the choice.
+- **A refusal gives way to a file written by anyone else**: a file field showing that a dropped file is not supported now drops the message when another writer puts a file in it, such as a list's team-files sheet, an example or the host's `setValues`. The message used to stay under the new file, as if that file were the unsupported one.
+
 ## [v0.23.2] - 2026-10-25
 
 ### Added

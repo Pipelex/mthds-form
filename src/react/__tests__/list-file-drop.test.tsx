@@ -6,8 +6,8 @@
  * takes several files at once".
  */
 import { useState } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField, ObjectRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
@@ -43,6 +43,12 @@ const listOf = (item: ListRunField['item'], extra: Partial<ListRunField> = {}): 
 const png = (name: string) => new File(['png'], name, { type: 'image/png' });
 const zip = (name: string) => new File(['zip'], name, { type: 'application/zip' });
 const HELD = { url: 'https://example.com/held.png', filename: 'held.png' };
+
+beforeAll(() => {
+  // jsdom implements neither, and a row makes an object URL for each file placed in it.
+  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
+  URL.revokeObjectURL = vi.fn();
+});
 
 /** The control is controlled; the host holds the array and records each change. */
 function Harness({
@@ -322,5 +328,68 @@ describe('where the drop area is offered', () => {
     expect(zoneInput().tabIndex).toBe(0);
     expect(zone()).toHaveAttribute('role', 'presentation');
     expect(zone()).not.toHaveAttribute('tabindex');
+  });
+});
+
+/** Where the host's upload stores a file: a reference no browser renders. */
+const STORED = 'pipelex-storage://org/assets/a.png';
+
+/**
+ * A host that uploads each file and writes its result into the row it was
+ * dropped on, as `useMethodForm` does, with the upload settled by the test.
+ */
+function UploadingHost({ field, upload }: { field: ListRunField; upload: Promise<unknown> }) {
+  const [value, setValue] = useState<unknown[]>([]);
+  const onDropFile = (rowId: string, file: File) => {
+    const index = Number(rowId.split('.').pop());
+    return upload.then(() => {
+      setValue((rows) =>
+        rows.map((row, at) => (at === index ? { url: STORED, filename: file.name } : row)),
+      );
+      return { url: STORED, filename: file.name };
+    });
+  };
+  return (
+    <ListField field={field} value={value} onChange={setValue} id="receipts" env={{ onDropFile }} />
+  );
+}
+
+function settledUpload() {
+  let resolve: () => void = () => {};
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+describe('a row the drop area fills takes the file as its own', () => {
+  it('paints the dropped file in its preview, as a file dropped on the row does', async () => {
+    const user = userEvent.setup();
+    const upload = settledUpload();
+    const { container } = render(
+      <UploadingHost field={listOf(imageItem)} upload={upload.promise} />,
+    );
+    dropOnZone([png('a.png')]);
+    await act(async () => upload.resolve());
+    expect(await screen.findByText('a.png')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^preview$/i }));
+    expect(container.querySelector('[src^="blob:"]')).not.toBeNull();
+  });
+
+  it('drops a refusal the row showed once the file placed in it lands', async () => {
+    const upload = settledUpload();
+    render(<UploadingHost field={listOf(imageItem)} upload={upload.promise} />);
+    dropOnZone([png('a.png')]);
+    await act(async () => upload.resolve());
+    await screen.findByText('a.png');
+    // Emptied, then refused on its own dropzone, then filled from the area.
+    await userEvent.setup().click(screen.getByRole('button', { name: S.removeFileAria }));
+    const row = document.querySelector('[data-list-row] [role="presentation"]');
+    if (!row) throw new Error('no row dropzone');
+    fireEvent.drop(row, { dataTransfer: { files: [zip('archive.zip')], types: ['Files'] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('archive.zip');
+    dropOnZone([png('b.png')]);
+    expect(await screen.findByText('b.png')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
