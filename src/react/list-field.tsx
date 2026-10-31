@@ -1,18 +1,25 @@
 'use client';
 
 import { shownAsOptional } from '../core/readiness';
-import { addChosenFiles, roomForChosenFiles } from '../core/sources';
+import {
+  addChosenFiles,
+  placeDroppedFiles,
+  roomForChosenFiles,
+  roomForDroppedFiles,
+} from '../core/sources';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { focusOutlineClass, selectedHoverBorderClass } from './role-tokens';
-import { cn } from './utils';
+import { cn, isThenable } from './utils';
 import type { ListRunField, RunField } from '../core';
 import { ConceptPill } from './concept-pill';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
-import { firstFocusable } from './focus';
+import { firstFocusable, followingFocusable } from './focus';
+import { ListDropAreaContext, type ListDropArea, type PlacedFile } from './list-drop-area';
+import { ListFileDrop } from './list-file-drop';
 import { destinationOf, movedId, type RowMove } from './row-moves';
 
 interface ListFieldProps {
@@ -35,8 +42,9 @@ interface ListFieldProps {
  * instead of renumbering them into each other - which is what used to drop a
  * half-typed value or a pending preview onto the neighbouring row. The row's
  * field ID stays POSITIONAL (`cvs.1`), because that ID is a PATH: a host writes
- * an upload back with `setValueAtPath(values, id.split('.'), value)`, and
- * `setValueAtPath` is a pure function of the value tree. Handing out an opaque
+ * an upload back with `setValueAtPath(current, id.split('.'), value)`, over its
+ * values as they are when the upload lands, and `setValueAtPath` is a pure
+ * function of the value tree. Handing out an opaque
  * token instead would mean the kernel keeping a live token-to-index registry for
  * that function to consult, which is exactly the kind of hidden state the
  * headless core does not have.
@@ -67,6 +75,19 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const landedRow = useRef<number | null>(null);
   // Upload failures a removal left at the wrong position; see `rowEnv` below.
   const [staleErrors, setStaleErrors] = useState<ReadonlyMap<string, string>>(NO_ERRORS);
+  // The uploads this list handed the host that have not answered yet, one entry
+  // each: on a list of files, every file its drop area placed and every file
+  // dropped on one of its rows. See `rowEnv`.
+  const [pending, setPending] = useState<ReadonlyMap<number, PendingUpload>>(NO_UPLOADS);
+  const nextUpload = useRef(0);
+  // The rows those uploads belong to now. An entry keeps the id it was handed
+  // and the newest move the host had logged then, and the moves logged since
+  // carry it to its row's id now, as they carry the rows' identities: a host
+  // that moves a row during an upload moves the row's write-back with it, so
+  // the list follows the upload to the row's new position, and lets go of one
+  // whose row the host removed, whose write-back the host has cancelled.
+  const rowMoves = env?.rowMoves;
+  const arriving = useMemo(() => arrivingRows(pending, rowMoves), [pending, rowMoves]);
 
   const setItem = (index: number, itemValue: unknown) => {
     const next = items.slice();
@@ -102,7 +123,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // ADD stays available on purpose. Appending leaves every existing index where
   // it was, so an in-flight write-back is unaffected, and freezing it would make
   // filling a list of files needlessly serial.
-  const busy = listIsBusy(id, env?.uploadingIds);
+  //
+  // The host says which files are arriving through `uploadingIds`, and a list
+  // of files adds the uploads it handed over itself, until each answers or the
+  // host removes its row, so a host that reports no `uploadingIds` still has
+  // those rows pinned.
+  const busy = listIsBusy(id, env?.uploadingIds) || arriving.size > 0;
 
   // An upload failure is keyed by position like everything else here, and it
   // outlives its upload, so the busy rule above cannot cover it: removing a row
@@ -122,29 +148,56 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
       return next.size === prev.size ? prev : next;
     });
   }, [hostErrors]);
+  // A list of files keeps its own record of the uploads it hands the host, and
+  // every one of them passes through here: a file dropped on a row as much as
+  // one its drop area places, which calls the same `onDropFile`. Until an
+  // upload a host returns answers, its row is that upload's write-back target,
+  // kept from the area's next batch and from removal whether or not the host
+  // reports `uploadingIds`. One entry per upload, because a row still waiting
+  // can take a second file dropped on it directly, and the first answer must
+  // not free it. A throw is not caught here: the row's dropzone reports it.
+  const fileItem =
+    field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
+  const tracksUploads = fileItem !== null;
   const rowEnv = useMemo<FieldEnv | undefined>(() => {
-    if (!env || staleErrors.size === 0) return env;
+    if (!env || (staleErrors.size === 0 && !tracksUploads)) return env;
     const drop = env.onDropFile;
+    const uploadErrors =
+      staleErrors.size === 0
+        ? env.uploadErrors
+        : new Map(
+            [...(env.uploadErrors ?? [])].filter(
+              ([key, message]) => staleErrors.get(key) !== message,
+            ),
+          );
     return {
       ...env,
-      uploadErrors: new Map(
-        [...(env.uploadErrors ?? [])].filter(([key, message]) => staleErrors.get(key) !== message),
-      ),
-      // A new file at a position is a new attempt there, so what the host says
-      // about that position from now on is about the file that is there.
+      uploadErrors,
       onDropFile: drop
         ? (dropId, file) => {
+            // A new file at a position is a new attempt there, so what the host
+            // says about that position from now on is about the file that is there.
             setStaleErrors((prev) => {
               if (!prev.has(dropId)) return prev;
               const next = new Map(prev);
               next.delete(dropId);
               return next;
             });
-            return drop(dropId, file);
+            const upload = drop(dropId, file);
+            if (tracksUploads && isThenable(upload)) {
+              const token = nextUpload.current++;
+              const seq = env.rowMoves?.[env.rowMoves.length - 1]?.seq ?? 0;
+              setPending((prev) => new Map(prev).set(token, { id: dropId, seq }));
+              // Both outcomes, so a rejection, which the host reports through
+              // `uploadErrors` on the row, is never left unhandled here.
+              const answered = () => setPending((prev) => withoutUpload(prev, token));
+              void Promise.resolve(upload).then(answered, answered);
+            }
+            return upload;
           }
         : undefined,
     };
-  }, [env, staleErrors]);
+  }, [env, staleErrors, tracksUploads]);
   // A `Concept[N]` slot is full at N. The bound is the method's, read off the
   // same `maxItems` ajv enforces, so offering one more row would offer one the
   // gate then refuses. It is deliberately NOT `itemCount`, which is the LOWER
@@ -160,9 +213,83 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // arriving, as the remove buttons are, because the row an upload will write
   // back to is still empty and would otherwise be filled under it.
   const fileSource = env?.fileSource;
-  const fileItem =
-    field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
   const room = roomForChosenFiles(items, field.maxItemCount);
+
+  // A list of files also takes several files from the person's device at once,
+  // dropped or picked on a drop area of its own, exactly when the host can
+  // upload one. Each accepted file goes into a free row first, then into a new
+  // one (`placeDroppedFiles`), and is handed to the host as if it had been
+  // dropped on that row. A row is free when it holds no file, no file is still
+  // arriving there (its write-back's target, which must not be filled under
+  // it: the host says so through `uploadingIds`, and the list knows it of the
+  // uploads it handed over itself, see `rowEnv`) and the rows show no failure there (the
+  // only record that one of the person's files did not arrive). The area stays
+  // open while files are arriving, as Add does, because appending moves no row
+  // and the free-row test never targets one in flight. See docs/upload-seam.md,
+  // "A list of files takes several files at once".
+  const dropFile = rowEnv?.onDropFile;
+  const dropOffered = fileItem !== null && dropFile !== undefined;
+  const isFreeRow = (index: number) => {
+    const rowId = `${id}.${index}`;
+    return (
+      !arriving.has(rowId) && !env?.uploadingIds?.has(rowId) && !rowEnv?.uploadErrors?.has(rowId)
+    );
+  };
+  const dropRoom = dropOffered ? roomForDroppedFiles(items, field.maxItemCount, isFreeRow) : 0;
+  const dropOpen = dropOffered && !env?.disabled && dropRoom !== 0;
+  // The files placed and not yet taken by their row's field, by row id; see
+  // `ListDropArea`.
+  const placed = useRef(new Map<string, PlacedFile>());
+  const [placements, setPlacements] = useState(0);
+  const dropArea = useMemo<ListDropArea | null>(() => {
+    if (!dropOffered) return null;
+    return {
+      generation: placements,
+      open: dropOpen,
+      takePlaced: (rowId) => {
+        const file = placed.current.get(rowId);
+        placed.current.delete(rowId);
+        return file;
+      },
+    };
+  }, [dropOffered, dropOpen, placements]);
+  // The drop area, and the row focus goes to when a pick made from the keyboard
+  // fills the list: the area shuts as the list fills, and the input that held
+  // focus is disabled under it. As after a choice in the sheet, focus goes to
+  // the last row filled, or on past the area when that row has nothing to take
+  // it yet, as a row whose file is still arriving does not.
+  const dropRef = useRef<HTMLDivElement>(null);
+  const landing = useRef<number | null>(null);
+  useEffect(() => {
+    const landed = landing.current;
+    if (landed === null) return;
+    landing.current = null;
+    const rows = rowsRef.current?.querySelectorAll(':scope > [data-list-row]');
+    const target =
+      firstFocusable(rows?.[landed]) ?? followingFocusable(dropRef.current, dropRef.current);
+    target?.focus();
+  });
+  const placeFiles = (files: readonly File[]): number => {
+    if (!dropFile) return 0;
+    const placement = placeDroppedFiles(items, files.length, field.maxItemCount, isFreeRow);
+    // Written before the first upload is asked for, so a host that records what
+    // each upload was dropped over sees the rows it is dropped into.
+    if (placement.appended > 0) onChange(placement.items);
+    // `dropFile` is the rows' own `onDropFile`, so each upload handed over here
+    // is recorded as arriving exactly as one dropped on the row is.
+    placement.targets.forEach((index, order) => {
+      const file = files[order];
+      if (!file) return;
+      const rowId = `${id}.${index}`;
+      placed.current.set(rowId, { file, upload: handOver(dropFile, rowId, file) });
+    });
+    const count = placement.targets.length;
+    if (count > 0) setPlacements((generation) => generation + 1);
+    if (count > 0 && count === dropRoom && dropRef.current?.contains(document.activeElement)) {
+      landing.current = placement.targets[count - 1] ?? null;
+    }
+    return count;
+  };
 
   return (
     <div className="space-y-2">
@@ -198,51 +325,67 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
       )}
 
       <div ref={rowsRef} className="space-y-2">
-        {items.length === 0 && (
+        {/* With a drop area, the area stands in for this line: its own words
+            say what to do, and three dashed boxes one above another would read
+            as three equal choices. */}
+        {items.length === 0 && !dropOffered && (
           <p className="rounded-md border border-dashed border-border bg-input/50 px-3 py-4 text-center text-[12px] text-muted-foreground">
             {s.noItemsYet}
           </p>
         )}
-        {items.map((item, index) => (
-          <div
-            key={rowKeys[index] ?? index}
-            data-list-row
-            className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
-          >
-            <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <FieldRenderer
-                // `required: true`: a row is in the array because the person
-                // added it, so it is never optional - an object row is never an
-                // optional structure that folds or closes.
-                field={{
-                  ...field.item,
-                  title: '',
-                  name: `${field.name}[${index}]`,
-                  required: true,
-                }}
-                value={item}
-                onChange={(v) => setItem(index, v)}
-                id={`${id}.${index}`}
-                env={rowEnv}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => removeItem(index)}
-              disabled={env?.disabled || busy}
-              aria-label={s.removeItemAria(index + 1)}
-              className={cn(
-                'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11',
-                focusOutlineClass,
-              )}
+        <ListDropAreaContext.Provider value={dropArea}>
+          {items.map((item, index) => (
+            <div
+              key={rowKeys[index] ?? index}
+              data-list-row
+              className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+              <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <FieldRenderer
+                  // `required: true`: a row is in the array because the person
+                  // added it, so it is never optional - an object row is never an
+                  // optional structure that folds or closes.
+                  field={{
+                    ...field.item,
+                    title: '',
+                    name: `${field.name}[${index}]`,
+                    required: true,
+                  }}
+                  value={item}
+                  onChange={(v) => setItem(index, v)}
+                  id={`${id}.${index}`}
+                  env={rowEnv}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeItem(index)}
+                disabled={env?.disabled || busy}
+                aria-label={s.removeItemAria(index + 1)}
+                className={cn(
+                  'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11',
+                  focusOutlineClass,
+                )}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </ListDropAreaContext.Provider>
+
+        {dropOffered && fileItem && (
+          <div ref={dropRef}>
+            <ListFileDrop
+              label={fieldLabel(field.title, field.name, presentation)}
+              formats={fileItem.formats}
+              shut={!dropOpen}
+              onPlace={placeFiles}
+            />
           </div>
-        ))}
+        )}
 
         <button
           type="button"
@@ -335,6 +478,80 @@ function listIsBusy(id: string, uploadingIds: ReadonlySet<string> | undefined): 
 }
 
 const NO_ERRORS: ReadonlyMap<string, string> = new Map();
+const NO_IDS: ReadonlySet<string> = new Set();
+
+/** An upload a list handed the host: the id it was handed, and the newest logged move then. */
+interface PendingUpload {
+  id: string;
+  seq: number;
+}
+const NO_UPLOADS: ReadonlyMap<number, PendingUpload> = new Map();
+
+/** `uploads` without the one under `token`, the same map when it was not there. */
+function withoutUpload(
+  uploads: ReadonlyMap<number, PendingUpload>,
+  token: number,
+): ReadonlyMap<number, PendingUpload> {
+  if (!uploads.has(token)) return uploads;
+  const next = new Map(uploads);
+  next.delete(token);
+  return next;
+}
+
+/**
+ * The ids of the rows the pending uploads belong to now: the id each was
+ * handed, carried through every move logged after it by `movedId`, which works
+ * on the whole path, so a move of an outer list's rows renames it too. An
+ * upload whose row a move removed belongs to no row.
+ */
+function arrivingRows(
+  uploads: ReadonlyMap<number, PendingUpload>,
+  moves: readonly RowMove[] | undefined,
+): ReadonlySet<string> {
+  if (uploads.size === 0) return NO_IDS;
+  const rows = new Set<string>();
+  for (const upload of uploads.values()) {
+    let at: string | undefined = upload.id;
+    for (const move of moves ?? []) {
+      if (at === undefined) break;
+      if (move.seq > upload.seq) at = movedId(at, move.listId, destinationOf(move.order));
+    }
+    if (at !== undefined) rows.add(at);
+  }
+  return rows;
+}
+
+/**
+ * Hands a file the drop area placed to the host's `onDropFile`, and reads a
+ * throw as an upload that failed, as `useMethodForm` reads one from its
+ * `uploadFile`: the rest of the batch is still handed over, and the row is not
+ * left waiting on a file that never left. The error is still reported, as a
+ * throw for a file dropped on a row is by the dropzone that called the host,
+ * so a host's bug does not vanish into a batch that otherwise went through.
+ */
+function handOver(drop: NonNullable<FieldEnv['onDropFile']>, rowId: string, file: File): unknown {
+  try {
+    return drop(rowId, file);
+  } catch (error) {
+    reportHostError(error);
+    // Marked handled now, as the error has just been reported: the row reads
+    // the rejection once it takes its file, which is a render later.
+    const failed = Promise.reject(error);
+    failed.catch(() => {});
+    return failed;
+  }
+}
+
+/**
+ * Reports a host's error to the page's error handlers, where a browser reports
+ * an uncaught one and a host's error tracking listens, or to the console on a
+ * platform without `reportError`, which is where react-dropzone reports one.
+ */
+function reportHostError(error: unknown): void {
+  if (typeof globalThis.reportError === 'function') globalThis.reportError(error);
+  // eslint-disable-next-line no-console -- the platform has no `reportError`.
+  else console.error(error);
+}
 
 /**
  * The failures a removal at `removed` leaves at the wrong position: every entry

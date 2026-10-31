@@ -32,6 +32,11 @@ function formatFileDate(date: Date): string {
   return inCurrentYear(date) ? DAY.format(date) : DAY_YEAR.format(date);
 }
 
+/** `a.pdf, b.pdf and c.pdf`, or `a.pdf, b.pdf, c.pdf and 4 more` when some are not named. */
+function someNames(names: readonly string[], more: number): string {
+  return AND.format(more > 0 ? [...names, `${more} more`] : names);
+}
+
 export const EN_FIELD_STRINGS: FieldStrings = {
   optionalBadge: 'optional',
   selectPlaceholder: 'Select…',
@@ -88,6 +93,22 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   no: 'No',
   unsupportedFileType: (formats) =>
     `That file type is not supported. Accepted formats: ${formats}.`,
+  dropFilesOrBrowse: 'Drop files or click to browse',
+  dropFilesToAdd: 'Drop to add the files',
+  addFilesAria: (label) => (label ? `Add files to ${label}` : 'Add files'),
+  filesAdded: (count) => (count === 1 ? '1 file added' : `${count} files added`),
+  filesRefused: (names, more, formats) =>
+    `${names.length + more === 1 ? 'Not added, because its' : 'Not added, because their'} file type is not supported: ${someNames(names, more)}. Accepted formats: ${formats}.`,
+  filesLeftOut: (names, more, fitted) => {
+    const these = names.length + more === 1 ? 'this file was' : 'these files were';
+    const room =
+      fitted === 0
+        ? 'The list is full'
+        : `The list had room for ${fitted === 1 ? '1 more file' : `${fitted} more files`}`;
+    return `${room}, so ${these} not added: ${someNames(names, more)}.`;
+  },
+  oneFileOnly: 'This field takes one file.',
+  oneFileOnlyInList: "This field takes one file. Drop several files on the list's drop area.",
   hideOptionalFields: 'Hide optional fields',
   hideOptionalInputs: 'Hide optional inputs',
   optionalFieldsCount: (count) => (count === 1 ? '1 optional field' : `${count} optional fields`),

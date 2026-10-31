@@ -32,6 +32,13 @@ describe('FR_FIELD_STRINGS', () => {
       s.downloadIncomplete(['a.pdf']),
       s.downloadFile('a.pdf'),
       s.unsupportedFileType('PDF, PNG'),
+      s.addFilesAria('Reçus'),
+      s.addFilesAria(''),
+      s.filesAdded(3),
+      s.filesRefused(['a.zip'], 0, 'PDF, PNG'),
+      s.filesRefused(['a.zip', 'b.zip', 'c.zip'], 2, 'PDF, PNG'),
+      s.filesLeftOut(['d.pdf'], 0, 2),
+      s.filesLeftOut(['d.pdf', 'e.pdf'], 0, 0),
       s.optionalFieldsCount(2),
       s.optionalInputsCount(2),
       s.chooseFromSourceAria('Devis'),
@@ -79,6 +86,26 @@ describe('FR_FIELD_STRINGS', () => {
     expect(s.downloadIncomplete(['a.pdf'])).toBe('Un fichier n’a pas pu être enregistré : a.pdf');
     expect(s.downloadIncomplete(['a.pdf', 'b.png'])).toBe(
       '2 fichiers n’ont pas pu être enregistrés : a.pdf, b.png',
+    );
+  });
+});
+
+describe('FR_FIELD_STRINGS for a batch of files', () => {
+  it('names the files a batch left out, with the rest counted', () => {
+    const s = FR_FIELD_STRINGS;
+    expect(s.filesAdded(1)).toBe('1 fichier ajouté');
+    expect(s.filesAdded(3)).toBe('3 fichiers ajoutés');
+    expect(normalize(s.filesRefused(['a.zip'], 0, 'PDF'))).toBe(
+      'Non ajouté, car son type n’est pas pris en charge : a.zip. Formats acceptés : PDF.',
+    );
+    expect(normalize(s.filesRefused(['a.zip', 'b.zip', 'c.zip'], 2, 'PDF'))).toBe(
+      'Non ajoutés, car leur type n’est pas pris en charge : a.zip, b.zip, c.zip et 2 autres. Formats acceptés : PDF.',
+    );
+    expect(normalize(s.filesLeftOut(['d.pdf'], 0, 1))).toBe(
+      'La liste n’avait de place que pour 1 fichier de plus, ce fichier n’a donc pas été ajouté : d.pdf.',
+    );
+    expect(normalize(s.filesLeftOut(['d.pdf', 'e.pdf'], 1, 0))).toBe(
+      'La liste est pleine, ces fichiers n’ont donc pas été ajoutés : d.pdf, e.pdf et 1 autre.',
     );
   });
 });

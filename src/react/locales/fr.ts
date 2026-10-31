@@ -66,6 +66,11 @@ function formatBytes(bytes: number): string {
   return MEGABYTES.format(bytes / (1024 * 1024));
 }
 
+/** « a.pdf, b.pdf et c.pdf », or « a.pdf, b.pdf, c.pdf et 4 autres » when some are not named. */
+function someNames(names: readonly string[], more: number): string {
+  return AND.format(more > 0 ? [...names, `${more} ${plural(more, 'autre', 'autres')}`] : names);
+}
+
 export const FR_FIELD_STRINGS: FieldStrings = {
   optionalBadge: 'facultatif',
   selectPlaceholder: 'Choisir…',
@@ -126,6 +131,30 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   no: 'Non',
   unsupportedFileType: (formats) =>
     `Ce type de fichier n’est pas pris en charge. Formats acceptés\u00a0: ${formats}.`,
+  dropFilesOrBrowse: 'Déposez des fichiers ou cliquez pour parcourir',
+  dropFilesToAdd: 'Déposez pour ajouter les fichiers',
+  addFilesAria: (label) => (label ? `Ajouter des fichiers à ${label}` : 'Ajouter des fichiers'),
+  filesAdded: (count) => `${count} ${plural(count, 'fichier ajouté', 'fichiers ajoutés')}`,
+  filesRefused: (names, more, formats) =>
+    `${
+      names.length + more === 1
+        ? 'Non ajouté, car son type n’est pas pris en charge'
+        : 'Non ajoutés, car leur type n’est pas pris en charge'
+    }\u00a0: ${someNames(names, more)}. Formats acceptés\u00a0: ${formats}.`,
+  filesLeftOut: (names, more, fitted) => {
+    const these =
+      names.length + more === 1
+        ? 'ce fichier n’a donc pas été ajouté'
+        : 'ces fichiers n’ont donc pas été ajoutés';
+    const room =
+      fitted === 0
+        ? 'La liste est pleine'
+        : `La liste n’avait de place que pour ${fitted} ${plural(fitted, 'fichier', 'fichiers')} de plus`;
+    return `${room}, ${these}\u00a0: ${someNames(names, more)}.`;
+  },
+  oneFileOnly: 'Ce champ accepte un seul fichier.',
+  oneFileOnlyInList:
+    'Ce champ accepte un seul fichier. Déposez-en plusieurs dans la zone de dépôt de la liste.',
   hideOptionalFields: 'Masquer les champs facultatifs',
   hideOptionalInputs: 'Masquer les entrées facultatives',
   optionalFieldsCount: (count) =>

@@ -11,12 +11,13 @@ import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FileRunField } from '../../core';
+import type { FileRunField, ListRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import { narrowFileFormats } from '../../core/narrow-file-formats';
 import { DocumentField, ImageField, type FileValue } from '../file-field';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
+import { ListField } from '../list-field';
 
 const field: FileRunField = {
   kind: 'document',
@@ -518,6 +519,23 @@ describe('the local preview belongs to the value it was made for', () => {
   });
 });
 
+describe('a refusal on screen', () => {
+  it('gives way to a file another writer puts in the field', async () => {
+    const user = userEvent.setup();
+    render(<HostOwnedField />);
+    const root = document.querySelector('[role="presentation"]');
+    if (!root) throw new Error('no dropzone');
+    const zip = new File(['zip'], 'archive.zip', { type: 'application/zip' });
+    fireEvent.drop(root, { dataTransfer: { files: [zip], types: ['Files'] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('archive.zip');
+    // An example, the list's sheet or a host's `setValues`: the refusal stayed
+    // under the new file and read as that file being unsupported.
+    await user.click(screen.getByRole('button', { name: 'host writes A' }));
+    expect(screen.getByText('a.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
 /** A host that owns the value and resolves storage URIs on demand. */
 function ResolvingField({
   initial,
@@ -759,6 +777,80 @@ describe('a file the slot cannot accept never reaches the host', () => {
     // The two that a run proves fail, and that this table used to advertise.
     expect(fileInput().accept).not.toContain('wordprocessingml');
     expect(fileInput().accept).not.toContain('presentationml');
+  });
+});
+
+describe('a batch dropped on a field that takes one file', () => {
+  /**
+   * react-dropzone rejects a batch of acceptable files as `too-many-files`,
+   * and the control used to name the first one as a type it does not support.
+   * It also took the one acceptable file out of a batch whose others it refused
+   * by type, uploading one file of a batch with nothing said about the choice.
+   */
+  const dropAll = (files: File[], root = document.querySelector('[role="presentation"]')) => {
+    if (!root) throw new Error('no dropzone root');
+    fireEvent.drop(root, { dataTransfer: { files, types: ['Files'] } });
+  };
+  const pdf = (name: string) => new File(['pdf'], name, { type: 'application/pdf' });
+  const zip = () => new File(['zip'], 'archive.zip', { type: 'application/zip' });
+
+  it('says the field takes one file, names none as unsupported, and calls no host', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    dropAll([pdf('a.pdf'), pdf('b.pdf')]);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(DEFAULT_FIELD_STRINGS.oneFileOnly);
+    expect(alert).not.toHaveTextContent('a.pdf');
+    expect(alert).not.toHaveTextContent('not supported');
+    expect(onDropFile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a batch whole when only one of its files is acceptable', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    dropAll([pdf('a.pdf'), zip()]);
+    expect(await screen.findByRole('alert')).toHaveTextContent(DEFAULT_FIELD_STRINGS.oneFileOnly);
+    expect(onDropFile).not.toHaveBeenCalled();
+  });
+
+  it('keeps naming a single refused file by its type', async () => {
+    renderField();
+    dropAll([zip()]);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('archive.zip');
+    expect(alert).toHaveTextContent('That file type is not supported.');
+  });
+
+  it('takes a single file after a refused batch, and clears the message', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    dropAll([pdf('a.pdf'), pdf('b.pdf')]);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    dropAll([pdf('a.pdf')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it("points at the list's drop area on a row of a list that has one", async () => {
+    const list: ListRunField = {
+      kind: 'list',
+      name: 'cvs',
+      conceptRef: 'native.Document[]',
+      required: true,
+      item: field,
+    };
+    const onDropFile = vi.fn();
+    render(
+      <ListField field={list} value={[undefined]} onChange={noop} id="cvs" env={{ onDropFile }} />,
+    );
+    dropAll(
+      [pdf('a.pdf'), pdf('b.pdf')],
+      document.querySelector('[data-list-row] [role="presentation"]'),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      DEFAULT_FIELD_STRINGS.oneFileOnlyInList,
+    );
+    expect(onDropFile).not.toHaveBeenCalled();
   });
 });
 

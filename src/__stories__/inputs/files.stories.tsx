@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { DEFAULT_FIELD_STRINGS as S } from '../../react';
 import { CaseForm } from '../case-form';
 import { CONTRACTS, INPUT_FORM } from '../_generated/files';
 import { PAYLOADS } from '../_generated/results.payloads';
@@ -337,4 +338,107 @@ export const UploadFailed: Story = {
 /** The same busy state on an image slot, where the preview area is what waits. */
 export const UploadingImage: Story = {
   args: { pipeCode: 'one_image', uploadingIds: ['one_image-picture'] },
+};
+
+const png = (name: string) => new File(['png'], name, { type: 'image/png' });
+const pdf = (name: string) => new File(['%PDF-1.4'], name, { type: 'application/pdf' });
+const zip = (name: string) => new File(['zip'], name, { type: 'application/zip' });
+
+/**
+ * Drops `files` on `target` as a browser does, through a real `DataTransfer`.
+ * A native event rather than `fireEvent.drop`, which copies the transfer's own
+ * properties onto a new one, and a real transfer keeps its files on its
+ * prototype, so the copy arrives empty.
+ */
+function dropFiles(target: Element, files: File[]) {
+  const data = new DataTransfer();
+  for (const file of files) data.items.add(file);
+  target.dispatchEvent(
+    new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }),
+  );
+}
+
+/** Every list's drop area on the canvas, both theme panes, in document order. */
+function dropAreas(canvasElement: HTMLElement): HTMLElement[] {
+  return [...canvasElement.querySelectorAll<HTMLElement>('[data-list-file-drop]')];
+}
+
+/** The drop area's own file input, which takes the tab stop and the area's name. */
+function areaInput(area: HTMLElement): HTMLInputElement {
+  const input = area.querySelector('input[type="file"]');
+  if (!(input instanceof HTMLInputElement)) throw new Error('A drop area with no file input.');
+  return input;
+}
+
+/**
+ * **Several files dropped on a list at once**, against `ManyFiles` above: the
+ * same two lists, with two pictures and a ZIP dropped together on the
+ * gallery's drop area. Each picture gets a row of its own, the ZIP is named in
+ * the area's alert with the formats the slot takes, and nothing reaches the
+ * host for it.
+ */
+export const DropSeveralFiles: Story = {
+  args: { pipeCode: 'many_files' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Per theme pane: the documents' area, then the gallery's.
+    const areas = dropAreas(canvasElement);
+    await expect(areas).toHaveLength(4);
+    for (const gallery of [areas[1], areas[3]]) {
+      if (!gallery) throw new Error('A gallery with no drop area.');
+      dropFiles(gallery, [png('north-wing.png'), png('loading-bay.png'), zip('more-photos.zip')]);
+    }
+    await waitFor(() => expect(canvas.getAllByText('north-wing.png')).toHaveLength(2));
+    await expect(canvas.getAllByText('loading-bay.png')).toHaveLength(2);
+    const alerts = canvas.getAllByRole('alert');
+    await expect(alerts).toHaveLength(2);
+    for (const alert of alerts) await expect(alert).toHaveTextContent('more-photos.zip');
+    for (const status of canvas.getAllByText(S.filesAdded(2))) {
+      await expect(status.closest('[role="status"]')).not.toBeNull();
+    }
+  },
+};
+
+/**
+ * **A bounded list takes what it has room for**: a list of exactly three
+ * images, with four dropped at once. Three fill a row each, the fourth is
+ * named as left out with the number that fitted, and the area is shut once
+ * the list is full.
+ */
+export const DropMoreThanFits: Story = {
+  args: { pipeCode: 'three_images' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const areas = dropAreas(canvasElement);
+    await expect(areas).toHaveLength(2);
+    for (const area of areas) {
+      dropFiles(area, [png('one.png'), png('two.png'), png('three.png'), png('four.png')]);
+    }
+    await waitFor(() => expect(canvas.getAllByText('three.png')).toHaveLength(2));
+    await expect(canvas.queryByText('four.png', { selector: ':not([role="alert"] *)' })).toBeNull();
+    const alerts = canvas.getAllByRole('alert');
+    await expect(alerts).toHaveLength(2);
+    for (const alert of alerts) await expect(alert).toHaveTextContent('four.png');
+    for (const area of areas) await expect(areaInput(area)).toBeDisabled();
+  },
+};
+
+/**
+ * **Several files dropped on a field that takes one**, against
+ * `TryAWrongFileType` above: the batch is refused whole, no file is taken, and
+ * the field says it takes one file rather than naming either as unsupported.
+ */
+export const DropSeveralOnOne: Story = {
+  args: { pipeCode: 'one_document' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const zones = canvasElement.querySelectorAll('[role="presentation"]');
+    await expect(zones).toHaveLength(2);
+    for (const zone of zones) dropFiles(zone, [pdf('first.pdf'), pdf('second.pdf')]);
+    await waitFor(() => expect(canvas.getAllByRole('alert')).toHaveLength(2));
+    for (const alert of canvas.getAllByRole('alert')) {
+      await expect(alert).toHaveTextContent(S.oneFileOnly);
+    }
+    await expect(canvas.queryByText('first.pdf')).toBeNull();
+  },
 };

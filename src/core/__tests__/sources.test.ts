@@ -26,6 +26,8 @@ import {
   WIRE_PLAIN,
   WIRE_VARIABLE,
 } from './contract-fixtures';
+// Internal to the package, so it is read from its module rather than the barrel.
+import { placeDroppedFiles, roomForDroppedFiles } from '../sources';
 
 const file = (id: string, url: string, name = `${id}.pdf`): SourceFile => ({ id, url, name });
 
@@ -113,6 +115,94 @@ describe('roomForChosenFiles', () => {
   it('has no bound when the list has none, and never goes below nothing', () => {
     expect(roomForChosenFiles([{ url: 'u1' }], undefined)).toBeUndefined();
     expect(roomForChosenFiles([{ url: 'u1' }, { url: 'u2' }, { url: 'u3' }], 2)).toBe(0);
+  });
+});
+
+describe('placeDroppedFiles', () => {
+  const FILE = { url: 'u1', filename: 'held.pdf' };
+
+  it('appends one empty row per file to an empty list, in order', () => {
+    expect(placeDroppedFiles(undefined, 3, undefined)).toEqual({
+      items: [undefined, undefined, undefined],
+      appended: 3,
+      targets: [0, 1, 2],
+      leftOut: 0,
+    });
+  });
+
+  it('fills the rows that hold no file first, then appends after the last', () => {
+    const held = [undefined, FILE, {}];
+    const placement = placeDroppedFiles(held, 3, undefined);
+    expect(placement.targets).toEqual([0, 2, 3]);
+    expect(placement.appended).toBe(1);
+    expect(placement.items).toEqual([undefined, FILE, {}, undefined]);
+    expect(held).toEqual([undefined, FILE, {}]);
+  });
+
+  it('appends nothing when the free rows take the whole batch', () => {
+    const held = [undefined, FILE, undefined];
+    const placement = placeDroppedFiles(held, 2, undefined);
+    expect(placement).toMatchObject({ appended: 0, targets: [0, 2], leftOut: 0 });
+    expect(placement.items).toEqual(held);
+    expect(placement.items).not.toBe(held);
+  });
+
+  it('skips a row the caller says is not free: one in flight, one whose upload failed', () => {
+    const busy = new Set([0, 2]);
+    const placement = placeDroppedFiles(
+      [undefined, undefined, undefined],
+      2,
+      undefined,
+      (index) => !busy.has(index),
+    );
+    expect(placement.targets).toEqual([1, 3]);
+    expect(placement.items).toHaveLength(4);
+  });
+
+  it('never fills a row that holds a file, whatever the predicate says', () => {
+    expect(placeDroppedFiles([FILE], 1, undefined, () => true).targets).toEqual([1]);
+  });
+
+  it('takes as many as a bounded list has room for, and leaves out the rest from the end', () => {
+    const placement = placeDroppedFiles([FILE, undefined], 4, 3);
+    expect(placement).toEqual({
+      items: [FILE, undefined, undefined],
+      appended: 1,
+      targets: [1, 2],
+      leftOut: 2,
+    });
+  });
+
+  it('leaves the whole batch out of a full list', () => {
+    expect(placeDroppedFiles([FILE, FILE], 2, 2)).toEqual({
+      items: [FILE, FILE],
+      appended: 0,
+      targets: [],
+      leftOut: 2,
+    });
+  });
+
+  it('still fills a free row of a list that already holds more rows than its bound', () => {
+    const placement = placeDroppedFiles([FILE, undefined, FILE], 2, 2);
+    expect(placement).toMatchObject({ appended: 0, targets: [1], leftOut: 1 });
+  });
+
+  it('says how much room it has, by the same test, and none when the list is unbounded', () => {
+    expect(roomForDroppedFiles([FILE, undefined], 3)).toBe(2);
+    expect(roomForDroppedFiles([FILE, undefined], 3, (index) => index !== 1)).toBe(1);
+    expect(roomForDroppedFiles([FILE, FILE], 2)).toBe(0);
+    expect(roomForDroppedFiles([FILE, FILE, FILE], 2)).toBe(0);
+    expect(roomForDroppedFiles([FILE], undefined)).toBeUndefined();
+    expect(roomForDroppedFiles(undefined, 2)).toBe(2);
+  });
+
+  it('places nothing for an empty batch', () => {
+    expect(placeDroppedFiles([undefined], 0, undefined)).toEqual({
+      items: [undefined],
+      appended: 0,
+      targets: [],
+      leftOut: 0,
+    });
   });
 });
 

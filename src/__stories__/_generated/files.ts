@@ -16,6 +16,7 @@ export const PIPE_REFS = [
   'files.one_document',
   'files.one_image',
   'files.required_vs_optional',
+  'files.three_images',
 ] as const;
 
 export const CONTRACTS: PipeIOContracts = {
@@ -1168,6 +1169,159 @@ export const CONTRACTS: PipeIOContracts = {
       optional: false,
     },
   },
+  'files.three_images': {
+    inputs: {
+      receipts: {
+        concept_ref: 'native.Image',
+        item_count: 3,
+        json_schema: {
+          items: {
+            description: 'An image',
+            properties: {
+              caption: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The caption of the image',
+                title: 'Caption',
+              },
+              filename: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The original filename of the image',
+                title: 'Filename',
+              },
+              height: {
+                anyOf: [
+                  {
+                    exclusiveMinimum: 0,
+                    type: 'integer',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The height of the image, in pixels',
+                title: 'Height',
+              },
+              mime_type: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The MIME type of the image',
+                title: 'Mime Type',
+              },
+              public_url: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The public URL of the image',
+                title: 'Public Url',
+              },
+              source_negative_prompt: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The source negative prompt of the image',
+                title: 'Source Negative Prompt',
+              },
+              source_prompt: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The source prompt of the image',
+                title: 'Source Prompt',
+              },
+              url: {
+                description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+                title: 'Url',
+                type: 'string',
+              },
+              width: {
+                anyOf: [
+                  {
+                    exclusiveMinimum: 0,
+                    type: 'integer',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The width of the image, in pixels',
+                title: 'Width',
+              },
+            },
+            required: ['url'],
+            title: 'native.Image',
+            type: 'object',
+          },
+          maxItems: 3,
+          minItems: 3,
+          type: 'array',
+        },
+        multiplicity: 'fixed',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'native.Text',
+      item_count: null,
+      json_schema: {
+        description: 'A text',
+        properties: {
+          text: {
+            description: 'The text',
+            title: 'Text',
+            type: 'string',
+          },
+        },
+        required: ['text'],
+        title: 'native.Text',
+        type: 'object',
+      },
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
 };
 
 export const INPUT_FORM: InputForm = {
@@ -1299,6 +1453,26 @@ export const INPUT_FORM: InputForm = {
       },
     ],
   },
+  'files.three_images': {
+    fields: [
+      {
+        concept_ref: 'native.Image',
+        description: 'An image',
+        gating: true,
+        item: {
+          concept_ref: 'native.Image',
+          description: 'An image',
+          kind: 'image',
+          required: true,
+        },
+        item_count: 3,
+        kind: 'list',
+        name: 'receipts',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
 };
 
 /**
@@ -1362,6 +1536,15 @@ export const OUTPUT_FORM: OutputForm = {
       required: true,
     },
   },
+  'files.three_images': {
+    field: {
+      concept_ref: 'native.Text',
+      description: 'A text',
+      kind: 'prose',
+      name: 'output',
+      required: true,
+    },
+  },
 };
 
 /**
@@ -1380,6 +1563,8 @@ export const PIPE_DESCRIPTIONS: Record<string, string> = {
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'files.one_image': 'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'files.required_vs_optional':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'files.three_images':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
 };
 
