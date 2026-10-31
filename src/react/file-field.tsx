@@ -25,6 +25,13 @@ import { useFieldStrings, type FieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
+import { useInListWithDropArea } from './list-drop-area';
+
+/**
+ * What the control refused: a file of a type the slot does not accept, or a
+ * batch of several files dropped on a field that takes one.
+ */
+type Refusal = { kind: 'type'; name: string } | { kind: 'batch' };
 
 /** The serializable value of a file field. URL is what the runner sends. */
 export interface FileValue {
@@ -287,14 +294,18 @@ function FileField({
   useEffect(() => () => setLocal(null), [setLocal]);
 
   /**
-   * A file the slot does not accept, held locally until the next pick.
+   * What the control refused, held locally until the next pick: a file the slot
+   * does not accept, by its name, or a batch of several files dropped on a
+   * field that takes one.
    *
    * Local rather than raised to the host, and that is the distinction to keep:
    * the host's `error` prop carries the GATE's verdict about a value, while this
    * is the control refusing to produce a value at all. Nothing is uploaded, so
    * there is nothing for a host to be told about yet.
    */
-  const [rejected, setRejected] = useState<string | null>(null);
+  const [rejected, setRejected] = useState<Refusal | null>(null);
+  // A row of a list that takes several files at once says where a batch goes.
+  const inListWithDropArea = useInListWithDropArea();
 
   /**
    * The host's upload failure the user has since moved past without uploading,
@@ -352,7 +363,7 @@ function FileField({
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
         // runtime cannot decode has no business reaching it.
-        setRejected(file.name);
+        setRejected({ kind: 'type', name: file.name });
         return;
       }
       setRejected(null);
@@ -409,17 +420,28 @@ function FileField({
     // handlers on a `role="presentation"` div, and the element a keyboard or
     // voice-control user lands on is a generic with no role and no name.
     noKeyboard: true,
-    onDrop: (files) => {
-      const file = files[0];
-      if (file) handleFile(file);
-    },
-    // react-dropzone rejects a file its own matcher refuses without ever calling
-    // `onDrop`, so without this a wrong drop is silently swallowed - the control
-    // simply does nothing, which reads as a broken dropzone rather than a
+    // Every drop and pick lands here, the files react-dropzone's own matcher
+    // refused included. Those must be answered: left alone, a wrong drop is
+    // silently swallowed, which reads as a broken dropzone rather than a
     // refused file.
-    onDropRejected: (rejections) => {
+    onDrop: (accepted, rejections) => {
+      // Several files at once are refused as a batch, whatever their types,
+      // and none reaches the host. react-dropzone rejects a batch of
+      // acceptable files as `too-many-files`, which used to be reported as
+      // the first file's type being unsupported, and it takes the one
+      // acceptable file out of a batch whose others it refuses by type, which
+      // uploaded one file of a batch with nothing said about the choice.
+      if (accepted.length + rejections.length > 1) {
+        setRejected({ kind: 'batch' });
+        return;
+      }
+      const file = accepted[0];
+      if (file) {
+        handleFile(file);
+        return;
+      }
       const name = rejections[0]?.file.name;
-      if (name) setRejected(name);
+      if (name) setRejected({ kind: 'type', name });
     },
   });
 
@@ -764,7 +786,15 @@ function FileField({
       {!busy &&
         (rejected ? (
           <p role="alert" className="text-[12px] text-destructive">
-            <span className="font-mono">{rejected}</span> — {s.unsupportedFileType(hint)}
+            {rejected.kind === 'type' ? (
+              <>
+                <span className="font-mono">{rejected.name}</span> — {s.unsupportedFileType(hint)}
+              </>
+            ) : inListWithDropArea ? (
+              s.oneFileOnlyInList
+            ) : (
+              s.oneFileOnly
+            )}
           </p>
         ) : (
           failure && (

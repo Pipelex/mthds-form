@@ -632,3 +632,80 @@ describe('a host’s own setValues is read by position', () => {
     expect([...result.current.failedUploadIds]).toEqual([]);
   });
 });
+
+describe('a batch dropped on a list of files, through the form', () => {
+  /** The attachments' drop area: its file input, named by the list. */
+  const attachmentsDrop = () =>
+    screen.getByLabelText(S.addFilesAria('Attachments')) as HTMLInputElement;
+  const named = (name: string) => new File(['%PDF-1.4'], name, { type: 'application/pdf' });
+
+  /** An `uploadFile` whose uploads the test settles by file name, in any order. */
+  function uploadsByName() {
+    const pending = new Map<string, ReturnType<typeof deferredUpload>>();
+    const uploadFile = vi.fn<NonNullable<UseMethodFormOptions['uploadFile']>>((file) => {
+      const upload = deferredUpload();
+      pending.set(file.name, upload);
+      return upload.promise;
+    });
+    const settle = (name: string) => {
+      const upload = pending.get(name);
+      if (!upload) throw new Error(`No upload of ${name}`);
+      return upload;
+    };
+    return { uploadFile, settle };
+  }
+  const stored = (name: string) => ({ url: `https://example.com/${name}`, filename: name });
+
+  it('lands each file in its own row, whatever order the uploads finish in', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    render(<Harness uploadFile={uploadFile} />);
+    await user.upload(attachmentsDrop(), [named('a.pdf'), named('b.pdf'), named('c.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+    expect(uploadFile.mock.calls.map(([, context]) => context?.id)).toEqual([
+      'attachments.0',
+      'attachments.1',
+      'attachments.2',
+    ]);
+
+    await act(async () => settle('c.pdf').resolve(stored('c.pdf')));
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    await act(async () => settle('b.pdf').resolve(stored('b.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), stored('b.pdf'), stored('c.pdf')]);
+    expect(failed()).toEqual([]);
+  });
+
+  it('marks only the row whose upload failed', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    const { container } = render(<Harness uploadFile={uploadFile} />);
+    await user.upload(attachmentsDrop(), [named('a.pdf'), named('b.pdf'), named('c.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    await act(async () => settle('b.pdf').reject(new Error('storage is down')));
+    await act(async () => settle('c.pdf').resolve(stored('c.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), null, stored('c.pdf')]);
+    expect(failed()).toEqual(['attachments.1']);
+    expect(failedRows(container)).toEqual([1]);
+  });
+
+  it('appends a second batch after the first while the first is still arriving', async () => {
+    const user = userEvent.setup();
+    const { uploadFile, settle } = uploadsByName();
+    render(<Harness uploadFile={uploadFile} />);
+    await user.upload(attachmentsDrop(), [named('a.pdf'), named('b.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(2));
+
+    // The rows of the first batch are empty and in flight, so not free.
+    expect(attachmentsDrop()).not.toBeDisabled();
+    await user.upload(attachmentsDrop(), [named('c.pdf')]);
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+    expect(uploadFile.mock.calls[2]?.[1]?.id).toBe('attachments.2');
+
+    await act(async () => settle('c.pdf').resolve(stored('c.pdf')));
+    await act(async () => settle('b.pdf').resolve(stored('b.pdf')));
+    await act(async () => settle('a.pdf').resolve(stored('a.pdf')));
+    expect(state().values.attachments).toEqual([stored('a.pdf'), stored('b.pdf'), stored('c.pdf')]);
+  });
+});

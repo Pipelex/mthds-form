@@ -1,7 +1,12 @@
 'use client';
 
 import { shownAsOptional } from '../core/readiness';
-import { addChosenFiles, roomForChosenFiles } from '../core/sources';
+import {
+  addChosenFiles,
+  placeDroppedFiles,
+  roomForChosenFiles,
+  roomForDroppedFiles,
+} from '../core/sources';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { focusOutlineClass, selectedHoverBorderClass } from './role-tokens';
@@ -13,6 +18,8 @@ import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
 import { firstFocusable } from './focus';
+import { ListDropAreaContext } from './list-drop-area';
+import { ListFileDrop } from './list-file-drop';
 import { destinationOf, movedId, type RowMove } from './row-moves';
 
 interface ListFieldProps {
@@ -164,6 +171,41 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
   const room = roomForChosenFiles(items, field.maxItemCount);
 
+  // A list of files also takes several files from the person's device at once,
+  // dropped or picked on a drop area of its own, exactly when the host can
+  // upload one. Each accepted file goes into a free row first, then into a new
+  // one (`placeDroppedFiles`), and is handed to the host as if it had been
+  // dropped on that row. A row is free when it holds no file, no file is still
+  // arriving there (its write-back's target, which must not be filled under
+  // it) and the rows show no failure there (the only record that one of the
+  // person's files did not arrive). The area stays open while files are
+  // arriving, as Add does, because appending moves no row and the free-row test
+  // never targets one in flight. See docs/upload-seam.md, "A list of files
+  // takes several files at once".
+  const dropFile = rowEnv?.onDropFile;
+  const dropOffered = fileItem !== null && dropFile !== undefined;
+  const isFreeRow = (index: number) => {
+    const rowId = `${id}.${index}`;
+    return !env?.uploadingIds?.has(rowId) && !rowEnv?.uploadErrors?.has(rowId);
+  };
+  const dropRoom = dropOffered ? roomForDroppedFiles(items, field.maxItemCount, isFreeRow) : 0;
+  const placeFiles = (files: readonly File[]): number => {
+    if (!dropFile) return 0;
+    const placement = placeDroppedFiles(items, files.length, field.maxItemCount, isFreeRow);
+    // Written before the first upload is asked for, so a host that records what
+    // each upload was dropped over sees the rows it is dropped into.
+    if (placement.appended > 0) onChange(placement.items);
+    placement.targets.forEach((index, order) => {
+      const file = files[order];
+      if (!file) return;
+      // The host reports a failure through `uploadErrors`, on the row. Nothing
+      // here waits on the upload, so its rejection is handled, not left to
+      // surface as an unhandled one.
+      void Promise.resolve(dropFile(`${id}.${index}`, file)).catch(() => {});
+    });
+    return placement.targets.length;
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -198,51 +240,65 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
       )}
 
       <div ref={rowsRef} className="space-y-2">
-        {items.length === 0 && (
+        {/* With a drop area, the area stands in for this line: its own words
+            say what to do, and three dashed boxes one above another would read
+            as three equal choices. */}
+        {items.length === 0 && !dropOffered && (
           <p className="rounded-md border border-dashed border-border bg-input/50 px-3 py-4 text-center text-[12px] text-muted-foreground">
             {s.noItemsYet}
           </p>
         )}
-        {items.map((item, index) => (
-          <div
-            key={rowKeys[index] ?? index}
-            data-list-row
-            className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
-          >
-            <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <FieldRenderer
-                // `required: true`: a row is in the array because the person
-                // added it, so it is never optional - an object row is never an
-                // optional structure that folds or closes.
-                field={{
-                  ...field.item,
-                  title: '',
-                  name: `${field.name}[${index}]`,
-                  required: true,
-                }}
-                value={item}
-                onChange={(v) => setItem(index, v)}
-                id={`${id}.${index}`}
-                env={rowEnv}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => removeItem(index)}
-              disabled={env?.disabled || busy}
-              aria-label={s.removeItemAria(index + 1)}
-              className={cn(
-                'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11',
-                focusOutlineClass,
-              )}
+        <ListDropAreaContext.Provider value={dropOffered}>
+          {items.map((item, index) => (
+            <div
+              key={rowKeys[index] ?? index}
+              data-list-row
+              className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
+              <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <FieldRenderer
+                  // `required: true`: a row is in the array because the person
+                  // added it, so it is never optional - an object row is never an
+                  // optional structure that folds or closes.
+                  field={{
+                    ...field.item,
+                    title: '',
+                    name: `${field.name}[${index}]`,
+                    required: true,
+                  }}
+                  value={item}
+                  onChange={(v) => setItem(index, v)}
+                  id={`${id}.${index}`}
+                  env={rowEnv}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeItem(index)}
+                disabled={env?.disabled || busy}
+                aria-label={s.removeItemAria(index + 1)}
+                className={cn(
+                  'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11',
+                  focusOutlineClass,
+                )}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </ListDropAreaContext.Provider>
+
+        {dropOffered && fileItem && (
+          <ListFileDrop
+            label={fieldLabel(field.title, field.name, presentation)}
+            formats={fileItem.formats}
+            shut={!!env?.disabled || dropRoom === 0}
+            onPlace={placeFiles}
+          />
+        )}
 
         <button
           type="button"

@@ -162,6 +162,36 @@ export interface FieldStrings {
    * accepted" on its own leaves the user guessing at the list they just failed.
    */
   unsupportedFileType: (formats: string) => string;
+
+  // A list of files takes several files at once (docs/upload-seam.md, "A list
+  // of files takes several files at once").
+  /** What a list of files' drop area says, under its rows. */
+  dropFilesOrBrowse: string;
+  /** What it says while files are dragged over it. */
+  dropFilesToAdd: string;
+  /**
+   * The accessible name of the file input inside that area, given the list's
+   * label as the form shows it, so it says which list the files go to.
+   */
+  addFilesAria: (label: string) => string;
+  /** Announced, visually hidden, once a batch is placed: how many files went in. */
+  filesAdded: (count: number) => string;
+  /**
+   * The files of a batch the list did not take because the slot does not accept
+   * their type: the first few names, how many more there were, and the slot's
+   * formats as the hint names them (`PDF, JPG, PNG`).
+   */
+  filesRefused: (names: readonly string[], more: number, formats: string) => string;
+  /**
+   * The files of a batch a bounded list had no room for: the first few names,
+   * how many more there were, and how many of the batch did fit.
+   */
+  filesLeftOut: (names: readonly string[], more: number, fitted: number) => string;
+  /** What a single file field says when several files are dropped on it at once. */
+  oneFileOnly: string;
+  /** The same, on a row of a list that has a drop area for several files. */
+  oneFileOnlyInList: string;
+
   /** The optional-entries disclosure ("field" inside a concept, "input" at top level). */
   hideOptionalFields: string;
   hideOptionalInputs: string;
