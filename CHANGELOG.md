@@ -1,10 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.24.0] - 2026-10-31
 
 ### Added
 
-- **A list of files takes several files at once**: a list whose item is a document or an image offers a drop area under its rows whenever the host supplies `onDropFile`. It takes several files dropped together or picked together in the device's file dialog, fills the rows left empty before appending new ones, names the files of a format the slot does not take and, on a bounded list, the files it had no room for, and hands each file to the host through `onDropFile` at its row's id, as if it had been dropped on that row. A batch dropped while earlier files are still uploading, whether the area placed them or the person dropped them on a row, goes after their rows, and the list's remove buttons stay shut until each upload answers or the host removes its row; a row the host moves through `rowMoves` takes its upload with it. A host on `useMethodForm` gets it with nothing to wire; a host writing its own uploads back must write each result over its values as they are when the upload lands, never over the values it held at the drop, and a host whose `onDropFile` returns nothing must report `uploadingIds`, the only way the list then learns which rows are still waiting for their file. See [docs/upload-seam.md](docs/upload-seam.md#a-list-of-files-takes-several-files-at-once).
+- **A list of files takes several files at once**: a list whose item is a document or an image offers a drop area under its rows whenever the host supplies `onDropFile`, which takes several files dropped or picked together, fills the rows left empty before appending new ones, names the files it refused by format or had no room for, and hands each file to the host through `onDropFile` at its row's id, as if it had been dropped on that row. A row whose upload has not answered, whether the area placed the file or the person dropped it on the row, is kept from the next batch and from removal, and follows the host's moves through `rowMoves`. A host on `useMethodForm` has nothing to wire; a host writing its own uploads back must write each result over its values as they are when the upload lands, never over the values it held at the drop, and one whose `onDropFile` returns nothing must report `uploadingIds`. See [docs/upload-seam.md](docs/upload-seam.md#a-list-of-files-takes-several-files-at-once).
 
 ### Changed
 
