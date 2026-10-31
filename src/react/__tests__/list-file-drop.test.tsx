@@ -93,6 +93,14 @@ function dropOnZone(files: File[]) {
   fireEvent.drop(root, { dataTransfer: { files, types: ['Files'] } });
 }
 
+/** Drops files on the dropzone of the row at `index`, as a person drops one on a row. */
+function dropOnRow(index: number, files: File[]) {
+  const rows = document.querySelectorAll('[data-list-row]');
+  const row = rows[index]?.querySelector('[role="presentation"]');
+  if (!row) throw new Error(`no dropzone on row ${index}`);
+  fireEvent.drop(row, { dataTransfer: { files, types: ['Files'] } });
+}
+
 describe('a batch dropped on a list of files', () => {
   it('appends one row per file in one write, and hands each to the host at its row, in order', async () => {
     const onDropFile = vi.fn();
@@ -453,17 +461,67 @@ describe('the uploads the area handed over, before they answer', () => {
     expect(remove).toBeEnabled();
   });
 
-  it('hands the rest of the batch over when the host throws on one file', async () => {
-    const onDropFile = vi.fn<DropFile>((rowId) => {
-      if (rowId === 'receipts.1') throw new Error('over quota');
-    });
-    render(<Harness field={listOf(imageItem)} env={{ onDropFile }} />);
-    dropOnZone([png('a.png'), png('b.png'), png('c.png')]);
+  it('hands the rest of the batch over when the host throws on one file, and reports the error', async () => {
+    const error = new Error('over quota');
+    const reportError = vi.fn();
+    vi.stubGlobal('reportError', reportError);
+    try {
+      const onDropFile = vi.fn<DropFile>((rowId) => {
+        if (rowId === 'receipts.1') throw error;
+      });
+      render(<Harness field={listOf(imageItem)} env={{ onDropFile }} />);
+      dropOnZone([png('a.png'), png('b.png'), png('c.png')]);
+      await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(3));
+      expect(onDropFile.mock.calls.map(([id]) => id)).toEqual([
+        'receipts.0',
+        'receipts.1',
+        'receipts.2',
+      ]);
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(error);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('the uploads dropped on a row of a list of files, before they answer', () => {
+  type DropFile = NonNullable<FieldEnv['onDropFile']>;
+  const handed = (onDropFile: ReturnType<typeof vi.fn<DropFile>>) =>
+    onDropFile.mock.calls.map(([id, file]) => `${id}:${file.name}`);
+
+  it('keeps the row from the area and from removal when the host reports no uploadingIds', async () => {
+    const onDropFile = vi.fn<DropFile>(() => new Promise<void>(() => {}));
+    render(
+      <Harness field={listOf(imageItem)} initial={[undefined, undefined]} env={{ onDropFile }} />,
+    );
+    dropOnRow(1, [png('a.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: S.removeItemAria(2) })).toBeDisabled();
+    dropOnZone([png('b.png'), png('c.png')]);
     await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(3));
-    expect(onDropFile.mock.calls.map(([id]) => id)).toEqual([
-      'receipts.0',
-      'receipts.1',
-      'receipts.2',
+    expect(handed(onDropFile)).toEqual([
+      'receipts.1:a.png',
+      'receipts.0:b.png',
+      'receipts.2:c.png',
+    ]);
+  });
+
+  it('keeps the row waiting until every upload dropped on it has answered', async () => {
+    const first = settledUpload();
+    const uploads = [first.promise, new Promise<void>(() => {})];
+    const onDropFile = vi.fn<DropFile>(() => uploads.shift());
+    render(<Harness field={listOf(imageItem)} initial={[undefined]} env={{ onDropFile }} />);
+    dropOnRow(0, [png('a.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    dropOnRow(0, [png('b.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(2));
+    await act(async () => first.resolve());
+    dropOnZone([png('c.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(3));
+    expect(handed(onDropFile)).toEqual([
+      'receipts.0:a.png',
+      'receipts.0:b.png',
+      'receipts.1:c.png',
     ]);
   });
 });

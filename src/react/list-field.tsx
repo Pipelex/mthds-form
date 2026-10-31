@@ -75,9 +75,10 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const landedRow = useRef<number | null>(null);
   // Upload failures a removal left at the wrong position; see `rowEnv` below.
   const [staleErrors, setStaleErrors] = useState<ReadonlyMap<string, string>>(NO_ERRORS);
-  // The rows the drop area handed a file to whose upload has not answered yet.
-  // See `placeFiles`.
-  const [arriving, setArriving] = useState<ReadonlySet<string>>(NO_IDS);
+  // The uploads this list handed the host that have not answered yet, counted
+  // by row id: on a list of files, every file its drop area placed and every
+  // file dropped on one of its rows. See `rowEnv`.
+  const [arriving, setArriving] = useState<ReadonlyMap<string, number>>(NO_COUNTS);
 
   const setItem = (index: number, itemValue: unknown) => {
     const next = items.slice();
@@ -114,9 +115,9 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // it was, so an in-flight write-back is unaffected, and freezing it would make
   // filling a list of files needlessly serial.
   //
-  // The host says which files are arriving through `uploadingIds`, and the list
-  // adds the uploads its own drop area handed over, until each answers, so a
-  // host that reports no `uploadingIds` still has its batch's rows pinned.
+  // The host says which files are arriving through `uploadingIds`, and a list
+  // of files adds the uploads it handed over itself, until each answers, so a
+  // host that reports no `uploadingIds` still has those rows pinned.
   const busy = listIsBusy(id, env?.uploadingIds) || arriving.size > 0;
 
   // An upload failure is keyed by position like everything else here, and it
@@ -137,29 +138,54 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
       return next.size === prev.size ? prev : next;
     });
   }, [hostErrors]);
+  // A list of files keeps its own record of the uploads it hands the host, and
+  // every one of them passes through here: a file dropped on a row as much as
+  // one its drop area places, which calls the same `onDropFile`. Until an
+  // upload a host returns answers, its row is that upload's write-back target,
+  // kept from the area's next batch and from removal whether or not the host
+  // reports `uploadingIds`. Counted, because a row still waiting can take a
+  // second file dropped on it directly, and the first answer must not free it.
+  // A throw is not caught here: it is the row's dropzone that reports it.
+  const fileItem =
+    field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
+  const tracksUploads = fileItem !== null;
   const rowEnv = useMemo<FieldEnv | undefined>(() => {
-    if (!env || staleErrors.size === 0) return env;
+    if (!env || (staleErrors.size === 0 && !tracksUploads)) return env;
     const drop = env.onDropFile;
+    const uploadErrors =
+      staleErrors.size === 0
+        ? env.uploadErrors
+        : new Map(
+            [...(env.uploadErrors ?? [])].filter(
+              ([key, message]) => staleErrors.get(key) !== message,
+            ),
+          );
     return {
       ...env,
-      uploadErrors: new Map(
-        [...(env.uploadErrors ?? [])].filter(([key, message]) => staleErrors.get(key) !== message),
-      ),
-      // A new file at a position is a new attempt there, so what the host says
-      // about that position from now on is about the file that is there.
+      uploadErrors,
       onDropFile: drop
         ? (dropId, file) => {
+            // A new file at a position is a new attempt there, so what the host
+            // says about that position from now on is about the file that is there.
             setStaleErrors((prev) => {
               if (!prev.has(dropId)) return prev;
               const next = new Map(prev);
               next.delete(dropId);
               return next;
             });
-            return drop(dropId, file);
+            const upload = drop(dropId, file);
+            if (tracksUploads && isThenable(upload)) {
+              setArriving((prev) => counted(prev, dropId, 1));
+              // Both outcomes, so a rejection, which the host reports through
+              // `uploadErrors` on the row, is never left unhandled here.
+              const answered = () => setArriving((prev) => counted(prev, dropId, -1));
+              void Promise.resolve(upload).then(answered, answered);
+            }
+            return upload;
           }
         : undefined,
     };
-  }, [env, staleErrors]);
+  }, [env, staleErrors, tracksUploads]);
   // A `Concept[N]` slot is full at N. The bound is the method's, read off the
   // same `maxItems` ajv enforces, so offering one more row would offer one the
   // gate then refuses. It is deliberately NOT `itemCount`, which is the LOWER
@@ -175,8 +201,6 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // arriving, as the remove buttons are, because the row an upload will write
   // back to is still empty and would otherwise be filled under it.
   const fileSource = env?.fileSource;
-  const fileItem =
-    field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
   const room = roomForChosenFiles(items, field.maxItemCount);
 
   // A list of files also takes several files from the person's device at once,
@@ -186,7 +210,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // dropped on that row. A row is free when it holds no file, no file is still
   // arriving there (its write-back's target, which must not be filled under
   // it: the host says so through `uploadingIds`, and the list knows it of the
-  // uploads its own area handed over) and the rows show no failure there (the
+  // uploads it handed over itself, see `rowEnv`) and the rows show no failure there (the
   // only record that one of the person's files did not arrive). The area stays
   // open while files are arriving, as Add does, because appending moves no row
   // and the free-row test never targets one in flight. See docs/upload-seam.md,
@@ -239,24 +263,14 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     // Written before the first upload is asked for, so a host that records what
     // each upload was dropped over sees the rows it is dropped into.
     if (placement.appended > 0) onChange(placement.items);
-    const answering: string[] = [];
+    // `dropFile` is the rows' own `onDropFile`, so each upload handed over here
+    // is recorded as arriving exactly as one dropped on the row is.
     placement.targets.forEach((index, order) => {
       const file = files[order];
       if (!file) return;
       const rowId = `${id}.${index}`;
-      const upload = handOver(dropFile, rowId, file);
-      placed.current.set(rowId, { file, upload });
-      if (!isThenable(upload)) return;
-      // Until the upload answers, its row is the write-back's target, kept from
-      // the next batch and from removal whether or not the host reports
-      // `uploadingIds`. Handling both outcomes also handles a rejection, which
-      // the host reports through `uploadErrors`, on the row, rather than leaving
-      // it to surface as an unhandled one.
-      answering.push(rowId);
-      const answered = () => setArriving((prev) => withoutId(prev, rowId));
-      void Promise.resolve(upload).then(answered, answered);
+      placed.current.set(rowId, { file, upload: handOver(dropFile, rowId, file) });
     });
-    if (answering.length > 0) setArriving((prev) => new Set([...prev, ...answering]));
     const count = placement.targets.length;
     if (count > 0) setPlacements((generation) => generation + 1);
     if (count > 0 && count === dropRoom && dropRef.current?.contains(document.activeElement)) {
@@ -452,13 +466,18 @@ function listIsBusy(id: string, uploadingIds: ReadonlySet<string> | undefined): 
 }
 
 const NO_ERRORS: ReadonlyMap<string, string> = new Map();
-const NO_IDS: ReadonlySet<string> = new Set();
+const NO_COUNTS: ReadonlyMap<string, number> = new Map();
 
-/** `ids` without `id`, the same set when it was not there. */
-function withoutId(ids: ReadonlySet<string>, id: string): ReadonlySet<string> {
-  if (!ids.has(id)) return ids;
-  const next = new Set(ids);
-  next.delete(id);
+/** `counts` with `id`'s count moved by `by`, an id counted down to nothing dropped. */
+function counted(
+  counts: ReadonlyMap<string, number>,
+  id: string,
+  by: 1 | -1,
+): ReadonlyMap<string, number> {
+  const count = (counts.get(id) ?? 0) + by;
+  const next = new Map(counts);
+  if (count > 0) next.set(id, count);
+  else next.delete(id);
   return next;
 }
 
@@ -466,14 +485,32 @@ function withoutId(ids: ReadonlySet<string>, id: string): ReadonlySet<string> {
  * Hands a file the drop area placed to the host's `onDropFile`, and reads a
  * throw as an upload that failed, as `useMethodForm` reads one from its
  * `uploadFile`: the rest of the batch is still handed over, and the row is not
- * left waiting on a file that never left.
+ * left waiting on a file that never left. The error is still reported, as a
+ * throw for a file dropped on a row is by the dropzone that called the host,
+ * so a host's bug does not vanish into a batch that otherwise went through.
  */
 function handOver(drop: NonNullable<FieldEnv['onDropFile']>, rowId: string, file: File): unknown {
   try {
     return drop(rowId, file);
   } catch (error) {
-    return Promise.reject(error);
+    reportHostError(error);
+    // Marked handled now, as the error has just been reported: the row reads
+    // the rejection once it takes its file, which is a render later.
+    const failed = Promise.reject(error);
+    failed.catch(() => {});
+    return failed;
   }
+}
+
+/**
+ * Reports a host's error to the page's error handlers, where a browser reports
+ * an uncaught one and a host's error tracking listens, or to the console on a
+ * platform without `reportError`, which is where react-dropzone reports one.
+ */
+function reportHostError(error: unknown): void {
+  if (typeof globalThis.reportError === 'function') globalThis.reportError(error);
+  // eslint-disable-next-line no-console -- the platform has no `reportError`.
+  else console.error(error);
 }
 
 /**
