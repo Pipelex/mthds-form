@@ -75,10 +75,19 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const landedRow = useRef<number | null>(null);
   // Upload failures a removal left at the wrong position; see `rowEnv` below.
   const [staleErrors, setStaleErrors] = useState<ReadonlyMap<string, string>>(NO_ERRORS);
-  // The uploads this list handed the host that have not answered yet, counted
-  // by row id: on a list of files, every file its drop area placed and every
-  // file dropped on one of its rows. See `rowEnv`.
-  const [arriving, setArriving] = useState<ReadonlyMap<string, number>>(NO_COUNTS);
+  // The uploads this list handed the host that have not answered yet, one entry
+  // each: on a list of files, every file its drop area placed and every file
+  // dropped on one of its rows. See `rowEnv`.
+  const [pending, setPending] = useState<ReadonlyMap<number, PendingUpload>>(NO_UPLOADS);
+  const nextUpload = useRef(0);
+  // The rows those uploads belong to now. An entry keeps the id it was handed
+  // and the newest move the host had logged then, and the moves logged since
+  // carry it to its row's id now, as they carry the rows' identities: a host
+  // that moves a row during an upload moves the row's write-back with it, so
+  // the list follows the upload to the row's new position, and lets go of one
+  // whose row the host removed, whose write-back the host has cancelled.
+  const rowMoves = env?.rowMoves;
+  const arriving = useMemo(() => arrivingRows(pending, rowMoves), [pending, rowMoves]);
 
   const setItem = (index: number, itemValue: unknown) => {
     const next = items.slice();
@@ -116,8 +125,9 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // filling a list of files needlessly serial.
   //
   // The host says which files are arriving through `uploadingIds`, and a list
-  // of files adds the uploads it handed over itself, until each answers, so a
-  // host that reports no `uploadingIds` still has those rows pinned.
+  // of files adds the uploads it handed over itself, until each answers or the
+  // host removes its row, so a host that reports no `uploadingIds` still has
+  // those rows pinned.
   const busy = listIsBusy(id, env?.uploadingIds) || arriving.size > 0;
 
   // An upload failure is keyed by position like everything else here, and it
@@ -143,9 +153,9 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // one its drop area places, which calls the same `onDropFile`. Until an
   // upload a host returns answers, its row is that upload's write-back target,
   // kept from the area's next batch and from removal whether or not the host
-  // reports `uploadingIds`. Counted, because a row still waiting can take a
-  // second file dropped on it directly, and the first answer must not free it.
-  // A throw is not caught here: it is the row's dropzone that reports it.
+  // reports `uploadingIds`. One entry per upload, because a row still waiting
+  // can take a second file dropped on it directly, and the first answer must
+  // not free it. A throw is not caught here: the row's dropzone reports it.
   const fileItem =
     field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
   const tracksUploads = fileItem !== null;
@@ -175,10 +185,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             });
             const upload = drop(dropId, file);
             if (tracksUploads && isThenable(upload)) {
-              setArriving((prev) => counted(prev, dropId, 1));
+              const token = nextUpload.current++;
+              const seq = env.rowMoves?.[env.rowMoves.length - 1]?.seq ?? 0;
+              setPending((prev) => new Map(prev).set(token, { id: dropId, seq }));
               // Both outcomes, so a rejection, which the host reports through
               // `uploadErrors` on the row, is never left unhandled here.
-              const answered = () => setArriving((prev) => counted(prev, dropId, -1));
+              const answered = () => setPending((prev) => withoutUpload(prev, token));
               void Promise.resolve(upload).then(answered, answered);
             }
             return upload;
@@ -466,19 +478,47 @@ function listIsBusy(id: string, uploadingIds: ReadonlySet<string> | undefined): 
 }
 
 const NO_ERRORS: ReadonlyMap<string, string> = new Map();
-const NO_COUNTS: ReadonlyMap<string, number> = new Map();
+const NO_IDS: ReadonlySet<string> = new Set();
 
-/** `counts` with `id`'s count moved by `by`, an id counted down to nothing dropped. */
-function counted(
-  counts: ReadonlyMap<string, number>,
-  id: string,
-  by: 1 | -1,
-): ReadonlyMap<string, number> {
-  const count = (counts.get(id) ?? 0) + by;
-  const next = new Map(counts);
-  if (count > 0) next.set(id, count);
-  else next.delete(id);
+/** An upload a list handed the host: the id it was handed, and the newest logged move then. */
+interface PendingUpload {
+  id: string;
+  seq: number;
+}
+const NO_UPLOADS: ReadonlyMap<number, PendingUpload> = new Map();
+
+/** `uploads` without the one under `token`, the same map when it was not there. */
+function withoutUpload(
+  uploads: ReadonlyMap<number, PendingUpload>,
+  token: number,
+): ReadonlyMap<number, PendingUpload> {
+  if (!uploads.has(token)) return uploads;
+  const next = new Map(uploads);
+  next.delete(token);
   return next;
+}
+
+/**
+ * The ids of the rows the pending uploads belong to now: the id each was
+ * handed, carried through every move logged after it by `movedId`, which works
+ * on the whole path, so a move of an outer list's rows renames it too. An
+ * upload whose row a move removed belongs to no row.
+ */
+function arrivingRows(
+  uploads: ReadonlyMap<number, PendingUpload>,
+  moves: readonly RowMove[] | undefined,
+): ReadonlySet<string> {
+  if (uploads.size === 0) return NO_IDS;
+  const rows = new Set<string>();
+  for (const upload of uploads.values()) {
+    let at: string | undefined = upload.id;
+    for (const move of moves ?? []) {
+      if (at === undefined) break;
+      if (move.seq > upload.seq) at = movedId(at, move.listId, destinationOf(move.order));
+    }
+    if (at !== undefined) rows.add(at);
+  }
+  return rows;
 }
 
 /**
