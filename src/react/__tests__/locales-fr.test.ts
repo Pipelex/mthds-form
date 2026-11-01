@@ -55,6 +55,10 @@ describe('FR_FIELD_STRINGS', () => {
       s.replaceEnteredDescription('Bureau de Paris'),
       s.exampleActions('Bureau de Paris'),
       s.deleteExampleTitle('Bureau de Paris'),
+      s.yesProbability(0.96),
+      s.verdictConfidence(0.5),
+      s.ratingLevel(2),
+      s.pageNumber(3),
     ];
     for (const answer of answers) expect(answer.trim()).not.toBe('');
   });
@@ -87,6 +91,16 @@ describe('FR_FIELD_STRINGS', () => {
     expect(s.downloadIncomplete(['a.pdf', 'b.png'])).toBe(
       '2 fichiers n’ont pas pu être enregistrés : a.pdf, b.png',
     );
+  });
+});
+
+describe('FR_FIELD_STRINGS for a verdict and a page', () => {
+  it('writes a measure as a French percentage, after a spaced colon', () => {
+    const s = FR_FIELD_STRINGS;
+    expect(normalize(s.yesProbability(0.96))).toBe('Probabilité du oui : 96 %');
+    expect(normalize(s.verdictConfidence(1))).toBe('Confiance : 100 %');
+    expect(s.ratingLevel(2)).toBe('Niveau 2');
+    expect(s.pageNumber(3)).toBe('Page 3');
   });
 });
 

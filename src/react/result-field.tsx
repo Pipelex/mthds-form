@@ -9,12 +9,18 @@ import {
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
+  isNativePageNode,
   isNativeValueNode,
+  nativeVerdictOf,
+  readChoiceContent,
   readCompositeContent,
   readDateContent,
   readDocumentContent,
   readHtmlContent,
   readImageContent,
+  readPageContent,
+  readRatingContent,
+  readYesNoContent,
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
@@ -53,11 +59,13 @@ import { HtmlPreview } from './html-preview';
 import { PdfDownloadButton } from './pdf-download-button';
 import { useFileNamePrompt } from './file-name-dialog';
 import { Markdown } from './markdown';
+import { ExtractedPageText } from './extracted-page-text';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import {
   enumLabeler,
   fieldLabel,
+  humanizeEnumValue,
   humanizeFieldName,
   useFieldPresentation,
   type FieldPresentation,
@@ -99,6 +107,11 @@ import { cn } from './utils';
  * print a page's source at a reader. Asking `refines`/`concept_ref` whether a
  * node is `native.Html` is a membership test on stated facts, which the
  * standard's own page names as the supported way to ask it.
+ *
+ * The same membership test keys the other concepts the kind vocabulary cannot
+ * name: `native.Date`, `native.Composite`, `native.Page`, and in `app` the three
+ * verdicts a judge returns (`native.YesNo`, `native.Rating`, `native.Choice`).
+ * See `docs/result-view.md` for each.
  */
 
 /**
@@ -938,16 +951,25 @@ function ImageValue({
   inGallery = false,
   inRow = false,
   compact = false,
+  downloadable = true,
 }: {
   value: unknown;
   inGallery?: boolean;
   inRow?: boolean;
   /** Rendering into a table cell: a thumbnail, not a picture. */
   compact?: boolean;
+  /**
+   * Whether the picture offers its own Download. A composite's member does
+   * not: the whole-result download carries no file from inside a composite,
+   * and a member has no place of its own in the result to name the file by.
+   * Its URL can still be copied.
+   */
+  downloadable?: boolean;
 }) {
   const s = useFieldStrings();
   const resolve = useResolveUrl();
-  const file = useStuffFile('image', value);
+  const stuffFile = useStuffFile('image', value);
+  const file = downloadable ? stuffFile : undefined;
   const content = readImageContent(value);
   if (!content) return <Absent />;
   const src = paintableUrl(content, resolve);
@@ -1162,11 +1184,20 @@ function LeafValue({
  *
  * Two concepts are not records to a reader. A `native.Date` is a date, read by
  * the arm that reads one. `native.Html`'s first text field is its markup source,
- * which is exactly what a result view must not print, so it takes the count.
+ * which is exactly what a result view must not print, so it takes the count. In
+ * `app`, a verdict (`native.YesNo`, `native.Rating`, `native.Choice`) is named
+ * by its answer, as the verdict arm shows it.
  */
 function RecordSummary({ field, value }: { field: ObjectRunField; value: unknown }) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
   if (isNativeDateNode(field)) return <DateValue value={value} />;
+  // A verdict in `app` is named by its answer, as the verdict arm draws it.
+  const verdict = presentation === 'app' ? nativeVerdictOf(field) : undefined;
+  const reading = verdict ? readVerdict(verdict, value, s) : undefined;
+  if (reading) {
+    return <span className="whitespace-nowrap text-[13px] text-foreground">{reading.answer}</span>;
+  }
   if (!isRecord(value) || Object.keys(value).length === 0) return <Absent />;
   const naming = isNativeHtmlNode(field)
     ? undefined
@@ -1977,19 +2008,37 @@ function ObjectTable({
  * summaries instead of forty lines of escaped JSON.
  *
  * The order matters and is by narrowness: `inner_html` and `date` name
- * themselves, `url` is a file, `items` is a list envelope, and `text` is last
- * of the recognised set because several models carry a `text` member beside
- * their own (a `Page`, for one).
+ * themselves, a `url` with an image media type or a pixel size is a picture,
+ * any other `url` is a file, `items` or a bare array is a list, and `text` is
+ * last of the recognised set because several models carry a `text` member
+ * beside their own (a `Page`, for one). A list whose entries are all records
+ * none of those claim is a list of structures, and is drawn as a table.
  */
 function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
+  // A member's name is the identifier the method composed it under. A builder
+  // reads it as written, in mono, as every other identifier in `studio`; a
+  // method app's reader has never seen the bundle, and reads it in words, as a
+  // field's label reads in `app`.
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
   return (
     <div className="space-y-3">
-      {members.map((member) => (
-        <div key={member.name} className="space-y-1">
-          <span className="font-mono text-[12px] font-semibold text-foreground">{member.name}</span>
-          <NativeValue value={member.value} />
-        </div>
-      ))}
+      {members.map((member) => {
+        const label = isApp ? humanizeFieldName(member.name) : member.name;
+        return (
+          <div key={member.name} className="space-y-1">
+            <span
+              className={cn(
+                'font-semibold text-foreground',
+                isApp ? 'text-[13.5px]' : 'font-mono text-[12px]',
+              )}
+            >
+              {label}
+            </span>
+            <NativeValue value={member.value} label={label} />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1998,9 +2047,10 @@ function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
  * One content of unknown model, rendered as the most specific thing it matches.
  *
  * Only reachable from `CompositeValue` — see that component for why reading a
- * value is allowed there and nowhere else in this file.
+ * value is allowed there and nowhere else in this file. `label` is the name the
+ * member is shown under, which a table drawn here is named by.
  */
-function NativeValue({ value }: { value: unknown }) {
+function NativeValue({ value, label }: { value: unknown; label: string }) {
   if (value === null || value === undefined || value === '') return <Absent />;
 
   const html = readHtmlContent(value);
@@ -2009,6 +2059,12 @@ function NativeValue({ value }: { value: unknown }) {
 
   const date = readDateContent(value);
   if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
+
+  // A picture, before a document, because both carry a `url`: an `ImageContent`
+  // is the one of the two that states an image media type, or the pixel size a
+  // document never has. It is drawn, as an image result is, rather than named
+  // as a link to a file.
+  if (isPicture(value)) return <ImageValue value={value} downloadable={false} />;
 
   const document = readDocumentContent(value);
   if (document?.url !== undefined) {
@@ -2021,16 +2077,21 @@ function NativeValue({ value }: { value: unknown }) {
     );
   }
 
-  // A `ListContent` envelope: the members of a composite are contents, and a
-  // plural one arrives wrapped exactly as a plural result does.
-  if (isRecord(value) && Array.isArray((value as Record<string, unknown>).items)) {
-    const items = (value as { items: unknown[] }).items;
+  // A plural member: in the `ListContent` envelope when the runner hydrated
+  // it, a bare array when it rendered the member raw, as a plural result
+  // arrives either way.
+  const items = isRecord(value) && Array.isArray(value.items) ? value.items : value;
+  if (Array.isArray(items)) {
     if (items.length === 0) return <Absent />;
+    // Records that are none of the contents above are structures, and a list
+    // of structures reads as a table, as it does wherever a descriptor states
+    // one.
+    if (items.every(isPlainRecord)) return <RecordsTable items={items} label={label} />;
     return (
       <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
         {items.map((item, index) => (
           <div key={index} className="bg-card/40 px-3 py-1.5">
-            <NativeValue value={item} />
+            <NativeValue value={item} label={label} />
           </div>
         ))}
       </div>
@@ -2039,7 +2100,7 @@ function NativeValue({ value }: { value: unknown }) {
 
   // `text` last of the recognised models: several carry one beside their own.
   if (isRecord(value)) {
-    const text = (value as Record<string, unknown>).text;
+    const text = value.text;
     if (typeof text === 'string') {
       return text === '' ? <Absent /> : <Markdown text={text} />;
     }
@@ -2048,6 +2109,102 @@ function NativeValue({ value }: { value: unknown }) {
   if (typeof value === 'string') return <Markdown text={value} />;
   if (typeof value !== 'object') return <Scalar value={value} />;
   return <RawValue value={value} compact={false} />;
+}
+
+/** An `ImageContent`: a `url`, with an image media type or the pixel size only an image has. */
+function isPicture(value: unknown): boolean {
+  const content = readImageContent(value);
+  if (!content) return false;
+  if (content.mimeType?.toLowerCase().startsWith('image/')) return true;
+  return content.width !== undefined && content.height !== undefined;
+}
+
+/**
+ * A record no content model above claims: a structure the composite holds,
+ * whose members are values rather than a page, a date, a file, a list or a
+ * text. Asked of every entry of a list before it is drawn as a table.
+ */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value) || Object.keys(value).length === 0) return false;
+  if (readHtmlContent(value) || readDateContent(value)) return false;
+  if (readDocumentContent(value)?.url !== undefined) return false;
+  if (Array.isArray(value.items) || typeof value.text === 'string') return false;
+  return true;
+}
+
+/**
+ * A composite member that is a list of structures, as a table.
+ *
+ * No descriptor states the structure's fields, so the columns are its members
+ * in the order the entries first state them, every entry contributing the ones
+ * it adds. A column is headed by its member's name, in words in `app` and as
+ * written in `studio`, like a composite member's own name. A value the entry
+ * leaves out is an absence, and a nested value is read the way any member is.
+ *
+ * The box scrolls sideways rather than widening the panel, like every table in
+ * the result view, so it is a named, focusable group.
+ */
+function RecordsTable({
+  items,
+  label,
+}: {
+  items: readonly Record<string, unknown>[];
+  label: string;
+}) {
+  const s = useFieldStrings();
+  const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
+  const columns: string[] = [];
+  for (const item of items) {
+    for (const key of Object.keys(item)) if (!columns.includes(key)) columns.push(key);
+  }
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      tabIndex={0}
+      className={cn('overflow-x-auto rounded-lg border border-border', focusOutlineClass)}
+    >
+      <table className="min-w-full border-collapse text-[12.5px] text-foreground">
+        <thead>
+          <tr className="border-b border-border bg-card/40">
+            {columns.map((column) => (
+              <th
+                key={column}
+                scope="col"
+                className={cn(
+                  'px-2.5 py-1.5 text-start align-bottom font-semibold',
+                  !isApp && 'font-mono text-[12px]',
+                )}
+              >
+                {isApp ? humanizeFieldName(column) : column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr key={index} className="border-b border-border/60 last:border-b-0">
+              {columns.map((column) => {
+                const cell = ownProp(item, column);
+                return (
+                  <td key={column} className="px-2.5 py-1.5 align-top">
+                    {typeof cell === 'boolean' ? (
+                      <span className="text-[13px] text-foreground">{cell ? s.yes : s.no}</span>
+                    ) : typeof cell === 'object' && cell !== null ? (
+                      <NativeValue value={cell} label={humanizeFieldName(column)} />
+                    ) : (
+                      <Scalar value={cell} />
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /** A plain object, for the one arm that has to ask. */
@@ -2234,6 +2391,145 @@ function chooseColumns(fields: readonly RunField[], budget: number): ChosenColum
   };
 }
 
+/**
+ * One page of an extracted document, as the document it is.
+ *
+ * `native.Page` is `{text_and_images: {text, images, raw_html}, page_view}`,
+ * an `object` node, and the structural renderer drew it as a record: in a
+ * list, a table whose name column was `raw_html`, which an extractor leaves
+ * empty. The reader came for the page's TEXT, so that is what is drawn,
+ * typeset, with the extractor's comments dropped and its tables drawn as
+ * tables (`ExtractedPageText`), then the pictures taken out of the page.
+ *
+ * The page view, a picture of the whole page, is the page a second time. A
+ * builder checking an extraction compares the two, so `studio` always shows
+ * it, under its own label; a method app's reader is shown it only when the
+ * extractor found nothing else on the page, where it is the page's one
+ * content.
+ */
+function PageValue({ field, value, depth }: { field: RunField; value: unknown; depth: number }) {
+  const presentation = useFieldPresentation();
+  const content = readPageContent(value);
+  if (!content) return <Absent />;
+  const extracted = content.text !== undefined || content.images.length > 0;
+  const showView = content.pageView !== undefined && (presentation === 'studio' || !extracted);
+  if (!extracted && !showView) return <Absent />;
+  // The descriptor's own node for the page view, so `studio` labels it as the
+  // method names it and the picture is drawn by the arm that draws an image.
+  const viewField =
+    field.kind === 'object'
+      ? field.fields.find((member) => member.name === 'page_view')
+      : undefined;
+  return (
+    <div className="space-y-3">
+      {content.text !== undefined && <ExtractedPageText text={content.text} />}
+      {content.images.length > 0 && (
+        <ResultAt segment="text_and_images">
+          <ResultAt segment="images">
+            <ImageGallery items={content.images} />
+          </ResultAt>
+        </ResultAt>
+      )}
+      {showView && (
+        <ResultAt segment="page_view">
+          {presentation === 'studio' && viewField ? (
+            <ResultField field={viewField} value={content.pageView} depth={depth + 1} />
+          ) : (
+            <ImageValue value={content.pageView} />
+          )}
+        </ResultAt>
+      )}
+    </div>
+  );
+}
+
+/** A verdict as a reader takes it in: the answer, and how sure its producer was. */
+interface VerdictReading {
+  answer: string;
+  measure?: string;
+}
+
+/**
+ * A verdict's value, read into the words it is shown in. `undefined` when the
+ * value is not the model its concept states, which leaves the node to the
+ * structural arms, as any value that disagrees with its descriptor is.
+ */
+function readVerdict(
+  verdict: 'yes_no' | 'rating' | 'choice',
+  value: unknown,
+  s: FieldStrings,
+): VerdictReading | undefined {
+  if (verdict === 'yes_no') {
+    const content = readYesNoContent(value);
+    if (!content) return undefined;
+    return {
+      answer: content.yesNo ? s.yes : s.no,
+      ...(content.probability !== undefined
+        ? { measure: s.yesProbability(content.probability) }
+        : {}),
+    };
+  }
+  if (verdict === 'rating') {
+    const content = readRatingContent(value);
+    if (!content) return undefined;
+    return {
+      // A scale that names its levels says which one in words; one that does
+      // not is counted from one, as a reader counts.
+      answer: content.label ?? s.ratingLevel(content.level + 1),
+      ...(content.confidence !== undefined
+        ? { measure: s.verdictConfidence(content.confidence) }
+        : {}),
+    };
+  }
+  const content = readChoiceContent(value);
+  if (!content) return undefined;
+  return {
+    answer: humanizeEnumValue(content.choice),
+    ...(content.confidence !== undefined
+      ? { measure: s.verdictConfidence(content.confidence) }
+      : {}),
+  };
+}
+
+/**
+ * A verdict, drawn as one: the answer large, and the producer's measure under
+ * it. `prominent` is the result itself, where the answer is the whole of what
+ * the reader came for; a verdict inside a structure is one value among others,
+ * and reads at the size of a value.
+ */
+function VerdictValue({ reading, prominent }: { reading: VerdictReading; prominent: boolean }) {
+  return (
+    <div className="space-y-0.5">
+      <p
+        className={cn(
+          'font-semibold text-foreground',
+          prominent ? 'text-[22px] leading-tight' : 'text-[15px] leading-snug',
+        )}
+      >
+        {reading.answer}
+      </p>
+      {reading.measure !== undefined && (
+        <p className="text-[12.5px] text-muted-foreground">{reading.measure}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Whether a `text` value is LONG: it holds a line break, or runs past what one
+ * line of a table cell holds (`CELL_LENGTH_LIMIT`).
+ *
+ * `text` is the standard's kind for a value with no promise about its length,
+ * and a method fills it with a name in one run and a memo in the next. A short
+ * one is a value, and sits beside its label; a long one is something written,
+ * so in `app` it takes the full width under its label and is typeset as the
+ * Markdown a model writes. Read off the value because nothing else can say:
+ * the descriptor states the kind, and the kind is the same either way.
+ */
+function isLongText(value: unknown): value is string {
+  return typeof value === 'string' && (value.includes('\n') || value.length > CELL_LENGTH_LIMIT);
+}
+
 export interface ResultFieldProps {
   field: RunField;
   value: unknown;
@@ -2271,6 +2567,7 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
   const pageDownloadShown = useFileDownloadShown('markup');
   const pdfShown = usePdfSaveShown();
   const location = useResultLocation();
+  const isApp = useFieldPresentation() === 'app';
 
   // The description rides the label's `title`, at every depth including this
   // one.
@@ -2365,12 +2662,48 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
     );
   }
 
+  // A page of an extracted document, before the kind switch: its node is an
+  // `object` over `{text_and_images, page_view}`, and drawn as a record the
+  // page's text sat two levels down, under a column named by `raw_html`.
+  if (isNativePageNode(field)) {
+    return (
+      <div className="space-y-2">
+        {header}
+        <PageValue field={field} value={unwrapped} depth={depth} />
+      </div>
+    );
+  }
+
+  // A verdict, in `app`: a judge's yes or no, rating or choice, which the
+  // structural arms draw as a record of its measures ("Yes no: Yes /
+  // Probability: 1"). Keyed by the concept the descriptor states, never by the
+  // keys the value holds; a value that is not the concept's model falls
+  // through to those arms, as any value that disagrees with its descriptor
+  // does. `studio` keeps the record, which is what a builder checks a judge
+  // against.
+  const verdict = isApp ? nativeVerdictOf(field) : undefined;
+  const reading = verdict ? readVerdict(verdict, unwrapped, s) : undefined;
+  if (reading) {
+    return (
+      <div className="space-y-1">
+        {header}
+        <VerdictValue reading={reading} prominent={depth === 0} />
+      </div>
+    );
+  }
+
   switch (field.kind) {
     case 'object': {
       const memberValue = (child: RunField) =>
         typeof unwrapped === 'object' && unwrapped !== null
           ? ownProp(unwrapped as Record<string, unknown>, child.name)
           : undefined;
+      // A long `text` value leaves the label's line in `app`, for the full
+      // width under it, where it is typeset (see `isLongText`). `studio` keeps
+      // every value beside its label, where a builder compares them.
+      const sharesALine = (child: RunField) =>
+        isInlineColumn(child) &&
+        !(isApp && child.kind === 'text' && isLongText(unwrap(child, memberValue(child))));
       return (
         <div className="space-y-2">
           {header}
@@ -2409,7 +2742,7 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
               // so does anything with chrome of its own - a table, a gallery, a
               // frame - which beside a label would be squeezed into whatever the
               // longest label left over.
-              isInlineColumn(child) ? (
+              sharesALine(child) ? (
                 <Fragment key={child.name}>
                   <div className="min-w-0">
                     <Label field={child} describe />
@@ -2472,12 +2805,17 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
               on the list beneath it. The COUNT is not part of the label though,
               so it survives on its own; it is a fact about this value rather
               than a name for it, and the panel's header does not carry it. */}
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            {header}
-            <span className="font-mono text-[10.5px] text-muted-foreground">
-              {s.itemsCount(items.length)}
-            </span>
-          </div>
+          {/* In `app`, the result itself carries no count: the host that
+              mounts it heads the result with its own ("7 results"), and a
+              second count under that heading says the same thing again. */}
+          {isApp && hideLabel && depth === 0 ? null : (
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              {header}
+              <span className="font-mono text-[10.5px] text-muted-foreground">
+                {s.itemsCount(items.length)}
+              </span>
+            </div>
+          )}
           {items.length === 0 ? (
             <p className="text-[13px] italic text-muted-foreground">{s.noItemsYet}</p>
           ) : isNativeValueNode(field.item) ? (
@@ -2487,6 +2825,40 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
             // date's `date` and `time`, print a page's markup source down a
             // column named by it, and show a composite as JSON. The arm keyed by
             // concept is the one that knows what each entry is.
+            <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+              {items.map((item, index) => (
+                <div key={index} className="bg-card/40 px-3 py-1.5">
+                  <ResultAt segment={String(index)}>
+                    <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                  </ResultAt>
+                </div>
+              ))}
+            </div>
+          ) : isNativePageNode(field.item) ? (
+            // A document's pages, one after the other, each drawn by the page
+            // arm and captioned with its number: a page is a document's unit,
+            // and a table of pages had a row per page and the text nowhere.
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                // An article, not a section: a named section is a landmark,
+                // and a landmark's name must be unique on the page, which
+                // "Page 1" is not once a host shows two results.
+                <article
+                  key={index}
+                  aria-label={s.pageNumber(index + 1)}
+                  className="space-y-2 rounded-lg border border-border bg-card/40 px-3.5 py-3"
+                >
+                  <span className="text-[12px] font-medium text-muted-foreground">
+                    {s.pageNumber(index + 1)}
+                  </span>
+                  <ResultAt segment={String(index)}>
+                    <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                  </ResultAt>
+                </article>
+              ))}
+            </div>
+          ) : isApp && nativeVerdictOf(field.item) ? (
+            // Verdicts in `app`, one per line, each drawn by the verdict arm.
             <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
               {items.map((item, index) => (
                 <div key={index} className="bg-card/40 px-3 py-1.5">
@@ -2576,8 +2948,14 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
             </div>
           )}
           {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
-              a table cell and this stacked row cannot disagree about it. */}
-          <LeafValue field={field} value={value} />
+              a table cell and this stacked row cannot disagree about it. A long
+              `text` value in `app` is the exception, typeset as the prose it
+              is (see `isLongText`); a chip and a cell keep it plain. */}
+          {isApp && field.kind === 'text' && isLongText(unwrapped) ? (
+            <Markdown text={unwrapped} />
+          ) : (
+            <LeafValue field={field} value={value} />
+          )}
         </div>
       );
   }

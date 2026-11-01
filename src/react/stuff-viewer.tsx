@@ -91,8 +91,11 @@ export interface StuffViewerProps {
    *
    * So the name comes from the caller, because only the caller knows it: the
    * graph knows which node was opened, a run page knows which variable it is
-   * showing. Absent, the descriptor's own name stands, which keeps a host that
-   * has nothing better to say honest rather than blank.
+   * showing. Absent, the descriptor's own name stands in `studio`, which keeps
+   * a host that has nothing better to say honest rather than blank. In `app`
+   * the panel draws a title only when this is given: "Output" tells a method
+   * app's reader nothing, and a host that heads the result itself wants no
+   * second heading under its own.
    *
    * It also supplies `downloadBaseName`'s default, so the file a reader saves
    * is named after the thing they were reading rather than `output.json`.
@@ -428,6 +431,18 @@ function StuffPanel({
   // the two files a reader saves of one page share a name.
   const pdfName = page && pdfShown ? pdfFileName(field, value, baseName) : undefined;
   const pageView = page !== undefined && view !== 'json';
+  // The panel's title. In `studio` it is always drawn: the stuff's name, or the
+  // descriptor's own. In `app` it is drawn only when the host named the stuff,
+  // because the descriptor's root is called `output` for every pipe there is,
+  // and "Output" over a result is a word that tells its reader nothing; a host
+  // that heads the result itself passes no name and gets no second heading. A
+  // one-page result in an app carries its own title on the page, so the panel
+  // adds none.
+  const titled = presentation !== 'app' || (name !== undefined && name !== '' && !page);
+  const switchShown = offered.length > 1;
+  // The row is left out when nothing is in it, so an app's result starts at
+  // its first line rather than under an empty band.
+  const headerShown = titled || downloadShown || switchShown || (page && pdfName !== undefined);
 
   return (
     <div
@@ -445,72 +460,72 @@ function StuffPanel({
       {/* The header is drawn once, here, and `ResultField` is told to skip its
           own - two headers that agree today drift tomorrow. It stays put across
           both views, so switching does not move the thing you are reading. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        {/* A one-page result in an app carries its own title on the page, so
-            the panel adds none: its row is the page's controls alone. */}
-        {page && presentation === 'app' ? (
-          <div />
-        ) : (
-          <div className="min-w-0 space-y-1">
-            <ResultHeader field={named} />
-          </div>
-        )}
-        <div className="flex shrink-0 items-center gap-2">
-          {page && pdfName !== undefined && (
-            <PdfDownloadButton
-              content={page}
-              path={field.name}
-              primary
-              {...(pdfName ? { fileName: pdfName } : {})}
-            />
-          )}
-          {downloadShown && (
-            <button
-              type="button"
-              onClick={() => void handleDownload()}
-              disabled={savingShown}
-              aria-label={page ? s.downloadHtml : s.download}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-60',
-                focusOutlineClass,
-              )}
-            >
-              {savingShown ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
-            </button>
-          )}
-          {dialog}
-          {offered.length > 1 && (
-            <div
-              role="group"
-              aria-label={s.resultViewGroup}
-              className="flex rounded-md border border-border p-0.5"
-            >
-              {offered.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setView(id)}
-                  aria-pressed={view === id}
-                  className={cn(
-                    'rounded px-2 py-0.5 text-[12px]',
-                    focusOutlineClass,
-                    view === id
-                      ? 'bg-card font-medium text-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {labels[id]}
-                </button>
-              ))}
+      {dialog}
+      {headerShown && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          {titled ? (
+            <div className="min-w-0 space-y-1">
+              <ResultHeader field={named} />
             </div>
+          ) : (
+            <div />
           )}
+          <div className="flex shrink-0 items-center gap-2">
+            {page && pdfName !== undefined && (
+              <PdfDownloadButton
+                content={page}
+                path={field.name}
+                primary
+                {...(pdfName ? { fileName: pdfName } : {})}
+              />
+            )}
+            {downloadShown && (
+              <button
+                type="button"
+                onClick={() => void handleDownload()}
+                disabled={savingShown}
+                aria-label={page ? s.downloadHtml : s.download}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-60',
+                  focusOutlineClass,
+                )}
+              >
+                {savingShown ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
+              </button>
+            )}
+            {switchShown && (
+              <div
+                role="group"
+                aria-label={s.resultViewGroup}
+                className="flex rounded-md border border-border p-0.5"
+              >
+                {offered.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setView(id)}
+                    aria-pressed={view === id}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-[12px]',
+                      focusOutlineClass,
+                      view === id
+                        ? 'bg-card font-medium text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {labels[id]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Said, not swallowed: a reader expecting three attachments and getting
           two could not tell before. The JSON copy still carries each missing

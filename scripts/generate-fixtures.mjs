@@ -146,7 +146,7 @@ const PIPELEX_PYTHON =
   process.env.PIPELEX_PYTHON ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'python');
 
 /** The carrier types whose declaration carries a `prompt`. See `synthesizeCarrier`. */
-const PROMPTED_PIPE_TYPES = new Set(['PipeLLM', 'PipeImgGen']);
+const PROMPTED_PIPE_TYPES = new Set(['PipeLLM', 'PipeImgGen', 'PipeJudge']);
 
 const MULTIPLICITIES = new Set(['single', 'variable', 'fixed']);
 const PRESENCES = new Set(['plain', 'optional', 'force']);
@@ -383,13 +383,42 @@ function slotTypeExpression(slot) {
  * satisfy the reference rules, and the output is `Text` for every case because
  * no story reads it. See the three rules in this file's header.
  */
-/** A JSON scalar as TOML. Deliberately narrow: an option is a flag or a number. */
-function tomlScalar(value) {
+/**
+ * A JSON value as TOML, inline: a scalar, an array, or an inline table.
+ *
+ * Most options are a flag or a number, but some operators declare their setup
+ * as tables: a judge's `criteria` and `options` are maps, its `levels` a list
+ * of tables, and a parallel's `branches` a list of tables naming the pipes it
+ * runs. They are written inline because an option is one line of the carrier;
+ * a key that is not a bare TOML key is quoted.
+ */
+function tomlValue(value) {
   if (typeof value === 'boolean' || typeof value === 'number') return String(value);
   if (typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(tomlValue).join(', ')}]`;
+  if (value !== null && typeof value === 'object') {
+    const members = Object.entries(value).map(
+      ([key, member]) =>
+        `${/^[A-Za-z0-9_-]+$/.test(key) ? key : JSON.stringify(key)} = ${tomlValue(member)}`,
+    );
+    return `{ ${members.join(', ')} }`;
+  }
   die(
-    `unsupported option value ${JSON.stringify(value)}: options are booleans, numbers or strings.`,
+    `unsupported option value ${JSON.stringify(value)}: options are booleans, numbers, ` +
+      `strings, arrays or tables of them.`,
   );
+}
+
+/**
+ * The pipes a carrier runs as its branches - a `PipeParallel`'s `branches`,
+ * read off its options. A controller is how a case reaches a result no single
+ * operator produces, a `native.Composite` of several parts above all, and the
+ * branches it names are carriers of the same case.
+ */
+function branchCodes(pipe) {
+  const branches = pipe.options?.branches;
+  if (!Array.isArray(branches)) return [];
+  return branches.map((branch) => branch?.pipe).filter((code) => typeof code === 'string');
 }
 
 function synthesizeCarrier(pipe) {
@@ -423,7 +452,7 @@ function synthesizeCarrier(pipe) {
     // the richest result shape in the standard would otherwise capture as half
     // empty. Kept a passthrough rather than a table: the options belong to the
     // operator, and this script has no business knowing them.
-    ...Object.entries(pipe.options ?? {}).map(([key, value]) => `${key} = ${tomlScalar(value)}`),
+    ...Object.entries(pipe.options ?? {}).map(([key, value]) => `${key} = ${tomlValue(value)}`),
     // Only the operators that HAVE a prompt get one. An extractor reads its
     // document slot and declares none, and the pipe types are closed shapes -
     // handing one a member it does not define is a parse error, not an ignored
@@ -465,11 +494,13 @@ function readCase(caseName) {
     // A carrier normally exists to hold slots, so an empty list is an authoring
     // slip - EXCEPT for a pipe that states its own prompt, which is how a case
     // reaches an operator that takes no input at all (`PipeImgGen` is the one in
-    // the corpus). Requiring the prompt is what keeps the exception narrow.
-    if (slots.length === 0 && typeof pipe.prompt !== 'string') {
+    // the corpus), and a controller that names the branches it runs, whose
+    // input is whatever those branches take. Requiring one or the other is
+    // what keeps the exception narrow.
+    if (slots.length === 0 && typeof pipe.prompt !== 'string' && branchCodes(pipe).length === 0) {
       die(
         `${caseName}: pipe '${pipe.code}' has no slots. A pipe may only be slotless if it ` +
-          `states its own 'prompt'.`,
+          `states its own 'prompt' or names the 'branches' it runs.`,
       );
     }
     if (pipe.type !== undefined && typeof pipe.type !== 'string') {
@@ -489,6 +520,17 @@ function readCase(caseName) {
     }
     return { ...pipe, slots: validated };
   });
+
+  // A branch names a carrier of the same case, and a name that is not one is a
+  // slip the engine would report against a file the author never wrote.
+  const codes = new Set(pipes.map((pipe) => pipe.code));
+  for (const pipe of pipes) {
+    for (const code of branchCodes(pipe)) {
+      if (!codes.has(code)) {
+        die(`${caseName}: pipe '${pipe.code}' runs '${code}', which is not a pipe of the case.`);
+      }
+    }
+  }
 
   // The domain the bundle declares - the first half of every `pipe_ref` the
   // builders key by, and the only way the payload pass can name its runs the
@@ -794,8 +836,15 @@ async function generatePayloads(cases, pipeCode) {
     // An authored method has no carriers and no `run` block - its runs leave
     // the page, through the hosted API - so it falls out here on its own.
     const entry = readAnyCase(caseName);
+    // A branch runs through the controller that names it, and running it on
+    // its own as well would buy a payload no story reads; the controller runs
+    // with no inputs of its own, as a slotless operator with a prompt does.
+    const branches = new Set(entry.pipes.flatMap(branchCodes));
     const runnable = entry.pipes.filter(
-      (pipe) => (pipe.run !== undefined || pipe.prompt) && (!pipeCode || pipe.code === pipeCode),
+      (pipe) =>
+        (pipe.run !== undefined || pipe.prompt || branchCodes(pipe).length > 0) &&
+        !branches.has(pipe.code) &&
+        (!pipeCode || pipe.code === pipeCode),
     );
     if (runnable.length === 0) continue;
     matched = true;

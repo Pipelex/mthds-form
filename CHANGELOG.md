@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A page of an extracted document reads as a document**: a `native.Page` result, or a concept refining it, is drawn by its own arm in both presentations, its text typeset as Markdown with the extractor's HTML comments dropped and each extracted `<table>` drawn as a table (read into text, never injected), followed by the pictures taken out of the page; a list of pages is one card per page, captioned "Page 1" (`pageNumber`). `studio` also shows the page view under its own name, and `app` shows it only when the page has neither text nor pictures. The kernel exports `isNativePageNode` and `readPageContent`. See [docs/result-view.md](docs/result-view.md#a-page-of-an-extracted-document).
+- **A verdict reads as an answer in `app`**: a `native.YesNo`, `native.Rating` or `native.Choice` result, or a concept refining one, is drawn in `app` as its answer, large, with the producer's measure under it ("Probability of yes: 96%", "Confidence: 96%"); a rating reads as its level's label or "Level 2", a choice as its option in words, a verdict in a table cell as its answer, and a list of verdicts one per line. `studio` keeps the record of its members. The kernel exports `nativeVerdictOf` and the readers `readYesNoContent`, `readRatingContent` and `readChoiceContent`. See [docs/result-view.md](docs/result-view.md#a-verdict).
+- **A composite's pictures and lists of structures**: a `native.Composite` member that is a picture is drawn, as an image result is, with its URL to copy and no download of its own; a member that is a list of structures, in the `{items}` envelope or a bare array, is a table; and in `app` each member is named in words ("Executive summary") rather than as the identifier the method composed it under. See [docs/result-view.md](docs/result-view.md#nativecomposite-the-one-arm-that-reads-the-value).
+- **A long text value is typeset in `app`**: a `text` value holding a line break or longer than one table cell's line takes the full width under its label in `app`, and is typeset as Markdown; a short one stays plain beside its label, and `studio` is unchanged. See [docs/result-view.md](docs/result-view.md#a-long-text-value).
+
+### Changed
+
+- **An app's result panel draws no "Output" title and no count of its own (Breaking)**: in `app`, `StuffViewer` draws a title only when the host passes `name`, and a list result no longer draws its count ("7 items") under it; a host that relied on the descriptor's "Output" title passes `name`, and `studio` is unchanged. See [docs/result-view.md](docs/result-view.md#stuffviewer--two-views-and-why-not-three).
+- **`FieldStrings` gains the keys of the page and verdict arms (Breaking)**: `yesProbability`, `verdictConfidence`, `ratingLevel`, `pageNumber` and `extractedTable`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/i18n.md](docs/i18n.md).
+
 ## [v0.24.0] - 2026-10-31
 
 ### Added

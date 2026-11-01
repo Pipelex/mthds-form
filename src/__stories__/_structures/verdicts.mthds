@@ -1,0 +1,9 @@
+domain      = "verdicts"
+description = "Results that are a verdict rather than a record: a yes or no, a rating on a scale of described levels, and one option of a declared set, each as a judge returns it, measures included."
+
+# No structures: the three verdicts are native concepts (`native.YesNo`,
+# `native.Rating`, `native.Choice`), and what the case varies is which one a
+# judge returns. The carriers are `PipeJudge`s, synthesized from
+# verdicts.slots.json, because a judge is what writes the measures beside the
+# verdict - a probability, a confidence, a distribution - which a `PipeLLM`
+# producing the same concept leaves empty.

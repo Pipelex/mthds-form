@@ -58,6 +58,7 @@ interface CheckedLine {
 interface InvoiceCheck {
   verdict: string;
   risk: string;
+  memo: string;
   lines: CheckedLine[];
 }
 
@@ -159,5 +160,40 @@ export const EveryKindInApp: Story = {
     const value = RESULT_PAYLOADS['results.every_kind_result'] as { priority: string };
     await expect(canvas.getAllByText(humanizeEnumValue(value.priority))).toHaveLength(BOTH_THEMES);
     await expect(canvas.queryByText(value.priority)).toBeNull();
+  },
+};
+
+/** The memo's heading, read out of its Markdown source. */
+function memoHeading(): string {
+  const heading = /^#+ (.+)$/m.exec(CHECK.memo)?.[1];
+  if (!heading) throw new Error('The memo holds no heading - re-read the fixture');
+  return heading;
+}
+
+/**
+ * A long `text` value in `app`: the memo, which the model wrote in Markdown,
+ * takes the full width under its label and is typeset, its heading a heading
+ * and its table a table. A short `text` value, the supplier, stays beside its
+ * label as written.
+ */
+export const LongTextTypesetInApp: Story = {
+  name: 'Long text typeset in app',
+  args: { presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole('heading', { name: memoHeading() })).toHaveLength(BOTH_THEMES);
+    await expect(canvasElement.textContent).not.toContain('## ');
+    await expect(canvasElement.textContent).not.toContain('|---');
+  },
+};
+
+/** The same memo in `studio`: the source the model wrote, as a builder reads it. */
+export const LongTextAsWrittenInStudio: Story = {
+  name: 'Long text as written in studio',
+  args: { presentation: 'studio' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole('heading', { name: memoHeading() })).toBeNull();
+    await expect(canvasElement.textContent).toContain(`## ${memoHeading()}`);
   },
 };

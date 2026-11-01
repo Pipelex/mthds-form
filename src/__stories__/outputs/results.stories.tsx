@@ -325,22 +325,68 @@ export const GeneratedImage: Story = {
   },
 };
 
+/** The real extraction's first page, and the parts of it a reader is shown. */
+function extractedPage() {
+  const [page] = itemsOf(payload('page_result')) as {
+    text_and_images: { text: { text: string } };
+    page_view: { url: string };
+  }[];
+  if (!page) throw new Error('The page fixture holds no page');
+  const text = page.text_and_images.text.text;
+  const heading = /^# (.+)$/m.exec(text)?.[1];
+  const caption = /<caption>([^<]+)<\/caption>/.exec(text)?.[1];
+  if (!heading || !caption) throw new Error('The page fixture changed shape - re-read it');
+  return { heading, caption, viewName: page.page_view.url.split('/').pop()! };
+}
+
 /**
- * **`native.Page[]` — the richest shape the standard defines**, and the reason
- * `native.Page` needs no renderer arm of its own.
+ * **`native.Page[]` — the richest shape the standard defines**, read by its
+ * own arm.
  *
- * Its descriptor is an `object` over `{text_and_images, page_view}`, so it works
- * by recursion into the `image` arm and a nested list. A real extraction of a
- * real PDF, so the text is the document's own and the page views are the images
- * the extractor rendered.
+ * A real extraction of a real PDF. Its descriptor is a list of `object`s over
+ * `{text_and_images, page_view}`, which the structural renderer used to draw
+ * as a table with a row per page and the text nowhere. Keyed by the concept,
+ * each page is a captioned document: its text typeset, the extractor's
+ * comments dropped and its `<table>` drawn as a table, never injected. In
+ * `studio` the page view, the picture of the whole page, follows under its
+ * own name, so a builder can compare the extraction with the page.
  */
 export const ExtractedPages: Story = {
   args: story('page_result', 720),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const pages = itemsOf(payload('page_result'));
-    await expect(pages.length).toBeGreaterThan(0);
+    const { heading, caption, viewName } = extractedPage();
+    await expect(canvas.getAllByRole('article', { name: 'Page 1' })).toHaveLength(
+      BOTH_THEMES * pages.length,
+    );
+    await expect(canvas.getAllByRole('heading', { name: heading })).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByRole('group', { name: caption })).toHaveLength(BOTH_THEMES);
+    await expect(canvas.getAllByText(viewName)).toHaveLength(BOTH_THEMES);
+    await expect(canvasElement.textContent).not.toMatch(/<\/?t[rdh]\b|<!--|PageNumber/);
     await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
+  },
+};
+
+/**
+ * The same pages in `app`: the document alone. No "Output" title and no count
+ * over it, which a host heading the result draws itself, and no page view,
+ * since the page's text is there to read.
+ */
+export const ExtractedPagesInApp: Story = {
+  name: 'Extracted pages in app',
+  args: { ...story('page_result', 720), presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const pages = itemsOf(payload('page_result'));
+    const { heading, caption, viewName } = extractedPage();
+    await expect(canvas.getAllByRole('heading', { name: heading })).toHaveLength(BOTH_THEMES);
+    const tables = canvas.getAllByRole('group', { name: caption });
+    await expect(tables).toHaveLength(BOTH_THEMES);
+    await expect(within(tables[0]!).getAllByRole('columnheader').length).toBeGreaterThan(0);
+    await expect(canvas.queryByText(viewName)).toBeNull();
+    await expect(canvas.queryByText('Output')).toBeNull();
+    await expect(canvas.queryByText(DEFAULT_FIELD_STRINGS.itemsCount(pages.length))).toBeNull();
   },
 };
 
