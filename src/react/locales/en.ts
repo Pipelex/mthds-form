@@ -23,6 +23,8 @@ const DAY_YEAR = new Intl.DateTimeFormat('en-GB', {
   month: 'short',
   year: 'numeric',
 });
+/** A verdict's measure as a whole percentage: `96%`. */
+const PERCENT = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 });
 
 /** "Today, 10:42", "Yesterday", "17 Oct", or "17 Oct 2025" for another year. */
 function formatFileDate(date: Date): string {
@@ -91,6 +93,11 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   resultViewGroup: 'Result view',
   yes: 'Yes',
   no: 'No',
+  yesProbability: (share) => `Probability of yes: ${PERCENT.format(share)}`,
+  verdictConfidence: (share) => `Confidence: ${PERCENT.format(share)}`,
+  ratingLevel: (position) => `Level ${position}`,
+  pageNumber: (position) => `Page ${position}`,
+  extractedTable: 'Table',
   unsupportedFileType: (formats) =>
     `That file type is not supported. Accepted formats: ${formats}.`,
   dropFilesOrBrowse: 'Drop files or click to browse',

@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { FileRunField, ObjectRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
-import { DEFAULT_FIELD_STRINGS } from '../../react';
+import { DEFAULT_FIELD_STRINGS, FieldPresentationProvider } from '../../react';
 import type { BrandManifest } from '../../brand/manifest';
 import { GenerativePage } from '../page';
 import { pick, pickKey } from '../ui/shadcn';
@@ -240,6 +240,79 @@ describe('the files a result hatch shows', () => {
         screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile(name) }),
       ).toBeInTheDocument();
     }
+  });
+});
+
+/**
+ * A result hatch mounts a PART of a result at depth 0, with a label the layout
+ * chose. In `app`, the kernel drops a list's count and draws a verdict large
+ * only for the whole result a panel shows, whose host heads it; it used to key
+ * both on depth 0, so a delegated list lost its count and a delegated verdict
+ * was drawn at the size of a whole result.
+ */
+describe('a part of the result a hatch delegates, in an app', () => {
+  const RESULT: ObjectRunField = {
+    kind: 'object',
+    name: 'review',
+    conceptRef: 'demo.Review',
+    required: true,
+    fields: [
+      {
+        kind: 'list',
+        name: 'findings',
+        conceptRef: 'native.Text',
+        required: true,
+        item: { kind: 'prose', name: 'item', conceptRef: 'native.Text', required: true },
+      },
+      {
+        kind: 'object',
+        name: 'compliant',
+        conceptRef: 'native.YesNo',
+        required: true,
+        // The members as the standard's model states them, with no concept of
+        // their own (the committed `verdicts` descriptor reads the same).
+        fields: [
+          { kind: 'boolean', name: 'yes_no', required: true },
+          { kind: 'number', name: 'probability', required: false, integer: false },
+        ],
+      },
+    ],
+  };
+  const SPEC: Spec = {
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['findings', 'verdict'] },
+      findings: {
+        type: 'MthdsResult',
+        props: { path: '/result/findings', hideLabel: true },
+        children: [],
+      },
+      verdict: {
+        type: 'MthdsResult',
+        props: { path: '/result/compliant', hideLabel: true },
+        children: [],
+      },
+    },
+  };
+
+  it('keeps its count and draws its verdict at the size of a value', () => {
+    const { container } = render(
+      <FieldPresentationProvider presentation="app">
+        <GenerativePage
+          spec={SPEC}
+          store={createStateStore({
+            result: {
+              findings: ['Clause 4 caps liability.', 'Clause 9 renews silently.'],
+              compliant: { yes_no: false, probability: 0.2 },
+            },
+          })}
+          scope={{ result: RESULT }}
+          brand={BRAND}
+        />
+      </FieldPresentationProvider>,
+    );
+    expect(container.textContent).toContain(DEFAULT_FIELD_STRINGS.itemsCount(2));
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.no).className).toContain('text-[15px]');
   });
 });
 

@@ -3,9 +3,11 @@ import type { OutputForm, PipeIOContracts, RunField } from '../core';
 import { buildResultField, getPipeIOContract, getPipeOutputForm } from '../core';
 import {
   FieldPresentationProvider,
+  FieldStringsProvider,
   ResultEnvProvider,
   StuffViewer,
   type FieldPresentation,
+  type ResolveUrl,
   type TableLayout,
 } from '../react';
 
@@ -61,6 +63,12 @@ export interface ResultViewProps {
    * bundle - `issued_on`, not "Issued on".
    */
   presentation?: FieldPresentation;
+  /** The stuff's name, passed to `StuffViewer` as a host that knows it passes it. */
+  name?: string;
+  /** The host's resolver for a stored reference, on `ResultEnvProvider`. */
+  resolveUrl?: ResolveUrl;
+  /** The host's locale, on `FieldStringsProvider`. The package's English when unset. */
+  locale?: string;
 }
 
 export function resultFieldFor(
@@ -87,21 +95,40 @@ export function ResultView({
   tableLayout,
   tableColumns,
   presentation = 'studio',
+  name,
+  resolveUrl,
+  locale,
 }: ResultViewProps) {
   const field = React.useMemo(
     () => resultFieldFor(contracts, outputForm, domain, pipeCode),
     [contracts, outputForm, domain, pipeCode],
   );
   const panel = (
-    <StuffViewer field={field} value={value} {...(tableLayout ? { tableLayout } : {})} />
+    <StuffViewer
+      field={field}
+      value={value}
+      {...(tableLayout ? { tableLayout } : {})}
+      {...(name ? { name } : {})}
+    />
   );
+  const env =
+    tableColumns === undefined && resolveUrl === undefined ? (
+      panel
+    ) : (
+      <ResultEnvProvider
+        {...(tableColumns === undefined ? {} : { tableColumns })}
+        {...(resolveUrl ? { resolveUrl } : {})}
+      >
+        {panel}
+      </ResultEnvProvider>
+    );
   return (
     <div style={width === undefined ? { maxWidth } : { width }}>
       <FieldPresentationProvider presentation={presentation}>
-        {tableColumns === undefined ? (
-          panel
+        {locale === undefined ? (
+          env
         ) : (
-          <ResultEnvProvider tableColumns={tableColumns}>{panel}</ResultEnvProvider>
+          <FieldStringsProvider locale={locale}>{env}</FieldStringsProvider>
         )}
       </FieldPresentationProvider>
     </div>

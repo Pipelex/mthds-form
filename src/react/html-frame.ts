@@ -115,6 +115,20 @@ export interface FrameDocumentOptions {
  * The page's own stylesheet comes after ours and so wins.
  * The stated `css_class` wraps a fragment only, since a document has its own
  * body.
+ *
+ * ## No referrer
+ *
+ * The document declares `no-referrer` itself, beside the policy. A `srcdoc`
+ * document takes its referrer policy from the host's page, so without it every
+ * picture and face the page loads would tell the server it comes from where it
+ * was shown, which nothing else this package paints does; an `<iframe>`'s own
+ * `referrerpolicy` would not help, since it governs only the request for the
+ * frame's `src`, and this frame has none. A method's page loses nothing by it:
+ * its pictures are the URLs the result view's own images already load with no
+ * referrer, and a cross-origin face is still sent its `Origin`, which is what
+ * the font's CORS answer reads. A page that declares its own referrer policy
+ * later in its head replaces this one, as a second `<meta name="referrer">`
+ * does.
  */
 export function frameDocument(
   content: HtmlContentView,
@@ -123,6 +137,7 @@ export function frameDocument(
   const head = [
     '<!doctype html><html><head><meta charset="utf-8">',
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${imgSrc}; font-src ${fontSrc}; base-uri 'none'; form-action 'none'">`,
+    '<meta name="referrer" content="no-referrer">',
     `<style>${styles}</style></head>`,
   ].join('');
   if (isWholeDocument(content.innerHtml)) return head + content.innerHtml;

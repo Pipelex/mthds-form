@@ -156,6 +156,25 @@ export interface FieldStrings {
   yes: string;
   no: string;
   /**
+   * The line under a yes or no verdict, in `app`, given the probability its
+   * producer reported that the answer is yes, from 0 to 1. It states the
+   * probability of yes whichever way the verdict went, which is what the
+   * producer measured: a "no" decided against a threshold can still carry a
+   * probability of yes above a half.
+   */
+  yesProbability: (share: number) => string;
+  /** The line under a rating or a choice, in `app`, given the producer's confidence, from 0 to 1. */
+  verdictConfidence: (share: number) => string;
+  /**
+   * A rating's verdict when its scale names no levels, given the level's
+   * position counted from one: the payload's `level` is an index from zero.
+   */
+  ratingLevel: (position: number) => string;
+  /** The caption over each page of an extracted document with several, counted from one. */
+  pageNumber: (position: number) => string;
+  /** What names a table read out of an extracted page when the table has no caption of its own. */
+  extractedTable: string;
+  /**
    * Shown when a picked file is not a format this slot accepts. Takes the
    * slot's own formats as the hint names them (`PNG, JPG`), after any narrowing
    * a host applied, so the message names what WOULD have worked - "not
