@@ -288,7 +288,12 @@ export interface ChoiceContentView {
   confidence?: number;
 }
 
-/** Read a `native.Choice` value. `undefined` when it carries no `choice`. */
+/**
+ * Read a `native.Choice` value. `undefined` when it carries no `choice`, or an
+ * empty one: the content model types `choice` as any text, but a choice
+ * question's options are keyed by non-empty strings and its `Choice` names one
+ * of them, so an empty key names no option and leaves no answer to draw.
+ */
 export function readChoiceContent(value: unknown): ChoiceContentView | undefined {
   if (!isRecord(value)) return undefined;
   const choice = readText(value, 'choice');

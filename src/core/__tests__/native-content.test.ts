@@ -370,4 +370,8 @@ describe('the verdicts a judge returns', () => {
     expect(readRatingContent({ level: -1 })).toBeUndefined();
     expect(readChoiceContent({ confidence: 0.4 })).toBeUndefined();
   });
+
+  it('refuses an empty choice, which names no option a choice question can declare', () => {
+    expect(readChoiceContent({ choice: '', confidence: 0.4 })).toBeUndefined();
+  });
 });
