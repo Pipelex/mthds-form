@@ -28,6 +28,7 @@ import * as verdicts from '../../__stories__/_generated/verdicts';
 import { PAYLOADS as VERDICT_PAYLOADS } from '../../__stories__/_generated/verdicts.payloads';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
+import { DEFAULT_IMG_SRC } from '../html-frame';
 import { ResultEnvProvider } from '../result-env';
 import { ResultField } from '../result-field';
 import { ResultRoot } from '../result-location';
@@ -61,6 +62,34 @@ function panel(presentation: FieldPresentation, field: RunField, value: unknown,
 }
 
 const PRESENTATIONS = ['studio', 'app'] as const satisfies FieldPresentation[];
+
+/** One directive's source list, out of a policy's text. */
+function directive(policy: string, name: string): string {
+  const found = policy
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name} `));
+  return found === undefined ? '' : found.slice(name.length + 1).trim();
+}
+
+/**
+ * Whether a source list admits a URL, for the expressions the frame's policies
+ * use: `'self'`, a scheme such as `data:` or `https:`, and a host. Enough to
+ * read those policies, not a policy engine. The frame is same-origin with the
+ * host's page, which `self` stands for, and a relative URL resolves against it.
+ */
+function sourceListAllows(sources: string, url: string, self = 'https://host.example'): boolean {
+  const target = new URL(url, `${self}/result`);
+  return sources
+    .split(/\s+/)
+    .filter((source) => source !== '')
+    .some((source) => {
+      if (source === "'self'") return target.origin === self;
+      if (source.startsWith("'")) return false;
+      if (/^[a-z][a-z0-9+.-]*:$/i.test(source)) return target.protocol === source.toLowerCase();
+      return target.host === source;
+    });
+}
 
 // ─── native.Page ─────────────────────────────────────────────────────────────
 
@@ -138,6 +167,45 @@ describe('a native.Page[] result', () => {
       expect(container.textContent).not.toContain(s.resultAbsentDescription);
     });
   }
+
+  it("frames a page's raw HTML under a policy that loads nothing from the network", () => {
+    // A fetched page's own pictures: a relative one, which would be fetched
+    // from the host's origin with its cookies, and a third party's.
+    const relative = '/account/avatar.png';
+    const remote = 'https://tracker.example/pixel.gif';
+    const rawOnly = [
+      {
+        text_and_images: {
+          text: null,
+          images: [],
+          raw_html: `<p>Fetched</p><img src="${relative}"><noscript><img src="${remote}"></noscript>`,
+        },
+      },
+    ];
+    const { container } = panel('app', pages, rawOnly);
+    const frame = new DOMParser().parseFromString(
+      container.querySelector('iframe')!.getAttribute('srcdoc')!,
+      'text/html',
+    );
+    const policy =
+      frame.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') ??
+      '';
+    const images = directive(policy, 'img-src');
+    const fonts = directive(policy, 'font-src');
+    expect(images).toBe('data:');
+    expect(fonts).toBe('data:');
+    for (const url of [relative, remote]) {
+      expect(sourceListAllows(images, url)).toBe(false);
+      expect(sourceListAllows(fonts, url)).toBe(false);
+    }
+    expect(sourceListAllows(images, 'data:image/png;base64,iVBORw0KGgo=')).toBe(true);
+    // The reading is not vacuous: a method's own page, under the default,
+    // loads both.
+    for (const url of [relative, remote]) expect(sourceListAllows(DEFAULT_IMG_SRC, url)).toBe(true);
+    expect(frame.querySelector('meta[name="referrer"]')?.getAttribute('content')).toBe(
+      'no-referrer',
+    );
+  });
 
   it('leaves the raw HTML out of a page that has text', () => {
     const withText = [

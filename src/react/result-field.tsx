@@ -2491,6 +2491,19 @@ function chooseColumns(fields: readonly RunField[], budget: number): ChosenColum
 }
 
 /**
+ * What a page's raw markup may load in its frame: inline `data:` pictures and
+ * faces, and nothing from the network.
+ *
+ * A method's own page embeds the pictures that method produced, which is why
+ * the frame's default lets it load them. Raw markup is a page an extractor
+ * fetched from somewhere else, and holds that page's images, faces, CSS
+ * `url()`s and `<noscript>` tracking pixels, which would load as the result is
+ * shown; its relative URLs would also resolve against the host's page and be
+ * fetched from the host's own origin, with the host's cookies.
+ */
+const RAW_PAGE_SOURCES = 'data:';
+
+/**
  * One page of an extracted document, as the document it is.
  *
  * `native.Page` is `{text_and_images: {text, images, raw_html}, page_view}`,
@@ -2510,8 +2523,9 @@ function chooseColumns(fields: readonly RunField[], budget: number): ChosenColum
  * whose text is only the extractor's comments (`<!-- PageNumber="1" -->`) has
  * none to show, and is drawn as a page with no text rather than as a blank
  * card. A page with no text whose extractor kept its raw markup shows that
- * markup instead, framed by `HtmlPreview` and never injected; a page with text
- * leaves it out, since the text already carries the page's content.
+ * markup instead, framed by `HtmlPreview` under a policy that lets it load
+ * nothing from the network (`RAW_PAGE_SOURCES`), and never injected; a page
+ * with text leaves it out, since the text already carries the page's content.
  */
 function PageValue({ field, value, depth }: { field: RunField; value: unknown; depth: number }) {
   const presentation = useFieldPresentation();
@@ -2537,7 +2551,14 @@ function PageValue({ field, value, depth }: { field: RunField; value: unknown; d
   return (
     <div className="space-y-3">
       {hasText && <ExtractedPageText segments={segments} />}
-      {rawPage && <HtmlPreview content={rawPage} downloadPdf={false} />}
+      {rawPage && (
+        <HtmlPreview
+          content={rawPage}
+          downloadPdf={false}
+          imgSrc={RAW_PAGE_SOURCES}
+          fontSrc={RAW_PAGE_SOURCES}
+        />
+      )}
       {content.images.length > 0 && (
         <ResultAt segment="text_and_images">
           <ResultAt segment="images">
