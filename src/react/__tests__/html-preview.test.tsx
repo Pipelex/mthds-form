@@ -112,6 +112,25 @@ describe('the frame policy', () => {
     const { container } = render(<HtmlPreview content={{ innerHtml: QUOTE }} />);
     expect(container.querySelector('iframe')!.getAttribute('sandbox')).toBe('allow-same-origin');
   });
+
+  it("declares no referrer in the frame's own head, a fragment's and a whole document's", () => {
+    // A `srcdoc` document takes the host page's referrer policy, and the
+    // frame element's attribute governs only a `src` it does not have.
+    for (const innerHtml of ['<p>x</p>', QUOTE]) {
+      const { container, unmount } = render(<HtmlPreview content={{ innerHtml }} />);
+      const doc = parse(container.querySelector('iframe')!.getAttribute('srcdoc')!);
+      const referrer = doc.head.querySelector('meta[name="referrer"]');
+      expect(referrer?.getAttribute('content')).toBe('no-referrer');
+      // Before anything the page's own head says.
+      const pageTitle = doc.head.querySelector('title');
+      if (pageTitle) {
+        expect(
+          referrer!.compareDocumentPosition(pageTitle) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      }
+      unmount();
+    }
+  });
 });
 
 describe('a whole document on screen', () => {

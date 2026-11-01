@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { CONTRACTS, OUTPUT_FORM } from '../../__stories__/_generated/lists';
+import {
+  CONTRACTS as RESULT_CONTRACTS,
+  OUTPUT_FORM as RESULT_OUTPUT_FORM,
+} from '../../__stories__/_generated/results';
+import { PAYLOADS as RESULT_PAYLOADS } from '../../__stories__/_generated/results.payloads';
+import {
+  CONTRACTS as VERDICT_CONTRACTS,
+  OUTPUT_FORM as VERDICT_OUTPUT_FORM,
+} from '../../__stories__/_generated/verdicts';
+import { PAYLOADS as VERDICT_PAYLOADS } from '../../__stories__/_generated/verdicts.payloads';
 import { getPipeIOContract } from '../contracts';
 import type { RunField } from '../descriptor';
 import { buildResultField } from '../derive';
@@ -7,8 +17,15 @@ import {
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
+  isNativePageNode,
+  isNativeValueNode,
   isViewableUrl,
+  nativeVerdictOf,
+  readChoiceContent,
   readDataUrl,
+  readPageContent,
+  readRatingContent,
+  readYesNoContent,
   viewableUrl,
 } from '../native-content';
 import { getPipeOutputForm } from '../output-form';
@@ -256,5 +273,105 @@ describe('a native predicate answers for the node, never for a list of it', () =
       expect(predicate(element)).toBe(true);
       expect(predicate(plural)).toBe(false);
     }
+  });
+});
+
+describe('native.Page', () => {
+  // The committed `results.page_result` fixture: a real extraction of a real
+  // PDF, its descriptor a list of `native.Page`.
+  const pages = buildResultField(
+    getPipeOutputForm(RESULT_OUTPUT_FORM, 'results', 'page_result')!,
+    getPipeIOContract(RESULT_CONTRACTS, 'results', 'page_result')!.output.json_schema,
+  );
+  const payload = RESULT_PAYLOADS['results.page_result'] as { items: unknown[] };
+
+  it('answers for the page and refuses the list of pages', () => {
+    expect(pages.kind).toBe('list');
+    expect(isNativePageNode(pages)).toBe(false);
+    expect(pages.kind === 'list' && isNativePageNode(pages.item)).toBe(true);
+  });
+
+  it('is not one of the natives a list draws one per line', () => {
+    // The generative layer reads `isNativeValueNode` to decide what it
+    // delegates to the kernel, and it does not delegate a page yet. The result
+    // view asks `isNativePageNode` beside it instead.
+    expect(pages.kind === 'list' && isNativeValueNode(pages.item)).toBe(false);
+  });
+
+  it("reads a page's text, its pictures and its view out of the real payload", () => {
+    const page = readPageContent(payload.items[0]);
+    expect(page?.text).toContain('# The Solar System');
+    expect(page?.images).toEqual([]);
+    expect(page?.pageView).toMatchObject({ mime_type: 'image/png' });
+  });
+
+  it('reads text written as a plain string, and leaves blank text out', () => {
+    expect(readPageContent({ text_and_images: { text: 'Plain' } })?.text).toBe('Plain');
+    expect(readPageContent({ text_and_images: { text: { text: '  ' } } })?.text).toBeUndefined();
+    expect(readPageContent({})).toEqual({ images: [] });
+    expect(readPageContent('a page')).toBeUndefined();
+  });
+});
+
+describe('the verdicts a judge returns', () => {
+  // The committed `verdicts` case: one PipeJudge per verdict concept, its
+  // payloads from real runs.
+  const fieldOf = (code: string) =>
+    buildResultField(
+      getPipeOutputForm(VERDICT_OUTPUT_FORM, 'verdicts', code)!,
+      getPipeIOContract(VERDICT_CONTRACTS, 'verdicts', code)!.output.json_schema,
+    );
+
+  it('names each verdict by the concept the descriptor states', () => {
+    expect(nativeVerdictOf(fieldOf('yes_no_verdict'))).toBe('yes_no');
+    expect(nativeVerdictOf(fieldOf('rating_verdict'))).toBe('rating');
+    expect(nativeVerdictOf(fieldOf('choice_verdict'))).toBe('choice');
+  });
+
+  it('answers for a refinement and refuses a list', () => {
+    const refined: RunField = {
+      kind: 'object',
+      name: 'approval',
+      conceptRef: 'legal.Approval',
+      refines: ['native.YesNo'],
+      required: true,
+      fields: [],
+    };
+    expect(nativeVerdictOf(refined)).toBe('yes_no');
+    const plural: RunField = { ...refined, kind: 'list', item: refined };
+    expect(nativeVerdictOf(plural)).toBeUndefined();
+    expect(nativeVerdictOf({ ...refined, conceptRef: 'native.Text', refines: [] })).toBeUndefined();
+  });
+
+  it('reads each real payload', () => {
+    expect(readYesNoContent(VERDICT_PAYLOADS['verdicts.yes_no_verdict'])).toEqual({
+      yesNo: true,
+      probability: 1,
+    });
+    expect(readRatingContent(VERDICT_PAYLOADS['verdicts.rating_verdict'])).toEqual({
+      level: 1,
+      label: 'Mixed',
+      confidence: 0.96,
+    });
+    expect(readChoiceContent(VERDICT_PAYLOADS['verdicts.choice_verdict'])).toEqual({
+      choice: 'billing',
+      confidence: 1,
+    });
+  });
+
+  it('reads the bare boolean an older YesNo unwraps to', () => {
+    expect(readYesNoContent(false)).toEqual({ yesNo: false });
+  });
+
+  it('drops a measure outside 0 to 1, and refuses a value that is not the model', () => {
+    expect(readYesNoContent({ yes_no: true, probability: 1.5 })).toEqual({ yesNo: true });
+    expect(readYesNoContent({ probability: 0.4 })).toBeUndefined();
+    expect(readRatingContent({ level: 1.5 })).toBeUndefined();
+    expect(readRatingContent({ level: -1 })).toBeUndefined();
+    expect(readChoiceContent({ confidence: 0.4 })).toBeUndefined();
+  });
+
+  it('refuses an empty choice, which names no option a choice question can declare', () => {
+    expect(readChoiceContent({ choice: '', confidence: 0.4 })).toBeUndefined();
   });
 });

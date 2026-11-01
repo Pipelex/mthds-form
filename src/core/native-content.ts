@@ -164,6 +164,143 @@ export function readHtmlContent(value: unknown): HtmlContentView | undefined {
 export const NATIVE_HTML_CONCEPT_REF = 'native.Html';
 export const NATIVE_DATE_CONCEPT_REF = 'native.Date';
 export const NATIVE_COMPOSITE_CONCEPT_REF = 'native.Composite';
+export const NATIVE_PAGE_CONCEPT_REF = 'native.Page';
+export const NATIVE_YES_NO_CONCEPT_REF = 'native.YesNo';
+export const NATIVE_RATING_CONCEPT_REF = 'native.Rating';
+export const NATIVE_CHOICE_CONCEPT_REF = 'native.Choice';
+
+/**
+ * `native.Page`, read: what one page of an extracted document holds.
+ *
+ * The model is `{text_and_images: {text, images, raw_html}, page_view}`, where
+ * `text` is a `TextContent` (`{text}`) and the images and the page view are
+ * `ImageContent`s. A reader of a page wants its TEXT first, and the structural
+ * renderer never reached it: the descriptor states the page as an `object`
+ * over two members, and the text sits two levels down, under a member named
+ * `text` inside a member named `text_and_images`. Keyed by the concept, this
+ * reads the documented model and nothing else.
+ */
+export interface PageContentView {
+  /** The page's extracted text, as the extractor wrote it, when it wrote any. */
+  text?: string;
+  /** The images extracted from the page, each an `ImageContent`, unread. */
+  images: readonly unknown[];
+  /**
+   * The page's markup as the extractor fetched it, when it kept any. It is the
+   * page's content a second time when the page has text, and its only content
+   * when it has none, which is when a renderer shows it, framed, never injected.
+   */
+  rawHtml?: string;
+  /** The rendering of the whole page, an `ImageContent`, when one was made. */
+  pageView?: unknown;
+}
+
+/**
+ * Read a `native.Page` value. `undefined` for anything that is not a record,
+ * so the caller renders its own absence.
+ */
+export function readPageContent(value: unknown): PageContentView | undefined {
+  if (!isRecord(value)) return undefined;
+  const textAndImages = ownProp(value, 'text_and_images');
+  const holder = isRecord(textAndImages) ? textAndImages : undefined;
+  const textContent = holder ? ownProp(holder, 'text') : undefined;
+  // `text` is a `TextContent`. A plain string is read too, since a page whose
+  // runner rendered it raw would carry one, and both name the same text.
+  const text =
+    typeof textContent === 'string'
+      ? textContent
+      : isRecord(textContent)
+        ? readText(textContent, 'text')
+        : undefined;
+  const images = holder ? ownProp(holder, 'images') : undefined;
+  const rawHtml = holder ? readText(holder, 'raw_html') : undefined;
+  const pageView = ownProp(value, 'page_view');
+  return {
+    ...(text !== undefined && text.trim() !== '' ? { text } : {}),
+    images: Array.isArray(images) ? images : [],
+    ...(rawHtml !== undefined && rawHtml.trim() !== '' ? { rawHtml } : {}),
+    ...(isRecord(pageView) ? { pageView } : {}),
+  };
+}
+
+/**
+ * A verdict's measures, as the judging runtime states them: each is a number
+ * from 0 to 1, present only when the producer reported one. A measure outside
+ * that range is the payload disagreeing with its own model, and is read as
+ * absent rather than shown as a percentage above a hundred.
+ */
+function readUnitInterval(record: Record<string, unknown>, key: string): number | undefined {
+  const value = readNumber(record, key);
+  return value !== undefined && value >= 0 && value <= 1 ? value : undefined;
+}
+
+/** `native.YesNo`, read. */
+export interface YesNoContentView {
+  /** The answer: yes is `true`. */
+  yesNo: boolean;
+  /** The probability that the answer is yes, from 0 to 1, when the producer reported one. */
+  probability?: number;
+}
+
+/**
+ * Read a `native.YesNo` value: `{yes_no, probability}`, or the bare boolean a
+ * single-member YesNo is unwrapped to by its content key. Both are the model
+ * the concept states, so reading either is reading the standard.
+ */
+export function readYesNoContent(value: unknown): YesNoContentView | undefined {
+  if (typeof value === 'boolean') return { yesNo: value };
+  if (!isRecord(value)) return undefined;
+  const yesNo = ownProp(value, 'yes_no');
+  if (typeof yesNo !== 'boolean') return undefined;
+  const probability = readUnitInterval(value, 'probability');
+  return { yesNo, ...(probability !== undefined ? { probability } : {}) };
+}
+
+/** `native.Rating`, read. */
+export interface RatingContentView {
+  /** The index of the selected level, 0 being the first level declared. */
+  level: number;
+  /** The name the scale gives the selected level, when it names its levels. */
+  label?: string;
+  /** The producer's confidence in the level, from 0 to 1, when it reported one. */
+  confidence?: number;
+}
+
+/** Read a `native.Rating` value. `undefined` when it carries no whole `level`. */
+export function readRatingContent(value: unknown): RatingContentView | undefined {
+  if (!isRecord(value)) return undefined;
+  const level = readNumber(value, 'level');
+  if (level === undefined || !Number.isInteger(level) || level < 0) return undefined;
+  const label = readText(value, 'label');
+  const confidence = readUnitInterval(value, 'confidence');
+  return {
+    level,
+    ...(label !== undefined ? { label } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
+  };
+}
+
+/** `native.Choice`, read. */
+export interface ChoiceContentView {
+  /** The key of the selected option, as the method declared it. */
+  choice: string;
+  /** The producer's confidence in the choice, from 0 to 1, when it reported one. */
+  confidence?: number;
+}
+
+/**
+ * Read a `native.Choice` value. `undefined` when it carries no `choice`, or an
+ * empty one: the content model types `choice` as any text, but a choice
+ * question's options are keyed by non-empty strings and its `Choice` names one
+ * of them, so an empty key names no option and leaves no answer to draw.
+ */
+export function readChoiceContent(value: unknown): ChoiceContentView | undefined {
+  if (!isRecord(value)) return undefined;
+  const choice = readText(value, 'choice');
+  if (choice === undefined) return undefined;
+  const confidence = readUnitInterval(value, 'confidence');
+  return { choice, ...(confidence !== undefined ? { confidence } : {}) };
+}
 
 /** One member of a composite: the name it was composed under, and its content. */
 export interface CompositeMember {
@@ -235,15 +372,49 @@ export function isNativeCompositeNode(node: NativeNode): boolean {
 }
 
 /**
- * Whether a node is one of the three natives the kind vocabulary cannot name —
- * a date, a page, a composite — which a renderer reads by CONCEPT before it
- * reads the kind. A list of one answers no (the predicates refuse a `list`
- * node), and its item answers yes.
+ * Whether a node is a `native.Page`, or a concept refining it — one page of an
+ * extracted document.
+ *
+ * Its node is an `object` over `{text_and_images, page_view}`, which the
+ * structural renderer laid out as a record: in a list, a table whose
+ * "Text and images" column was named by the first `text` member it found,
+ * `raw_html`, which an extractor leaves empty, so a page holding a whole
+ * report read as a row of dashes. Keyed by concept, the result view reads the
+ * page's text instead. See `readPageContent`.
+ */
+export function isNativePageNode(node: NativeNode): boolean {
+  return refinesNative(node, NATIVE_PAGE_CONCEPT_REF);
+}
+
+/**
+ * Whether a node is one of the verdicts a judge returns — a yes or no
+ * (`native.YesNo`), a rating (`native.Rating`) or a choice (`native.Choice`),
+ * or a concept refining one — and which.
+ *
+ * Their nodes are `object`s over the verdict and its measures (a `YesNo` from
+ * an older runtime, whose model had one member, is a `boolean` node unwrapped
+ * by its content key), so the structural renderer printed the measures as a
+ * record: "Yes no: Yes / Probability: 1". The concept is what says the record
+ * is a verdict, read off `concept_ref` and `refines` like every other native
+ * predicate here, never off which keys the value happens to hold.
+ */
+export function nativeVerdictOf(node: NativeNode): 'yes_no' | 'rating' | 'choice' | undefined {
+  if (refinesNative(node, NATIVE_YES_NO_CONCEPT_REF)) return 'yes_no';
+  if (refinesNative(node, NATIVE_RATING_CONCEPT_REF)) return 'rating';
+  if (refinesNative(node, NATIVE_CHOICE_CONCEPT_REF)) return 'choice';
+  return undefined;
+}
+
+/**
+ * Whether a node is one of the natives the kind vocabulary cannot name that a
+ * list draws one value per line — a date, an HTML page, a composite — which a
+ * renderer reads by CONCEPT before it reads the kind. A list of one answers no
+ * (the predicates refuse a `list` node), and its item answers yes.
  *
  * One answer, read twice: the result view renders a list whose item answers yes
  * one value per line rather than as a table, and the generative layer delegates
  * that list to the kernel, because no catalog component reads a native value.
- * Not re-exported: a host asks the three predicates it needs.
+ * Not re-exported: a host asks the predicates it needs.
  */
 export function isNativeValueNode(node: NativeNode): boolean {
   return isNativeDateNode(node) || isNativeHtmlNode(node) || isNativeCompositeNode(node);

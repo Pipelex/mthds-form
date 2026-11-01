@@ -140,8 +140,10 @@ describe('a list of native.Composite', () => {
       for (const text of ['Quarter closed', 'On plan', 'Audit opened', 'Watch']) {
         expect(container.textContent).toContain(text);
       }
-      // Each member is named, once per composite.
-      expect(container.textContent?.split('headline')).toHaveLength(value.items.length + 1);
+      // Each member is named, once per composite: as written in studio, in
+      // words in app.
+      const name = presentation === 'app' ? 'Headline' : 'headline';
+      expect(container.textContent?.split(name)).toHaveLength(value.items.length + 1);
       expect(container.textContent).not.toContain('{');
     });
   }

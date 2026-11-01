@@ -1,0 +1,53 @@
+{
+  "description": "Pipes whose RESULT is a verdict: a yes or no, a rating on a scale of described levels, and one option of a declared set. Each carrier is a `PipeJudge` stating its own prompt and its question, so `make fixtures-runs` captures the verdict with the measures a judge writes beside it (a probability, a confidence, a distribution), which is what the result view's verdict arms read. A judge names the deck's judgment model, `@default-judgment`, so the descriptor pass needs a deck that knows it.",
+  "pipes": [
+    {
+      "code": "yes_no_verdict",
+      "type": "PipeJudge",
+      "output": "YesNo",
+      "slots": [],
+      "prompt": "A message: 'Our production site has been down for an hour and customers are calling.'",
+      "options": {
+        "model": "@default-judgment",
+        "question": "Does this message need an answer today?",
+        "criteria": {
+          "yes": "Something is broken or blocked right now",
+          "no": "The sender can wait"
+        },
+        "threshold": 0.7
+      }
+    },
+    {
+      "code": "rating_verdict",
+      "type": "PipeJudge",
+      "output": "Rating",
+      "slots": [],
+      "prompt": "A review: 'Great product, setup took five minutes, but the mobile app crashes sometimes.'",
+      "options": {
+        "model": "@default-judgment",
+        "question": "How satisfied is this customer?",
+        "levels": [
+          { "label": "Unhappy", "description": "they would not recommend it" },
+          { "label": "Mixed", "description": "they like it with reservations" },
+          { "label": "Delighted", "description": "they would recommend it" }
+        ]
+      }
+    },
+    {
+      "code": "choice_verdict",
+      "type": "PipeJudge",
+      "output": "Choice",
+      "slots": [],
+      "prompt": "A support ticket: 'I was charged twice for my subscription this month and I want a refund.'",
+      "options": {
+        "model": "@default-judgment",
+        "question": "Which team should handle this support ticket?",
+        "options": {
+          "billing": "Charges, invoices, refunds and subscriptions",
+          "technical_support": "Errors, outages and features",
+          "sales": "Quotes and new contracts"
+        }
+      }
+    }
+  ]
+}

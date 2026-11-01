@@ -1,0 +1,41 @@
+{
+  "description": "A pipe whose RESULT is a `native.Composite` of three parts, the shape of a multi-part report: a Markdown executive summary, a list of four risk records, and a generated cover picture. The carrier is a `PipeParallel` naming three branch carriers, which `make fixtures-runs` runs through the parallel, never on their own; it captures what the hosted API returns for each member, which no descriptor states because a composite declares none.",
+  "pipes": [
+    {
+      "code": "launch_report",
+      "type": "PipeParallel",
+      "output": "Composite",
+      "slots": [],
+      "options": {
+        "branches": [
+          { "pipe": "summary_part", "result": "executive_summary" },
+          { "pipe": "risks_part", "result": "main_risks" },
+          { "pipe": "cover_part", "result": "cover_picture" }
+        ],
+        "add_each_output": true
+      }
+    },
+    {
+      "code": "summary_part",
+      "output": "Markdown",
+      "slots": [],
+      "prompt": "Write a short Markdown executive summary of the launch of a note-taking app, in two short paragraphs with the key facts in bold, followed by a bulleted list of three launch goals."
+    },
+    {
+      "code": "risks_part",
+      "output": "Risk[4]",
+      "slots": [],
+      "prompt": "Extract the four risks from these launch notes, each with its likelihood. Notes: the sync engine may lose edits under poor networks, which is likely, so high. Competitors may undercut our price, a medium likelihood. App store review may delay the launch, a low likelihood. Onboarding may confuse new users, a high likelihood."
+    },
+    {
+      "code": "cover_part",
+      "type": "PipeImgGen",
+      "output": "Image",
+      "slots": [],
+      "prompt": "A paper notebook and a pen on a wooden desk, flat illustration, soft morning light",
+      "options": {
+        "model": "$gen-image-testing"
+      }
+    }
+  ]
+}
