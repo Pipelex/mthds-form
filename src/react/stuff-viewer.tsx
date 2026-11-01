@@ -7,7 +7,13 @@ import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
 import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
 import { readStuffFile } from '../core/stuff-files';
-import { Absent, ResultField, ResultHeader, stringifyValue } from './result-field';
+import {
+  Absent,
+  HostHeadedResult,
+  ResultField,
+  ResultHeader,
+  stringifyValue,
+} from './result-field';
 import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { HtmlPreview } from './html-preview';
@@ -553,7 +559,11 @@ function StuffPanel({
         <HtmlPreview content={page} downloadPdf={false} bare fill />
       ) : (
         <ResultRoot baseName={baseName} path={[field.name]}>
-          <ResultField field={field} value={value} hideLabel />
+          {/* The whole result, which this panel and its host head: in `app`
+              it draws no count of its own, and a verdict is drawn large. */}
+          <HostHeadedResult>
+            <ResultField field={field} value={value} hideLabel />
+          </HostHeadedResult>
         </ResultRoot>
       )}
     </div>

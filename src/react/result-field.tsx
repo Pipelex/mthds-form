@@ -38,7 +38,7 @@ import {
 } from './result-env';
 import { absoluteUrl } from './absolute-url';
 import { ResultAt, ResultRoot, useResultLocation } from './result-location';
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createContext, Fragment, use, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -2510,9 +2510,10 @@ function readVerdict(
 
 /**
  * A verdict, drawn as one: the answer large, and the producer's measure under
- * it. `prominent` is the result itself, where the answer is the whole of what
- * the reader came for; a verdict inside a structure is one value among others,
- * and reads at the size of a value.
+ * it. `prominent` is the whole result a panel shows (`HostHeadedResult`), where
+ * the answer is the whole of what the reader came for; a verdict anywhere else,
+ * inside a structure, in a list or in a subtree a layout delegates, is one
+ * value among others, and reads at the size of a value.
  */
 function VerdictValue({ reading, prominent }: { reading: VerdictReading; prominent: boolean }) {
   return (
@@ -2561,6 +2562,28 @@ export interface ResultFieldProps {
 }
 
 /**
+ * Whether the `ResultField` beneath is the whole result, headed by its host.
+ *
+ * Only `StuffViewer` says so, around the one field it renders: the panel draws
+ * the result's header itself, and in `app` the host that mounts it heads the
+ * result in its own words ("7 results"). So that node draws no count of its
+ * own under the host's, and a verdict that is the whole result is drawn large.
+ *
+ * It is said explicitly because nothing else can stand in for it. A node's
+ * depth cannot: the generative layer's result hatch (`MthdsResult`) mounts a
+ * subtree of a result at depth 0, with a label the layout chose, and that
+ * subtree is a part of the result, not the whole of it. Neither can
+ * `hideLabel`, which a hatch sets as freely as the panel does. A `ResultField`
+ * a host renders on its own, and every node beneath the panel's, is a part too.
+ */
+const HostHeadedContext = createContext(false);
+
+/** Marks the `ResultField` inside it as the whole result its host heads. For `StuffViewer` alone. */
+export function HostHeadedResult({ children }: { children: React.ReactNode }) {
+  return <HostHeadedContext value>{children}</HostHeadedContext>;
+}
+
+/**
  * The single dispatch point, mirroring `FieldRenderer` on the input side.
  *
  * The outermost one also marks the root of the result, when no panel above it
@@ -2569,15 +2592,34 @@ export interface ResultFieldProps {
  */
 export function ResultField(props: ResultFieldProps) {
   const location = useResultLocation();
-  if (location) return <ResultNode {...props} />;
+  // Read by the one node it was set around, and cleared for every node beneath
+  // it, each of which is a part of the result rather than the whole.
+  const headed = use(HostHeadedContext);
+  const node = headed ? (
+    <HostHeadedContext value={false}>
+      <ResultNode {...props} headed />
+    </HostHeadedContext>
+  ) : (
+    <ResultNode {...props} />
+  );
+  if (location) return node;
   return (
     <ResultRoot baseName={props.field.name} path={[props.field.name]}>
-      <ResultNode {...props} />
+      {node}
     </ResultRoot>
   );
 }
 
-function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldProps) {
+function ResultNode({
+  field,
+  value,
+  depth = 0,
+  hideLabel = false,
+  headed = false,
+}: ResultFieldProps & {
+  /** The whole result, headed by its host: see {@link HostHeadedResult}. */
+  headed?: boolean;
+}) {
   const s = useFieldStrings();
   const unwrapped = unwrap(field, value);
   // Read up here, before any arm returns, because hooks may not follow one.
@@ -2704,7 +2746,7 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
     return (
       <div className="space-y-1">
         {header}
-        <VerdictValue reading={reading} prominent={depth === 0} />
+        <VerdictValue reading={reading} prominent={headed} />
       </div>
     );
   }
@@ -2822,10 +2864,12 @@ function ResultNode({ field, value, depth = 0, hideLabel = false }: ResultFieldP
               on the list beneath it. The COUNT is not part of the label though,
               so it survives on its own; it is a fact about this value rather
               than a name for it, and the panel's header does not carry it. */}
-          {/* In `app`, the result itself carries no count: the host that
-              mounts it heads the result with its own ("7 results"), and a
-              second count under that heading says the same thing again. */}
-          {isApp && hideLabel && depth === 0 ? null : (
+          {/* In `app`, the whole result a panel shows carries no count: the
+              host that mounts the panel heads the result with its own ("7
+              results"), and a second count under that heading says the same
+              thing again. Every other list keeps its count, a subtree a
+              generative layout delegates included (see `HostHeadedResult`). */}
+          {isApp && headed ? null : (
             <div className="flex flex-wrap items-baseline gap-x-2">
               {header}
               <span className="font-mono text-[10.5px] text-muted-foreground">

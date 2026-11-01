@@ -30,6 +30,7 @@ import { FieldPresentationProvider, type FieldPresentation } from '../field-pres
 import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
 import { ResultEnvProvider } from '../result-env';
 import { ResultField } from '../result-field';
+import { ResultRoot } from '../result-location';
 import { StuffViewer } from '../stuff-viewer';
 
 const s = DEFAULT_FIELD_STRINGS;
@@ -255,6 +256,19 @@ describe('a verdict', () => {
     expect(container.querySelector('table')).toBeNull();
   });
 
+  it('is drawn at a value size when mounted on its own, as a generative layout mounts a subtree', () => {
+    // At depth 0 and without its label, as the result hatch mounts a part of a
+    // result: the size is for the whole result a panel shows, not for depth 0.
+    const value = payloadOf('yes_no_verdict');
+    inPresentation(
+      'app',
+      <ResultRoot baseName="output" path={['output', 'compliant']}>
+        <ResultField field={yesNo} value={value} hideLabel />
+      </ResultRoot>,
+    );
+    expect(screen.getByText(value.yes_no ? s.yes : s.no).className).toContain('text-[15px]');
+  });
+
   it('speaks French where the host does', () => {
     const value = payloadOf('yes_no_verdict');
     render(
@@ -339,6 +353,18 @@ describe("an app's result panel", () => {
   it('keeps both for a builder', () => {
     const { container } = panel('studio', risks, items);
     expect(screen.getByText('output')).toBeTruthy();
+    expect(container.textContent).toContain(s.itemsCount(items.length));
+  });
+
+  it('keeps the count of a list mounted on its own, as a generative layout mounts a subtree', () => {
+    // At depth 0 and without its label, as the result hatch mounts a nested
+    // list: no host heading says how many there are, so the list does.
+    const { container } = inPresentation(
+      'app',
+      <ResultRoot baseName="report" path={['report', 'main_risks']}>
+        <ResultField field={risks} value={items} hideLabel />
+      </ResultRoot>,
+    );
     expect(container.textContent).toContain(s.itemsCount(items.length));
   });
 });
