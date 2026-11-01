@@ -504,6 +504,30 @@ describe('a native.Composite result', () => {
     expect(within(table).getByRole('columnheader', { name: 'likelihood' })).toBeTruthy();
   });
 
+  it.each([
+    ['studio', 'line_items'],
+    ['app', 'Line items'],
+  ] as const)(
+    'names a table nested in a cell as its column is headed, in %s',
+    (presentation, name) => {
+      // A list of structures inside a list of structures: the inner table's
+      // group reads as the header above it, as written for a builder and in
+      // words for an app's reader, never in words for both.
+      inPresentation(
+        presentation,
+        <StuffViewer
+          field={report}
+          value={{ orders: [{ customer: 'Acme', line_items: [{ sku: 'A-1', quantity: 2 }] }] }}
+        />,
+      );
+      const outer = within(
+        screen.getByRole('group', { name: presentation === 'app' ? 'Orders' : 'orders' }),
+      );
+      expect(outer.getByRole('columnheader', { name })).toBeTruthy();
+      expect(outer.getByRole('group', { name })).toBeTruthy();
+    },
+  );
+
   it('typesets a member that is a bare Markdown string, rather than reading it as a date', () => {
     const { container } = inPresentation(
       'app',

@@ -2235,7 +2235,8 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
  * in the order the entries first state them, every entry contributing the ones
  * it adds. A column is headed by its member's name, in words in `app` and as
  * written in `studio`, like a composite member's own name. A value the entry
- * leaves out is an absence, and a nested value is read the way any member is.
+ * leaves out is an absence, and a nested value is read the way any member is,
+ * a table in a cell named as its column is headed.
  *
  * The box scrolls sideways rather than widening the panel, like every table in
  * the result view, so it is a named, focusable group.
@@ -2253,6 +2254,9 @@ function RecordsTable({
   for (const item of items) {
     for (const key of Object.keys(item)) if (!columns.includes(key)) columns.push(key);
   }
+  // A column's name as this presentation shows it: its header, and the name of
+  // a table drawn in one of its cells, which must read as the header does.
+  const columnLabel = (column: string) => (isApp ? humanizeFieldName(column) : column);
   return (
     <div
       role="group"
@@ -2272,7 +2276,7 @@ function RecordsTable({
                   !isApp && 'font-mono text-[12px]',
                 )}
               >
-                {isApp ? humanizeFieldName(column) : column}
+                {columnLabel(column)}
               </th>
             ))}
           </tr>
@@ -2287,7 +2291,7 @@ function RecordsTable({
                     {typeof cell === 'boolean' ? (
                       <Bool value={cell} />
                     ) : typeof cell === 'object' && cell !== null ? (
-                      <NativeValue value={cell} label={humanizeFieldName(column)} />
+                      <NativeValue value={cell} label={columnLabel(column)} />
                     ) : (
                       <Scalar value={cell} />
                     )}
