@@ -46,18 +46,29 @@ const BOTH_THEMES = 2;
 
 const s = DEFAULT_FIELD_STRINGS;
 
+// A measure the producer did not report is left out or stated as `null`, both
+// of which the schema allows.
 interface YesNo {
   yes_no: boolean;
-  probability?: number;
+  probability?: number | null;
 }
 interface Rating {
   level: number;
-  label?: string;
-  confidence?: number;
+  label?: string | null;
+  confidence?: number | null;
 }
 interface Choice {
   choice: string;
-  confidence?: number;
+  confidence?: number | null;
+}
+
+/**
+ * A measure as the readers take it: a number from 0 to 1, and anything else no
+ * measure at all, which the renderer draws nothing for. The expectation follows
+ * the same rule, so a re-captured run that measured nothing asserts no line.
+ */
+function measureOf(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' && value >= 0 && value <= 1 ? value : undefined;
 }
 
 const YES_NO = PAYLOADS['verdicts.yes_no_verdict'] as YesNo;
@@ -73,10 +84,9 @@ export const YesNoInApp: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText(YES_NO.yes_no ? s.yes : s.no)).toHaveLength(BOTH_THEMES);
-    if (YES_NO.probability !== undefined) {
-      await expect(canvas.getAllByText(s.yesProbability(YES_NO.probability))).toHaveLength(
-        BOTH_THEMES,
-      );
+    const probability = measureOf(YES_NO.probability);
+    if (probability !== undefined) {
+      await expect(canvas.getAllByText(s.yesProbability(probability))).toHaveLength(BOTH_THEMES);
     }
     await expect(canvas.queryByText('Output')).toBeNull();
     await expect(canvas.queryByText('Yes no')).toBeNull();
@@ -91,10 +101,9 @@ export const RatingInApp: Story = {
     const canvas = within(canvasElement);
     const answer = RATING.label ?? s.ratingLevel(RATING.level + 1);
     await expect(canvas.getAllByText(answer)).toHaveLength(BOTH_THEMES);
-    if (RATING.confidence !== undefined) {
-      await expect(canvas.getAllByText(s.verdictConfidence(RATING.confidence))).toHaveLength(
-        BOTH_THEMES,
-      );
+    const confidence = measureOf(RATING.confidence);
+    if (confidence !== undefined) {
+      await expect(canvas.getAllByText(s.verdictConfidence(confidence))).toHaveLength(BOTH_THEMES);
     }
     await expect(canvas.queryByText('Probabilities')).toBeNull();
   },
@@ -107,10 +116,9 @@ export const ChoiceInApp: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText(humanizeEnumValue(CHOICE.choice))).toHaveLength(BOTH_THEMES);
-    if (CHOICE.confidence !== undefined) {
-      await expect(canvas.getAllByText(s.verdictConfidence(CHOICE.confidence))).toHaveLength(
-        BOTH_THEMES,
-      );
+    const confidence = measureOf(CHOICE.confidence);
+    if (confidence !== undefined) {
+      await expect(canvas.getAllByText(s.verdictConfidence(confidence))).toHaveLength(BOTH_THEMES);
     }
   },
 };
@@ -123,10 +131,11 @@ export const YesNoInFrench: Story = {
     const canvas = within(canvasElement);
     const fr = FR_FIELD_STRINGS;
     await expect(canvas.getAllByText(YES_NO.yes_no ? fr.yes : fr.no)).toHaveLength(BOTH_THEMES);
-    if (YES_NO.probability !== undefined) {
+    const probability = measureOf(YES_NO.probability);
+    if (probability !== undefined) {
       // The page's text is matched with its spaces collapsed, and French puts
       // a no-break space before the colon and the percent sign.
-      const measure = fr.yesProbability(YES_NO.probability).replace(/\s+/g, ' ');
+      const measure = fr.yesProbability(probability).replace(/\s+/g, ' ');
       await expect(canvas.getAllByText(measure)).toHaveLength(BOTH_THEMES);
     }
   },
@@ -143,8 +152,9 @@ export const RatingInStudio: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText('level')).toHaveLength(BOTH_THEMES);
     await expect(canvas.getAllByText('confidence')).toHaveLength(BOTH_THEMES);
-    if (RATING.confidence !== undefined) {
-      await expect(canvas.queryByText(s.verdictConfidence(RATING.confidence))).toBeNull();
+    const confidence = measureOf(RATING.confidence);
+    if (confidence !== undefined) {
+      await expect(canvas.queryByText(s.verdictConfidence(confidence))).toBeNull();
     }
   },
 };
