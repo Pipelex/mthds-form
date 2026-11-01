@@ -1,10 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { DOCUMENT_FORMATS } from '../../core';
 import type { FileRunField } from '../../core/descriptor';
-import { DEFAULT_FIELD_STRINGS, StuffViewer } from '../../react';
+import {
+  DEFAULT_FIELD_STRINGS,
+  FieldPresentationProvider,
+  StuffViewer,
+  type FieldPresentation,
+} from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
+import { expectTouchTarget, VIEWPORTS } from '../touch-target';
 import { PDF_URL, REPORT } from './media-payloads';
 
 /**
@@ -48,10 +54,18 @@ const document: FileRunField = {
   formats: DOCUMENT_FORMATS,
 };
 
-function Preview({ value }: { value: unknown }) {
+function Preview({
+  value,
+  presentation = 'studio',
+}: {
+  value: unknown;
+  presentation?: FieldPresentation;
+}) {
   return (
     <div style={{ maxWidth: 640 }}>
-      <StuffViewer field={document} value={value} />
+      <FieldPresentationProvider presentation={presentation}>
+        <StuffViewer field={document} value={value} />
+      </FieldPresentationProvider>
     </div>
   );
 }
@@ -168,5 +182,228 @@ export const ANestedReport: StoryObj<typeof ResultView> = {
       0,
     );
     await expect(canvas.queryByText(/\[object Object\]/)).toBeNull();
+  },
+};
+
+// ─── A PDF that is the whole result ──────────────────────────────────────────
+
+/** The served PDF as the whole result, as `A PDF → previewable` names it. */
+const SOLAR_SYSTEM = {
+  url: PDF_URL,
+  filename: 'solar_system.pdf',
+  mime_type: 'application/pdf',
+  title: 'The Solar System: An Overview',
+  snippet: 'The Solar System is a gravitationally bound system comprising the Sun…',
+};
+
+/**
+ * Pins what the browser says of its PDF viewer for one story, and gives the
+ * browser its own answer back afterwards.
+ *
+ * The result view asks `navigator.pdfViewerEnabled`, and the answer is the
+ * browser's: the headless Chromium the stories run in says it has no viewer,
+ * as Android's browsers do, and a desktop browser says it has one. A story
+ * about one case has to say which it is, so it reads the same in both.
+ */
+function pdfViewer(enabled: boolean) {
+  return () => {
+    Object.defineProperty(navigator, 'pdfViewerEnabled', {
+      configurable: true,
+      get: () => enabled,
+    });
+    return () => {
+      delete (navigator as { pdfViewerEnabled?: boolean }).pdfViewerEnabled;
+    };
+  };
+}
+
+/** The frames showing the served PDF, one in each theme pane. */
+function pdfFrames(canvasElement: HTMLElement): HTMLIFrameElement[] {
+  return [...canvasElement.querySelectorAll<HTMLIFrameElement>('iframe')].filter(
+    (frame) => frame.getAttribute('src') === PDF_URL,
+  );
+}
+
+/**
+ * A frame the size of a page: as wide as the result, √2 times as tall as it is
+ * wide, never taller than 80% of the screen and never shorter than 320px.
+ */
+async function expectPageSized(frame: HTMLElement) {
+  const { width, height } = frame.getBoundingClientRect();
+  const column = frame.parentElement!.getBoundingClientRect().width;
+  await expect(Math.abs(width - column)).toBeLessThanOrEqual(0.5);
+  const page = Math.max(320, Math.min(width * 1.414, window.innerHeight * 0.8));
+  await expect(Math.abs(height - page)).toBeLessThanOrEqual(1);
+}
+
+/**
+ * **A PDF that is the whole result, in an app: its pages, with no click.** The
+ * reader of a method app came for the file, so in `app` the result opens on
+ * it, framed at a page's size, with no Preview toggle in front of it. The
+ * viewer is pinned on, as on a desktop browser.
+ */
+export const ALonePdf: Story = {
+  name: 'A PDF that is the whole result, in an app → open',
+  args: { value: SOLAR_SYSTEM, presentation: 'app' },
+  beforeEach: pdfViewer(true),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const frames = pdfFrames(canvasElement);
+    await expect(frames).toHaveLength(2);
+    for (const frame of frames) {
+      await expect(frame.getAttribute('title')).toBe(SOLAR_SYSTEM.title);
+      await expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
+      await expect(frame.hasAttribute('sandbox')).toBe(false);
+    }
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
+  },
+};
+
+/** The screens the page-sized frame is held to: a phone, a tablet and a desktop. */
+const SCREENS = {
+  ...VIEWPORTS,
+  tablet: { name: 'Tablet, 768', styles: { width: '768px', height: '1024px' }, type: 'tablet' },
+} as const;
+
+/** A story of the lone PDF pinned to one of `SCREENS`, asserting the frame's size there. */
+function lonePdfOn(screen: keyof typeof SCREENS): Story {
+  return {
+    name: `A lone PDF, ${screen}`,
+    args: { value: SOLAR_SYSTEM, presentation: 'app' },
+    beforeEach: pdfViewer(true),
+    parameters: {
+      viewport: { options: SCREENS },
+      ...(screen === 'phone' ? { themePairStacked: true, themePairPadding: 24 } : {}),
+    },
+    globals: { viewport: { value: screen, isRotated: false } },
+    play: async ({ canvasElement }) => {
+      const width = Number.parseInt(SCREENS[screen].styles.width, 10);
+      await waitFor(() => expect(window.innerWidth).toBe(width));
+      const frames = pdfFrames(canvasElement);
+      await expect(frames).toHaveLength(2);
+      for (const frame of frames) await expectPageSized(frame);
+    },
+  };
+}
+
+/** On a phone the frame is a page tall, which there is less than the screen. */
+export const ALonePdfPhone = lonePdfOn('phone');
+/** On a tablet, likewise a page tall. */
+export const ALonePdfTablet = lonePdfOn('tablet');
+/** On a desktop a page is taller than the screen, and the frame stops at 80% of it. */
+export const ALonePdfDesktop = lonePdfOn('desktop');
+
+/**
+ * **A PDF inside a larger result keeps its toggle.** The report's source
+ * document is one field of a structure, so in `app` it is still named with a
+ * Preview, closed, and the frame opens on the click.
+ */
+export const ANestedPdf: StoryObj<typeof ResultView> = {
+  name: 'A PDF inside a report, in an app → toggle',
+  render: (args) => <ResultView {...args} />,
+  args: {
+    contracts: CONTRACTS,
+    outputForm: OUTPUT_FORM,
+    domain: 'results',
+    pipeCode: 'nested_media_result',
+    value: REPORT,
+    maxWidth: 720,
+    presentation: 'app',
+  },
+  beforeEach: pdfViewer(true),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggles = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
+    await expect(toggles).toHaveLength(2);
+    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await expect(pdfFrames(canvasElement)).toHaveLength(0);
+    await userEvent.click(toggles[0]!);
+    await expect(toggles[0]!.getAttribute('aria-expanded')).toBe('true');
+    await expect(pdfFrames(canvasElement)).toHaveLength(1);
+  },
+};
+
+/** The card's actions in each theme pane: the link and the download beside it. */
+function cardActions(canvasElement: HTMLElement): HTMLElement[] {
+  const canvas = within(canvasElement);
+  return [
+    ...canvas.getAllByRole('link', { name: DEFAULT_FIELD_STRINGS.openInNewTab }),
+    ...canvas
+      .getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.downloadFile('solar_system.pdf') })
+      .filter((button) => button.textContent === DEFAULT_FIELD_STRINGS.download),
+  ];
+}
+
+/**
+ * **A browser with no PDF viewer: a card, never a blank frame.** Android's
+ * browsers and headless ones draw no PDF in a page, and say so. The result then
+ * shows the file's name, a sentence saying it cannot be shown here, and two
+ * ways to it: a new tab, where a phone hands it to whatever reads PDFs, and
+ * its download.
+ */
+export const NoPdfViewer: Story = {
+  name: 'No PDF viewer → a card',
+  args: { value: SOLAR_SYSTEM, presentation: 'app' },
+  beforeEach: pdfViewer(false),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvasElement.querySelectorAll('iframe')).toHaveLength(0);
+    await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(2);
+    for (const link of canvas.getAllByRole('link', { name: DEFAULT_FIELD_STRINGS.openInNewTab })) {
+      await expect(link.getAttribute('href')).toBe(PDF_URL);
+      await expect(link.getAttribute('target')).toBe('_blank');
+    }
+    // The link and the download, in each theme.
+    await expect(cardActions(canvasElement)).toHaveLength(2 * 2);
+  },
+};
+
+/** The same card on a phone, where each of its actions is 44 pixels tall. */
+export const NoPdfViewerPhone: Story = {
+  name: 'No PDF viewer, phone',
+  args: { value: SOLAR_SYSTEM, presentation: 'app' },
+  beforeEach: pdfViewer(false),
+  parameters: {
+    viewport: { options: VIEWPORTS },
+    themePairStacked: true,
+    themePairPadding: 24,
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => expect(window.innerWidth).toBe(375));
+    const actions = cardActions(canvasElement);
+    await expect(actions).toHaveLength(2 * 2);
+    for (const action of actions) await expectTouchTarget(action);
+  },
+};
+
+/**
+ * **The same card behind a toggle.** A PDF inside a report, in a browser with
+ * no viewer, keeps its Preview, and opening it shows the card rather than a
+ * blank frame.
+ */
+export const NoPdfViewerNested: StoryObj<typeof ResultView> = {
+  name: 'No PDF viewer, a PDF inside a report → the same card',
+  render: (args) => <ResultView {...args} />,
+  args: {
+    contracts: CONTRACTS,
+    outputForm: OUTPUT_FORM,
+    domain: 'results',
+    pipeCode: 'nested_media_result',
+    value: REPORT,
+    maxWidth: 720,
+    presentation: 'app',
+  },
+  beforeEach: pdfViewer(false),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(0);
+    for (const toggle of canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })) {
+      await userEvent.click(toggle);
+    }
+    await expect(pdfFrames(canvasElement)).toHaveLength(0);
+    await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(2);
   },
 };
