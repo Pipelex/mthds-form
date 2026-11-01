@@ -3,8 +3,14 @@
 import type * as React from 'react';
 import type { EnumRunField, ObjectRunField, RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
-import type { CompositeMember, DocumentContentView } from '../core/native-content';
+import type {
+  CompositeMember,
+  DateContentView,
+  DocumentContentView,
+  HtmlContentView,
+} from '../core/native-content';
 import {
+  TYPED_SCALAR_MARKERS,
   formatDateContent,
   isNativeCompositeNode,
   isNativeDateNode,
@@ -2003,18 +2009,21 @@ function ObjectTable({
  *
  * `readHtmlContent`, `readDateContent`, `readDocumentContent` and the rest
  * already exist and are already payload readers — elsewhere in this file the
- * DESCRIPTOR chooses which one to call. Here nothing can, so they are tried in
- * order of specificity, and a member that matches none is shown raw. What that
- * costs is precision on a member whose content model this version does not
- * know; what it buys is that a composite of two summaries reads as two
- * summaries instead of forty lines of escaped JSON.
+ * DESCRIPTOR chooses which one to call. Here nothing can, so a member's record
+ * is read as a content model only when every member it holds is one that model
+ * declares (`readMemberContent`), and a member that matches none is shown raw.
+ * What that costs is precision on a member whose content model this version
+ * does not know; what it buys is that a composite of two summaries reads as two
+ * summaries instead of forty lines of escaped JSON, while a structure that
+ * happens to carry a `date`, a `url` or a `text` keeps every other member.
  *
- * The order matters and is by narrowness: `inner_html` and `date` name
- * themselves, a `url` with an image media type or a pixel size is a picture,
- * any other `url` is a file, `items` or a bare array is a list, and `text` is
- * last of the recognised set because several models carry a `text` member
- * beside their own (a `Page`, for one). A list whose entries are all records
- * none of those claim is a list of structures, and is drawn as a table.
+ * A bare string is text and a bare array is a list. A record holding only
+ * `inner_html` and `css_class` is a page, only a date's members a date, only an
+ * image's a picture, only a document's a file, only `items` a list and only
+ * `text` a text; a picture and a file share their `url`, so the media type
+ * decides between them when the record holds only the members both declare. A
+ * list whose entries are all records none of those claim is a list of
+ * structures, and is drawn as a table.
  */
 function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
   // A member's name is the identifier the method composed it under. A builder
@@ -2054,87 +2063,169 @@ function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
  */
 function NativeValue({ value, label }: { value: unknown; label: string }) {
   if (value === null || value === undefined || value === '') return <Absent />;
-
-  const html = readHtmlContent(value);
-  // A composite member carries no file controls, as its download carries none.
-  if (html) return <HtmlPreview content={html} downloadPdf={false} />;
-
-  // A date only as a record, `{date, time}` or the serializer's typed envelope,
-  // whose `date` member names it. A bare string names nothing, and a member that
-  // is one is text, typeset below; read as a date it printed Markdown as a line.
-  const date = isRecord(value) ? readDateContent(value) : undefined;
-  if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
-
-  // A picture, before a document, because both carry a `url`: an `ImageContent`
-  // is the one of the two that states an image media type, or the pixel size a
-  // document never has. It is drawn, as an image result is, rather than named
-  // as a link to a file.
-  if (isPicture(value)) return <ImageValue value={value} downloadable={false} />;
-
-  const document = readDocumentContent(value);
-  if (document?.url !== undefined) {
-    return (
-      <FileRef
-        url={document.url}
-        {...(document.mimeType !== undefined ? { mimeType: document.mimeType } : {})}
-        {...(document.filename !== undefined ? { filename: document.filename } : {})}
-      />
-    );
-  }
-
-  // A plural member: in the `ListContent` envelope when the runner hydrated
-  // it, a bare array when it rendered the member raw, as a plural result
-  // arrives either way.
-  const items = isRecord(value) && Array.isArray(value.items) ? value.items : value;
-  if (Array.isArray(items)) {
-    if (items.length === 0) return <Absent />;
-    // Records that are none of the contents above are structures, and a list
-    // of structures reads as a table, as it does wherever a descriptor states
-    // one.
-    if (items.every(isPlainRecord)) return <RecordsTable items={items} label={label} />;
-    return (
-      <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
-        {items.map((item, index) => (
-          <div key={index} className="bg-card/40 px-3 py-1.5">
-            <NativeValue value={item} label={label} />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // `text` last of the recognised models: several carry one beside their own.
-  if (isRecord(value)) {
-    const text = value.text;
-    if (typeof text === 'string') {
-      return text === '' ? <Absent /> : <Markdown text={text} />;
-    }
-  }
-
+  // A bare string names no model, and is text: read as a date, a member that
+  // is one printed Markdown as a line.
   if (typeof value === 'string') return <Markdown text={value} />;
-  if (typeof value !== 'object') return <Scalar value={value} />;
-  return <RawValue value={value} compact={false} />;
+  // A plural member rendered raw, as a plural result can arrive.
+  if (Array.isArray(value)) return <NativeList items={value} label={label} />;
+  if (!isRecord(value)) return <Scalar value={value} />;
+
+  const content = readMemberContent(value);
+  switch (content?.model) {
+    case 'html':
+      // A composite member carries no file controls, as its download carries none.
+      return <HtmlPreview content={content.html} downloadPdf={false} />;
+    case 'date':
+      return <span className="text-[13px] text-foreground">{formatDateContent(content.date)}</span>;
+    case 'image':
+      // Drawn, as an image result is, rather than named as a link to a file.
+      return <ImageValue value={value} downloadable={false} />;
+    case 'document':
+      return (
+        <FileRef
+          url={content.document.url}
+          {...(content.document.mimeType !== undefined
+            ? { mimeType: content.document.mimeType }
+            : {})}
+          {...(content.document.filename !== undefined
+            ? { filename: content.document.filename }
+            : {})}
+        />
+      );
+    case 'list':
+      // A plural member in the `ListContent` envelope, as the runner hydrates one.
+      return <NativeList items={content.items} label={label} />;
+    case 'text':
+      return content.text === '' ? <Absent /> : <Markdown text={content.text} />;
+    case undefined:
+      // A record no content model claims, a structure's or one that carries a
+      // model's member beside members of its own: shown whole, never with the
+      // members a model does not declare dropped.
+      return <RawValue value={value} compact={false} />;
+  }
 }
 
-/** An `ImageContent`: a `url`, with an image media type or the pixel size only an image has. */
-function isPicture(value: unknown): boolean {
-  const content = readImageContent(value);
-  if (!content) return false;
-  if (content.mimeType?.toLowerCase().startsWith('image/')) return true;
-  return content.width !== undefined && content.height !== undefined;
+/** A composite member that is a list: a table of structures, or one content per line. */
+function NativeList({ items, label }: { items: readonly unknown[]; label: string }) {
+  if (items.length === 0) return <Absent />;
+  // Records that are none of the content models are structures, and a list of
+  // structures reads as a table, as it does wherever a descriptor states one.
+  if (items.every(isPlainRecord)) return <RecordsTable items={items} label={label} />;
+  return (
+    <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+      {items.map((item, index) => (
+        <div key={index} className="bg-card/40 px-3 py-1.5">
+          <NativeValue value={item} label={label} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**
- * A record no content model above claims: a structure the composite holds,
- * whose members are values rather than a page, a date, a file, a list or a
- * text. Asked of every entry of a list before it is drawn as a table.
+ * The members each content model a composite member may be declares, as the
+ * runtime's models state them, never as the readers below read them: a record
+ * is read as a model only when every member it holds is one of these.
+ *
+ * Without that rule a record was claimed by the first model whose one member
+ * it carried, and every member that model does not declare was dropped: a
+ * structure's `{date, amount, payee}` read as a date, `{name, url, price}` as a
+ * file and `{text, score}` as a text, each losing the rest. A date also arrives
+ * in the serializer's typed envelope, so its two markers are a date's members.
+ */
+const TEXT_MEMBERS: ReadonlySet<string> = new Set(['text']);
+const DATE_MEMBERS: ReadonlySet<string> = new Set(['date', 'time', ...TYPED_SCALAR_MARKERS]);
+const HTML_MEMBERS: ReadonlySet<string> = new Set(['inner_html', 'css_class']);
+const DOCUMENT_MEMBERS: ReadonlySet<string> = new Set([
+  'url',
+  'public_url',
+  'mime_type',
+  'filename',
+  'title',
+  'snippet',
+]);
+const IMAGE_MEMBERS: ReadonlySet<string> = new Set([
+  'url',
+  'public_url',
+  'source_prompt',
+  'source_negative_prompt',
+  'caption',
+  'mime_type',
+  'width',
+  'height',
+  'filename',
+]);
+const LIST_MEMBERS: ReadonlySet<string> = new Set(['items']);
+
+/** Whether every member the record holds is one the model declares. */
+function holdsOnly(record: Record<string, unknown>, members: ReadonlySet<string>): boolean {
+  return Object.keys(record).every((key) => members.has(key));
+}
+
+/** A composite member read as the content model that claims it. */
+type MemberContent =
+  | { model: 'html'; html: HtmlContentView }
+  | { model: 'date'; date: DateContentView }
+  | { model: 'image' }
+  | { model: 'document'; document: DocumentContentView }
+  | { model: 'list'; items: readonly unknown[] }
+  | { model: 'text'; text: string };
+
+/**
+ * The content model a composite member's record is, read through the
+ * standard's readers, or `undefined` when none claims it. The one answer both
+ * `NativeValue` and `isPlainRecord` read, so a record drawn as a table row is
+ * never one a member would have drawn as a content, nor the other way round.
+ *
+ * Each model claims a record only when the record holds nothing that model
+ * does not declare and carries the member its reader requires. A picture and
+ * a document both carry a `url`: a record holding a member only an image
+ * declares (a caption, a prompt, a pixel size) is a picture, and one holding
+ * only the members both declare is a picture when its media type is an
+ * image's, and a document otherwise.
+ */
+function readMemberContent(record: Record<string, unknown>): MemberContent | undefined {
+  if (holdsOnly(record, HTML_MEMBERS)) {
+    const html = readHtmlContent(record);
+    if (html) return { model: 'html', html };
+  }
+  if (holdsOnly(record, DATE_MEMBERS)) {
+    const date = readDateContent(record);
+    if (date) return { model: 'date', date };
+  }
+  if (holdsOnly(record, IMAGE_MEMBERS)) {
+    const image = readImageContent(record);
+    if (
+      image &&
+      (!holdsOnly(record, DOCUMENT_MEMBERS) ||
+        image.mimeType?.toLowerCase().startsWith('image/') === true)
+    ) {
+      return { model: 'image' };
+    }
+  }
+  if (holdsOnly(record, DOCUMENT_MEMBERS)) {
+    const document = readDocumentContent(record);
+    if (document) return { model: 'document', document };
+  }
+  if (holdsOnly(record, LIST_MEMBERS)) {
+    const items = ownProp(record, 'items');
+    if (Array.isArray(items)) return { model: 'list', items };
+  }
+  if (holdsOnly(record, TEXT_MEMBERS)) {
+    const text = ownProp(record, 'text');
+    if (typeof text === 'string') return { model: 'text', text };
+  }
+  return undefined;
+}
+
+/**
+ * A record no content model claims: a structure the composite holds, whose
+ * members are values rather than a page, a date, a file, a list or a text.
+ * Asked of every entry of a list before it is drawn as a table.
  */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value) || Object.keys(value).length === 0) return false;
-  if (readHtmlContent(value) || readDateContent(value)) return false;
-  if (readDocumentContent(value)?.url !== undefined) return false;
-  if (Array.isArray(value.items) || typeof value.text === 'string') return false;
-  return true;
+  return readMemberContent(value) === undefined;
 }
 
 /**

@@ -444,4 +444,66 @@ describe('a native.Composite result', () => {
     expect(container.querySelector('img')).toBeNull();
     expect(container.textContent).toContain(value.cover_picture.url.split('/').pop());
   });
+
+  it('reads each real member as the content model it is', () => {
+    const { container } = inPresentation(
+      'app',
+      <ResultEnvProvider resolveUrl={resolveUrl}>
+        <StuffViewer field={report} value={value} />
+      </ResultEnvProvider>,
+    );
+    // The summary's text is typeset, the picture painted, the risks tabulated.
+    expect(screen.getByRole('heading', { name: 'Launch Executive Summary' })).toBeTruthy();
+    expect(container.querySelector(`img[src="${served}"]`)).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Main risks' })).toBeTruthy();
+  });
+
+  /** The table a member that is a list of records is drawn as, by its rows' cell texts. */
+  function memberTable(member: unknown[]): string[][] {
+    inPresentation('app', <StuffViewer field={report} value={{ ...value, ledger: member }} />);
+    const table = within(screen.getByRole('group', { name: 'Ledger' })).getByRole('table');
+    return within(table)
+      .getAllByRole('row')
+      .map((row) => Array.from(row.querySelectorAll('th, td'), (cell) => cell.textContent ?? ''));
+  }
+
+  // Each record carries one member a content model declares beside members of
+  // its own, so no model claims it, and every member is kept.
+  it('keeps every member of a record that carries a date beside its own', () => {
+    expect(memberTable([{ date: '2026-01-02', amount: 12.5, payee: 'Acme' }])).toEqual([
+      ['Date', 'Amount', 'Payee'],
+      ['2026-01-02', '12.5', 'Acme'],
+    ]);
+  });
+
+  it('keeps every member of a record that carries a url beside its own', () => {
+    expect(memberTable([{ name: 'Widget', url: 'https://example.com/w', price: 9 }])).toEqual([
+      ['Name', 'Url', 'Price'],
+      ['Widget', 'https://example.com/w', '9'],
+    ]);
+  });
+
+  it('keeps every member of a record that carries a text beside its own', () => {
+    expect(memberTable([{ text: 'Finding one', score: 0.9 }])).toEqual([
+      ['Text', 'Score'],
+      ['Finding one', '0.9'],
+    ]);
+  });
+
+  it("reads a date in the serializer's typed envelope as a date, bare or hydrated", () => {
+    const markers = { __class__: 'date', __module__: 'datetime' };
+    const { container } = inPresentation(
+      'app',
+      <StuffViewer
+        field={report}
+        value={{
+          signed_on: { date: '2026-01-02', ...markers },
+          starts_at: { date: { date: '2026-03-04', ...markers }, time: '10:30:00' },
+        }}
+      />,
+    );
+    expect(screen.getByText('2026-01-02')).toBeTruthy();
+    expect(screen.getByText('2026-03-04 10:30:00')).toBeTruthy();
+    expect(container.textContent).not.toContain('__class__');
+  });
 });

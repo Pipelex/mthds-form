@@ -18,6 +18,7 @@
 
 - **A list of stored pictures the host resolves is a gallery**: a list of images whose files only the host's `resolveUrl` can serve (no `public_url`, or a `file:` one) is now drawn as a grid of pictures, asking the resolver as each picture does; it used to ask the payload alone, find nothing it could paint and stack the pictures as full-width rows. See [docs/result-view.md](docs/result-view.md#files).
 - **A composite member that is a bare string is typeset**: a `native.Composite` member that arrives as a plain string is drawn as the Markdown it is; it used to be read as a date, because the date reader takes any string, and was printed as one plain line with its Markdown showing. See [docs/result-view.md](docs/result-view.md#nativecomposite-the-one-arm-that-reads-the-value).
+- **A composite member keeps the members no content model declares**: a record inside a `native.Composite` is read as a text, a date, a page, a file, a picture or a list only when every member it holds is one that model declares, the serializer's `__class__` and `__module__` counting as a date's; a record such as `{date, amount, payee}` or `{text, score}` used to be read as the one model whose member it carried, and every other member was dropped. A list of such records is a table, and a single one is shown whole. See [docs/result-view.md](docs/result-view.md#nativecomposite-the-one-arm-that-reads-the-value).
 
 ## [v0.24.0] - 2026-10-31
 
