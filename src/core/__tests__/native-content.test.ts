@@ -292,9 +292,9 @@ describe('native.Page', () => {
   });
 
   it('is not one of the natives a list draws one per line', () => {
-    // The generative layer reads `isNativeValueNode` into its brief, so a page
-    // joining it would move every captured layout's prompt. The result view
-    // asks `isNativePageNode` beside it instead.
+    // The generative layer reads `isNativeValueNode` to decide what it
+    // delegates to the kernel, and it does not delegate a page yet. The result
+    // view asks `isNativePageNode` beside it instead.
     expect(pages.kind === 'list' && isNativeValueNode(pages.item)).toBe(false);
   });
 
