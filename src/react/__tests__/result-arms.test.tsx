@@ -426,6 +426,19 @@ describe('a native.Composite result', () => {
     expect(within(table).getByRole('columnheader', { name: 'likelihood' })).toBeTruthy();
   });
 
+  it('typesets a member that is a bare Markdown string, rather than reading it as a date', () => {
+    const { container } = inPresentation(
+      'app',
+      <StuffViewer
+        field={report}
+        value={{ ...value, executive_summary: '## Launch\n\nThe launch is **on track**.' }}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'Launch' })).toBeTruthy();
+    expect(container.querySelector('strong')?.textContent).toBe('on track');
+    expect(container.textContent).not.toContain('## Launch');
+  });
+
   it('names the picture rather than painting it when nothing resolves its reference', () => {
     const { container } = inPresentation('app', <StuffViewer field={report} value={value} />);
     expect(container.querySelector('img')).toBeNull();

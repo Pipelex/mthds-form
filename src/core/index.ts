@@ -82,11 +82,11 @@ export { narrowFileFormats } from './narrow-file-formats';
 
 // ...and how to READ what one comes back as. The result side's twin of that
 // table: the pinned content models of `native.Document`, `native.Image`,
-// `native.Date`, `native.Page` and the three verdicts, read by the kind or the
-// concept the descriptor STATES. It lives in core rather than beside the
-// control that renders it for the same reason the format table does - a host
-// showing a result its own way needs the same answer, and two copies of an
-// answer is two places for it to drift. See ./native-content.
+// `native.Date`, `native.Page` and the verdicts (yes/no, rating, choice), read
+// by the kind or the concept the descriptor STATES. It lives in core rather
+// than beside the control that renders it for the same reason the format table
+// does - a host showing a result its own way needs the same answer, and two
+// copies of an answer is two places for it to drift. See ./native-content.
 export type {
   ChoiceContentView,
   CompositeMember,

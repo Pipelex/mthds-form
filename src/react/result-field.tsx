@@ -110,9 +110,10 @@ import { cn } from './utils';
  * standard's own page names as the supported way to ask it.
  *
  * The same membership test keys the other concepts the kind vocabulary cannot
- * name: `native.Date`, `native.Composite`, `native.Page`, and in `app` the three
- * verdicts a judge returns (`native.YesNo`, `native.Rating`, `native.Choice`).
- * See `docs/result-view.md` for each.
+ * name: `native.Date`, `native.Composite`, `native.Page`, and in `app` the
+ * verdicts a judge returns: a yes or no (`native.YesNo`), a rating
+ * (`native.Rating`) and a choice (`native.Choice`). See `docs/result-view.md`
+ * for each.
  */
 
 /**
@@ -2058,7 +2059,10 @@ function NativeValue({ value, label }: { value: unknown; label: string }) {
   // A composite member carries no file controls, as its download carries none.
   if (html) return <HtmlPreview content={html} downloadPdf={false} />;
 
-  const date = readDateContent(value);
+  // A date only as a record, `{date, time}` or the serializer's typed envelope,
+  // whose `date` member names it. A bare string names nothing, and a member that
+  // is one is text, typeset below; read as a date it printed Markdown as a line.
+  const date = isRecord(value) ? readDateContent(value) : undefined;
   if (date) return <span className="text-[13px] text-foreground">{formatDateContent(date)}</span>;
 
   // A picture, before a document, because both carry a `url`: an `ImageContent`
@@ -2152,7 +2156,6 @@ function RecordsTable({
   items: readonly Record<string, unknown>[];
   label: string;
 }) {
-  const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
   const columns: string[] = [];
@@ -2191,7 +2194,7 @@ function RecordsTable({
                 return (
                   <td key={column} className="px-2.5 py-1.5 align-top">
                     {typeof cell === 'boolean' ? (
-                      <span className="text-[13px] text-foreground">{cell ? s.yes : s.no}</span>
+                      <Bool value={cell} />
                     ) : typeof cell === 'object' && cell !== null ? (
                       <NativeValue value={cell} label={humanizeFieldName(column)} />
                     ) : (

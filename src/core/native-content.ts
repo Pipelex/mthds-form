@@ -382,9 +382,9 @@ export function isNativePageNode(node: NativeNode): boolean {
 }
 
 /**
- * Whether a node is one of the three verdicts a judge returns — a
- * `native.YesNo`, a `native.Rating` or a `native.Choice`, or a concept
- * refining one — and which.
+ * Whether a node is one of the verdicts a judge returns — a yes or no
+ * (`native.YesNo`), a rating (`native.Rating`) or a choice (`native.Choice`),
+ * or a concept refining one — and which.
  *
  * Their nodes are `object`s over the verdict and its measures (a `YesNo` from
  * an older runtime, whose model had one member, is a `boolean` node unwrapped
@@ -401,15 +401,15 @@ export function nativeVerdictOf(node: NativeNode): 'yes_no' | 'rating' | 'choice
 }
 
 /**
- * Whether a node is one of the three natives the kind vocabulary cannot name —
- * a date, a page, a composite — which a renderer reads by CONCEPT before it
- * reads the kind. A list of one answers no (the predicates refuse a `list`
- * node), and its item answers yes.
+ * Whether a node is one of the natives the kind vocabulary cannot name that a
+ * list draws one value per line — a date, an HTML page, a composite — which a
+ * renderer reads by CONCEPT before it reads the kind. A list of one answers no
+ * (the predicates refuse a `list` node), and its item answers yes.
  *
  * One answer, read twice: the result view renders a list whose item answers yes
  * one value per line rather than as a table, and the generative layer delegates
  * that list to the kernel, because no catalog component reads a native value.
- * Not re-exported: a host asks the three predicates it needs.
+ * Not re-exported: a host asks the predicates it needs.
  */
 export function isNativeValueNode(node: NativeNode): boolean {
   return isNativeDateNode(node) || isNativeHtmlNode(node) || isNativeCompositeNode(node);
