@@ -2251,10 +2251,14 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
   // A grid of empty squares is not a gallery. When NOTHING here can be painted -
   // every URL a storage reference the host has no resolver for - the tiles carry
   // no picture, and three large blanks say less than three lines would. So the
-  // layout follows what is actually showable rather than what the kind promises.
+  // layout follows what is actually showable rather than what the kind promises,
+  // asked exactly as each tile asks it (`paintableUrl`, the host's resolver
+  // first): a stored picture the host resolves is showable, and a gallery of
+  // them is a gallery.
+  const resolve = useResolveUrl();
   const anyViewable = items.some((item) => {
     const content = readImageContent(item);
-    return content ? !!(viewableUrl(content.publicUrl) ?? viewableUrl(content.url)) : false;
+    return content ? paintableUrl(content, resolve) !== undefined : false;
   });
   if (!anyViewable) return <FileRows items={items} kind="image" />;
   return (

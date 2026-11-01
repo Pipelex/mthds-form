@@ -1041,6 +1041,30 @@ describe('lists of files', () => {
     expect(screen.getByText('b.png')).toBeTruthy();
   });
 
+  it("is a gallery of stored pictures the host's resolver serves", () => {
+    // The layout asks the resolver as each tile does. It used to ask the payload
+    // alone, so stored pictures a host resolves (no `public_url`, or a `file:`
+    // one) fell back to full-width rows, each painted at its full size.
+    const resolveUrl = (url: string) => `/api/assets/${url.split('/').pop()}`;
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={resolveUrl}>
+        <ResultField
+          field={list('shots', file('item', 'image'))}
+          value={[
+            { url: 'pipelex-storage://x/a.png', public_url: null, mime_type: 'image/png' },
+            { url: 'pipelex-storage://x/b.png', public_url: 'file:///tmp/b.png' },
+          ]}
+        />
+      </ResultEnvProvider>,
+    );
+    const pictures = [...container.querySelectorAll('img')];
+    expect(pictures.map((picture) => picture.getAttribute('src'))).toEqual([
+      '/api/assets/a.png',
+      '/api/assets/b.png',
+    ]);
+    expect(pictures.every((picture) => picture.className.includes('aspect-square'))).toBe(true);
+  });
+
   it('renders a list of documents as rows, not cards', () => {
     // A document's whole content is a name and a link; a bordered box with an
     // index around two fields spends the chrome of a structure on them.
