@@ -51,6 +51,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FileText,
@@ -60,6 +61,7 @@ import {
 } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
 import { FocusFrame } from './focus-frame';
+import { usePdfViewer } from './pdf-viewer';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
 import { PdfDownloadButton } from './pdf-download-button';
@@ -423,6 +425,14 @@ function pathLabel(url: string): string {
  */
 const FILE_BUTTON_ON_A_PHONE = 'max-sm:grid max-sm:size-11 max-sm:place-items-center';
 
+/**
+ * An action that carries its word beside its icon, drawn as a document's
+ * Preview is: a small bordered button, 44px tall below `sm`. Its colour is the
+ * caller's.
+ */
+const CARD_ACTION =
+  'inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] hover:bg-card max-sm:min-h-11 max-sm:px-3';
+
 function CopyButton({
   value,
   provide,
@@ -640,8 +650,12 @@ interface FileSaveAttempt {
  * A file that does not arrive says so, on the button and to assistive
  * technology, until the reader tries again. The success mark reverts after a
  * moment, as the copy control's does.
+ *
+ * `labelled` draws it as a button with its word beside the icon, for a card
+ * whose actions are the point of it (a PDF the browser cannot show); beside a
+ * file's reference it is the icon alone.
  */
-function FileDownloadButton({ file }: { file: StuffFile }) {
+function FileDownloadButton({ file, labelled = false }: { file: StuffFile; labelled?: boolean }) {
   const s = useFieldStrings();
   const location = useResultLocation();
   const resolve = useResolveUrl();
@@ -698,9 +712,13 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         title={failed ? s.downloadFileFailed : label}
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
-          'shrink-0 rounded p-0.5 hover:bg-card disabled:opacity-60',
+          labelled
+            ? cn(CARD_ACTION, 'disabled:opacity-60')
+            : cn(
+                'shrink-0 rounded p-0.5 hover:bg-card disabled:opacity-60',
+                FILE_BUTTON_ON_A_PHONE,
+              ),
           focusOutlineClass,
-          FILE_BUTTON_ON_A_PHONE,
           failed ? 'text-destructive' : 'text-muted-foreground hover:text-foreground',
         )}
       >
@@ -713,6 +731,7 @@ function FileDownloadButton({ file }: { file: StuffFile }) {
         ) : (
           <Download aria-hidden className="size-3.5" />
         )}
+        {labelled && s.download}
       </button>
       <span id={statusId} role="status" className="sr-only">
         {failed ? s.downloadFileFailed : ''}
@@ -846,6 +865,18 @@ function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): str
 }
 
 /**
+ * Whether a previewable document is a PDF, read as `previewableUrl` reads
+ * renderability: the declared type when there is one, else the name's
+ * extension. Only a PDF needs the browser's PDF viewer, and only a PDF that is
+ * the whole result opens without a click.
+ */
+function isPdfDocument(content: DocumentContentView, url: string): boolean {
+  return content.mimeType
+    ? /^application\/pdf\s*(;|$)/i.test(content.mimeType)
+    : /\.pdf(\?|#|$)/i.test(content.filename ?? url);
+}
+
+/**
  * The document itself, in a frame.
  *
  * **Not the same question as `native.Html`, and the difference is the origin.**
@@ -886,31 +917,152 @@ function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): str
  *
  * The frame is a tab stop, and `FocusFrame` draws its keyboard focus, which no
  * focus selector can (see `./focus-frame`).
+ *
+ * **A PDF is framed only where the browser can draw one** (`usePdfViewer`).
+ * Where it cannot, as on Android, the frame would be blank, so the card saying
+ * so takes its place (`PdfUnavailable`). Until the browser has been asked (a
+ * render on a server, and the hydration after it) a box of the frame's size
+ * holds the place, so no frame is drawn only to be taken away. A picture framed
+ * as a document needs no PDF viewer and is framed at once.
  */
-function DocumentPreview({ url, name }: { url: string; name: string }) {
+function DocumentPreview({
+  url,
+  name,
+  pdf,
+  file,
+  whole,
+}: {
+  url: string;
+  name: string;
+  /** Whether the document is a PDF, which only a PDF viewer draws. */
+  pdf: boolean;
+  /** The file as the download reads it, for the card's own Download. */
+  file: StuffFile | undefined;
+  /** The frame is the whole result, and takes a page's size (`WHOLE_RESULT_FRAME`). */
+  whole: boolean;
+}) {
+  const viewer = usePdfViewer();
+  const size = whole ? WHOLE_RESULT_FRAME : NESTED_FRAME;
+  if (pdf && viewer === 'no') return <PdfUnavailable url={url} name={name} file={file} />;
+  if (pdf && viewer === 'unknown') {
+    return (
+      <div
+        aria-hidden
+        className={cn(
+          size,
+          'flex items-center justify-center rounded-lg border border-border bg-card/40',
+        )}
+      >
+        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
   return (
     <FocusFrame
       src={url}
       title={name}
       loading="lazy"
       referrerPolicy="no-referrer"
-      className="h-112 w-full rounded-lg border border-border bg-card/40"
+      className={cn(size, 'rounded-lg border border-border bg-card/40')}
     />
   );
 }
 
-function DocumentValue({ value }: { value: unknown }) {
+/**
+ * The size of a document's frame.
+ *
+ * Inside a larger result, opened by its toggle, it is the 28rem it always was.
+ * As the whole result it is a page: as wide as the result, as tall as an A4
+ * page at that width (√2 times it), so a page fitted to the width shows whole,
+ * and never taller than 80% of the screen, so on a desktop the document
+ * scrolls inside its frame and the reader still sees the screen around it.
+ * 20rem is its floor, for a phone held sideways.
+ */
+const NESTED_FRAME = 'h-112 w-full';
+const WHOLE_RESULT_FRAME = 'aspect-[1/1.414] max-h-[80vh] min-h-80 w-full';
+
+/**
+ * In place of a PDF's frame, where the browser draws no PDF in a page.
+ *
+ * The file's name, a sentence saying it cannot be shown here, and the two ways
+ * to it that work everywhere: a tab of its own, where a phone hands the file to
+ * whatever reads PDFs on it, and the download every file has. The link is the
+ * URL the frame would have had, the one `frameableUrl` admitted, and sends no
+ * referrer, as nothing here does. The download is a file's own button with its
+ * word beside it, so it follows the host's `downloads` setting as that button
+ * does: a host that hides the file buttons leaves the card its link alone.
+ */
+function PdfUnavailable({
+  url,
+  name,
+  file,
+}: {
+  url: string;
+  name: string;
+  file: StuffFile | undefined;
+}) {
+  const s = useFieldStrings();
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/40 px-3.5 py-3 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+        <FileText aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 space-y-0.5">
+          <p title={name} className="truncate text-[13px] font-medium text-foreground">
+            {name}
+          </p>
+          <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+            {s.pdfViewerUnavailable}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(CARD_ACTION, 'text-foreground', focusOutlineClass)}
+        >
+          <ExternalLink aria-hidden className="size-3.5" />
+          {s.openInNewTab}
+        </a>
+        {file && <FileDownloadButton file={file} labelled />}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A document: its name, its reference and snippet, and a preview where the
+ * browser can both frame and render it.
+ *
+ * **A PDF that is the whole result opens without a click, in `app`.** The
+ * reader of a method app came for that file, and a small toggle stood between
+ * them and its pages. Opened, it has no toggle at all, since closing the only
+ * thing the result holds would leave it empty. `whole` is the panel's own word
+ * that this is the whole result (`PanelResult`), so a PDF in a record, a list,
+ * a composite or a part a generative layout delegates keeps its toggle, closed.
+ *
+ * `studio` keeps the toggle on a whole result too. It is the builder's
+ * presentation and the default, also mounted in a graph's node panel that a
+ * builder moves through node after node; opening every PDF there would fetch
+ * each one and fill a narrow panel before anyone asked, and the builder's first
+ * question is usually what came back rather than what it looks like.
+ */
+function DocumentValue({ value, whole = false }: { value: unknown; whole?: boolean }) {
   const s = useFieldStrings();
   // Above the early return: a hook after one runs conditionally, which React
   // forbids and which the `<Absent />` path would trigger on any payload
   // missing a URL.
   const resolve = useResolveUrl();
+  const isApp = useFieldPresentation() === 'app';
   const [open, setOpen] = useState(false);
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
   const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename, s);
   const preview = previewableUrl(content, resolve);
+  const pdf = preview !== undefined && isPdfDocument(content, preview);
+  const opened = whole && isApp && pdf;
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -930,7 +1082,7 @@ function DocumentValue({ value }: { value: unknown }) {
             </p>
           )}
         </div>
-        {preview && (
+        {preview && !opened && (
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
@@ -949,7 +1101,9 @@ function DocumentValue({ value }: { value: unknown }) {
           </button>
         )}
       </div>
-      {preview && open && <DocumentPreview url={preview} name={name} />}
+      {preview && (opened || open) && (
+        <DocumentPreview url={preview} name={name} pdf={pdf} file={file} whole={opened} />
+      )}
     </div>
   );
 }
@@ -3164,9 +3318,13 @@ function ResultNode({
           {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
               a table cell and this stacked row cannot disagree about it. A long
               `text` value in `app` is the exception, typeset as the prose it
-              is (see `isLongText`); a chip and a cell keep it plain. */}
+              is (see `isLongText`); a chip and a cell keep it plain. So is a
+              document that is the whole result a panel shows, which is told
+              so: a PDF there opens without a click (see `DocumentValue`). */}
           {isApp && field.kind === 'text' && isLongText(unwrapped) ? (
             <Markdown text={unwrapped} />
+          ) : field.kind === 'document' && whole ? (
+            <DocumentValue value={unwrapped} whole />
           ) : (
             <LeafValue field={field} value={value} />
           )}

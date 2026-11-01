@@ -99,6 +99,8 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   preview: 'Aperçu',
   removeFileAria: 'Retirer le fichier',
   previewUnavailablePdf: 'Aperçu indisponible - ouvrez le fichier pour le consulter.',
+  pdfViewerUnavailable: 'Ce navigateur ne peut pas afficher le PDF ici.',
+  openInNewTab: 'Ouvrir dans un nouvel onglet',
   // U+002D HYPHEN-MINUS, as in the English defaults.
   resultAbsent: '-',
   resultAbsentDescription: 'Non renseigné',
