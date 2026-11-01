@@ -31,13 +31,17 @@
  *   (`<strong>`, a `<br>`) becomes its text, a line break kept as one, and its
  *   character references are decoded (`./html-entities`). Tables are found by
  *   counting `<table>` and `</table>` tags, so a table inside a cell does not
- *   end its outer table early; its rows are read as rows of the outer table,
- *   which is readable and never shows a tag.
+ *   end its outer table early, and the outer table's rows are read counting
+ *   them the same way, so a nested row's end does not end the outer row: the
+ *   nested table is part of the text of the cell holding it, a line for each
+ *   of its cells, which is readable and never shows a tag.
  * - **Any other HTML element is reduced to its text**: its tags are dropped, a
  *   block's tags (`<figure>`, `<figcaption>`, `<p>`, a `<br>`) leaving a line
  *   break so its text stays a line of its own, and a `<script>` or a `<style>`
  *   is dropped with its content, which is not text a reader reads. So a
- *   figure reads as its caption and its text. A table's own tags outside a
+ *   figure reads as its caption and its text. Inside a row of a Markdown pipe
+ *   table, where a line break would end the row, such a tag leaves a space
+ *   instead, so `| Ada | One<br>Two |` stays one row. A table's own tags outside a
  *   table that closes, and a tag whose name is not an HTML element's (an
  *   autolink such as `<https://…>`, a placeholder such as `<name>`), are left
  *   to the walker, which shows them as source: a table whose closing tag never
@@ -84,6 +88,7 @@ export type ExtractedSegment =
  */
 export function splitExtractedText(text: string): ExtractedSegment[] {
   const segments: ExtractedSegment[] = [];
+  const tableRows = text.includes('|') ? pipeTableRows(text) : [];
   let markdown = '';
   let index = 0;
   while (index < text.length) {
@@ -115,6 +120,11 @@ export function splitExtractedText(text: string): ExtractedSegment[] {
           pushMarkdown(segments, markdown);
           markdown = '';
           if (markup.table) segments.push({ kind: 'table', table: markup.table });
+        } else if (markup.text === '\n' && within(tableRows, index)) {
+          // A line break inside a row of a Markdown table would end the row
+          // there, and its cells after it would become a row of their own.
+          // The walker has no line break inside a cell, so a space it is.
+          markdown += ' ';
         } else {
           markdown += markup.text;
         }
@@ -131,6 +141,76 @@ export function splitExtractedText(text: string): ExtractedSegment[] {
 
 function pushMarkdown(segments: ExtractedSegment[], text: string) {
   if (text.trim() !== '') segments.push({ kind: 'markdown', text });
+}
+
+/** A stretch of the text, from its first character to just before its end. */
+type Span = readonly [start: number, end: number];
+
+function within(spans: readonly Span[], index: number): boolean {
+  return spans.some(([start, end]) => index >= start && index < end);
+}
+
+/**
+ * The stretches of the text that are the rows of a Markdown pipe table, as
+ * GFM reads one: a header row, the delimiter row under it with as many cells
+ * (`| --- | :-: |`), then every following line that holds a pipe, up to the
+ * first that does not. A table that GFM would continue through a line holding
+ * no pipe is cut short there, which leaves that line as it would be anyway.
+ */
+function pipeTableRows(text: string): Span[] {
+  const lines: Span[] = [];
+  for (let start = 0; ;) {
+    const newline = text.indexOf('\n', start);
+    lines.push([start, newline === -1 ? text.length : newline]);
+    if (newline === -1) break;
+    start = newline + 1;
+  }
+  const lineAt = (at: number) => {
+    const [start, end] = lines[at] ?? [0, 0];
+    return text.slice(start, end);
+  };
+  const rows: Span[] = [];
+  for (let at = 1; at < lines.length; at += 1) {
+    const header = lineAt(at - 1);
+    const delimiter = lineAt(at);
+    if (!header.includes('|') || !isDelimiterRow(delimiter)) continue;
+    if (rowCells(header).length !== rowCells(delimiter).length) continue;
+    let last = at;
+    while (last + 1 < lines.length && lineAt(last + 1).includes('|')) last += 1;
+    rows.push([lines[at - 1]?.[0] ?? 0, lines[last]?.[1] ?? text.length]);
+    at = last;
+  }
+  return rows;
+}
+
+/** A table row's cells: the line between its outer pipes, split at every pipe not escaped. */
+function rowCells(line: string): string[] {
+  let row = line.trim();
+  if (row.startsWith('|')) row = row.slice(1);
+  if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1);
+  // Walked rather than split with a lookbehind, which an older engine refuses
+  // to parse at all, taking the whole entry down with it.
+  const cells: string[] = [];
+  let cell = '';
+  for (let at = 0; at < row.length; at += 1) {
+    const char = row.charAt(at);
+    if (char === '\\') {
+      cell += row.slice(at, at + 2);
+      at += 1;
+    } else if (char === '|') {
+      cells.push(cell);
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell);
+  return cells;
+}
+
+/** A delimiter row: a pipe, and cells of dashes with an optional colon at either end. */
+function isDelimiterRow(line: string): boolean {
+  return line.includes('|') && rowCells(line).every((cell) => /^\s*:?-+:?\s*$/.test(cell));
 }
 
 /** ASCII punctuation: the characters a backslash makes literal in Markdown. */
@@ -368,35 +448,81 @@ function tableEnd(text: string, start: number): number | undefined {
   }
 }
 
-const CAPTION = /<caption\b[^>]*>([\s\S]*?)<\/caption\s*>/i;
-const ROW_START = /<tr\b[^>]*>/i;
-const ROW_END = /<\/tr\s*>/i;
-const CELL = /<(td|th)\b([^>]*)>([\s\S]*?)(?=<(?:td|th)\b|$)/gi;
-const CELL_END = /<\/t[dh]\s*>[\s\S]*$/i;
+/** The tags a table is built of, opening or closing: its own, its caption's, its rows' and its cells'. */
+const TABLE_STRUCTURE = /<(\/?)(table|caption|tr|td|th)\b([^>]*)>/gi;
 
-/** One table's markup, read. `undefined` when it holds neither a caption nor a row. */
+/**
+ * One table's markup, read. `undefined` when it holds neither a caption nor a row.
+ *
+ * The table's tags are read in order, counting the tables nested in it, and
+ * only the tags of the table itself build its caption, its rows and its
+ * cells: a nested table's `</tr>` does not end the row of the cell holding it,
+ * so the cells after that one stay in their row. The nested table is part of
+ * its cell's text (see `cellText`). A cell ends at its closing tag, or where
+ * the next cell, row or the table's end begins, as the HTML parser ends one.
+ * What lies outside a row (the table's groups, stray text) is not read.
+ */
 function readTable(markup: string): ExtractedTable | undefined {
-  const captionMatch = CAPTION.exec(markup);
-  const caption = captionMatch ? cellText(captionMatch[1] ?? '') : '';
-  const body = captionMatch ? markup.replace(CAPTION, '') : markup;
+  let caption = '';
+  let captionStart: number | undefined;
   const rows: ExtractedTableCell[][] = [];
-  // Everything before the first `<tr>` is the table's own tag and its groups.
-  for (const chunk of body.split(ROW_START).slice(1)) {
-    const row = chunk.split(ROW_END)[0] ?? '';
-    const cells: ExtractedTableCell[] = [];
-    for (const match of row.matchAll(CELL)) {
-      const [, tag = 'td', attributes = '', content = ''] = match;
-      const colSpan = span(attributes, COLSPAN);
-      const rowSpan = span(attributes, ROWSPAN);
-      cells.push({
-        text: cellText(content.replace(CELL_END, '')),
-        header: tag.toLowerCase() === 'th',
+  let row: ExtractedTableCell[] | undefined;
+  let cell: { header: boolean; attributes: string; start: number } | undefined;
+  let depth = 0;
+
+  const endCell = (at: number) => {
+    if (cell && row) {
+      const colSpan = span(cell.attributes, COLSPAN);
+      const rowSpan = span(cell.attributes, ROWSPAN);
+      row.push({
+        text: cellText(markup.slice(cell.start, at)),
+        header: cell.header,
         ...(colSpan !== undefined ? { colSpan } : {}),
         ...(rowSpan !== undefined ? { rowSpan } : {}),
       });
     }
-    if (cells.length > 0) rows.push(cells);
+    cell = undefined;
+  };
+  const endRow = (at: number) => {
+    endCell(at);
+    if (row && row.length > 0) rows.push(row);
+    row = undefined;
+  };
+
+  for (const tag of markup.matchAll(TABLE_STRUCTURE)) {
+    const closing = tag[1] === '/';
+    const name = (tag[2] ?? '').toLowerCase();
+    if (name === 'table') {
+      depth += closing ? -1 : 1;
+      if (depth === 0) break;
+      continue;
+    }
+    // A nested table's own caption, rows and cells are its cell's text.
+    if (depth !== 1) continue;
+    if (name === 'caption') {
+      if (!closing && caption === '' && captionStart === undefined) {
+        captionStart = tag.index + tag[0].length;
+      } else if (closing && captionStart !== undefined) {
+        caption = cellText(markup.slice(captionStart, tag.index));
+        captionStart = undefined;
+      }
+      continue;
+    }
+    if (name === 'tr') {
+      endRow(tag.index);
+      if (!closing) row = [];
+      continue;
+    }
+    endCell(tag.index);
+    if (!closing && row) {
+      cell = {
+        header: name === 'th',
+        attributes: tag[3] ?? '',
+        start: tag.index + tag[0].length,
+      };
+    }
   }
+  endRow(markup.length);
   if (rows.length === 0 && caption === '') return undefined;
   return { ...(caption !== '' ? { caption } : {}), rows };
 }
@@ -415,9 +541,19 @@ function span(attributes: string, pattern: RegExp): number | undefined {
   return value !== undefined && value > 1 && value <= 1000 ? value : undefined;
 }
 
-/** A cell's markup as its text: tags removed, a `<br>` kept as a line break, references decoded. */
+/**
+ * A cell's markup as its text: tags removed, a `<br>` kept as a line break,
+ * references decoded. A table nested in the cell is read into it too, each of
+ * its cells (and its caption) a line of the cell's text, so its words stay
+ * apart and no tag of it is shown.
+ */
 function cellText(markup: string): string {
-  return decodeHtmlEntities(markup.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ''))
+  return decodeHtmlEntities(
+    markup
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?(?:table|caption|tr|td|th)\b[^>]*>/gi, '\n')
+      .replace(/<[^>]*>/g, ''),
+  )
     .split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
     .filter((line) => line !== '')

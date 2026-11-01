@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { lexer, type Tokens } from 'marked';
 import { PAYLOADS } from '../../__stories__/_generated/results.payloads';
 import { readPageContent } from '../../core/native-content';
 import { splitExtractedText } from '../extracted-text';
@@ -73,16 +74,43 @@ describe('splitExtractedText', () => {
     ]);
   });
 
-  it('reads a nested table as rows of the outer one, so its close does not end the outer early', () => {
+  it("reads a nested table into its cell's text, so its close does not end the outer early", () => {
     const segments = splitExtractedText(
       '<table><tr><td>outer<table><tr><td>inner</td></tr></table></td></tr><tr><td>last</td></tr></table>tail',
     );
     expect(segments.map((segment) => segment.kind)).toEqual(['table', 'markdown']);
     const [table] = segments;
-    const texts = table?.kind === 'table' ? table.table.rows.flat().map((cell) => cell.text) : [];
-    expect(texts).toContain('inner');
-    expect(texts).toContain('last');
-    expect(texts.join(' ')).not.toMatch(/</);
+    expect(table?.kind === 'table' && table.table.rows).toEqual([
+      [{ text: 'outer\ninner', header: false }],
+      [{ text: 'last', header: false }],
+    ]);
+  });
+
+  it("keeps the outer row's cells after a cell holding a nested table", () => {
+    const [segment] = splitExtractedText(
+      '<table><tr><td>A<table><tr><td>B</td></tr></table></td><td>C</td></tr></table>',
+    );
+    expect(segment?.kind === 'table' && segment.table.rows).toEqual([
+      [
+        { text: 'A\nB', header: false },
+        { text: 'C', header: false },
+      ],
+    ]);
+    // Every cell of the nested table stays in its cell, its caption with them,
+    // and the nested caption does not head the outer table.
+    const [nested] = splitExtractedText(
+      '<table><tr><td>A<table><caption>Inner</caption><tr><td>B1</td><th>B2</th></tr>' +
+        '<tr><td>B3</td></tr></table></td><td>C</td></tr><tr><td>D</td></tr></table>',
+    );
+    expect(nested?.kind === 'table' && nested.table).toEqual({
+      rows: [
+        [
+          { text: 'A\nInner\nB1\nB2\nB3', header: false },
+          { text: 'C', header: false },
+        ],
+        [{ text: 'D', header: false }],
+      ],
+    });
   });
 
   it('leaves an unclosed table and a stray closing tag to the Markdown walker', () => {
@@ -193,5 +221,35 @@ describe('splitExtractedText with markup other than a table', () => {
   it('leaves an autolink, a placeholder and a comparison as written', () => {
     const text = 'See <https://example.com>, fill in <name@example.com> and <your name>; 1 < 2.';
     expect(splitExtractedText(text)).toEqual([{ kind: 'markdown', text }]);
+  });
+
+  it('keeps a <br> inside a Markdown table row from splitting the row', () => {
+    const table = [
+      '| Name | Note |',
+      '| --- | --- |',
+      '| Ada | Line one<br>Line two |',
+      '| Bob | Plain |',
+    ].join('\n');
+    const segments = splitExtractedText(`Before<br/>after\n\n${table}\n`);
+    expect(segments).toHaveLength(1);
+    const [segment] = segments;
+    const text = segment?.kind === 'markdown' ? segment.text : '';
+    // Outside the table a line break is kept, inside a row a space stands in.
+    expect(text.startsWith('Before\nafter\n')).toBe(true);
+    expect(text).toContain('| Ada | Line one Line two |\n| Bob | Plain |');
+    // And the Markdown walker reads two rows, each of two cells.
+    const parsed = lexer(text, { gfm: true }).find((token) => token.type === 'table') as
+      Tokens.Table | undefined;
+    expect(parsed?.rows.map((row) => row.map((cell) => cell.text))).toEqual([
+      ['Ada', 'Line one Line two'],
+      ['Bob', 'Plain'],
+    ]);
+  });
+
+  it('keeps a <br> as a line break in lines that only look like a table', () => {
+    // A header and a delimiter row of different widths are no table.
+    expect(splitExtractedText('| a | b |\n| --- |\n| 1<br>2 | 3 |')).toEqual([
+      { kind: 'markdown', text: '| a | b |\n| --- |\n| 1\n2 | 3 |' },
+    ]);
   });
 });
