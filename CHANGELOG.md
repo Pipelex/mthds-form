@@ -11,7 +11,7 @@
 
 ### Changed
 
-- **An app's result panel draws no "Output" title and no count of its own (Breaking)**: in `app`, `StuffViewer` draws a title only when the host passes `name`, and a list that is the whole result the panel shows no longer draws its count ("7 items") under it; a nested list keeps its count, and so does a list mounted on its own through `ResultField`, a generative layout's result hatch (`MthdsResult`) included. A host that relied on the descriptor's "Output" title passes `name`, and `studio` is unchanged. See [docs/result-view.md](docs/result-view.md#stuffviewer--two-views-and-why-not-three).
+- **An app's result panel draws no "Output" title and no count of its own (Breaking)**: in `app`, `StuffViewer` draws a title only when the host passes `name`, and when it draws none, a list that is the whole result the panel shows no longer draws its count ("7 items") under the host's heading; a panel the host names keeps the count under its title, a nested list keeps its count, and so does a list mounted on its own through `ResultField`, a generative layout's result hatch (`MthdsResult`) included. A host that relied on the descriptor's "Output" title passes `name`, and `studio` is unchanged. See [docs/result-view.md](docs/result-view.md#stuffviewer--two-views-and-why-not-three).
 - **`FieldStrings` gains the keys of the page and verdict arms (Breaking)**: `yesProbability`, `verdictConfidence`, `ratingLevel`, `pageNumber` and `extractedTable`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/i18n.md](docs/i18n.md).
 
 ### Fixed

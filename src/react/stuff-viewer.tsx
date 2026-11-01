@@ -7,13 +7,7 @@ import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
 import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
 import { readStuffFile } from '../core/stuff-files';
-import {
-  Absent,
-  HostHeadedResult,
-  ResultField,
-  ResultHeader,
-  stringifyValue,
-} from './result-field';
+import { Absent, PanelResult, ResultField, ResultHeader, stringifyValue } from './result-field';
 import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { HtmlPreview } from './html-preview';
@@ -559,11 +553,13 @@ function StuffPanel({
         <HtmlPreview content={page} downloadPdf={false} bare fill />
       ) : (
         <ResultRoot baseName={baseName} path={[field.name]}>
-          {/* The whole result, which this panel and its host head: in `app`
-              it draws no count of its own, and a verdict is drawn large. */}
-          <HostHeadedResult>
+          {/* The whole result, where a verdict is drawn large. Its host heads
+              it when the panel draws no title of its own, and then in `app` it
+              draws no count under the host's heading; under the panel's own
+              title, which says no count, it keeps its count. */}
+          <PanelResult hostHeaded={!titled}>
             <ResultField field={field} value={value} hideLabel />
-          </HostHeadedResult>
+          </PanelResult>
         </ResultRoot>
       )}
     </div>

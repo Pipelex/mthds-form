@@ -2629,7 +2629,7 @@ function readVerdict(
 
 /**
  * A verdict, drawn as one: the answer large, and the producer's measure under
- * it. `prominent` is the whole result a panel shows (`HostHeadedResult`), where
+ * it. `prominent` is the whole result a panel shows (`PanelResult`), where
  * the answer is the whole of what the reader came for; a verdict anywhere else,
  * inside a structure, in a list or in a subtree a layout delegates, is one
  * value among others, and reads at the size of a value.
@@ -2681,12 +2681,16 @@ export interface ResultFieldProps {
 }
 
 /**
- * Whether the `ResultField` beneath is the whole result, headed by its host.
+ * What the panel says of the `ResultField` beneath it: that it is the whole
+ * result the panel shows, and whether the panel's host heads it. `null` for
+ * every other node.
  *
- * Only `StuffViewer` says so, around the one field it renders: the panel draws
- * the result's header itself, and in `app` the host that mounts it heads the
- * result in its own words ("7 results"). So that node draws no count of its
- * own under the host's, and a verdict that is the whole result is drawn large.
+ * Only `StuffViewer` says so, around the one field it renders. A verdict that
+ * is the whole result is drawn large. And when the panel draws no title of its
+ * own, which in `app` is when the host passes no `name`, the host heads the
+ * result in its own words ("7 results"), so that node draws no count of its
+ * own under the host's; a panel that draws the host's name as its title leaves
+ * the count under it, since a title says no count.
  *
  * It is said explicitly because nothing else can stand in for it. A node's
  * depth cannot: the generative layer's result hatch (`MthdsResult`) mounts a
@@ -2695,11 +2699,32 @@ export interface ResultFieldProps {
  * `hideLabel`, which a hatch sets as freely as the panel does. A `ResultField`
  * a host renders on its own, and every node beneath the panel's, is a part too.
  */
-const HostHeadedContext = createContext(false);
+interface PanelResultMark {
+  hostHeaded: boolean;
+}
 
-/** Marks the `ResultField` inside it as the whole result its host heads. For `StuffViewer` alone. */
-export function HostHeadedResult({ children }: { children: React.ReactNode }) {
-  return <HostHeadedContext value>{children}</HostHeadedContext>;
+const PanelResultContext = createContext<PanelResultMark | null>(null);
+
+/** The two marks, made once, so a panel's re-render hands the field the same value. */
+const TITLED_PANEL: PanelResultMark = { hostHeaded: false };
+const HOST_HEADED_PANEL: PanelResultMark = { hostHeaded: true };
+
+/**
+ * Marks the `ResultField` inside it as the whole result a panel shows, and says
+ * whether the panel's host heads it. For `StuffViewer` alone.
+ */
+export function PanelResult({
+  hostHeaded,
+  children,
+}: {
+  hostHeaded: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <PanelResultContext value={hostHeaded ? HOST_HEADED_PANEL : TITLED_PANEL}>
+      {children}
+    </PanelResultContext>
+  );
 }
 
 /**
@@ -2713,11 +2738,11 @@ export function ResultField(props: ResultFieldProps) {
   const location = useResultLocation();
   // Read by the one node it was set around, and cleared for every node beneath
   // it, each of which is a part of the result rather than the whole.
-  const headed = use(HostHeadedContext);
-  const node = headed ? (
-    <HostHeadedContext value={false}>
-      <ResultNode {...props} headed />
-    </HostHeadedContext>
+  const panel = use(PanelResultContext);
+  const node = panel ? (
+    <PanelResultContext value={null}>
+      <ResultNode {...props} whole hostHeaded={panel.hostHeaded} />
+    </PanelResultContext>
   ) : (
     <ResultNode {...props} />
   );
@@ -2734,10 +2759,13 @@ function ResultNode({
   value,
   depth = 0,
   hideLabel = false,
-  headed = false,
+  whole = false,
+  hostHeaded = false,
 }: ResultFieldProps & {
-  /** The whole result, headed by its host: see {@link HostHeadedResult}. */
-  headed?: boolean;
+  /** The whole result a panel shows: see {@link PanelResult}. */
+  whole?: boolean;
+  /** The whole result, headed by the panel's host rather than by a title: see {@link PanelResult}. */
+  hostHeaded?: boolean;
 }) {
   const s = useFieldStrings();
   const unwrapped = unwrap(field, value);
@@ -2865,7 +2893,7 @@ function ResultNode({
     return (
       <div className="space-y-1">
         {header}
-        <VerdictValue reading={reading} prominent={headed} />
+        <VerdictValue reading={reading} prominent={whole} />
       </div>
     );
   }
@@ -2983,12 +3011,14 @@ function ResultNode({
               on the list beneath it. The COUNT is not part of the label though,
               so it survives on its own; it is a fact about this value rather
               than a name for it, and the panel's header does not carry it. */}
-          {/* In `app`, the whole result a panel shows carries no count: the
-              host that mounts the panel heads the result with its own ("7
-              results"), and a second count under that heading says the same
-              thing again. Every other list keeps its count, a subtree a
-              generative layout delegates included (see `HostHeadedResult`). */}
-          {isApp && headed ? null : (
+          {/* In `app`, the whole result a panel shows carries no count when
+              the panel draws no title of its own: the host that mounts it
+              heads the result with its own ("7 results"), and a second count
+              under that heading says the same thing again. A panel the host
+              names draws that name, which says no count, so the list keeps
+              its own under it. Every other list keeps its count, a subtree a
+              generative layout delegates included (see `PanelResult`). */}
+          {isApp && hostHeaded ? null : (
             <div className="flex flex-wrap items-baseline gap-x-2">
               {header}
               <span className="font-mono text-[10.5px] text-muted-foreground">

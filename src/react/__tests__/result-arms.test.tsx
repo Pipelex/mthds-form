@@ -251,6 +251,13 @@ describe('a verdict', () => {
     expect(container.textContent).not.toMatch(/Yes no|Probability:|Output/);
   });
 
+  it("stays large under the panel's own title, when the host names it", () => {
+    const value = payloadOf('yes_no_verdict');
+    panel('app', yesNo, value, 'eligibility');
+    expect(screen.getByText('Eligibility')).toBeTruthy();
+    expect(screen.getByText(value.yes_no ? s.yes : s.no).className).toContain('text-[22px]');
+  });
+
   it('reads a rating by the name of its level, and a choice in words', () => {
     const rated = payloadOf('rating_verdict');
     panel('app', rating, rated);
@@ -413,9 +420,12 @@ describe("an app's result panel", () => {
     expect(container.textContent).not.toContain(s.itemsCount(items.length));
   });
 
-  it("draws the host's name when it gives one", () => {
-    panel('app', risks, items, 'main_risks');
+  it("draws the host's name when it gives one, and the count under it", () => {
+    // The panel heads the result itself, with a title that says no count, so
+    // the list keeps its own.
+    const { container } = panel('app', risks, items, 'main_risks');
     expect(screen.getByText('Main risks')).toBeTruthy();
+    expect(container.textContent).toContain(s.itemsCount(items.length));
   });
 
   it('keeps both for a builder', () => {
