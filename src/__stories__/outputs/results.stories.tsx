@@ -357,9 +357,12 @@ export const ExtractedPages: Story = {
     const canvas = within(canvasElement);
     const pages = itemsOf(payload('page_result'));
     const { heading, caption, viewName } = extractedPage();
-    await expect(canvas.getAllByRole('article', { name: 'Page 1' })).toHaveLength(
-      BOTH_THEMES * pages.length,
-    );
+    // One card per page, each named by its own number, in each theme.
+    for (let page = 1; page <= pages.length; page += 1) {
+      await expect(
+        canvas.getAllByRole('article', { name: DEFAULT_FIELD_STRINGS.pageNumber(page) }),
+      ).toHaveLength(BOTH_THEMES);
+    }
     await expect(canvas.getAllByRole('heading', { name: heading })).toHaveLength(BOTH_THEMES);
     await expect(canvas.getAllByRole('group', { name: caption })).toHaveLength(BOTH_THEMES);
     await expect(canvas.getAllByText(viewName)).toHaveLength(BOTH_THEMES);

@@ -1,24 +1,26 @@
 /**
- * An extracted page's text, made readable: its comments dropped and its tables
- * read into a table model, so the result view can typeset the rest as Markdown
- * and draw the tables as tables.
+ * An extracted page's text, made readable: its comments dropped, its tables
+ * read into a table model and its other markup reduced to text, so the result
+ * view can typeset the rest as Markdown and draw the tables as tables.
  *
  * ## Why a page's text needs this and a model's answer does not
  *
  * A document extractor writes Markdown, but not only Markdown. It marks the
  * page's furniture with HTML comments (`<!-- PageHeader="Report" -->`,
- * `<!-- PageNumber="1" -->`), and it writes every table as an HTML `<table>`,
- * because a Markdown table cannot hold a caption or a merged cell. The
- * `Markdown` walker deliberately shows an HTML block as its own source rather
- * than injecting it (see `./markdown`), so a page used to print its comments
- * and a wall of `<tr>`/`<td>` tags where its tables were.
+ * `<!-- PageNumber="1" -->`), it writes every table as an HTML `<table>`,
+ * because a Markdown table cannot hold a caption or a merged cell, and it wraps
+ * a figure's caption and text in a `<figure>`. The `Markdown` walker
+ * deliberately shows HTML as its own source rather than injecting it (see
+ * `./markdown`), so a page used to print its comments, a wall of `<tr>`/`<td>`
+ * tags where its tables were, and `<figure>` tags around its figures.
  *
  * The answer is not to inject the markup. The extracted text is data from a
  * document nobody here wrote, and putting it into the host's DOM as HTML would
  * be an injection path. So the tables are READ instead: their rows and cells
  * are taken out as text, and the result view draws a table of its own around
- * them. Nothing here returns markup, and nothing that reads this module's
- * output can render one, because a cell is a string.
+ * them. Nothing here returns markup to render, and nothing that reads this
+ * module's output can render one, because a cell is a string and a stretch of
+ * Markdown is typeset by a walker that never injects.
  *
  * ## What is read, and what is left alone
  *
@@ -26,19 +28,32 @@
  *   content, and an extractor's comments are page furniture.
  * - **A `<table>` is read**: its `<caption>`, its rows, and each row's `<th>`
  *   and `<td>` cells with their `colspan` and `rowspan`. A cell's own markup
- *   (`<strong>`, a `<br>`) becomes its text, a line break kept as one. Tables
- *   are found by counting `<table>` and `</table>` tags, so a table inside a
- *   cell does not end its outer table early; its rows are read as rows of the
- *   outer table, which is readable and never shows a tag.
- * - **Everything else is left to the Markdown walker**, including any other
- *   HTML an extractor writes, which it shows as source. A table whose closing
- *   tag never comes is left there too, rather than guessed at.
+ *   (`<strong>`, a `<br>`) becomes its text, a line break kept as one, and its
+ *   character references are decoded (`./html-entities`). Tables are found by
+ *   counting `<table>` and `</table>` tags, so a table inside a cell does not
+ *   end its outer table early; its rows are read as rows of the outer table,
+ *   which is readable and never shows a tag.
+ * - **Any other HTML element is reduced to its text**: its tags are dropped, a
+ *   block's tags (`<figure>`, `<figcaption>`, `<p>`, a `<br>`) leaving a line
+ *   break so its text stays a line of its own, and a `<script>` or a `<style>`
+ *   is dropped with its content, which is not text a reader reads. So a
+ *   figure reads as its caption and its text. A table's own tags outside a
+ *   table that closes, and a tag whose name is not an HTML element's (an
+ *   autolink such as `<https://…>`, a placeholder such as `<name>`), are left
+ *   to the walker, which shows them as source: a table whose closing tag never
+ *   comes is left there rather than guessed at.
+ * - **Code is left exactly as written.** A fenced code block and an inline code
+ *   span are copied through untouched, so a code sample that shows a comment, a
+ *   `<table>` or a `<figure>` still shows it, and a table or a comment around a
+ *   fence never ends inside it, so a fence is never split.
  *
  * Patterns are fine here where they are not for a page the view frames
  * (`./markup-storage`), because nothing is executed or fetched on the strength
  * of what they find: the worst a misread can do is draw a cell's text in the
- * wrong cell.
+ * wrong cell, or show a tag's text where its markup was.
  */
+
+import { decodeHtmlEntities } from './html-entities';
 
 /** One cell of an extracted table: its text, whether it is a header cell, and its spans. */
 export interface ExtractedTableCell {
@@ -58,43 +73,299 @@ export interface ExtractedTable {
 export type ExtractedSegment =
   { kind: 'markdown'; text: string } | { kind: 'table'; table: ExtractedTable };
 
-const COMMENT = /<!--[\s\S]*?-->/g;
-const TABLE_TAG = /<(\/?)table\b[^>]*>/gi;
-
 /**
  * Split an extracted page's text into the Markdown around its tables and the
- * tables themselves, in order. Empty stretches are left out.
+ * tables themselves, in order. Empty stretches are left out, so a page whose
+ * text is only comments or empty markup splits into nothing.
+ *
+ * One pass from left to right, because what a stretch of text is depends on
+ * what came before it: a `<table>` inside a code span is code, and a backtick
+ * inside a table's cell is a character.
  */
 export function splitExtractedText(text: string): ExtractedSegment[] {
-  const source = text.replace(COMMENT, '');
   const segments: ExtractedSegment[] = [];
-  let cursor = 0;
-  let depth = 0;
-  let start = -1;
-  for (const match of source.matchAll(TABLE_TAG)) {
-    const closing = match[1] === '/';
-    if (!closing) {
-      if (depth === 0) start = match.index;
-      depth += 1;
+  let markdown = '';
+  let index = 0;
+  while (index < text.length) {
+    if (index === 0 || text[index - 1] === '\n') {
+      const fenceEnd = fencedBlockEnd(text, index);
+      if (fenceEnd !== undefined) {
+        markdown += text.slice(index, fenceEnd);
+        index = fenceEnd;
+        continue;
+      }
+    }
+    const char = text.charAt(index);
+    // An escaped character is literal: `\`` opens no code span and `\<` no tag.
+    if (char === '\\' && ESCAPABLE.test(text.charAt(index + 1))) {
+      markdown += text.slice(index, index + 2);
+      index += 2;
       continue;
     }
-    // A stray closing tag outside any table is text, and the walker shows it.
-    if (depth === 0) continue;
-    depth -= 1;
-    if (depth > 0) continue;
-    const end = match.index + match[0].length;
-    pushMarkdown(segments, source.slice(cursor, start));
-    const table = readTable(source.slice(start, end));
-    if (table) segments.push({ kind: 'table', table });
-    cursor = end;
+    if (char === '`') {
+      const end = codeSpanEnd(text, index);
+      markdown += text.slice(index, end);
+      index = end;
+      continue;
+    }
+    if (char === '<') {
+      const markup = readMarkup(text, index);
+      if (markup) {
+        if ('table' in markup) {
+          pushMarkdown(segments, markdown);
+          markdown = '';
+          if (markup.table) segments.push({ kind: 'table', table: markup.table });
+        } else {
+          markdown += markup.text;
+        }
+        index = markup.end;
+        continue;
+      }
+    }
+    markdown += char;
+    index += 1;
   }
-  // An unclosed table, and whatever follows the last closed one.
-  pushMarkdown(segments, source.slice(cursor));
+  pushMarkdown(segments, markdown);
   return segments;
 }
 
 function pushMarkdown(segments: ExtractedSegment[], text: string) {
   if (text.trim() !== '') segments.push({ kind: 'markdown', text });
+}
+
+/** ASCII punctuation: the characters a backslash makes literal in Markdown. */
+const ESCAPABLE = /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]$/;
+
+/** A fence's opening line: its indentation, its marker, and its info string. */
+const FENCE_OPEN = /[ \t]*(`{3,}|~{3,})([^\n]*)/y;
+/** Any line that could open a fence, for the searches that must step over one. */
+const FENCE_LINE = /^[ \t]*(?:`{3,}|~{3,})/gm;
+
+/**
+ * Where a fenced code block opening at `start`, a line's start, ends: just
+ * past its closing fence's line, or the end of the text when it never closes,
+ * as CommonMark has it. `undefined` when no fence opens there. A backtick
+ * fence's info string holds no backtick, so a line that does opens inline code
+ * instead.
+ */
+function fencedBlockEnd(text: string, start: number): number | undefined {
+  FENCE_OPEN.lastIndex = start;
+  const open = FENCE_OPEN.exec(text);
+  if (!open) return undefined;
+  const marker = open[1] ?? '';
+  const fenceChar = marker.charAt(0);
+  if (fenceChar === '`' && (open[2] ?? '').includes('`')) return undefined;
+  let lineEnd = text.indexOf('\n', start);
+  while (lineEnd !== -1) {
+    const next = text.indexOf('\n', lineEnd + 1);
+    const end = next === -1 ? text.length : next;
+    const line = text.slice(lineEnd + 1, end).trim();
+    if (line.length >= marker.length && [...line].every((c) => c === fenceChar)) return end;
+    lineEnd = next;
+  }
+  return text.length;
+}
+
+/** A blank line, which no code span crosses. */
+const BLANK_LINE = /\n[ \t]*\n/g;
+
+/**
+ * Where a code span opening at `start` ends: past the next run of exactly as
+ * many backticks, within its paragraph. A run that nothing closes is literal
+ * backticks, and the scan goes on after it.
+ */
+function codeSpanEnd(text: string, start: number): number {
+  const open = backtickRun(text, start);
+  BLANK_LINE.lastIndex = start;
+  const blank = BLANK_LINE.exec(text);
+  const limit = blank ? blank.index : text.length;
+  let cursor = start + open;
+  for (;;) {
+    const next = text.indexOf('`', cursor);
+    if (next === -1 || next >= limit) return start + open;
+    const length = backtickRun(text, next);
+    if (length === open) return next + length;
+    cursor = next + length;
+  }
+}
+
+function backtickRun(text: string, start: number): number {
+  let end = start;
+  while (text.charAt(end) === '`') end += 1;
+  return end - start;
+}
+
+/**
+ * The first match of a global `pattern` at or after `from` that is not inside a
+ * fenced code block: what a comment's end and a table's closing tag are
+ * searched with, so neither can end inside a fence and split it.
+ */
+function nextOutsideFences(text: string, from: number, pattern: RegExp): RegExpExecArray | null {
+  let cursor = from;
+  for (;;) {
+    pattern.lastIndex = cursor;
+    const match = pattern.exec(text);
+    if (!match) return null;
+    FENCE_LINE.lastIndex = cursor;
+    const fence = FENCE_LINE.exec(text);
+    if (!fence || fence.index >= match.index) return match;
+    cursor = fencedBlockEnd(text, fence.index) ?? fence.index + fence[0].length;
+  }
+}
+
+const COMMENT = /<!--[\s\S]*?-->/g;
+const COMMENT_END = /-->/g;
+const TABLE_OPEN = /<table\b[^>]*>/iy;
+const TABLE_TAG = /<(\/?)table\b[^>]*>/gi;
+/** An HTML tag: its closing slash, its name, and its attributes up to the `>`. */
+const HTML_TAG = /<(\/?)([a-z][a-z0-9]*)(?=[\s/>])[^<>]*>/iy;
+
+/**
+ * The elements whose tags leave a line break when dropped, so their text stays
+ * a line of its own: the block elements an extractor or a web page writes.
+ */
+const BLOCK_ELEMENTS: ReadonlySet<string> = new Set([
+  'address',
+  'article',
+  'aside',
+  'blockquote',
+  'body',
+  'br',
+  'center',
+  'dd',
+  'details',
+  'dialog',
+  'div',
+  'dl',
+  'dt',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'head',
+  'header',
+  'hgroup',
+  'hr',
+  'html',
+  'legend',
+  'li',
+  'main',
+  'nav',
+  'ol',
+  'option',
+  'p',
+  'pre',
+  'section',
+  'summary',
+  'title',
+  'ul',
+]);
+
+/** The elements whose tags are dropped with nothing in their place: text-level markup. */
+const INLINE_ELEMENTS: ReadonlySet<string> = new Set([
+  'a',
+  'abbr',
+  'b',
+  'bdi',
+  'bdo',
+  'big',
+  'cite',
+  'code',
+  'data',
+  'del',
+  'dfn',
+  'em',
+  'font',
+  'i',
+  'img',
+  'ins',
+  'kbd',
+  'label',
+  'mark',
+  'picture',
+  'q',
+  's',
+  'samp',
+  'small',
+  'source',
+  'span',
+  'strike',
+  'strong',
+  'sub',
+  'sup',
+  'time',
+  'tt',
+  'u',
+  'var',
+  'wbr',
+]);
+
+/** The elements whose content is not text a reader reads, dropped with their tags. */
+const RAW_TEXT_ENDS: ReadonlyMap<string, RegExp> = new Map([
+  ['script', /<\/script\s*>/gi],
+  ['style', /<\/style\s*>/gi],
+]);
+
+/** What a `<` turned out to open: text to keep in the Markdown, or a table read whole. */
+type Markup = { end: number; text: string } | { end: number; table: ExtractedTable | undefined };
+
+/**
+ * Read the markup a `<` at `start` opens: a comment, a table, or a tag. A table
+ * is read whole; a comment is dropped; an HTML element's tag is reduced to the
+ * line break or the nothing it stands for. `undefined` for anything else, which
+ * stays in the text as written: an unclosed comment or table, a table's own
+ * tags outside one, and a name that is not an HTML element's.
+ */
+function readMarkup(text: string, start: number): Markup | undefined {
+  if (text.startsWith('<!--', start)) {
+    const close = nextOutsideFences(text, start + 4, COMMENT_END);
+    return close ? { end: close.index + close[0].length, text: '' } : undefined;
+  }
+  TABLE_OPEN.lastIndex = start;
+  if (TABLE_OPEN.test(text)) {
+    const end = tableEnd(text, start);
+    if (end === undefined) return undefined;
+    return { end, table: readTable(text.slice(start, end).replace(COMMENT, '')) };
+  }
+  HTML_TAG.lastIndex = start;
+  const tag = HTML_TAG.exec(text);
+  if (!tag) return undefined;
+  const closing = tag[1] === '/';
+  const name = (tag[2] ?? '').toLowerCase();
+  const end = start + tag[0].length;
+  const rawTextEnd = closing ? undefined : RAW_TEXT_ENDS.get(name);
+  if (rawTextEnd) {
+    rawTextEnd.lastIndex = end;
+    const close = rawTextEnd.exec(text);
+    return { end: close ? close.index + close[0].length : end, text: '\n' };
+  }
+  if (RAW_TEXT_ENDS.has(name) || BLOCK_ELEMENTS.has(name)) return { end, text: '\n' };
+  if (INLINE_ELEMENTS.has(name)) return { end, text: '' };
+  return undefined;
+}
+
+/**
+ * Where the table whose opening tag is at `start` ends, counting its nested
+ * tables: just past the `</table>` that closes it, or `undefined` when none
+ * does. A tag inside a fenced code block is not counted.
+ */
+function tableEnd(text: string, start: number): number | undefined {
+  let depth = 0;
+  let cursor = start;
+  for (;;) {
+    const tag = nextOutsideFences(text, cursor, TABLE_TAG);
+    if (!tag) return undefined;
+    depth += tag[1] === '/' ? -1 : 1;
+    cursor = tag.index + tag[0].length;
+    if (depth === 0) return cursor;
+  }
 }
 
 const CAPTION = /<caption\b[^>]*>([\s\S]*?)<\/caption\s*>/i;
@@ -115,8 +386,8 @@ function readTable(markup: string): ExtractedTable | undefined {
     const cells: ExtractedTableCell[] = [];
     for (const match of row.matchAll(CELL)) {
       const [, tag = 'td', attributes = '', content = ''] = match;
-      const colSpan = span(attributes, 'colspan');
-      const rowSpan = span(attributes, 'rowspan');
+      const colSpan = span(attributes, COLSPAN);
+      const rowSpan = span(attributes, ROWSPAN);
       cells.push({
         text: cellText(content.replace(CELL_END, '')),
         header: tag.toLowerCase() === 'th',
@@ -130,45 +401,25 @@ function readTable(markup: string): ExtractedTable | undefined {
   return { ...(caption !== '' ? { caption } : {}), rows };
 }
 
+const COLSPAN = /\bcolspan\s*=\s*["']?(\d+)/i;
+const ROWSPAN = /\browspan\s*=\s*["']?(\d+)/i;
+
 /**
  * A span attribute, as the number a table cell takes. One is no span at all,
  * and a value past a thousand is the markup misbehaving rather than a table:
  * both are dropped, and the cell spans one.
  */
-function span(attributes: string, name: 'colspan' | 'rowspan'): number | undefined {
-  const match = new RegExp(`\\b${name}\\s*=\\s*["']?(\\d+)`, 'i').exec(attributes);
+function span(attributes: string, pattern: RegExp): number | undefined {
+  const match = pattern.exec(attributes);
   const value = match ? Number(match[1]) : undefined;
   return value !== undefined && value > 1 && value <= 1000 ? value : undefined;
 }
 
-/** A cell's markup as its text: tags removed, a `<br>` kept as a line break, entities decoded. */
+/** A cell's markup as its text: tags removed, a `<br>` kept as a line break, references decoded. */
 function cellText(markup: string): string {
-  return decodeEntities(markup.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ''))
+  return decodeHtmlEntities(markup.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ''))
     .split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
     .filter((line) => line !== '')
     .join('\n');
-}
-
-const NAMED_ENTITIES: Readonly<Record<string, string>> = {
-  amp: '&',
-  lt: '<',
-  gt: '>',
-  quot: '"',
-  apos: "'",
-  nbsp: ' ',
-};
-
-/** The entities an extractor writes: the five XML ones, a no-break space and numeric references. */
-function decodeEntities(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
-    if (body.startsWith('#')) {
-      const code =
-        body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : Number(body.slice(1));
-      return Number.isInteger(code) && code > 0 && code <= 0x10ffff
-        ? String.fromCodePoint(code)
-        : entity;
-    }
-    return NAMED_ENTITIES[body.toLowerCase()] ?? entity;
-  });
 }

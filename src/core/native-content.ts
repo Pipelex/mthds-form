@@ -185,6 +185,12 @@ export interface PageContentView {
   text?: string;
   /** The images extracted from the page, each an `ImageContent`, unread. */
   images: readonly unknown[];
+  /**
+   * The page's markup as the extractor fetched it, when it kept any. It is the
+   * page's content a second time when the page has text, and its only content
+   * when it has none, which is when a renderer shows it, framed, never injected.
+   */
+  rawHtml?: string;
   /** The rendering of the whole page, an `ImageContent`, when one was made. */
   pageView?: unknown;
 }
@@ -207,10 +213,12 @@ export function readPageContent(value: unknown): PageContentView | undefined {
         ? readText(textContent, 'text')
         : undefined;
   const images = holder ? ownProp(holder, 'images') : undefined;
+  const rawHtml = holder ? readText(holder, 'raw_html') : undefined;
   const pageView = ownProp(value, 'page_view');
   return {
     ...(text !== undefined && text.trim() !== '' ? { text } : {}),
     images: Array.isArray(images) ? images : [],
+    ...(rawHtml !== undefined && rawHtml.trim() !== '' ? { rawHtml } : {}),
     ...(isRecord(pageView) ? { pageView } : {}),
   };
 }

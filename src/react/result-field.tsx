@@ -38,7 +38,7 @@ import {
 } from './result-env';
 import { absoluteUrl } from './absolute-url';
 import { ResultAt, ResultRoot, useResultLocation } from './result-location';
-import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -60,6 +60,7 @@ import { PdfDownloadButton } from './pdf-download-button';
 import { useFileNamePrompt } from './file-name-dialog';
 import { Markdown } from './markdown';
 import { ExtractedPageText } from './extracted-page-text';
+import { splitExtractedText } from './extracted-text';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import {
@@ -2406,12 +2407,27 @@ function chooseColumns(fields: readonly RunField[], budget: number): ChosenColum
  * it, under its own label; a method app's reader is shown it only when the
  * extractor found nothing else on the page, where it is the page's one
  * content.
+ *
+ * Whether the page HAS text is the reading's answer, not the string's: a page
+ * whose text is only the extractor's comments (`<!-- PageNumber="1" -->`) has
+ * none to show, and is drawn as a page with no text rather than as a blank
+ * card. A page with no text whose extractor kept its raw markup shows that
+ * markup instead, framed by `HtmlPreview` and never injected; a page with text
+ * leaves it out, since the text already carries the page's content.
  */
 function PageValue({ field, value, depth }: { field: RunField; value: unknown; depth: number }) {
   const presentation = useFieldPresentation();
   const content = readPageContent(value);
+  const text = content?.text;
+  const segments = useMemo(() => (text === undefined ? [] : splitExtractedText(text)), [text]);
+  const hasText = segments.length > 0;
+  const rawHtml = hasText ? undefined : content?.rawHtml;
+  const rawPage = useMemo(
+    () => (rawHtml === undefined ? undefined : { innerHtml: rawHtml }),
+    [rawHtml],
+  );
   if (!content) return <Absent />;
-  const extracted = content.text !== undefined || content.images.length > 0;
+  const extracted = hasText || rawPage !== undefined || content.images.length > 0;
   const showView = content.pageView !== undefined && (presentation === 'studio' || !extracted);
   if (!extracted && !showView) return <Absent />;
   // The descriptor's own node for the page view, so `studio` labels it as the
@@ -2422,7 +2438,8 @@ function PageValue({ field, value, depth }: { field: RunField; value: unknown; d
       : undefined;
   return (
     <div className="space-y-3">
-      {content.text !== undefined && <ExtractedPageText text={content.text} />}
+      {hasText && <ExtractedPageText segments={segments} />}
+      {rawPage && <HtmlPreview content={rawPage} downloadPdf={false} />}
       {content.images.length > 0 && (
         <ResultAt segment="text_and_images">
           <ResultAt segment="images">

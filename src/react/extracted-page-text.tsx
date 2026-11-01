@@ -1,7 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
-import { splitExtractedText, type ExtractedTable } from './extracted-text';
+import type { ExtractedSegment, ExtractedTable } from './extracted-text';
 import { useFieldStrings } from './field-strings';
 import { Markdown } from './markdown';
 import { focusOutlineClass } from './role-tokens';
@@ -10,12 +9,13 @@ import { cn } from './utils';
 /**
  * One extracted page's text, typeset: Markdown where the extractor wrote
  * Markdown, a table where it wrote a `<table>`, and nothing where it wrote a
- * comment. The reading is `splitExtractedText`'s, which returns text and
- * never markup, so every cell reaches the DOM as a text child. See
- * `./extracted-text` for what is read and why nothing is injected.
+ * comment. It draws the segments `splitExtractedText` read, which hold text
+ * and never markup to render, so every cell reaches the DOM as a text child.
+ * The caller splits, because whether a page has any text to show at all is
+ * the same reading. See `./extracted-text` for what is read and why nothing is
+ * injected.
  */
-export function ExtractedPageText({ text }: { text: string }) {
-  const segments = useMemo(() => splitExtractedText(text), [text]);
+export function ExtractedPageText({ segments }: { segments: readonly ExtractedSegment[] }) {
   return (
     <div className="space-y-2">
       {segments.map((segment, index) =>

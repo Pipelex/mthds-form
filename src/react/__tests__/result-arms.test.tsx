@@ -108,6 +108,47 @@ describe('a native.Page[] result', () => {
     expect(container.textContent).toContain(pageViewName);
   });
 
+  it('falls back to the page view in an app when the text is only comments', () => {
+    const commentsOnly = [
+      {
+        ...payload.items[0],
+        text_and_images: { text: { text: '<!-- PageNumber="1" -->\n' }, images: [] },
+      },
+    ];
+    const { container } = panel('app', pages, commentsOnly);
+    expect(container.textContent).toContain(pageViewName);
+    // Without a page view, it is a page with nothing in it, said as such.
+    const { container: bare } = panel('app', pages, [
+      { text_and_images: { text: { text: '<!-- PageNumber="1" -->' }, images: [] } },
+    ]);
+    expect(within(bare).getByText(s.resultAbsentDescription)).toBeTruthy();
+  });
+
+  for (const presentation of PRESENTATIONS) {
+    it(`frames a page's raw HTML when it has no text, and never injects it, in ${presentation}`, () => {
+      const rawOnly = [
+        { text_and_images: { text: null, images: [], raw_html: '<h1>Fetched page</h1>' } },
+      ];
+      const { container } = panel(presentation, pages, rawOnly);
+      const frame = container.querySelector('iframe');
+      expect(frame?.getAttribute('sandbox')).not.toContain('allow-scripts');
+      expect(frame?.getAttribute('srcdoc')).toContain('<h1>Fetched page</h1>');
+      expect(container.querySelector('h1')).toBeNull();
+      expect(container.textContent).not.toContain(s.resultAbsentDescription);
+    });
+  }
+
+  it('leaves the raw HTML out of a page that has text', () => {
+    const withText = [
+      {
+        text_and_images: { text: { text: 'The text' }, images: [], raw_html: '<h1>Fetched</h1>' },
+      },
+    ];
+    const { container } = panel('app', pages, withText);
+    expect(screen.getByText('The text')).toBeTruthy();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
   it('names an uncaptioned extracted table with the strings', () => {
     const page = [
       {
