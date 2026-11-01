@@ -3,8 +3,8 @@ description = "A result made of several parts at once: a Markdown summary, a lis
 
 # A composite declares no members, so its descriptor is `kind: "unknown"` and
 # the renderer reads each member as the content it is by definition. This case
-# gives it the three members a multi-part report has: prose, a list of one
-# structure, and an image. The carriers are synthesized from
+# gives it the three members a multi-part report has: prose, a list of `Risk`
+# records, and an image. The carriers are synthesized from
 # composites.slots.json: a `PipeParallel` naming three branch carriers, which
 # the payload pass runs through the parallel rather than on their own.
 
