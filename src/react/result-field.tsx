@@ -35,11 +35,13 @@ import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff
 import {
   useFileDownloadShown,
   usePdfSaveShown,
+  useResolveRendition,
   useResolveShareUrl,
   useResolveUrl,
   useSaveFiles,
   useTableColumns,
   useTableLayout,
+  type ResolveRendition,
   type ResolveUrl,
 } from './result-env';
 import { absoluteUrl } from './absolute-url';
@@ -62,6 +64,7 @@ import { ConceptPill } from './concept-pill';
 import { FocusFrame } from './focus-frame';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
+import { ImageViewer } from './image-viewer';
 import { PdfDownloadButton } from './pdf-download-button';
 import { useFileNamePrompt } from './file-name-dialog';
 import { Markdown } from './markdown';
@@ -954,12 +957,64 @@ function DocumentValue({ value }: { value: unknown }) {
   );
 }
 
+/**
+ * The widths a smaller copy of a picture is asked for, in the picture's own
+ * pixels: twice the widest box the view draws it in, so it stays sharp on a
+ * high-density screen. A gallery's tile is narrower than 288 CSS pixels (a
+ * column is at least 140, and one twice that wide would make room for
+ * another); a table cell's thumbnail is 40 pixels tall, and its width is read
+ * generously, since a wide picture is wide there too. See `ResolveRendition`.
+ */
+const TILE_RENDITION_WIDTH = 576;
+const CELL_RENDITION_WIDTH = 256;
+
+/**
+ * The host's smaller copy of a picture the view can already paint whole, or
+ * the whole picture when the host has none: the copy is asked of the
+ * picture's own `url`, as the resolver is, and passes the same gate. It is the
+ * `src` of a small picture and nothing else; every other use of the picture
+ * (its viewer, its link, its copy control, its download) keeps `whole`.
+ */
+function renditionUrl(
+  content: { url: string },
+  whole: string,
+  resolveRendition: ResolveRendition | undefined,
+  width: number,
+): string {
+  return viewableUrl(resolveRendition?.(content.url, { width })) ?? whole;
+}
+
+/**
+ * How a gallery's tile opens the gallery's viewer at its own picture, and the
+ * button focus goes back to when the viewer closes.
+ */
+interface TileOpener {
+  open: () => void;
+  ref: React.Ref<HTMLButtonElement>;
+}
+
+/**
+ * A picture, as a result shows it: a button that opens it in the viewer
+ * (`./image-viewer`), with the file's controls beside it.
+ *
+ * It used to be a link opening the raw file in a new tab, which left the
+ * result behind and, for a list, showed one picture per tab. The viewer
+ * shows it large over the result and moves through a list in place; the file
+ * itself is still one click away, from the viewer's "open the original" and,
+ * in `studio` and on a lone picture, from the file's name under it.
+ *
+ * Where it is drawn small (a gallery's tile, a table cell's thumbnail) its box
+ * is reserved before the picture arrives and the spinner sits inside it, so
+ * nothing moves when it lands, and it is drawn from the host's smaller copy
+ * when the host supplies one (`resolveRendition`).
+ */
 function ImageValue({
   value,
   inGallery = false,
   inRow = false,
   compact = false,
   downloadable = true,
+  opener,
 }: {
   value: unknown;
   inGallery?: boolean;
@@ -973,59 +1028,98 @@ function ImageValue({
    * Its URL can still be copied.
    */
   downloadable?: boolean;
+  /** A gallery's tile: the gallery's viewer, rather than one of its own. */
+  opener?: TileOpener;
 }) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
   const resolve = useResolveUrl();
+  const resolveRendition = useResolveRendition();
   const stuffFile = useStuffFile('image', value);
   const file = downloadable ? stuffFile : undefined;
+  // A lone picture's own viewer. Above the early return, as every hook is.
+  const [viewing, setViewing] = useState(false);
+  const ownButton = useRef<HTMLButtonElement>(null);
   const content = readImageContent(value);
   if (!content) return <Absent />;
   const src = paintableUrl(content, resolve);
-  // In a gallery the tile IS the border, so the image fills it and the caption
-  // sits under it; on its own the image keeps its own frame and a height cap.
+  const renditionWidth = inGallery
+    ? TILE_RENDITION_WIDTH
+    : compact
+      ? CELL_RENDITION_WIDTH
+      : undefined;
+  const drawn =
+    src !== undefined && renditionWidth !== undefined
+      ? renditionUrl(content, src, resolveRendition, renditionWidth)
+      : src;
+  // Named as the file's line under it names it, so a tile, its line and the
+  // viewer's title agree.
+  const name = src === undefined ? '' : fileLabel(src, content.filename, s);
+  // A tile in `app` is the picture and the caption the payload states, and no
+  // file name: a name like `22d29b4410c16562.png` under every tile tells a
+  // reader nothing, and the viewer carries the name and the file's controls.
+  // `studio` keeps the line, which a builder reads against the payload.
+  const fileLine = src !== undefined && !compact && !(inGallery && presentation === 'app');
+  const size =
+    !inGallery && !compact && content.width && content.height
+      ? { width: content.width, height: content.height }
+      : undefined;
   return (
     <div className={inGallery ? 'space-y-1' : 'space-y-1.5'}>
-      {src ? (
-        // Wrapped in a link: the picture is a PREVIEW of a file, and clicking a
-        // preview to see the thing it previews is what a reader expects. The
-        // reference underneath is the other half - a picture with no URL beside
-        // it is a result you can look at and cannot use.
-        <a
-          href={src}
-          target="_blank"
-          rel="noreferrer"
-          title={content.url}
-          // BLOCK when the image fills its column, inline-block otherwise. An
-          // `inline-block` anchor shrink-wraps, so a `w-full` image inside one
-          // resolves to zero width — the panel showed a tall empty sliver with
-          // the spinner clipped inside it. A gallery tile and a table cell size
-          // themselves, so they keep the inline box.
+      {src !== undefined && drawn !== undefined ? (
+        // A button, not a link: the picture opens in the viewer over the
+        // result. Enter and Space open it as a click does.
+        <button
+          ref={opener ? opener.ref : ownButton}
+          type="button"
+          onClick={opener ? opener.open : () => setViewing(true)}
+          aria-label={s.viewImage(name)}
+          aria-haspopup="dialog"
           className={cn(
-            inGallery || compact ? 'inline-block' : 'block w-full',
+            // BLOCK when the picture fills its column. A table cell's
+            // thumbnail sizes itself, and is 44px square at the least below
+            // `sm`, where it is tapped.
+            compact
+              ? 'inline-flex items-center justify-center align-top max-sm:min-h-11 max-sm:min-w-11'
+              : 'block w-full',
+            'cursor-zoom-in',
             focusOutlineInsetClass,
           )}
         >
           <LoadingImage
-            src={src}
+            src={drawn}
+            {...(drawn !== src ? { fallbackSrc: src } : {})}
             alt={content.caption ?? s.preview}
+            lazy={inGallery || compact}
+            {...(size ? { size } : {})}
+            {...(inGallery
+              ? // The tile's box is square before anything arrives, and the
+                // picture covers it once it does: tiles of one size, whatever
+                // the pictures' shapes, and nothing moves when one lands.
+                { box: 'aspect-square w-full overflow-hidden' }
+              : compact
+                ? { box: 'h-10 min-w-10' }
+                : {})}
             className={cn(
-              inGallery && 'block aspect-square w-full object-cover',
-              // A cell is one line tall. An image column rendered at the standalone
-              // height turns every row into a picture and the table into a
-              // slideshow, so a cell gets a thumbnail and the row's expansion gets
-              // the picture.
+              inGallery && 'absolute inset-0 size-full object-cover',
+              // A cell is one line tall. An image column rendered at the
+              // standalone height turns every row into a picture and the
+              // table into a slideshow, so a cell gets a thumbnail and the
+              // row's expansion gets the picture.
               compact && 'h-10 w-auto rounded border border-border object-cover',
               // On its own: the full width it is given, capped generously in
               // height. `max-h-64` was a 256px thumbnail in a panel several
               // times that tall — a generated report image is the RESULT here,
-              // not a decoration beside one, and it was unreadable at that size.
-              // `object-contain` keeps the aspect ratio when the cap bites.
+              // not a decoration beside one, and it was unreadable at that
+              // size. `object-contain` keeps the aspect ratio when the cap
+              // bites, and the payload's own width and height, when it states
+              // them, reserve the box before the picture arrives.
               !inGallery &&
                 !compact &&
-                'max-h-176 w-full rounded-lg border border-border object-contain',
+                'h-auto max-h-176 w-full rounded-lg border border-border object-contain',
             )}
           />
-        </a>
+        </button>
       ) : inRow ? (
         // The row variant of "nothing to paint": an icon and a name, exactly as
         // a document row reads, because that is what this has become.
@@ -1062,7 +1156,7 @@ function ImageValue({
           file={file}
         />
       )}
-      {src && !compact && (
+      {fileLine && (
         <div className={inGallery ? 'px-2.5' : undefined}>
           <FileRef
             // `src` IS `paintableUrl(content, resolve)`, and this branch only
@@ -1085,6 +1179,22 @@ function ImageValue({
         >
           {content.caption}
         </p>
+      )}
+      {viewing && src !== undefined && (
+        <ImageViewer
+          pictures={[
+            {
+              src,
+              name,
+              ...(content.caption ? { caption: content.caption } : {}),
+              actions: <FileActions copy={{ url: src, storageUrl: content.url }} file={file} />,
+            },
+          ]}
+          index={0}
+          onIndexChange={() => {}}
+          onClose={() => setViewing(false)}
+          returnFocus={() => ownButton.current}
+        />
       )}
     </div>
   );
@@ -1233,37 +1343,84 @@ function RecordSummary({ field, value }: { field: ObjectRunField; value: unknown
  * would otherwise remount it on each state change and restart the download.
  * `onError` clears the spinner too — a failure that spins forever is the worst
  * of the three states.
+ *
+ * **Where the box comes from decides whether anything moves.** With a `box`,
+ * the caller sizes the box (a gallery's square tile, a cell's 40px line) and
+ * the picture fills it, so the spinner sits inside a box that is already the
+ * size it will be. With a `size`, the payload's own width and height give the
+ * picture its proportions before it arrives. With neither, nothing knows the
+ * picture's height until it lands, so the spinner holds a minimum height and
+ * the box settles once.
+ *
+ * A `fallbackSrc` is the whole picture behind a smaller copy (`src`): a copy
+ * that fails to load gives way to it, so a host's missing copy costs the
+ * reader the wait and never the picture.
  */
-function LoadingImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+function LoadingImage({
+  src,
+  fallbackSrc,
+  alt,
+  className,
+  box,
+  size,
+  lazy = false,
+}: {
+  src: string;
+  fallbackSrc?: string;
+  alt: string;
+  className?: string;
+  /** The classes that size the box the picture fills, when the caller sizes it. */
+  box?: string;
+  /** The picture's own width and height, when the payload states them. */
+  size?: { width: number; height: number };
+  /** Drawn below the fold in a list of them: leave it to the browser to fetch when near. */
+  lazy?: boolean;
+}) {
   const [state, setState] = useState<'loading' | 'done'>('loading');
   // `src` changing means a different picture: show the spinner again.
   const [current, setCurrent] = useState(src);
+  const [shown, setShown] = useState(src);
   if (current !== src) {
     setCurrent(src);
+    setShown(src);
     setState('loading');
   }
+  const reserved = box !== undefined || size !== undefined;
   return (
-    <span className="relative block">
+    <span className={cn('relative block', box)}>
       {state === 'loading' && (
         <span
           role="status"
           aria-label={alt}
-          className="absolute inset-0 flex items-center justify-center rounded-lg border border-border bg-card/40"
+          className={cn(
+            'absolute inset-0 flex items-center justify-center',
+            // A box the caller drew is the frame; anything else gets one.
+            box ? 'bg-muted/40' : 'rounded-lg border border-border bg-card/40',
+          )}
         >
           <Loader2 aria-hidden className="size-4 animate-spin text-muted-foreground" />
         </span>
       )}
       <img
-        src={src}
+        src={shown}
         alt={alt}
         // A result view has no business telling a third party where it was
         // opened from, and a payload's image URL is a third party by default.
         // The document frame has said so since it was written; every `<img>`
         // this package paints says it now too.
         referrerPolicy="no-referrer"
+        decoding="async"
+        {...(lazy ? { loading: 'lazy' as const } : {})}
+        {...(size ? { width: size.width, height: size.height } : {})}
         onLoad={() => setState('done')}
-        onError={() => setState('done')}
-        className={cn(className, state === 'loading' && 'min-h-40 opacity-0')}
+        onError={() => {
+          if (fallbackSrc !== undefined && shown !== fallbackSrc) setShown(fallbackSrc);
+          else setState('done');
+        }}
+        className={cn(
+          className,
+          state === 'loading' && (reserved ? 'opacity-0' : 'min-h-40 opacity-0'),
+        )}
       />
     </span>
   );
@@ -2344,8 +2501,15 @@ function ScalarLines({ field, items }: { field: RunField; items: readonly unknow
  * them the way a person looks at images: several at once, compared side by side.
  * An entry whose URL the browser cannot paint keeps its reference, because a
  * grid of identical broken-image glyphs would be worse than the text.
+ *
+ * A tile opens the gallery's one viewer at its own picture, and the viewer
+ * moves through the pictures the gallery can paint, in the gallery's order;
+ * one it cannot paint is a name in the grid and not a stop in the viewer.
+ * Each picture's controls in the viewer sit at that picture's place in the
+ * result, so its download is named as the tile's own would be.
  */
 function ImageGallery({ items }: { items: readonly unknown[] }) {
+  const s = useFieldStrings();
   // A grid of empty squares is not a gallery. When NOTHING here can be painted -
   // every URL a storage reference the host has no resolver for - the tiles carry
   // no picture, and three large blanks say less than three lines would. So the
@@ -2354,21 +2518,73 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
   // first): a stored picture the host resolves is showable, and a gallery of
   // them is a gallery.
   const resolve = useResolveUrl();
-  const anyViewable = items.some((item) => {
+  // The entry shown, and the tile that opened the viewer, which focus goes
+  // back to when it closes whichever picture it was moved to.
+  const [viewing, setViewing] = useState<{ entry: number; opener: number } | null>(null);
+  const tiles = useRef(new Map<number, HTMLButtonElement>());
+  const pictures = items.flatMap((item, entry) => {
     const content = readImageContent(item);
-    return content ? paintableUrl(content, resolve) !== undefined : false;
+    const src = content ? paintableUrl(content, resolve) : undefined;
+    return content && src !== undefined ? [{ entry, item, content, src }] : [];
   });
-  if (!anyViewable) return <FileRows items={items} kind="image" />;
+  if (pictures.length === 0) return <FileRows items={items} kind="image" />;
+  const shown = viewing ? pictures.findIndex((picture) => picture.entry === viewing.entry) : -1;
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
-      {items.map((item, index) => (
-        <div key={index} className="overflow-hidden rounded-lg border border-border bg-card/40">
-          <ResultAt segment={String(index)}>
-            <ImageValue value={item} inGallery />
-          </ResultAt>
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
+        {items.map((item, index) => (
+          <div key={index} className="overflow-hidden rounded-lg border border-border bg-card/40">
+            <ResultAt segment={String(index)}>
+              <ImageValue
+                value={item}
+                inGallery
+                opener={{
+                  open: () => setViewing({ entry: index, opener: index }),
+                  ref: (button) => {
+                    if (button) tiles.current.set(index, button);
+                    else tiles.current.delete(index);
+                  },
+                }}
+              />
+            </ResultAt>
+          </div>
+        ))}
+      </div>
+      {viewing && (
+        <ImageViewer
+          pictures={pictures.map(({ entry, item, content, src }) => ({
+            src,
+            name: fileLabel(src, content.filename, s),
+            ...(content.caption ? { caption: content.caption } : {}),
+            actions: (
+              <ResultAt segment={String(entry)}>
+                <ViewerFileActions value={item} src={src} />
+              </ResultAt>
+            ),
+          }))}
+          index={Math.max(shown, 0)}
+          onIndexChange={(position) => {
+            const picture = pictures[position];
+            if (picture) setViewing({ entry: picture.entry, opener: viewing.opener });
+          }}
+          onClose={() => setViewing(null)}
+          returnFocus={() => tiles.current.get(viewing.opener)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * A gallery's picture's controls in the viewer, drawn at the picture's place
+ * in the result: its URL to copy, and its download, named as its tile's would
+ * be.
+ */
+function ViewerFileActions({ value, src }: { value: unknown; src: string }) {
+  const file = useStuffFile('image', value);
+  const content = readImageContent(value);
+  return (
+    <FileActions copy={{ url: src, ...(content ? { storageUrl: content.url } : {}) }} file={file} />
   );
 }
 
