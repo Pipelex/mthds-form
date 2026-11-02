@@ -1355,15 +1355,24 @@ function ImageValue({
 }
 
 /**
- * The kinds a table cell can hold — short, single-line values.
+ * The kinds a table cell shows WHOLE, on one line: short scalars, and a list of
+ * them, drawn as chips that wrap.
  *
- * `prose` is deliberately absent. A paragraph in a `<td>` is worse than a card:
- * it forces one column to the width of the longest answer and drags every other
- * row's height with it. A list whose element carries prose renders as cards, and
- * that is the right answer rather than a limitation.
+ * It decides how a cell draws its value and whether the row opens, not which
+ * fields get a column: every column a table shows has a cell, and a value of a
+ * kind left out here is drawn there in short, with the row opening onto the
+ * whole of it (`isInlineColumn`).
  *
- * `object` and `list` are absent for the obvious reason, and `document`/`image`
- * because a file's chrome (a link, a preview) is not a cell.
+ * `prose` is deliberately absent. A paragraph in a `<td>` forces one column to
+ * the width of the longest answer and drags every other row's height with it,
+ * so a cell shows its first line, and a list of prose is drawn as lines rather
+ * than chips.
+ *
+ * `object` and `list` are absent because a cell names a record and counts a
+ * list of structures. `document` and `image` are absent because a file's
+ * chrome (its link, its copy control, its download, a preview) does not fit a
+ * line: a cell draws a picture as a thumbnail, which opens the picture's
+ * viewer, and the row's detail draws the file with its controls.
  */
 const TABULAR_KINDS = new Set<RunField['kind']>(['text', 'number', 'boolean', 'date', 'enum']);
 
