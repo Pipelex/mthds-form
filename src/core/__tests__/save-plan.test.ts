@@ -168,7 +168,7 @@ describe('planStuffSave: what a whole result saves as', () => {
 
 describe("a search result's sources are web pages, not files", () => {
   // The committed `search` case: the engine's own descriptor, and what a real
-  // search returned for it, twenty web pages each stated as a `native.Document`.
+  // search returned for it, its web pages each stated as a `native.Document`.
   const search = buildResultField(
     getPipeOutputForm(SEARCH_OUTPUT_FORM, 'search', 'search_result')!,
     getPipeIOContract(SEARCH_CONTRACTS, 'search', 'search_result')!.output.json_schema,
@@ -213,7 +213,11 @@ describe("a search result's sources are web pages, not files", () => {
     expect(plan.files.map((file) => file.name)).toEqual(['output.json']);
   });
 
-  it('keeps a file a concept refining a search result adds beside its sources', () => {
+  it('passes over the sources alone of a refining node, should it state a member beside them', () => {
+    // MTHDS refuses a concept that declares both `refines` and `structure`, so a
+    // concept refining a search result adds no member. The walk keys on the
+    // `sources` member alone all the same, never on the whole node, so a
+    // descriptor that did state another would still have its file saved.
     const refined: RunField = {
       ...search,
       kind: 'object',
