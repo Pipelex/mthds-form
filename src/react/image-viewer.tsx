@@ -149,9 +149,6 @@ export function ImageViewer({
             event.stopPropagation();
             go(event.key === 'ArrowLeft' ? -1 : 1);
           }}
-          // React events follow the portal back up the tree; a click in the
-          // viewer is not a click on the row or the card the picture sits in.
-          onClick={(event) => event.stopPropagation()}
           {...(picture.caption ? {} : { 'aria-describedby': undefined })}
           className={cn(
             'm-0 h-dvh w-full max-w-none gap-0 rounded-none border-0 p-0',

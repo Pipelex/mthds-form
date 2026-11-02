@@ -302,6 +302,29 @@ describe('a gallery', () => {
     expect(card).not.toHaveBeenCalled();
   });
 
+  it("keeps a drag from its panel onto its backdrop from the host's card", async () => {
+    const user = userEvent.setup();
+    const card = vi.fn();
+    render(
+      <div onClick={card} onMouseDown={card}>
+        <Gallery />
+      </div>,
+    );
+    await user.click(tile('eb2eb9e9fa5bf156.png'));
+    card.mockClear();
+    // A selection of the picture's name, released over the backdrop: the
+    // browser fires the click on the nearest element holding both.
+    const panel = viewer();
+    const backdrop = panel.previousElementSibling as HTMLElement;
+    let holder = panel.parentElement;
+    while (holder && !holder.contains(backdrop)) holder = holder.parentElement;
+    fireEvent.mouseDown(within(panel).getByText('eb2eb9e9fa5bf156.png'));
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(holder!);
+    expect(card).not.toHaveBeenCalled();
+    expect(viewer()).toBeInTheDocument();
+  });
+
   it('moves only through the pictures it can paint', async () => {
     const user = userEvent.setup();
     // The middle one is a reference nothing resolves: a name in the grid, and

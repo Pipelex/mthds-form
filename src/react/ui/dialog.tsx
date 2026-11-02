@@ -51,18 +51,33 @@ export function closeAutoFocus(
   };
 }
 
+const keepPress = (event: React.MouseEvent) => event.stopPropagation();
+
 /**
- * The backdrop keeps a press on it to itself. React events follow the
- * component tree, through a portal and past every box, so a click on a
- * dialog's backdrop otherwise reaches the components the dialog is drawn
- * inside: a host's clickable card around a result, a row that opens. Radix
- * dismisses on `pointerdown`, which it hears on the document, so that event
- * is left to bubble: stopping it would keep the dialog open.
+ * Holds a dialog's backdrop and its panel, and keeps every press on either to
+ * the dialog. React events follow the component tree, through a portal and
+ * past every box, so a click in a dialog otherwise reaches the components the
+ * dialog is drawn inside: a host's clickable card around a result, a row that
+ * opens.
+ *
+ * The guard sits on the element holding both rather than on the backdrop,
+ * because a press that begins on one and ends on the other, a text selection
+ * dragged out of the panel and released over the backdrop, fires its `click`
+ * on the nearest element containing both, which is neither. Its handlers run
+ * after every handler inside the dialog, so those all still run. It is
+ * `display: contents` and both its children are `fixed`, so it draws no box
+ * and moves nothing in the host's layout.
+ *
+ * Radix dismisses on `pointerdown`, which it hears on the document, so that
+ * event is left to bubble: stopping it would keep the dialog open.
  */
-export const overlayKeepsPresses = {
-  onClick: (event: React.MouseEvent) => event.stopPropagation(),
-  onMouseDown: (event: React.MouseEvent) => event.stopPropagation(),
-};
+export function DialogSurface({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="contents" onClick={keepPress} onMouseDown={keepPress}>
+      {children}
+    </div>
+  );
+}
 
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
@@ -90,8 +105,8 @@ const DialogContent = React.forwardRef<
     returnFocus?: ReturnFocus;
   }
 >(({ className, layout = 'dialog', returnFocus, onCloseAutoFocus, children, ...props }, ref) => (
-  <>
-    <DialogOverlay {...overlayKeepsPresses} />
+  <DialogSurface>
+    <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
@@ -109,7 +124,7 @@ const DialogContent = React.forwardRef<
     >
       {children}
     </DialogPrimitive.Content>
-  </>
+  </DialogSurface>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 

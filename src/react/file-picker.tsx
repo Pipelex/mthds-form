@@ -210,9 +210,6 @@ export function FilePicker({
           // transform, which would make it the containing block of anything
           // `fixed` inside it.
           style={drag > 0 ? { transform: `translateY(${drag}px)` } : undefined}
-          // Swallowed so nothing inside reaches a host's own handlers: a click
-          // in the sheet is never a click on the field or the row it sits in.
-          onClick={(event) => event.stopPropagation()}
         >
           <FilePickerBody {...props} onDrag={setDrag} onClose={() => onOpenChange(false)} />
         </DialogContent>
