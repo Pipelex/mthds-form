@@ -458,7 +458,7 @@ describe('a search result', () => {
     expect(container.textContent).toContain('An answer');
   });
 
-  it('names the sources in French where the host does', () => {
+  it('speaks French where the host does', () => {
     render(
       <FieldPresentationProvider presentation="app">
         <FieldStringsProvider locale="fr">
@@ -466,7 +466,11 @@ describe('a search result', () => {
         </FieldStringsProvider>
       </FieldPresentationProvider>,
     );
+    // The heading reads `Sources` in both locales, so it cannot show the
+    // locale applies; the answer's copy control is worded differently in each.
     expect(screen.getByRole('list', { name: 'Sources' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copier le texte' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: s.copyText })).toBeNull();
   });
 
   describe('a list of them', () => {
