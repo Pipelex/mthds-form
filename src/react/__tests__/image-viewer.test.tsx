@@ -73,12 +73,14 @@ const resolveRendition: ResolveRendition = (url, { width }) =>
 function Gallery({
   value = STORED,
   presentation = 'studio',
+  resolve = resolveUrl,
   rendition,
   saveFiles,
   askFileName = false,
 }: {
   value?: unknown;
   presentation?: FieldPresentation;
+  resolve?: ResolveUrl;
   rendition?: ResolveRendition;
   saveFiles?: SaveFiles;
   askFileName?: boolean;
@@ -86,7 +88,7 @@ function Gallery({
   return (
     <FieldPresentationProvider presentation={presentation}>
       <ResultEnvProvider
-        resolveUrl={resolveUrl}
+        resolveUrl={resolve}
         {...(rendition ? { resolveRendition: rendition } : {})}
         {...(saveFiles ? { saveFiles } : {})}
         {...(askFileName ? { downloads: { askFileName: true } } : {})}
@@ -166,6 +168,26 @@ describe('a lone picture', () => {
     ]);
   });
 
+  it('closes when its picture can no longer be painted, and does not reopen by itself', async () => {
+    const user = userEvent.setup();
+    const Lone = ({ resolve }: { resolve: ResolveUrl }) => (
+      <ResultEnvProvider resolveUrl={resolve}>
+        <StuffViewer field={image('output')} value={STORED[0]} />
+      </ResultEnvProvider>
+    );
+    const { rerender } = render(<Lone resolve={resolveUrl} />);
+    await user.click(tile('22d29b4410c16562.png'));
+    expect(viewer()).toBeInTheDocument();
+    // The host's resolver stops answering: nothing to show, so no viewer.
+    rerender(<Lone resolve={() => undefined} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // It answers again: the picture is back, and the viewer stays closed
+    // until the reader opens it.
+    rerender(<Lone resolve={resolveUrl} />);
+    expect(tile('22d29b4410c16562.png')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it("reserves the picture's box from the payload's width and height", () => {
     const { container } = render(
       <StuffViewer field={image('output')} value={{ ...STORED[0]!, url: lone.url }} />,
@@ -232,6 +254,35 @@ describe('a gallery', () => {
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await waitFor(() => expect(tile('22d29b4410c16562.png')).toHaveFocus());
+  });
+
+  it('closes when the list loses the picture it shows, and gives focus to a tile left', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Gallery />);
+    await user.click(tile('eb2eb9e9fa5bf156.png'));
+    expect(viewer()).toHaveAccessibleName('eb2eb9e9fa5bf156.png');
+    // The run's list is now one picture: not the one shown, and not the
+    // tile that opened the viewer.
+    rerender(<Gallery value={[STORED[0]]} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(tile('22d29b4410c16562.png')).toHaveFocus());
+  });
+
+  it('closes when nothing can be painted any more, and does not reopen by itself', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Gallery />);
+    await user.click(tile('eb2eb9e9fa5bf156.png'));
+    // The host's resolver stops answering: the gallery becomes rows.
+    rerender(<Gallery resolve={() => undefined} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Focus stays in the result, on the gallery that is now rows, rather
+    // than falling to the page's body.
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(document.activeElement).toContainElement(screen.getByText('eb2eb9e9fa5bf156.png'));
+    // It answers again: the tiles are back, and the viewer stays closed.
+    rerender(<Gallery />);
+    expect(tile('eb2eb9e9fa5bf156.png')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('moves only through the pictures it can paint', async () => {

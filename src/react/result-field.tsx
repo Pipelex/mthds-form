@@ -1194,9 +1194,13 @@ function ImageValue({
   // A lone picture's own viewer. Above the early return, as every hook is.
   const [viewing, setViewing] = useState(false);
   const ownButton = useRef<HTMLButtonElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
   const content = readImageContent(value);
+  const src = content ? paintableUrl(content, resolve) : undefined;
+  // A picture that can no longer be painted closes its viewer, for good: kept
+  // in state, the viewer would come back by itself when the picture did.
+  if (viewing && src === undefined) setViewing(false);
   if (!content) return <Absent />;
-  const src = paintableUrl(content, resolve);
   const renditionWidth = inGallery
     ? TILE_RENDITION_WIDTH
     : compact
@@ -1219,7 +1223,7 @@ function ImageValue({
       ? { width: content.width, height: content.height }
       : undefined;
   return (
-    <div className={inGallery ? 'space-y-1' : 'space-y-1.5'}>
+    <div ref={frame} className={inGallery ? 'space-y-1' : 'space-y-1.5'}>
       {src !== undefined && drawn !== undefined ? (
         // A button, not a link: the picture opens in the viewer over the
         // result. Enter and Space open it as a click does.
@@ -1347,7 +1351,11 @@ function ImageValue({
           index={0}
           onIndexChange={() => {}}
           onClose={() => setViewing(false)}
-          returnFocus={() => ownButton.current}
+          // The picture, or when it can no longer be painted the first
+          // control of the file line that replaced it.
+          returnFocus={() =>
+            ownButton.current ?? frame.current?.querySelector<HTMLElement>('a[href], button')
+          }
         />
       )}
     </div>
@@ -2685,14 +2693,36 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
   // back to when it closes whichever picture it was moved to.
   const [viewing, setViewing] = useState<{ entry: number; opener: number } | null>(null);
   const tiles = useRef(new Map<number, HTMLButtonElement>());
+  const gallery = useRef<HTMLDivElement>(null);
   const pictures = items.flatMap((item, entry) => {
     const content = readImageContent(item);
     const src = content ? paintableUrl(content, resolve) : undefined;
     return content && src !== undefined ? [{ entry, item, content, src }] : [];
   });
-  if (pictures.length === 0) return <FileRows items={items} kind="image" />;
   const shown = viewing ? pictures.findIndex((picture) => picture.entry === viewing.entry) : -1;
-  return (
+  // The picture shown is gone (the list changed, or the host's resolver
+  // stopped answering for it): the viewer closes, and stays closed. Kept open
+  // on another picture it would show one the reader did not ask for, and
+  // kept in state while it cannot be drawn it would come back by itself
+  // when the picture did. The same adjustment during render `LoadingImage`
+  // makes when its picture changes.
+  if (viewing && shown === -1) setViewing(null);
+  // Where focus goes as the viewer closes: the tile that opened it, or when
+  // that tile is gone the first tile left, or the gallery itself, so focus
+  // never falls back to the page's body.
+  const returnFocus = (opener: number) => () => {
+    const first = [...tiles.current.entries()].sort(([a], [b]) => a - b)[0]?.[1];
+    return tiles.current.get(opener) ?? first ?? gallery.current;
+  };
+  // The one element both layouts share, so focus has somewhere to land when
+  // a gallery whose viewer was open becomes rows.
+  const frame = (children: React.ReactNode) => (
+    <div ref={gallery} tabIndex={-1} className="outline-none">
+      {children}
+    </div>
+  );
+  if (pictures.length === 0) return frame(<FileRows items={items} kind="image" />);
+  return frame(
     <>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
         {items.map((item, index) => (
@@ -2713,7 +2743,7 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
           </div>
         ))}
       </div>
-      {viewing && (
+      {viewing && shown !== -1 && (
         <ImageViewer
           pictures={pictures.map(({ entry, item, content, src }) => ({
             src,
@@ -2725,16 +2755,16 @@ function ImageGallery({ items }: { items: readonly unknown[] }) {
               </ResultAt>
             ),
           }))}
-          index={Math.max(shown, 0)}
+          index={shown}
           onIndexChange={(position) => {
             const picture = pictures[position];
             if (picture) setViewing({ entry: picture.entry, opener: viewing.opener });
           }}
           onClose={() => setViewing(null)}
-          returnFocus={() => tiles.current.get(viewing.opener)}
+          returnFocus={returnFocus(viewing.opener)}
         />
       )}
-    </>
+    </>,
   );
 }
 
