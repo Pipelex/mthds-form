@@ -63,6 +63,13 @@ const hrefOf = (url: string) => new URL(url).href;
 const hostOf = (url: string) => new URL(url).hostname.replace(/^www\./, '');
 
 /**
+ * A title as the list shows it. The captured run wrote an ampersand in a
+ * page's title escaped, `&amp;`, as runs did before the runtime decoded a
+ * title, and the reader decodes it; the run escapes nothing else.
+ */
+const shownTitle = (title: string) => title.replaceAll('&amp;', '&').trim();
+
+/**
  * Where citation `n` leads: the source listed `n`th, or, for the copy of the
  * page listed twice, the first listing kept for it.
  */
@@ -113,7 +120,7 @@ export const AnswerWithCitations: Story = {
       }
     }
     // The sources: one link per page, the page listed twice once, each with
-    // its title and its host, `www.` dropped.
+    // its title, decoded, and its host, `www.` dropped.
     const { copy } = listedTwice();
     const kept = SEARCH_RESULT.sources.filter((_, index) => index + 1 !== copy);
     for (const list of sourceLists(canvasElement)) {
@@ -124,11 +131,12 @@ export const AnswerWithCitations: Story = {
       for (const [index, link] of links.entries()) {
         const source = kept[index];
         if (!source?.title) throw new Error('A source of the captured run lost its title.');
-        await expect(link.textContent).toContain(source.title.trim());
+        await expect(link.textContent).toContain(shownTitle(source.title));
         await expect(link.textContent).toContain(hostOf(source.url));
         await expect(link.getAttribute('target')).toBe('_blank');
         await expect(link.getAttribute('rel')).toBe('noopener noreferrer');
       }
+      await expect(list.textContent).not.toContain('&amp;');
     }
     // Never a file: no download of its own, no copy of its address, no file
     // name, and no "Output" title.
@@ -188,7 +196,9 @@ export const SourceWithNoTitle: Story = {
     }
     // The other sources keep their titles.
     const titled = UNTITLED_SOURCE.sources.find((source) => source.title);
-    await expect(sourceLinks(canvasElement, titled?.title ?? '-')).toHaveLength(BOTH_THEMES);
+    await expect(sourceLinks(canvasElement, shownTitle(titled?.title ?? '-'))).toHaveLength(
+      BOTH_THEMES,
+    );
   },
 };
 
