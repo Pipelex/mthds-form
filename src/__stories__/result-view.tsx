@@ -7,6 +7,7 @@ import {
   ResultEnvProvider,
   StuffViewer,
   type FieldPresentation,
+  type ResolveRendition,
   type ResolveUrl,
   type TableLayout,
 } from '../react';
@@ -67,6 +68,8 @@ export interface ResultViewProps {
   name?: string;
   /** The host's resolver for a stored reference, on `ResultEnvProvider`. */
   resolveUrl?: ResolveUrl;
+  /** The host's smaller copy of a picture, on `ResultEnvProvider`. */
+  resolveRendition?: ResolveRendition;
   /** The host's locale, on `FieldStringsProvider`. The package's English when unset. */
   locale?: string;
 }
@@ -97,6 +100,7 @@ export function ResultView({
   presentation = 'studio',
   name,
   resolveUrl,
+  resolveRendition,
   locale,
 }: ResultViewProps) {
   const field = React.useMemo(
@@ -112,12 +116,13 @@ export function ResultView({
     />
   );
   const env =
-    tableColumns === undefined && resolveUrl === undefined ? (
+    tableColumns === undefined && resolveUrl === undefined && resolveRendition === undefined ? (
       panel
     ) : (
       <ResultEnvProvider
         {...(tableColumns === undefined ? {} : { tableColumns })}
         {...(resolveUrl ? { resolveUrl } : {})}
+        {...(resolveRendition ? { resolveRendition } : {})}
       >
         {panel}
       </ResultEnvProvider>

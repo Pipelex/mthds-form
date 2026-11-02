@@ -138,6 +138,11 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   ratingLevel: (position) => `Niveau ${position}`,
   pageNumber: (position) => `Page ${position}`,
   extractedTable: 'Tableau',
+  viewImage: (name) => `Voir ${name}`,
+  imagePosition: (position, count) => `${position} sur ${count}`,
+  previousImage: 'Image précédente',
+  nextImage: 'Image suivante',
+  openOriginal: 'Ouvrir l’original',
   unsupportedFileType: (formats) =>
     `Ce type de fichier n’est pas pris en charge. Formats acceptés\u00a0: ${formats}.`,
   dropFilesOrBrowse: 'Déposez des fichiers ou cliquez pour parcourir',

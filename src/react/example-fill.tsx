@@ -251,7 +251,6 @@ export function FillWithExample({
             className="top-auto max-h-[calc(100dvh-1.5rem)]"
             ref={sheet}
             returnFocus={() => control.current ?? afterControl.current}
-            onClick={(event) => event.stopPropagation()}
           >
             <div className="px-4 pt-4 pb-3">
               <div className="flex items-start gap-3">
@@ -364,7 +363,6 @@ export function FillWithExample({
               const row = rows.current.get(replacing.id);
               return row?.isConnected ? row : control.current;
             }}
-            onClick={(event) => event.stopPropagation()}
           >
             <AlertDialogTitle>{s.replaceEnteredTitle}</AlertDialogTitle>
             <AlertDialogDescription>
@@ -474,7 +472,7 @@ function RenameExampleDialog({
         if (!next && state !== 'busy') onCancel();
       }}
     >
-      <DialogContent returnFocus={returnFocus} onClick={(event) => event.stopPropagation()}>
+      <DialogContent returnFocus={returnFocus}>
         <DialogTitle>{s.renameExampleTitle}</DialogTitle>
         <DialogDescription className="sr-only">{example.name}</DialogDescription>
         <div className="space-y-1.5">
@@ -566,7 +564,7 @@ function DeleteExampleDialog({
         if (!next && state !== 'busy') onCancel();
       }}
     >
-      <AlertDialogContent returnFocus={returnFocus} onClick={(event) => event.stopPropagation()}>
+      <AlertDialogContent returnFocus={returnFocus}>
         <AlertDialogTitle>{s.deleteExampleTitle(example.name)}</AlertDialogTitle>
         <AlertDialogDescription>{s.deleteExampleDescription}</AlertDialogDescription>
         {state === 'failed' && (

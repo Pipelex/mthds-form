@@ -100,6 +100,11 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   ratingLevel: (position) => `Level ${position}`,
   pageNumber: (position) => `Page ${position}`,
   extractedTable: 'Table',
+  viewImage: (name) => `View ${name}`,
+  imagePosition: (position, count) => `${position} of ${count}`,
+  previousImage: 'Previous picture',
+  nextImage: 'Next picture',
+  openOriginal: 'Open the original',
   unsupportedFileType: (formats) =>
     `That file type is not supported. Accepted formats: ${formats}.`,
   dropFilesOrBrowse: 'Drop files or click to browse',
