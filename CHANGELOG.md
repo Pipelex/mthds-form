@@ -18,6 +18,7 @@
 ### Fixed
 
 - **A gallery no longer jumps while its pictures load**: each tile is a square box reserved before its picture arrives, with the spinner inside it and the picture covering it, and tiles and table thumbnails load lazily; a lone picture reserves its box from the payload's `width` and `height` when the run states them, and a table cell's thumbnail keeps its row's height while it loads instead of standing 160 pixels tall. See [docs/result-view.md](docs/result-view.md#tiles-keep-their-box).
+- **A click on a dialog's backdrop stays in the dialog**: a click or press on the dimmed backdrop of the team's files, the examples, their questions or a picture's viewer no longer reaches the handlers of the elements the form or the result is drawn inside, such as a host's clickable card; the backdrop still dismisses a dialog, and a question still waits for its answer.
 
 ## [v0.25.0] - 2026-11-01
 
