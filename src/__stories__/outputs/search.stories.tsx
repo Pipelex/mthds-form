@@ -223,8 +223,10 @@ export const CitationPastTheEnd: Story = {
 
 /**
  * The real search on a phone: its long titles wrap inside the panel rather
- * than pushing it wider, and each source's link, the whole entry, is a target
- * a finger can take, 44 pixels tall at least.
+ * than pushing it wider, each source's link, the whole entry, is a target a
+ * finger can take, 44 pixels tall at least, and every title starts at one
+ * edge, after a two-digit marker and after the page listed twice's pair as
+ * after `[1]`.
  */
 export const OnAPhone: Story = {
   name: 'On a phone',
@@ -236,7 +238,10 @@ export const OnAPhone: Story = {
     await expect(lists).toHaveLength(BOTH_THEMES);
     for (const list of lists) {
       await expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth);
-      for (const link of within(list).getAllByRole('link')) await expectTouchTarget(link);
+      const links = within(list).getAllByRole('link');
+      for (const link of links) await expectTouchTarget(link);
+      const starts = links.map((link) => Math.round(link.getBoundingClientRect().left));
+      await expect(new Set(starts).size).toBe(1);
     }
   },
 };

@@ -3141,10 +3141,20 @@ function SearchResultValue({ content }: { content: SearchResultContentView }) {
           <p id={headingId} className="text-[12px] font-medium text-muted-foreground">
             {s.searchSources}
           </p>
-          <ul aria-labelledby={headingId} className="space-y-1">
+          {/* One marker column for the whole list, as wide as its widest
+              marker, so every title starts at one edge: after `[10]` and
+              after a merged `[4][5]` as after `[1]`. Each entry spans both
+              columns as a subgrid of the list's, and stays a list item. */}
+          <ul
+            aria-labelledby={headingId}
+            className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-1"
+          >
             {content.sources.map((source) => (
-              <li key={source.citations[0]} className="flex min-w-0 items-baseline gap-2">
-                <span className="min-w-6 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+              <li
+                key={source.citations[0]}
+                className="col-span-2 grid grid-cols-subgrid items-baseline"
+              >
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                   {source.citations.map((citation) => `[${citation}]`).join('')}
                 </span>
                 <SearchSource source={source} />
