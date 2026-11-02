@@ -3114,9 +3114,11 @@ function VerdictValue({ reading, prominent }: { reading: VerdictReading; promine
  * width with each inline citation a link to the source it names, then the
  * sources, each once.
  *
- * A source is a web page, not a file, so it is drawn as a link: its title (or
- * its address, when it has none) and its site's host name, opening in a tab of
- * its own, with no download, no copy control and no file name. Each source is
+ * A source is a web page, not a file, so it has no download, no copy control
+ * and no file name. A source with a web address is drawn as a link opening in a
+ * tab of its own: its title (or its address, when it has none) and its site's
+ * host name. A source with any other address is the same entry in plain text,
+ * with no host name and no link. Each source is
  * marked with the citations that name it (`[1]`, or `[1][3]` for a page the
  * payload listed twice), so a reader can find the source behind a number.
  */
