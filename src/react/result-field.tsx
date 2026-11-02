@@ -3123,15 +3123,12 @@ function VerdictValue({ reading, prominent }: { reading: VerdictReading; promine
 function SearchResultValue({ content }: { content: SearchResultContentView }) {
   const s = useFieldStrings();
   const headingId = useId();
-  const citations = useMemo(
-    () => (citation: number) => {
-      const source = citedSource(content, citation);
-      return source?.href
-        ? { href: source.href, label: source.title ?? source.address }
-        : undefined;
-    },
-    [content],
-  );
+  // Made afresh on each render, with no memo: `content` is read from the value
+  // on every render of the arm, so a memo keyed on it would never hit.
+  const citations = (citation: number) => {
+    const source = citedSource(content, citation);
+    return source?.href ? { href: source.href, label: source.title ?? source.address } : undefined;
+  };
   return (
     <div className="space-y-3">
       {content.answer.trim() === '' ? (
