@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A search result reads as an answer with linked sources in `app`**: a `native.SearchResult` result, or a concept refining it, is drawn as its answer typeset as Markdown at the result's full width, each inline citation (`[2]`, or a run such as `[2][3]`) a link to the source it counts to, then its sources, each a link opening in a new tab that shows its title (or its address) and its site's host name, marked with the citations that name it, and never drawn as a file; a title is shown with its complete character references decoded once (decimal, hexadecimal, and `amp`, `lt`, `gt`, `quot`, `apos` and `nbsp`, a no-break space read as an ordinary one), since a run made before the runtime decoded a page's title keeps it escaped as `&amp;`. A source listed twice is kept once, by the runtime's rule: two web addresses name one page when they agree as written with the scheme set aside between `http` and `https`, the host lowercased with one leading `www.` dropped, the fragment dropped, a missing path read as `/` and one trailing `/` dropped from any other path, the query kept as written; and only an `http:` or `https:` address is ever linked; a list of search results is one card per search, each drawn the same way, rather than a table; `studio` keeps the record of its members and the table. The kernel exports `isNativeSearchResultNode`, `readSearchResultContent`, `citedSource` and `splitCitations`, and `Markdown` takes a `citations` function. See [docs/result-view.md](docs/result-view.md#a-search-result).
+
+### Changed
+
+- **Saving a result never fetches a search result's sources**: `collectStuffFiles`, and so `planStuffSave` and the header's whole-result Download, pass over the `sources` of a `native.SearchResult` (or a concept refining it) wherever it sits in the output, since each is a web page rather than a file the result holds; a search result saves as its JSON copy alone, which keeps every address, and a real file beside it is still saved. See [docs/result-view.md](docs/result-view.md#saving-a-result).
+- **`FieldStrings` gains the heading of a search result's sources (Breaking)**: `searchSources`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds it. See [docs/i18n.md](docs/i18n.md).
+
 ## [v0.26.0] - 2026-11-02
 
 ### Added

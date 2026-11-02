@@ -8,14 +8,18 @@ import type {
   DateContentView,
   DocumentContentView,
   HtmlContentView,
+  SearchResultContentView,
+  SearchSourceView,
 } from '../core/native-content';
 import {
   TYPED_SCALAR_MARKERS,
+  citedSource,
   formatDateContent,
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
   isNativePageNode,
+  isNativeSearchResultNode,
   isNativeValueNode,
   nativeVerdictOf,
   readChoiceContent,
@@ -26,6 +30,7 @@ import {
   readImageContent,
   readPageContent,
   readRatingContent,
+  readSearchResultContent,
   readYesNoContent,
   viewableUrl,
 } from '../core/native-content';
@@ -3105,6 +3110,105 @@ function VerdictValue({ reading, prominent }: { reading: VerdictReading; promine
 }
 
 /**
+ * A search result, drawn as one: the answer, typeset at the result's full
+ * width with each inline citation a link to the source it names, then the
+ * sources, each once.
+ *
+ * A source is a web page, not a file, so it has no download, no copy control
+ * and no file name. A source with a web address is drawn as a link opening in a
+ * tab of its own: its title (or its address, when it has none) and its site's
+ * host name. A source with any other address is the same entry in plain text,
+ * with no host name and no link. Each source is
+ * marked with the citations that name it (`[1]`, or `[1][3]` for a page the
+ * payload listed twice), so a reader can find the source behind a number.
+ */
+function SearchResultValue({ content }: { content: SearchResultContentView }) {
+  const s = useFieldStrings();
+  const headingId = useId();
+  // Made afresh on each render, with no memo: `content` is read from the value
+  // on every render of the arm, so a memo keyed on it would never hit.
+  const citations = (citation: number) => {
+    const source = citedSource(content, citation);
+    return source?.href ? { href: source.href, label: source.title ?? source.address } : undefined;
+  };
+  return (
+    <div className="space-y-3">
+      {content.answer.trim() === '' ? (
+        <Absent />
+      ) : (
+        <Markdown text={content.answer} citations={citations} />
+      )}
+      {content.sources.length > 0 && (
+        <div className="space-y-1.5">
+          <p id={headingId} className="text-[12px] font-medium text-muted-foreground">
+            {s.searchSources}
+          </p>
+          {/* One marker column for the whole list, as wide as its widest
+              marker, so every title starts at one edge: after `[10]` and
+              after a merged `[4][5]` as after `[1]`. Each entry spans both
+              columns as a subgrid of the list's, and stays a list item. */}
+          <ul
+            aria-labelledby={headingId}
+            className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-1"
+          >
+            {content.sources.map((source) => (
+              <li
+                key={source.citations[0]}
+                className="col-span-2 grid grid-cols-subgrid items-baseline"
+              >
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {source.citations.map((citation) => `[${citation}]`).join('')}
+                </span>
+                <SearchSource source={source} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One source: its title, else its address, and the site's host name under it.
+ * The whole entry is the link, so it is one tab stop, and below `sm` it is 44
+ * pixels tall at least, so a finger can follow it. An address that is not a
+ * web one is shown as text and links nowhere.
+ */
+function SearchSource({ source }: { source: SearchSourceView }) {
+  const body = (
+    <>
+      <span
+        className={cn(
+          'text-[13px] leading-5 wrap-anywhere text-foreground',
+          source.href && 'underline underline-offset-2',
+        )}
+      >
+        {source.title ?? source.address}
+      </span>
+      {source.host && (
+        <span className="block text-[12px] leading-4 text-muted-foreground wrap-anywhere">
+          {source.host}
+        </span>
+      )}
+    </>
+  );
+  if (!source.href) return <div className="min-w-0">{body}</div>;
+  return (
+    <a
+      href={source.href}
+      target="_blank"
+      // `noreferrer` as well as `noopener`: a result view has no business
+      // telling a site which page its reader came from.
+      rel="noopener noreferrer"
+      className={cn('block min-w-0 rounded-sm max-sm:py-1.5', focusOutlineClass)}
+    >
+      {body}
+    </a>
+  );
+}
+
+/**
  * Whether a `text` value is LONG: it holds a line break, or runs past what one
  * line of a table cell holds (`CELL_LENGTH_LIMIT`).
  *
@@ -3350,6 +3454,33 @@ function ResultNode({
     );
   }
 
+  // A search result, in `app`: the answer a search wrote and the web pages it
+  // was written from, which the structural arms draw as a record, the answer
+  // squeezed beside its label and each page a file to download. Keyed by the
+  // concept the descriptor states, never by the keys the value holds; a value
+  // that is not the concept's model falls through to those arms, as a verdict
+  // does. `studio` keeps the record, which is what a builder checks a search
+  // against: the answer as written, and every source as the run returned it.
+  const search =
+    isApp && isNativeSearchResultNode(field) ? readSearchResultContent(unwrapped) : undefined;
+  if (search) {
+    return (
+      <div className="space-y-2">
+        {/* The answer is a text, and it can be copied as every text value can:
+            the source as written, citations included. */}
+        {search.answer.trim() === '' ? (
+          header
+        ) : (
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">{header}</div>
+            <CopyButton value={search.answer} label={s.copyText} />
+          </div>
+        )}
+        <SearchResultValue content={search} />
+      </div>
+    );
+  }
+
   switch (field.kind) {
     case 'object': {
       const memberValue = (child: RunField) =>
@@ -3530,9 +3661,12 @@ function ResultNode({
                 </div>
               ))}
             </div>
-          ) : columns ? (
+          ) : columns && !(isApp && isNativeSearchResultNode(field.item)) ? (
             // Same shape every row: the labels are column headers, not per-row
-            // labels. See `ObjectTable`.
+            // labels. See `ObjectTable`. A list of search results in `app` is
+            // the exception: a row would hide each answer's citations and its
+            // sources until it is opened, so each search takes a card of its
+            // own below and is drawn by the search arm. `studio` keeps the table.
             <ObjectTable
               columns={columns}
               element={field.item}

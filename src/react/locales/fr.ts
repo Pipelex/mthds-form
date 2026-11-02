@@ -138,6 +138,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   ratingLevel: (position) => `Niveau ${position}`,
   pageNumber: (position) => `Page ${position}`,
   extractedTable: 'Tableau',
+  searchSources: 'Sources',
   viewImage: (name) => `Voir ${name}`,
   imagePosition: (position, count) => `${position} sur ${count}`,
   previousImage: 'Image précédente',

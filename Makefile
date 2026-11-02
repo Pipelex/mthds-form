@@ -69,9 +69,12 @@ fixtures:
 # declaration can tell you what a run returns. ONLY=<case> narrows it to one
 # case; PIPE=<code> with it re-runs ONE pipe and merges the result into the
 # case's committed module, so a sweep that died on the tenth pipe does not
-# re-buy the nine before it. Runs under tsx so that merge can import the module.
+# re-buy the nine before it. A pipe whose payload was read from a run (the
+# module's READ_FROM) is kept by a sweep and bought again only when PIPE= names
+# it. DRY=1 lists what would run and what is kept, and runs nothing. Runs under
+# tsx so that merge can import the module.
 fixtures-runs:
-	npx tsx scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY)) $(if $(PIPE),--pipe $(PIPE))
+	npx tsx scripts/generate-fixtures.mjs --runs $(if $(ONLY),--only $(ONLY)) $(if $(PIPE),--pipe $(PIPE)) $(if $(DRY),--dry-run)
 
 # The BRIEFS: for each generative hero, the brief as DATA - built from the
 # committed descriptors and payloads - laid out by the designer method's own

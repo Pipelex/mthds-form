@@ -1,0 +1,8 @@
+domain      = "search"
+description = "A result that is a web search's answer with the sources it cites: the answer in Markdown, its inline citations, and the web pages the search returned beside it."
+
+# No structures: the result is a native concept (`native.SearchResult`), the
+# answer and its source documents. The carrier is a `PipeSearch`, synthesized
+# from search.slots.json, because a search is what returns the sources beside
+# the answer it wrote from them; a `PipeLLM` producing the same concept would
+# invent its sources.
