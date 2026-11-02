@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.26.0] - 2026-11-02
+
+### Added
+
+- **A PDF the browser cannot draw shows a card, never a blank frame**: where `navigator.pdfViewerEnabled` is `false`, as in Android's browsers and in headless ones, a PDF's frame in the result view, opened on its own or by its toggle, is replaced by a card with the file's name, a sentence saying this browser cannot show the PDF here, a link that opens it in a new tab and its download. A server render never reads `navigator`, and a page hydrated on such a browser never draws the frame first. See [docs/result-view.md](docs/result-view.md#a-result-that-is-one-pdf).
+- **A picture opens in a viewer**: a lone image result, a gallery's tile and a table cell's thumbnail open the picture over the result, whole and as large as the screen allows, with its name, its caption, "Open the original", its copy control and its download; a list's pictures are moved through in place by the previous and next buttons, the arrow keys or a swipe, with the position stated ("2 of 6"), and focus goes back to the picture that opened it. It is the whole screen on a phone and is drawn at the root of the result, so a picture in a table that stacks its rows opens over the viewport. See [docs/result-view.md](docs/result-view.md#a-picture-opens-in-a-viewer).
+- **`resolveRendition` on `ResultEnvProvider`**: a host that keeps smaller copies of its pictures answers `(url, { width }) => string | undefined` with one, asked at the width that covers a tile or a thumbnail at twice its size for the picture's stated shape, and a gallery's tiles and a table cell's thumbnails are drawn from it, while the viewer, "Open the original", the copy control and every download keep the whole picture; a copy the URL gate refuses or that fails to load gives way to the whole picture. `ResolveRendition`, `RenditionRequest` and `useResolveRendition` are exported from `./react`. See [docs/result-view.md](docs/result-view.md#smaller-copies-the-hosts-resolverendition).
+
+### Changed
+
+- **A result that is one PDF opens on its pages in `app`**: a PDF that is the whole result a `StuffViewer` shows is framed as the result opens, with no Preview toggle, as wide as the result and a page tall, at most 80% of the screen's height and never shorter than 320px, a floor that wins on a short screen such as a phone held sideways; a PDF inside a record, a list, a composite or a part mounted on its own through `ResultField` keeps its toggle, closed, and `studio` keeps the toggle everywhere. See [docs/result-view.md](docs/result-view.md#a-result-that-is-one-pdf).
+- **A painted picture is a button rather than a link (Breaking)**: a click, Enter or Space opens the viewer instead of the file in a new tab, and the button is named for the picture it opens ("View figure.png"); the original still opens in a tab of its own from the viewer.
+- **A gallery's tiles in `app` show the picture and its caption alone**: the file's name, copy control and download are no longer drawn under each tile in `app`, and are in the viewer instead, the name being the tile's accessible name and the viewer's title; `studio` tiles and a lone picture keep their file line. See [docs/result-view.md](docs/result-view.md#what-a-tile-says-in-each-presentation).
+- **`FieldStrings` gains the keys of a PDF the browser cannot show and of the picture viewer (Breaking)**: `pdfViewerUnavailable`, `openInNewTab`, `viewImage`, `imagePosition`, `previousImage`, `nextImage` and `openOriginal`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/i18n.md](docs/i18n.md).
+
+### Fixed
+
+- **A gallery no longer jumps while its pictures load**: each tile is a square box reserved before its picture arrives, with the spinner inside it and the picture covering it, and tiles and table thumbnails load lazily; a lone picture reserves its box from the payload's `width` and `height` when the run states them, and a table cell's thumbnail keeps its row's height while it loads instead of standing 160 pixels tall. See [docs/result-view.md](docs/result-view.md#tiles-keep-their-box).
+- **A click in a dialog stays in the dialog**: a click or press in the team's files, the examples, their questions or a picture's viewer, whether on its panel, on its dimmed backdrop or a text selection dragged from the panel and released over the backdrop, no longer reaches the handlers of the elements the form or the result is drawn inside, such as a host's clickable card; the backdrop still dismisses a dialog, and a question still waits for its answer.
+
 ## [v0.25.0] - 2026-11-01
 
 ### Added

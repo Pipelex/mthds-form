@@ -77,6 +77,14 @@ export interface FieldStrings {
   removeFileAria: string;
   previewUnavailablePdf: string;
   /**
+   * Said in a result, in place of a PDF's frame, where the browser draws no PDF
+   * in a page (Android's browsers, a headless browser): above the actions that
+   * open the file in a new tab and save it.
+   */
+  pdfViewerUnavailable: string;
+  /** The link that opens a file in a new tab, where it cannot be shown in the page. */
+  openInNewTab: string;
+  /**
    * What a result slot the run resolved as an absence SHOWS — a dash, not a
    * sentence. Beside forty values in a grid, "not provided" repeated is louder
    * than the data; a dash reads as the blank it is.
@@ -174,6 +182,21 @@ export interface FieldStrings {
   pageNumber: (position: number) => string;
   /** What names a table read out of an extracted page when the table has no caption of its own. */
   extractedTable: string;
+
+  // A picture's viewer (docs/result-view.md, "A picture opens in a viewer").
+  /**
+   * The accessible name of a result's picture, which opens it in the viewer,
+   * given the picture's name: a gallery's tile in `app` shows no name, so this
+   * is what tells one tile from the next to a screen reader.
+   */
+  viewImage: (name: string) => string;
+  /** Where the viewer stands in a list of pictures, counted from one: "3 of 6". */
+  imagePosition: (position: number, count: number) => string;
+  /** The viewer's two buttons that move to the picture before or after this one. */
+  previousImage: string;
+  nextImage: string;
+  /** The viewer's link that opens the whole picture in a tab of its own. */
+  openOriginal: string;
   /**
    * Shown when a picked file is not a format this slot accepts. Takes the
    * slot's own formats as the hint names them (`PNG, JPG`), after any narrowing

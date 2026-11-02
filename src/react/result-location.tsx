@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use, useMemo, type ReactNode } from 'react';
+import { OverlayLayer } from './overlay-layer';
 
 /**
  * Where in a result the node being rendered sits, and what its saved files are
@@ -69,7 +70,14 @@ export function ResultRoot({
   // No segment holds a NUL: each is a field's name or an index.
   const key = path.join('\u0000');
   const location = useMemo(() => ({ baseName, path: key.split('\u0000') }), [baseName, key]);
-  return <ResultLocationContext value={location}>{children}</ResultLocationContext>;
+  // The root of a result is also where a surface opened deep inside it (a
+  // picture's viewer) is drawn, outside every box the result draws: see
+  // `./overlay-layer`.
+  return (
+    <ResultLocationContext value={location}>
+      <OverlayLayer>{children}</OverlayLayer>
+    </ResultLocationContext>
+  );
 }
 
 /** One step down: into a record's field (its name) or a list's entry (its index). */

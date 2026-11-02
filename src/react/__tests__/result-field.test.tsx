@@ -1062,7 +1062,10 @@ describe('lists of files', () => {
       '/api/assets/a.png',
       '/api/assets/b.png',
     ]);
-    expect(pictures.every((picture) => picture.className.includes('aspect-square'))).toBe(true);
+    // Square tiles: the box the picture fills is square before it arrives.
+    expect(
+      pictures.every((picture) => picture.parentElement?.className.includes('aspect-square')),
+    ).toBe(true);
   });
 
   it('renders a list of documents as rows, not cards', () => {

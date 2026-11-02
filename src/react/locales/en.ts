@@ -65,6 +65,8 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
+  pdfViewerUnavailable: 'This browser cannot show the PDF here.',
+  openInNewTab: 'Open in a new tab',
   // U+002D HYPHEN-MINUS, deliberately: not an en dash, not an em dash.
   resultAbsent: '-',
   resultAbsentDescription: 'Not provided',
@@ -98,6 +100,11 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   ratingLevel: (position) => `Level ${position}`,
   pageNumber: (position) => `Page ${position}`,
   extractedTable: 'Table',
+  viewImage: (name) => `View ${name}`,
+  imagePosition: (position, count) => `${position} of ${count}`,
+  previousImage: 'Previous picture',
+  nextImage: 'Next picture',
+  openOriginal: 'Open the original',
   unsupportedFileType: (formats) =>
     `That file type is not supported. Accepted formats: ${formats}.`,
   dropFilesOrBrowse: 'Drop files or click to browse',

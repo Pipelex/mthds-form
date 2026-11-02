@@ -59,6 +59,8 @@ describe('FR_FIELD_STRINGS', () => {
       s.verdictConfidence(0.5),
       s.ratingLevel(2),
       s.pageNumber(3),
+      s.viewImage('a.png'),
+      s.imagePosition(3, 6),
     ];
     for (const answer of answers) expect(answer.trim()).not.toBe('');
   });

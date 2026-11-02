@@ -83,6 +83,10 @@ So `data/inputs/` holds the served files — the corpus's own extraction PDF, an
 
 The **descriptor is still the corpus's own**, and that is the half that matters: `results.nested_media_result` is generated from `src/__stories__/_structures/results.mthds` like every other, so the kinds are the engine's. That pipe carries no `run` block and cannot — the language forbids a `PipeLLM` resolving to a concept containing images, and no other operator produces a structure — which is exactly why the payload is supplied and the descriptor is not.
 
+The stories about a PDF pin `navigator.pdfViewerEnabled` for their own run, through a `beforeEach` that defines it and removes it afterwards. The headless Chromium the stories run in reports no PDF viewer and a desktop browser reports one, so a story about the frame, or about the card that replaces it where there is no viewer, says which browser it is about and reads the same in both ([result-view.md](result-view.md#a-result-that-is-one-pdf)).
+
+`Outputs/Pictures` needs no supplied payload: its pictures are the corpus's own runs (`results.image_result` and `lists.gallery`), and a story-host resolver maps each stored reference to one of the served pictures, as `Outputs/Composites` does for its one. It stands in for a host's smaller copies the same way, answering the served picture under a `?w=` query, which the static server ignores, so a story reads from each `src` whether it was given the copy or the whole picture. Its viewer stories pin a phone's, a tablet's and a desktop's viewport, the phone and the desktop as `pinnedTo` does, and hold the open viewer and its picture inside each.
+
 ### The three artifacts
 
 Sourced differently, and all three generated:

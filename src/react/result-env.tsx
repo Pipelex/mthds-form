@@ -51,6 +51,70 @@ export type { ResolveUrls } from './markup-storage';
 export type ResolveUrl = (url: string) => string | undefined;
 
 /**
+ * What the view asks a host for when it draws a picture small: the width it
+ * would like the picture to be, in the picture's own pixels.
+ *
+ * It is the width that covers the box the view draws the picture in, at twice
+ * the box's CSS size, so the copy stays sharp on a high-density screen, and it
+ * follows the picture's shape when the payload states its `width` and
+ * `height`. A gallery's tile is a square narrower than 288 CSS pixels that
+ * the picture covers: `576` for a square or portrait picture, and `576` times
+ * the aspect ratio for a landscape one, which covers the square by its
+ * height. A table cell's thumbnail is 40 CSS pixels tall at the picture's own
+ * width: `80` times the aspect ratio, and never less than `256`. A picture of
+ * no stated shape is asked for at `576` in a tile and `256` in a cell. The
+ * view reads these from the shape rather than measuring each box, so a host
+ * that makes its copies on demand keeps few per picture, and may round a
+ * width up to the nearest copy it keeps.
+ */
+export interface RenditionRequest {
+  width: number;
+}
+
+/**
+ * The host's seam for a SMALLER copy of a picture, which the view draws where
+ * it shows the picture small: a gallery's tiles and a table cell's thumbnail.
+ *
+ * ## Why a result view needs one
+ *
+ * Without it every tile loads the whole picture: a generated image is around
+ * a megabyte at 1024 pixels, drawn in a box of 150. A gallery of six spins for
+ * seconds before a single tile shows, and a table with a picture per row loads
+ * every original to draw a thumbnail 40 pixels tall. The kernel cannot make a
+ * smaller copy itself, since it holds a reference and the host holds the file;
+ * a host that can (a resizing route, copies made when the file was stored, an
+ * image service in front of its storage) answers here.
+ *
+ * ## The contract
+ *
+ * Called with the picture's own `url` member, exactly as `resolveUrl` is (a
+ * `pipelex-storage://` reference, or whatever `http(s):` or `data:` URL the
+ * payload carries), and the {@link RenditionRequest}. Answer the URL of a copy
+ * of that picture at least `width` pixels wide (or the original's own width,
+ * where the original is narrower), keeping its aspect ratio, or `undefined`
+ * to have the view draw the whole picture, which is exactly what it does with
+ * no such function. Synchronous and pure, for the reasons `ResolveUrl` gives:
+ * a host that presigns its copies resolves them in a batch before it renders
+ * and closes over the result.
+ *
+ * - **The answer passes the URL gate**, as any resolver's does, and an answer
+ *   the gate refuses counts as none.
+ * - **It only ever paints.** The copy is the `src` of that one small picture
+ *   and nothing else: the viewer the picture opens, its "open the original"
+ *   link, its copy control and every download keep the whole picture's URL,
+ *   chosen as before (`resolveUrl`, then `public_url`, then `url`). A copy
+ *   therefore never becomes the file a reader opens, saves or shares, and is
+ *   never framed.
+ * - **It is asked only about a picture the view can already paint.** A copy
+ *   makes a picture lighter; it never makes one showable that is not, so a
+ *   stored reference neither `resolveUrl` nor the payload can paint is still
+ *   named rather than drawn.
+ * - **A copy that does not load gives way to the whole picture**, so a
+ *   missing copy costs the reader the wait, never the picture.
+ */
+export type ResolveRendition = (url: string, request: RenditionRequest) => string | undefined;
+
+/**
  * How a stored reference becomes a URL that works OUTSIDE this page — pasted
  * into another tab, another app, a colleague's message.
  *
@@ -195,6 +259,13 @@ interface ResultEnv {
    * answer, so a page is never held back by it for good.
    */
   resolveUrls?: ResolveUrls;
+  /**
+   * A smaller copy of a picture, for the places the view draws one small: a
+   * gallery's tiles and a table cell's thumbnail. Optional; unset, or for a
+   * picture it does not answer, the whole picture is drawn. See
+   * {@link ResolveRendition}.
+   */
+  resolveRendition?: ResolveRendition;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
   /**
@@ -250,6 +321,7 @@ const ResultEnvContext = createContext<ResultEnv>({});
 export function ResultEnvProvider({
   resolveUrl,
   resolveUrls,
+  resolveRendition,
   resolveShareUrl,
   proseImages,
   tableColumns,
@@ -263,6 +335,7 @@ export function ResultEnvProvider({
     () => ({
       resolveUrl,
       resolveUrls,
+      resolveRendition,
       resolveShareUrl,
       proseImages,
       tableColumns,
@@ -274,6 +347,7 @@ export function ResultEnvProvider({
     [
       resolveUrl,
       resolveUrls,
+      resolveRendition,
       resolveShareUrl,
       proseImages,
       tableColumns,
@@ -354,6 +428,11 @@ export function useResolveUrl(): ResolveUrl | undefined {
 export function useMarkupResolvers(): MarkupResolvers {
   const { resolveUrl, resolveUrls } = use(ResultEnvContext);
   return useMemo(() => ({ resolveUrl, resolveUrls }), [resolveUrl, resolveUrls]);
+}
+
+/** The host's smaller copies of a picture, when it supplies them. */
+export function useResolveRendition(): ResolveRendition | undefined {
+  return use(ResultEnvContext).resolveRendition;
 }
 
 /** The share-URL minter, when the host supplies one. */
