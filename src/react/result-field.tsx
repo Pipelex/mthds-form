@@ -3652,9 +3652,12 @@ function ResultNode({
                 </div>
               ))}
             </div>
-          ) : columns ? (
+          ) : columns && !(isApp && isNativeSearchResultNode(field.item)) ? (
             // Same shape every row: the labels are column headers, not per-row
-            // labels. See `ObjectTable`.
+            // labels. See `ObjectTable`. A list of search results in `app` is
+            // the exception: a row would hide each answer's citations and its
+            // sources until it is opened, so each search takes a card of its
+            // own below and is drawn by the search arm. `studio` keeps the table.
             <ObjectTable
               columns={columns}
               element={field.item}

@@ -28,7 +28,7 @@ import { PAYLOADS as RESULT_PAYLOADS } from '../../__stories__/_generated/result
 import * as verdicts from '../../__stories__/_generated/verdicts';
 import { PAYLOADS as VERDICT_PAYLOADS } from '../../__stories__/_generated/verdicts.payloads';
 import * as search from '../../__stories__/_generated/search';
-import { SEARCH_RESULT, listedTwice } from '../../__stories__/outputs/search-payloads';
+import { CITATIONS, SEARCH_RESULT, listedTwice } from '../../__stories__/outputs/search-payloads';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
 import { DEFAULT_IMG_SRC } from '../html-frame';
@@ -467,6 +467,47 @@ describe('a search result', () => {
       </FieldPresentationProvider>,
     );
     expect(screen.getByRole('list', { name: 'Sources' })).toBeTruthy();
+  });
+
+  describe('a list of them', () => {
+    // A plural node's concept is its element's, so the list states
+    // `native.SearchResult` and its item is the search.
+    const searches: RunField = {
+      kind: 'list',
+      name: 'output',
+      conceptRef: 'native.SearchResult',
+      required: true,
+      item: field,
+    };
+    const second = { answer: 'A second search, citing [2].', sources: SEARCH_RESULT.sources };
+    const value = [SEARCH_RESULT, second];
+
+    it('draws each search by its arm in an app, never as a row of a table', () => {
+      const { container } = panel('app', searches, value);
+      expect(container.querySelector('table')).toBeNull();
+      // Each search lists its own sources, deduplicated.
+      const lists = screen.getAllByRole('list', { name: s.searchSources });
+      expect(lists).toHaveLength(value.length);
+      for (const list of lists) {
+        expect(within(list).getAllByRole('listitem')).toHaveLength(
+          SEARCH_RESULT.sources.length - 1,
+        );
+      }
+      // And each answer's citations link to its sources: every `[2]` the real
+      // answer writes, and the second answer's one.
+      const cited = screen.getAllByRole('link', { name: '[2]' });
+      expect(cited).toHaveLength(CITATIONS.filter((citation) => citation === 2).length + 1);
+      for (const link of cited) {
+        expect(link.getAttribute('href')).toBe(SEARCH_RESULT.sources[1]?.url);
+      }
+    });
+
+    it('stays a table for a builder in studio', () => {
+      const { container } = panel('studio', searches, value);
+      expect(container.querySelector('table')).not.toBeNull();
+      expect(screen.queryByRole('list', { name: s.searchSources })).toBeNull();
+      expect(screen.queryByRole('link', { name: '[2]' })).toBeNull();
+    });
   });
 });
 
