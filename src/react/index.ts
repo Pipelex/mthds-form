@@ -75,12 +75,15 @@ export { saveInBrowser } from './save-in-browser';
 // hosted platform is a presigned URL that expires — see result-env.tsx. The same
 // provider takes the host's save function, which download controls to draw, and
 // whether a table too wide for its box scrolls or stacks its rows, and the
-// host's own PDF maker for an HTML page.
+// host's own PDF maker for an HTML page. `resolveRendition` is the host's
+// smaller copy of a picture, for a gallery's tiles and a cell's thumbnail.
 export type {
   DownloadDisplay,
   PdfPage,
   ProseImages,
   RenderPdf,
+  RenditionRequest,
+  ResolveRendition,
   ResolveShareUrl,
   ResolveUrl,
   ResolveUrls,
@@ -89,6 +92,7 @@ export type {
 export {
   ResultEnvProvider,
   useProseImages,
+  useResolveRendition,
   useResolveShareUrl,
   useResolveUrl,
   useResolvedUrl,
