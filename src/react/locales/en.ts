@@ -65,6 +65,8 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   preview: 'Preview',
   removeFileAria: 'Remove file',
   previewUnavailablePdf: 'Preview unavailable - open to view.',
+  pdfViewerUnavailable: 'This browser cannot show the PDF here.',
+  openInNewTab: 'Open in a new tab',
   // U+002D HYPHEN-MINUS, deliberately: not an en dash, not an em dash.
   resultAbsent: '-',
   resultAbsentDescription: 'Not provided',

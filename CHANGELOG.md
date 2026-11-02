@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A PDF the browser cannot draw shows a card, never a blank frame**: where `navigator.pdfViewerEnabled` is `false`, as in Android's browsers and in headless ones, a PDF's frame in the result view, opened on its own or by its toggle, is replaced by a card with the file's name, a sentence saying this browser cannot show the PDF here, a link that opens it in a new tab and its download. A server render never reads `navigator`, and a page hydrated on such a browser never draws the frame first. See [docs/result-view.md](docs/result-view.md#a-result-that-is-one-pdf).
+
+### Changed
+
+- **A result that is one PDF opens on its pages in `app`**: a PDF that is the whole result a `StuffViewer` shows is framed as the result opens, with no Preview toggle, as wide as the result and a page tall, at most 80% of the screen's height and never shorter than 320px, a floor that wins on a short screen such as a phone held sideways; a PDF inside a record, a list, a composite or a part mounted on its own through `ResultField` keeps its toggle, closed, and `studio` keeps the toggle everywhere. See [docs/result-view.md](docs/result-view.md#a-result-that-is-one-pdf).
+- **`FieldStrings` gains the keys of a PDF the browser cannot show (Breaking)**: `pdfViewerUnavailable` and `openInNewTab`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/i18n.md](docs/i18n.md).
+
 ## [v0.25.0] - 2026-11-01
 
 ### Added
