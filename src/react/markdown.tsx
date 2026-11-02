@@ -327,8 +327,18 @@ function InlineToken({ token }: { token: Token }) {
       const href = safeHref(link.href);
       // A link whose scheme we will not follow keeps its TEXT. Dropping the
       // anchor and dropping the words are different things, and only the first
-      // is a security decision.
-      if (!href) return <Inline tokens={link.tokens} />;
+      // is a security decision. The text is still the link's own, which the
+      // author wrote, so a bracketed number in it stays text as it does inside
+      // a link that is followed. Citations are switched off rather than the
+      // link flag set: `ProseImage` reads that flag, and an image in a refused
+      // link's text is not inside an anchor.
+      if (!href) {
+        return (
+          <CitationsContext value={undefined}>
+            <Inline tokens={link.tokens} />
+          </CitationsContext>
+        );
+      }
       return (
         // The flag is set for everything under the anchor, so a nested `image`
         // token knows not to open one of its own — see {@link ProseImage}.
@@ -362,8 +372,9 @@ function InlineToken({ token }: { token: Token }) {
  * or one a reference definition names, into a link, an `![…](…)` into an
  * image, and code into a code span or block, and none of those arrive here.
  * Inside a link's own text a citation stays text, since an anchor inside an
- * anchor is not valid HTML (see {@link ProseImage}). With no citations given,
- * the text is rendered as it always was.
+ * anchor is not valid HTML (see {@link ProseImage}), and so it does in the text
+ * of a link whose address is refused, which is still the author's link text.
+ * With no citations given, the text is rendered as it always was.
  */
 function CitedText({ text }: { text: string }) {
   const citations = React.use(CitationsContext);

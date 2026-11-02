@@ -317,11 +317,15 @@ describe('inline citations', () => {
     expect(container.textContent).toBe('Past the end [3], and nothing at [0].');
   });
 
-  it("leaves the author's own brackets alone: a link, an image, code and a link's text", () => {
+  it("leaves the author's own brackets alone: a link, an image, code and a link's text, followed or refused", () => {
     const text = [
       'A link [1](https://elsewhere.example/x) and an image ![2](https://elsewhere.example/y.png).',
       '',
       'Code `[1]` and an escaped \\[2\\] and [a link with [1] inside](https://elsewhere.example/z).',
+      '',
+      // A link whose address is refused keeps its text, and its text is still
+      // the author's: a script, and a relative page.
+      '[see [2] here](javascript:alert(1)) and [the guide [2]](guide.html).',
       '',
       '```',
       'array[1]',
@@ -333,6 +337,11 @@ describe('inline citations', () => {
     expect(hrefs).not.toContain('https://example.org/b');
     expect(container.querySelector('code')?.textContent).toBe('[1]');
     expect(container.querySelector('pre')?.textContent).toBe('array[1]');
+    // A refused link's words are kept, its bracket among them, as text.
+    expect(container.textContent).toContain('see [2] here and the guide [2].');
+    expect([...container.querySelectorAll('a')].map((link) => link.textContent)).not.toContain(
+      '[2]',
+    );
     // No anchor inside an anchor.
     expect(container.querySelector('a a')).toBeNull();
   });
