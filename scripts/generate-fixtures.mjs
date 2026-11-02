@@ -146,7 +146,7 @@ const PIPELEX_PYTHON =
   process.env.PIPELEX_PYTHON ?? path.resolve(REPO, '..', 'pipelex', '.venv', 'bin', 'python');
 
 /** The carrier types whose declaration carries a `prompt`. See `synthesizeCarrier`. */
-const PROMPTED_PIPE_TYPES = new Set(['PipeLLM', 'PipeImgGen', 'PipeJudge']);
+const PROMPTED_PIPE_TYPES = new Set(['PipeLLM', 'PipeImgGen', 'PipeJudge', 'PipeSearch']);
 
 const MULTIPLICITIES = new Set(['single', 'variable', 'fixed']);
 const PRESENCES = new Set(['plain', 'optional', 'force']);

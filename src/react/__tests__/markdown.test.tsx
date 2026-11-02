@@ -282,3 +282,76 @@ describe('a linked image does not open an anchor inside an anchor', () => {
     );
   });
 });
+
+describe('inline citations', () => {
+  /** Two sources, as a search result's arm hands them: a number to an address and a name. */
+  const SOURCES: Record<number, { href: string; label: string }> = {
+    1: { href: 'https://example.com/a', label: 'Page A' },
+    2: { href: 'https://example.org/b', label: 'Page B' },
+  };
+  const citations = (citation: number) => SOURCES[citation];
+
+  it('links each citation of a run to the source it counts to', () => {
+    const { container } = render(<Markdown text="Less water [1][2]." citations={citations} />);
+    const links = container.querySelectorAll('a');
+    expect([...links].map((link) => link.textContent)).toEqual(['[1]', '[2]']);
+    expect(links[0]?.getAttribute('href')).toBe('https://example.com/a');
+    expect(links[1]?.getAttribute('href')).toBe('https://example.org/b');
+    expect(links[0]?.getAttribute('title')).toBe('Page A');
+    expect(links[0]?.getAttribute('target')).toBe('_blank');
+    expect(links[0]?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(container.textContent).toBe('Less water [1][2].');
+  });
+
+  it('reads citations wherever text is: in emphasis, a heading, a list item and a table', () => {
+    const text = '# Title [1]\n\n**Bold [2]**\n\n- item [1]\n\n| a |\n|---|\n| cell [2] |';
+    const { container } = render(<Markdown text={text} citations={citations} />);
+    expect(container.querySelectorAll('h1 a, strong a, li a, td a')).toHaveLength(4);
+  });
+
+  it('leaves a number that names no source as text', () => {
+    const { container } = render(
+      <Markdown text="Past the end [3], and nothing at [0]." citations={citations} />,
+    );
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toBe('Past the end [3], and nothing at [0].');
+  });
+
+  it("leaves the author's own brackets alone: a link, an image, code and a link's text", () => {
+    const text = [
+      'A link [1](https://elsewhere.example/x) and an image ![2](https://elsewhere.example/y.png).',
+      '',
+      'Code `[1]` and an escaped \\[2\\] and [a link with [1] inside](https://elsewhere.example/z).',
+      '',
+      '```',
+      'array[1]',
+      '```',
+    ].join('\n');
+    const { container } = render(<Markdown text={text} citations={citations} />);
+    const hrefs = [...container.querySelectorAll('a')].map((link) => link.getAttribute('href'));
+    expect(hrefs).not.toContain('https://example.com/a');
+    expect(hrefs).not.toContain('https://example.org/b');
+    expect(container.querySelector('code')?.textContent).toBe('[1]');
+    expect(container.querySelector('pre')?.textContent).toBe('array[1]');
+    // No anchor inside an anchor.
+    expect(container.querySelector('a a')).toBeNull();
+  });
+
+  it('links only an http: or https: address, whatever the caller answers', () => {
+    const hostile = (citation: number) =>
+      citation === 1
+        ? { href: 'javascript:alert(1)', label: 'x' }
+        : citation === 2
+          ? { href: 'data:text/html,<script>alert(1)</script>', label: 'y' }
+          : { href: '/same-origin/path', label: 'z' };
+    const { container } = render(<Markdown text="[1] [2] [3]" citations={hostile} />);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toBe('[1] [2] [3]');
+  });
+
+  it('reads no citation at all when none are given', () => {
+    const { container } = render(<Markdown text="Less water [1][2]." />);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toBe('Less water [1][2].');
+  });
+});

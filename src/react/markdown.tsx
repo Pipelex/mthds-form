@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { marked, type Token, type Tokens } from 'marked';
 
-import { viewableUrl } from '../core/native-content';
+import { splitCitations, viewableUrl, webHref } from '../core/native-content';
 import { useProseImages, type ProseImages } from './result-env';
 import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
@@ -62,9 +62,28 @@ export interface MarkdownProps {
    * {@link ProseImages} for why the default is not to load.
    */
   proseImages?: ProseImages;
+  /**
+   * Where an inline citation leads: given the number in a `[2]` (a run such as
+   * `[2][3]` is two), the source it names, or `undefined` for a number that
+   * names none, which stays the text it is. Unset, no citation is read and the
+   * text renders exactly as it does without one.
+   *
+   * Only plain text is read for citations: a bracketed number that is already
+   * a link or an image, or that sits inside code or inside a link's own text,
+   * is the author's and is left alone. And only an `http:` or `https:` address
+   * becomes a link, read by parsing it, whatever the function answers.
+   */
+  citations?: (citation: number) => MarkdownCitation | undefined;
 }
 
-export function Markdown({ text, className, proseImages }: MarkdownProps) {
+/** Where a citation leads: the source's address, and what it is called. */
+export interface MarkdownCitation {
+  href: string;
+  /** The source's name, shown on hover over the citation: its title, or its address. */
+  label: string;
+}
+
+export function Markdown({ text, className, proseImages, citations }: MarkdownProps) {
   const tokens = React.useMemo(() => marked.lexer(text, LEX_OPTIONS), [text]);
   const fromEnv = useProseImages();
   // The prop wins over the provider, so a host rendering one prose value its own
@@ -72,9 +91,11 @@ export function Markdown({ text, className, proseImages }: MarkdownProps) {
   const mode = proseImages ?? fromEnv;
   return (
     <ProseImagesContext value={mode}>
-      <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
-        <Blocks tokens={tokens} />
-      </div>
+      <CitationsContext value={citations}>
+        <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
+          <Blocks tokens={tokens} />
+        </div>
+      </CitationsContext>
     </ProseImagesContext>
   );
 }
@@ -87,6 +108,9 @@ export function Markdown({ text, className, proseImages }: MarkdownProps) {
  * arm reads through all three would put it in every signature in the file.
  */
 const ProseImagesContext = React.createContext<ProseImages>('link');
+
+/** Where citations lead, threaded to the text arm for the reason the policy above is. */
+const CitationsContext = React.createContext<MarkdownProps['citations']>(undefined);
 
 const HEADING_CLASS: Record<number, string> = {
   1: 'text-[16px] font-semibold',
@@ -268,7 +292,7 @@ function InlineToken({ token }: { token: Token }) {
       // inside it; when it did not, `tokens` is absent and the string is the
       // content. Both arms are needed - reading `.text` unconditionally drops
       // nested emphasis, and recursing unconditionally renders nothing.
-      return text.tokens ? <Inline tokens={text.tokens} /> : <>{decode(text.text)}</>;
+      return text.tokens ? <Inline tokens={text.tokens} /> : <CitedText text={decode(text.text)} />;
     }
     case 'escape':
       return <>{(token as Tokens.Escape).text}</>;
@@ -327,6 +351,52 @@ function InlineToken({ token }: { token: Token }) {
     default:
       return <>{rawOf(token)}</>;
   }
+}
+
+/**
+ * A run of plain text, with each inline citation in it a link to its source
+ * when the caller says where citations lead.
+ *
+ * This is the one place a citation is read, and it is reached only by plain
+ * text: the lexer has already made a bracketed number followed by an address,
+ * or one a reference definition names, into a link, an `![…](…)` into an
+ * image, and code into a code span or block, and none of those arrive here.
+ * Inside a link's own text a citation stays text, since an anchor inside an
+ * anchor is not valid HTML (see {@link ProseImage}). With no citations given,
+ * the text is rendered as it always was.
+ */
+function CitedText({ text }: { text: string }) {
+  const citations = React.use(CitationsContext);
+  const insideLink = React.use(InsideLinkContext);
+  if (!citations || insideLink) return <>{text}</>;
+  return (
+    <>
+      {splitCitations(text).map((segment, index) => {
+        const target = 'citation' in segment ? citations(segment.citation) : undefined;
+        // Checked here too, whoever answered: only a web address is followed.
+        const href = target ? webHref(target.href) : undefined;
+        if (!target || !href) return <React.Fragment key={index}>{segment.text}</React.Fragment>;
+        return (
+          <a
+            key={index}
+            href={href}
+            target="_blank"
+            // `noreferrer` as well as `noopener`, as every link here carries.
+            rel="noopener noreferrer"
+            title={target.label}
+            // A hair of margin, so the underlines of a run like `[2][3]` read
+            // as two links rather than one.
+            className={cn(
+              'mx-px whitespace-nowrap rounded-sm underline underline-offset-2',
+              focusOutlineClass,
+            )}
+          >
+            {segment.text}
+          </a>
+        );
+      })}
+    </>
+  );
 }
 
 /**

@@ -182,6 +182,11 @@ export interface FieldStrings {
   pageNumber: (position: number) => string;
   /** What names a table read out of an extracted page when the table has no caption of its own. */
   extractedTable: string;
+  /**
+   * The heading over a search result's sources, in `app`: the web pages its
+   * answer was written from, listed after the answer.
+   */
+  searchSources: string;
 
   // A picture's viewer (docs/result-view.md, "A picture opens in a viewer").
   /**

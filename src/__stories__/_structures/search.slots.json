@@ -1,0 +1,12 @@
+{
+  "description": "A pipe whose RESULT is a search's answer with its sources, a `native.SearchResult`. The carrier is a `PipeSearch` stating its own prompt, so `make fixtures-runs` captures the answer the search provider wrote, with its inline citations, beside the web pages it cites, which is what the result view's search arm reads.",
+  "pipes": [
+    {
+      "code": "search_result",
+      "type": "PipeSearch",
+      "output": "SearchResult",
+      "slots": [],
+      "prompt": "What are the 2026 French e-invoicing requirements for small companies?"
+    }
+  ]
+}

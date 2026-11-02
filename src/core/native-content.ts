@@ -168,6 +168,7 @@ export const NATIVE_PAGE_CONCEPT_REF = 'native.Page';
 export const NATIVE_YES_NO_CONCEPT_REF = 'native.YesNo';
 export const NATIVE_RATING_CONCEPT_REF = 'native.Rating';
 export const NATIVE_CHOICE_CONCEPT_REF = 'native.Choice';
+export const NATIVE_SEARCH_RESULT_CONCEPT_REF = 'native.SearchResult';
 
 /**
  * `native.Page`, read: what one page of an extracted document holds.
@@ -302,6 +303,165 @@ export function readChoiceContent(value: unknown): ChoiceContentView | undefined
   return { choice, ...(confidence !== undefined ? { confidence } : {}) };
 }
 
+/**
+ * One source of a search result, read: a document the answer was written from,
+ * which a search returns as a web page rather than as a file.
+ */
+export interface SearchSourceView {
+  /**
+   * The source's address as a reader is shown it: the web address when it has
+   * one (normalised, as `href`), else its `url` as the payload states it.
+   */
+  address: string;
+  /**
+   * The web address, normalised, when the source has one: an `http:` or
+   * `https:` URL, read from `url`, else from `public_url`. It is the only kind
+   * of address a renderer links; any other is shown as text.
+   */
+  href?: string;
+  /** The web address's host name, a leading `www.` dropped: the site a reader recognises. */
+  host?: string;
+  title?: string;
+  snippet?: string;
+  /**
+   * The citations that name this source, each counted from one over the
+   * sources as the payload lists them. More than one when the payload listed
+   * the same address more than once: a later copy is not kept, and its number
+   * names the copy that is.
+   */
+  citations: readonly number[];
+}
+
+/** `native.SearchResult`, read: the answer, and each of its sources once. */
+export interface SearchResultContentView {
+  /** The answer, as written: Markdown with inline citations (`[2]`, `[2][3]`). */
+  answer: string;
+  /** Each source once, in the order the payload first lists it. */
+  sources: readonly SearchSourceView[];
+}
+
+/**
+ * An address a renderer may link: a URL the gate admits whose protocol, as
+ * the parser reports it, is `http:` or `https:`. Parsed rather than matched,
+ * as the gate itself is: the gate strips what the parser strips and returns
+ * the string it judged, and a root-relative path, which it admits, has no
+ * origin of its own and does not parse alone.
+ */
+function readWebUrl(candidate: string | undefined): URL | undefined {
+  const judged = viewableUrl(candidate);
+  if (judged === undefined) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(judged);
+  } catch {
+    return undefined;
+  }
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed : undefined;
+}
+
+/**
+ * A web address a renderer may link, normalised: `http:` or `https:`, read by
+ * parsing, and `undefined` for any other address. Not re-exported: the
+ * Markdown walker reads it to check an address a host hands it for a
+ * citation, as the search reader checks a source's.
+ */
+export function webHref(candidate: string | undefined): string | undefined {
+  return readWebUrl(candidate)?.href;
+}
+
+/**
+ * Read a `native.SearchResult` value: `{answer, sources}`, each source a
+ * `native.Document`. `undefined` when the value is not that model (no string
+ * `answer`, a `sources` that is not a list, or a source that is not a document
+ * with a `url`), which leaves the node to the structural arms. A missing
+ * `sources` reads as none, since the runtime's model defaults it to an empty
+ * list.
+ *
+ * **A source listed twice is kept once.** Two sources are the same when their
+ * web addresses are the same once each is parsed and its fragment removed
+ * (`#section` names a place in the page, not another page), or, for an address
+ * that is not a web one, when the two strings are. The first is kept, where
+ * the payload first lists it, and the citations of every copy name it.
+ */
+export function readSearchResultContent(value: unknown): SearchResultContentView | undefined {
+  if (!isRecord(value)) return undefined;
+  const answer = ownProp(value, 'answer');
+  if (typeof answer !== 'string') return undefined;
+  const given = ownProp(value, 'sources');
+  if (given !== undefined && !Array.isArray(given)) return undefined;
+  const sources: (Omit<SearchSourceView, 'citations'> & { citations: number[] })[] = [];
+  const kept = new Map<string, number>();
+  for (const [index, entry] of (given ?? []).entries()) {
+    const document = readDocumentContent(entry);
+    if (!document) return undefined;
+    const web = readWebUrl(document.url) ?? readWebUrl(document.publicUrl);
+    const key = web ? withoutFragment(web) : document.url;
+    const citation = index + 1;
+    const existing = kept.get(key);
+    if (existing !== undefined) {
+      sources[existing]?.citations.push(citation);
+      continue;
+    }
+    kept.set(key, sources.length);
+    const host = web?.hostname.replace(/^www\./, '');
+    const title = document.title?.trim();
+    sources.push({
+      address: web?.href ?? document.url,
+      ...(web ? { href: web.href } : {}),
+      ...(host ? { host } : {}),
+      ...(title ? { title } : {}),
+      ...(document.snippet !== undefined ? { snippet: document.snippet } : {}),
+      citations: [citation],
+    });
+  }
+  return { answer, sources };
+}
+
+function withoutFragment(url: URL): string {
+  const copy = new URL(url.href);
+  copy.hash = '';
+  return copy.href;
+}
+
+/**
+ * The source an inline citation names, counted from one over the sources as
+ * the payload lists them: `[2]` names the second, or the copy kept for it.
+ * `undefined` for a number that names no source, which a renderer leaves as
+ * the text it is.
+ */
+export function citedSource(
+  content: SearchResultContentView,
+  citation: number,
+): SearchSourceView | undefined {
+  return content.sources.find((source) => source.citations.includes(citation));
+}
+
+/** A run of text, or an inline citation in it: `[2]`, its number and its text. */
+export type CitationSegment = { text: string } | { citation: number; text: string };
+
+/**
+ * A run of text cut at its inline citations: every `[n]`, `n` a whole number
+ * from one written with no leading zero, is a segment of its own, and a run
+ * such as `[2][3]` is two. Text between them is kept as written, so joining
+ * the segments' text gives the run back.
+ *
+ * It reads plain text only. Which runs of an answer are plain text (not a link,
+ * an image or code, where a bracketed number is the author's own) is the
+ * Markdown reader's question, and it hands this only those.
+ */
+export function splitCitations(text: string): CitationSegment[] {
+  const segments: CitationSegment[] = [];
+  let last = 0;
+  for (const match of text.matchAll(/\[([1-9][0-9]*)\]/g)) {
+    const at = match.index;
+    if (at > last) segments.push({ text: text.slice(last, at) });
+    segments.push({ citation: Number(match[1]), text: match[0] });
+    last = at + match[0].length;
+  }
+  if (last < text.length) segments.push({ text: text.slice(last) });
+  return segments;
+}
+
 /** One member of a composite: the name it was composed under, and its content. */
 export interface CompositeMember {
   name: string;
@@ -403,6 +563,20 @@ export function nativeVerdictOf(node: NativeNode): 'yes_no' | 'rating' | 'choice
   if (refinesNative(node, NATIVE_RATING_CONCEPT_REF)) return 'rating';
   if (refinesNative(node, NATIVE_CHOICE_CONCEPT_REF)) return 'choice';
   return undefined;
+}
+
+/**
+ * Whether a node is a `native.SearchResult`, or a concept refining it: a
+ * search's answer and the documents it was written from.
+ *
+ * Its node is an `object` over `{answer, sources}`, which the structural
+ * renderer drew as a record: the answer squeezed beside its label with its
+ * Markdown printed, and each web page it cites drawn as a file to download.
+ * The concept is what says the record is a search result, never the keys the
+ * value holds. See `readSearchResultContent`.
+ */
+export function isNativeSearchResultNode(node: NativeNode): boolean {
+  return refinesNative(node, NATIVE_SEARCH_RESULT_CONCEPT_REF);
 }
 
 /**

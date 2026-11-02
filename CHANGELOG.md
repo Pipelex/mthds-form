@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A search result reads as an answer with linked sources in `app`**: a `native.SearchResult` result, or a concept refining it, is drawn as its answer typeset as Markdown at the result's full width, each inline citation (`[2]`, or a run such as `[2][3]`) a link to the source it counts to, then its sources, each a link opening in a new tab that shows its title (or its address) and its site's host name, marked with the citations that name it, and never drawn as a file. A source listed twice is kept once, compared by its parsed address without the fragment, and only an `http:` or `https:` address is ever linked; `studio` keeps the record of its members. The kernel exports `isNativeSearchResultNode`, `readSearchResultContent`, `citedSource` and `splitCitations`, and `Markdown` takes a `citations` function. See [docs/result-view.md](docs/result-view.md#a-search-result).
+
+### Changed
+
+- **`FieldStrings` gains the heading of a search result's sources (Breaking)**: `searchSources`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds it. See [docs/i18n.md](docs/i18n.md).
+
 ## [v0.26.0] - 2026-11-02
 
 ### Added

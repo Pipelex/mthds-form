@@ -10,14 +10,20 @@ import {
   OUTPUT_FORM as VERDICT_OUTPUT_FORM,
 } from '../../__stories__/_generated/verdicts';
 import { PAYLOADS as VERDICT_PAYLOADS } from '../../__stories__/_generated/verdicts.payloads';
+import {
+  CONTRACTS as SEARCH_CONTRACTS,
+  OUTPUT_FORM as SEARCH_OUTPUT_FORM,
+} from '../../__stories__/_generated/search';
 import { getPipeIOContract } from '../contracts';
 import type { RunField } from '../descriptor';
 import { buildResultField } from '../derive';
 import {
+  citedSource,
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
   isNativePageNode,
+  isNativeSearchResultNode,
   isNativeValueNode,
   isViewableUrl,
   nativeVerdictOf,
@@ -25,8 +31,11 @@ import {
   readDataUrl,
   readPageContent,
   readRatingContent,
+  readSearchResultContent,
   readYesNoContent,
+  splitCitations,
   viewableUrl,
+  webHref,
 } from '../native-content';
 import { getPipeOutputForm } from '../output-form';
 
@@ -373,5 +382,243 @@ describe('the verdicts a judge returns', () => {
 
   it('refuses an empty choice, which names no option a choice question can declare', () => {
     expect(readChoiceContent({ choice: '', confidence: 0.4 })).toBeUndefined();
+  });
+});
+
+describe('a search result', () => {
+  // The committed `search` case: one PipeSearch carrier, its descriptor the
+  // engine's own.
+  const field = buildResultField(
+    getPipeOutputForm(SEARCH_OUTPUT_FORM, 'search', 'search_result')!,
+    getPipeIOContract(SEARCH_CONTRACTS, 'search', 'search_result')!.output.json_schema,
+  );
+
+  /** A source as the runtime's search worker writes one. */
+  const page = (url: string, title: string | null = 'A page') => ({
+    title,
+    url,
+    public_url: url,
+    snippet: 'An excerpt.',
+    mime_type: 'text/html',
+    filename: null,
+  });
+
+  it('is named by the concept the descriptor states, a refinement too, never a list', () => {
+    expect(field.kind).toBe('object');
+    expect(isNativeSearchResultNode(field)).toBe(true);
+    const refined: RunField = {
+      ...field,
+      conceptRef: 'research.Answer',
+      refines: ['native.SearchResult'],
+    };
+    expect(isNativeSearchResultNode(refined)).toBe(true);
+    const plural: RunField = { ...field, kind: 'list', item: field };
+    expect(isNativeSearchResultNode(plural)).toBe(false);
+    expect(nativeVerdictOf(field)).toBeUndefined();
+  });
+
+  it('reads the answer and each source: its address, its title and its site', () => {
+    const content = readSearchResultContent({
+      answer: 'Water less in winter [1].',
+      sources: [page('https://www.example.com/winter'), page('https://plants.example.org/a', null)],
+    });
+    expect(content).toEqual({
+      answer: 'Water less in winter [1].',
+      sources: [
+        {
+          address: 'https://www.example.com/winter',
+          href: 'https://www.example.com/winter',
+          host: 'example.com',
+          title: 'A page',
+          snippet: 'An excerpt.',
+          citations: [1],
+        },
+        {
+          address: 'https://plants.example.org/a',
+          href: 'https://plants.example.org/a',
+          host: 'plants.example.org',
+          snippet: 'An excerpt.',
+          citations: [2],
+        },
+      ],
+    });
+  });
+
+  it('reads a missing source list as none, as the runtime defaults it', () => {
+    expect(readSearchResultContent({ answer: 'Nothing found.' })).toEqual({
+      answer: 'Nothing found.',
+      sources: [],
+    });
+  });
+
+  it('refuses a value that is not the model, which leaves it to the structural arms', () => {
+    expect(readSearchResultContent('an answer')).toBeUndefined();
+    expect(readSearchResultContent({ sources: [] })).toBeUndefined();
+    expect(readSearchResultContent({ answer: 3, sources: [] })).toBeUndefined();
+    expect(readSearchResultContent({ answer: 'x', sources: 'none' })).toBeUndefined();
+    expect(
+      readSearchResultContent({ answer: 'x', sources: [{ title: 'No address' }] }),
+    ).toBeUndefined();
+    expect(
+      readSearchResultContent({ answer: 'x', sources: ['https://example.com'] }),
+    ).toBeUndefined();
+  });
+
+  it('keeps an untitled source untitled, and a blank title is none', () => {
+    const content = readSearchResultContent({
+      answer: '',
+      sources: [page('https://example.com/a', '   ')],
+    });
+    expect(content?.sources[0]?.title).toBeUndefined();
+    expect(content?.sources[0]?.address).toBe('https://example.com/a');
+  });
+
+  describe('a source listed twice is kept once', () => {
+    it('compares parsed addresses with the fragment removed, and keeps the first', () => {
+      const content = readSearchResultContent({
+        answer: '[1] [2] [3] [4]',
+        sources: [
+          page('https://www.example.com/winter', 'First'),
+          page('https://example.org/other', 'Other'),
+          page('HTTPS://WWW.EXAMPLE.COM/winter#humidity', 'Second copy'),
+          page(' https://www.example.com/winter ', 'Third copy'),
+        ],
+      })!;
+      expect(content.sources.map((source) => source.title)).toEqual(['First', 'Other']);
+      expect(content.sources[0]?.citations).toEqual([1, 3, 4]);
+      expect(content.sources[1]?.citations).toEqual([2]);
+    });
+
+    it('tells apart what parsing tells apart: the scheme, the path and the query', () => {
+      const content = readSearchResultContent({
+        answer: '',
+        sources: [
+          page('https://example.com/a'),
+          page('http://example.com/a'),
+          page('https://example.com/a?b=1'),
+          page('https://example.com/a/'),
+        ],
+      })!;
+      expect(content.sources).toHaveLength(4);
+    });
+
+    it('compares an address that is not a web one as it is written', () => {
+      const content = readSearchResultContent({
+        answer: '',
+        sources: [
+          page('pipelex-storage://a'),
+          page('pipelex-storage://a'),
+          page('pipelex-storage://b'),
+        ],
+      })!;
+      expect(content.sources.map((source) => source.citations)).toEqual([[1, 2], [3]]);
+    });
+
+    it('names the kept copy for a citation of a dropped one', () => {
+      const content = readSearchResultContent({
+        answer: '',
+        sources: [
+          page('https://example.com/a', 'Kept'),
+          page('https://example.com/a#x', 'Dropped'),
+        ],
+      })!;
+      expect(citedSource(content, 2)?.title).toBe('Kept');
+    });
+  });
+
+  describe('which addresses may be linked', () => {
+    it('links only an http: or https: address, read by parsing it', () => {
+      const linked = (url: string) =>
+        readSearchResultContent({ answer: '', sources: [page(url)] })?.sources[0];
+      expect(linked('https://example.com/a')?.href).toBe('https://example.com/a');
+      expect(linked('http://localhost:3000/a')?.href).toBe('http://localhost:3000/a');
+      for (const refused of [
+        'javascript:alert(1)',
+        'java\tscript:alert(1)',
+        'data:text/html,<p>x</p>',
+        'data:image/png;base64,AAAA',
+        'file:///etc/passwd',
+        '/api/assets/a',
+        '//evil.example/a',
+        'pipelex-storage://bucket/a',
+        'mailto:a@example.com',
+      ]) {
+        const source = linked(refused);
+        expect(source?.href, refused).toBeUndefined();
+        expect(source?.host, refused).toBeUndefined();
+        // Shown as written, as text.
+        expect(source?.address, refused).toBe(refused);
+      }
+    });
+
+    it('takes a web public_url when the url is not one', () => {
+      const content = readSearchResultContent({
+        answer: '',
+        sources: [{ url: 'pipelex-storage://bucket/a', public_url: 'https://cdn.example.com/a' }],
+      })!;
+      expect(content.sources[0]?.href).toBe('https://cdn.example.com/a');
+      expect(content.sources[0]?.address).toBe('https://cdn.example.com/a');
+    });
+
+    it('drops only a leading www. from the host', () => {
+      const host = (url: string) =>
+        readSearchResultContent({ answer: '', sources: [page(url)] })?.sources[0]?.host;
+      expect(host('https://www.example.com/')).toBe('example.com');
+      expect(host('https://WWW.Example.COM/')).toBe('example.com');
+      expect(host('https://www2.example.com/')).toBe('www2.example.com');
+      expect(host('https://news.www.example.com/')).toBe('news.www.example.com');
+    });
+
+    it('normalises what it links, as the gate does', () => {
+      expect(webHref(' https://example.com/a b ')).toBe('https://example.com/a%20b');
+      expect(webHref('https://exa\nmple.com/')).toBe('https://example.com/');
+      expect(webHref(undefined)).toBeUndefined();
+      expect(webHref('not a url')).toBeUndefined();
+    });
+  });
+
+  describe('a citation', () => {
+    const content = readSearchResultContent({
+      answer: '',
+      sources: [page('https://example.com/a', 'A'), page('https://example.com/b', 'B')],
+    })!;
+
+    it('counts from one over the sources as listed', () => {
+      expect(citedSource(content, 1)?.title).toBe('A');
+      expect(citedSource(content, 2)?.title).toBe('B');
+    });
+
+    it('names nothing past the end of the list, nor at zero', () => {
+      expect(citedSource(content, 3)).toBeUndefined();
+      expect(citedSource(content, 0)).toBeUndefined();
+    });
+
+    it('is read out of a run of text, each number of a run on its own', () => {
+      expect(splitCitations('Less water [1], drained saucers [2][3].')).toEqual([
+        { text: 'Less water ' },
+        { citation: 1, text: '[1]' },
+        { text: ', drained saucers ' },
+        { citation: 2, text: '[2]' },
+        { citation: 3, text: '[3]' },
+        { text: '.' },
+      ]);
+    });
+
+    it('is only a whole number from one in brackets', () => {
+      for (const text of ['[0]', '[02]', '[x]', '[ 2 ]', '[2.5]', '[-1]', '[]', '2]', '[2']) {
+        expect(splitCitations(text), text).toEqual([{ text }]);
+      }
+      expect(splitCitations('[12]')).toEqual([{ citation: 12, text: '[12]' }]);
+    });
+
+    it('gives the text back whole when its segments are joined', () => {
+      const text = 'a [1] b [2][3][x] [0] c';
+      expect(
+        splitCitations(text)
+          .map((segment) => segment.text)
+          .join(''),
+      ).toBe(text);
+      expect(splitCitations('')).toEqual([]);
+    });
   });
 });
