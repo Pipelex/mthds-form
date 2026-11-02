@@ -1112,15 +1112,48 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
 }
 
 /**
- * The widths a smaller copy of a picture is asked for, in the picture's own
- * pixels: twice the widest box the view draws it in, so it stays sharp on a
- * high-density screen. A gallery's tile is narrower than 288 CSS pixels (a
- * column is at least 140, and one twice that wide would make room for
- * another); a table cell's thumbnail is 40 pixels tall, and its width is read
- * generously, since a wide picture is wide there too. See `ResolveRendition`.
+ * What a smaller copy of a picture must cover, in the picture's own pixels:
+ * twice the box the view draws it in, so it stays sharp on a high-density
+ * screen. A gallery's tile is a square narrower than 288 CSS pixels (a column
+ * is at least 140, and one twice that wide would make room for another), and
+ * a table cell's thumbnail is 40 CSS pixels tall. See `ResolveRendition`.
  */
-const TILE_RENDITION_WIDTH = 576;
+const TILE_RENDITION_SIDE = 576;
+const CELL_RENDITION_HEIGHT = 80;
+/** The least a cell's copy is asked for, and all it is asked for with no shape to go on. */
 const CELL_RENDITION_WIDTH = 256;
+
+/**
+ * The width to ask a picture's copy for, from the box it is drawn in and the
+ * picture's shape, when the payload states its `width` and `height`.
+ *
+ * A tile is square and the picture covers it, so a landscape picture is
+ * scaled to the tile's HEIGHT and overflows its width: its copy has to be the
+ * tile's side times its aspect ratio wide, where a portrait or a square one
+ * needs the side alone. A cell's thumbnail is drawn at the cell's height and
+ * its own width, so its copy is the cell's height times the aspect ratio
+ * wide, and never less than `CELL_RENDITION_WIDTH`, which keeps a host making
+ * copies on demand to a few widths for every picture narrower than a
+ * panorama. With no stated shape the view asks the widths a square needs.
+ */
+function renditionWidth(
+  place: 'tile' | 'cell',
+  content: { width?: number; height?: number },
+): number {
+  const { width, height } = content;
+  const ratio =
+    width !== undefined && height !== undefined && width > 0 && height > 0
+      ? width / height
+      : undefined;
+  if (place === 'tile') {
+    return ratio === undefined
+      ? TILE_RENDITION_SIDE
+      : Math.ceil(TILE_RENDITION_SIDE * Math.max(1, ratio));
+  }
+  return ratio === undefined
+    ? CELL_RENDITION_WIDTH
+    : Math.max(CELL_RENDITION_WIDTH, Math.ceil(CELL_RENDITION_HEIGHT * ratio));
+}
 
 /**
  * The host's smaller copy of a picture the view can already paint whole, or
@@ -1201,14 +1234,10 @@ function ImageValue({
   // in state, the viewer would come back by itself when the picture did.
   if (viewing && src === undefined) setViewing(false);
   if (!content) return <Absent />;
-  const renditionWidth = inGallery
-    ? TILE_RENDITION_WIDTH
-    : compact
-      ? CELL_RENDITION_WIDTH
-      : undefined;
+  const place = inGallery ? 'tile' : compact ? 'cell' : undefined;
   const drawn =
-    src !== undefined && renditionWidth !== undefined
-      ? renditionUrl(content, src, resolveRendition, renditionWidth)
+    src !== undefined && place !== undefined
+      ? renditionUrl(content, src, resolveRendition, renditionWidth(place, content))
       : src;
   // Named as the file's line under it names it, so a tile, its line and the
   // viewer's title agree.

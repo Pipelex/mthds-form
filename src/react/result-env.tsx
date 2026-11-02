@@ -54,13 +54,18 @@ export type ResolveUrl = (url: string) => string | undefined;
  * What the view asks a host for when it draws a picture small: the width it
  * would like the picture to be, in the picture's own pixels.
  *
- * It is twice the widest box the view draws the picture in, so a copy that
- * wide stays sharp on a high-density screen. The view asks for a few fixed
- * widths rather than measuring each box, so a host that makes its copies on
- * demand keeps a few per picture: today `576` for a gallery's tile, which is
- * narrower than 288 CSS pixels, and `256` for a table cell's thumbnail, which
- * is 40 CSS pixels tall. A host may round a width up to the nearest copy it
- * keeps.
+ * It is the width that covers the box the view draws the picture in, at twice
+ * the box's CSS size, so the copy stays sharp on a high-density screen, and it
+ * follows the picture's shape when the payload states its `width` and
+ * `height`. A gallery's tile is a square narrower than 288 CSS pixels that
+ * the picture covers: `576` for a square or portrait picture, and `576` times
+ * the aspect ratio for a landscape one, which covers the square by its
+ * height. A table cell's thumbnail is 40 CSS pixels tall at the picture's own
+ * width: `80` times the aspect ratio, and never less than `256`. A picture of
+ * no stated shape is asked for at `576` in a tile and `256` in a cell. The
+ * view reads these from the shape rather than measuring each box, so a host
+ * that makes its copies on demand keeps few per picture, and may round a
+ * width up to the nearest copy it keeps.
  */
 export interface RenditionRequest {
   width: number;
@@ -85,11 +90,12 @@ export interface RenditionRequest {
  * Called with the picture's own `url` member, exactly as `resolveUrl` is (a
  * `pipelex-storage://` reference, or whatever `http(s):` or `data:` URL the
  * payload carries), and the {@link RenditionRequest}. Answer the URL of a copy
- * of that picture at least `width` pixels wide where the original is, keeping
- * its aspect ratio, or `undefined` to have the view draw the whole picture,
- * which is exactly what it does with no such function. Synchronous and pure,
- * for the reasons `ResolveUrl` gives: a host that presigns its copies resolves
- * them in a batch before it renders and closes over the result.
+ * of that picture at least `width` pixels wide (or the original's own width,
+ * where the original is narrower), keeping its aspect ratio, or `undefined`
+ * to have the view draw the whole picture, which is exactly what it does with
+ * no such function. Synchronous and pure, for the reasons `ResolveUrl` gives:
+ * a host that presigns its copies resolves them in a batch before it renders
+ * and closes over the result.
  *
  * - **The answer passes the URL gate**, as any resolver's does, and an answer
  *   the gate refuses counts as none.

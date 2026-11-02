@@ -537,6 +537,59 @@ describe("a host's smaller copy of a picture", () => {
     expect(screen.getByText('lost.png')).toBeInTheDocument();
   });
 
+  it("asks a tile's copy for the width that covers the square, by the picture's shape", () => {
+    const rendition = vi.fn(resolveRendition);
+    const shaped = (width: number | null, height: number | null) => ({
+      ...STORED[0],
+      width,
+      height,
+    });
+    const { container } = render(
+      <Gallery
+        value={[shaped(2048, 1024), shaped(1024, 2048), shaped(null, null)]}
+        rendition={rendition}
+      />,
+    );
+    // A landscape picture covers the square by its height, so its copy is
+    // the tile's side times its aspect ratio wide; a portrait one covers it by
+    // its width; a picture of no stated shape gets the square's width.
+    expect([...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual([
+      '/api/assets/22d29b4410c16562.png?w=1152',
+      '/api/assets/22d29b4410c16562.png?w=576',
+      '/api/assets/22d29b4410c16562.png?w=576',
+    ]);
+  });
+
+  it("asks a cell's copy for the cell's height times the picture's shape, at the least 256", () => {
+    const figures: ListRunField = {
+      kind: 'list',
+      name: 'output',
+      conceptRef: 'demo.Figure',
+      required: true,
+      item: {
+        kind: 'object',
+        name: 'output',
+        conceptRef: 'demo.Figure',
+        required: true,
+        fields: [text('caption'), image('picture')],
+      } satisfies ObjectRunField,
+    };
+    const rows = [
+      { caption: 'Panorama', picture: { ...STORED[0], width: 4000, height: 400 } },
+      { caption: 'Portrait', picture: { ...STORED[1], width: 400, height: 800 } },
+    ];
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={resolveUrl} resolveRendition={resolveRendition}>
+        <ResultField field={figures} value={rows} />
+      </ResultEnvProvider>,
+    );
+    // A 40px row draws a ten-to-one panorama 400px wide: 800 pixels at twice
+    // the density, where a 256 copy would be blurred.
+    expect(
+      [...container.querySelectorAll('tbody img')].map((img) => img.getAttribute('src')),
+    ).toEqual(['/api/assets/22d29b4410c16562.png?w=800', '/api/assets/eb2eb9e9fa5bf156.png?w=256']);
+  });
+
   it("paints a table cell's thumbnail from a copy at a cell's width", () => {
     const rendition = vi.fn(resolveRendition);
     const figures: ListRunField = {
