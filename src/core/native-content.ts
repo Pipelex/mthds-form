@@ -399,6 +399,11 @@ export function webHref(candidate: string | undefined): string | undefined {
  * the same when the two strings are. The first is kept, where the payload
  * first lists it, under its own title and at its own address, and the
  * citations of every copy name it.
+ *
+ * **A source's title is decoded, once** (`decodeTitle`): a run made before the
+ * runtime decoded the page's title kept it escaped (`Requirements &amp; SAP
+ * Integration`), and it keeps it so for good. The snippet is left as written,
+ * and so is the answer, which is Markdown and decoded as Markdown.
  */
 export function readSearchResultContent(value: unknown): SearchResultContentView | undefined {
   if (!isRecord(value)) return undefined;
@@ -421,7 +426,7 @@ export function readSearchResultContent(value: unknown): SearchResultContentView
     }
     kept.set(key, sources.length);
     const host = web?.parsed.hostname.replace(/^www\./, '');
-    const title = document.title?.trim();
+    const title = document.title === undefined ? undefined : decodeTitle(document.title).trim();
     sources.push({
       address: web?.parsed.href ?? document.url,
       ...(web ? { href: web.parsed.href } : {}),
@@ -432,6 +437,44 @@ export function readSearchResultContent(value: unknown): SearchResultContentView
     });
   }
   return { answer, sources };
+}
+
+/**
+ * The named references a page's title is decoded from: the ones an escaper
+ * writes. A `Map`, so a name such as `constructor` finds nothing inherited.
+ */
+const TITLE_NAMED_REFERENCES: ReadonlyMap<string, string> = new Map([
+  ['amp', '&'],
+  ['lt', '<'],
+  ['gt', '>'],
+  ['quot', '"'],
+  ['apos', "'"],
+  ['nbsp', '\u00a0'],
+]);
+
+/** A complete character reference: decimal, hexadecimal or named, closed by `;`. */
+const TITLE_REFERENCE = /&(?:#([0-9]+)|#[xX]([0-9a-fA-F]+)|([a-z]+));/g;
+
+/**
+ * A page's title, its character references decoded, as a reader is meant to
+ * see it. Only a complete reference is read: a decimal `&#39;`, a hexadecimal
+ * `&#x27;`, or a name of `TITLE_NAMED_REFERENCES`, each closed by `;`. Anything
+ * else stays exactly as written, a semicolonless look-alike such as `&notable`
+ * or `R&D &copy editing` among it, and so does a reference to a code point
+ * that is not a character (zero, a surrogate, or one past U+10FFFF). It is one
+ * pass, so `&amp;amp;` reads as `&amp;`, never as `&`. A no-break space, the
+ * one `&nbsp;` decodes to, reads as an ordinary space.
+ */
+function decodeTitle(title: string): string {
+  return title
+    .replace(TITLE_REFERENCE, (reference, decimal?: string, hex?: string, name?: string) => {
+      if (name !== undefined) return TITLE_NAMED_REFERENCES.get(name) ?? reference;
+      const codePoint = decimal !== undefined ? Number(decimal) : parseInt(hex ?? '', 16);
+      const isCharacter =
+        codePoint > 0 && codePoint <= 0x10ffff && !(codePoint >= 0xd800 && codePoint <= 0xdfff);
+      return isCharacter ? String.fromCodePoint(codePoint) : reference;
+    })
+    .replace(/\u00a0/g, ' ');
 }
 
 /**

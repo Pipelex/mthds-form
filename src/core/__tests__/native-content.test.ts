@@ -474,6 +474,91 @@ describe('a search result', () => {
     expect(content?.sources[0]?.address).toBe('https://example.com/a');
   });
 
+  describe("a source's title is decoded once", () => {
+    /** The title a source written with `title` is read as. */
+    const titled = (title: string) =>
+      readSearchResultContent({ answer: '', sources: [page('https://example.com/a', title)] })
+        ?.sources[0]?.title;
+
+    it('decodes the escaped ampersand a real run wrote', () => {
+      const listed = (SEARCH_PAYLOADS['search.search_result'] as { sources: { title: string }[] })
+        .sources;
+      const written = 'France B2B E-Invoicing: Requirements &amp; SAP Integration';
+      const at = listed.findIndex((source) => source.title === written);
+      expect(at).toBeGreaterThanOrEqual(0);
+      const content = readSearchResultContent(SEARCH_PAYLOADS['search.search_result'])!;
+      expect(citedSource(content, at + 1)?.title).toBe(
+        'France B2B E-Invoicing: Requirements & SAP Integration',
+      );
+    });
+
+    it('decodes each named reference of the set', () => {
+      expect(titled('&lt;b&gt; &quot;Q&quot; &apos;A&apos; &amp;')).toBe(`<b> "Q" 'A' &`);
+    });
+
+    it('decodes a decimal and a hexadecimal reference', () => {
+      expect(titled('Don&#39;t panic')).toBe("Don't panic");
+      expect(titled('Don&#x27;t &#X27;panic&#x2019;')).toBe("Don't 'panic\u2019");
+      expect(titled('&#x1F600; &#128512;')).toBe('\u{1F600} \u{1F600}');
+    });
+
+    it('decodes once, never the text a reference decoded to', () => {
+      expect(titled('R&amp;amp;D')).toBe('R&amp;D');
+      expect(titled('&amp;#39;')).toBe('&#39;');
+    });
+
+    it('leaves a reference with no closing ; as written', () => {
+      for (const title of ['&notable', 'R&D &copy editing', 'A &amp B', 'A &#39 B', 'A &#x27 B']) {
+        expect(titled(title), title).toBe(title);
+      }
+    });
+
+    it('leaves a name outside the set as written', () => {
+      for (const title of [
+        '&copy; 2026',
+        '&AMP;',
+        '&eacute;t&eacute;',
+        '&constructor;',
+        '&;',
+        '&#;',
+        '&#x;',
+      ]) {
+        expect(titled(title), title).toBe(title);
+      }
+    });
+
+    it('reads a no-break space as an ordinary one', () => {
+      expect(titled('Requirements&nbsp;and&#160;SAP&#xA0;Integration')).toBe(
+        'Requirements and SAP Integration',
+      );
+      expect(titled('Requirements\u00a0and SAP')).toBe('Requirements and SAP');
+      // A title that is only spaces once decoded is none.
+      expect(titled('&nbsp;&#32;')).toBeUndefined();
+    });
+
+    it('leaves a reference to a code point that is not a character as written', () => {
+      for (const title of [
+        'A &#0; B',
+        'A &#xD800; B',
+        'A &#57343; B',
+        'A &#x110000; B',
+        'A &#99999999999999999999; B',
+      ]) {
+        expect(titled(title), title).toBe(title);
+      }
+    });
+
+    it('decodes the title alone, never the snippet or the answer', () => {
+      const content = readSearchResultContent({
+        answer: 'Q&amp;A [1]',
+        sources: [{ ...page('https://example.com/a', 'Q&amp;A'), snippet: 'Q&amp;A' }],
+      })!;
+      expect(content.answer).toBe('Q&amp;A [1]');
+      expect(content.sources[0]?.title).toBe('Q&A');
+      expect(content.sources[0]?.snippet).toBe('Q&amp;A');
+    });
+  });
+
   describe('a source listed twice is kept once', () => {
     /** The citations of each source kept, in order: which copies were read as one page. */
     const kept = (...urls: string[]) =>
