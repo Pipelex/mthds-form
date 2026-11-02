@@ -8,6 +8,7 @@
 
 ### Changed
 
+- **Saving a result never fetches a search result's sources**: `collectStuffFiles`, and so `planStuffSave` and the header's whole-result Download, pass over the `sources` of a `native.SearchResult` (or a concept refining it) wherever it sits in the output, since each is a web page rather than a file the result holds; a search result saves as its JSON copy alone, which keeps every address, and a real file beside it is still saved. See [docs/result-view.md](docs/result-view.md#saving-a-result).
 - **`FieldStrings` gains the heading of a search result's sources (Breaking)**: `searchSources`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds it. See [docs/i18n.md](docs/i18n.md).
 
 ## [v0.26.0] - 2026-11-02

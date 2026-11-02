@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import {
+  CONTRACTS as SEARCH_CONTRACTS,
+  OUTPUT_FORM as SEARCH_OUTPUT_FORM,
+} from '../../__stories__/_generated/search';
+import { PAYLOADS as SEARCH_PAYLOADS } from '../../__stories__/_generated/search.payloads';
+import { getPipeIOContract } from '../contracts';
 import type { FileRunField, ObjectRunField, RunField, TextRunField } from '../descriptor';
+import { buildResultField } from '../derive';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../file-formats';
+import { getPipeOutputForm } from '../output-form';
 import { planFileSave, planStuffSave, splitFileName, typedFileStem } from '../save-plan';
 import { collectStuffFiles } from '../stuff-files';
 
@@ -155,6 +163,90 @@ describe('planStuffSave: what a whole result saves as', () => {
   it('never plans JSON that throws on a BigInt', () => {
     const plan = planStuffSave(text('output'), { big: 10n }, { baseName: 'b' });
     expect(plan.files[0]?.text).toContain('"10"');
+  });
+});
+
+describe("a search result's sources are web pages, not files", () => {
+  // The committed `search` case: the engine's own descriptor, and what a real
+  // search returned for it, twenty web pages each stated as a `native.Document`.
+  const search = buildResultField(
+    getPipeOutputForm(SEARCH_OUTPUT_FORM, 'search', 'search_result')!,
+    getPipeIOContract(SEARCH_CONTRACTS, 'search', 'search_result')!.output.json_schema,
+  );
+  const answer = SEARCH_PAYLOADS['search.search_result'];
+  const named = (field: RunField, name: string): RunField => ({ ...field, name });
+
+  it('saves a search result as its data alone', () => {
+    const plan = planStuffSave(search, answer, { baseName: 'output' });
+    expect(plan.files.map((file) => [file.name, file.kind, file.mimeType])).toEqual([
+      ['output.json', 'data', 'application/json'],
+    ]);
+    expect(plan.unavailable).toEqual([]);
+    // The JSON copy still carries every address.
+    for (const source of (answer as { sources: { url: string }[] }).sources) {
+      expect(plan.files[0]?.text).toContain(source.url);
+    }
+  });
+
+  it('saves the real file beside a search result, and none of its sources', () => {
+    const field = report([named(search, 'research'), document_('contract')]);
+    const plan = planStuffSave(
+      field,
+      { research: answer, contract: { url: 'https://cdn.example/contract.pdf' } },
+      { baseName: 'brief' },
+    );
+    expect(plan.files.map((file) => [file.name, file.path])).toEqual([
+      ['brief-contract.pdf', 'report.contract'],
+      ['brief.json', 'report'],
+    ]);
+  });
+
+  it('passes over the sources of every search result in a list', () => {
+    const field: RunField = {
+      kind: 'list',
+      name: 'output',
+      conceptRef: 'native.SearchResult',
+      required: true,
+      item: search,
+    };
+    const plan = planStuffSave(field, [answer, answer], { baseName: 'output' });
+    expect(plan.files.map((file) => file.name)).toEqual(['output.json']);
+  });
+
+  it('keeps a file a concept refining a search result adds beside its sources', () => {
+    const refined: RunField = {
+      ...search,
+      kind: 'object',
+      conceptRef: 'research.Brief',
+      refines: ['native.SearchResult'],
+      fields: [...(search.kind === 'object' ? search.fields : []), document_('appendix')],
+    };
+    const plan = planStuffSave(
+      refined,
+      { ...(answer as object), appendix: { url: 'https://cdn.example/appendix.pdf' } },
+      { baseName: 'output' },
+    );
+    expect(plan.files.map((file) => file.name)).toEqual(['output-appendix.pdf', 'output.json']);
+  });
+
+  it('still walks a list of documents a structure names sources', () => {
+    // The member is passed over because the concept is a search result, never
+    // because of its name.
+    const field = report([
+      {
+        kind: 'list',
+        name: 'sources',
+        conceptRef: 'native.Document',
+        required: true,
+        item: document_('source'),
+      },
+    ]);
+    const plan = planStuffSave(
+      field,
+      { sources: [{ url: 'https://cdn.example/a.pdf' }] },
+      { baseName: 'r' },
+    );
+    expect(plan.files.map((file) => file.name)).toEqual(['r-sources-0.pdf', 'r.json']);
   });
 });
 
