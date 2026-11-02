@@ -1548,13 +1548,23 @@ function LoadingImage({
   lazy?: boolean;
 }) {
   const [state, setState] = useState<'loading' | 'done'>('loading');
-  // `src` changing means a different picture: show the spinner again.
-  const [current, setCurrent] = useState(src);
+  const [current, setCurrent] = useState({ src, fallbackSrc });
   const [shown, setShown] = useState(src);
-  if (current !== src) {
-    setCurrent(src);
-    setShown(src);
-    setState('loading');
+  if (current.src !== src || current.fallbackSrc !== fallbackSrc) {
+    // A different `src` is a different picture, drawn from its copy again. A
+    // different `fallbackSrc` behind the same copy is the whole picture under
+    // a new URL (a host re-presigning one that expired): it replaces the old
+    // one where the old one is drawn, after the copy failed, and waits
+    // otherwise, since the copy is what is drawn.
+    const next =
+      current.src !== src ? src : shown === current.fallbackSrc ? (fallbackSrc ?? src) : shown;
+    setCurrent({ src, fallbackSrc });
+    // Only a new URL loads, and only a load ends the spinner: an unchanged
+    // `<img>` fires nothing, so it keeps the state it has.
+    if (next !== shown) {
+      setShown(next);
+      setState('loading');
+    }
   }
   const reserved = box !== undefined || size !== undefined;
   return (

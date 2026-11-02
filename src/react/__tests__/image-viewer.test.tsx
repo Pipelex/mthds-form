@@ -496,6 +496,32 @@ describe("a host's smaller copy of a picture", () => {
     expect(within(first!.parentElement!).getByRole('status')).toBeInTheDocument();
   });
 
+  it('takes up a new URL for the whole picture once the copy has failed', () => {
+    // A host that presigns: the whole picture's URL is minted again when the
+    // last one expires, and its copies live on a route of their own.
+    const signed =
+      (signature: string): ResolveUrl =>
+      (url) => {
+        const whole = resolveUrl(url);
+        return whole === undefined ? undefined : `${whole}?sig=${signature}`;
+      };
+    const copies: ResolveRendition = (url, { width }) =>
+      `/api/copies/${url.split('/').pop()}?w=${width}`;
+    const { container, rerender } = render(<Gallery resolve={signed('1')} rendition={copies} />);
+    const [first] = container.querySelectorAll('img');
+    expect(first).toHaveAttribute('src', '/api/copies/22d29b4410c16562.png?w=576');
+    // While the copy is drawn, a new whole URL changes nothing on screen.
+    rerender(<Gallery resolve={signed('2')} rendition={copies} />);
+    expect(first).toHaveAttribute('src', '/api/copies/22d29b4410c16562.png?w=576');
+    fireEvent.error(first!);
+    expect(first).toHaveAttribute('src', '/api/assets/22d29b4410c16562.png?sig=2');
+    // The copy failed, and the whole picture's URL is minted again: the new
+    // one replaces the old, rather than the tile keeping a URL that expired.
+    rerender(<Gallery resolve={signed('3')} rendition={copies} />);
+    expect(first).toHaveAttribute('src', '/api/assets/22d29b4410c16562.png?sig=3');
+    expect(within(first!.parentElement!).getByRole('status')).toBeInTheDocument();
+  });
+
   it('is never asked about a picture the view cannot paint whole', () => {
     const rendition = vi.fn(resolveRendition);
     // The second is a reference nothing resolves and the gate refuses: the
