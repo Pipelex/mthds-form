@@ -285,6 +285,23 @@ describe('a gallery', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it("closes on a click on its backdrop, which never reaches the host's card", async () => {
+    const user = userEvent.setup();
+    const card = vi.fn();
+    render(
+      <div onClick={card}>
+        <Gallery />
+      </div>,
+    );
+    await user.click(tile('eb2eb9e9fa5bf156.png'));
+    // Opening it is a click in the result, which the host may well hear.
+    card.mockClear();
+    const backdrop = viewer().previousElementSibling as HTMLElement;
+    await user.click(backdrop);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(card).not.toHaveBeenCalled();
+  });
+
   it('moves only through the pictures it can paint', async () => {
     const user = userEvent.setup();
     // The middle one is a reference nothing resolves: a name in the grid, and

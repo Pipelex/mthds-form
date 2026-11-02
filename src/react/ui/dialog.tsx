@@ -51,6 +51,19 @@ export function closeAutoFocus(
   };
 }
 
+/**
+ * The backdrop keeps a press on it to itself. React events follow the
+ * component tree, through a portal and past every box, so a click on a
+ * dialog's backdrop otherwise reaches the components the dialog is drawn
+ * inside: a host's clickable card around a result, a row that opens. Radix
+ * dismisses on `pointerdown`, which it hears on the document, so that event
+ * is left to bubble: stopping it would keep the dialog open.
+ */
+export const overlayKeepsPresses = {
+  onClick: (event: React.MouseEvent) => event.stopPropagation(),
+  onMouseDown: (event: React.MouseEvent) => event.stopPropagation(),
+};
+
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -78,7 +91,7 @@ const DialogContent = React.forwardRef<
   }
 >(({ className, layout = 'dialog', returnFocus, onCloseAutoFocus, children, ...props }, ref) => (
   <>
-    <DialogOverlay />
+    <DialogOverlay {...overlayKeepsPresses} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(

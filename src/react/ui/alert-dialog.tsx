@@ -4,7 +4,7 @@ import * as React from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 
 import { cn } from '../utils';
-import { closeAutoFocus, type ReturnFocus } from './dialog';
+import { closeAutoFocus, overlayKeepsPresses, type ReturnFocus } from './dialog';
 
 /*
  * The vendored alert dialog, over `@radix-ui/react-alert-dialog`: the question
@@ -24,7 +24,10 @@ const AlertDialogContent = React.forwardRef<
   }
 >(({ className, returnFocus, onCloseAutoFocus, ...props }, ref) => (
   <>
-    <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+    <AlertDialogPrimitive.Overlay
+      className="fixed inset-0 z-50 bg-black/50"
+      {...overlayKeepsPresses}
+    />
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
