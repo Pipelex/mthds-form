@@ -77,6 +77,14 @@ export interface FieldStrings {
   removeFileAria: string;
   previewUnavailablePdf: string;
   /**
+   * Said in a result, in place of a PDF's frame, where the browser draws no PDF
+   * in a page (Android's browsers, a headless browser): above the actions that
+   * open the file in a new tab and save it.
+   */
+  pdfViewerUnavailable: string;
+  /** The link that opens a file in a new tab, where it cannot be shown in the page. */
+  openInNewTab: string;
+  /**
    * What a result slot the run resolved as an absence SHOWS — a dash, not a
    * sentence. Beside forty values in a grid, "not provided" repeated is louder
    * than the data; a dash reads as the blank it is.
