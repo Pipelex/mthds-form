@@ -8,10 +8,10 @@ import { PAYLOADS } from '../_generated/search.payloads';
  * `_generated/search.payloads.ts`: what a search returned for the corpus
  * carrier's prompt, read from a run's saved results rather than bought again
  * (that module's `READ_FROM` names the run). It holds what nobody would have
- * written by hand: twenty sources counted from one as they arrived, citations
- * in runs (`[2][3][9]`) with no space before them, and one page listed twice,
- * once with `www.` and once without. Its addresses and excerpts are public web
- * pages.
+ * written by hand: sources counted from one as they arrived, citations in runs
+ * (`[2][3][9]`) with no space before them, one page listed twice, once with
+ * `www.` and once without, and a title with its ampersand escaped as `&amp;`.
+ * Its addresses and excerpts are public web pages.
  *
  * **The variants are hand-built, and they have to be.** A source with no title,
  * no sources at all and an answer citing past the end of its list are things a
