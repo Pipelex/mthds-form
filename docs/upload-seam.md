@@ -198,6 +198,8 @@ A resolution that **fails** leaves the "cannot be shown" state rather than the f
 
 The result view has a second, optional resolver beside it, `resolveUrls` on `ResultEnvProvider`: an async, bulk one, asked for every stored picture an HTML page names in one call, before the page is framed, made into a PDF or saved. A reference it leaves out is asked of `resolveUrl`. See [result-view.md](result-view.md#stored-pictures-inside-a-page).
 
+And a third, also optional and on `ResultEnvProvider` alone: `resolveRendition(url, { width })`, the URL of a smaller copy of a picture, which the result view draws where it shows a picture small (a gallery's tiles, a table cell's thumbnail) so that it does not load the whole file to paint a tile. It is asked with the same `url` member `resolveUrl` is, and only ever paints: the viewer a picture opens, its copy control and its download keep the URL `resolveUrl` gives. A host that has no copies passes nothing, and every picture is drawn whole. See [result-view.md](result-view.md#smaller-copies-the-hosts-resolverendition).
+
 ## What the control decides it can preview
 
 A file is previewable when the **filename** or the **URL** says so, tested separately. They used to be concatenated into one string and matched with an end-anchored extension test, which made the filename half dead code — a filename's extension was always followed by a space — so a value with a good filename and an extension-less URL (an opaque storage id, a `data:` URL) was offered no preview at all. A `data:` URL's declared MIME type is read too, since it is the only type such a URL carries.

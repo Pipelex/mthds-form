@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A picture opens in a viewer**: a lone image result, a gallery's tile and a table cell's thumbnail open the picture over the result, whole and as large as the screen allows, with its name, its caption, "Open the original", its copy control and its download; a list's pictures are moved through in place by the previous and next buttons, the arrow keys or a swipe, with the position stated ("2 of 6"), and focus goes back to the picture that opened it. It is the whole screen on a phone and is drawn at the root of the result, so a picture in a table that stacks its rows opens over the viewport. See [docs/result-view.md](docs/result-view.md#a-picture-opens-in-a-viewer).
+- **`resolveRendition` on `ResultEnvProvider`**: a host that keeps smaller copies of its pictures answers `(url, { width }) => string | undefined` with one, and a gallery's tiles and a table cell's thumbnails are drawn from it, while the viewer, "Open the original", the copy control and every download keep the whole picture; a copy the URL gate refuses or that fails to load gives way to the whole picture. `ResolveRendition`, `RenditionRequest` and `useResolveRendition` are exported from `./react`. See [docs/result-view.md](docs/result-view.md#smaller-copies-the-hosts-resolverendition).
+
+### Changed
+
+- **A painted picture is a button rather than a link**: a click, Enter or Space opens the viewer instead of the file in a new tab, and the button is named for the picture it opens ("View figure.png"); the original still opens in a tab of its own from the viewer.
+- **A gallery's tiles in `app` show the picture and its caption alone**: the file's name, copy control and download are no longer drawn under each tile in `app`, and are in the viewer instead, the name being the tile's accessible name and the viewer's title; `studio` tiles and a lone picture keep their file line. See [docs/result-view.md](docs/result-view.md#what-a-tile-says-in-each-presentation).
+- **`FieldStrings` gains the keys of the picture viewer (Breaking)**: `viewImage`, `imagePosition`, `previousImage`, `nextImage` and `openOriginal`, in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/i18n.md](docs/i18n.md).
+
+### Fixed
+
+- **A gallery no longer jumps while its pictures load**: each tile is a square box reserved before its picture arrives, with the spinner inside it and the picture covering it, and tiles and table thumbnails load lazily; a lone picture reserves its box from the payload's `width` and `height` when the run states them, and a table cell's thumbnail keeps its row's height while it loads instead of standing 160 pixels tall. See [docs/result-view.md](docs/result-view.md#tiles-keep-their-box).
+
 ## [v0.25.0] - 2026-11-01
 
 ### Added
