@@ -26,7 +26,8 @@
  * pass: each is the `main_stuff` of a run made elsewhere, read from that run's
  * saved results with the `--read-run` command of scripts/generate-fixtures.mjs
  * and taken in through the same edit. `READ_FROM` says which run, and what it
- * was. `make fixtures-runs` buys the pipe again and drops its entry.
+ * was. A sweep keeps them as they are: only `make fixtures-runs ONLY=<case>
+ * PIPE=<code>` buys the pipe again, and drops its entry.
  */
 
 /** Every pipe_ref that was run for this case, in sorted order. */
