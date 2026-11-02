@@ -52,6 +52,7 @@
  *
  *   make fixtures        the DESCRIPTORS - what each pipe DECLARES
  *   make fixtures-runs   the PAYLOADS    - what running it actually produced
+ *   --read-run           a payload read from a run's saved results, not re-run
  *   make briefs          the BRIEFS      - what a producer is handed
  *   make fixtures-specs  the SPECS       - what the designer method laid out
  *   make prompt-hash     the PROMPT PIN  - moved to the method as it is now
@@ -777,9 +778,42 @@ async function runPipe(api, entry, bundle, pipe) {
   };
 }
 
-/** The payload module for one case: `pipe_ref` -> what that pipe produced. */
-function emitPayloads(entry, payloads) {
+/**
+ * The payload module for one case: `pipe_ref` -> what that pipe produced.
+ *
+ * `readFrom` names the payloads this pass did not buy: `pipe_ref` -> the run
+ * each was read from and what that run was, taken in by `--read-run`. It is
+ * written into the module, so a re-emit carries it, and a re-run of the pipe
+ * drops its entry.
+ */
+function emitPayloads(entry, payloads, readFrom = {}) {
   const pipeRefs = Object.keys(payloads).sort();
+  const read = Object.keys(readFrom)
+    .filter((pipeRef) => pipeRef in payloads)
+    .sort();
+  const readNote =
+    read.length === 0
+      ? []
+      : [
+          ' *',
+          ' * **Read, not run.** The payloads `READ_FROM` names were not bought by this',
+          " * pass: each is the `main_stuff` of a run made elsewhere, read from that run's",
+          ' * saved results with the `--read-run` command of scripts/generate-fixtures.mjs',
+          ' * and taken in through the same edit. `READ_FROM` says which run, and what it',
+          ' * was. `make fixtures-runs` buys the pipe again and drops its entry.',
+        ];
+  const readExport =
+    read.length === 0
+      ? []
+      : [
+          '/** The payloads read from a run rather than run by this pass: the run, and what it was. */',
+          `export const READ_FROM: Record<string, { run: string; note: string }> = ${JSON.stringify(
+            Object.fromEntries(read.map((pipeRef) => [pipeRef, readFrom[pipeRef]])),
+            null,
+            2,
+          )};`,
+          '',
+        ];
   return [
     '/**',
     ` * Real payloads from real runs of ${sourcePathOf(entry.caseName)} - DO NOT EDIT.`,
@@ -804,14 +838,97 @@ function emitPayloads(entry, payloads) {
     ' * that is the link one deployment answered on one day - presigned, expiring,',
     ' * naming its bucket - and it resolves nowhere else. See `redactResolvedUrls` in',
     ' * the generator.',
+    ...readNote,
     ' */',
     '',
     `/** Every pipe_ref that was run for this case, in sorted order. */`,
     `export const RUN_PIPE_REFS = ${JSON.stringify(pipeRefs)} as const;`,
     '',
+    ...readExport,
     `export const PAYLOADS: Record<string, unknown> = ${JSON.stringify(payloads, null, 2)};`,
     '',
   ].join('\n');
+}
+
+/**
+ * The pipes of a case the payload pass runs: each with a `run` block, a prompt
+ * of its own or branches it names, less the branches a controller runs.
+ */
+function runnablePipes(entry) {
+  // A branch runs through the controller that names it, and running it on
+  // its own as well would buy a payload no story reads; the controller runs
+  // with no inputs of its own, as a slotless operator with a prompt does.
+  const branches = new Set(entry.pipes.flatMap(branchCodes));
+  return entry.pipes.filter(
+    (pipe) =>
+      (pipe.run !== undefined || pipe.prompt || branchCodes(pipe).length > 0) &&
+      !branches.has(pipe.code),
+  );
+}
+
+/** A committed payloads module's payloads and its `READ_FROM`, or none. */
+async function loadPayloadsModule(outPath) {
+  if (!existsSync(outPath)) return { payloads: {}, readFrom: {} };
+  // Under tsx, which is what lets a pass import a committed module.
+  const loaded = await import(pathToFileURL(outPath).href);
+  return { payloads: { ...loaded.PAYLOADS }, readFrom: { ...(loaded.READ_FROM ?? {}) } };
+}
+
+/**
+ * The READ-RUN command: one pipe's payload taken from a run's saved results
+ * rather than bought again.
+ *
+ * A run made elsewhere (a carrier run by hand on the hosted API, a run a review
+ * walked) may already hold the payload a story wants, and buying it again would
+ * spend inference on an answer that is on disk. `<results.json>` is the hosted
+ * results route's answer as it was saved, `pipeline_run_id` and `main_stuff`
+ * among it; its `main_stuff` goes into the case's module through the same edit
+ * a sweep makes, merged as `--pipe` merges, and `--note` says what the run was,
+ * which the module keeps in `READ_FROM` beside the run's id. The pipe has to be
+ * one the payload pass would run, so the module never carries a pipe the case
+ * does not run. Nothing is run, and nothing is spent.
+ */
+async function readRunPayload(args) {
+  const option = (name) => {
+    const at = args.indexOf(name);
+    return at === -1 ? undefined : args[at + 1];
+  };
+  const file = option('--read-run');
+  const caseName = option('--only');
+  const pipeCode = option('--pipe');
+  const note = option('--note')?.trim();
+  if (!file || !caseName || !pipeCode || !note) {
+    die('--read-run needs <results.json> --only <case> --pipe <code> --note "<what the run was>".');
+  }
+  if (!existsSync(file)) die(`no such file: ${file}`);
+  const entry = readAnyCase(caseName);
+  if (!runnablePipes(entry).some((pipe) => pipe.code === pipeCode)) {
+    die(`no runnable pipe '${pipeCode}' in ${caseName}.`);
+  }
+  let results;
+  try {
+    results = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (error) {
+    die(`${file} is not JSON: ${error?.message ?? error}`);
+  }
+  const run = results?.pipeline_run_id;
+  if (typeof run !== 'string' || run === '') {
+    die(`${file} names no pipeline_run_id: it is not a run's saved results.`);
+  }
+  if (results.main_stuff === undefined || results.main_stuff === null) {
+    die(`${file} holds no main_stuff (run ${run}).`);
+  }
+  const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
+  const { payloads, readFrom } = await loadPayloadsModule(outPath);
+  const pipeRef = `${entry.domain}.${pipeCode}`;
+  payloads[pipeRef] = redactResolvedUrls(results.main_stuff);
+  readFrom[pipeRef] = { run, note };
+  mkdirSync(OUT_DIR, { recursive: true });
+  writeFileSync(outPath, emitPayloads(entry, payloads, readFrom));
+  execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
+  process.stdout.write(
+    `  ${caseName}: ${pipeCode} read from run ${run} -> ${path.relative(REPO, outPath)}\n`,
+  );
 }
 
 /**
@@ -836,21 +953,15 @@ async function generatePayloads(cases, pipeCode) {
     // An authored method has no carriers and no `run` block - its runs leave
     // the page, through the hosted API - so it falls out here on its own.
     const entry = readAnyCase(caseName);
-    // A branch runs through the controller that names it, and running it on
-    // its own as well would buy a payload no story reads; the controller runs
-    // with no inputs of its own, as a slotless operator with a prompt does.
-    const branches = new Set(entry.pipes.flatMap(branchCodes));
-    const runnable = entry.pipes.filter(
-      (pipe) =>
-        (pipe.run !== undefined || pipe.prompt || branchCodes(pipe).length > 0) &&
-        !branches.has(pipe.code) &&
-        (!pipeCode || pipe.code === pipeCode),
-    );
+    const runnable = runnablePipes(entry).filter((pipe) => !pipeCode || pipe.code === pipeCode);
     if (runnable.length === 0) continue;
     matched = true;
 
     const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
     let payloads = {};
+    // A payload read from a run, by `--read-run`, keeps its note until this
+    // pass buys the pipe again; a whole case's sweep buys every one.
+    let readFrom = {};
     if (pipeCode) {
       if (!existsSync(outPath)) {
         die(
@@ -858,8 +969,7 @@ async function generatePayloads(cases, pipeCode) {
             `  capture is the whole case - run it without --pipe.`,
         );
       }
-      // Under tsx, which is what lets this pass import a committed module.
-      payloads = { ...(await import(pathToFileURL(outPath).href)).PAYLOADS };
+      ({ payloads, readFrom } = await loadPayloadsModule(outPath));
     }
 
     // The bundle travels as TEXT, so nothing is written to disk on the way: no
@@ -870,12 +980,13 @@ async function generatePayloads(cases, pipeCode) {
       process.stdout.write(`  ${caseName}: running ${pipe.code}…\n`);
       const { payload, runId, cost } = await runPipe(api, entry, bundle, pipe);
       payloads[`${entry.domain}.${pipe.code}`] = payload;
+      delete readFrom[`${entry.domain}.${pipe.code}`];
       costs.push(cost);
       // On disk as soon as it is paid for: the next pipe may die, and it
       // takes the process with it. Formatted on the way out, like every other
       // emitted module: the format gate reads these files and the emitter
       // writes JSON, not prettier's TS.
-      writeFileSync(outPath, emitPayloads(entry, payloads));
+      writeFileSync(outPath, emitPayloads(entry, payloads, readFrom));
       execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
       process.stdout.write(
         `    ${pipe.code}${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
@@ -1535,8 +1646,8 @@ async function reemitModules() {
   // payloads themselves are copied through untouched: a re-emit never runs.
   for (const caseName of payloadModules) {
     const outPath = path.join(OUT_DIR, `${caseName}.payloads.ts`);
-    const { PAYLOADS } = await import(pathToFileURL(outPath).href);
-    writeFileSync(outPath, emitPayloads(readAnyCase(caseName), PAYLOADS));
+    const { payloads, readFrom } = await loadPayloadsModule(outPath);
+    writeFileSync(outPath, emitPayloads(readAnyCase(caseName), payloads, readFrom));
     execFileSync('npx', ['prettier', '--write', outPath], { stdio: 'ignore', cwd: REPO });
     process.stdout.write(`  ${caseName}: re-emitted ${path.relative(REPO, outPath)}\n`);
   }
@@ -1606,6 +1717,10 @@ function main() {
   }
   if (args.includes('--reemit')) {
     reemitModules().catch((error) => die(error?.stack ?? String(error)));
+    return;
+  }
+  if (args.includes('--read-run')) {
+    readRunPayload(args).catch((error) => die(error?.stack ?? String(error)));
     return;
   }
   const structures = discoverCases();

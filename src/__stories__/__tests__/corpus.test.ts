@@ -5,6 +5,8 @@ import { OUTPUT_FORM as LIST_OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
+import { OUTPUT_FORM as SEARCH_OUTPUT_FORM } from '../_generated/search';
+import { PAYLOADS as SEARCH_PAYLOADS } from '../_generated/search.payloads';
 import { HEROES, pipeRefOf } from '../heroes';
 
 /**
@@ -256,6 +258,7 @@ describe('the run payloads', () => {
     const cases: [Record<string, unknown>, Record<string, unknown>][] = [
       [OUTPUT_FORM, PAYLOADS],
       [LIST_OUTPUT_FORM, LIST_PAYLOADS],
+      [SEARCH_OUTPUT_FORM, SEARCH_PAYLOADS],
     ];
     for (const [outputForm, payloads] of cases) {
       for (const pipeRef of Object.keys(payloads)) {

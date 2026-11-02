@@ -14,6 +14,7 @@ import {
   CONTRACTS as SEARCH_CONTRACTS,
   OUTPUT_FORM as SEARCH_OUTPUT_FORM,
 } from '../../__stories__/_generated/search';
+import { PAYLOADS as SEARCH_PAYLOADS } from '../../__stories__/_generated/search.payloads';
 import { getPipeIOContract } from '../contracts';
 import type { RunField } from '../descriptor';
 import { buildResultField } from '../derive';
@@ -474,6 +475,12 @@ describe('a search result', () => {
   });
 
   describe('a source listed twice is kept once', () => {
+    /** The citations of each source kept, in order: which copies were read as one page. */
+    const kept = (...urls: string[]) =>
+      readSearchResultContent({ answer: '', sources: urls.map((url) => page(url)) })!.sources.map(
+        (source) => source.citations,
+      );
+
     it('compares parsed addresses with the fragment removed, and keeps the first', () => {
       const content = readSearchResultContent({
         answer: '[1] [2] [3] [4]',
@@ -489,17 +496,103 @@ describe('a search result', () => {
       expect(content.sources[1]?.citations).toEqual([2]);
     });
 
-    it('tells apart what parsing tells apart: the scheme, the path and the query', () => {
+    it('sets the scheme aside between http and https', () => {
+      expect(kept('https://example.com/a', 'http://example.com/a')).toEqual([[1, 2]]);
+      expect(kept('http://example.com:8080/a', 'https://example.com:8080/a')).toEqual([[1, 2]]);
+    });
+
+    it('drops one leading www. from the host, after lowercasing it', () => {
+      expect(kept('https://www.example.com/a', 'https://example.com/a')).toEqual([[1, 2]]);
+      expect(kept('https://Example.COM/a', 'https://WWW.example.com/a')).toEqual([[1, 2]]);
+      // One, not every: `www.www.` is one `www.` short of the bare host.
+      expect(kept('https://www.www.example.com/a', 'https://example.com/a')).toEqual([[1], [2]]);
+      // A leading `www.` only, never a `www` elsewhere in the name.
+      expect(kept('https://www2.example.com/a', 'https://2.example.com/a')).toEqual([[1], [2]]);
+      expect(kept('https://news.www.example.com/a', 'https://news.example.com/a')).toEqual([
+        [1],
+        [2],
+      ]);
+    });
+
+    it('keeps the port and the user information as written', () => {
+      expect(kept('https://example.com:8443/a', 'https://example.com/a')).toEqual([[1], [2]]);
+      // Even the scheme's default, which the parser drops and the runtime keeps.
+      expect(kept('https://example.com:443/a', 'https://example.com/a')).toEqual([[1], [2]]);
+      expect(kept('https://reader@example.com/a', 'https://example.com/a')).toEqual([[1], [2]]);
+      expect(kept('https://reader@WWW.example.com/a', 'https://reader@example.com/a')).toEqual([
+        [1, 2],
+      ]);
+    });
+
+    it('drops the fragment', () => {
+      expect(kept('https://example.com/a#one', 'https://example.com/a#two')).toEqual([[1, 2]]);
+      expect(kept('https://example.com/a', 'https://example.com/a#')).toEqual([[1, 2]]);
+    });
+
+    it('drops one trailing / from the path, and keeps the path / alone', () => {
+      expect(kept('https://example.com/a/', 'https://example.com/a')).toEqual([[1, 2]]);
+      expect(kept('https://example.com/a/?q=1', 'https://example.com/a?q=1')).toEqual([[1, 2]]);
+      // One, not every.
+      expect(kept('https://example.com/a//', 'https://example.com/a')).toEqual([[1], [2]]);
+      // An address with no path has the path `/`, which is never emptied.
+      expect(kept('https://example.com/', 'https://example.com')).toEqual([[1, 2]]);
+      expect(kept('https://example.com/?q=1', 'https://example.com?q=1')).toEqual([[1, 2]]);
+      expect(kept('https://example.com/#top', 'http://www.example.com')).toEqual([[1, 2]]);
+    });
+
+    it('keeps the case of the path', () => {
+      expect(kept('https://example.com/Guide', 'https://example.com/guide')).toEqual([[1], [2]]);
+    });
+
+    it('keeps the query as written, and tells apart two paths', () => {
+      expect(kept('https://example.com/a?id=1', 'https://example.com/a?id=2')).toEqual([[1], [2]]);
+      expect(kept('https://example.com/a?id=1', 'https://example.com/a')).toEqual([[1], [2]]);
+      expect(kept('https://example.com/a?b=2&a=1', 'https://example.com/a?a=1&b=2')).toEqual([
+        [1],
+        [2],
+      ]);
+      expect(kept('https://example.com/a?Q=1', 'https://example.com/a?q=1')).toEqual([[1], [2]]);
+      // An empty query is none.
+      expect(kept('https://example.com/a?', 'https://example.com/a')).toEqual([[1, 2]]);
+      expect(kept('https://example.com/a', 'https://example.com/b')).toEqual([[1], [2]]);
+      expect(kept('https://example.com/a', 'https://example.org/a')).toEqual([[1], [2]]);
+    });
+
+    it('keeps the first copy under its own title and at its own address', () => {
       const content = readSearchResultContent({
         answer: '',
         sources: [
-          page('https://example.com/a'),
-          page('http://example.com/a'),
-          page('https://example.com/a?b=1'),
-          page('https://example.com/a/'),
+          page('https://www.example.com/guide/', 'Kept'),
+          page('http://example.com/guide', 'Dropped'),
         ],
       })!;
-      expect(content.sources).toHaveLength(4);
+      expect(content.sources).toHaveLength(1);
+      expect(content.sources[0]).toMatchObject({
+        title: 'Kept',
+        address: 'https://www.example.com/guide/',
+        href: 'https://www.example.com/guide/',
+        host: 'example.com',
+        citations: [1, 2],
+      });
+    });
+
+    it('reads one page twice in a real run, and two pages on one site as two', () => {
+      // Positions 4 and 5 of the committed run are one page, with and without
+      // `www.`; 14 and 15 are two pages of one site, and both stay.
+      const content = readSearchResultContent(SEARCH_PAYLOADS['search.search_result'])!;
+      const listed = (SEARCH_PAYLOADS['search.search_result'] as { sources: { url: string }[] })
+        .sources;
+      expect(listed[3]?.url).toBe(
+        'https://www.resolveit.nl/en/blog/frankrijk-e-facturatie-september-2026',
+      );
+      expect(listed[4]?.url).toBe(
+        'https://resolveit.nl/en/blog/frankrijk-e-facturatie-september-2026',
+      );
+      expect(citedSource(content, 5)).toBe(citedSource(content, 4));
+      expect(citedSource(content, 4)?.address).toBe(listed[3]?.url);
+      expect(citedSource(content, 4)?.citations).toEqual([4, 5]);
+      expect(citedSource(content, 15)).not.toBe(citedSource(content, 14));
+      expect(content.sources).toHaveLength(listed.length - 1);
     });
 
     it('compares an address that is not a web one as it is written', () => {
@@ -512,6 +605,12 @@ describe('a search result', () => {
         ],
       })!;
       expect(content.sources.map((source) => source.citations)).toEqual([[1, 2], [3]]);
+      // Never one with a web address, even one its key would spell the same.
+      expect(kept('example.com/a', 'https://example.com/a')).toEqual([[1], [2]]);
+    });
+
+    it('matches an address the parser refuses only with itself', () => {
+      expect(kept('http://[bad/a', 'http://[bad/a', 'http://[bad/a/')).toEqual([[1, 2], [3]]);
     });
 
     it('names the kept copy for a citation of a dropped one', () => {

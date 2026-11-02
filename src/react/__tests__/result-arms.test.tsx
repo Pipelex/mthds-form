@@ -28,7 +28,7 @@ import { PAYLOADS as RESULT_PAYLOADS } from '../../__stories__/_generated/result
 import * as verdicts from '../../__stories__/_generated/verdicts';
 import { PAYLOADS as VERDICT_PAYLOADS } from '../../__stories__/_generated/verdicts.payloads';
 import * as search from '../../__stories__/_generated/search';
-import { DUPLICATE_SOURCES, SEARCH_RESULT } from '../../__stories__/outputs/search-payloads';
+import { SEARCH_RESULT, listedTwice } from '../../__stories__/outputs/search-payloads';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
 import { DEFAULT_IMG_SRC } from '../html-frame';
@@ -377,28 +377,33 @@ describe('a search result', () => {
   });
 
   it('is the answer typeset and its sources as links in an app, never as files', () => {
+    // A real search's answer: a list with emphasis, citations in runs.
     const { container } = panel('app', field, SEARCH_RESULT);
     // The Markdown is typeset, not printed.
-    expect(container.querySelector('h2')?.textContent).toBe('Watering in winter');
-    expect(container.querySelector('strong')?.textContent).toBe('less water');
-    expect(container.textContent).not.toMatch(/\*\*|##/);
-    // Each citation links to the source it counts to.
-    const [, watering, humidity] = SEARCH_RESULT.sources;
-    expect(screen.getByRole('link', { name: '[2]' }).getAttribute('href')).toBe(watering?.url);
-    expect(screen.getAllByRole('link', { name: '[3]' })[0]?.getAttribute('href')).toBe(
-      humidity?.url,
+    expect(container.querySelector('li strong')).not.toBeNull();
+    expect(container.textContent).not.toMatch(/\*\*/);
+    // Each citation links to the source it counts to, from one as listed: in
+    // `[2][3][9]`, the ninth.
+    const { sources } = SEARCH_RESULT;
+    expect(screen.getAllByRole('link', { name: '[2]' })[0]?.getAttribute('href')).toBe(
+      sources[1]?.url,
     );
-    // The sources, each a link to its page with its site's name.
+    expect(screen.getByRole('link', { name: '[9]' }).getAttribute('href')).toBe(sources[8]?.url);
+    // The sources, each a link to its page with its site's name, the page
+    // listed twice once.
+    const { copy } = listedTwice();
     const list = screen.getByRole('list', { name: s.searchSources });
     const links = within(list).getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual(
-      SEARCH_RESULT.sources.map((source) => source.url),
+      sources.filter((_, index) => index + 1 !== copy).map((source) => source.url),
     );
     for (const link of links) {
       expect(link.getAttribute('target')).toBe('_blank');
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     }
-    expect(within(list).getByText('example.com')).toBeTruthy();
+    const first = new URL(sources[0]?.url ?? '').hostname;
+    expect(first.startsWith('www.')).toBe(true);
+    expect(within(list).getAllByText(first.slice('www.'.length)).length).toBeGreaterThan(0);
     // No file chrome: no download of a source, no copy of its address.
     expect(screen.queryByRole('button', { name: /^Download ./ })).toBeNull();
     expect(screen.queryByRole('button', { name: s.copyUrl })).toBeNull();
@@ -407,14 +412,16 @@ describe('a search result', () => {
   });
 
   it('lists a source once, marked with every citation that names it', () => {
-    panel('app', field, DUPLICATE_SOURCES);
+    // The real run lists one page twice, with `www.` and without.
+    const { kept, copy } = listedTwice();
+    panel('app', field, SEARCH_RESULT);
     const list = screen.getByRole('list', { name: s.searchSources });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(list).getByText('[1][3]')).toBeTruthy();
-    const kept = DUPLICATE_SOURCES.sources[0]?.url;
-    const citations = screen.getAllByRole('link', { name: '[3]' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(SEARCH_RESULT.sources.length - 1);
+    expect(within(list).getByText(`[${kept}][${copy}]`)).toBeTruthy();
+    const first = SEARCH_RESULT.sources[kept - 1]?.url;
+    const citations = screen.getAllByRole('link', { name: `[${kept}]` });
     expect(citations.length).toBeGreaterThan(0);
-    for (const citation of citations) expect(citation.getAttribute('href')).toBe(kept);
+    for (const citation of citations) expect(citation.getAttribute('href')).toBe(first);
   });
 
   it('shows an address that is not a web one as text, and links neither it nor its citation', () => {

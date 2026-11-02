@@ -347,7 +347,7 @@ export interface SearchResultContentView {
  * the string it judged, and a root-relative path, which it admits, has no
  * origin of its own and does not parse alone.
  */
-function readWebUrl(candidate: string | undefined): URL | undefined {
+function readWebUrl(candidate: string | undefined): WebAddress | undefined {
   const judged = viewableUrl(candidate);
   if (judged === undefined) return undefined;
   let parsed: URL;
@@ -356,7 +356,21 @@ function readWebUrl(candidate: string | undefined): URL | undefined {
   } catch {
     return undefined;
   }
-  return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed : undefined;
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    ? { parsed, written: stripUrlWhitespace(candidate ?? '') }
+    : undefined;
+}
+
+/**
+ * A web address, both ways: as the parser reads it, which is what a renderer
+ * links and names the site by, and as the payload wrote it, less only the
+ * whitespace and controls the parser strips before it reads, which is what two
+ * sources are compared by. The gate returns the parser's normalised string, so
+ * the address as written is taken from the payload, not from the gate.
+ */
+interface WebAddress {
+  parsed: URL;
+  written: string;
 }
 
 /**
@@ -366,7 +380,7 @@ function readWebUrl(candidate: string | undefined): URL | undefined {
  * citation, as the search reader checks a source's.
  */
 export function webHref(candidate: string | undefined): string | undefined {
-  return readWebUrl(candidate)?.href;
+  return readWebUrl(candidate)?.parsed.href;
 }
 
 /**
@@ -377,11 +391,14 @@ export function webHref(candidate: string | undefined): string | undefined {
  * `sources` reads as none, since the runtime's model defaults it to an empty
  * list.
  *
- * **A source listed twice is kept once.** Two sources are the same when their
- * web addresses are the same once each is parsed and its fragment removed
- * (`#section` names a place in the page, not another page), or, for an address
- * that is not a web one, when the two strings are. The first is kept, where
- * the payload first lists it, and the citations of every copy name it.
+ * **A source listed twice is kept once.** Two sources with web addresses are
+ * the same page when `samePageKey` reads the two alike: it sets aside what does
+ * not change the page (`http` or `https`, the host's case and a leading
+ * `www.`, the fragment, a trailing `/`) and keeps the query as written. Two
+ * sources whose addresses are not web ones, or that the parser refuses, are
+ * the same when the two strings are. The first is kept, where the payload
+ * first lists it, under its own title and at its own address, and the
+ * citations of every copy name it.
  */
 export function readSearchResultContent(value: unknown): SearchResultContentView | undefined {
   if (!isRecord(value)) return undefined;
@@ -395,7 +412,7 @@ export function readSearchResultContent(value: unknown): SearchResultContentView
     const document = readDocumentContent(entry);
     if (!document) return undefined;
     const web = readWebUrl(document.url) ?? readWebUrl(document.publicUrl);
-    const key = web ? withoutFragment(web) : document.url;
+    const key = web ? `web ${samePageKey(web.written)}` : `as written ${document.url}`;
     const citation = index + 1;
     const existing = kept.get(key);
     if (existing !== undefined) {
@@ -403,11 +420,11 @@ export function readSearchResultContent(value: unknown): SearchResultContentView
       continue;
     }
     kept.set(key, sources.length);
-    const host = web?.hostname.replace(/^www\./, '');
+    const host = web?.parsed.hostname.replace(/^www\./, '');
     const title = document.title?.trim();
     sources.push({
-      address: web?.href ?? document.url,
-      ...(web ? { href: web.href } : {}),
+      address: web?.parsed.href ?? document.url,
+      ...(web ? { href: web.parsed.href } : {}),
       ...(host ? { host } : {}),
       ...(title ? { title } : {}),
       ...(document.snippet !== undefined ? { snippet: document.snippet } : {}),
@@ -417,10 +434,43 @@ export function readSearchResultContent(value: unknown): SearchResultContentView
   return { answer, sources };
 }
 
-function withoutFragment(url: URL): string {
-  const copy = new URL(url.href);
-  copy.hash = '';
-  return copy.href;
+/**
+ * An address split into its parts as written, by the expression RFC 3986 gives
+ * for it (appendix B): scheme, authority, path, query and fragment. Every part
+ * is optional, so it matches any string.
+ */
+const URI_PARTS = /^(?:([^:/?#]+):)?(?:\/\/([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#([\s\S]*))?$/;
+
+/**
+ * What two web addresses of one page have in common, so a search that lists
+ * the page twice lists it once. It is the runtime's rule, which deduplicates a
+ * search's sources the same way, so it reads the address as written, split as
+ * RFC 3986 splits it (`URI_PARTS`), rather than as the parser normalises it:
+ *
+ * - the scheme is left out: `http` and `https` serve the same page, and a
+ *   search lists either (the address is a web one, the parser has said so);
+ * - the host is lowercased and has one leading `www.` dropped, since
+ *   `www.example.com` and `example.com` are one site to a reader; the user
+ *   information and the port stay as written, a scheme's default port too;
+ * - the fragment is left out: `#section` names a place in the page, not
+ *   another page;
+ * - a path not written is the path `/`, so `https://example.com` and
+ *   `https://example.com/` are one page; one trailing `/` is dropped from any
+ *   other path (`/guide/` is `/guide`), and its case is kept;
+ * - the query stays, as written, since `?id=445` may be all that tells two
+ *   pages apart; an empty one is none.
+ */
+function samePageKey(written: string): string {
+  const parts = URI_PARTS.exec(written);
+  if (!parts) return written;
+  const [, , authority = '', path = '', query = ''] = parts;
+  const at = authority.lastIndexOf('@');
+  const host = authority
+    .slice(at + 1)
+    .toLowerCase()
+    .replace(/^www\./, '');
+  const page = path === '' ? '/' : path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+  return `${authority.slice(0, at + 1)}${host}${page}${query === '' ? '' : `?${query}`}`;
 }
 
 /**
