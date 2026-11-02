@@ -246,6 +246,18 @@ describe('a gallery', () => {
     expect(within(viewer()).getByText(S.imagePosition(2, 3))).toBeInTheDocument();
   });
 
+  it.each(['Shift', 'Alt', 'Control', 'Meta'])(
+    'leaves an arrow key alone while %s is held',
+    async (modifier) => {
+      const user = userEvent.setup();
+      render(<Gallery />);
+      await user.click(tile('22d29b4410c16562.png'));
+      await user.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}`);
+      expect(within(viewer()).getByText(S.imagePosition(1, 3))).toBeInTheDocument();
+      expect(viewer()).toHaveAccessibleName('22d29b4410c16562.png');
+    },
+  );
+
   it('gives focus back to the tile that opened it, wherever it was moved to', async () => {
     const user = userEvent.setup();
     render(<Gallery />);

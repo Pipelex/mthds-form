@@ -142,7 +142,15 @@ export function ImageViewer({
             }
           }}
           onKeyDown={(event) => {
-            if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+            if (
+              event.defaultPrevented ||
+              event.altKey ||
+              event.ctrlKey ||
+              event.metaKey ||
+              event.shiftKey
+            ) {
+              return;
+            }
             if (isTextEntry(event.target)) return;
             if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
             event.preventDefault();
