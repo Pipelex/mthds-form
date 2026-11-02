@@ -1,6 +1,7 @@
 import { ownProp } from './own-property';
 import {
   isNativeHtmlNode,
+  isNativeSearchResultNode,
   readDocumentContent,
   readHtmlContent,
   readImageContent,
@@ -135,7 +136,16 @@ function walk(field: RunField, raw: unknown, path: string[], out: StuffFile[]): 
     case 'object': {
       if (typeof value !== 'object' || value === null || Array.isArray(value)) return;
       const record = value as Record<string, unknown>;
+      // A search result's sources are the web pages its answer was written
+      // from. Its model states each as a `native.Document`, but none is a file
+      // the result holds: saving one would fetch somebody's page across
+      // origins and file it as `output-sources-0`. The JSON copy keeps every
+      // address. Only that member is passed over, so a concept refining a
+      // search result keeps any file it adds; the concept says it, wherever
+      // the node sits, and the value is never asked.
+      const skipped = isNativeSearchResultNode(field) ? SEARCH_SOURCES : undefined;
       for (const child of field.fields) {
+        if (child.name === skipped) continue;
         walk(child, ownProp(record, child.name), [...here, child.name], out);
       }
       return;
@@ -155,6 +165,9 @@ function walk(field: RunField, raw: unknown, path: string[], out: StuffFile[]): 
       return;
   }
 }
+
+/** The member of `native.SearchResult` that holds its sources, as its content model names it. */
+const SEARCH_SOURCES = 'sources';
 
 /**
  * The one unwrap path, matching the renderer's: a content model is opened by

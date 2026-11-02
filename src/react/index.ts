@@ -119,7 +119,7 @@ export { resolveHtmlStorageUrls } from './markup-storage';
 // How every `prose` result is typeset. Exported because a host rendering its
 // own summary of a run wants the same typesetting the panel uses, and because
 // re-deriving it is how two markdown renderings on one page start to disagree.
-export type { MarkdownProps } from './markdown';
+export type { MarkdownCitation, MarkdownProps } from './markdown';
 export { Markdown } from './markdown';
 
 export { FieldShell } from './field-shell';

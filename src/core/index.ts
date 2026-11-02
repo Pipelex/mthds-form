@@ -82,13 +82,15 @@ export { narrowFileFormats } from './narrow-file-formats';
 
 // ...and how to READ what one comes back as. The result side's twin of that
 // table: the pinned content models of `native.Document`, `native.Image`,
-// `native.Date`, `native.Page` and the verdicts (yes/no, rating, choice), read
-// by the kind or the concept the descriptor STATES. It lives in core rather
+// `native.Date`, `native.Page`, the verdicts (yes/no, rating, choice) and a
+// search's answer with its sources, read by the kind or the concept the
+// descriptor STATES. It lives in core rather
 // than beside the control that renders it for the same reason the format table
 // does - a host showing a result its own way needs the same answer, and two
 // copies of an answer is two places for it to drift. See ./native-content.
 export type {
   ChoiceContentView,
+  CitationSegment,
   CompositeMember,
   DataUrlView,
   DateContentView,
@@ -97,6 +99,8 @@ export type {
   ImageContentView,
   PageContentView,
   RatingContentView,
+  SearchResultContentView,
+  SearchSourceView,
   YesNoContentView,
 } from './native-content';
 export {
@@ -106,14 +110,17 @@ export {
   NATIVE_HTML_CONCEPT_REF,
   NATIVE_PAGE_CONCEPT_REF,
   NATIVE_RATING_CONCEPT_REF,
+  NATIVE_SEARCH_RESULT_CONCEPT_REF,
   NATIVE_YES_NO_CONCEPT_REF,
   TYPED_SCALAR_MARKERS,
+  citedSource,
   formatDateContent,
   hasTypedScalarMarkers,
   isNativeCompositeNode,
   isNativeDateNode,
   isNativeHtmlNode,
   isNativePageNode,
+  isNativeSearchResultNode,
   isViewableUrl,
   nativeVerdictOf,
   readChoiceContent,
@@ -125,7 +132,9 @@ export {
   readImageContent,
   readPageContent,
   readRatingContent,
+  readSearchResultContent,
   readYesNoContent,
+  splitCitations,
   viewableUrl,
 } from './native-content';
 

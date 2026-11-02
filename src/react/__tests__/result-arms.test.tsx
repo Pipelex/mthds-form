@@ -1,6 +1,7 @@
 /**
  * The arms the result view keys by concept for a reader: a page of an
- * extracted document, a judge's verdict, a composite's members, and the
+ * extracted document, a judge's verdict, a search's answer with its sources,
+ * a composite's members, and the
  * rules that keep an app's result free of a builder's chrome (a long text set
  * as Markdown, no "Output" title, no second count).
  *
@@ -8,7 +9,7 @@
  * returned, through the exported lookups a host uses, and checks both
  * presentations: `app` changes, and `studio` keeps what a builder reads.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import type {
   ObjectRunField,
@@ -26,6 +27,8 @@ import * as results from '../../__stories__/_generated/results';
 import { PAYLOADS as RESULT_PAYLOADS } from '../../__stories__/_generated/results.payloads';
 import * as verdicts from '../../__stories__/_generated/verdicts';
 import { PAYLOADS as VERDICT_PAYLOADS } from '../../__stories__/_generated/verdicts.payloads';
+import * as search from '../../__stories__/_generated/search';
+import { CITATIONS, SEARCH_RESULT, listedTwice } from '../../__stories__/outputs/search-payloads';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS, FieldStringsProvider } from '../field-strings';
 import { DEFAULT_IMG_SRC } from '../html-frame';
@@ -355,6 +358,160 @@ describe('a verdict', () => {
     );
     expect(screen.getByText(value.yes_no ? 'Oui' : 'Non')).toBeTruthy();
     expect(screen.getByText(/^Probabilité du oui/)).toBeTruthy();
+  });
+});
+
+describe('a search result', () => {
+  const field = fieldOf(search, 'search', 'search_result');
+
+  // A clipboard, so a copy control that is drawn is found: without one it
+  // draws nothing, and "no copy of a source's address" would hold vacuously.
+  beforeEach(() => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is the answer typeset and its sources as links in an app, never as files', () => {
+    // A real search's answer: a list with emphasis, citations in runs.
+    const { container } = panel('app', field, SEARCH_RESULT);
+    // The Markdown is typeset, not printed.
+    expect(container.querySelector('li strong')).not.toBeNull();
+    expect(container.textContent).not.toMatch(/\*\*/);
+    // Each citation links to the source it counts to, from one as listed: in
+    // `[2][3][9]`, the ninth.
+    const { sources } = SEARCH_RESULT;
+    expect(screen.getAllByRole('link', { name: '[2]' })[0]?.getAttribute('href')).toBe(
+      sources[1]?.url,
+    );
+    expect(screen.getByRole('link', { name: '[9]' }).getAttribute('href')).toBe(sources[8]?.url);
+    // The sources, each a link to its page with its site's name, the page
+    // listed twice once.
+    const { copy } = listedTwice();
+    const list = screen.getByRole('list', { name: s.searchSources });
+    const links = within(list).getAllByRole('link');
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      sources.filter((_, index) => index + 1 !== copy).map((source) => source.url),
+    );
+    for (const link of links) {
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    }
+    const first = new URL(sources[0]?.url ?? '').hostname;
+    expect(first.startsWith('www.')).toBe(true);
+    expect(within(list).getAllByText(first.slice('www.'.length)).length).toBeGreaterThan(0);
+    // No file chrome: no download of a source, no copy of its address.
+    expect(screen.queryByRole('button', { name: /^Download ./ })).toBeNull();
+    expect(screen.queryByRole('button', { name: s.copyUrl })).toBeNull();
+    // Not a record of its members, and not titled "Output".
+    expect(container.textContent).not.toMatch(/Answer|Output/);
+  });
+
+  it('lists a source once, marked with every citation that names it', () => {
+    // The real run lists one page twice, with `www.` and without.
+    const { kept, copy } = listedTwice();
+    panel('app', field, SEARCH_RESULT);
+    const list = screen.getByRole('list', { name: s.searchSources });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(SEARCH_RESULT.sources.length - 1);
+    expect(within(list).getByText(`[${kept}][${copy}]`)).toBeTruthy();
+    const first = SEARCH_RESULT.sources[kept - 1]?.url;
+    const citations = screen.getAllByRole('link', { name: `[${kept}]` });
+    expect(citations.length).toBeGreaterThan(0);
+    for (const citation of citations) expect(citation.getAttribute('href')).toBe(first);
+  });
+
+  it('shows an address that is not a web one as text, and links neither it nor its citation', () => {
+    panel('app', field, {
+      answer: 'See [1].',
+      sources: [{ url: 'javascript:alert(1)', title: 'Not a page' }],
+    });
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    expect(screen.getByText('Not a page')).toBeTruthy();
+  });
+
+  it('offers the answer to copy, as written', () => {
+    panel('app', field, SEARCH_RESULT);
+    expect(screen.getByRole('button', { name: s.copyText })).toBeTruthy();
+  });
+
+  it('draws an empty answer as an absence and still lists the sources', () => {
+    const { container } = panel('app', field, { ...SEARCH_RESULT, answer: '' });
+    expect(container.textContent).toContain(s.resultAbsentDescription);
+    expect(screen.getByRole('list', { name: s.searchSources })).toBeTruthy();
+  });
+
+  it('stays the record a builder checks a search against in studio', () => {
+    const { container } = panel('studio', field, SEARCH_RESULT);
+    expect(container.textContent).toContain('answer');
+    expect(container.textContent).toContain('sources');
+    expect(screen.queryByRole('list', { name: s.searchSources })).toBeNull();
+    expect(screen.queryByRole('link', { name: '[2]' })).toBeNull();
+  });
+
+  it('falls back to the record when the value is not the model its concept states', () => {
+    const { container } = panel('app', field, { answer: 'An answer', sources: 'none' });
+    expect(screen.queryByRole('list', { name: s.searchSources })).toBeNull();
+    expect(container.textContent).toContain('An answer');
+  });
+
+  it('speaks French where the host does', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <FieldStringsProvider locale="fr">
+          <StuffViewer field={field} value={SEARCH_RESULT} />
+        </FieldStringsProvider>
+      </FieldPresentationProvider>,
+    );
+    // The heading reads `Sources` in both locales, so it cannot show the
+    // locale applies; the answer's copy control is worded differently in each.
+    expect(screen.getByRole('list', { name: 'Sources' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copier le texte' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: s.copyText })).toBeNull();
+  });
+
+  describe('a list of them', () => {
+    // A plural node's concept is its element's, so the list states
+    // `native.SearchResult` and its item is the search.
+    const searches: RunField = {
+      kind: 'list',
+      name: 'output',
+      conceptRef: 'native.SearchResult',
+      required: true,
+      item: field,
+    };
+    const second = { answer: 'A second search, citing [2].', sources: SEARCH_RESULT.sources };
+    const value = [SEARCH_RESULT, second];
+
+    it('draws each search by its arm in an app, never as a row of a table', () => {
+      const { container } = panel('app', searches, value);
+      expect(container.querySelector('table')).toBeNull();
+      // Each search lists its own sources, deduplicated.
+      const lists = screen.getAllByRole('list', { name: s.searchSources });
+      expect(lists).toHaveLength(value.length);
+      for (const list of lists) {
+        expect(within(list).getAllByRole('listitem')).toHaveLength(
+          SEARCH_RESULT.sources.length - 1,
+        );
+      }
+      // And each answer's citations link to its sources: every `[2]` the real
+      // answer writes, and the second answer's one.
+      const cited = screen.getAllByRole('link', { name: '[2]' });
+      expect(cited).toHaveLength(CITATIONS.filter((citation) => citation === 2).length + 1);
+      for (const link of cited) {
+        expect(link.getAttribute('href')).toBe(SEARCH_RESULT.sources[1]?.url);
+      }
+    });
+
+    it('stays a table for a builder in studio', () => {
+      const { container } = panel('studio', searches, value);
+      expect(container.querySelector('table')).not.toBeNull();
+      expect(screen.queryByRole('list', { name: s.searchSources })).toBeNull();
+      expect(screen.queryByRole('link', { name: '[2]' })).toBeNull();
+    });
   });
 });
 
