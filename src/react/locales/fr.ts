@@ -223,6 +223,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     `Remplir le formulaire avec «\u00a0${name}\u00a0» remplace toutes ses valeurs.`,
   replaceEnteredConfirm: 'Remplacer',
   exampleActions: (name) => `Actions pour ${name}`,
+  openExample: 'Ouvrir',
   renameExample: 'Renommer',
   deleteExample: 'Supprimer',
   renameExampleTitle: 'Renommer l’exemple',

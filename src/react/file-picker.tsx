@@ -28,6 +28,7 @@ import { useFieldStrings, type FieldStrings } from './field-strings';
 import { focusOutlineClass, focusOutlineInsetClass, selectedCheckedFillClass } from './role-tokens';
 import {
   DimRows,
+  drawsNothing,
   ListAction,
   ListMessage,
   MoreFooter,
@@ -75,8 +76,9 @@ export interface FilePickerSource<F extends SourceFile = SourceFile> extends Fil
    * (the row is at least 64px tall and grows with a larger glyph), and is
    * hidden from assistive technology, since the row's second line says the
    * type. A row it returns what React renders nothing for keeps the kernel's
-   * glyph: `null`, `undefined`, `true`, `false` or `''`, so a
-   * `cond && <Tile />` whose condition is false falls back as it reads. A
+   * glyph: `null`, `undefined`, `true`, `false` or `''`, or an array of
+   * nothing but those, an empty one included, so a `cond && <Tile />` whose
+   * condition is false, or a `.map()` over nothing, falls back as it reads. A
    * number is drawn, `0` included, because React draws it as text, so a
    * condition that is a count is the host's to turn into a boolean.
    */
@@ -533,17 +535,6 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
     if (!Number.isNaN(date.getTime())) parts.push(s.fileDate(date));
   }
   return parts.join(' · ');
-}
-
-/**
- * Whether a host's glyph draws nothing, by React's own rule: React renders
- * nothing for `null`, `undefined`, a boolean or an empty string, so a row given
- * one keeps the kernel's outline rather than an empty slot. A number, `0`
- * included, is not here, because React renders it as text, and drawing what
- * React draws keeps a host's glyph meaning in the row what it means anywhere.
- */
-function drawsNothing(glyph: ReactNode): boolean {
-  return glyph === null || glyph === undefined || typeof glyph === 'boolean' || glyph === '';
 }
 
 /**

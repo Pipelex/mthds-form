@@ -6,6 +6,7 @@ import {
   getPipeIOContract,
 } from '../core';
 import type { FilePickerSource } from '../react';
+import { CONTRACTS as FILES_CONTRACTS, INPUT_FORM as FILES_INPUT_FORM } from './_generated/files';
 import {
   CONTRACTS as STRUCTURED_CONTRACTS,
   INPUT_FORM as STRUCTURED_INPUT_FORM,
@@ -170,13 +171,15 @@ export function fileSourceOf(
 }
 
 /**
- * Two saved runs of the address form. A host stores an example as the inputs a
- * run was started with, so these are made the way a form makes them, by
+ * Saved runs of the address form. A host stores an example as the inputs a run
+ * was started with, so these are made the way a form makes them, by
  * `apiInputsFromRunValues` over the generated contract, from values a person
  * could have typed. Writing the run-input envelopes out by hand would be
- * writing a payload the standard owns.
+ * writing a payload the standard owns. The first two are the offices; the
+ * third is a warehouse whose street runs long, with an access code no line
+ * can break inside.
  */
-const EXAMPLES: FormExample[] = (() => {
+const ADDRESSES: FormExample[] = (() => {
   const contract = getPipeIOContract(STRUCTURED_CONTRACTS, 'structured', 'flat_object');
   const descriptor = getPipeInputForm(STRUCTURED_INPUT_FORM, 'structured', 'flat_object');
   if (!contract || !descriptor) throw new Error('No fixture entry for structured.flat_object.');
@@ -197,14 +200,58 @@ const EXAMPLES: FormExample[] = (() => {
       city: 'Berlin',
       country: 'Germany',
     }),
+    example('ex_3', 'Lyon warehouse', {
+      street:
+        'Zone industrielle des Gaulnes, bâtiment logistique 4, quai de chargement C, code d’accès REF_ZI_GAULNES_BATIMENT_0004_QUAI_C_NORD',
+      city: 'Jonage',
+      country: 'France',
+    }),
   ];
 })();
 
-/** What the example source answers: two examples, none, or a failure. */
-export type ExamplesAnswer = 'two' | 'none' | 'failure';
+/**
+ * An example saved when the method took an invoice's document rather than an
+ * address: it holds an input the address form no longer takes and lacks the
+ * one it needs, so it no longer fits. It is made the same way, over the
+ * document form's generated contract.
+ */
+const EARLIER_EXAMPLE: FormExample = (() => {
+  const contract = getPipeIOContract(FILES_CONTRACTS, 'files', 'one_document');
+  const descriptor = getPipeInputForm(FILES_INPUT_FORM, 'files', 'one_document');
+  if (!contract || !descriptor) throw new Error('No fixture entry for files.one_document.');
+  const attachment = { url: TEAM_FILES[0]?.url ?? '', filename: TEAM_FILES[0]?.name ?? '' };
+  return {
+    id: 'ex_4',
+    name: 'Scanned invoice',
+    inputs: apiInputsFromRunValues(
+      { attachment },
+      buildRunFields(descriptor, contract.inputs),
+      contract.inputs,
+    ),
+  };
+})();
 
+/**
+ * What the example source answers: the two offices, none, a failure, or a
+ * varied list, the two offices with the long warehouse and the example that no
+ * longer fits.
+ */
+export type ExamplesAnswer = 'two' | 'none' | 'failure' | 'varied';
+
+const EXAMPLES_BY_ANSWER: Record<ExamplesAnswer, readonly FormExample[]> = {
+  two: ADDRESSES.slice(0, 2),
+  none: [],
+  failure: [],
+  varied: [...ADDRESSES, EARLIER_EXAMPLE],
+};
+
+/**
+ * The method's examples as a source answers with them, renaming and deleting
+ * for real. Opening an example and describing its row are a host's own
+ * surface and rendering, so a story adds `open` and `renderDetail` itself.
+ */
 export function exampleSourceOf(answer: ExamplesAnswer): ExampleSource {
-  let examples = answer === 'two' ? [...EXAMPLES] : [];
+  let examples = [...EXAMPLES_BY_ANSWER[answer]];
   return {
     list: async () => {
       if (answer === 'failure') throw new Error('The host could not list its examples.');

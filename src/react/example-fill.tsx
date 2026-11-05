@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { MoreHorizontal, Sparkles, X } from 'lucide-react';
 import type { ExampleSource, FormExample, RunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
@@ -10,6 +10,7 @@ import { useFieldStrings } from './field-strings';
 import { followingFocusable } from './focus';
 import {
   DimRows,
+  drawsNothing,
   ListAction,
   ListMessage,
   MoreFooter,
@@ -44,14 +45,41 @@ import { cn } from './utils';
 /*
  * The example source's control: "Fill with an example", the list of the
  * method's examples it opens, the question asked before an example replaces
- * what a person entered, and the row menu that renames and deletes. Filling
- * sets the form's values and nothing else: it never starts a run. See
+ * what a person entered, and the row menu that opens, renames and deletes.
+ * Filling sets the form's values and nothing else: it never starts a run. See
  * docs/sources.md.
  */
 
+/**
+ * An example source as the control set takes it: the kernel's `ExampleSource`,
+ * which lists the examples and says what may be done with them, and what a
+ * row says under the example's name, which only a renderer can draw. Every
+ * `ExampleSource` is one, so a host that describes nothing passes its source
+ * as it is.
+ */
+export interface ExamplePickerSource extends ExampleSource {
+  /**
+   * Draws a line under a row's name: what the example holds, say, or that it
+   * no longer fits the form. It receives the example as `list` returned it and
+   * the fields the control reads examples back against, the form's own. What
+   * it returns is drawn inside the row's button, under the name, in the list's
+   * small muted type unless it styles itself, and is read with the name as the
+   * row's accessible name, so it is phrasing content with nothing interactive
+   * in it: text, a `<span>`, a decorative icon. It wraps within the row and
+   * never widens it; a host wanting one line truncates its own element. A row
+   * it returns what React renders nothing for stays the one line of its name:
+   * `null`, `undefined`, `true`, `false` or `''`, or an array of nothing but
+   * those, an empty one included. It is declared as a method,
+   * as `FilePickerSource.renderGlyph` is, so a source whose `renderDetail`
+   * takes the host's own example type, the type its `list` answers with, is
+   * still accepted.
+   */
+  renderDetail?(example: FormExample, fields: readonly RunField[]): ReactNode;
+}
+
 export interface FillWithExampleProps {
-  /** The host's examples of this method. */
-  source: ExampleSource;
+  /** The host's examples of this method, and what each row says under its name. */
+  source: ExamplePickerSource;
   /** The form's fields, which an example's inputs are read back against. */
   fields: RunField[];
   /**
@@ -125,6 +153,13 @@ export function FillWithExample({
   const afterControl = useRef<HTMLElement | null>(null);
   const rows = useRef(new Map<string, HTMLButtonElement>());
   const menus = useRef(new Map<string, HTMLButtonElement>());
+  // The example Open was chosen on, handed to the host's `open` once the list
+  // has closed and given focus back to the control.
+  const handingOver = useRef<FormExample | null>(null);
+  // A row's choice as the latest render makes it, which the `fill` handed to
+  // the host calls, so it reads the fields, the touched state and the disabled
+  // state current when it is called rather than when the example was opened.
+  const latestChoice = useRef<(example: FormExample) => void>(() => undefined);
   // The row a rename or a delete hands focus to as its dialog closes, by id.
   const afterRowDialog = useRef<{ id: string | undefined; to: 'row' | 'menu' } | null>(null);
   const register =
@@ -165,7 +200,16 @@ export function FillWithExample({
     setDeleting(null);
   }
 
-  if (source.hideWhenEmpty && !open && (answer ?? hasExamples) !== true) return null;
+  // Under `hideWhenEmpty` the control leaves while the method is known to have
+  // no example, and stays mounted drawing nothing. What it held goes with it:
+  // a question asked by a `fill` the host kept, which would otherwise come
+  // back unasked when the control is drawn again, and that `fill` itself.
+  const hidden = source.hideWhenEmpty === true && !open && (answer ?? hasExamples) !== true;
+  if (hidden && (replacing || renaming || deleting)) {
+    setReplacing(null);
+    setRenaming(null);
+    setDeleting(null);
+  }
 
   const closeList = () => {
     // The list just read is the freshest answer there is: a list read to its
@@ -186,13 +230,40 @@ export function FillWithExample({
     if (disabled) return;
     onFill(runValuesFromInputs(example.inputs, fields), example);
     setReplacing(null);
-    closeList();
+    // A fill the host asked for, from an example it opened, finds the list
+    // already closed.
+    if (open) closeList();
   };
   const choose = (example: FormExample) => {
+    if (disabled) return;
     if (touched) setReplacing(example);
     else fill(example);
   };
-  const manages = source.rename !== undefined || source.delete !== undefined;
+  // Each render's choice becomes the one a `fill` handed to the host makes;
+  // while the control is hidden, and once it is gone, that `fill` does nothing.
+  useEffect(() => {
+    latestChoice.current = hidden ? () => undefined : choose;
+    return () => {
+      latestChoice.current = () => undefined;
+    };
+  });
+
+  if (hidden) return null;
+
+  const manages =
+    source.open !== undefined || source.rename !== undefined || source.delete !== undefined;
+  // Open closes the list, and its example goes to the host only once the list
+  // has given focus back to "Fill with an example": a surface the host opens
+  // from there then returns focus there as it closes. The panel calls this
+  // just before it moves focus, so the call waits for the move.
+  const handOver = () => {
+    const example = handingOver.current;
+    handingOver.current = null;
+    if (!example || !source.open) return;
+    // Called on the source, as every handler is, so a source written as a
+    // class keeps `this`.
+    queueMicrotask(() => source.open?.(example, () => latestChoice.current(example)));
+  };
 
   // A later page that failed is said before the rows still shown: the footer
   // that shows it is not a live region, so this line is what announces it.
@@ -251,6 +322,7 @@ export function FillWithExample({
             className="top-auto max-h-[calc(100dvh-1.5rem)]"
             ref={sheet}
             returnFocus={() => control.current ?? afterControl.current}
+            onCloseAutoFocus={handOver}
           >
             <div className="px-4 pt-4 pb-3">
               <div className="flex items-start gap-3">
@@ -299,9 +371,10 @@ export function FillWithExample({
                               focusOutlineInsetClass,
                             )}
                           >
-                            <span className="truncate text-[16px] font-medium text-foreground">
-                              {example.name}
-                            </span>
+                            <ExampleRowText
+                              name={example.name}
+                              detail={source.renderDetail?.(example, fields)}
+                            />
                           </button>
                           {manages && (
                             // Not modal, so the question a menu item opens takes
@@ -318,6 +391,16 @@ export function FillWithExample({
                                 <MoreHorizontal className="size-5" aria-hidden="true" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {source.open && (
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      handingOver.current = example;
+                                      closeList();
+                                    }}
+                                  >
+                                    {s.openExample}
+                                  </DropdownMenuItem>
+                                )}
                                 {source.rename && (
                                   <DropdownMenuItem onSelect={() => setRenaming(example)}>
                                     {s.renameExample}
@@ -381,7 +464,8 @@ export function FillWithExample({
       {source.rename && renaming && (
         <RenameExampleDialog
           example={renaming}
-          rename={source.rename}
+          // Bound, since the dialog calls it on its own: a class keeps `this`.
+          rename={source.rename.bind(source)}
           returnFocus={returnFromRowDialog}
           onDone={(renamed) => {
             // Matched by the id the row had: a host that versions its records
@@ -402,7 +486,7 @@ export function FillWithExample({
       {source.delete && deleting && (
         <DeleteExampleDialog
           example={deleting}
-          remove={source.delete}
+          remove={source.delete.bind(source)}
           returnFocus={returnFromRowDialog}
           onDone={(deleted) => {
             const index = pages.items.findIndex((item) => item.id === deleted.id);
@@ -418,6 +502,31 @@ export function FillWithExample({
         />
       )}
     </>
+  );
+}
+
+/**
+ * A row's words: the example's name on one line, cut short when it is long,
+ * and under it what the host's `renderDetail` drew, which wraps. The space
+ * between them is a text node, so the row's accessible name reads them as two
+ * phrases whatever the two lines are styled as.
+ */
+function ExampleRowText({ name, detail }: { name: string; detail: ReactNode }) {
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-[16px] font-medium text-foreground">{name}</span>
+      {!drawsNothing(detail) && (
+        <>
+          {' '}
+          <span
+            data-slot="example-row-detail"
+            className="mt-0.5 block text-[13px] wrap-break-word text-muted-foreground"
+          >
+            {detail}
+          </span>
+        </>
+      )}
+    </span>
   );
 }
 

@@ -39,9 +39,10 @@ export { MethodForm, useMethodForm } from './method-form';
 // example". `MethodForm` mounts both from `useMethodForm`'s options; these are
 // for a host that renders its own form around `FieldRenderer`. The seams'
 // shapes are re-exported from the core entry, where a host's server reads them
-// too; `FilePickerSource` is the one shape of the control set's own, a file
-// source with the glyph its rows draw, since a rendering has no place in the
-// headless core. See docs/sources.md.
+// too; `FilePickerSource` and `ExamplePickerSource` are the two shapes of the
+// control set's own, a file source with the glyph its rows draw and an example
+// source with the line under each row's name, since a rendering has no place
+// in the headless core. See docs/sources.md.
 export type {
   ExampleSource,
   ExampleSourcePage,
@@ -55,7 +56,7 @@ export type {
 } from '../core';
 export type { FilePickerEntryProps, FilePickerProps, FilePickerSource } from './file-picker';
 export { FilePicker, FilePickerEntry } from './file-picker';
-export type { FillWithExampleProps } from './example-fill';
+export type { ExamplePickerSource, FillWithExampleProps } from './example-fill';
 export { FillWithExample } from './example-fill';
 
 export type { ResultFieldProps } from './result-field';
