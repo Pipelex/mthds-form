@@ -11,6 +11,10 @@
 
 - **`FieldStrings` gains the row menu's Open (Breaking)**: `openExample`, "Open" in English and "Ouvrir" in French; a host that supplies a complete `FieldStrings` rather than a partial override adds it. See [docs/i18n.md](docs/i18n.md).
 
+### Fixed
+
+- **A source typed over the host's own example compiles**: `ExampleSource`'s `rename` and `delete` are declared as optional methods, as `open` is, so a source whose handlers take the host's own example type, the type its `list` answers with, now compiles under `strictFunctionTypes`, where it used to fail with TS2322; a source that compiled before still does. See [docs/sources.md](docs/sources.md#the-example-source).
+
 ## [v0.27.0] - 2026-11-02
 
 ### Added

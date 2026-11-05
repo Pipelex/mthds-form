@@ -571,6 +571,41 @@ describe('a fill the host kept, once hideWhenEmpty has taken the control', () =>
   });
 });
 
+describe('a source typed over the host’s own example', () => {
+  /** A host's own example, carrying the revision its inputs were listed at. */
+  type RevisedExample = FormExample & { inputRevision: number };
+
+  it('compiles with every handler taking that type, and hands each the row as listed', async () => {
+    const user = userEvent.setup();
+    const listed: RevisedExample = { ...PARIS, inputRevision: 3 };
+    const opened: number[] = [];
+    // The type checker is half of this test: each handler takes the host's own
+    // example, which a method's parameter accepts and a function-typed
+    // property would refuse under `strictFunctionTypes`.
+    const source: ExamplePickerSource = {
+      list: async () => ({ examples: [listed] }),
+      open: (example: RevisedExample, fill) => {
+        opened.push(example.inputRevision);
+        fill();
+      },
+      rename: async (example: RevisedExample, name) => ({ ...example, name }),
+      delete: async (example: RevisedExample) => {
+        opened.push(-example.inputRevision);
+      },
+      renderDetail: (example: RevisedExample) => `Revision ${example.inputRevision}`,
+    };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    await within(dialog).findByRole('button', { name: 'Paris office Revision 3' });
+    await user.click(
+      within(dialog).getByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(opened).toEqual([3]));
+    expect(screen.getByLabelText('city')).toHaveValue('Paris');
+  });
+});
+
 describe('the line under a row’s name', () => {
   /** A host's own example, carrying the words its rows are described in. */
   type HostExample = FormExample & { summary: string };

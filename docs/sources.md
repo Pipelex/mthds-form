@@ -150,9 +150,9 @@ A single field is written `{ url, filename }` through its own `onChange`, the va
 ```ts
 interface ExampleSource {
   list: (query: { cursor?: string; signal: AbortSignal }) => Promise<{ examples: FormExample[]; nextCursor?: string | null }>;
-  open?: (example: FormExample, fill: () => void) => void;
-  rename?: (example: FormExample, name: string) => Promise<FormExample | void>;
-  delete?: (example: FormExample) => Promise<void>;
+  open?(example: FormExample, fill: () => void): void;
+  rename?(example: FormExample, name: string): Promise<FormExample | void>;
+  delete?(example: FormExample): Promise<void>;
   hideWhenEmpty?: boolean;
 }
 
@@ -164,6 +164,8 @@ interface FormExample {
 ```
 
 An example's `inputs` are a run's inputs: each `{ concept, content }`, an optional input left out, an empty plural input a bare `[]`, which is what `form.inputs` holds. So a host saves an example from the inputs a run was started with and hands it back as it stored it. `runValuesFromInputs(inputs, fields)` reads them back into the controls' shape; an input no field takes is ignored, and a field the example says nothing of is left empty.
+
+A host may carry its own fields on the examples its `list` answers with, such as the revision an example's inputs were listed at, and every handler receives each example exactly as `list` returned it. `open`, `rename` and `delete` are declared as methods, as `renderDetail` is, because TypeScript compares a method's parameter in both directions, so a handler typed over the host's own example (`open: (example: HostExample, fill) => …`) is accepted without a cast. Declared as function-typed properties, they would refuse that handler under `strictFunctionTypes`.
 
 `ExamplePickerSource`, exported from `./react`, is the kernel's `ExampleSource` with one more optional member, `renderDetail(example, fields)`, which draws the line under a row's name (see "The examples list" below). Every `ExampleSource` is one, so a host that describes no row passes its source as it is, and `useMethodForm`'s `exampleSource` and `FillWithExample`'s `source` both take one.
 

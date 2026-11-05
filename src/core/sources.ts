@@ -135,6 +135,12 @@ export interface ExampleSourcePage {
  * is offered on a row's menu only when given, Open first, so a host gives each
  * only to a person it is for, and `rename` and `delete` only to a person
  * allowed to change examples. A source with any one of them has a row menu.
+ *
+ * The three are declared as methods, as `./react`'s `renderDetail` is,
+ * because TypeScript compares a method's parameter in both directions: a
+ * source whose handlers take the host's own example type, the type its `list`
+ * answers with, is accepted. Declared as function-typed properties they would
+ * refuse it under `strictFunctionTypes`, which is why they must stay methods.
  */
 export interface ExampleSource {
   /** Lists one page of the method's examples. Rejecting shows the failure with Try again. */
@@ -154,14 +160,14 @@ export interface ExampleSource {
    * form" calls it rather than setting the values itself. It may be called
    * any number of times, or never.
    */
-  open?: (example: FormExample, fill: () => void) => void;
+  open?(example: FormExample, fill: () => void): void;
   /**
    * Renames an example. Resolving to the example as stored replaces the row;
    * resolving to nothing keeps the row under the new name.
    */
-  rename?: (example: FormExample, name: string) => Promise<FormExample | void>;
+  rename?(example: FormExample, name: string): Promise<FormExample | void>;
   /** Deletes an example. Asked for only after the person confirmed it. */
-  delete?: (example: FormExample) => Promise<void>;
+  delete?(example: FormExample): Promise<void>;
   /**
    * Whether "Fill with an example" is left out while the method has no
    * example. `false` by default, when the empty list says how to make one.
