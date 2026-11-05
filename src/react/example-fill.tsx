@@ -258,9 +258,10 @@ export function FillWithExample({
   const handOver = () => {
     const example = handingOver.current;
     handingOver.current = null;
-    const openExample = source.open;
-    if (!example || !openExample) return;
-    queueMicrotask(() => openExample(example, () => latestChoice.current(example)));
+    if (!example || !source.open) return;
+    // Called on the source, as every handler is, so a source written as a
+    // class keeps `this`.
+    queueMicrotask(() => source.open?.(example, () => latestChoice.current(example)));
   };
 
   // A later page that failed is said before the rows still shown: the footer
@@ -462,7 +463,8 @@ export function FillWithExample({
       {source.rename && renaming && (
         <RenameExampleDialog
           example={renaming}
-          rename={source.rename}
+          // Bound, since the dialog calls it on its own: a class keeps `this`.
+          rename={source.rename.bind(source)}
           returnFocus={returnFromRowDialog}
           onDone={(renamed) => {
             // Matched by the id the row had: a host that versions its records
@@ -483,7 +485,7 @@ export function FillWithExample({
       {source.delete && deleting && (
         <DeleteExampleDialog
           example={deleting}
-          remove={source.delete}
+          remove={source.delete.bind(source)}
           returnFocus={returnFromRowDialog}
           onDone={(deleted) => {
             const index = pages.items.findIndex((item) => item.id === deleted.id);

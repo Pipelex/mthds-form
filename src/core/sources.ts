@@ -141,6 +141,7 @@ export interface ExampleSourcePage {
  * source whose handlers take the host's own example type, the type its `list`
  * answers with, is accepted. Declared as function-typed properties they would
  * refuse it under `strictFunctionTypes`, which is why they must stay methods.
+ * The control calls each on its source, so a class's methods keep `this`.
  */
 export interface ExampleSource {
   /** Lists one page of the method's examples. Rejecting shows the failure with Try again. */

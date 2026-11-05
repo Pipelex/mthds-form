@@ -606,6 +606,73 @@ describe('a source typed over the host’s own example', () => {
   });
 });
 
+describe('a source written as a class', () => {
+  /**
+   * A host's examples kept on an instance, whose methods read it through
+   * `this`. A class body is strict, so a method called off its instance finds
+   * `this` undefined and throws: a rename or a delete would then show its
+   * failure, and an open would never reach the instance.
+   */
+  class TeamExamples implements ExampleSource {
+    private examples: FormExample[] = [PARIS, LYON];
+    readonly calls: string[] = [];
+
+    async list(): Promise<ExampleSourcePage> {
+      return { examples: this.examples };
+    }
+    open(example: FormExample, fill: () => void): void {
+      this.calls.push(`open ${example.name}`);
+      fill();
+    }
+    async rename(example: FormExample, name: string): Promise<FormExample> {
+      this.calls.push(`rename ${example.name}`);
+      const renamed = { ...example, name };
+      this.examples = this.examples.map((item) => (item.id === example.id ? renamed : item));
+      return renamed;
+    }
+    async delete(example: FormExample): Promise<void> {
+      this.calls.push(`delete ${example.name}`);
+      this.examples = this.examples.filter((item) => item.id !== example.id);
+    }
+  }
+
+  it('calls open, rename and delete on the source, so each reaches the instance', async () => {
+    const user = userEvent.setup();
+    const source = new TeamExamples();
+    render(<Harness exampleSource={source} />);
+
+    await openRowMenu(user, 'Paris office');
+    await user.click(screen.getByRole('menuitem', { name: S.renameExample }));
+    const renaming = await screen.findByRole('dialog', { name: S.renameExampleTitle });
+    const field = within(renaming).getByLabelText(S.exampleName);
+    await user.clear(field);
+    await user.type(field, 'Head office{Enter}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: S.renameExampleTitle })).toBeNull(),
+    );
+    const dialog = screen.getByRole('dialog', { name: S.examplesTitle });
+    expect(within(dialog).getByRole('button', { name: 'Head office' })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: S.exampleActions('Lyon office') }));
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: S.deleteExample,
+      }),
+    );
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('button', { name: 'Lyon office' })).toBeNull(),
+    );
+
+    await user.click(within(dialog).getByRole('button', { name: S.exampleActions('Head office') }));
+    await user.click(await screen.findByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(source.calls).toContain('open Head office'));
+    expect(source.calls).toEqual(['rename Paris office', 'delete Lyon office', 'open Head office']);
+    // The instance's `open` called the fill it was handed, which filled the form.
+    await waitFor(() => expect(screen.getByLabelText('city')).toHaveValue('Paris'));
+  });
+});
+
 describe('the line under a row’s name', () => {
   /** A host's own example, carrying the words its rows are described in. */
   type HostExample = FormExample & { summary: string };

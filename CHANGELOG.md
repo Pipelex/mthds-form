@@ -13,7 +13,7 @@
 
 ### Fixed
 
-- **A source typed over the host's own example compiles**: `ExampleSource`'s `rename` and `delete` are declared as optional methods, as `open` is, so a source whose handlers take the host's own example type, the type its `list` answers with, now compiles under `strictFunctionTypes`, where it used to fail with TS2322; a source that compiled before still does. See [docs/sources.md](docs/sources.md#the-example-source).
+- **An example source typed over the host's own example, or written as a class, works**: `ExampleSource`'s `rename` and `delete` are declared as optional methods, as `open` is, so a source whose handlers take the host's own example type, the type its `list` answers with, now compiles under `strictFunctionTypes`, where it used to fail with TS2322, and the control calls each on its source, so a source written as a class keeps `this`; a source that compiled before still does. See [docs/sources.md](docs/sources.md#the-example-source).
 
 ## [v0.27.0] - 2026-11-02
 
