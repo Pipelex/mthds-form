@@ -1,9 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useState } from 'react';
 import { FileImage } from 'lucide-react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
-import type { InputForm, PipeIOContracts, RunField } from '../../core';
-import { getPipeInputForm, getPipeIOContract, narrowFileFormats } from '../../core';
-import { DEFAULT_FIELD_STRINGS as S, MethodForm, useMethodForm } from '../../react';
+import type { FormExample, InputForm, PipeIOContracts, RunField } from '../../core';
+import {
+  getPipeInputForm,
+  getPipeIOContract,
+  narrowFileFormats,
+  runValuesFromInputs,
+} from '../../core';
+import {
+  DEFAULT_FIELD_STRINGS as S,
+  humanizeFieldName,
+  MethodForm,
+  useMethodForm,
+} from '../../react';
 import { CONTRACTS, INPUT_FORM } from '../_generated/files';
 import {
   CONTRACTS as STRUCTURED_CONTRACTS,
@@ -48,6 +59,10 @@ interface SourcesStoryProps {
   rows?: 'kernel' | 'host';
   /** The example source's answer; no example source when absent. */
   examples?: ExamplesAnswer;
+  /** Whether the example source opens an example, in the host's own panel under the form. */
+  opens?: boolean;
+  /** Whether each example's row says what it holds, or that it no longer fits. */
+  describes?: boolean;
 }
 
 /**
@@ -71,6 +86,41 @@ function HostGlyph({ format }: { format: TeamFile['format'] }) {
   );
 }
 
+/** What a host keeps of a row's own words: each piece of text a value holds, in order. */
+function heldWords(value: unknown): string[] {
+  if (typeof value === 'string') return value === '' ? [] : [value];
+  if (Array.isArray(value)) return value.flatMap(heldWords);
+  if (value && typeof value === 'object') return Object.values(value).flatMap(heldWords);
+  return [];
+}
+
+/**
+ * A host's line under an example's name, in the host's own words and look:
+ * what the example holds, read back against the form's fields, or, for an
+ * example saved for an earlier form, the inputs it now needs, beside the
+ * host's own warning dot, a colour the kernel's theme has no role for. The dot
+ * is decorative; the words say it.
+ */
+function ExampleLine({ example, fields }: { example: FormExample; fields: readonly RunField[] }) {
+  const missing = fields.filter((field) => field.required && !(field.name in example.inputs));
+  if (missing.length > 0) {
+    const labels = missing.map((field) => field.title ?? humanizeFieldName(field.name));
+    return (
+      <span data-misfit className="flex items-start gap-1.5">
+        <span aria-hidden="true" className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-500" />
+        <span>Needs new inputs: {labels.join(', ')}</span>
+      </span>
+    );
+  }
+  return <>{heldWords(runValuesFromInputs(example.inputs, [...fields])).join(', ')}</>;
+}
+
+/** The example the host has open, and the fill the form handed it. */
+interface OpenedExample {
+  example: FormExample;
+  fill: () => void;
+}
+
 function SourcesStory({
   contracts,
   inputForm,
@@ -81,7 +131,10 @@ function SourcesStory({
   narrowTo,
   rows = 'kernel',
   examples,
+  opens = false,
+  describes = false,
 }: SourcesStoryProps) {
+  const [opened, setOpened] = useState<OpenedExample | null>(null);
   const contract = getPipeIOContract(contracts, domain, pipeCode);
   const descriptor = getPipeInputForm(inputForm, domain, pipeCode);
   if (!contract || !descriptor) {
@@ -102,11 +155,48 @@ function SourcesStory({
             rows === 'host' ? (file: TeamFile) => <HostGlyph format={file.format} /> : undefined,
         }
       : undefined,
-    exampleSource: examples ? exampleSourceOf(examples) : undefined,
+    exampleSource: examples
+      ? {
+          ...exampleSourceOf(examples),
+          open: opens ? (example, fill) => setOpened({ example, fill }) : undefined,
+          renderDetail: describes
+            ? (example, fields) => <ExampleLine example={example} fields={fields} />
+            : undefined,
+        }
+      : undefined,
   });
   return (
     <div data-sources-demo style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
       <MethodForm form={form} presentation="app" />
+      {opened && (
+        // The host's own surface for an opened example, drawn under the form
+        // rather than over it, since what it shows is the host's to decide.
+        <div
+          data-opened-example
+          className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-4"
+        >
+          <p className="min-w-0 flex-1 text-[14px] text-foreground">
+            Opened: {opened.example.name}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              opened.fill();
+              setOpened(null);
+            }}
+            className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-[14px] font-medium text-primary-foreground"
+          >
+            Fill the form
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpened(null)}
+            className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-[14px] text-foreground"
+          >
+            Close
+          </button>
+        </div>
+      )}
       <pre className="text-[11px] text-foreground" data-testid="sources-values">
         {JSON.stringify(form.values, null, 2)}
       </pre>
@@ -437,5 +527,106 @@ export const ExamplesFailed: Story = {
   play: async ({ canvasElement }) => {
     const dialog = within(await openExamples(canvasElement));
     await expect(await dialog.findByRole('button', { name: S.tryAgain })).toBeVisible();
+  },
+};
+
+/**
+ * **The examples, each described, with Open.** The host draws a line under
+ * each name (`renderDetail`): what the example holds, or, for one saved when
+ * the method took a document, "Needs new inputs: Address" beside the host's
+ * own warning dot. The line is inside the row's button, so it is read with the
+ * name. The row menu offers Open first, then Rename and Delete. Left open on
+ * the menu so the accessibility check reads it.
+ */
+export const ExamplesDescribed: Story = {
+  name: 'The examples, each described, with Open',
+  args: { ...FormWithExamples.args, examples: 'varied', opens: true, describes: true },
+  play: async ({ canvasElement }) => {
+    const dialog = within(await openExamples(canvasElement));
+    await expect(
+      await dialog.findByRole('button', { name: 'Paris office 1 rue de la Paix, Paris, France' }),
+    ).toBeVisible();
+    const misfit = dialog.getByRole('button', {
+      name: /^Scanned invoice\s+Needs new inputs: Address$/,
+    });
+    await expect(misfit.querySelector('[data-misfit]')).toBeVisible();
+    await userEvent.click(dialog.getByRole('button', { name: S.exampleActions('Paris office') }));
+    const menu = await within(canvasElement.ownerDocument.body).findByRole('menu');
+    await expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual([S.openExample, S.renameExample, S.deleteExample]);
+  },
+};
+
+/**
+ * **Opening an example.** Open closes the list and gives focus back to "Fill
+ * with an example", then hands the example to the host, whose own panel shows
+ * it under the form. The panel's "Fill the form" calls the fill the form
+ * handed over, which fills the form as choosing the row does.
+ */
+export const OpenAnExample: Story = {
+  name: 'Open an example',
+  args: { ...ExamplesDescribed.args },
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = within(await openExamples(canvasElement));
+    await userEvent.click(
+      await dialog.findByRole('button', { name: S.exampleActions('Berlin office') }),
+    );
+    await userEvent.click(await body.findByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    const demo = pane(canvasElement);
+    await expect(await demo.findByText('Opened: Berlin office')).toBeVisible();
+    await expect(demo.getByRole('button', { name: S.fillWithExample })).toHaveFocus();
+    await userEvent.click(demo.getByRole('button', { name: 'Fill the form' }));
+    await waitFor(() => expect(demo.getByLabelText('Street')).toHaveValue('Unter den Linden 5'));
+    await expect(demo.getByLabelText('City')).toHaveValue('Berlin');
+  },
+};
+
+/**
+ * The described list holds its widths: the warehouse's long line wraps inside
+ * its row, an access code no space breaks included, and neither the line, the
+ * row nor the page scrolls sideways.
+ */
+async function expectDescribedRowsFit(canvasElement: HTMLElement) {
+  const dialog = await openExamples(canvasElement);
+  const row = await within(dialog).findByRole('button', { name: /^Lyon warehouse\s/ });
+  const line = row.querySelector<HTMLElement>('[data-slot="example-row-detail"]');
+  if (!line) throw new Error('The warehouse row has no line under its name');
+  await expect(line.scrollWidth).toBeLessThanOrEqual(line.clientWidth);
+  await expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+  await expect(line.getBoundingClientRect().right).toBeLessThanOrEqual(
+    row.getBoundingClientRect().right,
+  );
+  // Wrapped, rather than cut: at least two lines of 13px type.
+  await expect(line.getBoundingClientRect().height).toBeGreaterThanOrEqual(26);
+  await expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+  await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+    window.innerWidth,
+  );
+}
+
+/** **Described rows on a phone**: a long line wraps inside the bottom sheet's rows. */
+export const ExamplesDescribedOnAPhone: Story = {
+  name: 'The examples, described, phone',
+  ...pinnedTo('phone'),
+  args: { ...ExamplesDescribed.args },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectDescribedRowsFit(canvasElement);
+  },
+};
+
+/** **Described rows on a desktop**: the same, in the dialog at most 560px wide. */
+export const ExamplesDescribedOnADesktop: Story = {
+  name: 'The examples, described, desktop',
+  ...pinnedTo('desktop'),
+  args: { ...ExamplesDescribed.args },
+  play: async ({ canvasElement }) => {
+    await atWidth('desktop');
+    await expectDescribedRowsFit(canvasElement);
   },
 };

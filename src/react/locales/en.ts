@@ -170,6 +170,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
     `Filling the form with “${name}” replaces every value in it.`,
   replaceEnteredConfirm: 'Replace',
   exampleActions: (name) => `Actions for ${name}`,
+  openExample: 'Open',
   renameExample: 'Rename',
   deleteExample: 'Delete',
   renameExampleTitle: 'Rename the example',

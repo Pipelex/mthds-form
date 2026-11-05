@@ -2,11 +2,12 @@
  * The example source seam, through the whole form: "Fill with an example"
  * offered when the host gives a source and only then, an untouched form filled
  * at once, an edited one asked "Replace what you entered?" first, filling
- * never starting a run, the row menu's rename and delete, and every state of
- * the examples list.
+ * never starting a run, the row menu's open, rename and delete, the line a
+ * host draws under a row's name, and every state of the examples list.
  */
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { beforeAll, describe, expect, it, vi, type Mock } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
 // drags the gate and ajv into a suite that tests the control set.
@@ -14,7 +15,8 @@ import { getPipeIOContract } from '../../core/contracts';
 import { getPipeInputForm } from '../../core/derive';
 import type { ExampleSource, ExampleSourcePage, FormExample } from '../../core/sources';
 import { buildRunFields } from '../../core/derive';
-import { apiInputsFromRunValues } from '../../core/values';
+import { apiInputsFromRunValues, runValuesFromInputs } from '../../core/values';
+import { FillWithExample, type ExamplePickerSource } from '../example-fill';
 import { MethodForm, useMethodForm, type UseMethodFormOptions } from '../method-form';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/structured';
@@ -317,6 +319,448 @@ describe('the row menu', () => {
     await user.click(within(question).getByRole('button', { name: S.deleteExample }));
     expect(await within(question).findByRole('alert')).toHaveTextContent(S.deleteFailed);
     expect(within(question).getByRole('button', { name: S.tryAgain })).toBeInTheDocument();
+  });
+});
+
+/** Opens the list and the menu of the row named `name`, and answers the menu. */
+const openRowMenu = async (user: ReturnType<typeof userEvent.setup>, name = 'Paris office') => {
+  const dialog = await openExamples(user);
+  await user.click(await within(dialog).findByRole('button', { name: S.exampleActions(name) }));
+  return screen.findByRole('menu');
+};
+const menuItems = () => screen.getAllByRole('menuitem').map((item) => item.textContent);
+
+/** Chooses Open on the row named `name`, and waits for the host to be handed its example. */
+const openFromMenu = async (
+  user: ReturnType<typeof userEvent.setup>,
+  open: Mock,
+  name = 'Paris office',
+) => {
+  await openRowMenu(user, name);
+  await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+  await waitFor(() => expect(open).toHaveBeenCalled());
+};
+
+/** The `fill` the host was last handed with an example. */
+const fillOf = (open: Mock): (() => void) => {
+  const call = open.mock.calls.at(-1);
+  if (!call) throw new Error('open was never called');
+  return call[1] as () => void;
+};
+
+describe('opening an example', () => {
+  const manage = {
+    rename: async (example: FormExample, name: string) => ({ ...example, name }),
+    delete: async () => undefined,
+  };
+
+  it('is offered only when the host gives open, and first, before Rename and Delete', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<Harness exampleSource={sourceOf([PARIS], manage)} />);
+    await openRowMenu(user);
+    expect(menuItems()).toEqual([S.renameExample, S.deleteExample]);
+    unmount();
+
+    render(<Harness exampleSource={sourceOf([PARIS], { ...manage, open: vi.fn() })} />);
+    await openRowMenu(user);
+    expect(menuItems()).toEqual([S.openExample, S.renameExample, S.deleteExample]);
+  });
+
+  it('gives a source with open alone a row menu holding Open alone', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS], { open: vi.fn() })} />);
+    await openRowMenu(user);
+    expect(menuItems()).toEqual([S.openExample]);
+  });
+
+  it('closes the list, gives focus back to "Fill with an example", then calls open once', async () => {
+    const user = userEvent.setup();
+    let focusedWhenOpened: Element | null = null;
+    let listWhenOpened: HTMLElement | null = null;
+    const open = vi.fn(() => {
+      focusedWhenOpened = document.activeElement;
+      listWhenOpened = screen.queryByRole('dialog');
+    });
+    render(<Harness exampleSource={sourceOf([PARIS, LYON], { open })} />);
+    await openFromMenu(user, open);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(PARIS, expect.any(Function));
+    expect(listWhenOpened).toBeNull();
+    expect(focusedWhenOpened).toBe(screen.getByRole('button', { name: S.fillWithExample }));
+    // Opening fills nothing by itself.
+    expect(state().values).toEqual({});
+    // Nothing calls it again afterwards, nor as the list opens and closes again.
+    await openExamples(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands over a fill that fills the form, as choosing the row does', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    const onRun = vi.fn();
+    render(<Harness exampleSource={sourceOf([PARIS], { open })} onRun={onRun} />);
+    await openFromMenu(user, open);
+    act(() => fillOf(open)());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByLabelText('city')).toHaveValue('Paris');
+    expect(state().values).toEqual({
+      address: { street: '1 rue de la Paix', city: 'Paris', country: undefined },
+    });
+    expect(state().touched).toBe(false);
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('asks before the fill replaces what the person entered, then gives focus back to the control', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    render(<Harness exampleSource={sourceOf([PARIS], { open })} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    await openFromMenu(user, open);
+    act(() => fillOf(open)());
+    const question = await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+    expect(screen.getByLabelText('street')).toHaveValue('9 quai Voltaire');
+    await user.click(within(question).getByRole('button', { name: S.replaceEnteredConfirm }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByLabelText('street')).toHaveValue('1 rue de la Paix');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: S.fillWithExample })).toHaveFocus(),
+    );
+  });
+
+  it('reads the example against the fields as they are when the fill is called', async () => {
+    const user = userEvent.setup();
+    const flatFields = buildRunFields(FLAT.descriptor, FLAT.contract.inputs);
+    const fileContract = getPipeIOContract(FILE_CONTRACTS, 'files', 'one_document');
+    const fileDescriptor = getPipeInputForm(FILE_INPUT_FORM, 'files', 'one_document');
+    if (!fileContract || !fileDescriptor) throw new Error('No fixture for files.one_document');
+    const otherFields = buildRunFields(fileDescriptor, fileContract.inputs);
+    const open = vi.fn();
+    const onFill = vi.fn();
+    const source = sourceOf([PARIS], { open });
+    const { rerender } = render(
+      <FillWithExample source={source} fields={flatFields} touched={false} onFill={onFill} />,
+    );
+    await openFromMenu(user, open);
+    rerender(
+      <FillWithExample source={source} fields={otherFields} touched={false} onFill={onFill} />,
+    );
+    act(() => fillOf(open)());
+    expect(onFill).toHaveBeenCalledTimes(1);
+    expect(onFill).toHaveBeenCalledWith(runValuesFromInputs(PARIS.inputs, otherFields), PARIS);
+    expect(onFill.mock.calls[0]?.[0]).not.toHaveProperty('address');
+  });
+
+  it('hands over a fill that does nothing while the form is held shut', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    const source = sourceOf([PARIS], { open });
+    const { rerender } = render(<Harness exampleSource={source} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    await openFromMenu(user, open);
+    rerender(<Harness exampleSource={source} disabled />);
+    act(() => fillOf(open)());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+
+    // Opened again, the form now held open, the same fill fills as asked.
+    rerender(<Harness exampleSource={source} />);
+    act(() => fillOf(open)());
+    expect(await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle })).toBeVisible();
+  });
+
+  it('hands over a fill that does nothing once the control is gone', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    const onFill = vi.fn();
+    const fields = buildRunFields(FLAT.descriptor, FLAT.contract.inputs);
+    const { unmount } = render(
+      <FillWithExample
+        source={sourceOf([PARIS], { open })}
+        fields={fields}
+        touched={false}
+        onFill={onFill}
+      />,
+    );
+    await openFromMenu(user, open);
+    unmount();
+    fillOf(open)();
+    expect(onFill).not.toHaveBeenCalled();
+  });
+});
+
+describe('a fill the host kept, once hideWhenEmpty has taken the control', () => {
+  /**
+   * A host whose only example is deleted elsewhere while the person opens it:
+   * the read that follows the list's close finds none, and the control leaves
+   * while staying mounted. `hideWhenEmpty` is the host's to change later, as
+   * it does for a person who becomes allowed to save examples.
+   */
+  const hostLosingItsExample = () => {
+    let examples: FormExample[] = [PARIS];
+    const open = vi.fn();
+    const list = vi.fn(async () => ({ examples }));
+    return {
+      open,
+      source: (hideWhenEmpty: boolean): ExampleSource => ({ list, open, hideWhenEmpty }),
+      deleteElsewhere: () => {
+        examples = [];
+      },
+    };
+  };
+  const controlGone = () =>
+    waitFor(() => expect(screen.queryByRole('button', { name: S.fillWithExample })).toBeNull());
+
+  it('fills nothing in an untouched form', async () => {
+    const user = userEvent.setup();
+    const host = hostLosingItsExample();
+    render(<Harness exampleSource={host.source(true)} />);
+    await openRowMenu(user);
+    host.deleteElsewhere();
+    await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(host.open).toHaveBeenCalled());
+    await controlGone();
+    act(() => fillOf(host.open)());
+    expect(state().values).toEqual({});
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('asks nothing over a touched form, then or when the control is drawn again', async () => {
+    const user = userEvent.setup();
+    const host = hostLosingItsExample();
+    const { rerender } = render(<Harness exampleSource={host.source(true)} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    await openRowMenu(user);
+    host.deleteElsewhere();
+    await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(host.open).toHaveBeenCalled());
+    await controlGone();
+    act(() => fillOf(host.open)());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    // Drawn again without a remount: no question comes back unasked.
+    rerender(<Harness exampleSource={host.source(false)} />);
+    expect(await screen.findByRole('button', { name: S.fillWithExample })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+  });
+
+  it('takes a question the fill already asked with it, and does not bring it back', async () => {
+    const user = userEvent.setup();
+    const host = hostLosingItsExample();
+    const { rerender } = render(<Harness exampleSource={host.source(false)} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    await openRowMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(host.open).toHaveBeenCalled());
+    act(() => fillOf(host.open)());
+    await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+
+    host.deleteElsewhere();
+    rerender(<Harness exampleSource={host.source(true)} />);
+    await controlGone();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    rerender(<Harness exampleSource={host.source(false)} />);
+    expect(await screen.findByRole('button', { name: S.fillWithExample })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+  });
+});
+
+describe('a source typed over the host’s own example', () => {
+  /** A host's own example, carrying the revision its inputs were listed at. */
+  type RevisedExample = FormExample & { inputRevision: number };
+
+  it('compiles with every handler taking that type, and hands each the row as listed', async () => {
+    const user = userEvent.setup();
+    const listed: RevisedExample = { ...PARIS, inputRevision: 3 };
+    const opened: number[] = [];
+    // The type checker is half of this test: each handler takes the host's own
+    // example, which a method's parameter accepts and a function-typed
+    // property would refuse under `strictFunctionTypes`.
+    const source: ExamplePickerSource = {
+      list: async () => ({ examples: [listed] }),
+      open: (example: RevisedExample, fill) => {
+        opened.push(example.inputRevision);
+        fill();
+      },
+      rename: async (example: RevisedExample, name) => ({ ...example, name }),
+      delete: async (example: RevisedExample) => {
+        opened.push(-example.inputRevision);
+      },
+      renderDetail: (example: RevisedExample) => `Revision ${example.inputRevision}`,
+    };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    await within(dialog).findByRole('button', { name: 'Paris office Revision 3' });
+    await user.click(
+      within(dialog).getByRole('button', { name: S.exampleActions('Paris office') }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(opened).toEqual([3]));
+    expect(screen.getByLabelText('city')).toHaveValue('Paris');
+  });
+});
+
+describe('a source written as a class', () => {
+  /**
+   * A host's examples kept on an instance, whose methods read it through
+   * `this`. A class body is strict, so a method called off its instance finds
+   * `this` undefined and throws: a rename or a delete would then show its
+   * failure, and an open would never reach the instance.
+   */
+  class TeamExamples implements ExampleSource {
+    private examples: FormExample[] = [PARIS, LYON];
+    readonly calls: string[] = [];
+
+    async list(): Promise<ExampleSourcePage> {
+      return { examples: this.examples };
+    }
+    open(example: FormExample, fill: () => void): void {
+      this.calls.push(`open ${example.name}`);
+      fill();
+    }
+    async rename(example: FormExample, name: string): Promise<FormExample> {
+      this.calls.push(`rename ${example.name}`);
+      const renamed = { ...example, name };
+      this.examples = this.examples.map((item) => (item.id === example.id ? renamed : item));
+      return renamed;
+    }
+    async delete(example: FormExample): Promise<void> {
+      this.calls.push(`delete ${example.name}`);
+      this.examples = this.examples.filter((item) => item.id !== example.id);
+    }
+  }
+
+  it('calls open, rename and delete on the source, so each reaches the instance', async () => {
+    const user = userEvent.setup();
+    const source = new TeamExamples();
+    render(<Harness exampleSource={source} />);
+
+    await openRowMenu(user, 'Paris office');
+    await user.click(screen.getByRole('menuitem', { name: S.renameExample }));
+    const renaming = await screen.findByRole('dialog', { name: S.renameExampleTitle });
+    const field = within(renaming).getByLabelText(S.exampleName);
+    await user.clear(field);
+    await user.type(field, 'Head office{Enter}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: S.renameExampleTitle })).toBeNull(),
+    );
+    const dialog = screen.getByRole('dialog', { name: S.examplesTitle });
+    expect(within(dialog).getByRole('button', { name: 'Head office' })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: S.exampleActions('Lyon office') }));
+    await user.click(await screen.findByRole('menuitem', { name: S.deleteExample }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: S.deleteExample,
+      }),
+    );
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('button', { name: 'Lyon office' })).toBeNull(),
+    );
+
+    await user.click(within(dialog).getByRole('button', { name: S.exampleActions('Head office') }));
+    await user.click(await screen.findByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(source.calls).toContain('open Head office'));
+    expect(source.calls).toEqual(['rename Paris office', 'delete Lyon office', 'open Head office']);
+    // The instance's `open` called the fill it was handed, which filled the form.
+    await waitFor(() => expect(screen.getByLabelText('city')).toHaveValue('Paris'));
+  });
+});
+
+describe('the line under a row’s name', () => {
+  /** A host's own example, carrying the words its rows are described in. */
+  type HostExample = FormExample & { summary: string };
+
+  it('draws renderDetail under the name, inside the row, and reads it with the row', async () => {
+    const user = userEvent.setup();
+    const examples: HostExample[] = [
+      { ...PARIS, summary: '1 rue de la Paix, Paris' },
+      { ...LYON, summary: '' },
+    ];
+    // Typed over the host's own example, which a method's parameter allows.
+    const renderDetail = vi.fn((example: HostExample) => <span>{example.summary}</span>);
+    const source: ExamplePickerSource = { list: async () => ({ examples }), renderDetail };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    const row = await within(dialog).findByRole('button', {
+      name: 'Paris office 1 rue de la Paix, Paris',
+    });
+    const detail = row.querySelector('[data-slot="example-row-detail"]');
+    expect(detail).toHaveTextContent('1 rue de la Paix, Paris');
+    // Under the name: the name first, then the line.
+    expect(row.textContent).toMatch(/^Paris office\s*1 rue de la Paix, Paris$/);
+    expect(renderDetail).toHaveBeenCalledWith(
+      examples[0],
+      expect.arrayContaining([expect.objectContaining({ name: 'address' })]),
+    );
+    // Its menu is still named by the example alone, and choosing it still fills.
+    await user.click(row);
+    expect(screen.getByLabelText('city')).toHaveValue('Paris');
+  });
+
+  it('keeps a row its renderDetail draws nothing for to the one line of its name', async () => {
+    const user = userEvent.setup();
+    const answers = [null, undefined, false, true, ''];
+    const examples = answers.map((_, index) => ({
+      ...PARIS,
+      id: `ex_${index}`,
+      name: `Row ${index}`,
+    }));
+    const source: ExamplePickerSource = {
+      list: async () => ({ examples }),
+      renderDetail: (example) => answers[Number(example.id.slice(3))],
+    };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    for (const example of examples) {
+      const row = await within(dialog).findByRole('button', { name: example.name });
+      expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
+      expect(row.textContent).toBe(example.name);
+    }
+  });
+
+  it('treats an array that draws nothing as nothing, and draws one that holds something', async () => {
+    const user = userEvent.setup();
+    // What a host's `.map()` over an example's files returns: none at all,
+    // only nothing, nothing nested, and, for the last row, a file's name.
+    const details: Record<string, ReactNode> = {
+      ex_a: [],
+      ex_b: [null, false],
+      ex_c: [[''], [undefined, true]],
+      ex_d: [null, 'INV-2291.pdf'],
+    };
+    const examples = Object.keys(details).map((id) => ({ ...PARIS, id, name: `Row ${id}` }));
+    const source: ExamplePickerSource = {
+      list: async () => ({ examples }),
+      renderDetail: (example) => details[example.id],
+    };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    for (const name of ['Row ex_a', 'Row ex_b', 'Row ex_c']) {
+      const row = await within(dialog).findByRole('button', { name });
+      expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
+      expect(row.textContent).toBe(name);
+    }
+    const drawn = within(dialog).getByRole('button', { name: 'Row ex_d INV-2291.pdf' });
+    expect(drawn.querySelector('[data-slot="example-row-detail"]')).toHaveTextContent(
+      'INV-2291.pdf',
+    );
+  });
+
+  it('leaves a row as it was without renderDetail', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS])} />);
+    const dialog = await openExamples(user);
+    const row = await within(dialog).findByRole('button', { name: 'Paris office' });
+    expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
+    expect(row.textContent).toBe('Paris office');
   });
 });
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.28.0] - 2026-11-05
+
+### Added
+
+- **An example opens in the host's own surface**: `ExampleSource.open(example, fill)` is a capability like `rename` and `delete`; given, each row's menu offers Open first, then Rename and Delete, and a source with `open` alone still has a menu. Choosing Open closes the list and gives focus back to "Fill with an example", then calls `open` once, so a dialog the host opens there returns focus to the control as it closes. `fill` is the row's own choice of that example, made when the host calls it: the example's inputs are read back against the form's fields as they are at that moment, "Replace what you entered?" is asked first over the person's own values, it fills through `onFill` as a row's choice does, and it does nothing while the form is held shut or once the control is gone, `hideWhenEmpty` having taken it away included. See [docs/sources.md](docs/sources.md#the-examples-list).
+- **A host draws a line under an example's name**: `ExamplePickerSource`, exported from `./react`, is an `ExampleSource` with an optional `renderDetail(example, fields)`, whose return is drawn under the row's name inside its button, so it is read with the name as the row's accessible name; it wraps within the row and never widens it, and a return React draws nothing for, an array of nothing included, leaves the row the one line of its name. `useMethodForm`'s `exampleSource` and `FillWithExample`'s `source` take one, and every `ExampleSource` is one. See [docs/sources.md](docs/sources.md#the-examples-list).
+
+### Changed
+
+- **`FieldStrings` gains the row menu's Open (Breaking)**: `openExample`, "Open" in English and "Ouvrir" in French; a host that supplies a complete `FieldStrings` rather than a partial override adds it. See [docs/i18n.md](docs/i18n.md).
+
+### Fixed
+
+- **An example source typed over the host's own example, or written as a class, works**: `ExampleSource`'s `rename` and `delete` are declared as optional methods, as `open` is, so a source whose handlers take the host's own example type, the type its `list` answers with, now compiles under `strictFunctionTypes`, where it used to fail with TS2322, and the control calls each on its source, so a source written as a class keeps `this`; a source that compiled before still does. See [docs/sources.md](docs/sources.md#the-example-source).
+- **A host's glyph that is an array of nothing falls back**: a `renderGlyph` that returns an array React draws nothing for, `[]` or one holding only `null`, booleans, empty strings or such arrays, as a host's `.map()` over an empty list does, now keeps the kernel's outline where it used to leave an empty glyph slot. See [docs/sources.md](docs/sources.md#a-row-in-the-hosts-words-and-glyph).
+
 ## [v0.27.0] - 2026-11-02
 
 ### Added

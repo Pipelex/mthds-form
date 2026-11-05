@@ -1,13 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import type {
-  ExampleSource,
-  PipeIOContract,
-  PipeInputFormDescriptor,
-  Readiness,
-  RunField,
-} from '../core';
+import type { PipeIOContract, PipeInputFormDescriptor, Readiness, RunField } from '../core';
 import { buildRunFields } from '../core/derive';
 import { ownProp } from '../core/own-property';
 import {
@@ -22,7 +16,7 @@ import {
 } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures, seedInputs } from '../core/seed';
 import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/values';
-import { FillWithExample } from './example-fill';
+import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { UploadedFile } from './file-field';
 import type { FilePickerSource } from './file-picker';
@@ -112,9 +106,11 @@ export interface UseMethodFormOptions {
    * Where the form can take a saved example of the method. When given,
    * `MethodForm` offers "Fill with an example" above the fields, which sets
    * every value at once (as `reset` does) and never starts a run; a touched
-   * form asks before it replaces what was entered. See docs/sources.md.
+   * form asks before it replaces what was entered. Its `open`, when given,
+   * hands a row's example to the host's own surface, and its `renderDetail`
+   * draws a line under each row's name. See docs/sources.md.
    */
-  exampleSource?: ExampleSource;
+  exampleSource?: ExamplePickerSource;
 }
 
 /** What the form says to its consumer: the values, the run inputs, the gate. */
@@ -236,7 +232,7 @@ export interface MethodFormController extends MethodFormState {
   /** The host's file source, which `MethodForm` hands its file fields. */
   fileSource: FilePickerSource | undefined;
   /** The host's example source, which `MethodForm` offers above the fields. */
-  exampleSource: ExampleSource | undefined;
+  exampleSource: ExamplePickerSource | undefined;
 }
 
 const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
