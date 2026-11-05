@@ -148,7 +148,8 @@ export interface ExampleSource {
    * `fill` is the row's own choice of that example, made when it is called:
    * the example's inputs read back against the form's fields as they are at
    * that moment, "Replace what you entered?" asked first when the form holds
-   * the person's own values, and nothing at all while the form is held shut.
+   * the person's own values, and nothing at all while the form is held shut
+   * or once the control is gone, `hideWhenEmpty` having taken it away included.
    * It fills through the same path a row's choice does, so a host's "Fill the
    * form" calls it rather than setting the values itself. It may be called
    * any number of times, or never.

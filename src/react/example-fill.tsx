@@ -199,6 +199,17 @@ export function FillWithExample({
     setDeleting(null);
   }
 
+  // Under `hideWhenEmpty` the control leaves while the method is known to have
+  // no example, and stays mounted drawing nothing. What it held goes with it:
+  // a question asked by a `fill` the host kept, which would otherwise come
+  // back unasked when the control is drawn again, and that `fill` itself.
+  const hidden = source.hideWhenEmpty === true && !open && (answer ?? hasExamples) !== true;
+  if (hidden && (replacing || renaming || deleting)) {
+    setReplacing(null);
+    setRenaming(null);
+    setDeleting(null);
+  }
+
   const closeList = () => {
     // The list just read is the freshest answer there is: a list read to its
     // end with nothing left (its last example deleted) takes the control away
@@ -228,15 +239,15 @@ export function FillWithExample({
     else fill(example);
   };
   // Each render's choice becomes the one a `fill` handed to the host makes;
-  // once the control is gone, a `fill` the host kept does nothing.
+  // while the control is hidden, and once it is gone, that `fill` does nothing.
   useEffect(() => {
-    latestChoice.current = choose;
+    latestChoice.current = hidden ? () => undefined : choose;
     return () => {
       latestChoice.current = () => undefined;
     };
   });
 
-  if (source.hideWhenEmpty && !open && (answer ?? hasExamples) !== true) return null;
+  if (hidden) return null;
 
   const manages =
     source.open !== undefined || source.rename !== undefined || source.delete !== undefined;

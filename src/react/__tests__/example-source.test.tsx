@@ -490,6 +490,87 @@ describe('opening an example', () => {
   });
 });
 
+describe('a fill the host kept, once hideWhenEmpty has taken the control', () => {
+  /**
+   * A host whose only example is deleted elsewhere while the person opens it:
+   * the read that follows the list's close finds none, and the control leaves
+   * while staying mounted. `hideWhenEmpty` is the host's to change later, as
+   * it does for a person who becomes allowed to save examples.
+   */
+  const hostLosingItsExample = () => {
+    let examples: FormExample[] = [PARIS];
+    const open = vi.fn();
+    const list = vi.fn(async () => ({ examples }));
+    return {
+      open,
+      source: (hideWhenEmpty: boolean): ExampleSource => ({ list, open, hideWhenEmpty }),
+      deleteElsewhere: () => {
+        examples = [];
+      },
+    };
+  };
+  const controlGone = () =>
+    waitFor(() => expect(screen.queryByRole('button', { name: S.fillWithExample })).toBeNull());
+
+  it('fills nothing in an untouched form', async () => {
+    const user = userEvent.setup();
+    const host = hostLosingItsExample();
+    render(<Harness exampleSource={host.source(true)} />);
+    await openRowMenu(user);
+    host.deleteElsewhere();
+    await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(host.open).toHaveBeenCalled());
+    await controlGone();
+    act(() => fillOf(host.open)());
+    expect(state().values).toEqual({});
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('asks nothing over a touched form, then or when the control is drawn again', async () => {
+    const user = userEvent.setup();
+    const host = hostLosingItsExample();
+    const { rerender } = render(<Harness exampleSource={host.source(true)} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    await openRowMenu(user);
+    host.deleteElsewhere();
+    await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(host.open).toHaveBeenCalled());
+    await controlGone();
+    act(() => fillOf(host.open)());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    // Drawn again without a remount: no question comes back unasked.
+    rerender(<Harness exampleSource={host.source(false)} />);
+    expect(await screen.findByRole('button', { name: S.fillWithExample })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+  });
+
+  it('takes a question the fill already asked with it, and does not bring it back', async () => {
+    const user = userEvent.setup();
+    const host = hostLosingItsExample();
+    const { rerender } = render(<Harness exampleSource={host.source(false)} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    await openRowMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+    await waitFor(() => expect(host.open).toHaveBeenCalled());
+    act(() => fillOf(host.open)());
+    await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+
+    host.deleteElsewhere();
+    rerender(<Harness exampleSource={host.source(true)} />);
+    await controlGone();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    rerender(<Harness exampleSource={host.source(false)} />);
+    expect(await screen.findByRole('button', { name: S.fillWithExample })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+  });
+});
+
 describe('the line under a row’s name', () => {
   /** A host's own example, carrying the words its rows are described in. */
   type HostExample = FormExample & { summary: string };
