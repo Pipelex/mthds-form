@@ -6,6 +6,7 @@
  * through a search, every state of the list, and a row in the host's own words
  * and glyph.
  */
+import type { ReactNode } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -681,5 +682,34 @@ describe('a row in the host’s words and glyph', () => {
     const tally = within(dialog).getByRole('radio', { name: /tally\.pdf/ });
     expect(tally.querySelector('[data-slot="file-row-glyph"]')).toHaveTextContent('0');
     expect(tally.querySelector('svg.lucide-file-text')).toBeNull();
+  });
+
+  it('keeps the kernel’s glyph for an array that draws nothing, as a host’s map can return', async () => {
+    const user = userEvent.setup();
+    // What a host's `.map()` over its badges returns: none at all, only
+    // nothing, nothing nested, and, for the last row, a count React draws.
+    const glyphs: Record<string, ReactNode> = {
+      [INVOICE.id]: [],
+      [OLDER.id]: [null, false],
+      [DRAFT.id]: [[''], [undefined, true]],
+      fl_4: [null, 0],
+    };
+    const tally: SourceFile = { ...OLDER, id: 'fl_4', name: 'tally.pdf' };
+    const source: FilePickerSource = {
+      initialScope: 'everyone',
+      list: async () => ({ files: [INVOICE, OLDER, DRAFT, tally] }),
+      renderGlyph: (file) => glyphs[file.id],
+    };
+    render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
+    const dialog = await openPicker(user);
+    await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
+    for (const name of [/INV-2291\.pdf/, /INV-2288\.pdf/, /contract-acme-draft\.pdf/]) {
+      const row = within(dialog).getByRole('radio', { name });
+      expect(row.querySelector('svg.lucide-file-text')).not.toBeNull();
+      expect(row.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
+    }
+    const drawn = within(dialog).getByRole('radio', { name: /tally\.pdf/ });
+    expect(drawn.querySelector('[data-slot="file-row-glyph"]')).toHaveTextContent('0');
+    expect(drawn.querySelector('svg.lucide-file-text')).toBeNull();
   });
 });

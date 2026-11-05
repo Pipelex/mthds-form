@@ -5,6 +5,7 @@
  * never starting a run, the row menu's open, rename and delete, the line a
  * host draws under a row's name, and every state of the examples list.
  */
+import type { ReactNode } from 'react';
 import { beforeAll, describe, expect, it, vi, type Mock } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -723,6 +724,34 @@ describe('the line under a row’s name', () => {
       expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
       expect(row.textContent).toBe(example.name);
     }
+  });
+
+  it('treats an array that draws nothing as nothing, and draws one that holds something', async () => {
+    const user = userEvent.setup();
+    // What a host's `.map()` over an example's files returns: none at all,
+    // only nothing, nothing nested, and, for the last row, a file's name.
+    const details: Record<string, ReactNode> = {
+      ex_a: [],
+      ex_b: [null, false],
+      ex_c: [[''], [undefined, true]],
+      ex_d: [null, 'INV-2291.pdf'],
+    };
+    const examples = Object.keys(details).map((id) => ({ ...PARIS, id, name: `Row ${id}` }));
+    const source: ExamplePickerSource = {
+      list: async () => ({ examples }),
+      renderDetail: (example) => details[example.id],
+    };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    for (const name of ['Row ex_a', 'Row ex_b', 'Row ex_c']) {
+      const row = await within(dialog).findByRole('button', { name });
+      expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
+      expect(row.textContent).toBe(name);
+    }
+    const drawn = within(dialog).getByRole('button', { name: 'Row ex_d INV-2291.pdf' });
+    expect(drawn.querySelector('[data-slot="example-row-detail"]')).toHaveTextContent(
+      'INV-2291.pdf',
+    );
   });
 
   it('leaves a row as it was without renderDetail', async () => {

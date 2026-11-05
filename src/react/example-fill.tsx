@@ -68,7 +68,8 @@ export interface ExamplePickerSource extends ExampleSource {
    * in it: text, a `<span>`, a decorative icon. It wraps within the row and
    * never widens it; a host wanting one line truncates its own element. A row
    * it returns what React renders nothing for stays the one line of its name:
-   * `null`, `undefined`, `true`, `false` or `''`. It is declared as a method,
+   * `null`, `undefined`, `true`, `false` or `''`, or an array of nothing but
+   * those, an empty one included. It is declared as a method,
    * as `FilePickerSource.renderGlyph` is, so a source whose `renderDetail`
    * takes the host's own example type, the type its `list` answers with, is
    * still accepted.
