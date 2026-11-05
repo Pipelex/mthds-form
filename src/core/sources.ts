@@ -13,8 +13,9 @@
  * answers with, and the rules that write an answer into a value are tested in
  * node. No React, no fetch. What a row SAYS is data here (`SourceFile`'s
  * `typeLabel` and `origin` are the host's words); how a row DRAWS is a
- * rendering, so the glyph a host draws on a row is `./react`'s
- * (`FilePickerSource.renderGlyph`), never a field of these shapes.
+ * rendering, so the glyph a host draws on a file's row and the line it draws
+ * under an example's name are `./react`'s (`FilePickerSource.renderGlyph`,
+ * `ExamplePickerSource.renderDetail`), never a field of these shapes.
  */
 
 /** Whose files a file source lists: the person's own, or the whole team's. */
@@ -130,13 +131,29 @@ export interface ExampleSourcePage {
 
 /**
  * Where a form can take a whole set of values. When a form has one, it offers
- * "Fill with an example". `rename` and `delete` are capabilities: each is
- * offered on a row's menu only when given, so a host gives them only to a
- * person allowed to change examples.
+ * "Fill with an example". `open`, `rename` and `delete` are capabilities: each
+ * is offered on a row's menu only when given, Open first, so a host gives each
+ * only to a person it is for, and `rename` and `delete` only to a person
+ * allowed to change examples. A source with any one of them has a row menu.
  */
 export interface ExampleSource {
   /** Lists one page of the method's examples. Rejecting shows the failure with Try again. */
   list: (query: ExampleSourceQuery) => Promise<ExampleSourcePage>;
+  /**
+   * Opens an example in the host's own surface, to show what it holds and
+   * what it produced. Choosing Open closes the list and gives focus back to
+   * "Fill with an example", then calls `open` once, so a surface the host
+   * opens over the form from there returns focus there as it closes.
+   *
+   * `fill` is the row's own choice of that example, made when it is called:
+   * the example's inputs read back against the form's fields as they are at
+   * that moment, "Replace what you entered?" asked first when the form holds
+   * the person's own values, and nothing at all while the form is held shut.
+   * It fills through the same path a row's choice does, so a host's "Fill the
+   * form" calls it rather than setting the values itself. It may be called
+   * any number of times, or never.
+   */
+  open?: (example: FormExample, fill: () => void) => void;
   /**
    * Renames an example. Resolving to the example as stored replaces the row;
    * resolving to nothing keeps the row under the new name.

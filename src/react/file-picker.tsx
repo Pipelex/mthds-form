@@ -28,6 +28,7 @@ import { useFieldStrings, type FieldStrings } from './field-strings';
 import { focusOutlineClass, focusOutlineInsetClass, selectedCheckedFillClass } from './role-tokens';
 import {
   DimRows,
+  drawsNothing,
   ListAction,
   ListMessage,
   MoreFooter,
@@ -533,17 +534,6 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
     if (!Number.isNaN(date.getTime())) parts.push(s.fileDate(date));
   }
   return parts.join(' · ');
-}
-
-/**
- * Whether a host's glyph draws nothing, by React's own rule: React renders
- * nothing for `null`, `undefined`, a boolean or an empty string, so a row given
- * one keeps the kernel's outline rather than an empty slot. A number, `0`
- * included, is not here, because React renders it as text, and drawing what
- * React draws keeps a host's glyph meaning in the row what it means anywhere.
- */
-function drawsNothing(glyph: ReactNode): boolean {
-  return glyph === null || glyph === undefined || typeof glyph === 'boolean' || glyph === '';
 }
 
 /**

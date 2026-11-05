@@ -2,11 +2,11 @@
  * The example source seam, through the whole form: "Fill with an example"
  * offered when the host gives a source and only then, an untouched form filled
  * at once, an edited one asked "Replace what you entered?" first, filling
- * never starting a run, the row menu's rename and delete, and every state of
- * the examples list.
+ * never starting a run, the row menu's open, rename and delete, the line a
+ * host draws under a row's name, and every state of the examples list.
  */
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi, type Mock } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
 // drags the gate and ajv into a suite that tests the control set.
@@ -14,7 +14,8 @@ import { getPipeIOContract } from '../../core/contracts';
 import { getPipeInputForm } from '../../core/derive';
 import type { ExampleSource, ExampleSourcePage, FormExample } from '../../core/sources';
 import { buildRunFields } from '../../core/derive';
-import { apiInputsFromRunValues } from '../../core/values';
+import { apiInputsFromRunValues, runValuesFromInputs } from '../../core/values';
+import { FillWithExample, type ExamplePickerSource } from '../example-fill';
 import { MethodForm, useMethodForm, type UseMethodFormOptions } from '../method-form';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/structured';
@@ -317,6 +318,237 @@ describe('the row menu', () => {
     await user.click(within(question).getByRole('button', { name: S.deleteExample }));
     expect(await within(question).findByRole('alert')).toHaveTextContent(S.deleteFailed);
     expect(within(question).getByRole('button', { name: S.tryAgain })).toBeInTheDocument();
+  });
+});
+
+/** Opens the list and the menu of the row named `name`, and answers the menu. */
+const openRowMenu = async (user: ReturnType<typeof userEvent.setup>, name = 'Paris office') => {
+  const dialog = await openExamples(user);
+  await user.click(await within(dialog).findByRole('button', { name: S.exampleActions(name) }));
+  return screen.findByRole('menu');
+};
+const menuItems = () => screen.getAllByRole('menuitem').map((item) => item.textContent);
+
+/** Chooses Open on the row named `name`, and waits for the host to be handed its example. */
+const openFromMenu = async (
+  user: ReturnType<typeof userEvent.setup>,
+  open: Mock,
+  name = 'Paris office',
+) => {
+  await openRowMenu(user, name);
+  await user.click(screen.getByRole('menuitem', { name: S.openExample }));
+  await waitFor(() => expect(open).toHaveBeenCalled());
+};
+
+/** The `fill` the host was last handed with an example. */
+const fillOf = (open: Mock): (() => void) => {
+  const call = open.mock.calls.at(-1);
+  if (!call) throw new Error('open was never called');
+  return call[1] as () => void;
+};
+
+describe('opening an example', () => {
+  const manage = {
+    rename: async (example: FormExample, name: string) => ({ ...example, name }),
+    delete: async () => undefined,
+  };
+
+  it('is offered only when the host gives open, and first, before Rename and Delete', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<Harness exampleSource={sourceOf([PARIS], manage)} />);
+    await openRowMenu(user);
+    expect(menuItems()).toEqual([S.renameExample, S.deleteExample]);
+    unmount();
+
+    render(<Harness exampleSource={sourceOf([PARIS], { ...manage, open: vi.fn() })} />);
+    await openRowMenu(user);
+    expect(menuItems()).toEqual([S.openExample, S.renameExample, S.deleteExample]);
+  });
+
+  it('gives a source with open alone a row menu holding Open alone', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS], { open: vi.fn() })} />);
+    await openRowMenu(user);
+    expect(menuItems()).toEqual([S.openExample]);
+  });
+
+  it('closes the list, gives focus back to "Fill with an example", then calls open once', async () => {
+    const user = userEvent.setup();
+    let focusedWhenOpened: Element | null = null;
+    let listWhenOpened: HTMLElement | null = null;
+    const open = vi.fn(() => {
+      focusedWhenOpened = document.activeElement;
+      listWhenOpened = screen.queryByRole('dialog');
+    });
+    render(<Harness exampleSource={sourceOf([PARIS, LYON], { open })} />);
+    await openFromMenu(user, open);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(PARIS, expect.any(Function));
+    expect(listWhenOpened).toBeNull();
+    expect(focusedWhenOpened).toBe(screen.getByRole('button', { name: S.fillWithExample }));
+    // Opening fills nothing by itself.
+    expect(state().values).toEqual({});
+    // Nothing calls it again afterwards, nor as the list opens and closes again.
+    await openExamples(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands over a fill that fills the form, as choosing the row does', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    const onRun = vi.fn();
+    render(<Harness exampleSource={sourceOf([PARIS], { open })} onRun={onRun} />);
+    await openFromMenu(user, open);
+    act(() => fillOf(open)());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByLabelText('city')).toHaveValue('Paris');
+    expect(state().values).toEqual({
+      address: { street: '1 rue de la Paix', city: 'Paris', country: undefined },
+    });
+    expect(state().touched).toBe(false);
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('asks before the fill replaces what the person entered, then gives focus back to the control', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    render(<Harness exampleSource={sourceOf([PARIS], { open })} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    await openFromMenu(user, open);
+    act(() => fillOf(open)());
+    const question = await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle });
+    expect(screen.getByLabelText('street')).toHaveValue('9 quai Voltaire');
+    await user.click(within(question).getByRole('button', { name: S.replaceEnteredConfirm }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByLabelText('street')).toHaveValue('1 rue de la Paix');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: S.fillWithExample })).toHaveFocus(),
+    );
+  });
+
+  it('reads the example against the fields as they are when the fill is called', async () => {
+    const user = userEvent.setup();
+    const flatFields = buildRunFields(FLAT.descriptor, FLAT.contract.inputs);
+    const fileContract = getPipeIOContract(FILE_CONTRACTS, 'files', 'one_document');
+    const fileDescriptor = getPipeInputForm(FILE_INPUT_FORM, 'files', 'one_document');
+    if (!fileContract || !fileDescriptor) throw new Error('No fixture for files.one_document');
+    const otherFields = buildRunFields(fileDescriptor, fileContract.inputs);
+    const open = vi.fn();
+    const onFill = vi.fn();
+    const source = sourceOf([PARIS], { open });
+    const { rerender } = render(
+      <FillWithExample source={source} fields={flatFields} touched={false} onFill={onFill} />,
+    );
+    await openFromMenu(user, open);
+    rerender(
+      <FillWithExample source={source} fields={otherFields} touched={false} onFill={onFill} />,
+    );
+    act(() => fillOf(open)());
+    expect(onFill).toHaveBeenCalledTimes(1);
+    expect(onFill).toHaveBeenCalledWith(runValuesFromInputs(PARIS.inputs, otherFields), PARIS);
+    expect(onFill.mock.calls[0]?.[0]).not.toHaveProperty('address');
+  });
+
+  it('hands over a fill that does nothing while the form is held shut', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    const source = sourceOf([PARIS], { open });
+    const { rerender } = render(<Harness exampleSource={source} />);
+    await user.type(screen.getByLabelText('street'), '9 quai Voltaire');
+    const typed = state().values;
+    await openFromMenu(user, open);
+    rerender(<Harness exampleSource={source} disabled />);
+    act(() => fillOf(open)());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state().values).toEqual(typed);
+
+    // Opened again, the form now held open, the same fill fills as asked.
+    rerender(<Harness exampleSource={source} />);
+    act(() => fillOf(open)());
+    expect(await screen.findByRole('alertdialog', { name: S.replaceEnteredTitle })).toBeVisible();
+  });
+
+  it('hands over a fill that does nothing once the control is gone', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn();
+    const onFill = vi.fn();
+    const fields = buildRunFields(FLAT.descriptor, FLAT.contract.inputs);
+    const { unmount } = render(
+      <FillWithExample
+        source={sourceOf([PARIS], { open })}
+        fields={fields}
+        touched={false}
+        onFill={onFill}
+      />,
+    );
+    await openFromMenu(user, open);
+    unmount();
+    fillOf(open)();
+    expect(onFill).not.toHaveBeenCalled();
+  });
+});
+
+describe('the line under a row’s name', () => {
+  /** A host's own example, carrying the words its rows are described in. */
+  type HostExample = FormExample & { summary: string };
+
+  it('draws renderDetail under the name, inside the row, and reads it with the row', async () => {
+    const user = userEvent.setup();
+    const examples: HostExample[] = [
+      { ...PARIS, summary: '1 rue de la Paix, Paris' },
+      { ...LYON, summary: '' },
+    ];
+    // Typed over the host's own example, which a method's parameter allows.
+    const renderDetail = vi.fn((example: HostExample) => <span>{example.summary}</span>);
+    const source: ExamplePickerSource = { list: async () => ({ examples }), renderDetail };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    const row = await within(dialog).findByRole('button', {
+      name: 'Paris office 1 rue de la Paix, Paris',
+    });
+    const detail = row.querySelector('[data-slot="example-row-detail"]');
+    expect(detail).toHaveTextContent('1 rue de la Paix, Paris');
+    // Under the name: the name first, then the line.
+    expect(row.textContent).toMatch(/^Paris office\s*1 rue de la Paix, Paris$/);
+    expect(renderDetail).toHaveBeenCalledWith(
+      examples[0],
+      expect.arrayContaining([expect.objectContaining({ name: 'address' })]),
+    );
+    // Its menu is still named by the example alone, and choosing it still fills.
+    await user.click(row);
+    expect(screen.getByLabelText('city')).toHaveValue('Paris');
+  });
+
+  it('keeps a row its renderDetail draws nothing for to the one line of its name', async () => {
+    const user = userEvent.setup();
+    const answers = [null, undefined, false, true, ''];
+    const examples = answers.map((_, index) => ({
+      ...PARIS,
+      id: `ex_${index}`,
+      name: `Row ${index}`,
+    }));
+    const source: ExamplePickerSource = {
+      list: async () => ({ examples }),
+      renderDetail: (example) => answers[Number(example.id.slice(3))],
+    };
+    render(<Harness exampleSource={source} />);
+    const dialog = await openExamples(user);
+    for (const example of examples) {
+      const row = await within(dialog).findByRole('button', { name: example.name });
+      expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
+      expect(row.textContent).toBe(example.name);
+    }
+  });
+
+  it('leaves a row as it was without renderDetail', async () => {
+    const user = userEvent.setup();
+    render(<Harness exampleSource={sourceOf([PARIS])} />);
+    const dialog = await openExamples(user);
+    const row = await within(dialog).findByRole('button', { name: 'Paris office' });
+    expect(row.querySelector('[data-slot="example-row-detail"]')).toBeNull();
+    expect(row.textContent).toBe('Paris office');
   });
 });
 

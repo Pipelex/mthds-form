@@ -225,6 +225,19 @@ export function useSourcePages<T>(load: LoadSourcePage<T>, key: string | null): 
 }
 
 /**
+ * Whether what a host's renderer returned for a row draws nothing, by React's
+ * own rule: React renders nothing for `null`, `undefined`, a boolean or an
+ * empty string, so a row given one keeps what it draws without it (a file's
+ * outline, an example's one line) rather than an empty slot. A number, `0`
+ * included, is not here, because React renders it as text, and drawing what
+ * React draws keeps a host's rendering meaning in the row what it means
+ * anywhere.
+ */
+export function drawsNothing(drawn: ReactNode): boolean {
+  return drawn === null || drawn === undefined || typeof drawn === 'boolean' || drawn === '';
+}
+
+/**
  * The rows of a list still being read: static and dim, with no pulse, so a
  * wait is not drawn as motion. Hidden from assistive technology, which hears
  * the wait from the list's status line instead.

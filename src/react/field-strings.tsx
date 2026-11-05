@@ -329,6 +329,8 @@ export interface FieldStrings {
   replaceEnteredConfirm: string;
   /** The accessible name of an example row's menu, given the example's name. */
   exampleActions: (name: string) => string;
+  /** The row menu's items, in its order: Open, offered when the source opens examples, then Rename and Delete. */
+  openExample: string;
   renameExample: string;
   deleteExample: string;
   /** The rename dialog: its title, the name field's label, and its button while it works. */

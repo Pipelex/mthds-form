@@ -5,7 +5,7 @@ Beside the upload ([upload-seam.md](upload-seam.md)), a form has two more option
 - **A file source** lists files the host already stores. Every empty file field then offers "Choose from your team's files", and the file chosen is written into the field exactly as an upload's result is.
 - **An example source** lists saved examples of the method. The form then offers "Fill with an example", which sets every value at once and never starts a run.
 
-The kernel states the shapes (`src/core/sources.ts`, exported from `.` and re-exported as types from `./react`) and applies the answers; the controls are `./react`'s, and so is `FilePickerSource`, a file source with the glyph its rows draw, since a rendering has no place in the headless core. Neither knows any platform's routes, records or permissions: a host maps its own lists onto these shapes. A host that gives neither seam gets the form it had before, with nothing added.
+The kernel states the shapes (`src/core/sources.ts`, exported from `.` and re-exported as types from `./react`) and applies the answers; the controls are `./react`'s, and so are `FilePickerSource`, a file source with the glyph its rows draw, and `ExamplePickerSource`, an example source with the line its rows draw under each example's name, since a rendering has no place in the headless core. Neither knows any platform's routes, records or permissions: a host maps its own lists onto these shapes. A host that gives neither seam gets the form it had before, with nothing added.
 
 ```tsx
 import { MethodForm, useMethodForm, type ExampleSource, type FileSource } from '@pipelex/mthds-form/react';
@@ -36,6 +36,8 @@ function RunForm({ descriptor, contract, methodId, canEdit }: RunFormProps) {
       const page = await host.listExamples(methodId, { cursor }, { signal });
       return { examples: page.items, nextCursor: page.next_cursor };
     },
+    // Shows the example in the host's own surface, whose "Fill the form" calls `fill`.
+    open: canEdit ? (example, fill) => host.showExample(example, fill) : undefined,
     // Given only to a person allowed to change the method's examples.
     rename: canEdit ? (example, name) => host.renameExample(example.id, name) : undefined,
     delete: canEdit ? (example) => host.deleteExample(example.id) : undefined,
@@ -148,6 +150,7 @@ A single field is written `{ url, filename }` through its own `onChange`, the va
 ```ts
 interface ExampleSource {
   list: (query: { cursor?: string; signal: AbortSignal }) => Promise<{ examples: FormExample[]; nextCursor?: string | null }>;
+  open?: (example: FormExample, fill: () => void) => void;
   rename?: (example: FormExample, name: string) => Promise<FormExample | void>;
   delete?: (example: FormExample) => Promise<void>;
   hideWhenEmpty?: boolean;
@@ -162,13 +165,21 @@ interface FormExample {
 
 An example's `inputs` are a run's inputs: each `{ concept, content }`, an optional input left out, an empty plural input a bare `[]`, which is what `form.inputs` holds. So a host saves an example from the inputs a run was started with and hands it back as it stored it. `runValuesFromInputs(inputs, fields)` reads them back into the controls' shape; an input no field takes is ignored, and a field the example says nothing of is left empty.
 
+`ExamplePickerSource`, exported from `./react`, is the kernel's `ExampleSource` with one more optional member, `renderDetail(example, fields)`, which draws the line under a row's name (see "The examples list" below). Every `ExampleSource` is one, so a host that describes no row passes its source as it is, and `useMethodForm`'s `exampleSource` and `FillWithExample`'s `source` both take one.
+
+```ts
+interface ExamplePickerSource extends ExampleSource {
+  renderDetail?(example: FormExample, fields: readonly RunField[]): ReactNode;
+}
+```
+
 ### Filling the form
 
 A host that prefills the form itself (a past run's inputs, a value it knows) gives those values through `initialValues` or `reset`, never `setValues`: the form counts what arrives through `setValues` as the person's own work, and would ask before an example replaced it.
 
 "Fill with an example" sits above the fields and opens the examples as a sheet below 1280px and a dialog from 1280px. Choosing one fills the form and closes the list. Filling replaces every value, as `reset` does, and like `reset` it forgets the attempt and any upload in flight; it never starts a run.
 
-A form held shut (`disabled`, as a host holds it while a run is in flight) shuts every surface the sources opened: an open examples list, the question before a replace, a rename or a delete, and an open sheet of the team's files all close, writing nothing. The sheets are modal, so this only matters when a host disables the form by itself, but nothing in them writes to the form once it is.
+A form held shut (`disabled`, as a host holds it while a run is in flight) shuts every surface the sources opened: an open examples list, the question before a replace, a rename or a delete, and an open sheet of the team's files all close, writing nothing. The sheets are modal, so this only matters when a host disables the form by itself, but nothing in them writes to the form once it is, and neither does the `fill` a host was handed by Open.
 
 A form the person has worked on is asked first: "Replace what you entered?", with Replace and Cancel. Cancel leaves the form exactly as it was and the list open. The form counts as worked on when it holds a value that would send a different run from the one it was last given (its initial values, or the last `reset` or fill), or while a file is arriving; a value typed and erased again does not count, nor does an optional structure opened and left empty, because neither changes the run. `useMethodForm` reports this as `touched`, through `sameRunValues`, and a host holding its own values can compare them the same way.
 
@@ -176,11 +187,17 @@ A form the person has worked on is asked first: "Replace what you entered?", wit
 
 The list is read again each time it opens, since an example may have been saved since. The rows are in the order the host gives them. When deletes empty the rows read so far while the host has more, the next page is read at once, so the list says it has none only once it has been read to its end.
 
-`rename` and `delete` are capabilities: each is offered on a row's menu only when given. Rename opens a dialog on the example's name; Save is disabled while the name is empty once trimmed, reads "Renaming…" while the host works, and a failure keeps the dialog open with the new name, says so, and turns Save into Try again. Resolving to the example as stored replaces the row, matched by the id it had, so a host that answers a renamed example under a new id still updates it; resolving to nothing keeps it under the new name. Delete asks first, and only Delete in that question calls the host; a failure keeps the question open with Try again, and success removes the row.
+A row is the example's name on one line, cut short when it is long. A host that gives `renderDetail` draws a second line under it: what the example holds, say, or that it no longer fits the form and needs new inputs. It receives the example as `list` returned it and the fields the control reads examples back against, the form's own, so a host can word either from what it already has without reading anything more. What it returns is drawn inside the row's button, in the list's small muted type unless it styles itself, so it is read with the name as the row's accessible name ("Paris office 1 rue de la Paix, Paris"); it must therefore be phrasing content with nothing interactive in it, such as text, a `<span>` or a decorative icon. It wraps within the row and never widens it, a word too long for the line included; a host that wants one line truncates its own element. A return that React draws nothing for (`null`, `undefined`, a boolean or an empty string) leaves the row the one line of its name, so a `cond && <Line />` whose condition is false falls back as it reads. The kernel computes neither a summary nor a fit itself, because a host already words both in its own terms, and the kernel's theme has no warning role to draw a misfit with. `renderDetail` is declared as a method, as `renderGlyph` is, so a source whose `renderDetail` takes the host's own example type, the type its `list` answers with, is still accepted.
+
+`open`, `rename` and `delete` are capabilities: each is offered on a row's menu only when given, in that order, and a source with any one of them has the menu, so a source with `open` alone offers Open alone.
+
+Open is for a host that shows an example in a surface of its own: what it holds, what it last produced, how to change it. Choosing it closes the list and gives focus back to "Fill with an example", and only then calls `open(example, fill)`, once, so a dialog the host opens from there returns focus to the control as it closes, where the list's own close puts it. `fill` is the row's own choice of that example, made at the moment the host calls it rather than when the example was opened: the example's inputs are read back against the form's fields as they are then, a form holding the person's own values is asked "Replace what you entered?" first, and while the form is held shut, or once the control is gone, it does nothing. It fills through `onFill`, as a row's choice does, so a host's "Fill the form" fills the form by the path the form already has rather than setting values itself. A host may call it any number of times, or never.
+
+Rename opens a dialog on the example's name; Save is disabled while the name is empty once trimmed, reads "Renaming…" while the host works, and a failure keeps the dialog open with the new name, says so, and turns Save into Try again. Resolving to the example as stored replaces the row, matched by the id it had, so a host that answers a renamed example under a new id still updates it; resolving to nothing keeps it under the new name. Delete asks first, and only Delete in that question calls the host; a failure keeps the question open with Try again, and success removes the row.
 
 With no example, the list says how to make one: "No examples yet. Run it, then save the run as an example." That suits a person who can save one. For a person who cannot, a host sets `hideWhenEmpty`: the form then reads the list as it mounts, following it past empty pages, and offers "Fill with an example" only once the method is known to have one. It reads the list again each time the examples close, so a delete that took the last one takes the control with it, and while that read is under way the control keeps its last answer rather than blinking out. The open list never vanishes under the person, whatever they delete in it. A failure to read still offers the control, so the failure is shown rather than hidden. When the list closes on the method's last example, the control goes as the list closes, and focus moves on to what follows it on the page, the form's first field as a rule.
 
-Focus goes back where the person was. Closing the examples returns it to "Fill with an example"; keeping what was entered at "Replace what you entered?" returns it to the example that asked; cancelling a rename or a delete returns it to that row's menu button, a rename to the renamed row's, and a delete to the row that took the deleted one's place, or to the close button when none is left.
+Focus goes back where the person was. Closing the examples returns it to "Fill with an example", and so does choosing Open, before the host is called; keeping what was entered at "Replace what you entered?" returns it to the example that asked; cancelling a rename or a delete returns it to that row's menu button, a rename to the renamed row's, and a delete to the row that took the deleted one's place, or to the close button when none is left.
 
 ## The states
 
@@ -201,9 +218,9 @@ Each list has one polite status line (`role="status"`) that announces what it sh
 `MethodForm` mounts both from `useMethodForm`'s options. A host that renders the fields itself, around `FieldRenderer` and its own values, threads them through the same pieces:
 
 - **`FieldEnv.fileSource`** carries the file source, a `FilePickerSource` with its glyphs when the host draws them, to every file field and list `FieldRenderer` renders, as `onDropFile` carries the upload.
-- **`<FillWithExample source fields touched onFill />`** is the example control on its own. `onFill(values, example)` receives the example's values already in the controls' shape; the host sets its values to them, and passes `touched` from its own comparison (`!sameRunValues(values, lastGiven, fields)`).
+- **`<FillWithExample source fields touched onFill />`** is the example control on its own, its `source` an `ExamplePickerSource` when the host draws a line under each name. `onFill(values, example)` receives the example's values already in the controls' shape; the host sets its values to them, and passes `touched` from its own comparison (`!sameRunValues(values, lastGiven, fields)`).
 - **`FilePicker` and `FilePickerEntry`** are the sheet and its row, for a host drawing a file control of its own.
 
 ## What stays the host's
 
-Which files and examples exist and who may see them, what "mine" means, which scope a person starts on, which files are test files, how a file's type is worded and drawn on a row when the host wants its own look, how pages are cut, saving an example (from a run's inputs) and who may rename or delete one. The package lists, chooses, writes and asks; it never fetches, stores or decides who may.
+Which files and examples exist and who may see them, what "mine" means, which scope a person starts on, which files are test files, how a file's type is worded and drawn on a row when the host wants its own look, what a row says under an example's name, what opening an example shows, how pages are cut, saving an example (from a run's inputs) and who may open, rename or delete one. The package lists, chooses, writes and asks; it never fetches, stores or decides who may.
