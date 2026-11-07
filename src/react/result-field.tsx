@@ -74,7 +74,7 @@ import { HtmlPreview } from './html-preview';
 import { ImageViewer } from './image-viewer';
 import { PdfDownloadButton } from './pdf-download-button';
 import { useFileNamePrompt } from './file-name-dialog';
-import { Markdown } from './markdown';
+import { Markdown, opensWithHeading } from './markdown';
 import { ExtractedPageText } from './extracted-page-text';
 import { splitExtractedText } from './extracted-text';
 import { encodedFileSummary } from './encoded-file';
@@ -199,7 +199,21 @@ export function ResultHeader({ field }: { field: RunField }) {
   return <Label field={field} describe />;
 }
 
-function Label({ field, describe = false }: { field: RunField; describe?: boolean }) {
+function Label({
+  field,
+  describe = false,
+  unseen = false,
+}: {
+  field: RunField;
+  describe?: boolean;
+  /**
+   * Said to assistive technology and not drawn: the label of a text that
+   * opens with a heading of its own, which names it on the page (the leaf arm
+   * of `ResultNode`). With `describe`, the description a drawn label carries
+   * in its tooltip is said after it, so a screen reader still hears it.
+   */
+  unseen?: boolean;
+}) {
   // The same rule the input side follows, and for the same reason: in `studio`
   // the label IS the identifier the method author wrote, so it is shown
   // verbatim in mono beside its concept pill; in `app` it becomes a humanised
@@ -212,6 +226,13 @@ function Label({ field, describe = false }: { field: RunField; describe?: boolea
   const labelText = fieldLabel(field.title, field.name, presentation);
   if (labelText.trim() === '') {
     return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
+  }
+  if (unseen) {
+    return (
+      <span className="sr-only">
+        {describe && field.description ? `${labelText}: ${field.description}` : labelText}
+      </span>
+    );
   }
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
@@ -2407,12 +2428,18 @@ function CompositeValue({ members }: { members: readonly CompositeMember[] }) {
     <div className="space-y-3">
       {members.map((member) => {
         const label = isApp ? humanizeFieldName(member.name) : member.name;
+        // A member that is a text heading itself is named by that heading in
+        // `app`, and its name is said rather than drawn, as a text field's
+        // label is in `ResultNode`'s leaf arm.
+        const text = memberText(member.value);
+        const headed = isApp && text !== undefined && opensWithHeading(text);
         return (
           <div key={member.name} className="space-y-1">
             <span
               className={cn(
                 'font-semibold text-foreground',
                 isApp ? 'text-[13.5px]' : 'font-mono text-[12px]',
+                headed && 'sr-only',
               )}
             >
               {label}
@@ -2474,6 +2501,19 @@ function NativeValue({ value, label }: { value: unknown; label: string }) {
       // members a model does not declare dropped.
       return <RawValue value={value} compact={false} />;
   }
+}
+
+/**
+ * The text `NativeValue` typesets as Markdown for a member, or `undefined`
+ * for a member it draws as anything else: the same two arms, a bare string and
+ * a record the text model claims, so `CompositeValue` asks whether a member
+ * heads itself of exactly the text that will be drawn.
+ */
+function memberText(value: unknown): string | undefined {
+  if (typeof value === 'string') return value === '' ? undefined : value;
+  if (!isRecord(value)) return undefined;
+  const content = readMemberContent(value);
+  return content?.model === 'text' && content.text !== '' ? content.text : undefined;
 }
 
 /** A composite member that is a list: a table of structures, or one content per line. */
@@ -3222,6 +3262,20 @@ function isLongText(value: unknown): value is string {
   return typeof value === 'string' && (value.includes('\n') || value.length > CELL_LENGTH_LIMIT);
 }
 
+/**
+ * The text a leaf node typesets as Markdown, or `undefined` for one it prints
+ * plain: a `prose` value in either presentation, as `LeafValue` sets it, and a
+ * long `text` value in `app` (see `isLongText`). The leaf arm of `ResultNode`
+ * draws the text from this answer and hides a label over a text that heads
+ * itself from the same one, so the two cannot drift apart. The kind is the
+ * descriptor's; the value is read only for what is written in it.
+ */
+function typesetText(field: RunField, value: unknown, isApp: boolean): string | undefined {
+  if (typeof value !== 'string' || value === '') return undefined;
+  if (field.kind === 'prose') return value;
+  return isApp && field.kind === 'text' && isLongText(value) ? value : undefined;
+}
+
 export interface ResultFieldProps {
   field: RunField;
   value: unknown;
@@ -3720,9 +3774,23 @@ function ResultNode({
     case 'prose':
     case 'number':
     case 'enum':
-    case 'unknown':
+    case 'unknown': {
+      // A text typeset as Markdown that opens with a heading of its own names
+      // itself, in `app`: its label is said rather than drawn, because the
+      // label set over the heading read as the same title twice ("Executive
+      // summary" over "Launch Executive Summary"). `studio` keeps it, since
+      // there the label is the identifier, not a title.
+      const typeset = typesetText(field, unwrapped, isApp);
+      const headed = isApp && !hideLabel && typeset !== undefined && opensWithHeading(typeset);
+      const labelDrawn = !hideLabel && !headed;
       return (
-        <div className={field.kind === 'image' ? 'space-y-1.5' : 'space-y-0.5'}>
+        <div
+          className={cn(
+            field.kind === 'image' ? 'space-y-1.5' : 'space-y-0.5',
+            // Holds the copy control's float, when it floats.
+            copyText !== undefined && !labelDrawn && 'flow-root',
+          )}
+        >
           {/* The copy control rides the label row, and it is on every TEXT
               value whether or not it turns out to be markdown. A result view is
               where a person goes to take something away, and the alternative
@@ -3730,26 +3798,41 @@ function ResultNode({
               which picks up the layout and loses the source. What it writes is
               the source the run produced, not the typeset rendering.
 
-              The row survives `hideLabel`, which is the top-level case
-              `StuffViewer` uses: the header moves up to the panel, the button
-              does not follow it, and a text result with no way to copy it would
-              be exactly the one worth copying. */}
+              It survives `hideLabel`, which is the top-level case `StuffViewer`
+              uses: the header moves up to the panel, the button does not follow
+              it, and a text result with no way to copy it would be exactly the
+              one worth copying. With no label drawn - that case, or a text that
+              heads itself - it floats at the text's top right and the text's
+              first lines run beside it, where a row of its own left it alone
+              in a corner over an empty band. */}
           {copyText === undefined ? (
+            // A text that heads itself always has something to copy, so this
+            // arm draws the label exactly when it is not hidden.
             header
-          ) : (
+          ) : labelDrawn ? (
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">{header}</div>
               <CopyButton value={copyText} label={s.copyText} />
             </div>
+          ) : (
+            <>
+              {headed && <Label field={field} describe unseen />}
+              <div className="float-right ml-2">
+                <CopyButton value={copyText} label={s.copyText} />
+              </div>
+            </>
           )}
           {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
-              a table cell and this stacked row cannot disagree about it. A long
-              `text` value in `app` is the exception, typeset as the prose it
-              is (see `isLongText`); a chip and a cell keep it plain. So is a
-              document that is the whole result a panel shows, which is told
-              so: a PDF there opens without a click (see `DocumentValue`). */}
-          {isApp && field.kind === 'text' && isLongText(unwrapped) ? (
-            <Markdown text={unwrapped} />
+              a table cell and this stacked row cannot disagree about it. A text
+              typeset as Markdown is the exception, drawn from the one decision
+              (`typesetText`) that also decides whether it heads itself: a
+              `prose` value, as `LeafValue` would set it, and a long `text`
+              value in `app`, typeset as the prose it is (see `isLongText`),
+              where a chip and a cell keep it plain. So is a document that is
+              the whole result a panel shows, which is told so: a PDF there
+              opens without a click (see `DocumentValue`). */}
+          {typeset !== undefined ? (
+            <Markdown text={typeset} />
           ) : field.kind === 'document' && whole ? (
             <DocumentValue value={unwrapped} whole />
           ) : (
@@ -3757,6 +3840,7 @@ function ResultNode({
           )}
         </div>
       );
+    }
   }
 
   // Unreachable while the switch covers `RunFieldKind`. A twelfth kind added to

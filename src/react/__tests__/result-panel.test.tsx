@@ -247,3 +247,67 @@ describe('the stuff name', () => {
     expect(saveFiles.mock.calls[0]?.[0]).toMatchObject([{ name: 'report_pages.json' }]);
   });
 });
+
+/**
+ * Where the panel's Download is drawn. Beside a title or a view switch it is
+ * the header's; with nothing beside it, as in an app's result a host heads
+ * itself, it stood alone at the panel's right edge over an empty band, so it
+ * is drawn at the result's foot instead, after what a reader has read.
+ */
+describe("the panel's Download", () => {
+  const download = () => screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download });
+  /** Whether `a` comes before `b` in the document. */
+  const before = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('is drawn at the foot of an app result the host heads itself', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} />
+      </FieldPresentationProvider>,
+    );
+    expect(before(screen.getByText('INV-1'), download())).toBe(true);
+  });
+
+  it('stays in the header beside the title the host names', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} name="report_pages" />
+      </FieldPresentationProvider>,
+    );
+    expect(before(download(), screen.getByText('INV-1'))).toBe(true);
+    expect(before(screen.getByText('Report pages'), download())).toBe(true);
+  });
+
+  it('stays in the header beside the view switch', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} views={['rendered', 'json']} />
+      </FieldPresentationProvider>,
+    );
+    expect(before(download(), screen.getByText('INV-1'))).toBe(true);
+  });
+
+  it("stays in a builder's header", () => {
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
+    expect(before(download(), screen.getByText('INV-1'))).toBe(true);
+  });
+
+  it('reports the files that did not arrive under itself, at the foot', async () => {
+    const saveFiles = vi.fn<SaveFiles>(async (files) => ({
+      failed: files.map((file) => ({ file, reason: 'refused' })),
+    }));
+    render(
+      <ResultEnvProvider saveFiles={saveFiles}>
+        <FieldPresentationProvider presentation="app">
+          <StuffViewer field={invoice} value={{ reference: 'INV-1' }} />
+        </FieldPresentationProvider>
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(download());
+    const status = await screen.findByRole('status');
+    await waitFor(() => expect(status.textContent).not.toBe(''));
+    expect(before(download(), status)).toBe(true);
+    expect(before(screen.getByText('INV-1'), status)).toBe(true);
+  });
+});

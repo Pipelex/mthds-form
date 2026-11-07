@@ -101,6 +101,36 @@ export function Markdown({ text, className, proseImages, citations }: MarkdownPr
 }
 
 /**
+ * Whether `text`, typeset here, opens with a heading of its own: its first
+ * block, blank lines aside, is a `#` heading or an underlined one.
+ *
+ * The result view asks it of a text it typesets in `app`, to leave out the
+ * field's label over a text that names itself: a summary that opens with
+ * "Launch Executive Summary" read as a stutter under "Executive summary". It
+ * reads the text the way `Markdown` will typeset it, with the same lexer and
+ * options, so the two cannot disagree about what the first block is.
+ *
+ * Only the opening block is lexed, up to the first blank line, because only it
+ * decides and a blank line ends every block that could begin there (one that
+ * runs past it, such as a fence or a comment, is still that block when cut
+ * short). That keeps the question cheap however long the text is, which
+ * matters because it is asked on every render: a generative page re-renders
+ * its result on each keystroke in an input beside it.
+ */
+export function opensWithHeading(text: string): boolean {
+  const body = text.slice(LEADING_BLANK_LINES.exec(text)?.[0].length ?? 0);
+  const end = body.search(BLANK_LINE);
+  const opening = end === -1 ? body : body.slice(0, end);
+  const first = marked.lexer(opening, LEX_OPTIONS).find((token) => token.type !== 'space');
+  return first?.type === 'heading';
+}
+
+/** The blank lines before a text's first line that holds anything. */
+const LEADING_BLANK_LINES = /^(?:[ \t]*\r?\n)*/;
+/** A blank line, which ends a block. */
+const BLANK_LINE = /\r?\n[ \t]*\r?\n/;
+
+/**
  * The policy, threaded to the one token that needs it.
  *
  * A context rather than a prop on every walker: `Block`, `Inline` and

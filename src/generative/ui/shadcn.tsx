@@ -487,7 +487,15 @@ export function Textarea({
  * reads the accent rather than the button colour, and focused in `--ring`, as
  * everything in the tab order is, never in the browser's own ring.
  */
-const NATIVE_CHECK = cn('size-4', checkedAccentClass, focusOutlineClass);
+const NATIVE_CHECK = cn('size-4 shrink-0', checkedAccentClass, focusOutlineClass);
+
+/**
+ * The label a native radio or check box sits in, which is where a finger
+ * lands: a tap anywhere on a label activates the control it wraps. The box
+ * keeps its 16 pixels, and below `sm` its row grows to 44 pixels tall across
+ * the column, so the target is the whole row rather than the box.
+ */
+const NATIVE_CHECK_ROW = 'flex items-center gap-2 text-sm max-sm:min-h-11';
 
 export function Radio({
   props,
@@ -502,9 +510,10 @@ export function Radio({
   return (
     <fieldset className="space-y-2" aria-invalid={field.error ? true : undefined}>
       <legend className={LABEL}>{props.label}</legend>
-      <div className="space-y-2">
+      {/* Rows of 44 pixels need no gap between them on a phone. */}
+      <div className="space-y-2 max-sm:space-y-0">
         {(props.options ?? []).map((option, index) => (
-          <label key={`${index}-${option}`} className="flex items-center gap-2 text-sm">
+          <label key={`${index}-${option}`} className={NATIVE_CHECK_ROW}>
             <input
               type="radio"
               name={id}
@@ -537,7 +546,7 @@ export function Checkbox({
   const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props);
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <label htmlFor={id} className={NATIVE_CHECK_ROW}>
         <input
           id={id}
           name={props.name}

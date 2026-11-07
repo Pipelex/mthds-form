@@ -18,6 +18,8 @@ import {
 } from '../../generative';
 import { BRANDS, type BrandFixture } from './brands';
 import { standInUpload } from '../stand-in-upload';
+import { expect } from 'storybook/test';
+import { atWidth, expectEveryTouchTarget, pinnedTo } from '../touch-target';
 
 /**
  * The harness the `Generative` stories render through: a captured layout,
@@ -215,6 +217,28 @@ export function makeLayoutPage(fields: RunField[], fixtures: readonly SpecFixtur
     );
   }
   return Page;
+}
+
+/**
+ * A layout's story on a phone: the page at a 375px viewport, its two theme
+ * panes stacked and edge to edge, and every control the page draws - the
+ * layer's own and the kernel's it delegates to - held to the 44 pixels a
+ * finger needs, with nothing scrolling sideways. The receipt under the page
+ * is a `<summary>` the story draws, which is not a control the measure counts.
+ */
+export function onAPhone(story: { name: string; args: LayoutStoryArgs }) {
+  const phone = pinnedTo('phone');
+  return {
+    ...story,
+    name: `${story.name}, phone`,
+    parameters: { ...phone.parameters, themePairPadding: 0 },
+    globals: phone.globals,
+    play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+      await atWidth('phone');
+      await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+      await expectEveryTouchTarget(canvasElement);
+    },
+  };
 }
 
 /**

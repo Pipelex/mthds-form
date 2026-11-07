@@ -82,9 +82,11 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
               value={option}
               variant="outline"
               // The pressed fill and its text are the toggle's own selected state,
-              // and the pressed edge is the accent's, as a tag's is.
+              // and the pressed edge is the accent's, as a tag's is. Below `sm`
+              // each option grows to the 44 pixels a finger needs, in both
+              // directions, as every other control of the kernel does there.
               className={cn(
-                'h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:font-medium',
+                'h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:font-medium max-sm:h-11 max-sm:min-w-11',
                 selectedStateBorderClass,
               )}
             >

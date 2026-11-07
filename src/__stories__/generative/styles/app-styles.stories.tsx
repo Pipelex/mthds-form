@@ -10,7 +10,7 @@ import * as summarizePeople from '../../_generated/summarize_people';
 import { SPECS as SUMMARIZE_PEOPLE_SPECS } from '../../_generated/summarize_people.specs';
 import * as trips from '../../_generated/trips';
 import { SPECS as TRIPS_SPECS } from '../../_generated/trips.specs';
-import { atWidth, expectTouchTarget, pinnedTo } from '../../touch-target';
+import { atWidth, expectEveryTouchTarget, pinnedTo } from '../../touch-target';
 import { GENERATIVE_STORY_PARAMETERS, assertRenderable, heroFields } from '../layout-page';
 import { DesignedPage, Frame } from './frame';
 import { AppScope, styleFontsReady } from './scope';
@@ -212,36 +212,17 @@ export const TeamTypeface: Story = {
 
 // ─── On a phone ────────────────────────────────────────────────────────────
 
-const CONTROLS =
-  'button, input:not([type="hidden"]):not([type="file"]):not([aria-hidden="true"]), textarea';
-
 /**
- * The controls that are short of 44px on a phone with no style as with one,
- * filed as L-261107-96ad4c: the kernel's enum options (36px) and the result
- * view's Download button (28px). A style sizes neither, so these stories hold
- * every other control and leave those to the kernel's own phone stories.
- */
-function knownShort(control: Element): boolean {
-  // An enum option is a toggle-group item; a file picker's choices, also radios, are held.
-  if (control.matches('[role="radio"][data-radix-collection-item]')) return true;
-  return control.textContent?.trim() === 'Download';
-}
-
-/**
- * On a phone, a style keeps the page in its width and every control a style
- * can reach - the host's band and action row, the kernel's fields - at 44px
- * or more to tap: its radius, its faces and its rhythm never shrink one.
+ * On a phone, a style keeps the page in its width and every control on it -
+ * the host's band and action row, the kernel's fields, the result view's
+ * actions - at 44px or more to tap: its radius, its faces and its rhythm
+ * never shrink one.
  */
 async function expectPhoneReady(canvasElement: HTMLElement) {
   await atWidth('phone');
   await styleFontsReady();
   await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
-  const controls = [...canvasElement.querySelectorAll(CONTROLS)].filter((control) => {
-    const box = control.getBoundingClientRect();
-    return box.width > 0 && box.height > 0 && !knownShort(control);
-  });
-  await expect(controls.length).toBeGreaterThan(0);
-  for (const control of controls) await expectTouchTarget(control);
+  await expectEveryTouchTarget(canvasElement);
 }
 
 function onAPhone(subject: 'compose' | 'result', style: AppStyleId, team: TeamKey): Story {
