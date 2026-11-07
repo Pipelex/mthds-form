@@ -210,6 +210,14 @@ describe('descriptionAddsToLabel', () => {
     expect(descriptionAddsToLabel('In %', 'Discount', ['number'])).toBe(true);
   });
 
+  it('keeps a word whole across its combining marks', () => {
+    // Different words over the same base letters: the vowel signs are marks.
+    expect(descriptionAddsToLabel('नीम', 'नाम', ['text'])).toBe(true);
+    expect(descriptionAddsToLabel('Pâté'.normalize('NFD'), 'Pâte', ['text'])).toBe(true);
+    // An accent typed as a mark is the same word as the precomposed letter.
+    expect(descriptionAddsToLabel('The pâte'.normalize('NFD'), 'Pâte', ['text'])).toBe(false);
+  });
+
   it('counts a symbol as a word', () => {
     expect(descriptionAddsToLabel('Rate in %', 'Rate', ['number'])).toBe(true);
     expect(descriptionAddsToLabel('In €', 'Budget', ['number'])).toBe(true);

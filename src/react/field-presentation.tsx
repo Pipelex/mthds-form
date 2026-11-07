@@ -342,12 +342,17 @@ const FILLER = new Set([
 
 /**
  * A text's content words, stemmed: lower-cased, possessives and filler words
- * dropped. A word is a run of letters and digits, or one symbol (`€`, `%`,
- * `+`, an emoji); sentence punctuation is not a word.
+ * dropped. A word is a run of letters, combining marks and digits, or one
+ * symbol (`€`, `%`, `+`, an emoji); sentence punctuation is not a word. The
+ * marks keep a word whole where a vowel sign or an accent is a mark of its
+ * own (Devanagari's "नाम" and "नीम" are two words, not one shared pair of
+ * letters), and the text is composed first, so an accent typed as a mark
+ * reads as the letter it decorates.
  */
 function contentStems(text: string): string[] {
   return (
     text
+      .normalize('NFC')
       .toLowerCase()
       .replace(/['’]s\b/gu, '')
       .match(WORD) ?? []
@@ -356,7 +361,7 @@ function contentStems(text: string): string[] {
     .map(stem);
 }
 
-const WORD = /[\p{L}\p{N}]+|[\p{S}%‰#@]/gu;
+const WORD = /[\p{L}\p{M}\p{N}]+|[\p{S}%‰#@]/gu;
 
 /** One suffix off, never below three letters: `arriving` and `arrive` both give `arriv`. */
 function stem(word: string): string {
