@@ -17,7 +17,10 @@ function laidOut(scrollWidth: number, clientWidth: number) {
   vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(clientWidth);
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("the JSON view's block", () => {
   it('is no tab stop while every line fits', () => {
@@ -31,6 +34,28 @@ describe("the JSON view's block", () => {
   it('takes focus while a line is wider than the block', () => {
     laidOut(900, 320);
     render(<JsonView value={{ note: 'A line long enough to scroll the block sideways.' }} />);
+    expect(block().getAttribute('tabindex')).toBe('0');
+  });
+
+  it('measures again when the block resizes', () => {
+    // jsdom lays nothing out and observes nothing, so an observer stands in
+    // that the test can fire, as a browser does when the panel narrows.
+    let resized: (() => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    laidOut(300, 320);
+    render(<JsonView value={{ note: 'Fits the wide panel, not the narrow one.' }} />);
+    expect(block().hasAttribute('tabindex')).toBe(false);
+    laidOut(300, 240);
+    act(() => resized!());
     expect(block().getAttribute('tabindex')).toBe('0');
   });
 

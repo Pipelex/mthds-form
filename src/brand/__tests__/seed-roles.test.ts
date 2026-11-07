@@ -32,6 +32,9 @@ const hex = (value: string): SrgbColor => ({
 
 const contrast = (a: string, b: string) => contrastRatio(hex(a), hex(b));
 
+/** What `deriveBrandRoles` throws when no shade of the accent reads on every surface. */
+const REFUSAL = /No accent ink can read on every surface at once/;
+
 /** A deterministic `#rrggbb` from hue (degrees), saturation and lightness (0..1). */
 function hsl(hue: number, saturation: number, lightness: number): string {
   const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
@@ -348,7 +351,9 @@ describe('a surface on the far side of the page', () => {
           let ink: string | undefined;
           try {
             ink = deriveBrandRoles({ accent }, page, [surface]).accentInk;
-          } catch {
+          } catch (error) {
+            // The refusal, and nothing else, stands for no ink.
+            expect(String(error)).toMatch(REFUSAL);
             ink = undefined;
           }
           const where = `${accent} on ${page} beside ${surface}`;
@@ -447,7 +452,9 @@ describe('a surface on the far side of the page', () => {
         let ink: string | undefined;
         try {
           ink = deriveBrandRoles({ accent }, page, [surface]).accentInk;
-        } catch {
+        } catch (error) {
+          // The refusal, and nothing else, stands for no ink.
+          expect(String(error)).toMatch(REFUSAL);
           ink = undefined;
         }
         if (ink) {
