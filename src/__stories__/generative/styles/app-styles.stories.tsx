@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect } from 'storybook/test';
+import { expect, within } from 'storybook/test';
 import { findFixture, type SpecFixture } from '../../../generative';
 import type { InputForm, PipeIOContracts, RunField } from '../../../core';
 import * as designSlides from '../../_generated/design_slides';
@@ -116,10 +116,83 @@ function StyledPage({ subject, style, team, typeface }: StyledPageArgs) {
   );
 }
 
+// ─── The stylesheet reaches the page ──────────────────────────────────────
+
+/** The labels of a layout's calls to action, read off its spec rather than off the DOM's classes. */
+function callsToAction(subject: Subject): string[] {
+  if (subject === 'compose' || subject === 'result') return [];
+  const { elements } = LAYOUTS[subject].fixture.spec as {
+    elements: Record<string, { type: string; props?: { label?: unknown } }>;
+  };
+  return Object.values(elements).flatMap((element) =>
+    element.type === 'Cta' && typeof element.props?.label === 'string' ? [element.props.label] : [],
+  );
+}
+
+/**
+ * `value` as the browser computes `property` for an element standing where
+ * `beside` stands, at its font size: the token resolved in the same context
+ * and in the same normal form as the element's own computed value.
+ */
+function resolvedBeside(beside: HTMLElement, property: string, value: string): string {
+  const probe = document.createElement('span');
+  probe.style.fontSize = getComputedStyle(beside).fontSize;
+  probe.style.setProperty(property, value);
+  (beside.parentElement ?? beside).appendChild(probe);
+  try {
+    return getComputedStyle(probe).getPropertyValue(property);
+  } finally {
+    probe.remove();
+  }
+}
+
+/**
+ * The stylesheet finds the DOM by its markup and its utility classes
+ * (`styles.css`), so a change to either would drop a style's treatment with
+ * every other check green. This holds each host page to what its scope sets:
+ * every title's weight and tracking, and its face where a style or a team's
+ * typeface sets one; a result's own headings under a style; and the layout's
+ * call to action, found by its role and label, wearing `--action-shadow`.
+ */
+async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subject) {
+  const pages = [...canvasElement.querySelectorAll<HTMLElement>('.app-host')];
+  await expect(pages.length, 'host pages').toBeGreaterThan(0);
+  for (const page of pages) {
+    const styled = page.matches('.app-style:not(.app-style-quiet)');
+    const facesSet = styled || page.matches('[data-typeface]');
+    const titles = [...page.querySelectorAll<HTMLElement>('h1, h2, h3')].filter(
+      (heading) =>
+        !heading.classList.contains('uppercase') && (styled || !heading.closest('.af-result')),
+    );
+    await expect(titles.length, 'titles').toBeGreaterThan(0);
+    for (const title of titles) {
+      const drawn = getComputedStyle(title);
+      const name = title.textContent?.trim() ?? title.tagName;
+      await expect(drawn.fontWeight, `${name}: weight`).toBe(
+        resolvedBeside(title, 'font-weight', 'var(--heading-weight)'),
+      );
+      await expect(drawn.letterSpacing, `${name}: tracking`).toBe(
+        resolvedBeside(title, 'letter-spacing', 'var(--heading-tracking)'),
+      );
+      if (facesSet)
+        await expect(drawn.fontFamily, `${name}: face`).toBe(
+          resolvedBeside(title, 'font-family', 'var(--font-heading, var(--font-sans))'),
+        );
+    }
+    for (const label of callsToAction(subject)) {
+      const action = within(page).getByRole('button', { name: label });
+      await expect(getComputedStyle(action).boxShadow, `${label}: shadow`).toBe(
+        resolvedBeside(action, 'box-shadow', 'var(--action-shadow)'),
+      );
+    }
+  }
+}
+
 const meta = {
   title: 'Generative/App styles',
   component: StyledPage,
   args: { subject: 'compose', style: 'quiet', team: 'none', typeface: 'none' },
+  play: async ({ canvasElement, args }) => expectStyleReachesPage(canvasElement, args.subject),
   argTypes: {
     subject: {
       control: 'select',
@@ -230,7 +303,10 @@ function onAPhone(subject: 'compose' | 'result', style: AppStyleId, team: TeamKe
     name: `${subject === 'compose' ? 'Compose' : 'Result'} · ${style} · phone`,
     ...pinnedTo('phone'),
     args: { subject, style, team },
-    play: async ({ canvasElement }) => expectPhoneReady(canvasElement),
+    play: async ({ canvasElement }) => {
+      await expectPhoneReady(canvasElement);
+      await expectStyleReachesPage(canvasElement, subject);
+    },
   };
 }
 
