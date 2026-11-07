@@ -115,7 +115,10 @@ export function Card({
   children,
 }: BaseComponentProps<{ title?: string | null; description?: string | null }>) {
   return (
+    // A style's panel: a host writes the style's field fill onto `--input`
+    // here, as on its own panel, so the fields inside do not sink into it.
     <div
+      data-style-panel=""
       className={cn('rounded-lg p-6 text-card-foreground', panelSurfaceClass, panelFlatShadowClass)}
     >
       {props.title || props.description ? (

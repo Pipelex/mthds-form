@@ -10,8 +10,10 @@
  *   rather than titling the page, so it keeps the kernel's weight. An
  *   uppercase eyebrow is not a title and reads none.
  * - `--panel-fill`, `--panel-edge`, `--panel-edge-width` and `--panel-shadow`:
- *   a panel the generative layer draws on the page, its rail and its card.
- *   A group inside a panel is not a panel and reads none.
+ *   a panel the generative layer draws on the page, its rail and its card,
+ *   each marked `data-style-panel` so a host can write the style's field fill
+ *   onto `--input` inside it, as on its own panel. A group inside a panel is
+ *   not a panel and reads none.
  * - `--action-shadow`: a designed page's call to action.
  *
  * Each read carries the value the element painted before it read the token,

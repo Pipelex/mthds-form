@@ -243,6 +243,7 @@ function Rail({ props, children }: BaseComponentProps<{ title: string }>) {
     // carry its own, or a host that defines no tokens loses the declaration
     // outright. See src/styles/tailwind-entry.css.
     <div
+      data-style-panel=""
       className={cn(
         'rounded-[calc(var(--radius,0.5rem)*1.5)] p-7 text-card-foreground',
         panelSurfaceClass,

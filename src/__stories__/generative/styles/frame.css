@@ -188,13 +188,16 @@
   max-width: 62ch;
   text-wrap: pretty;
 }
-.af-panel {
+.af-panel,
+.af [data-style-panel] {
   /*
    * A style's field fill (`--panel-field`) is part of its panel treatment, so
-   * it reaches the fields inside the host's panel and no others: a captured
-   * layout's fields keep the host's fill on their own cards.
+   * it reaches the fields inside every panel the style dresses, the host's
+   * and a captured layout's rail and cards, and no others.
    */
   --input: var(--panel-field, var(--host-input));
+}
+.af-panel {
   background: var(--panel-fill, var(--card));
   border: var(--panel-edge-width, 1px) solid var(--panel-edge, var(--border));
   box-shadow: var(--panel-shadow, none);

@@ -209,6 +209,10 @@ function highlight(json: string) {
   return out;
 }
 
+/** The clipboard's presence never changes while a page is open. */
+const noSubscription = () => () => {};
+const hasClipboard = () => typeof navigator !== 'undefined' && Boolean(navigator.clipboard);
+
 /**
  * The payload as JSON — the receipt, with the whole of it one click from the
  * clipboard.
@@ -220,10 +224,6 @@ function highlight(json: string) {
  * tab was — one labelled fallback, not one of three guesses offered as a
  * choice.
  */
-/** The clipboard's presence never changes while a page is open. */
-const noSubscription = () => () => {};
-const hasClipboard = () => typeof navigator !== 'undefined' && Boolean(navigator.clipboard);
-
 export function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
   const [copied, setCopied] = useState(false);

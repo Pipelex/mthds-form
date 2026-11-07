@@ -232,13 +232,15 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
           field: role('card'),
         },
         // On a dark page a shadow barely shows, so the panel is lifted by its
-        // fill instead, the card a little toward the foreground, and its
+        // fill instead, the card a little toward the foreground, with a faint
+        // highlight along its top edge where light would catch it, and its
         // fields sink back to the page's own background.
         dark: {
           fill: role('card', { toward: { role: 'foreground', share: 0.07 } }),
           edge: null,
           edgeWidth: 1,
-          shadow: '0 2px 4px rgb(0 0 0 / 0.55), 0 24px 56px -12px rgb(0 0 0 / 0.95)',
+          shadow:
+            'inset 0 1px 0 rgb(255 255 255 / 0.07), 0 2px 4px rgb(0 0 0 / 0.55), 0 24px 56px -12px rgb(0 0 0 / 0.95)',
           field: role('background'),
         },
       },
