@@ -7,6 +7,7 @@ import { ownProp } from '../core/own-property';
 import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
+import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { OptionalToggle } from './optional-toggle';
@@ -87,6 +88,9 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   const data = value ?? {};
   const label = fieldLabel(field.title, field.name, presentation);
   const grouping = structureGrouping(depth, label.trim() !== '');
+  // Document-unique, as every control's id is: two forms mounting the same
+  // method must not label one structure with the other's name.
+  const domId = useFieldDomId(id);
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
@@ -119,8 +123,8 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   // A named structure is a group its name labels, so assistive technology
   // hears the levels a reader sees: two cities in two structures are each
   // announced inside their own. A list's row draws no name and is no group.
-  const nameId = `${id}--name`;
-  const descriptionId = `${id}--description`;
+  const nameId = `${domId}--name`;
+  const descriptionId = `${domId}--description`;
   const group =
     grouping === 'none'
       ? {}

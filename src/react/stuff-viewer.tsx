@@ -260,13 +260,15 @@ export function JsonView({ value }: { value: unknown }) {
         </button>
       )}
       {/* A region that scrolls sideways takes focus, so a keyboard can scroll
-          it, and is named, as a result table's is. */}
+          it, and is named, as a result table's is. On a phone it is never
+          shorter than the 44px Copy JSON button and its inset, so a scalar's
+          one line keeps the button inside its border. */}
       <pre
         role="group"
         aria-label={s.viewJson}
         tabIndex={0}
         className={cn(
-          'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed max-sm:pr-14',
+          'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed max-sm:min-h-[60px] max-sm:pr-14',
           focusOutlineClass,
         )}
       >

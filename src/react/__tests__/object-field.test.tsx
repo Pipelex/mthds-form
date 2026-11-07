@@ -175,6 +175,22 @@ describe('how a structure groups its fields', () => {
     expect(within(home).getByDisplayValue('London')).toBeInTheDocument();
   });
 
+  it("names each form's structure by its own heading when the same method is mounted twice", () => {
+    const titled = (title: string): ObjectRunField => ({ ...structOf([stay]), title });
+    render(
+      <>
+        <Harness field={titled('Trip brief')} initial={{ stay: { city: 'Lisbon' } }} />
+        <Harness field={titled('Press brief')} initial={{ stay: { city: 'Porto' } }} />
+      </>,
+    );
+    // Both structures sit at the same path, so an id built from the path alone
+    // labels the second group with the first one's heading.
+    const trip = screen.getByRole('group', { name: 'Trip brief' });
+    const press = screen.getByRole('group', { name: 'Press brief' });
+    expect(within(trip).getByDisplayValue('Lisbon')).toBeInTheDocument();
+    expect(within(press).getByDisplayValue('Porto')).toBeInTheDocument();
+  });
+
   it("counts a row's structure, so a structure in a form's own list is ruled and not boxed", () => {
     // The list is the form's own field, so nothing above it is a structure.
     // Were the row's structure not counted, the one inside it would read as a
