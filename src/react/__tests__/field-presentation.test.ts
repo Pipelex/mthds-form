@@ -282,9 +282,15 @@ describe('shownItemDescription', () => {
     ).toBeUndefined();
   });
 
-  it('says nothing in studio, where every row shows it, nor for a list that is a row', () => {
+  it('says nothing in studio, where every row shows it', () => {
     const note = 'Email address the invoice is sent to';
     expect(shownItemDescription(note, 'contacts', undefined, kinds, 'studio')).toBeUndefined();
-    expect(shownItemDescription(note, '', undefined, kinds, 'app')).toBeUndefined();
+  });
+
+  it('says it in a list that is a row, which the list above it does not', () => {
+    const note = 'Email address the invoice is sent to';
+    expect(shownItemDescription(note, '', undefined, kinds, 'app')).toBe(note);
+    expect(shownItemDescription(note, '', 'Who receives the invoice', kinds, 'app')).toBe(note);
+    expect(shownItemDescription('A contact', '', 'A contact', kinds, 'app')).toBeUndefined();
   });
 });

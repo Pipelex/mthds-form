@@ -230,8 +230,9 @@ export function shownDescription(
  * "Contacts" and "Who receives the invoice". A top-level plural slot carries
  * one string as both its description and its item's, and says it once.
  * `studio` shows it on every row, and says nothing here. A list that is
- * itself a row has no label, and leaves its item's description to the list
- * above it, as any row does.
+ * itself a row has no label, and says its item's description once in that
+ * row, since the list above it says only what the row is; the wire states
+ * no list of lists, but a host may hand one to the controls.
  */
 export function shownItemDescription(
   itemDescription: string | undefined,
@@ -240,7 +241,7 @@ export function shownItemDescription(
   kinds: readonly ConceptCategory[],
   presentation: FieldPresentation,
 ): string | undefined {
-  if (!itemDescription || presentation !== 'app' || listLabel.trim() === '') return undefined;
+  if (!itemDescription || presentation !== 'app') return undefined;
   if (itemDescription === listDescription) return undefined;
   const said = listDescription ? `${listLabel} ${listDescription}` : listLabel;
   return descriptionAddsToLabel(itemDescription, said, kinds) ? itemDescription : undefined;
