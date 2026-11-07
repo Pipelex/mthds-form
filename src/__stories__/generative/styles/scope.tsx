@@ -34,15 +34,21 @@ const FONTS_PATIENCE_MS = 10_000;
  * any face, so a measurement taken on it reads the fallback faces. A font
  * service that never answers, for the stylesheet or for a face, is waited on
  * for `FONTS_PATIENCE_MS` in all, after which the page is measured in its
- * fallback faces rather than not at all.
+ * fallback faces rather than not at all. A stylesheet still loading by then
+ * is marked `stalled`, so the stories after it measure at once instead of
+ * each spending its own patience, most of a test's time, on the same
+ * silence; if it arrives later after all, its `load` marks it `loaded`.
  */
 export async function styleFontsReady(): Promise<void> {
   let patience: ReturnType<typeof setTimeout> | undefined;
-  const outOfPatience = new Promise<void>((resolve) => {
-    patience = setTimeout(resolve, FONTS_PATIENCE_MS);
+  const outOfPatience = new Promise<'out of patience'>((resolve) => {
+    patience = setTimeout(() => resolve('out of patience'), FONTS_PATIENCE_MS);
   });
   try {
-    await Promise.race([fontsSettled(), outOfPatience]);
+    const outcome = await Promise.race([fontsSettled(), outOfPatience]);
+    const link = document.querySelector<HTMLLinkElement>(FONTS_LINK);
+    if (outcome === 'out of patience' && link?.dataset.appStyleFonts === 'loading')
+      link.dataset.appStyleFonts = 'stalled';
   } finally {
     clearTimeout(patience);
   }
