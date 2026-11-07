@@ -227,6 +227,11 @@ function useAbsolutePath(path: string): string | undefined {
 
 // ─── The escape hatches ──────────────────────────────────────────────────────
 
+/** A label without a trailing "(optional)", which the kernel's own badge says. */
+function withoutOptionalMark(label: string): string {
+  return label.replace(/\s*\(optional\)\s*$/i, '') || label;
+}
+
 function MthdsField({
   props,
 }: BaseComponentProps<{ path: string; label?: string | null; hint?: string | null }>) {
@@ -239,7 +244,9 @@ function MthdsField({
       found && (props.label || props.hint)
         ? {
             ...found,
-            title: props.label || found.title,
+            // The control marks an optional field itself, so a label that
+            // says "(optional)" too would say it twice.
+            title: props.label ? withoutOptionalMark(props.label) : found.title,
             description: props.hint || found.description,
           }
         : found,

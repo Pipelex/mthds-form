@@ -878,7 +878,8 @@ function FileField({
             disabled={busy}
             onClick={() => setShowUrl(true)}
             className={cn(
-              'flex w-fit items-center gap-1 rounded-sm font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
+              'flex w-fit items-center gap-1 rounded-sm text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
+              presentation !== 'app' && 'font-mono',
               focusOutlineClass,
               'focus-visible:outline-offset-2',
             )}

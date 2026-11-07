@@ -1,5 +1,36 @@
 # Changelog
 
+## [Unreleased]
+
+### Highlights
+
+- **The designer method lays out a host's composer and result page, in the team's style**: a layout may now be one moment of a compose-then-result app rather than a whole product page. The designer is handed the frame's own vocabulary (`designerCatalog({ frame })`), the brief names the frame and the team's app style, and the page it writes is validated against the same vocabulary (`frameCatalog`, `layoutCheckProblems`). Storybook's `Generative/Designer frames` stories show three apps' composer and result page, as the kernel's plain view and as the designer method laid them out, in each style.
+- **A refused layout goes back for one more pass**: the method's second entry, `generative.repair_layout`, is handed the page and the checks' problems in words and writes the whole page again with them fixed, which is how a producer recovers a page that one slip would otherwise have thrown away.
+
+### Added
+
+- **Frames**: `FRAMES` (`page`, `composer`, `result`), `componentNamesFor(frame)`, `frameCatalog(frame)`, `COMPOSER_COMPONENTS`, `RESULT_COMPONENTS` and `FRAME_COMPONENTS`. The composer frame places a `Composer` (the page's headline, lede, inputs in one raised panel and the action row) with `FieldGroup`s inside it; the result frame places a `ResultHeader` and the result through `Fact`, `Detail`, `DateText`, `TextList`, `ProportionBar`, `Swatches` and `Picture`. Neither frame has the components the host draws itself (`AppBar`, `Footer`, `Workspace`, `Rail`, `Cta`, `Hero`) nor a bare `Button`. See [docs/generative-ui.md](docs/generative-ui.md) § "A host's frames: the composer and the result page".
+- **`FrameHostProvider` and `useFrameHost`**: a host hands the frame components what only it knows, how long a run takes (`eta`), the result's actions primary first (`actions`) and what each does (`onAction`), so a stored layout never carries them.
+- **A brief for a frame and a style**: `inputBrief` and `resultBrief` take `frame` and `style` (an `AppStyleId` from `./brand`), and `inputBrief` takes the `result` field too, so a composer's brief says what one run gives back. The brief carries the style's name and direction as data, and the method lays them out in a Style section that asks for a composition reading as that style.
+- **What a producer needs beside the method**: `layoutCheckProblems(spec, { frame, descriptor })`, every problem the catalog and the descriptor checks find, one per line, in the words the repair pass reads; `seedLine(seed)`, the one line a creative seed travels as; and `REPAIR_ATTEMPTS`, how many times a refused layout goes back before the host keeps the plain form.
+- **`createStateStore`, re-exported from `./generative`** with the `Spec`, `StateStore` and `StateModel` types, so a host makes the store a page reads with this entry's own json-render rather than a second copy the page would not recognise.
+- **`promptHashSubject(method)`**: what `PROMPT_HASH` hashes, the method's text followed by every frame's catalog.
+- **A `MthdsField` worded by the page**: optional `label` and `hint` props replace the descriptor's title and description where the layout wrote its own.
+- **A `DataTable` column's format**: a column may state `format: 'date'` (or `'text'`, `'number'`), and a date column reads as a day rather than an ISO string.
+
+- **A brand's logo at a root-relative path**: `logo.onLight` and `logo.onDark` in `brand.json` may be a path on the host's own origin (`/brand/logo.svg`) as well as an http(s) URL, accepted only when it resolves on that origin, so `//elsewhere.example/x.svg` is still refused. See [docs/brand.md](docs/brand.md).
+- **A run button a host can hold**: a whole page's `Cta` and a `Composer`'s run button are disabled while the scope's `env.disabled` is set, as the plain form's submit is, so a second press during a run is not a second billed run.
+
+### Changed
+
+- **`PROMPT_HASH` moves, so every layout stored under the previous hash is stale**: the method's Brief gained the style, the method gained `repair_layout`, and the hash now covers every frame's catalog as well as the method's text. A host that keys stored layouts on the hash designs them again; until then it renders the plain form, as it does for any stale layout. An edit to the designer method is a minor release, never a patch.
+- **`designerCatalog()` takes options**: `designerCatalog({ frame })`, the page frame when omitted, which is the catalog it returned before.
+- **The layout checks refuse a Grid whose only child carries the repeat**: json-render renders a repeat's element once and its children once per item, so that Grid was one cell holding every item in a column. `layoutProblems` says to put the repeat on the Grid, which is what the repair pass then does.
+- **In the `app` presentation, the meta marks read in the body face**: a field's optional badge, a list's item count and "paste a URL instead" were monospace beside labels that are not. `studio` keeps them monospace.
+- **A `MthdsField` label that says "(optional)"** has the mark dropped, since the control's own badge says it.
+- **A `Collapsible` draws a chevron that turns as it opens**, so a closed section no longer reads as an empty text field, and its summary is 44 pixels tall.
+- **A layout's props may hold an expression anywhere inside them**: the catalog check no longer refuses a `{ "$state": … }` nested in an array or an object, which json-render resolves where it sits.
+
 ## [v0.30.0] - 2026-11-07
 
 ### Highlights

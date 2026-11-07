@@ -24,7 +24,7 @@ import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
 import { catalog } from './catalog';
 import { frameRenderers } from './frame-registry';
-import { generativeRenderers } from './registry';
+import { generativeRenderers, useDescriptorScope } from './registry';
 import { useResultSlot } from './result-slot';
 import { useControlId } from './ui/shadcn';
 
@@ -289,10 +289,14 @@ function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
 }
 
 function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string | null }>) {
+  // The host's `env.disabled` holds the run while one is going, as it holds
+  // the plain form's submit: a second press would be a second billed run.
+  const busy = useDescriptorScope().env?.disabled ?? false;
   return (
     <div className="mt-6">
       <button
         type="button"
+        disabled={busy}
         onClick={() => emit('press')}
         className={cn(
           'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90',
@@ -301,6 +305,7 @@ function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string 
           // replace or hide.
           actionShadowClass,
           focusOutlineClass,
+          'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-primary',
         )}
       >
         {props.label}

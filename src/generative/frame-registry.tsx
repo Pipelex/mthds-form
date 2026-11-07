@@ -9,11 +9,11 @@ import {
   actionShadowClass,
   headingClass,
   panelFlatShadowClass,
-  panelRaisedShadowClass,
   panelSurfaceClass,
 } from '../react/style-tokens';
 import { cn } from '../react/utils';
 import { useFrameHost } from './frame-host';
+import { useDescriptorScope } from './registry';
 
 /**
  * The renderers of the two frames' vocabularies (`frame-definitions.ts`): the
@@ -61,6 +61,9 @@ interface ComposerProps {
 
 function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) {
   const host = useFrameHost();
+  // The host's `env.disabled` holds the run while one is going, as it holds
+  // the plain form's submit: a second press would be a second billed run.
+  const busy = useDescriptorScope().env?.disabled ?? false;
   const two = props.columns === '2';
   return (
     <div
@@ -81,11 +84,25 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           </p>
         ) : null}
       </div>
+      {/* The composer's panel is the host's panel, so with no style it is the
+          host's hairline with no shadow, as `quiet` asks, and a style's
+          shadow floats it. */}
       <div
         data-style-panel=""
-        className={cn(RADIUS, panelSurfaceClass, panelRaisedShadowClass, 'p-7 max-sm:p-5')}
+        className={cn(RADIUS, panelSurfaceClass, panelFlatShadowClass, 'p-7 max-sm:p-5')}
       >
-        <div className={cn('grid gap-8', two && 'md:grid-cols-2 md:gap-x-10')}>{children}</div>
+        {/* Two columns flow the groups down one column and on into the next,
+            balanced, rather than a grid's rows: a row as tall as its tallest
+            group left a hole beside every long list. The space between groups
+            is a top margin, which a column break truncates. */}
+        <div
+          className={cn(
+            'grid gap-8',
+            two && 'md:block md:columns-2 md:gap-x-10 md:[&>*]:break-inside-avoid md:[&>*+*]:mt-8',
+          )}
+        >
+          {children}
+        </div>
         <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
           {host.eta ? (
             <span className="inline-flex items-center gap-2 text-sm text-muted-foreground max-sm:justify-center">
@@ -96,11 +113,13 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           )}
           <button
             type="button"
+            disabled={busy}
             onClick={() => emit('press')}
             className={cn(
               'inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius,0.5rem)] bg-primary px-[22px] text-[15px] font-semibold text-primary-foreground transition-all hover:bg-primary/90',
               actionShadowClass,
               focusOutlineClass,
+              'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-primary',
             )}
           >
             {props.runLabel} <ArrowRight className="size-4" aria-hidden="true" />
@@ -200,7 +219,19 @@ interface ProportionBarProps {
   valueKey: string;
 }
 
-const SEGMENT_MIX = [100, 70, 45, 85, 30, 60, 20];
+/**
+ * A segment's share of the accent, mixed into the muted fill: an even ramp
+ * from the full accent down to a quarter of it, in the order the parts come,
+ * so two segments are never a near shade of each other the way a fixed
+ * cycle's neighbours (85 after 100, 60 after 70) were.
+ */
+function segmentMix(index: number, count: number): number {
+  return count <= 1 ? 100 : Math.round(100 - (index * 75) / (count - 1));
+}
+
+function segmentColor(index: number, count: number): string {
+  return `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${segmentMix(index, count)}%, var(--muted, hsl(240 4.8% 95.9%)))`;
+}
 
 function amount(value: number, unit: string | null | undefined): string {
   if (unit && /^[A-Z]{3}$/.test(unit)) {
@@ -257,7 +288,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
             key={p.label}
             style={{
               width: `${(p.value / scale) * 100}%`,
-              background: `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${SEGMENT_MIX[i % SEGMENT_MIX.length]}%, var(--muted, hsl(240 4.8% 95.9%)))`,
+              background: segmentColor(i, parts.length),
             }}
           />
         ))}
@@ -271,7 +302,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
             <span
               className="size-2 rounded-[2px]"
               style={{
-                background: `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${SEGMENT_MIX[i % SEGMENT_MIX.length]}%, var(--muted, hsl(240 4.8% 95.9%)))`,
+                background: segmentColor(i, parts.length),
               }}
               aria-hidden="true"
             />
@@ -355,7 +386,9 @@ function Fact({
 function Detail({ props }: BaseComponentProps<{ label: string; value?: unknown }>) {
   if (!present(props.value)) return null;
   return (
-    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 border-b border-border py-2.5 text-[14px] last:border-b-0">
+    // A rule between the rows of a list of details, never under one set in a
+    // row: there it read as an underline on every detail but the last.
+    <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-3 border-b border-border py-2.5 text-[14px] last:border-b-0 [.flex-row>&]:border-b-0 [.flex-row>&]:grid-cols-[auto_minmax(0,1fr)]">
       <span className="text-muted-foreground">{props.label}</span>
       <span className="text-foreground">{String(props.value)}</span>
     </div>

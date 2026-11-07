@@ -303,7 +303,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
           {fieldLabel(field.title, field.name, presentation)}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="list" />}
-        <span className="font-mono text-[10.5px] text-muted-foreground">
+        <span className={cn('text-[10.5px] text-muted-foreground', !isApp && 'font-mono')}>
           {/* "of N" is a claim about an EXACT count, so it needs both bounds and
               needs them equal. Read off `itemCount` alone - the LOWER bound - a
               model saying "at least two" was announced as a list of exactly two
@@ -315,7 +315,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             : s.itemsCount(items.length)}
         </span>
         {shownAsOptional(field) && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span
+            className={cn(
+              'ml-auto text-[10px] uppercase tracking-wider text-muted-foreground',
+              !isApp && 'font-mono',
+            )}
+          >
             {s.optionalBadge}
           </span>
         )}

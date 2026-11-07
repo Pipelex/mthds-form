@@ -8,6 +8,7 @@ import { fieldControlClass } from '../../react/field-styles';
 import { checkedAccentClass, focusOutlineClass } from '../../react/role-tokens';
 import { headingClass, panelFlatShadowClass, panelSurfaceClass } from '../../react/style-tokens';
 import { cn } from '../../react/utils';
+import { ChevronDown } from 'lucide-react';
 import { Switch as SwitchPrimitive } from '../../react/ui/switch';
 
 /**
@@ -234,8 +235,14 @@ export function Collapsible({
       open={props.defaultOpen ?? false}
       data-slot="collapsible"
     >
-      <summary className="cursor-pointer list-none rounded-md px-4 py-3 text-sm font-medium select-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-        {props.title}
+      {/* A chevron that turns as it opens: without one the closed section
+          read as an empty text field with a placeholder. */}
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md px-4 py-3 text-sm font-medium select-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+        <span>{props.title}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground transition-transform [details[open]>summary_&]:rotate-180"
+        />
       </summary>
       <div className="border-t border-border px-4 py-3">{children}</div>
     </details>
