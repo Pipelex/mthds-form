@@ -75,7 +75,9 @@ main_pipe   = "design_layout"
 # text, and fails loudly on any issue, so a repair is a change HERE, never to
 # the fixture.
 #
-# Both model stages pin the same model. The specs pass takes MODEL=<id> to
+# Both model stages pin the same model: gpt-6.1-sol since the designer-reach
+# spike, where a blind critic scored it level with claude-5.5-opus at about a
+# third of the cost per page, with every layout valid. The specs pass takes MODEL=<id> to
 # override every pin at once for a comparative run (and TEMPERATURE=<n> for a
 # model that fixes its own), and records which model produced each fixture.
 #
@@ -308,7 +310,7 @@ type = "PipeLLM"
 description = "Read the brief and plan the page: what it is for, how it is composed, what each region holds and with which components, what runs the method, and what is delegated."
 inputs = { catalog = "Catalog", brief_text = "Text", seed = "Text?" }
 output = "PagePlan"
-model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 8192 }
+model = { model = "gpt-6.1-sol", temperature = 0.5, max_tokens = 8192 }
 system_prompt = """
 You are a product designer with taste. You plan ONE page for a method - its inputs, or its result - to be built from a fixed catalog of components and bound to state the host provides. The page must read as a small, purpose-built web app, never as a form. Its shape is yours to decide: nothing here prescribes one. You write the plan and a second designer builds the page from it, so every decision you leave open is one they will make without you.
 """
@@ -372,12 +374,13 @@ type        = "PipeLLM"
 description = "Build the page the plan describes: emit the JSONL patches of a spec over the catalog, bound to the host's state at the paths the brief lists."
 inputs      = { plan = "PagePlan", catalog = "Catalog", brief_text = "Text" }
 output      = "Text"
-# The object form, because the default output cap (4096 tokens on this model)
-# is not enough for a page over a deeply nested result: the Company hero's
-# first run spent exactly 4096 tokens and came back empty. The object form
+# The object form, because the default output cap (4096 tokens on
+# claude-5-sonnet, where this was learned) is not enough for a page over a
+# deeply nested result: the Company hero's first run spent exactly 4096
+# tokens and came back empty. The object form
 # requires a temperature; this is the runtime's own default, so the setting
 # the earlier captures ran under is unchanged.
-model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 16384 }
+model = { model = "gpt-6.1-sol", temperature = 0.5, max_tokens = 16384 }
 system_prompt = """
 You are a product designer with taste, building ONE page for a method - its inputs, or its result - as a JSON spec over a fixed catalog of components, bound to state the host provides. A designer has planned the page; you build exactly that page, and it must read as a small, purpose-built web app, never as a form.
 """

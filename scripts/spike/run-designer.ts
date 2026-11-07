@@ -5,7 +5,7 @@
  * frame, and keep every capture with what judged it.
  *
  *   npx tsx scripts/spike/run-designer.ts [--only invoice,trip] [--moment compose|result]
- *       [--models claude-5-sonnet,claude-5.5-opus] [--seeds 2] [--round r1]
+ *       [--models gpt-6.1-sol] [--seeds 2] [--round r1]
  *
  * Each capture is compiled, validated against the catalog, held to the frame's
  * vocabulary and checked with `layoutProblems`; one that fails is a finding,
@@ -54,7 +54,7 @@ function arg(name: string): string | undefined {
 
 const only = (arg('--only') ?? 'invoice,trip,slides').split(',');
 const moments = (arg('--moment') ?? 'compose,result').split(',') as Array<'compose' | 'result'>;
-const models = (arg('--models') ?? 'claude-5-sonnet,claude-5.5-opus').split(',');
+const models = (arg('--models') ?? 'gpt-6.1-sol').split(',');
 const seeds = Number(arg('--seeds') ?? '2');
 const round = arg('--round') ?? 'r1';
 const concurrency = Number(arg('--concurrency') ?? '6');
