@@ -402,6 +402,7 @@ describe('a surface on the far side of the page', () => {
     const luminance = ([r, g, b]: readonly number[]) =>
       0.2126 * linear[r!]! + 0.7152 * linear[g!]! + 0.0722 * linear[b!]!;
     const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    /** Each channel's weight on the chroma for the accent's hue, as `fromHsl` lays it out. */
     const lineOf = (accent: string) => {
       const [r, g, b] = [1, 3, 5].map((at) => parseInt(accent.slice(at, at + 2), 16) / 255) as [
         number,
@@ -421,20 +422,16 @@ describe('a surface on the far side of the page', () => {
             : max === g
               ? (b - r) / chroma + 2
               : (r - g) / chroma + 4;
-      return (value: number): number[] => {
-        const c = (1 - Math.abs(2 * value - 1)) * saturation;
-        const x = c * (1 - Math.abs((sector % 2) - 1));
-        const m = value - c / 2;
-        const [r1, g1, b1] = [
-          [c, x, 0],
-          [x, c, 0],
-          [0, c, x],
-          [0, x, c],
-          [x, 0, c],
-          [c, 0, x],
-        ][Math.min(5, Math.floor(sector))]!;
-        return [r1! + m, g1! + m, b1! + m];
-      };
+      const x = 1 - Math.abs((sector % 2) - 1);
+      const weights = [
+        [1, x, 0],
+        [x, 1, 0],
+        [0, 1, x],
+        [0, x, 1],
+        [x, 0, 1],
+        [1, 0, x],
+      ][Math.min(5, Math.floor(sector))]!;
+      return { saturation, weights };
     };
     let refused = 0;
     let derived = 0;
@@ -462,12 +459,20 @@ describe('a surface on the far side of the page', () => {
         }
         refused++;
         const under = backgrounds.map((background) => luminance(bytes(hex(background).components)));
-        const shade = lineOf(accent);
+        const { saturation, weights } = lineOf(accent);
+        const [wr, wg, wb] = weights as [number, number, number];
+        const byte = (channel: number) => Math.round(Math.min(1, Math.max(0, channel)) * 255);
         for (let step = 0; step <= 8192; step++) {
-          const channels = shade(step / 8192);
-          const own = luminance(bytes(channels));
+          // Scalar arithmetic, with nothing allocated, since it runs millions of times.
+          const value = step / 8192;
+          const c = (1 - Math.abs(2 * value - 1)) * saturation;
+          const m = value - c / 2;
+          const r = byte(c * wr + m);
+          const g = byte(c * wg + m);
+          const b = byte(c * wb + m);
+          const own = 0.2126 * linear[r]! + 0.7152 * linear[g]! + 0.0722 * linear[b]!;
           if (!under.every((background) => ratio(own, background) >= 4.5)) continue;
-          const candidate = toHex(channels);
+          const candidate = toHex([r / 255, g / 255, b / 255]);
           const reads = backgrounds.every((background) => contrast(candidate, background) >= 4.5);
           expect(
             reads ? candidate : undefined,
@@ -479,7 +484,9 @@ describe('a surface on the far side of the page', () => {
     // The sweep reaches both answers.
     expect(derived).toBeGreaterThan(0);
     expect(refused).toBeGreaterThan(0);
-  });
+    // A sweep of a thousand derivations, each refusal sampled finely: a
+    // second here and several on a shared CI runner, past the default bound.
+  }, 30_000);
 
   it('keeps every ink it found before, where the extreme reads on every surface', () => {
     // The path every style's surfaces take: the extreme reads on each, so the
