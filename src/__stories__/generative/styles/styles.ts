@@ -38,13 +38,16 @@ export interface Typeface {
   /** The family name, as Google Fonts and a stylesheet name it. */
   family: string;
   category: 'sans-serif' | 'serif';
-  /** The weights a style may ask of it; each is loaded. */
+  /** The weights the stories load it in, read off `axes`. */
   weights: readonly number[];
   /** What renders while the face loads, or when it never does. */
   fallback: string;
   /** Whether a team may pick it as its body face, or a style uses it for headings only. */
   use: 'body' | 'heading';
-  /** The Google Fonts axis spec the stories load it with. */
+  /**
+   * The Google Fonts axis spec the stories load it with. It starts at 300,
+   * the host's own title weight, which a team's face carries on `quiet`.
+   */
   axes: string;
 }
 
@@ -54,15 +57,15 @@ export interface Typeface {
  * heading face and is not offered as a body.
  */
 export const TYPEFACES: readonly Typeface[] = [
-  face('inter', 'Inter', 'sans-serif', 'body', 'wght@400..700'),
-  face('dm-sans', 'DM Sans', 'sans-serif', 'body', 'opsz,wght@9..40,400..700'),
-  face('plus-jakarta-sans', 'Plus Jakarta Sans', 'sans-serif', 'body', 'wght@400..700'),
-  face('manrope', 'Manrope', 'sans-serif', 'body', 'wght@400..700'),
-  face('ibm-plex-sans', 'IBM Plex Sans', 'sans-serif', 'body', 'wght@400;500;600;700'),
-  face('source-sans-3', 'Source Sans 3', 'sans-serif', 'body', 'wght@400..700'),
-  face('work-sans', 'Work Sans', 'sans-serif', 'body', 'wght@400..700'),
-  face('space-grotesk', 'Space Grotesk', 'sans-serif', 'body', 'wght@400..700'),
-  face('newsreader', 'Newsreader', 'serif', 'heading', 'opsz,wght@6..72,400..700'),
+  face('inter', 'Inter', 'sans-serif', 'body', 'wght@300..700'),
+  face('dm-sans', 'DM Sans', 'sans-serif', 'body', 'opsz,wght@9..40,300..700'),
+  face('plus-jakarta-sans', 'Plus Jakarta Sans', 'sans-serif', 'body', 'wght@300..700'),
+  face('manrope', 'Manrope', 'sans-serif', 'body', 'wght@300..700'),
+  face('ibm-plex-sans', 'IBM Plex Sans', 'sans-serif', 'body', 'wght@300;400;500;600;700'),
+  face('source-sans-3', 'Source Sans 3', 'sans-serif', 'body', 'wght@300..700'),
+  face('work-sans', 'Work Sans', 'sans-serif', 'body', 'wght@300..700'),
+  face('space-grotesk', 'Space Grotesk', 'sans-serif', 'body', 'wght@300..700'),
+  face('newsreader', 'Newsreader', 'serif', 'heading', 'opsz,wght@6..72,300..700'),
 ];
 
 function face(
@@ -76,7 +79,7 @@ function face(
     id,
     family,
     category,
-    weights: [400, 500, 600, 700],
+    weights: axisWeights(axes),
     fallback:
       category === 'serif'
         ? 'ui-serif, Georgia, Cambria, "Times New Roman", serif'
@@ -84,6 +87,26 @@ function face(
     use,
     axes,
   };
+}
+
+/**
+ * The weights a Google Fonts axis spec loads: every hundred of a `wght`
+ * range (`wght@300..700`, `opsz,wght@9..40,300..700`), or each weight it
+ * lists (`wght@300;400;500`).
+ */
+export function axisWeights(axes: string): number[] {
+  const [names = '', values = ''] = axes.split('@');
+  const at = names.split(',').indexOf('wght');
+  if (at < 0) return [];
+  const weights = new Set<number>();
+  for (const tuple of values.split(';')) {
+    const value = tuple.split(',')[at] ?? '';
+    const [low, high] = value.split('..').map(Number);
+    if (low === undefined || Number.isNaN(low)) continue;
+    const top = high === undefined || Number.isNaN(high) ? low : high;
+    for (let weight = Math.ceil(low / 100) * 100; weight <= top; weight += 100) weights.add(weight);
+  }
+  return [...weights].sort((a, b) => a - b);
 }
 
 export function typeface(id: TypefaceId): Typeface {
@@ -98,12 +121,6 @@ export function fontStack(id: TypefaceId): string {
   return `"${found.family}", ${found.fallback}`;
 }
 
-/**
- * How a style draws a panel: its fill and its edge as references to roles
- * the theme already has, and its shadow, which is a value of its own in each
- * theme because a shadow that reads on a light page is invisible on a dark
- * one.
- */
 /** A value that differs by theme, or one value for both. */
 export type Themed = string | { light: string; dark: string };
 
@@ -111,6 +128,17 @@ export function inTheme(value: Themed, theme: 'light' | 'dark'): string {
   return typeof value === 'string' ? value : value[theme];
 }
 
+/**
+ * How a style draws the host's panel - the composer's, with its action row:
+ * its fill and its edge as references to roles the theme already has, and
+ * its shadow, which is a value of its own in each theme because a shadow that
+ * reads on a light page is invisible on a dark one.
+ *
+ * It reaches no other box. A group inside the panel (a structure's fields, a
+ * list's rows) keeps the kernel's own fill and hairline, and a captured
+ * layout keeps its own cards: the stories apply a style to neither, so the
+ * table holds no value for them that a page has shown.
+ */
 export interface PanelTreatment {
   /**
    * The panel's fill: a role of the theme contract, or one mixed with the
@@ -124,17 +152,9 @@ export interface PanelTreatment {
   /** The panel's shadow in each theme, or none. */
   shadow: { light: string; dark: string } | null;
   /**
-   * A group inside a panel - a structure's fields, a list's row: its fill and
-   * its edge, never a shadow, so a panel never floats inside another.
+   * The fields' own fill (the kernel's `--input`), where the host's would
+   * sink into the panel; absent, the host's.
    */
-  inset: { fill: Themed; edge: Themed };
-  /**
-   * A group inside a group: its fill, where it must differ from its parent's
-   * to read as a container rather than an indent; absent, it takes the
-   * group's.
-   */
-  nested?: Themed;
-  /** The fields' own fill inside the panel, where the host's would sink into it; absent, the host's. */
   field?: Themed;
 }
 
@@ -158,11 +178,10 @@ export interface AppStyle {
    */
   actionShadow: string | null;
   /**
-   * The rhythm, as a multiple of the gaps and paddings of the page - the
-   * host's margins around the form, and the form's and the layer's own gaps
-   * through Tailwind's `--spacing` - or null for the host's own. It never
-   * reaches a control: every control resets `--spacing` to the base, because
-   * scoping it to the page, the first way tried, scaled every control's
+   * The rhythm, as a multiple of the host frame's own margins, paddings and
+   * gaps around the form (`frame.css` reads it), or null for the host's own.
+   * It reaches neither the form inside nor a control: scoping Tailwind's
+   * `--spacing` to the page, the first way tried, scaled every control's
    * height with the rhythm (a text field 39.6px tall under `bold`, under the
    * 44px a finger needs; 52.8px under `editorial`).
    */
@@ -209,15 +228,8 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
         light: '0 1px 2px rgb(16 24 40 / 0.05), 0 12px 32px -10px rgb(16 24 40 / 0.16)',
         dark: '0 2px 4px rgb(0 0 0 / 0.55), 0 24px 56px -12px rgb(0 0 0 / 0.95)',
       },
-      inset: {
-        fill: {
-          light: 'color-mix(in oklab, var(--muted) 70%, transparent)',
-          dark: 'color-mix(in oklab, var(--foreground) 5%, transparent)',
-        },
-        edge: 'transparent',
-      },
-      // White fields on the tinted groups, dark ones on the lifted panel: a
-      // field the same tint as its group lost its edge.
+      // Fields set into the panel: white on a light page, the page itself
+      // under the lifted panel on a dark one.
       field: { light: 'var(--card)', dark: 'var(--background)' },
     },
     actionShadow: '0 8px 20px -8px color-mix(in oklab, var(--primary) 60%, transparent)',
@@ -238,7 +250,6 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
       edge: 'var(--border)',
       edgeWidth: '1px',
       shadow: null,
-      inset: { fill: 'transparent', edge: 'var(--border)' },
     },
     actionShadow: 'none',
     density: 1.25,
@@ -254,21 +265,11 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
     bodyFace: 'space-grotesk',
     radius: '6px',
     panel: {
-      // One firm edge around a solid panel, and groups inside it set apart by
-      // their fill alone: an edge on every level read as a wireframe.
+      // One firm edge around a solid panel, softer on a dark page.
       fill: 'var(--muted)',
       edge: { light: FIRM_EDGE, dark: 'color-mix(in oklab, var(--foreground) 30%, transparent)' },
       edgeWidth: '2px',
       shadow: null,
-      inset: {
-        // Raised off the panel in both themes: the card on a light page, the
-        // panel toward the foreground on a dark one, where the card is darker.
-        fill: {
-          light: 'var(--card)',
-          dark: 'color-mix(in oklab, var(--muted) 90%, var(--foreground))',
-        },
-        edge: 'transparent',
-      },
     },
     actionShadow: 'none',
     density: 0.85,
@@ -288,10 +289,9 @@ export type StyleTokens = Record<string, string>;
  *   else the style's) and the heading face (the style's own, or the body's).
  * - `--heading-weight`, `--heading-tracking`.
  * - `--radius`: the control radius; panels derive theirs from it.
- * - `--panel-fill`, `--panel-edge`, `--panel-edge-width`, `--panel-shadow`; `--inset-fill` and
- *   `--inset-edge` for a group inside a panel.
- * - `--inset-nested-fill`, a group inside a group, and `--input`, the
- *   fields' fill, where a style sets them.
+ * - `--panel-fill`, `--panel-edge`, `--panel-edge-width`, `--panel-shadow`:
+ *   the host's panel, read by `frame.css`.
+ * - `--input`, the fields' fill, where a style sets one.
  * - `--action-shadow`: the designed page's call to action.
  * - `--density`: the rhythm, read by the host's frame around the form.
  */
@@ -317,9 +317,6 @@ export function styleTokens(
     tokens['--panel-edge'] = inTheme(style.panel.edge, theme);
     tokens['--panel-edge-width'] = style.panel.edgeWidth;
     tokens['--panel-shadow'] = style.panel.shadow ? style.panel.shadow[theme] : 'none';
-    tokens['--inset-fill'] = inTheme(style.panel.inset.fill, theme);
-    tokens['--inset-edge'] = inTheme(style.panel.inset.edge, theme);
-    if (style.panel.nested) tokens['--inset-nested-fill'] = inTheme(style.panel.nested, theme);
     if (style.panel.field) tokens['--input'] = inTheme(style.panel.field, theme);
   }
   if (style.actionShadow !== null) tokens['--action-shadow'] = style.actionShadow;

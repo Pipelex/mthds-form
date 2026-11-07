@@ -4,19 +4,43 @@ import { HOST_PAGE, TEAMS, teamTokens, type TeamKey } from './teams';
 import './frame.css';
 import './styles.css';
 
+const FONTS_LINK = 'link[data-app-style-fonts]';
+
 /**
  * The faces, loaded once from Google Fonts. Story-only: a host self-hosts the
- * closed list instead, so its pages make no request to a font service.
+ * closed list instead, so its pages make no request to a font service. The
+ * link records whether its stylesheet is still loading, for `styleFontsReady`.
  */
 function useStyleFonts(): void {
   React.useEffect(() => {
-    if (document.querySelector('link[data-app-style-fonts]')) return;
+    if (document.querySelector(FONTS_LINK)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = googleFontsHref();
-    link.dataset.appStyleFonts = '';
+    link.dataset.appStyleFonts = 'loading';
+    link.addEventListener('load', () => (link.dataset.appStyleFonts = 'loaded'), { once: true });
+    link.addEventListener('error', () => (link.dataset.appStyleFonts = 'failed'), { once: true });
     document.head.appendChild(link);
   }, []);
+}
+
+/**
+ * Resolves once the faces a page uses have loaded, or failed to: first the
+ * stylesheet that declares them, then the faces themselves. `document.fonts
+ * .ready` alone resolves before a stylesheet an effect appended has declared
+ * any face, so a measurement taken on it reads the fallback faces.
+ */
+export async function styleFontsReady(): Promise<void> {
+  const link = document.querySelector<HTMLLinkElement>(FONTS_LINK);
+  if (link?.dataset.appStyleFonts === 'loading') {
+    await new Promise<void>((resolve) => {
+      link.addEventListener('load', () => resolve(), { once: true });
+      link.addEventListener('error', () => resolve(), { once: true });
+    });
+  }
+  // A layout pass is what requests the faces the page now declares.
+  document.body.getBoundingClientRect();
+  await document.fonts.ready;
 }
 
 function declarations(tokens: Record<string, string>): string {
@@ -26,7 +50,10 @@ function declarations(tokens: Record<string, string>): string {
 }
 
 export interface AppScopeProps {
-  /** The style; `none` renders the host's page with no style class at all. */
+  /**
+   * The style; `none` renders the host's page with no style class at all. A
+   * typeface on it sets what it sets on `quiet`, the host's own look.
+   */
   style: AppStyleId | 'none';
   /** The team whose colours the page wears, or none. */
   team: TeamKey | null;
@@ -47,7 +74,11 @@ export function AppScope({ style, team, typeface = null, children }: AppScopePro
   const scope = `app-scope-${React.useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const css = React.useMemo(() => {
     const theme = (mode: 'light' | 'dark') => ({
-      ...(style === 'none' ? {} : styleTokens(style, typeface, mode)),
+      ...(style !== 'none'
+        ? styleTokens(style, typeface, mode)
+        : typeface
+          ? styleTokens('quiet', typeface, mode)
+          : {}),
       ...(team ? teamTokens(TEAMS[team], HOST_PAGE[mode]) : {}),
     });
     const light = declarations(theme('light'));

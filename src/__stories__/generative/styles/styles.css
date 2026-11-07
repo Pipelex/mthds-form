@@ -2,22 +2,26 @@
  * The app styles, applied to the rendered page - story-only, and disposable.
  *
  * Every value comes from `styles.ts` as a custom property set on the style's
- * scope (`--font-sans`, `--font-heading`, `--heading-weight`,
- * `--heading-tracking`, `--radius`, `--panel-fill`, `--panel-edge`,
- * `--panel-edge-width`, `--panel-shadow`, `--inset-fill`, `--inset-edge`,
- * `--inset-nested-fill`, `--input`, `--action-shadow`, `--density`); this
- * file only says
- * WHERE they land on the DOM the kernel's controls and the generative layer
- * draw today. It reaches
- * that DOM by its utility classes, which is exactly why it is disposable: the
- * components are meant to read these tokens themselves, each with today's
- * value as its fallback, and this file is deleted then.
+ * scope. Three of them the kernel already reads as theme tokens (`--radius`,
+ * `--input`, and `--font-sans` through Tailwind's `font-sans`); the host's
+ * frame reads the panel tokens and `--density` (`frame.css`); and this file
+ * says where the rest land on the DOM the kernel's controls and the
+ * generative layer draw today: the faces (`--font-sans`, `--font-heading`),
+ * the titles (`--heading-weight`, `--heading-tracking`) and the call to
+ * action (`--action-shadow`). It reaches that DOM by its utility classes,
+ * which is exactly why it is disposable: the components are meant to read
+ * these tokens themselves, each with today's value as its fallback, and this
+ * file is deleted then.
+ *
+ * Nothing here draws a box. A captured layout keeps its own cards, and a
+ * group inside the host's panel keeps the kernel's own fill and hairline.
  *
  * The faces and the headings are turned on by a style's class. `quiet` has
  * none: it is the host's own look, and a page wearing it renders exactly as
  * one wearing no style, unless a team picked a typeface, which
- * `data-typeface` marks. The panels are read on every host page, because the
- * host states its own panel treatment through the same tokens.
+ * `data-typeface` marks on any host page. The titles and the action are read
+ * on every host page, because the host states its own treatment of both
+ * through the same tokens.
  *
  * Plain CSS, unlayered, so it outranks the utilities it overrides.
  */
@@ -28,10 +32,10 @@
  */
 
 /* ---- faces ---- */
-:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-style[data-typeface]) {
+:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-host[data-typeface]) {
   font-family: var(--font-sans);
 }
-:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-style[data-typeface])
+:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-host[data-typeface])
   :is(h1, h2, h3):not([class~='uppercase']) {
   font-family: var(--font-heading, var(--font-sans));
 }

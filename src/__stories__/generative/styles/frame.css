@@ -33,14 +33,11 @@
   --ring: #2f5bd3;
   --link: #2f5bd3;
   --radius: 6px;
-  /* The host's own panels: a hairline, no shadow, and a group inside a panel
-     as the kernel draws it. A style overrides these. */
+  /* The host's own panel: a hairline and no shadow. A style overrides these. */
   --panel-fill: var(--card);
   --panel-edge: var(--border);
   --panel-edge-width: 1px;
   --panel-shadow: none;
-  --inset-fill: color-mix(in oklab, var(--card) 40%, transparent);
-  --inset-edge: var(--border);
   /* The host's own titles: light and slightly tight. A style overrides these. */
   --heading-weight: 300;
   --heading-tracking: -0.025em;
@@ -170,7 +167,6 @@
 }
 .af-display {
   font-family: var(--font-heading, inherit);
-  text-wrap: balance;
   font-size: 36px;
   line-height: 1.1;
   font-weight: var(--heading-weight);

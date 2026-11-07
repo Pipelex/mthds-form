@@ -1,7 +1,7 @@
 import { deriveBrandRoles, type BrandSeeds } from '../../../brand';
 
 /**
- * Three teams' colours, as a team sets them: up to three seeds (the button,
+ * Teams' colours, as a team sets them: up to three seeds (the button,
  * the accent, the header band) and a logo. The seeds are real sites' own
  * colours, read off the custom properties each site's stylesheets declare,
  * from the brands a brand-reading method produced from those sites on

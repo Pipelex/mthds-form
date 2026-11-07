@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { deriveBrandRoles } from '../../brand';
 import {
   APP_STYLES,
   APP_STYLE_IDS,
   TYPEFACES,
+  axisWeights,
   fontStack,
   inTheme,
   googleFontsHref,
@@ -62,7 +64,7 @@ describe('styleTokens', () => {
         const tokens = styleTokens(id, null, theme);
         expect('--action-shadow' in tokens).toBe(APP_STYLES[id].actionShadow !== null);
         // The tokens a style sets only where it departs from the host's.
-        const optional = ['--action-shadow', '--inset-nested-fill', '--input'];
+        const optional = ['--action-shadow', '--input'];
         const rest = Object.keys(tokens).filter((name) => !optional.includes(name));
         expect(rest.sort()).toEqual(
           [
@@ -71,8 +73,6 @@ describe('styleTokens', () => {
             '--font-sans',
             '--heading-tracking',
             '--heading-weight',
-            '--inset-edge',
-            '--inset-fill',
             '--panel-edge',
             '--panel-edge-width',
             '--panel-fill',
@@ -98,7 +98,8 @@ describe('styleTokens', () => {
     for (const id of APP_STYLE_IDS) {
       const panel = APP_STYLES[id].panel;
       if (!panel) continue;
-      for (const themed of [panel.fill, panel.edge, panel.inset.fill, panel.inset.edge]) {
+      const themes = [panel.fill, panel.edge, ...(panel.field ? [panel.field] : [])];
+      for (const themed of themes) {
         for (const theme of THEMES) {
           const value = inTheme(themed, theme);
           expect(value, `${id}: ${value}`).not.toMatch(literal);
@@ -125,15 +126,30 @@ describe('the typefaces', () => {
     expect(() => typeface('comic-sans' as never)).toThrow();
   });
 
-  it('loads every face, each with the weights a style asks of it', () => {
+  it('reads the weights an axis spec loads, from a range or a list', () => {
+    expect(axisWeights('wght@300..700')).toEqual([300, 400, 500, 600, 700]);
+    expect(axisWeights('opsz,wght@9..40,350..600')).toEqual([400, 500, 600]);
+    expect(axisWeights('wght@400;600')).toEqual([400, 600]);
+    expect(axisWeights('opsz@9..40')).toEqual([]);
+  });
+
+  it("loads every face, each with the weights a style asks of it and the host's own title weight", () => {
     const href = googleFontsHref();
     for (const face of TYPEFACES)
-      expect(href).toContain(`family=${face.family.replace(/ /g, '+')}:`);
+      expect(href).toContain(`family=${face.family.replace(/ /g, '+')}:${face.axes}`);
     expect(href).toMatch(/&display=swap$/);
+    // The host's titles keep their weight under a team's face on `quiet`.
+    const frame = readFileSync(new URL('../generative/styles/frame.css', import.meta.url), 'utf8');
+    const host = Number(/--heading-weight:\s*(\d+)/.exec(frame)?.[1]);
+    expect(host).toBeGreaterThan(0);
+    const asked = [host];
     for (const id of APP_STYLE_IDS) {
       const { headingWeight } = APP_STYLES[id];
-      if (headingWeight === null) continue;
-      for (const face of TYPEFACES) expect(face.weights).toContain(headingWeight);
+      if (headingWeight !== null) asked.push(headingWeight);
+    }
+    for (const face of TYPEFACES) {
+      expect(face.weights).toEqual(axisWeights(face.axes));
+      for (const weight of asked) expect(face.weights, face.family).toContain(weight);
     }
   });
 });

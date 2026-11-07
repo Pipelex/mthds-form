@@ -13,12 +13,12 @@ import { SPECS as TRIPS_SPECS } from '../../_generated/trips.specs';
 import { atWidth, expectTouchTarget, pinnedTo } from '../../touch-target';
 import { GENERATIVE_STORY_PARAMETERS, assertRenderable, heroFields } from '../layout-page';
 import { DesignedPage, Frame } from './frame';
-import { AppScope } from './scope';
+import { AppScope, styleFontsReady } from './scope';
 import { APP_STYLE_IDS, TYPEFACES, type AppStyleId, type TypefaceId } from './styles';
 import { TEAM_KEYS, type TeamKey } from './teams';
 
 /**
- * The four app styles, worn by a host's page: a style (`quiet`, `soft`,
+ * The app styles, worn by a host's page: a style (`quiet`, `soft`,
  * `editorial`, `bold`) and a team's colours (none, or `stripe`, `gov-uk`,
  * `typer`, each read off that site), on two kinds of page.
  *
@@ -219,7 +219,7 @@ const CONTROLS =
  * The controls that are short of 44px on a phone with no style as with one,
  * filed as L-261107-96ad4c: the kernel's enum options (36px) and the result
  * view's Download button (28px). A style sizes neither, so these stories hold
- * every other control and leave those two to the kernel's own phone stories.
+ * every other control and leave those to the kernel's own phone stories.
  */
 function knownShort(control: Element): boolean {
   return control.getAttribute('role') === 'radio' || control.textContent?.trim() === 'Download';
@@ -232,7 +232,7 @@ function knownShort(control: Element): boolean {
  */
 async function expectPhoneReady(canvasElement: HTMLElement) {
   await atWidth('phone');
-  await document.fonts.ready;
+  await styleFontsReady();
   await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
   const controls = [...canvasElement.querySelectorAll(CONTROLS)].filter((control) => {
     const box = control.getBoundingClientRect();

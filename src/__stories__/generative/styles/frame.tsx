@@ -1,5 +1,3 @@
-import * as React from 'react';
-import { createStateStore } from '@json-render/core';
 import type { RunField } from '../../../core';
 import {
   buildResultField,
@@ -13,9 +11,8 @@ import {
   ResultEnvProvider,
   StuffViewer,
   useMethodForm,
-  type FieldEnv,
 } from '../../../react';
-import { GenerativePage, pathFromDomId, seedInputs, type SpecFixture } from '../../../generative';
+import { GenerativePage, type SpecFixture } from '../../../generative';
 import { deriveBrandRoles, type BrandManifest } from '../../../brand';
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../../_generated/trips';
 import {
@@ -24,6 +21,7 @@ import {
 } from '../../_generated/composites';
 import { PAYLOADS as COMPOSITE_PAYLOADS } from '../../_generated/composites.payloads';
 import { STOCK } from '../brands';
+import { useLayoutStore } from '../layout-page';
 import { HOST_PAGE, TEAMS, type TeamKey } from './teams';
 
 /**
@@ -68,22 +66,20 @@ const PENCIL = 'M4 20h4L19 9l-4-4L4 16v4z';
 
 /**
  * The logo the band draws: the team's, or the host's own when the app wears no
- * team's colours. On a team's band, the mark is the one drawn for that band's
- * ground - the light mark on a dark band - in both themes; on the host's own
- * band, the theme decides.
+ * team's colours. On a light page a team's band is its header colour, so the
+ * mark is the one drawn for that ground - the light mark on a dark band; on a
+ * dark page the band is the page itself (`bandOn`), so it takes the light
+ * mark. With no band, the theme decides.
  */
 function Logo({ team }: { team: TeamKey | null }) {
   const { name, logo } = team
     ? TEAMS[team]
     : { name: STOCK.manifest.name, logo: { ...STOCK.manifest.logo, wide: true } };
   const onBand = team ? deriveBrandRoles(TEAMS[team].seeds, HOST_PAGE.light).onHeader : undefined;
-  const marks: Array<['on-light' | 'on-dark' | 'on-band', string]> =
-    onBand === undefined
-      ? [
-          ['on-light', logo.onLight],
-          ['on-dark', logo.onDark],
-        ]
-      : [['on-band', onBand === '#ffffff' ? logo.onDark : logo.onLight]];
+  const marks: Array<['on-light' | 'on-dark', string]> = [
+    ['on-light', onBand === '#ffffff' ? logo.onDark : logo.onLight],
+    ['on-dark', logo.onDark],
+  ];
   return (
     <span className="af-logo">
       {marks.map(([which, src]) => (
@@ -293,16 +289,7 @@ export function DesignedPage({
   team: TeamKey | null;
   idPrefix: string;
 }) {
-  const store = React.useMemo(() => createStateStore({ inputs: seedInputs(fields) }), [fields]);
-  const env = React.useMemo<FieldEnv>(
-    () => ({
-      onDropFile: (id, file) => {
-        const path = pathFromDomId(idPrefix, id);
-        if (path) store.set(path, { url: URL.createObjectURL(file), filename: file.name });
-      },
-    }),
-    [idPrefix, store],
-  );
+  const { store, env } = useLayoutStore(fields, idPrefix);
   const page = (
     <div>
       <FieldPresentationProvider presentation="app">
