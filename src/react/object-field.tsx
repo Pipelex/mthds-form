@@ -32,10 +32,25 @@ interface ObjectFieldProps {
 const StructureDepthContext = createContext(0);
 
 /**
+ * Whether the host draws the form inside a panel of its own, which
+ * `MethodForm`'s `framed` states. Only the host knows it: the kernel cannot
+ * see the box around it, and a form on a bare page still needs its own card
+ * to say where a structure ends. Only `ObjectField` reads it, and only for a
+ * form's own structure (`section`, below).
+ */
+export const FramedFormContext = createContext(false);
+
+/**
  * How a structure groups its sub-fields, by where it stands.
  *
  * - `box`: a structure that is a form's own field, under its name - one
  *   hairline card, which is what says where the structure ends.
+ * - `section`: the same structure when the host has framed the form in a
+ *   panel of its own (`FramedFormContext`). The host's panel is already the
+ *   card, so a second one inside it read as a box in a box: the structure's
+ *   name heads its fields with nothing drawn around them, and `MethodForm`
+ *   sets a hairline between it and any input beside it, which is what says
+ *   where it ends.
  * - `rule`: a structure inside a structure, under its name - its fields hang
  *   from a rule along their left edge rather than from a second card inside
  *   the first. A card in a card in a host's panel is three boxes deep, and on
@@ -44,11 +59,12 @@ const StructureDepthContext = createContext(0);
  * - `none`: a structure whose name is not drawn, which is a list's row. The
  *   row is already a box, so the structure adds nothing around its fields.
  */
-type StructureGrouping = 'box' | 'rule' | 'none';
+type StructureGrouping = 'box' | 'section' | 'rule' | 'none';
 
-function structureGrouping(depth: number, labelled: boolean): StructureGrouping {
+function structureGrouping(depth: number, labelled: boolean, framed: boolean): StructureGrouping {
   if (!labelled) return 'none';
-  return depth === 0 ? 'box' : 'rule';
+  if (depth > 0) return 'rule';
+  return framed ? 'section' : 'box';
 }
 
 /**
@@ -73,7 +89,8 @@ function structureNameClass(isApp: boolean, depth: number): string {
 /**
  * A structured concept: its sub-fields under its name, grouped by where the
  * structure stands (`StructureGrouping`): a card for a form's own structure,
- * a rule for one inside another, and nothing for a list's row, so nesting
+ * or a section when the host has framed the form in its own panel, a rule
+ * for one inside another, and nothing for a list's row, so nesting
  * stays legible without boxing a field into a sliver of a phone. Empty
  * optional sub-fields collapse behind a "+ N optional" toggle - required and
  * already-filled fields always show.
@@ -94,7 +111,7 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   const depth = use(StructureDepthContext);
   const data = value ?? {};
   const label = fieldLabel(field.title, field.name, presentation);
-  const grouping = structureGrouping(depth, label.trim() !== '');
+  const grouping = structureGrouping(depth, label.trim() !== '', use(FramedFormContext));
   // Document-unique, as every control's id is: two forms mounting the same
   // method must not label one structure with the other's name.
   const domId = useFieldDomId(id);
@@ -142,7 +159,13 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
         };
 
   return (
-    <div className="space-y-2" {...group}>
+    <div
+      className="space-y-2"
+      // What `MethodForm` sets its hairline against, beside a framed form's
+      // own structure.
+      data-form-section={grouping === 'section' ? '' : undefined}
+      {...group}
+    >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span id={nameId} className={cn('text-foreground', structureNameClass(isApp, depth))}>
           {label}
@@ -162,8 +185,10 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
         className={cn(
           'space-y-4',
           grouping === 'box' && 'rounded-lg border bg-card/40 p-4 max-sm:p-3',
+          grouping === 'section' && 'pt-2',
           grouping === 'rule' && 'border-l-2 pl-4 max-sm:pl-3',
-          grouping !== 'none' && (error ? 'border-destructive/50' : 'border-border'),
+          (grouping === 'box' || grouping === 'rule') &&
+            (error ? 'border-destructive/50' : 'border-border'),
         )}
       >
         <StructureDepthContext value={depth + 1}>

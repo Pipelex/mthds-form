@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`MethodForm`'s `framed`**: a host that draws the form inside a panel of its own says so, and a structure among the inputs is then a section, its name a heading over its fields, set off from the inputs beside it by a hairline across the form, rather than a card inside the host's panel; without it a structure keeps its card. The grouping is on the DOM as `data-structure-group="section"`. See [docs/method-form.md](docs/method-form.md).
+
 ## [v0.30.0] - 2026-11-07
 
 ### Highlights

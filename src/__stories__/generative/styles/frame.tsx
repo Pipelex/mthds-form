@@ -175,7 +175,8 @@ function ComposeBody() {
           <p className="af-lead">{TRIP_APP.lede}</p>
         </div>
         <div className="af-panel af-comp">
-          <MethodForm form={form} presentation="app" />
+          {/* The panel is the host's, so the form draws no card inside it. */}
+          <MethodForm form={form} presentation="app" framed />
           <div className="af-act">
             <span className="af-eta">
               <Icon d={CLOCK} /> {TRIP_APP.eta}

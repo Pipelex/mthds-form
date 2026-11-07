@@ -117,6 +117,37 @@ describe('what the form renders and reports', () => {
   });
 });
 
+describe('a form its host has framed', () => {
+  const groupings = (container: HTMLElement) =>
+    [...container.querySelectorAll('[data-structure-group]')].map((group) =>
+      group.getAttribute('data-structure-group'),
+    );
+
+  it('boxes each structure among its inputs when the host draws no panel around it', () => {
+    const { container } = render(<Harness {...SHOP} />);
+    expect(groupings(container)).toEqual(['box']);
+    expect(container.querySelector('[data-form-section]')).toBeNull();
+  });
+
+  it("draws each one as a section, ruled off from what follows, inside the host's panel", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Harness {...SHOP} formProps={{ framed: true }} />);
+    await user.click(screen.getByRole('button', { name: '1 optional input' }));
+    // The shop and the refund account, each a section; the bank account
+    // inside the shop folds behind its own disclosure.
+    expect(groupings(container)).toEqual(['section', 'section']);
+    const stack = container.querySelector('[data-form-section]')!.parentElement!;
+    // The rules are the stack's: jsdom computes no style, so the classes are
+    // what can be read here, and the stories measure the drawn hairline.
+    expect(stack.className).toContain('[&>[data-form-section]+*]:border-t');
+    expect(stack.className).toContain('[&>*+[data-form-section]]:border-t');
+    // The disclosure is a block of its own, so the rule above it runs the
+    // form's width rather than the button's.
+    const disclosure = screen.getByRole('button', { name: 'Hide optional inputs' });
+    expect(disclosure.parentElement!.parentElement).toBe(stack);
+  });
+});
+
 describe('initial values', () => {
   it('lays a host value over the method’s seed until the first edit', async () => {
     const user = userEvent.setup();

@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import type { BooleanRunField, ListRunField, ObjectRunField, TextRunField } from '../../core';
-import { ObjectField } from '../object-field';
+import { FramedFormContext, ObjectField } from '../object-field';
 import { FieldRenderer } from '../field-renderer';
 
 const flag = (name: string): BooleanRunField => ({
@@ -136,6 +136,31 @@ describe('how a structure groups its fields', () => {
     // The request's own card, then the stay's rule inside it.
     expect(groups).toEqual(['box', 'rule']);
     expect(groupingAround(screen.getByDisplayValue('Lisbon'))).toBe('rule');
+  });
+
+  it("draws a framed form's own structure as a section, with no card in the host's panel", () => {
+    // The host's panel is already the card; a second one inside it read as a
+    // box in a box under every style.
+    const { container } = render(
+      <FramedFormContext value>
+        <Harness
+          field={request}
+          initial={{ stay: { city: 'Lisbon' }, travellers: [{ name: 'Ada', home: {} }] }}
+        />
+      </FramedFormContext>,
+    );
+    const groups = [...container.querySelectorAll('[data-structure-group]')].map((group) =>
+      group.getAttribute('data-structure-group'),
+    );
+    // The request's section, the stay's rule, the row's nothing, the home's rule.
+    expect(groups).toEqual(['section', 'rule', 'none', 'rule']);
+    const section = container.querySelector('[data-structure-group="section"]')!;
+    expect(section.className).not.toMatch(/\bborder\b|\brounded/);
+    // Still the group its heading names, and the one `MethodForm` sets its rule against.
+    const brief = screen.getByRole('group', { name: 'brief' });
+    expect(brief).toHaveAttribute('data-form-section');
+    expect(within(brief).getByDisplayValue('Lisbon')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-form-section]')).toHaveLength(1);
   });
 
   it("draws nothing around a row's structure, and rules a structure inside the row", () => {
