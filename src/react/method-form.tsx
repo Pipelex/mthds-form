@@ -782,15 +782,18 @@ type MethodFormFieldsProps = Omit<MethodFormProps, 'locale' | 'strings' | 'prese
 
 /**
  * The hairline a framed form sets between a structure's section and any
- * input, disclosure or example row beside it: above whatever follows a
- * section, and above a section that follows anything. It is the edge the
- * section's card drew when the form was not framed, drawn once between two
- * neighbours rather than around one of them, so a section last in the form
- * leaves no rule over the host's own action row. Tailwind reads the classes
- * whole in source, so they are spelled out.
+ * input, disclosure or example row beside it: under a section that anything
+ * follows, and over a section that follows anything but another section, so
+ * two sections share one rule. It is the edge the section's card drew when
+ * the form was not framed, drawn once between two neighbours rather than
+ * around one of them, so a section last in the form leaves no rule over the
+ * host's own action row. Each rule is the section's own: a neighbour's root
+ * may be a box of its own (a boolean's row is filled, bordered and padded),
+ * and a border or padding set on it would reshape that box. Tailwind reads
+ * the classes whole in source, so they are spelled out.
  */
 const SECTION_RULES =
-  '[&>[data-form-section]+*]:border-t [&>[data-form-section]+*]:border-border [&>[data-form-section]+*]:pt-6 [&>*+[data-form-section]]:border-t [&>*+[data-form-section]]:border-border [&>*+[data-form-section]]:pt-6';
+  '[&>[data-form-section]:not(:last-child)]:border-b [&>[data-form-section]:not(:last-child)]:border-border [&>[data-form-section]:not(:last-child)]:pb-6 [&>:not([data-form-section])+[data-form-section]]:border-t [&>:not([data-form-section])+[data-form-section]]:border-border [&>:not([data-form-section])+[data-form-section]]:pt-6';
 
 function MethodFormFields({
   form,
@@ -916,16 +919,7 @@ function MethodFormFields({
         />
       ))}
       {(folded.length > 0 || structureOpen) && (
-        // A block of its own, so the hairline a framed form draws over it
-        // runs the form's width rather than the button's.
-        <div>
-          <OptionalToggle
-            count={folded.length}
-            expanded={expanded}
-            onToggle={toggle}
-            noun="input"
-          />
-        </div>
+        <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />
       )}
     </div>
   );

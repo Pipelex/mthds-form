@@ -420,12 +420,14 @@ export const SwitchesEveryStyle: Story = {
   name: 'Switches · every style · stripe.com colours',
   args: { subject: 'compose', style: 'quiet', team: 'stripe' },
   render: (args) => <SwitchesInEveryStyle team={args.team === 'none' ? null : args.team} />,
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, globals }) => {
     const off = [...canvasElement.querySelectorAll<HTMLElement>('[role="switch"]')].filter(
       (track) => track.getAttribute('aria-checked') === 'false',
     );
-    // Five styles in two theme panes.
-    await expect(off).toHaveLength(10);
+    // One off switch for no style and for each style, in each theme pane the
+    // toolbar shows.
+    const panes = globals.themeView === 'light' || globals.themeView === 'dark' ? 1 : 2;
+    await expect(off).toHaveLength((APP_STYLE_IDS.length + 1) * panes);
     for (const track of off) {
       const row = track.parentElement!;
       const style = track.closest('.app-host')?.className ?? '';

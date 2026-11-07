@@ -36,6 +36,12 @@ function artifacts(contracts: PipeIOContracts, inputForm: InputForm, domain: str
 const SHOP = artifacts(STRUCTURED, STRUCTURED_FORM, 'structured', 'shop_with_bank');
 const FLAT = artifacts(STRUCTURED, STRUCTURED_FORM, 'structured', 'flat_object');
 const ATTACHMENTS = artifacts(FILES, FILES_FORM, 'files', 'required_vs_optional');
+const INVOICE_WITH_SOURCE = artifacts(
+  STRUCTURED,
+  STRUCTURED_FORM,
+  'structured',
+  'invoice_with_source',
+);
 
 type HarnessProps = Partial<UseMethodFormOptions> &
   Pick<UseMethodFormOptions, 'descriptor' | 'contract'> & {
@@ -129,6 +135,25 @@ describe('a form its host has framed', () => {
     expect(container.querySelector('[data-form-section]')).toBeNull();
   });
 
+  /**
+   * The elements the stack's rules land on, each rule's own selector run
+   * against the rendered form: jsdom computes no style, so the selectors are
+   * what can be read here, and the stories measure the drawn hairline.
+   */
+  const ruled = (stack: Element) => {
+    const rules = stack.className
+      .split(/\s+/)
+      .map((name) => /^\[(&.+)\]:(border-[tb]|pt-6|pb-6)$/.exec(name))
+      .filter((match) => match !== null);
+    expect(rules.length).toBeGreaterThan(0);
+    return rules.flatMap(([, selector, rule]) =>
+      [...stack.querySelectorAll(selector!.replaceAll('&', ':scope'))].map((element) => ({
+        element,
+        rule: rule!,
+      })),
+    );
+  };
+
   it("draws each one as a section, ruled off from what follows, inside the host's panel", async () => {
     const user = userEvent.setup();
     const { container } = render(<Harness {...SHOP} formProps={{ framed: true }} />);
@@ -136,15 +161,28 @@ describe('a form its host has framed', () => {
     // The shop and the refund account, each a section; the bank account
     // inside the shop folds behind its own disclosure.
     expect(groupings(container)).toEqual(['section', 'section']);
-    const stack = container.querySelector('[data-form-section]')!.parentElement!;
-    // The rules are the stack's: jsdom computes no style, so the classes are
-    // what can be read here, and the stories measure the drawn hairline.
-    expect(stack.className).toContain('[&>[data-form-section]+*]:border-t');
-    expect(stack.className).toContain('[&>*+[data-form-section]]:border-t');
-    // The disclosure is a block of its own, so the rule above it runs the
-    // form's width rather than the button's.
-    const disclosure = screen.getByRole('button', { name: 'Hide optional inputs' });
-    expect(disclosure.parentElement!.parentElement).toBe(stack);
+    const [shop, refund] = container.querySelectorAll('[data-form-section]');
+    const stack = shop!.parentElement!;
+    // One rule under each section, since something follows each, and none
+    // over the second, which the first's rule already sets off.
+    expect(ruled(stack).map(({ element, rule }) => [element, rule])).toEqual([
+      [shop, 'border-b'],
+      [refund, 'border-b'],
+      [shop, 'pb-6'],
+      [refund, 'pb-6'],
+    ]);
+  });
+
+  it("sets its rules on the section alone, never on a neighbour's own box", () => {
+    // A structure followed by a file field: whatever the neighbour's root is
+    // (a boolean's is a filled, padded row), a border or padding set on it
+    // would reshape it, so the rule between the two is the section's.
+    const { container } = render(<Harness {...INVOICE_WITH_SOURCE} formProps={{ framed: true }} />);
+    const sections = [...container.querySelectorAll('[data-form-section]')];
+    expect(sections).toHaveLength(1);
+    const hits = ruled(sections[0]!.parentElement!);
+    expect(hits.map(({ rule }) => rule)).toEqual(['border-b', 'pb-6']);
+    for (const { element } of hits) expect(element).toBe(sections[0]);
   });
 });
 
