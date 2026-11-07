@@ -597,6 +597,17 @@ describe('a typeset text that opens with a heading of its own', () => {
   /** The element a field's label is drawn in, by its words. */
   const labelOf = (words: string) => screen.getByText(words, { selector: 'span' });
 
+  it('still says the description its hidden label would have shown', () => {
+    inPresentation(
+      'app',
+      <ResultField
+        field={record({ ...text('memo'), description: 'Why the invoice is held' })}
+        value={{ supplier: 'Acme', memo: headed }}
+      />,
+    );
+    expect(labelOf('Memo: Why the invoice is held').className).toContain('sr-only');
+  });
+
   for (const kind of ['text', 'prose'] as const) {
     it(`is named by its heading in an app, its ${kind} label said but not drawn`, () => {
       inPresentation(

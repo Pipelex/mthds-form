@@ -209,8 +209,8 @@ function Label({
   /**
    * Said to assistive technology and not drawn: the label of a text that
    * opens with a heading of its own, which names it on the page (the leaf arm
-   * of `ResultNode`). Its description, which rides the drawn label's tooltip,
-   * goes with it.
+   * of `ResultNode`). With `describe`, the description a drawn label carries
+   * in its tooltip is said after it, so a screen reader still hears it.
    */
   unseen?: boolean;
 }) {
@@ -227,7 +227,13 @@ function Label({
   if (labelText.trim() === '') {
     return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
   }
-  if (unseen) return <span className="sr-only">{labelText}</span>;
+  if (unseen) {
+    return (
+      <span className="sr-only">
+        {describe && field.description ? `${labelText}: ${field.description}` : labelText}
+      </span>
+    );
+  }
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
       <Described description={describe ? field.description : undefined}>
@@ -3810,7 +3816,7 @@ function ResultNode({
             </div>
           ) : (
             <>
-              {headed && <Label field={field} unseen />}
+              {headed && <Label field={field} describe unseen />}
               <div className="float-right ml-2">
                 <CopyButton value={copyText} label={s.copyText} />
               </div>
