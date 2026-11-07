@@ -1,13 +1,20 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
 import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
 import { readStuffFile } from '../core/stuff-files';
-import { Absent, PanelResult, ResultField, ResultHeader, stringifyValue } from './result-field';
+import {
+  Absent,
+  PanelResult,
+  ResultField,
+  ResultHeader,
+  resultHeadsItself,
+  stringifyValue,
+} from './result-field';
 import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { HtmlPreview } from './html-preview';
@@ -126,7 +133,7 @@ export interface StuffViewerProps {
   downloadBaseName?: string;
   /**
    * Which download controls this panel draws, laid key by key over what
-   * `ResultEnvProvider` says: `{ result: false }` drops the header's Download
+   * `ResultEnvProvider` says: `{ result: false }` drops the panel's Download
    * and keeps each file's own button, `{ files: false }` the reverse. For a
    * surface where saving makes no sense (a preview inside an editor, say), set
    * both to `false`.
@@ -202,6 +209,10 @@ function highlight(json: string) {
   return out;
 }
 
+/** The clipboard's presence never changes while a page is open. */
+const noSubscription = () => () => {};
+const hasClipboard = () => typeof navigator !== 'undefined' && Boolean(navigator.clipboard);
+
 /**
  * The payload as JSON — the receipt, with the whole of it one click from the
  * clipboard.
@@ -216,6 +227,11 @@ function highlight(json: string) {
 export function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
   const [copied, setCopied] = useState(false);
+  // Whether the page can copy: `false` on the server and while hydrating,
+  // the clipboard's answer after. Read while rendering, it drew the Copy JSON
+  // button and the block's room for it on the client alone, a hydration
+  // mismatch.
+  const canCopy = useSyncExternalStore(noSubscription, hasClipboard, () => false);
   // The check mark reverts after a moment. The timer belongs to the effect, so
   // it is cleared when the control unmounts rather than firing into a
   // component, or a document, that is gone.
@@ -239,7 +255,7 @@ export function JsonView({ value }: { value: unknown }) {
   }
   return (
     <div className="relative">
-      {typeof navigator !== 'undefined' && navigator.clipboard && (
+      {canCopy && (
         <button
           type="button"
           onClick={() => {
@@ -247,7 +263,8 @@ export function JsonView({ value }: { value: unknown }) {
           }}
           aria-label={s.copyJson}
           className={cn(
-            'absolute right-2 top-2 rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground',
+            // 44 by 44 on a phone, like every control a finger taps.
+            'absolute right-2 top-2 inline-flex items-center justify-center rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground max-sm:size-11',
             focusOutlineClass,
           )}
         >
@@ -258,14 +275,27 @@ export function JsonView({ value }: { value: unknown }) {
           )}
         </button>
       )}
-      <pre className="overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed">
+      {/* A region that scrolls sideways takes focus, so a keyboard can scroll
+          it, and is named, as a result table's is. On a phone, beside the
+          Copy JSON button, it is never shorter than the button's 44px and its
+          inset, so a scalar's one line keeps the button inside its border. */}
+      <pre
+        role="group"
+        aria-label={s.viewJson}
+        tabIndex={0}
+        className={cn(
+          'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed',
+          canCopy && 'max-sm:min-h-[60px] max-sm:pr-14',
+          focusOutlineClass,
+        )}
+      >
         {highlight(text)}
       </pre>
     </div>
   );
 }
 
-/** One press of the header's Download, and the result it saved. */
+/** One press of the panel's Download, and the result it saved. */
 interface DownloadAttempt {
   field: RunField;
   baseName: string;
@@ -437,12 +467,59 @@ function StuffPanel({
   // and "Output" over a result is a word that tells its reader nothing; a host
   // that heads the result itself passes no name and gets no second heading. A
   // one-page result in an app carries its own title on the page, so the panel
-  // adds none.
-  const titled = presentation !== 'app' || (name !== undefined && name !== '' && !page);
+  // adds none, and neither does a text that opens with a heading of its own
+  // (`resultHeadsItself`): the host's name over it read as the same title
+  // twice, so the name gives way to the heading, and is said rather than
+  // drawn, as a field's label gives way to one inside a result.
+  const headsItself = !page && resultHeadsItself(field, value, presentation);
+  const hostNamed = name !== undefined && name !== '';
+  const titled = presentation !== 'app' || (hostNamed && !page && !headsItself);
   const switchShown = offered.length > 1;
+  // A Download with nothing beside it - an app's result with no title, no view
+  // switch and no page - is drawn at the result's foot, where a reader who has
+  // read it takes it away. At the top it stood alone at the panel's right edge
+  // over an empty band, a corner the eye reads as chrome rather than as the
+  // result's action. A host-named text whose heading took the title's place is
+  // one of these: the heading opens the result, and the Download follows it.
+  const downloadAtFoot = downloadShown && !titled && !switchShown && !page;
   // The row is left out when nothing is in it, so an app's result starts at
   // its first line rather than under an empty band.
-  const headerShown = titled || downloadShown || switchShown || (page && pdfName !== undefined);
+  const headerShown =
+    titled || (downloadShown && !downloadAtFoot) || switchShown || (page && pdfName !== undefined);
+  const downloadButton = downloadShown && (
+    <button
+      type="button"
+      onClick={() => void handleDownload()}
+      disabled={savingShown}
+      aria-label={page ? s.downloadHtml : s.download}
+      className={cn(
+        // 44 pixels tall below `sm`, as every control a finger hits is.
+        'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-60 max-sm:min-h-11 max-sm:px-3',
+        focusOutlineClass,
+      )}
+    >
+      {savingShown ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Download className="h-3.5 w-3.5" />
+      )}
+      {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
+    </button>
+  );
+  // Said, not swallowed: a reader expecting three attachments and getting two
+  // could not tell before. The JSON copy still carries each missing file's
+  // reference, when it was planned. The live region is there from the start
+  // and only its text changes, because a region inserted with its message
+  // already in it is not reliably announced. It sits under the Download,
+  // wherever that is drawn.
+  const missedStatus = downloadShown && (
+    <p
+      role="status"
+      className={cn('shrink-0 text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
+    >
+      {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
+    </p>
+  );
 
   return (
     <div
@@ -461,6 +538,10 @@ function StuffPanel({
           own - two headers that agree today drift tomorrow. It stays put across
           both views, so switching does not move the thing you are reading. */}
       {dialog}
+      {/* The host's name for a result that names itself: said first, where
+          the title would have stood, and in both views, so the panel's
+          opening does not change with the view. */}
+      {hostNamed && headsItself && <ResultHeader field={named} unseen />}
       {headerShown && (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
           {titled ? (
@@ -479,25 +560,7 @@ function StuffPanel({
                 {...(pdfName ? { fileName: pdfName } : {})}
               />
             )}
-            {downloadShown && (
-              <button
-                type="button"
-                onClick={() => void handleDownload()}
-                disabled={savingShown}
-                aria-label={page ? s.downloadHtml : s.download}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-60',
-                  focusOutlineClass,
-                )}
-              >
-                {savingShown ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Download className="h-3.5 w-3.5" />
-                )}
-                {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
-              </button>
-            )}
+            {!downloadAtFoot && downloadButton}
             {switchShown && (
               <div
                 role="group"
@@ -511,7 +574,8 @@ function StuffPanel({
                     onClick={() => setView(id)}
                     aria-pressed={view === id}
                     className={cn(
-                      'rounded px-2 py-0.5 text-[12px]',
+                      // 44 by 44 below `sm`, as every control a finger hits is.
+                      'rounded px-2 py-0.5 text-[12px] max-sm:min-h-11 max-sm:min-w-11 max-sm:px-3',
                       focusOutlineClass,
                       view === id
                         ? 'bg-card font-medium text-foreground'
@@ -527,22 +591,7 @@ function StuffPanel({
         </div>
       )}
 
-      {/* Said, not swallowed: a reader expecting three attachments and getting
-          two could not tell before. The JSON copy still carries each missing
-          file's reference, when it was planned. The live region is there from
-          the start and only its text changes, because a region inserted with
-          its message already in it is not reliably announced. */}
-      {downloadShown && (
-        <p
-          role="status"
-          className={cn(
-            'shrink-0 text-[12px] text-destructive',
-            missedShown.length === 0 && 'sr-only',
-          )}
-        >
-          {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
-        </p>
-      )}
+      {!downloadAtFoot && missedStatus}
 
       {view === 'json' ? (
         <JsonView value={value} />
@@ -556,11 +605,20 @@ function StuffPanel({
           {/* The whole result, where a verdict is drawn large. Its host heads
               it when the panel draws no title of its own, and then in `app` it
               draws no count under the host's heading; under the panel's own
-              title, which says no count, it keeps its count. */}
+              title, which says no count, it keeps its count. A text that names
+              itself draws no panel title either, so it counts as host-headed
+              here, though its own heading is what opens it; a text has no
+              count to draw in any case. */}
           <PanelResult hostHeaded={!titled}>
             <ResultField field={field} value={value} hideLabel />
           </PanelResult>
         </ResultRoot>
+      )}
+      {downloadAtFoot && (
+        <div className="space-y-1 pt-2">
+          {downloadButton}
+          {missedStatus}
+        </div>
       )}
     </div>
   );

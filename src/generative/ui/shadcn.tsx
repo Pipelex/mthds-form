@@ -6,6 +6,7 @@ import { hasOwnProp } from '../../core/own-property';
 import { enumLabeler, useFieldPresentation } from '../../react/field-presentation';
 import { fieldControlClass } from '../../react/field-styles';
 import { checkedAccentClass, focusOutlineClass } from '../../react/role-tokens';
+import { headingClass, panelFlatShadowClass, panelSurfaceClass } from '../../react/style-tokens';
 import { cn } from '../../react/utils';
 import { Switch as SwitchPrimitive } from '../../react/ui/switch';
 
@@ -114,11 +115,16 @@ export function Card({
   children,
 }: BaseComponentProps<{ title?: string | null; description?: string | null }>) {
   return (
-    <div className="rounded-lg border border-border bg-card p-6 text-card-foreground">
+    // A style's panel: a host writes the style's field fill onto `--input`
+    // here, as on its own panel, so the fields inside do not sink into it.
+    <div
+      data-style-panel=""
+      className={cn('rounded-lg p-6 text-card-foreground', panelSurfaceClass, panelFlatShadowClass)}
+    >
       {props.title || props.description ? (
         <div className="mb-4 space-y-1.5">
           {props.title ? (
-            <h3 className="text-lg leading-none font-semibold">{props.title}</h3>
+            <h3 className={cn('text-lg leading-none', headingClass(600))}>{props.title}</h3>
           ) : null}
           {props.description ? (
             <p className="text-sm text-muted-foreground">{props.description}</p>
@@ -238,11 +244,13 @@ export function Collapsible({
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
+// Every level reads the page's heading style (`react/style-tokens`), falling
+// back to the weight and tracking it was set in.
 const HEADING = {
-  h1: 'text-3xl font-bold tracking-tight',
-  h2: 'text-2xl font-semibold tracking-tight',
-  h3: 'text-lg font-semibold',
-  h4: 'text-base font-semibold',
+  h1: cn('text-3xl', headingClass(700, true)),
+  h2: cn('text-2xl', headingClass(600, true)),
+  h3: cn('text-lg', headingClass(600)),
+  h4: cn('text-base', headingClass(600)),
 };
 
 export function Heading({
@@ -487,7 +495,15 @@ export function Textarea({
  * reads the accent rather than the button colour, and focused in `--ring`, as
  * everything in the tab order is, never in the browser's own ring.
  */
-const NATIVE_CHECK = cn('size-4', checkedAccentClass, focusOutlineClass);
+const NATIVE_CHECK = cn('size-4 shrink-0', checkedAccentClass, focusOutlineClass);
+
+/**
+ * The label a native radio or check box sits in, which is where a finger
+ * lands: a tap anywhere on a label activates the control it wraps. The box
+ * keeps its 16 pixels, and below `sm` its row grows to 44 pixels tall across
+ * the column, so the target is the whole row rather than the box.
+ */
+const NATIVE_CHECK_ROW = 'flex items-center gap-2 text-sm max-sm:min-h-11';
 
 export function Radio({
   props,
@@ -502,9 +518,10 @@ export function Radio({
   return (
     <fieldset className="space-y-2" aria-invalid={field.error ? true : undefined}>
       <legend className={LABEL}>{props.label}</legend>
-      <div className="space-y-2">
+      {/* Rows of 44 pixels need no gap between them on a phone. */}
+      <div className="space-y-2 max-sm:space-y-0">
         {(props.options ?? []).map((option, index) => (
-          <label key={`${index}-${option}`} className="flex items-center gap-2 text-sm">
+          <label key={`${index}-${option}`} className={NATIVE_CHECK_ROW}>
             <input
               type="radio"
               name={id}
@@ -537,7 +554,7 @@ export function Checkbox({
   const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props);
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <label htmlFor={id} className={NATIVE_CHECK_ROW}>
         <input
           id={id}
           name={props.name}

@@ -8,6 +8,7 @@ import {
   heroFields,
   layoutStory,
   makeLayoutPage,
+  onAPhone,
 } from './layout-page';
 
 /**
@@ -21,9 +22,12 @@ import {
  * one of them binds the same paths, because the paths are the descriptor's and
  * not theirs.
  *
- * The last two stories are the pinned layout under someone else's tokens. A
- * page that only reads in the stock palette is a page with a problem the
- * palette is hiding.
+ * Two stories are the pinned layout under someone else's tokens. A page that
+ * only reads in the stock palette is a page with a problem the palette is
+ * hiding. The last two are two of the layouts on a phone, where every control
+ * the page draws is held to the 44 pixels a finger needs: the pinned one's
+ * segmented choices, number, radios and switch, and the steps another model
+ * laid the request out in, with their Next.
  */
 
 const fields = heroFields(CONTRACTS, INPUT_FORM, 'trips', 'plan_trip');
@@ -46,3 +50,6 @@ export const Sonnet5: Story = layoutStory(layout('pipelex-method--claude-5-sonne
 export const Gpt55: Story = layoutStory(layout('pipelex-method--gpt-5.5'), STOCK);
 export const MthdsTokens: Story = layoutStory(layout(PINNED), MTHDS);
 export const PipelexTokens: Story = layoutStory(layout(PINNED), PIPELEX);
+
+export const Opus48Phone: Story = onAPhone(layoutStory(layout(PINNED), STOCK));
+export const Gpt55Phone: Story = onAPhone(layoutStory(layout('pipelex-method--gpt-5.5'), STOCK));

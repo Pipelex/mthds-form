@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { createContext, use, useState } from 'react';
 import { cn } from './utils';
 import type { ObjectRunField } from '../core';
 import { ownProp } from '../core/own-property';
 import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
+import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { OptionalToggle } from './optional-toggle';
+import { headingFaceClass } from './style-tokens';
 
 interface ObjectFieldProps {
   field: ObjectRunField;
@@ -21,9 +23,60 @@ interface ObjectFieldProps {
 }
 
 /**
- * A structured concept: its sub-fields rendered inside one hairline-grouped
- * card so nesting stays legible. Empty optional sub-fields collapse behind a
- * "+ N optional" toggle - required and already-filled fields always show.
+ * How many structures a field sits inside: 0 for a form's own field, one more
+ * inside each structure. A list adds nothing to it, while the structure a
+ * list's row holds counts like any other and draws nothing around its fields
+ * (`none`, below), so a structure inside that row hangs from a rule rather
+ * than drawing a card in the row's box. Only `ObjectField` reads it.
+ */
+const StructureDepthContext = createContext(0);
+
+/**
+ * How a structure groups its sub-fields, by where it stands.
+ *
+ * - `box`: a structure that is a form's own field, under its name - one
+ *   hairline card, which is what says where the structure ends.
+ * - `rule`: a structure inside a structure, under its name - its fields hang
+ *   from a rule along their left edge rather than from a second card inside
+ *   the first. A card in a card in a host's panel is three boxes deep, and on
+ *   a phone each one's padding took the width a field needed: the stay's city
+ *   of a trip request came out about 237 pixels wide.
+ * - `none`: a structure whose name is not drawn, which is a list's row. The
+ *   row is already a box, so the structure adds nothing around its fields.
+ */
+type StructureGrouping = 'box' | 'rule' | 'none';
+
+function structureGrouping(depth: number, labelled: boolean): StructureGrouping {
+  if (!labelled) return 'none';
+  return depth === 0 ? 'box' : 'rule';
+}
+
+/**
+ * A structure's name, set as a heading over its fields' labels in `app`: the
+ * form's own structures largest, and one inside another a step below, so the
+ * levels of a request read as levels rather than as one flat list of labels.
+ * `studio` keeps the mono identifier every label there is set in.
+ */
+function structureNameClass(isApp: boolean, depth: number): string {
+  if (!isApp) return 'font-mono text-[13px] font-medium leading-none';
+  // A structure's name takes the page's heading face, so a style's serif
+  // reaches the form's sections, and keeps the kernel's own weight: it labels
+  // a group of fields rather than titling the page.
+  return cn(
+    depth === 0
+      ? 'text-[16px] font-semibold leading-snug'
+      : 'text-[14.5px] font-semibold leading-snug',
+    headingFaceClass,
+  );
+}
+
+/**
+ * A structured concept: its sub-fields under its name, grouped by where the
+ * structure stands (`StructureGrouping`): a card for a form's own structure,
+ * a rule for one inside another, and nothing for a list's row, so nesting
+ * stays legible without boxing a field into a sliver of a phone. Empty
+ * optional sub-fields collapse behind a "+ N optional" toggle - required and
+ * already-filled fields always show.
  *
  * A CLOSED optional sub-structure (absent value) folds behind that toggle and
  * is counted like any empty optional field. The toggle also opens and closes
@@ -38,7 +91,13 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   // A grouped concept reads as a section heading in an app, not as a typed field.
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
+  const depth = use(StructureDepthContext);
   const data = value ?? {};
+  const label = fieldLabel(field.title, field.name, presentation);
+  const grouping = structureGrouping(depth, label.trim() !== '');
+  // Document-unique, as every control's id is: two forms mounting the same
+  // method must not label one structure with the other's name.
+  const domId = useFieldDomId(id);
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
@@ -68,39 +127,57 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
     }
   };
 
+  // A named structure is a group its name labels, so assistive technology
+  // hears the levels a reader sees: two cities in two structures are each
+  // announced inside their own. A list's row draws no name and is no group.
+  const nameId = `${domId}--name`;
+  const descriptionId = `${domId}--description`;
+  const group =
+    grouping === 'none'
+      ? {}
+      : {
+          role: 'group',
+          'aria-labelledby': nameId,
+          'aria-describedby': field.description ? descriptionId : undefined,
+        };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" {...group}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span
-          className={cn(
-            'text-[13px] font-medium leading-none text-foreground',
-            isApp ? 'text-[13.5px]' : 'font-mono',
-          )}
-        >
-          {fieldLabel(field.title, field.name, presentation)}
+        <span id={nameId} className={cn('text-foreground', structureNameClass(isApp, depth))}>
+          {label}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
       </div>
       {field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
+        <p id={descriptionId} className="text-[12px] leading-relaxed text-muted-foreground">
+          {field.description}
+        </p>
       )}
 
       <div
+        // Names the grouping for a host's stylesheet and for tests, which
+        // cannot read a box or a rule from the classes that draw it.
+        data-structure-group={grouping}
         className={cn(
-          'space-y-4 rounded-lg border bg-card/40 p-4',
-          error ? 'border-destructive/50' : 'border-border',
+          'space-y-4',
+          grouping === 'box' && 'rounded-lg border bg-card/40 p-4 max-sm:p-3',
+          grouping === 'rule' && 'border-l-2 pl-4 max-sm:pl-3',
+          grouping !== 'none' && (error ? 'border-destructive/50' : 'border-border'),
         )}
       >
-        {visible.map((child) => (
-          <FieldRenderer
-            key={child.name}
-            field={child}
-            value={ownProp(data, child.name)}
-            onChange={(v) => setChild(child.name, v)}
-            id={`${id}.${child.name}`}
-            env={env}
-          />
-        ))}
+        <StructureDepthContext value={depth + 1}>
+          {visible.map((child) => (
+            <FieldRenderer
+              key={child.name}
+              field={child}
+              value={ownProp(data, child.name)}
+              onChange={(v) => setChild(child.name, v)}
+              id={`${id}.${child.name}`}
+              env={env}
+            />
+          ))}
+        </StructureDepthContext>
 
         {(folded.length > 0 || structureOpen) && (
           <OptionalToggle

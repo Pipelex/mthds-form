@@ -8,6 +8,7 @@
  * Rendered is the result, JSON is what came back, and a third human rendering
  * beside them is the thing this design exists to refuse.
  */
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -245,5 +246,192 @@ describe('the stuff name', () => {
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download }));
     await waitFor(() => expect(saveFiles).toHaveBeenCalledOnce());
     expect(saveFiles.mock.calls[0]?.[0]).toMatchObject([{ name: 'report_pages.json' }]);
+  });
+});
+
+/**
+ * Where the panel's Download is drawn. Beside a title or a view switch it is
+ * the header's; with nothing beside it, as in an app's result a host heads
+ * itself, it stood alone at the panel's right edge over an empty band, so it
+ * is drawn at the result's foot instead, after what a reader has read.
+ */
+describe("the panel's Download", () => {
+  const download = () => screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download });
+  /** Whether `a` comes before `b` in the document. */
+  const before = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('is drawn at the foot of an app result the host heads itself', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} />
+      </FieldPresentationProvider>,
+    );
+    expect(before(screen.getByText('INV-1'), download())).toBe(true);
+  });
+
+  it('stays in the header beside the title the host names', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} name="report_pages" />
+      </FieldPresentationProvider>,
+    );
+    expect(before(download(), screen.getByText('INV-1'))).toBe(true);
+    expect(before(screen.getByText('Report pages'), download())).toBe(true);
+  });
+
+  it('stays in the header beside the view switch', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <StuffViewer field={invoice} value={{ reference: 'INV-1' }} views={['rendered', 'json']} />
+      </FieldPresentationProvider>,
+    );
+    expect(before(download(), screen.getByText('INV-1'))).toBe(true);
+  });
+
+  it("stays in a builder's header", () => {
+    render(<StuffViewer field={invoice} value={{ reference: 'INV-1' }} />);
+    expect(before(download(), screen.getByText('INV-1'))).toBe(true);
+  });
+
+  it('reports the files that did not arrive under itself, at the foot', async () => {
+    const saveFiles = vi.fn<SaveFiles>(async (files) => ({
+      failed: files.map((file) => ({ file, reason: 'refused' })),
+    }));
+    render(
+      <ResultEnvProvider saveFiles={saveFiles}>
+        <FieldPresentationProvider presentation="app">
+          <StuffViewer field={invoice} value={{ reference: 'INV-1' }} />
+        </FieldPresentationProvider>
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(download());
+    const status = await screen.findByRole('status');
+    await waitFor(() => expect(status.textContent).not.toBe(''));
+    expect(before(download(), status)).toBe(true);
+    expect(before(screen.getByText('INV-1'), status)).toBe(true);
+  });
+});
+
+/**
+ * A host's title over a result that opens with its own heading. The panel
+ * draws the host's `name` as its title in `app`, and a text whose Markdown
+ * opens with a heading draws that heading too, so the same title read twice
+ * ("Executive summary" over "Launch Executive Summary"). The name gives way to
+ * the heading, as a field's label does inside a result: it is said to
+ * assistive technology rather than drawn, and the Download, with nothing left
+ * beside it, goes to the result's foot.
+ */
+describe("a host's title over a text that heads itself", () => {
+  const memo = (kind: 'text' | 'prose'): RunField => ({
+    kind,
+    name: 'output',
+    conceptRef: kind === 'prose' ? 'demo.Memo' : 'native.Text',
+    required: true,
+    description: 'What the launch is about',
+  });
+  const headed = '## Launch Executive Summary\n\nWe are launching **NoteFlow**.';
+  const download = () => screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download });
+  const heading = () => screen.getByRole('heading', { name: 'Launch Executive Summary' });
+  const before = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const inApp = (node: ReactNode) =>
+    render(<FieldPresentationProvider presentation="app">{node}</FieldPresentationProvider>);
+
+  for (const kind of ['prose', 'text'] as const) {
+    it(`says the name rather than drawing it over a ${kind} that opens with a heading`, () => {
+      inApp(<StuffViewer field={memo(kind)} value={headed} name="executive_summary" />);
+      // The heading stands as the result's title, drawn once.
+      expect(heading()).toBeTruthy();
+      // The host's name, and its description, are said and not drawn.
+      expect(screen.getByText('Executive summary: What the launch is about').className).toContain(
+        'sr-only',
+      );
+      expect(screen.queryByText('Executive summary')).toBeNull();
+      // Said first, where the title would have stood.
+      expect(before(screen.getByText(/^Executive summary/), heading())).toBe(true);
+    });
+  }
+
+  it('draws nothing for a label that gives way and has no text, not even its concept', () => {
+    // A member whose descriptor title is empty: where a label is drawn, its
+    // concept stands in for it; where it gives way to the text's heading,
+    // drawing that would put a mark over the heading.
+    const report: RunField = {
+      kind: 'object',
+      name: 'output',
+      conceptRef: 'demo.Report',
+      required: true,
+      fields: [{ ...memo('prose'), name: 'summary', title: '' }],
+    };
+    inApp(<StuffViewer field={report} value={{ summary: headed }} />);
+    expect(heading()).toBeTruthy();
+    expect(screen.queryByText('demo.Memo')).toBeNull();
+  });
+
+  it('draws the Download at the foot, after the text, with nothing left beside it', () => {
+    inApp(<StuffViewer field={memo('prose')} value={headed} name="executive_summary" />);
+    expect(before(heading(), download())).toBe(true);
+    expect(before(screen.getByText('NoteFlow'), download())).toBe(true);
+  });
+
+  it('keeps the Download in the header beside a view switch the host asks for', () => {
+    inApp(
+      <StuffViewer
+        field={memo('prose')}
+        value={headed}
+        name="executive_summary"
+        views={['rendered', 'json']}
+      />,
+    );
+    expect(before(download(), heading())).toBe(true);
+    expect(screen.queryByText('Executive summary')).toBeNull();
+  });
+
+  it('says the name in the JSON view too, so the header does not move with the view', async () => {
+    inApp(
+      <StuffViewer
+        field={memo('prose')}
+        value={headed}
+        name="executive_summary"
+        views={['rendered', 'json']}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.viewJson }));
+    expect(screen.getByText('Executive summary: What the launch is about').className).toContain(
+      'sr-only',
+    );
+    expect(screen.queryByText('Executive summary')).toBeNull();
+  });
+
+  it('keeps the title over a text whose heading comes later', () => {
+    inApp(
+      <StuffViewer
+        field={memo('prose')}
+        value={'We are launching.\n\n## Why\n\nBecause.'}
+        name="executive_summary"
+      />,
+    );
+    expect(screen.getByText('Executive summary').className).not.toContain('sr-only');
+    // The title has the Download beside it, in the header.
+    expect(before(download(), screen.getByText('We are launching.'))).toBe(true);
+  });
+
+  it('keeps the title over a short text, which the view does not typeset', () => {
+    inApp(<StuffViewer field={memo('text')} value="# Not typeset" name="executive_summary" />);
+    expect(screen.getByText('Executive summary').className).not.toContain('sr-only');
+  });
+
+  it("keeps a builder's title, which is the identifier", () => {
+    render(<StuffViewer field={memo('prose')} value={headed} name="executive_summary" />);
+    expect(screen.getByText('executive_summary').className).not.toContain('sr-only');
+    expect(heading()).toBeTruthy();
+  });
+
+  it('reads a text wrapped in its content model as the panel renders it', () => {
+    const wrapped: RunField = { ...memo('text'), contentKey: 'text' };
+    inApp(<StuffViewer field={wrapped} value={{ text: headed }} name="executive_summary" />);
+    expect(heading()).toBeTruthy();
+    expect(screen.queryByText('Executive summary')).toBeNull();
   });
 });
