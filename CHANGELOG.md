@@ -6,6 +6,10 @@
 
 - **`MethodForm`'s `framed`**: a host that draws the form inside a panel of its own says so, and a structure among the inputs is then a section, its name a heading over its fields, set off from the inputs beside it by a hairline across the form, rather than a card inside the host's panel; without it a structure keeps its card. The grouping is on the DOM as `data-structure-group="section"`. See [docs/method-form.md](docs/method-form.md).
 
+### Fixed
+
+- **An off switch shows its track**: the switch's track, in the form and on a produced page, is `--muted-foreground` when off rather than `--input`, the fill of the boolean's own row, so it reads at 3:1 on its row and its thumb shows on it, where an off switch read as a lone thumb. See [docs/theming.md](docs/theming.md).
+
 ## [v0.30.0] - 2026-11-07
 
 ### Highlights

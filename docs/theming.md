@@ -16,6 +16,8 @@ Each is a whole CSS colour, in any syntax a browser accepts — `hsl(0 0% 100%)`
 
 `--input` is the control surface and is meaningfully distinct from `--background`: fields read as a family because they share it. Dark mode follows the `.dark` class convention.
 
+A switch that is off draws its track in `--muted-foreground`, never in `--input`. The boolean's row is filled with `--input`, so a track of the same fill had no edge on it and an off switch read as a lone thumb, on every host and under every app style, whose field fill is the panel's own. `--muted-foreground` is the token a palette keeps readable on the page and the fields, which gives the track the 3:1 that identifies a control, and the thumb, in `--background`, shows on it. `Generative/App styles` › "Switches · every style" measures both in every style and theme.
+
 The typeface is not a token of this table, and on purpose. The controls inherit the host's typeface, and the two typography variables a brand sets, `--font-sans` and `--font-mono`, are Tailwind's own theme variables, which `theme.css` leaves alone: it is unlayered, so a value there would override every host's typeface. See [brand.md](brand.md) § "The contract".
 
 If your app is already a shadcn/ui codebase, you have all of these and there is nothing to do.

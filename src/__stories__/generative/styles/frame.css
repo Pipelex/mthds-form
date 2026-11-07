@@ -278,9 +278,18 @@
   font-size: 14px;
   font-weight: 500;
 }
-.af-btn:focus-visible,
-.af-band-btn:focus-visible {
+.af-btn:focus-visible {
   outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/*
+ * The band's own ink, the colour its name and logo are set in, which reads
+ * on the band by construction. `--ring` is a team's accent ink, measured on
+ * the page and the panels but never on the team's header colour the band is
+ * filled with: on gov.uk's blue band it was blue on blue.
+ */
+.af-band-btn:focus-visible {
+  outline: 2px solid currentColor;
   outline-offset: 2px;
 }
 
