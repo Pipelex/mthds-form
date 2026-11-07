@@ -3,8 +3,8 @@ import { expect, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/verdicts';
 import { PAYLOADS } from '../_generated/verdicts.payloads';
 import { DEFAULT_FIELD_STRINGS, FR_FIELD_STRINGS } from '../../react';
-// The kernel's own wording, read as an oracle. It is internal and not part of
-// the public API, which is why a story reaches it by its deep path.
+// The kernel's own wording, read as an oracle, from the core entry that
+// exports it.
 import { humanizeEnumValue } from '../../core';
 import { ResultView } from '../result-view';
 
