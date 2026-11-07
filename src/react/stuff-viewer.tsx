@@ -265,10 +265,17 @@ export function JsonView({ value }: { value: unknown }) {
     if (!pre) return;
     const measure = () => setOverflows(pre.scrollWidth > pre.clientWidth);
     measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(pre);
-    return () => observer.disconnect();
+    // A host's monospace webfont that arrives after this widens every line
+    // inside a box that keeps its size, which the observer never hears of.
+    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+    fonts?.addEventListener('loadingdone', measure);
+    const observer =
+      typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+    observer?.observe(pre);
+    return () => {
+      fonts?.removeEventListener('loadingdone', measure);
+      observer?.disconnect();
+    };
   }, [text]);
 
   if (text === undefined) {

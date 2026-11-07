@@ -5,7 +5,7 @@
  * "JSON". jsdom lays nothing out, so the widths are what a browser measures.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { JsonView } from '../stuff-viewer';
 
@@ -32,5 +32,23 @@ describe("the JSON view's block", () => {
     laidOut(900, 320);
     render(<JsonView value={{ note: 'A line long enough to scroll the block sideways.' }} />);
     expect(block().getAttribute('tabindex')).toBe('0');
+  });
+
+  it('measures again once a webfont arrives, which widens its lines in a box that keeps its size', () => {
+    // jsdom has no font set, so one stands in that can announce a load.
+    const fonts = new EventTarget();
+    Object.defineProperty(document, 'fonts', { value: fonts, configurable: true });
+    try {
+      laidOut(300, 320);
+      render(<JsonView value={{ note: 'Fits in the fallback face, not in the webfont.' }} />);
+      expect(block().hasAttribute('tabindex')).toBe(false);
+      laidOut(340, 320);
+      act(() => {
+        fonts.dispatchEvent(new Event('loadingdone'));
+      });
+      expect(block().getAttribute('tabindex')).toBe('0');
+    } finally {
+      Reflect.deleteProperty(document, 'fonts');
+    }
   });
 });
