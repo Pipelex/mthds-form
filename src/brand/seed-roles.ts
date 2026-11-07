@@ -299,13 +299,37 @@ function paleFill(accent: SrgbColor, page: SrgbColor, extreme: SrgbColor): SrgbC
 }
 
 /**
- * How far the walk below moves the lightness at a time. A channel moves at
- * most twice as fast as the lightness, so a step this short moves no channel
- * by more than half a byte, and a hex by at most one byte a channel: a run of
- * shades that read can fall between two steps only when it is narrower than
- * that, a single shade where two channels turn over within one step.
+ * Every shade of one hue and saturation, as the lightness of a point inside
+ * it, from black to white. Each channel is linear in the lightness on either
+ * side of the middle (`fromHsl`), so the lightness at which it turns over to
+ * its next byte is solved for rather than searched; between two neighbouring
+ * turnovers every channel keeps its byte, and the hex is one shade. A walk in
+ * fixed steps could not promise this: where two channels turn over close
+ * together, a shade spans less lightness than any step, and the one shade
+ * that reads may be it.
  */
-const WALK_STEP = 1 / 1024;
+function shadeLightnesses(hue: number, saturation: number): number[] {
+  const bounds = new Set<number>([0, 0.5, 1]);
+  for (const [low, high] of [
+    [0, 0.5],
+    [0.5, 1],
+  ] as const) {
+    const from = fromHsl(hue, saturation, low);
+    const to = fromHsl(hue, saturation, high);
+    for (let channel = 0; channel < 3; channel++) {
+      const start = from[channel]! * 255;
+      const rise = to[channel]! * 255 - start;
+      if (rise === 0) continue;
+      // `snapped` rounds a channel, so its byte turns over at each half.
+      for (let byte = 0; byte < 255; byte++) {
+        const at = low + ((byte + 0.5 - start) / rise) * (high - low);
+        if (at > low && at < high) bounds.add(at);
+      }
+    }
+  }
+  const sorted = [...bounds].sort((a, b) => a - b);
+  return sorted.slice(1).map((bound, index) => (sorted[index]! + bound) / 2);
+}
 
 /**
  * The accent as text on every background given: the accent itself if it
@@ -323,11 +347,12 @@ const WALK_STEP = 1 / 1024;
  *
  * A surface on the far side of the page's lightness, a dark panel on a light
  * page, is one the extreme does not read on. The shades that read on every
- * background are then a run between the two extremes, if there are any: a
- * shade dark enough for the light backgrounds and light enough for the dark
- * ones. The lightness is walked, toward the extreme and then away from it, in
- * steps of at most a byte a channel (`WALK_STEP`), and the first run it meets
- * is narrowed to its first shade by the same halving.
+ * background then lie between the two extremes, if there are any: a shade
+ * dark enough for the light backgrounds and light enough for the dark ones,
+ * and sometimes a single one. Every shade of the accent's hue and saturation
+ * is tried (`shadeLightnesses`), nearest first, toward the extreme and then
+ * away from it, and the first that reads is the ink; `undefined` means no
+ * shade does.
  */
 function inkFor(
   accent: SrgbColor,
@@ -350,14 +375,13 @@ function inkFor(
   };
   const toward = extreme === BLACK ? 0 : 1;
   if (reads(extreme)) return narrowed(lightness, toward);
-  for (const end of [toward, 1 - toward]) {
-    const direction = Math.sign(end - lightness);
-    let short = lightness;
-    for (let value = lightness; direction !== 0;) {
-      value = direction > 0 ? Math.min(end, value + WALK_STEP) : Math.max(end, value - WALK_STEP);
-      if (reads(at(value))) return narrowed(short, value);
-      if (value === end) break;
-      short = value;
+  const shades = shadeLightnesses(hue, saturation);
+  const darker = shades.filter((value) => value < lightness).reverse();
+  const lighter = shades.filter((value) => value > lightness);
+  for (const side of toward === 0 ? [darker, lighter] : [lighter, darker]) {
+    for (const value of side) {
+      const shade = at(value);
+      if (reads(shade)) return shade;
     }
   }
   return undefined;

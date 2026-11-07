@@ -359,6 +359,128 @@ describe('a surface on the far side of the page', () => {
     }
   });
 
+  it('finds a shade that reads although it spans less lightness than a byte', () => {
+    // On a chromatic accent two channels can turn over to their next byte
+    // within a sliver of lightness, so the one shade that reads everywhere is
+    // narrower than any fixed step a walk could take: these each have a
+    // shade that reads at 4.5:1 on all three backgrounds, which a walk in
+    // steps of 1/1024 stepped over and refused.
+    const cases: [accent: string, page: string, surface: string, ink: string][] = [
+      ['#f3f4ee', '#ffffff', '#040404', '#727a4f'],
+      ['#100e11', '#000000', '#fdfdfd', '#7f7087'],
+    ];
+    for (const [accent, page, surface, ink] of cases) {
+      const roles = deriveBrandRoles({ accent }, page, [surface]);
+      expect(roles.accentInk, accent).toBe(ink);
+      for (const background of [page, roles.accentFill!, surface]) {
+        expect(contrast(ink, background)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('refuses a chromatic accent only when no shade of it reads', () => {
+    // The accents a far-side surface leaves the most room for: a white page
+    // beside a black panel and the reverse, swept over hues and
+    // lightnesses with a fixed seed. A shade is any hex on the accent's line
+    // of hue and saturation, sampled here independently, at a step far finer
+    // than all but the narrowest shades; wherever the derivation refuses, the
+    // sampling must find no shade that reads on every background.
+    let seed = 0x5eed;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+    const bytes = (channels: readonly number[]) =>
+      channels.map((channel) => Math.round(Math.min(1, Math.max(0, channel)) * 255));
+    const toHex = (channels: readonly number[]) =>
+      `#${bytes(channels)
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('')}`;
+    // Relative luminance by byte, so the sampling is cheap; a shade it finds
+    // is confirmed with the contrast the derivation itself measures.
+    const linear = Array.from({ length: 256 }, (_, byte) => {
+      const value = byte / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = ([r, g, b]: readonly number[]) =>
+      0.2126 * linear[r!]! + 0.7152 * linear[g!]! + 0.0722 * linear[b!]!;
+    const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const lineOf = (accent: string) => {
+      const [r, g, b] = [1, 3, 5].map((at) => parseInt(accent.slice(at, at + 2), 16) / 255) as [
+        number,
+        number,
+        number,
+      ];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const chroma = max - min;
+      const lightness = (max + min) / 2;
+      const saturation = chroma === 0 ? 0 : Math.min(1, chroma / (1 - Math.abs(2 * lightness - 1)));
+      const sector =
+        chroma === 0
+          ? 0
+          : max === r
+            ? ((g - b) / chroma + 6) % 6
+            : max === g
+              ? (b - r) / chroma + 2
+              : (r - g) / chroma + 4;
+      return (value: number): number[] => {
+        const c = (1 - Math.abs(2 * value - 1)) * saturation;
+        const x = c * (1 - Math.abs((sector % 2) - 1));
+        const m = value - c / 2;
+        const [r1, g1, b1] = [
+          [c, x, 0],
+          [x, c, 0],
+          [0, c, x],
+          [0, x, c],
+          [x, 0, c],
+          [c, 0, x],
+        ][Math.min(5, Math.floor(sector))]!;
+        return [r1! + m, g1! + m, b1! + m];
+      };
+    };
+    let refused = 0;
+    let derived = 0;
+    for (const [page, surface] of [
+      ['#ffffff', '#000000'],
+      ['#000000', '#ffffff'],
+    ] as const) {
+      for (let trial = 0; trial < 500; trial++) {
+        const accent = toHex([random(), random(), random()]);
+        const fill = deriveBrandRoles({ accent }, page).accentFill!;
+        const backgrounds = [page, fill, surface];
+        const where = `${accent} on ${page} beside ${surface}`;
+        let ink: string | undefined;
+        try {
+          ink = deriveBrandRoles({ accent }, page, [surface]).accentInk;
+        } catch {
+          ink = undefined;
+        }
+        if (ink) {
+          derived++;
+          for (const background of backgrounds) {
+            expect(contrast(ink, background), where).toBeGreaterThanOrEqual(4.5);
+          }
+          continue;
+        }
+        refused++;
+        const under = backgrounds.map((background) => luminance(bytes(hex(background).components)));
+        const shade = lineOf(accent);
+        for (let step = 0; step <= 8192; step++) {
+          const channels = shade(step / 8192);
+          const own = luminance(bytes(channels));
+          if (!under.every((background) => ratio(own, background) >= 4.5)) continue;
+          const candidate = toHex(channels);
+          const reads = backgrounds.every((background) => contrast(candidate, background) >= 4.5);
+          expect(
+            reads ? candidate : undefined,
+            `${where}: refused, yet this reads`,
+          ).toBeUndefined();
+        }
+      }
+    }
+    // The sweep reaches both answers.
+    expect(derived).toBeGreaterThan(0);
+    expect(refused).toBeGreaterThan(0);
+  });
+
   it('keeps every ink it found before, where the extreme reads on every surface', () => {
     // The path every style's surfaces take: the extreme reads on each, so the
     // ink is the first shade toward it that does, as it always was. Amber
