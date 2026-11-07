@@ -297,10 +297,11 @@ describe('deriveBrandRoles leaves what the team did not set to the host', () => 
   });
 
   it('refuses a surface no accent ink can read on, only when there is an accent', () => {
-    // On a white page the ink moves toward black, which reaches only 3.94:1
-    // on #6b6b6b: no ink the search could reach reads there.
+    // An ink dark enough for the white page reaches at most 3.94:1 on
+    // #6b6b6b, and one light enough for #6b6b6b fails the page: no shade of
+    // the accent reads on both.
     expect(() => deriveBrandRoles({ accent: '#2563eb' }, '#ffffff', ['#6b6b6b'])).toThrow(
-      /No accent ink can read on #6b6b6b/,
+      /No accent ink can read on every surface at once: .*#ffffff.* and #6b6b6b/,
     );
     // With no accent no ink is derived, so the same surface costs the team
     // nothing: its header is painted as it is without it.
@@ -308,6 +309,65 @@ describe('deriveBrandRoles leaves what the team did not set to the host', () => 
       deriveBrandRoles({ header: '#14213d' }, '#ffffff'),
     );
     expect(Object.keys(deriveBrandRoles(null, '#ffffff', ['#6b6b6b']))).toEqual([]);
+  });
+});
+
+describe('a surface on the far side of the page', () => {
+  /** Every grey a hex can carry, `#000000` to `#ffffff`. */
+  const GREYS = Array.from(
+    { length: 256 },
+    (_, value) => `#${value.toString(16).padStart(2, '0').repeat(3)}`,
+  );
+
+  it('finds an ink between the extremes before it refuses the surface', () => {
+    // A white page, the near-white pale fill of a pale accent and a black
+    // panel: black, the page's extreme, cannot read on the panel, yet one
+    // grey reads on all three, and it is the ink. The derivation used to
+    // refuse the panel before it measured anything.
+    const roles = deriveBrandRoles({ accent: '#f0f0f0' }, '#ffffff', ['#000000']);
+    expect(roles.accentInk).toBe('#757575');
+    for (const background of ['#ffffff', roles.accentFill!, '#000000']) {
+      expect(contrast(roles.accentInk!, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('refuses one only when no shade of the accent reads on every background at once', () => {
+    // A grey accent's shades are the greys, so every one of them is tried
+    // here and the derivation's answer is held to the whole set: an ink that
+    // reads on the page, the pale fill and the surface, or a refusal exactly
+    // when no grey does.
+    for (const page of ['#ffffff', '#f6f7f9', '#0d0d0d', '#12151c']) {
+      for (const surface of ['#000000', '#1a1a1a', '#6b6b6b', '#f2f2f2', '#ffffff']) {
+        for (const accent of GREYS.filter((_, index) => index % 15 === 0)) {
+          // The pale fill depends on the accent and the page alone.
+          const fill = deriveBrandRoles({ accent }, page).accentFill!;
+          const backgrounds = [page, fill, surface];
+          const readable = GREYS.filter((grey) =>
+            backgrounds.every((background) => contrast(grey, background) >= 4.5),
+          );
+          let ink: string | undefined;
+          try {
+            ink = deriveBrandRoles({ accent }, page, [surface]).accentInk;
+          } catch {
+            ink = undefined;
+          }
+          const where = `${accent} on ${page} beside ${surface}`;
+          if (ink === undefined) expect(readable, where).toEqual([]);
+          else expect(readable, where).toContain(ink);
+        }
+      }
+    }
+  });
+
+  it('keeps every ink it found before, where the extreme reads on every surface', () => {
+    // The path every style's surfaces take: the extreme reads on each, so the
+    // ink is the first shade toward it that does, as it always was. Amber
+    // moves a little further to read on the host's grey panel than on the
+    // page alone.
+    expect(deriveBrandRoles({ accent: '#f59e0b' }, '#ffffff').accentInk).toBe('#9c6406');
+    expect(deriveBrandRoles({ accent: '#f59e0b' }, '#ffffff', ['#eef1f5']).accentInk).toBe(
+      '#996206',
+    );
   });
 });
 

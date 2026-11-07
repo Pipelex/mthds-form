@@ -157,8 +157,9 @@ function resolvedBeside(beside: HTMLElement, property: string, value: string): s
  * weight and tracking, and its face where a style or a team's typeface sets
  * one; a result's own headings under a style; the layout's call to action,
  * found by its role and label, wearing `--action-shadow` and, while it has
- * keyboard focus, the focus outline no shadow can hide; and the host's own
- * main action wearing the same shadow.
+ * keyboard focus, the focus outline no shadow can hide; the host's own main
+ * action wearing the same shadow; every panel the style dresses on a produced
+ * page in a panel's corner; and the band's focus outline reading on the band.
  */
 async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subject) {
   const pages = [...canvasElement.querySelectorAll<HTMLElement>('.app-host')];
@@ -206,6 +207,13 @@ async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subje
     for (const main of page.querySelectorAll<HTMLElement>('.af-btn:not(.ghost, .link)')) {
       await expect(getComputedStyle(main).boxShadow, 'the host action: shadow').toBe(
         resolvedBeside(main, 'box-shadow', 'var(--action-shadow)'),
+      );
+    }
+    // Every panel a style dresses on a produced page, the rail and the card,
+    // takes a panel's corner, one and a half times a control's.
+    for (const panel of page.querySelectorAll<HTMLElement>('[data-style-panel]')) {
+      await expect(getComputedStyle(panel).borderTopLeftRadius, 'a style panel: corner').toBe(
+        resolvedBeside(panel, 'border-top-left-radius', 'calc(var(--radius) * 1.5)'),
       );
     }
     for (const button of page.querySelectorAll<HTMLElement>('.af-band-btn')) {

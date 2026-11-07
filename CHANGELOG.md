@@ -8,7 +8,9 @@
 
 ### Fixed
 
+- **`deriveBrandRoles` measures the accent before it refuses a surface**: a surface on the far side of the page's lightness, such as a dark panel on a light page, is refused only when no shade of the accent reads on the page, the pale fill and every surface at once, and otherwise the ink is the first shade that does; it used to be refused whenever pure black, or pure white on a dark page, did not read on it. Every ink derived before is unchanged. See [docs/brand.md](docs/brand.md).
 - **The JSON view's block is a tab stop only while it scrolls**: it takes keyboard focus while a line is wider than it, as a result table's box does, rather than always, which left a stop per block that scrolled nothing. See [docs/result-view.md](docs/result-view.md).
+- **A produced page's card rounds like a panel**: the generative layer's `Card` takes one and a half times `--radius` at its corners, as the `Rail` and a host's own panel do, where it kept a control's corner and so disagreed with the rail under any style that sets a radius. See [docs/theming.md](docs/theming.md).
 - **An off switch shows its track**: the switch's track, in the form and on a produced page, is `--muted-foreground` when off rather than `--input`, the fill of the boolean's own row, so it reads at 3:1 on its row and its thumb shows on it, where an off switch read as a lone thumb. See [docs/theming.md](docs/theming.md).
 
 ## [v0.30.0] - 2026-11-07
