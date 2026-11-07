@@ -353,6 +353,22 @@ describe("a host's title over a text that heads itself", () => {
     });
   }
 
+  it('draws nothing for a label that gives way and has no text, not even its concept', () => {
+    // A member whose descriptor title is empty: where a label is drawn, its
+    // concept stands in for it; where it gives way to the text's heading,
+    // drawing that would put a mark over the heading.
+    const report: RunField = {
+      kind: 'object',
+      name: 'output',
+      conceptRef: 'demo.Report',
+      required: true,
+      fields: [{ ...memo('prose'), name: 'summary', title: '' }],
+    };
+    inApp(<StuffViewer field={report} value={{ summary: headed }} />);
+    expect(heading()).toBeTruthy();
+    expect(screen.queryByText('demo.Memo')).toBeNull();
+  });
+
   it('draws the Download at the foot, after the text, with nothing left beside it', () => {
     inApp(<StuffViewer field={memo('prose')} value={headed} name="executive_summary" />);
     expect(before(heading(), download())).toBe(true);

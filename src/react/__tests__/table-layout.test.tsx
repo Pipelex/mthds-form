@@ -211,6 +211,29 @@ describe('tableLayout="stack"', () => {
     }
   });
 
+  it('gives a table inside an open row none of the outer chevron', async () => {
+    // An order's lines are a list of records, which no cell holds, so the
+    // orders open; the lines are a name and a number, so they do not.
+    const lines = { ...list(record([text('item'), number('qty')])), name: 'lines' };
+    const orders = list(record([text('reference'), lines]));
+    const { container } = render(
+      <StuffViewer
+        field={orders}
+        value={[{ reference: 'O-1', lines: [{ item: 'pen', qty: 2 }] }]}
+        tableLayout="stack"
+      />,
+    );
+    const outer = table(container);
+    expect(outer.className).toContain('[--fit-chevron:var(--expand-column,2rem)]');
+    await userEvent.click(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    );
+    const inner = outer.querySelector('table')!;
+    expect(inner).toBeTruthy();
+    // Set on the inner table itself: left unset, it would inherit the outer's.
+    expect(inner.className).toContain('[--fit-chevron:0px]');
+  });
+
   it('takes a chevron column from the share only when the rows open', () => {
     // A name and two numbers: every column fits a cell whole, so no row opens
     // and no chevron column is drawn, and none is taken from the share.
@@ -218,7 +241,9 @@ describe('tableLayout="stack"', () => {
     expect(
       screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
     ).toBeNull();
-    expect(table(closed.container).className).not.toContain('--fit-chevron:');
+    // Set to nothing rather than left unset: a custom property inherits, and
+    // this table could be drawn inside an outer table's open row.
+    expect(table(closed.container).className).toContain('[--fit-chevron:0px]');
     closed.unmount();
     // A column the budget hides: the rows open, and their chevron's width,
     // whichever the viewport gives it, is taken from the share.

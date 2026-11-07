@@ -228,15 +228,19 @@ function Label({
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
   const labelText = fieldLabel(field.title, field.name, presentation);
-  if (labelText.trim() === '') {
-    return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
-  }
+  // An unseen label draws nothing, an empty one included: the pill below
+  // stands in for a missing label where one is drawn, and drawing it here
+  // would put a visible mark over the heading the label gave way to.
   if (unseen) {
+    if (labelText.trim() === '') return null;
     return (
       <span className="sr-only">
         {describe && field.description ? `${labelText}: ${field.description}` : labelText}
       </span>
     );
+  }
+  if (labelText.trim() === '') {
+    return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
   }
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
@@ -1947,8 +1951,15 @@ const WORD_FLOOR =
  * name and two numbers, took a part of a chevron column that was not there
  * from every column beside the name, and on a 375px phone, where the chevron
  * is 3.25rem, its header "Quantity" broke as "Quantit" over "y".
+ *
+ * A fitting table whose rows cannot open sets it to nothing (`FIT_NO_CHEVRON`)
+ * rather than leaving it unset: a custom property inherits, and a table drawn
+ * inside an open row's record is a descendant of the outer table, which does
+ * open, so an unset variable would hand the inner table the outer one's
+ * chevron and take it from the inner columns' share.
  */
 const FIT_CHEVRON = '[--fit-chevron:var(--expand-column,2rem)]';
+const FIT_NO_CHEVRON = '[--fit-chevron:0px]';
 const FIT_SHARE_BESIDE_NAME: Readonly<Record<number, string>> = {
   2: '[--fit-share:calc(72cqw_-_3rem_-_var(--fit-chevron,0px))]',
   3: '[--fit-share:calc((72cqw_-_4.5rem_-_var(--fit-chevron,0px))/2)]',
@@ -2230,7 +2241,7 @@ function ObjectTable({
           'w-full min-w-full border-collapse text-[13px]',
           stacked?.table,
           fitShare,
-          fitShare !== undefined && canExpand && FIT_CHEVRON,
+          fitShare !== undefined && (canExpand ? FIT_CHEVRON : FIT_NO_CHEVRON),
         )}
       >
         {/* Gone while the rows are blocks: each value then carries its own
