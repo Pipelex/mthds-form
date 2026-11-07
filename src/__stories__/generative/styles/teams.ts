@@ -3,11 +3,15 @@ import { deriveBrandRoles, type BrandSeeds } from '../../../brand';
 /**
  * Teams' colours, as a team sets them: up to three seeds (the button,
  * the accent, the header band) and a logo. The seeds are real sites' own
- * colours, read off the custom properties each site's stylesheets declare,
- * from the brands a brand-reading method produced from those sites on
- * 2026-10-10 (`pipelex-method`, claude-5.5-opus); `provenance` names the
- * property behind each seed. A team's name and logo are the site's, loaded
- * from the site, and nothing here is that organisation's endorsement.
+ * colours, read off the custom properties each site's stylesheets declare.
+ * They were picked from brands a brand-reading method produced from those
+ * sites on 2026-10-10 (claude-5.5-opus), a corpus kept outside this
+ * repository, unlike the one under `data/brands/` that `make brands`
+ * compiles. So `provenance` is the audit trail here: it names the property
+ * behind each seed, which anyone can read off the live site again. A team's
+ * name and logo are the site's, loaded from the site on every render (no
+ * check depends on them arriving), and nothing here is that organisation's
+ * endorsement.
  *
  * They are story fixtures, not package data: what they are for is whether a
  * style still reads as itself under somebody's colours - a saturated violet,
@@ -94,9 +98,15 @@ export type Theme = 'light' | 'dark';
 
 /**
  * The page colour a team's accent is measured against, in each theme: the
- * host's panel surface, where the form and the result are read. It is the
- * `--background` of the host's palette in `frame.css`, which a test holds it
- * to.
+ * host's page, the `--background` of its palette in `frame.css`, which a test
+ * holds it to. It is the host's own panel and a captured layout's cards too,
+ * but not every surface a style draws: `bold`'s panel is the host's `--muted`
+ * and `soft`'s dark panel is lifted toward the foreground, and on both of
+ * those, in the dark theme, the accent's ink falls a little under 4.5:1.
+ * Nothing draws the ink as text on a panel today (it is the ring, the
+ * selected edge and the check on the selected fill), so it shows in no
+ * story; measuring it against the surface a style actually draws is the
+ * style roles' job.
  */
 export const HOST_PAGE: Readonly<Record<Theme, string>> = { light: '#ffffff', dark: '#12151c' };
 

@@ -40,7 +40,10 @@
  * ---- titles: the page's, and the layer's sections and cards ----
  * Read on every host page: the host states its own title weight and tracking
  * (`frame.css`), and a style overrides them. A heading inside a result is the
- * run's content, not a title of the page, and keeps the result view's weight.
+ * run's content, not a title of the page, so the host's light titles never
+ * reach it: on a page with no style, or `quiet`, it keeps the result view's
+ * weight. A style does reach it, in the rule below, and the face rule above
+ * reaches it too, so a style's result reads in the style's own type.
  */
 .app-host :is(h1, h2, h3):not([class~='uppercase']):not(.af-result *) {
   font-weight: var(--heading-weight);
@@ -61,6 +64,11 @@
  * ring in the same `box-shadow`, and hides its outline, so replacing the
  * shadow then would leave the focus invisible. While focused it wears the
  * layer's own ring and glow.
+ *
+ * Unlayered, it also outranks the layer's hover glow, which sits in
+ * Tailwind's utilities layer, so on a host page the action does not glow on
+ * hover either: the host's treatment holds in every state but focus, and the
+ * hover's change of fill is the feedback that remains.
  */
 .app-host [class*='shadow-[0_0_28px']:not(:focus-visible) {
   box-shadow: var(--action-shadow);

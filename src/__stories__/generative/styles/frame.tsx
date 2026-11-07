@@ -261,7 +261,12 @@ export function manifestFor(team: TeamKey | null): BrandManifest {
   };
 }
 
-/** Whether a layout draws its own app bar, in which case it is the whole page and the host draws no band. */
+/**
+ * Whether a layout draws its own app bar, in which case it is the whole page
+ * and the host draws no band. Wherever the layout places it: the catalog
+ * allows one `AppBar` and renders it as the page's banner, so a host band
+ * beside it would be a second banner, however deep the bar sits.
+ */
 function drawsItsOwnBar(fixture: SpecFixture): boolean {
   const { root, elements } = fixture.spec as {
     root: string;
