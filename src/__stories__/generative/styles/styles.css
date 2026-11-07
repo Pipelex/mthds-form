@@ -1,0 +1,83 @@
+/*
+ * The app styles, applied to the rendered page - story-only, and disposable.
+ *
+ * Every value comes from `styles.ts` as a custom property set on the style's
+ * scope (`--font-sans`, `--font-heading`, `--heading-weight`,
+ * `--heading-tracking`, `--radius`, `--panel-fill`, `--panel-edge`,
+ * `--panel-edge-width`, `--panel-shadow`, `--inset-fill`, `--inset-edge`,
+ * `--action-shadow`); this file only says
+ * WHERE they land on the DOM the kernel's controls and the generative layer
+ * draw today. It reaches
+ * that DOM by its utility classes, which is exactly why it is disposable: the
+ * components are meant to read these tokens themselves, each with today's
+ * value as its fallback, and this file is deleted then.
+ *
+ * The faces and the headings are turned on by a style's class. `quiet` has
+ * none: it is the host's own look, and a page wearing it renders exactly as
+ * one wearing no style, unless a team picked a typeface, which
+ * `data-typeface` marks. The panels are read on every host page, because the
+ * host states its own panel treatment through the same tokens.
+ *
+ * Plain CSS, unlayered, so it outranks the utilities it overrides.
+ */
+
+/*
+ * A title is a heading set in words: an uppercase heading is an eyebrow, set
+ * small and tracked wide in the body face, and no style touches it.
+ */
+
+/* ---- faces ---- */
+:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-style[data-typeface]) {
+  font-family: var(--font-sans);
+}
+:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-style[data-typeface])
+  :is(h1, h2, h3):not([class~='uppercase']) {
+  font-family: var(--font-heading, var(--font-sans));
+}
+
+/*
+ * ---- the page's title ----
+ * Read on every host page: the host states its own title weight and tracking
+ * (`frame.css`), and a style overrides them. A heading inside a result is the
+ * run's content, not the page's title, and keeps the result view's weight.
+ */
+.app-host h1:not([class~='uppercase']):not(.af-result *) {
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+}
+
+/* ---- headings: the layer's hero, section and card titles ---- */
+:is(.app-style-soft, .app-style-editorial, .app-style-bold)
+  :is(h1, h2, h3):not([class~='uppercase']) {
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+}
+
+/*
+ * ---- the designed page's action ----
+ * The layer's call to action glows in the button colour. A style whose panels
+ * cast no shadow sets `--action-shadow` to none, and the glow goes with them.
+ */
+:is(.app-style-editorial, .app-style-bold) [class*='shadow-[0_0_28px'] {
+  box-shadow: var(--action-shadow);
+}
+
+/*
+ * ---- panels: the layer's cards and rail ----
+ * Read on every host page, not only a styled one: the host states its own
+ * panel treatment as tokens (`frame.css`), which is what a page with no
+ * style - and `quiet` - wears, and a style overrides them.
+ */
+.app-host [class~='bg-card'][class~='border'] {
+  background: var(--panel-fill);
+  border-color: var(--panel-edge);
+  border-width: var(--panel-edge-width);
+  box-shadow: var(--panel-shadow);
+}
+
+/* ---- a group inside a panel: the kernel's structure box and list rows ---- */
+.app-host [class~='bg-card/40'][class~='border'] {
+  background: var(--inset-fill);
+  border-color: var(--inset-edge);
+  box-shadow: none;
+}
