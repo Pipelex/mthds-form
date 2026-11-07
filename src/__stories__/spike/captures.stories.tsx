@@ -58,7 +58,12 @@ const meta = {
   component: CaptureView,
   parameters: { themePairPadding: 0, layout: 'fullscreen', a11y: { test: 'off' } },
   globals: { themeView: 'light' },
-  argTypes: { capture: { control: 'select', options: Object.keys(CAPTURES).sort() } },
+  argTypes: {
+    capture: { control: 'select', options: Object.keys(CAPTURES).sort() },
+    theme: { control: 'inline-radio', options: ['light', 'dark'] },
+    style: { control: 'select', options: ['quiet', 'soft', 'editorial', 'bold'] },
+    team: { control: 'select', options: ['none', 'northfield', 'wayfarer', 'kiln'] },
+  },
 } satisfies Meta<typeof CaptureView>;
 
 export default meta;
