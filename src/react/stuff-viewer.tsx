@@ -583,8 +583,9 @@ function StuffPanel({
               it when the panel draws no title of its own, and then in `app` it
               draws no count under the host's heading; under the panel's own
               title, which says no count, it keeps its count. A text that names
-              itself is the one result headed by neither, and it has no count
-              to draw. */}
+              itself draws no panel title either, so it counts as host-headed
+              here, though its own heading is what opens it; a text has no
+              count to draw in any case. */}
           <PanelResult hostHeaded={!titled}>
             <ResultField field={field} value={value} hideLabel />
           </PanelResult>

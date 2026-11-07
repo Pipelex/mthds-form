@@ -244,10 +244,18 @@ export const NamedTextThatNamesItself: Story = {
     for (const name of said) await expect(name.className).toContain('sr-only');
     const downloads = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.download });
     await expect(downloads).toHaveLength(BOTH_THEMES);
+    // The text ends on a list, the same in each theme's pane, in document order.
+    const items = canvas.getAllByRole('listitem');
+    const perPane = items.length / BOTH_THEMES;
     for (const [index, download] of downloads.entries()) {
-      // The heading opens the result, and the Download follows the text.
+      // The heading opens the result, and the Download follows the whole text,
+      // its last line included.
+      const last = items[(index + 1) * perPane - 1]!;
       await expect(
         headings[index]!.compareDocumentPosition(download) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      await expect(
+        last.compareDocumentPosition(download) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
   },

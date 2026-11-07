@@ -265,6 +265,17 @@ describe('tableLayout="stack"', () => {
     expect(screen.getByRole('columnheader', { name: 'unit_price_differs' })).toBe(header);
   });
 
+  it('leaves an app header as it is, an authored title with an underscore included', () => {
+    const fields = [
+      text('reference'),
+      { ...number('unit_price'), title: 'Unit price (EUR_HT)' },
+      number('quantity'),
+    ];
+    const { container } = renderTable(fields, { layout: 'stack', app: true });
+    expect(container.querySelector('thead wbr')).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Unit price (EUR_HT)' })).toBeTruthy();
+  });
+
   it('gives no word floor to a table that scrolls, or to one that is blocks at every width', () => {
     const scrolled = renderTable(columns(3));
     expect(scrolled.container.querySelector('[data-fit]')).toBeNull();

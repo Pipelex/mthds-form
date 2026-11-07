@@ -1982,7 +1982,9 @@ const FIT_SHARE_WITHOUT_NAME: Readonly<Record<number, string>> = {
  * whose words are joined by underscores rather than spaces, and a header that
  * wraps only between words would otherwise hold the whole identifier on one
  * line. `<wbr>` adds the break and nothing to the text, so the header still
- * reads, copies and is named exactly as written.
+ * reads, copies and is named exactly as written. In `app` a header is a
+ * humanised name or an authored title, whose words are spaced already, so it
+ * is left as it is.
  */
 function identifierWords(label: string): React.ReactNode {
   const words = label.split('_');
@@ -2283,7 +2285,9 @@ function ObjectTable({
                 {/* The authored description, once, on the header - it is worth
                     having and not worth repeating under every value. */}
                 <Described description={column.description}>
-                  {identifierWords(fieldLabel(column.title, column.name, presentation))}
+                  {presentation === 'studio'
+                    ? identifierWords(fieldLabel(column.title, column.name, presentation))
+                    : fieldLabel(column.title, column.name, presentation)}
                 </Described>
               </th>
             ))}
