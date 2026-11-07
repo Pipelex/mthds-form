@@ -156,7 +156,7 @@ A code is put into words by a short list of rules, kept short on purpose:
 - **An all-caps code of several words is lowercased first.** The capitals of `HIGH_RISK` are a convention of the code rather than an emphasis its author meant, and "HIGH RISK" on a sentence-case page reads as an alarm.
 - **A single all-caps token is left exactly as written.** `USD`, `EUR`, `OK` and `HIGH` hold no separator, and a lone capitalised word is far more often an acronym, a unit or a currency than a shouted word, so lowercasing it would misspell it.
 - **Only a code is worded.** A value holding a space, a slash or a symbol, or one that does not start with a letter (`Very satisfied`, `N/A`, `18-24`), is authored words already and is shown verbatim.
-- **Acronyms inside a longer code are not guessed.** `po` stays `po` where a reader expects `PO`, exactly as a field name does. The label is derived from the value and from nothing else: the standard's descriptor carries no display label for an option, and the decision was not to add one, so the method's author who wants `PO` read writes the code so that it reads (`matches_PO` reads "Matches PO").
+- **Acronyms inside a longer code are not guessed.** `po` stays `po` where a reader expects `PO`, exactly as a field name does. A code's words are derived from the code by rule, since the standard's descriptor carries no display label for an option and none is added, so the method's author who wants `PO` read writes the code so that it reads (`matches_PO` reads "Matches PO"); whether those words are shown at all is the enum's to decide, below.
 
 What a person reads is then decided per enum rather than per value, and two cases show the code as written even in `app`:
 

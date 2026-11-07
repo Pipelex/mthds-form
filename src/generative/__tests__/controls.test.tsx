@@ -175,6 +175,18 @@ describe('the options a catalog choice offers', () => {
     );
     expect(screen.getByRole('combobox', { name: 'Talk' })).toHaveTextContent('Executives');
   });
+
+  it('Select shows the chosen option as its code in studio', () => {
+    render(
+      <GenerativePage
+        spec={choice('Select')}
+        store={createStateStore({ inputs: { talk: 'executives' } })}
+        scope={{}}
+        brand={BRAND}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Talk' })).toHaveTextContent('executives');
+  });
 });
 
 /**
