@@ -59,6 +59,28 @@ The kernel has one selected state. A pressed toggle, whether an enum pill, the M
 
 `scripts/assert-bundle.mjs` lists the two as optional tokens: every read of one must fall back to what its row says, in source and in the built sheet, the chain must end at a token `theme.css` defines, `theme.css` must not define either, and this page must name each.
 
+## Style tokens
+
+A team's app style ([brand.md](brand.md) § "App styles and typefaces") reaches the page through eight more optional tokens, outside the table above, which `theme.css` defines none of. The `./brand` entry's `deriveStyleRoles` returns the roles a host writes onto them, as `deriveBrandRoles` does for the colours; the kernel and the generative layer only read them.
+
+| Token | What reads it | Falls back to |
+| --- | --- | --- |
+| `--font-heading` | Every heading the controls and the generative layer draw: a produced page's hero, section, panel, card and content headings, a heading in a typeset result, and a dialog's title | `revert-layer`: the face the heading wore before, a host's own heading rule in an earlier layer or the face it inherits |
+| `--heading-weight` | The same headings | The weight each was set in: 700 for a hero and a produced page's first-level heading, 600 for the rest, 500 for the rename dialog's title and the picture viewer's file name |
+| `--heading-tracking` | The same headings | Tailwind's `tracking-tight` (`-0.025em`) where a heading was set in it, `revert-layer` elsewhere |
+| `--panel-fill` | A panel the generative layer draws on the page: its rail and its card | `--card` |
+| `--panel-edge` | The same panels' edge | `--border` |
+| `--panel-edge-width` | The same panels' edge width | `1px` |
+| `--panel-shadow` | The same panels' shadow | The rail's large shadow (Tailwind's `shadow-xl`), and none for a card |
+| `--action-shadow` | A produced page's call to action | Its glow in the button colour, `0 0 28px` at 35%, and `0 0 44px` at 50% under the pointer |
+
+- **What reads them, and what does not.** A title is a heading set in words: an uppercase eyebrow, the rail's, is set small and tracked wide in the body face and reads none. A structure's name over its fields labels a group of the form rather than titling the page, and keeps the body face and the kernel's own weight. A panel is a surface on the page: a group inside a panel (a structure's box, a result's JSON or table) is not one, and keeps the kernel's own fill and hairline; nor are the kernel's popovers, menus and dialogs.
+- **What a host defines.** Write each role `deriveStyleRoles` returns onto its token, on the same scope as the colour tokens, the panel's roles restated under `.dark` from its `dark` treatment (brand.md § "Mapping the roles onto tokens"). A role the choice does not set is not a key, so its token stays undefined and the fallback stands: `quiet` sets none of them. A host also states its own treatment of the same things, its titles' weight and its panels, through the same tokens where it wants a designed page to wear it, which is what makes `quiet` its look rather than an absence, and resets them (`initial`) where it does not, such as the headings inside a result, which are the run's content.
+- **Focus is never a shadow.** The call to action draws its focus as `focusOutlineClass`'s outline, so a style's `--action-shadow`, `none` included, can neither replace nor hide it.
+- **A host that defines none renders as it did.** Each read is an arbitrary property carrying the value it replaced (`[font-weight:var(--heading-weight,600)]`, `[box-shadow:var(--panel-shadow,…)]`), spelled in `src/react/style-tokens.ts`, which the generative layer reads too. A fallback that is a value rather than a token is held to its shape: a weight, a length, `revert-layer`, `none` or a shadow, never empty. `revert-layer` is the fallback where the element set no value of its own: it undoes that one declaration, so a host's stylesheet for its headings, layered before the package's utilities as a Tailwind host's base layer is, still reaches them.
+
+`scripts/assert-bundle.mjs` lists all eight as optional tokens: `--panel-fill` and `--panel-edge` must fall back through `--card` and `--border` to `theme.css`'s values, the others to a value of their row's shape, in source and in the built sheet; `theme.css` must define none, and this page must name each.
+
 ## Host setup
 
 ### A host that runs Tailwind (the common case)

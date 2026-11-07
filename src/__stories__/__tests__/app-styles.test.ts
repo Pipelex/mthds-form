@@ -1,74 +1,57 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { deriveBrandRoles } from '../../brand';
+import { APP_STYLE_IDS, TYPEFACES, deriveBrandRoles, deriveStyleRoles } from '../../brand';
+import { googleFontsHref, roleColorCss, styleTokens } from '../generative/styles/styles';
 import {
-  APP_STYLES,
-  APP_STYLE_IDS,
-  TYPEFACES,
-  axisWeights,
-  fontStack,
-  inTheme,
-  googleFontsHref,
-  styleTokens,
-  typeface,
-} from '../generative/styles/styles';
-import { HOST_PAGE, TEAMS, TEAM_KEYS, bandOn, teamTokens } from '../generative/styles/teams';
+  HOST_PAGE,
+  HOST_PALETTE,
+  TEAMS,
+  TEAM_KEYS,
+  bandOn,
+  styleSurfaces,
+  teamTokens,
+} from '../generative/styles/teams';
 
 /**
- * The app styles' table, held to the rules the stories rely on: `quiet` sets
- * nothing, a team's typeface replaces the body face and, where a style's
- * headings follow the body, the heading face, a style adds
- * no colour of its own, and a team's colours land on the tokens docs/brand.md
- * maps them to. The rendering itself is the `Generative/App styles` stories'
- * to show.
+ * The stories' host, held to the rules the stories rely on: it writes the
+ * roles `deriveStyleRoles` returns onto the tokens docs/brand.md maps them to,
+ * `quiet` sets nothing, a style adds no colour of its own, the faces load in
+ * every weight a style or the host asks of them, and a team's colours land on
+ * the tokens docs/brand.md names, the accent's ink measured on every surface
+ * the style draws. The roles themselves are `src/brand/__tests__/styles.test.ts`'s,
+ * and the rendering the `Generative/App styles` stories'.
  */
 
 const THEMES = ['light', 'dark'] as const;
-const BODY_FACES = TYPEFACES.filter((face) => face.use === 'body');
+const FRAME = readFileSync(new URL('../generative/styles/frame.css', import.meta.url), 'utf8');
 
 describe('styleTokens', () => {
   it('sets nothing for quiet with no typeface, in either theme', () => {
-    for (const theme of THEMES) expect(styleTokens('quiet', null, theme)).toEqual({});
+    for (const theme of THEMES) expect(styleTokens(deriveStyleRoles('quiet'), theme)).toEqual({});
   });
 
   it("gives quiet a team's typeface as both its body and its heading face, and nothing else", () => {
-    const tokens = styleTokens('quiet', 'manrope', 'light');
-    expect(tokens).toEqual({
-      '--font-sans': fontStack('manrope'),
-      '--font-heading': fontStack('manrope'),
+    const manrope = TYPEFACES.find((face) => face.id === 'manrope')!;
+    expect(styleTokens(deriveStyleRoles('quiet', 'manrope'), 'light')).toEqual({
+      '--font-sans': manrope.stack,
+      '--font-heading': manrope.stack,
     });
   });
 
-  it("replaces every style's body face with a team's typeface", () => {
-    for (const id of APP_STYLE_IDS) {
-      for (const face of BODY_FACES) {
-        expect(styleTokens(id, face.id, 'light')['--font-sans']).toBe(fontStack(face.id));
-      }
-    }
-  });
-
-  it("replaces the heading face only where a style's headings follow its body", () => {
-    for (const id of APP_STYLE_IDS) {
-      const style = APP_STYLES[id];
-      const heading = styleTokens(id, 'ibm-plex-sans', 'light')['--font-heading'];
-      if (style.headingFace === null || style.headingFace === 'body') {
-        expect(heading).toBe(fontStack('ibm-plex-sans'));
-      } else {
-        expect(heading).toBe(fontStack(style.headingFace));
-      }
-    }
-  });
-
-  it('gives every style but quiet a full set of tokens, in both themes', () => {
+  it('writes every role of a style but quiet onto its token, in both themes', () => {
     for (const id of APP_STYLE_IDS.filter((candidate) => candidate !== 'quiet')) {
+      const roles = deriveStyleRoles(id);
       for (const theme of THEMES) {
-        const tokens = styleTokens(id, null, theme);
-        expect('--action-shadow' in tokens).toBe(APP_STYLES[id].actionShadow !== null);
-        // The tokens a style sets only where it departs from the host's.
-        const optional = ['--action-shadow', '--panel-field'];
-        const rest = Object.keys(tokens).filter((name) => !optional.includes(name));
-        expect(rest.sort()).toEqual(
+        const tokens = styleTokens(roles, theme);
+        expect('--panel-field' in tokens, id).toBe(roles.panel![theme].field !== undefined);
+        expect(
+          Object.keys(tokens)
+            .filter((name) => name !== '--panel-field')
+            .sort(),
+          id,
+        ).toEqual(
           [
+            '--action-shadow',
             '--density',
             '--font-heading',
             '--font-sans',
@@ -81,91 +64,72 @@ describe('styleTokens', () => {
             '--radius',
           ].sort(),
         );
+        expect(tokens['--heading-weight']).toBe(String(roles.headingWeight));
+        expect(tokens['--radius']).toBe(`${roles.radius}px`);
+        expect(tokens['--panel-shadow']).toBe(roles.panel![theme].shadow ?? 'none');
       }
-    }
-  });
-
-  it('draws a shadow per theme, never the light one on a dark page', () => {
-    for (const id of APP_STYLE_IDS) {
-      const shadow = APP_STYLES[id].panel?.shadow;
-      if (!shadow) continue;
-      expect(shadow.dark).not.toBe(shadow.light);
-      expect(styleTokens(id, null, 'dark')['--panel-shadow']).toBe(shadow.dark);
     }
   });
 
   it('adds no colour: every fill and edge is a role of the theme, a mix of one, or none', () => {
     const literal = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/i;
     for (const id of APP_STYLE_IDS) {
-      const panel = APP_STYLES[id].panel;
-      if (!panel) continue;
-      const themes = [panel.fill, panel.edge, ...(panel.field ? [panel.field] : [])];
-      for (const themed of themes) {
-        for (const theme of THEMES) {
-          const value = inTheme(themed, theme);
-          expect(value, `${id}: ${value}`).not.toMatch(literal);
-          expect(value === 'transparent' || value.includes('var(--'), `${id}: ${value}`).toBe(true);
+      for (const theme of THEMES) {
+        const tokens = styleTokens(deriveStyleRoles(id), theme);
+        for (const name of ['--panel-fill', '--panel-edge', '--panel-field', '--action-shadow']) {
+          const value = tokens[name];
+          if (value === undefined || value === 'none' || value === 'transparent') continue;
+          expect(value, `${id} ${name}`).not.toMatch(literal);
+          expect(value, `${id} ${name}`).toContain('var(--');
+          expect(value, `${id} ${name}`).not.toMatch(/var\(--panel-field\b/);
         }
       }
     }
   });
 
-  it('never fills a field from `--panel-field`, the token the fill itself sets', () => {
-    for (const id of APP_STYLE_IDS) {
-      const field = APP_STYLES[id].panel?.field;
-      if (!field) continue;
-      for (const theme of THEMES)
-        expect(inTheme(field, theme), id).not.toMatch(/var\(--panel-field\b/);
-    }
+  it("writes a role colour as color-mix() over the contract's tokens, as resolveRoleColor measures it", () => {
+    expect(roleColorCss({ role: 'muted' })).toBe('var(--muted)');
+    expect(roleColorCss({ role: 'card', toward: { role: 'foreground', share: 0.07 } })).toBe(
+      'color-mix(in oklab, var(--card) 93%, var(--foreground))',
+    );
+    expect(roleColorCss({ role: 'foreground', alpha: 0.62 })).toBe(
+      'color-mix(in oklab, var(--foreground) 62%, transparent)',
+    );
   });
 
   it('sets no `--input` on the page, so a field fill reaches the host panel alone', () => {
     for (const id of APP_STYLE_IDS) {
-      for (const theme of THEMES) expect('--input' in styleTokens(id, null, theme), id).toBe(false);
+      for (const theme of THEMES)
+        expect('--input' in styleTokens(deriveStyleRoles(id), theme), id).toBe(false);
     }
+    expect(FRAME).toMatch(/\.af-panel \{[^}]*--input: var\(--panel-field, var\(--host-input\)\)/);
   });
 });
 
-describe('the typefaces', () => {
-  it('ends every stack on a generic family, so a face that never loads still renders its kind', () => {
-    for (const face of TYPEFACES) {
-      expect(fontStack(face.id)).toMatch(new RegExp(`^"${face.family}", .*\\b${face.category}$`));
-    }
-  });
+describe('the faces the stories load', () => {
+  /** The weights a Google Fonts axis spec loads, from a range or a list. */
+  function axisWeights(spec: string): number[] {
+    const [axes, values] = spec.split('@') as [string, string];
+    const at = axes.split(',').indexOf('wght');
+    if (at < 0) return [];
+    return values.split(';').flatMap((tuple) => {
+      const weight = tuple.split(',')[at]!;
+      if (!weight.includes('..')) return [Number(weight)];
+      const [from, to] = weight.split('..').map(Number) as [number, number];
+      return [100, 200, 300, 400, 500, 600, 700, 800, 900].filter((w) => w >= from && w <= to);
+    });
+  }
 
-  it("names only faces on the list, and offers a style's heading-only face as no body", () => {
-    for (const id of APP_STYLE_IDS) {
-      const { bodyFace, headingFace } = APP_STYLES[id];
-      if (bodyFace) expect(typeface(bodyFace).use).toBe('body');
-      if (headingFace && headingFace !== 'body') expect(typeface(headingFace)).toBeDefined();
-    }
-    expect(() => typeface('comic-sans' as never)).toThrow();
-  });
-
-  it('reads the weights an axis spec loads, from a range or a list', () => {
-    expect(axisWeights('wght@300..700')).toEqual([300, 400, 500, 600, 700]);
-    expect(axisWeights('opsz,wght@9..40,350..600')).toEqual([400, 500, 600]);
-    expect(axisWeights('wght@400;600')).toEqual([400, 600]);
-    expect(axisWeights('opsz@9..40')).toEqual([]);
-  });
-
-  it("loads every face, each with the weights a style asks of it and the host's own title weight", () => {
+  it("loads every face in each weight it is listed in, which covers the host's own title weight", () => {
     const href = googleFontsHref();
-    for (const face of TYPEFACES)
-      expect(href).toContain(`family=${face.family.replace(/ /g, '+')}:${face.axes}`);
     expect(href).toMatch(/&display=swap$/);
-    // The host's titles keep their weight under a team's face on `quiet`.
-    const frame = readFileSync(new URL('../generative/styles/frame.css', import.meta.url), 'utf8');
-    const host = Number(/--heading-weight:\s*(\d+)/.exec(frame)?.[1]);
+    const host = Number(/--heading-weight:\s*(\d+)/.exec(FRAME)?.[1]);
     expect(host).toBeGreaterThan(0);
-    const asked = [host];
-    for (const id of APP_STYLE_IDS) {
-      const { headingWeight } = APP_STYLES[id];
-      if (headingWeight !== null) asked.push(headingWeight);
-    }
     for (const face of TYPEFACES) {
-      expect(face.weights).toEqual(axisWeights(face.axes));
-      for (const weight of asked) expect(face.weights, face.family).toContain(weight);
+      const spec = new RegExp(`family=${face.family.replace(/ /g, '\\+')}:([^&]+)`).exec(href)?.[1];
+      expect(spec, face.family).toBeDefined();
+      const loaded = axisWeights(spec!);
+      for (const weight of [...face.weights, host]) expect(loaded, face.family).toContain(weight);
     }
   });
 });
@@ -184,10 +148,46 @@ const BRAND_MAPPING = {
 } as const;
 
 describe('teamTokens', () => {
+  it("holds the host's palette to the one frame.css paints", () => {
+    for (const theme of THEMES) {
+      const rule = theme === 'light' ? '\\.app-host' : '\\.dark \\.app-host';
+      const block = new RegExp(`^${rule} \\{([^}]*)\\}`, 'm').exec(FRAME)?.[1] ?? '';
+      for (const [name, value] of Object.entries(HOST_PALETTE[theme]))
+        expect(new RegExp(`--${name}:\\s*([^;]+);`).exec(block)?.[1], `${theme} --${name}`).toBe(
+          value,
+        );
+    }
+  });
+
+  it("measures the accent's ink on the canvas and on the panel and fields a style draws", () => {
+    expect(styleSurfaces(deriveStyleRoles('quiet'), 'light')).toEqual(['#f6f7f9', '#ffffff']);
+    // bold's muted panel, and its fields on the card.
+    expect(styleSurfaces(deriveStyleRoles('bold'), 'light')).toEqual([
+      '#f6f7f9',
+      '#eef1f5',
+      '#ffffff',
+    ]);
+    // soft's dark panel, lifted toward the foreground, and its fields on the page.
+    expect(styleSurfaces(deriveStyleRoles('soft'), 'dark')).toEqual([
+      '#0b0d12',
+      '#1e2129',
+      '#12151c',
+    ]);
+    for (const key of TEAM_KEYS) {
+      for (const theme of THEMES) {
+        for (const id of APP_STYLE_IDS) {
+          const surfaces = styleSurfaces(deriveStyleRoles(id), theme);
+          expect(teamTokens(TEAMS[key], theme, surfaces)['--link']).toBe(
+            deriveBrandRoles(TEAMS[key].seeds, HOST_PAGE[theme], surfaces).accentInk,
+          );
+        }
+      }
+    }
+  });
+
   it("measures each theme against the page the host's palette paints", () => {
-    const frame = readFileSync(new URL('../generative/styles/frame.css', import.meta.url), 'utf8');
     const background = (selector: string) =>
-      new RegExp(`^${selector} \\{[^}]*?--background:\\s*([^;]+);`, 'm').exec(frame)?.[1];
+      new RegExp(`^${selector} \\{[^}]*?--background:\\s*([^;]+);`, 'm').exec(FRAME)?.[1];
     expect(background('\\.app-host')).toBe(HOST_PAGE.light);
     expect(background('\\.dark \\.app-host')).toBe(HOST_PAGE.dark);
   });

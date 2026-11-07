@@ -14,7 +14,7 @@ import { atWidth, expectEveryTouchTarget, pinnedTo } from '../../touch-target';
 import { GENERATIVE_STORY_PARAMETERS, assertRenderable, heroFields } from '../layout-page';
 import { DesignedPage, Frame } from './frame';
 import { AppScope, styleFontsReady } from './scope';
-import { APP_STYLE_IDS, TYPEFACES, type AppStyleId, type TypefaceId } from './styles';
+import { APP_STYLE_IDS, TYPEFACES, type AppStyleId, type TypefaceId } from '../../../brand';
 import { TEAM_KEYS, type TeamKey } from './teams';
 
 /**
@@ -35,8 +35,10 @@ import { TEAM_KEYS, type TeamKey } from './teams';
  * shot. `style: none` renders the host's page with no style class at all, the
  * reference `quiet` must match pixel for pixel.
  *
- * A spike: the stylesheet behind it is story-only and disposable, and the
- * values it applies live in `styles.ts`. See docs/storybook.md, "App styles".
+ * The values are the `./brand` entry's: `deriveStyleRoles` returns the roles a
+ * style and a typeface set, `styles.ts` writes them onto this host's tokens,
+ * and the kernel's controls and the generative layer read the tokens
+ * themselves. See docs/storybook.md, "App styles".
  */
 
 type Subject =
@@ -116,7 +118,7 @@ function StyledPage({ subject, style, team, typeface }: StyledPageArgs) {
   );
 }
 
-// ─── The stylesheet reaches the page ──────────────────────────────────────
+// ─── The style reaches the page ────────────────────────────────────────────
 
 /** The labels of a layout's calls to action, read off its spec rather than off the DOM's classes. */
 function callsToAction(subject: Subject): string[] {
@@ -147,12 +149,14 @@ function resolvedBeside(beside: HTMLElement, property: string, value: string): s
 }
 
 /**
- * The stylesheet finds the DOM by its markup and its utility classes
- * (`styles.css`), so a change to either would drop a style's treatment with
- * every other check green. This holds each host page to what its scope sets:
- * every title's weight and tracking, and its face where a style or a team's
- * typeface sets one; a result's own headings under a style; and the layout's
- * call to action, found by its role and label, wearing `--action-shadow`.
+ * Each component reads the tokens itself, so a heading or a button that
+ * stopped reading one would drop a style's treatment with every other check
+ * green. This holds each host page to what its scope sets: every title's
+ * weight and tracking, and its face where a style or a team's typeface sets
+ * one; a result's own headings under a style; the layout's call to action,
+ * found by its role and label, wearing `--action-shadow` and, while it has
+ * keyboard focus, the focus outline no shadow can hide; and the host's own
+ * main action wearing the same shadow.
  */
 async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subject) {
   const pages = [...canvasElement.querySelectorAll<HTMLElement>('.app-host')];
@@ -183,6 +187,23 @@ async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subje
       const action = within(page).getByRole('button', { name: label });
       await expect(getComputedStyle(action).boxShadow, `${label}: shadow`).toBe(
         resolvedBeside(action, 'box-shadow', 'var(--action-shadow)'),
+      );
+      action.focus({ preventScroll: true });
+      try {
+        await expect(action.matches(':focus-visible'), `${label}: focus-visible`).toBe(true);
+        // The button transitions every property, its outline included, so the
+        // outline is read once it has settled.
+        await Promise.all(action.getAnimations().map((animation) => animation.finished));
+        const focused = getComputedStyle(action);
+        await expect(focused.outlineStyle, `${label}: focus outline`).toBe('solid');
+        await expect(focused.outlineWidth, `${label}: focus outline`).toBe('2px');
+      } finally {
+        action.blur();
+      }
+    }
+    for (const main of page.querySelectorAll<HTMLElement>('.af-btn:not(.ghost, .link)')) {
+      await expect(getComputedStyle(main).boxShadow, 'the host action: shadow').toBe(
+        resolvedBeside(main, 'box-shadow', 'var(--action-shadow)'),
       );
     }
   }

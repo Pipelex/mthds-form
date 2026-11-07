@@ -7,7 +7,18 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
-import { linkTextClass, selectedBorderClass, selectedFillClass } from '../react/role-tokens';
+import {
+  focusOutlineClass,
+  linkTextClass,
+  selectedBorderClass,
+  selectedFillClass,
+} from '../react/role-tokens';
+import {
+  actionShadowClass,
+  headingClass,
+  panelRaisedShadowClass,
+  panelSurfaceClass,
+} from '../react/style-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
@@ -20,8 +31,11 @@ import { useControlId } from './ui/shadcn';
  * What the brand catalog's components RENDER as - the product page's chrome,
  * over the same tokens the kernel's controls read, and over NOTHING else: no
  * literal colour, no literal radius, no literal typeface. The rail's panel is
- * `bg-card` on `border-border`, a hairline is `border-border`, the call to
- * action's glow is the accent composed with `color-mix()`, the corners are
+ * the page's style panel (`--panel-*`), falling back to `bg-card` on
+ * `border-border` and a large shadow; a title reads the style's heading face,
+ * weight and tracking; a hairline is `border-border`; the call to action wears
+ * the style's `--action-shadow`, falling back to a glow of the accent composed
+ * with `color-mix()` (see `react/style-tokens`); the corners are
  * `--radius` and its multiples, a tag is `font-mono`, the logo is the
  * manifest's pair. The running text names no face at all: it inherits the
  * page's, which a brand's compiled stylesheet sets on its scope from
@@ -133,7 +147,12 @@ function Hero({ props }: BaseComponentProps<HeroProps>) {
           {props.eyebrow}
         </p>
       ) : null}
-      <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-[44px] sm:leading-[1.15]">
+      <h1
+        className={cn(
+          'max-w-2xl text-4xl text-foreground sm:text-[44px] sm:leading-[1.15]',
+          headingClass(700, true),
+        )}
+      >
         {props.headline}
       </h1>
       {props.lede ? (
@@ -184,7 +203,7 @@ function ResultPanel() {
   if (!slot?.content) return null;
   return (
     <section className="border-t border-border py-9" data-testid="result-panel" aria-live="polite">
-      <h2 className="mb-6 text-xl font-semibold tracking-tight text-foreground">
+      <h2 className={cn('mb-6 text-xl text-foreground', headingClass(600, true))}>
         {slot.title ?? 'Result'}
       </h2>
       {slot.content}
@@ -206,7 +225,7 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
           {props.number ? (
             <span className={cn('font-mono text-[12px]', linkTextClass)}>{props.number}</span>
           ) : null}
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">{props.title}</h2>
+          <h2 className={cn('text-xl text-foreground', headingClass(600, true))}>{props.title}</h2>
         </div>
         {props.lede ? <p className="mt-1.5 text-sm text-muted-foreground">{props.lede}</p> : null}
       </div>
@@ -223,7 +242,13 @@ function Rail({ props, children }: BaseComponentProps<{ title: string }>) {
     // the `@theme inline` mapping and does not inherit its fallback - it has to
     // carry its own, or a host that defines no tokens loses the declaration
     // outright. See src/styles/tailwind-entry.css.
-    <div className="rounded-[calc(var(--radius,0.5rem)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
+    <div
+      className={cn(
+        'rounded-[calc(var(--radius,0.5rem)*1.5)] p-7 text-card-foreground',
+        panelSurfaceClass,
+        panelRaisedShadowClass,
+      )}
+    >
       <h2 className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {props.title}
       </h2>
@@ -268,10 +293,12 @@ function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string 
         type="button"
         onClick={() => emit('press')}
         className={cn(
-          'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground',
-          // The fallback is not decoration here either - see Rail above.
-          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_50%,transparent)]',
-          'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden',
+          'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90',
+          // The page's call-to-action shadow, or the glow in the button colour
+          // it had. Focus is an outline, which no shadow a style sets can
+          // replace or hide.
+          actionShadowClass,
+          focusOutlineClass,
         )}
       >
         {props.label}

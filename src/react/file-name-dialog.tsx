@@ -13,6 +13,7 @@ import { typedFileStem } from '../core/save-plan';
 import { useFieldStrings } from './field-strings';
 import { useAskFileName } from './result-env';
 import { focusOutlineClass } from './role-tokens';
+import { headingClass } from './style-tokens';
 import { cn } from './utils';
 
 /**
@@ -161,7 +162,7 @@ export function FileNameDialog({ stem, extension, onConfirm, onCancel }: FileNam
         onKeyDown={onKeyDown}
         className="w-full max-w-sm space-y-3 rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-lg"
       >
-        <h2 id={titleId} className="text-[14px] font-medium">
+        <h2 id={titleId} className={cn('text-[14px]', headingClass(500))}>
           {s.fileNameTitle}
         </h2>
         <div className="flex items-center rounded-md border border-border bg-input focus-within:outline-solid focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring">

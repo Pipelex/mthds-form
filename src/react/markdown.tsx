@@ -6,6 +6,7 @@ import { marked, type Token, type Tokens } from 'marked';
 import { splitCitations, viewableUrl, webHref } from '../core/native-content';
 import { useProseImages, type ProseImages } from './result-env';
 import { focusOutlineClass } from './role-tokens';
+import { headingClass } from './style-tokens';
 import { cn } from './utils';
 
 /**
@@ -145,13 +146,15 @@ const ProseImagesContext = React.createContext<ProseImages>('link');
 /** Where citations lead, threaded to the text arm for the reason the policy above is. */
 const CitationsContext = React.createContext<MarkdownProps['citations']>(undefined);
 
+// Every level reads the page's heading style (`./style-tokens`), falling
+// back to the semibold it was set in.
 const HEADING_CLASS: Record<number, string> = {
-  1: 'text-[16px] font-semibold',
-  2: 'text-[14.5px] font-semibold',
-  3: 'text-[13.5px] font-semibold',
-  4: 'text-[13px] font-semibold',
-  5: 'text-[13px] font-semibold',
-  6: 'text-[13px] font-semibold',
+  1: cn('text-[16px]', headingClass(600)),
+  2: cn('text-[14.5px]', headingClass(600)),
+  3: cn('text-[13.5px]', headingClass(600)),
+  4: cn('text-[13px]', headingClass(600)),
+  5: cn('text-[13px]', headingClass(600)),
+  6: cn('text-[13px]', headingClass(600)),
 };
 
 function Blocks({ tokens }: { tokens: readonly Token[] }) {

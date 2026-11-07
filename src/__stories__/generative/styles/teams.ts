@@ -1,4 +1,10 @@
-import { deriveBrandRoles, type BrandSeeds } from '../../../brand';
+import {
+  deriveBrandRoles,
+  resolveRoleColor,
+  type BrandSeeds,
+  type ColorTokenName,
+  type StyleRoles,
+} from '../../../brand';
 
 /**
  * Teams' colours, as a team sets them: up to three seeds (the button,
@@ -97,20 +103,55 @@ export const TEAM_KEYS = Object.keys(TEAMS) as TeamKey[];
 export type Theme = 'light' | 'dark';
 
 /**
- * The surface a team's accent is measured against, in each theme: the
- * `--background` of the host's palette in `frame.css`, which a test holds it
- * to. It fills the host's own panel, a captured layout's cards and the band;
- * the page behind them is the host's `--canvas`, a shade darker in light and
- * in dark, where the ink reads better still. It is not every surface a style
- * draws, though: `bold`'s panel is the host's `--muted`
- * and `soft`'s dark panel is lifted toward the foreground, and on both of
- * those, in the dark theme, the accent's ink falls a little under 4.5:1.
- * Nothing draws the ink as text on a panel today (it is the ring, the
- * selected edge and the check on the selected fill), so it shows in no
- * story; measuring it against the surface a style actually draws is the
- * style roles' job.
+ * The host's palette in each theme, as `frame.css` writes it (a test holds
+ * the two to each other): the roles a style's panel names, and `canvas`, the
+ * page behind the host's panels, a shade off its `background`.
  */
-export const HOST_PAGE: Readonly<Record<Theme, string>> = { light: '#ffffff', dark: '#12151c' };
+export const HOST_PALETTE: Readonly<
+  Record<Theme, { canvas: string } & Partial<Record<ColorTokenName, string>>>
+> = {
+  light: {
+    canvas: '#f6f7f9',
+    background: '#ffffff',
+    foreground: '#0f1729',
+    card: '#ffffff',
+    muted: '#eef1f5',
+    border: '#dde2e9',
+    primary: '#0f1729',
+  },
+  dark: {
+    canvas: '#0b0d12',
+    background: '#12151c',
+    foreground: '#eef1f6',
+    card: '#12151c',
+    muted: '#1c212b',
+    border: '#353c49',
+    primary: '#eef1f6',
+  },
+};
+
+/** The page a team's accent is measured on: the host's `--background`, which fills its panels, a layout's cards and the band. */
+export const HOST_PAGE: Readonly<Record<Theme, string>> = {
+  light: HOST_PALETTE.light.background!,
+  dark: HOST_PALETTE.dark.background!,
+};
+
+/**
+ * The other surfaces the accent's ink sits on, in `theme`: the canvas, where
+ * a result's eyebrow is set, and the panel a style draws with the fields set
+ * into it, or the host's own card. `deriveBrandRoles` moves the ink until it
+ * reads on all of them: measured on the page alone, it fell just under 4.5:1
+ * on `bold`'s muted panel and on `soft`'s lifted dark one, and on the light
+ * canvas, a shade darker than the page.
+ */
+export function styleSurfaces(roles: StyleRoles, theme: Theme): string[] {
+  const palette = HOST_PALETTE[theme];
+  const panel = roles.panel?.[theme];
+  const fills = panel
+    ? [panel.fill, ...(panel.field ? [panel.field] : [])]
+    : [{ role: 'card' as const }];
+  return [palette.canvas, ...fills.map((fill) => resolveRoleColor(fill, palette))];
+}
 
 /**
  * The band in `theme`: the team's header colour as the band's ground, or, on
@@ -132,10 +173,15 @@ export function bandOn(header: string, onHeader: string, theme: Theme): Record<s
  * onto `--primary`, the accent's ink onto `--link` and `--ring`, its pale
  * fill onto `--selected`. The header band's two roles go to the host's own
  * band, which the controls do not draw. An absent role sets nothing, so the
- * host's own token stays.
+ * host's own token stays. `surfaces` are the other surfaces the accent's ink
+ * must read on (`styleSurfaces`).
  */
-export function teamTokens(team: Team, theme: Theme): Record<string, string> {
-  const roles = deriveBrandRoles(team.seeds, HOST_PAGE[theme]);
+export function teamTokens(
+  team: Team,
+  theme: Theme,
+  surfaces: readonly string[] = [],
+): Record<string, string> {
+  const roles = deriveBrandRoles(team.seeds, HOST_PAGE[theme], surfaces);
   const tokens: Record<string, string> = {};
   if (roles.action !== undefined) {
     tokens['--primary'] = roles.action;

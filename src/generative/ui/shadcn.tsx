@@ -6,6 +6,7 @@ import { hasOwnProp } from '../../core/own-property';
 import { enumLabeler, useFieldPresentation } from '../../react/field-presentation';
 import { fieldControlClass } from '../../react/field-styles';
 import { checkedAccentClass, focusOutlineClass } from '../../react/role-tokens';
+import { headingClass, panelFlatShadowClass, panelSurfaceClass } from '../../react/style-tokens';
 import { cn } from '../../react/utils';
 import { Switch as SwitchPrimitive } from '../../react/ui/switch';
 
@@ -114,11 +115,13 @@ export function Card({
   children,
 }: BaseComponentProps<{ title?: string | null; description?: string | null }>) {
   return (
-    <div className="rounded-lg border border-border bg-card p-6 text-card-foreground">
+    <div
+      className={cn('rounded-lg p-6 text-card-foreground', panelSurfaceClass, panelFlatShadowClass)}
+    >
       {props.title || props.description ? (
         <div className="mb-4 space-y-1.5">
           {props.title ? (
-            <h3 className="text-lg leading-none font-semibold">{props.title}</h3>
+            <h3 className={cn('text-lg leading-none', headingClass(600))}>{props.title}</h3>
           ) : null}
           {props.description ? (
             <p className="text-sm text-muted-foreground">{props.description}</p>
@@ -238,11 +241,13 @@ export function Collapsible({
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
+// Every level reads the page's heading style (`react/style-tokens`), falling
+// back to the weight and tracking it was set in.
 const HEADING = {
-  h1: 'text-3xl font-bold tracking-tight',
-  h2: 'text-2xl font-semibold tracking-tight',
-  h3: 'text-lg font-semibold',
-  h4: 'text-base font-semibold',
+  h1: cn('text-3xl', headingClass(700, true)),
+  h2: cn('text-2xl', headingClass(600, true)),
+  h3: cn('text-lg', headingClass(600)),
+  h4: cn('text-base', headingClass(600)),
 };
 
 export function Heading({

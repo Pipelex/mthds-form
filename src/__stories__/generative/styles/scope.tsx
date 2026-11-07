@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { googleFontsHref, styleTokens, type AppStyleId, type TypefaceId } from './styles';
-import { TEAMS, teamTokens, type TeamKey } from './teams';
+import { deriveStyleRoles, type AppStyleId, type TypefaceId } from '../../../brand';
+import { googleFontsHref, styleTokens } from './styles';
+import { TEAMS, styleSurfaces, teamTokens, type TeamKey } from './teams';
 import './frame.css';
-import './styles.css';
 
 const FONTS_LINK = 'link[data-app-style-fonts]';
 
@@ -89,7 +89,11 @@ export interface AppScopeProps {
 /**
  * A host's page wearing a style and a team's colours: the host's palette
  * (`app-host`), the style's class, and the tokens of both, in each theme, as
- * a host sets them at the root of the page it brands. The `.dark` class is an
+ * a host sets them at the root of the page it brands: the roles
+ * `deriveStyleRoles` returns for the style and the typeface, written onto
+ * this host's tokens (`styleTokens`), and the team's colour roles, its accent's
+ * ink measured on every surface the style draws (`styleSurfaces`). `none`
+ * derives what `quiet` does, which is nothing but a typeface's faces. The `.dark` class is an
  * ancestor's (the `ThemePair` pane's), so each theme's tokens are one rule of
  * a stylesheet scoped to this page rather than an inline style.
  */
@@ -97,13 +101,10 @@ export function AppScope({ style, team, typeface = null, children }: AppScopePro
   useStyleFonts();
   const scope = `app-scope-${React.useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const css = React.useMemo(() => {
+    const roles = deriveStyleRoles(style === 'none' ? 'quiet' : style, typeface);
     const theme = (mode: 'light' | 'dark') => ({
-      ...(style !== 'none'
-        ? styleTokens(style, typeface, mode)
-        : typeface
-          ? styleTokens('quiet', typeface, mode)
-          : {}),
-      ...(team ? teamTokens(TEAMS[team], mode) : {}),
+      ...styleTokens(roles, mode),
+      ...(team ? teamTokens(TEAMS[team], mode, styleSurfaces(roles, mode)) : {}),
     });
     const light = declarations(theme('light'));
     const dark = declarations(theme('dark'));
