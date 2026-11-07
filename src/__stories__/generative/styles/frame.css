@@ -5,7 +5,9 @@
  * with its action row, the request bar over the result). Story-only, and
  * written as a host would write it: every value a style may change is read
  * through a token with the host's own value as its fallback, so a page that
- * wears no style renders exactly the host's look.
+ * wears no style renders exactly the host's look. The kernel's controls and
+ * the generative layer read the same tokens themselves (docs/theming.md,
+ * "Style tokens"); this sheet only says what the host states through them.
  *
  * Story chrome, so it is plain CSS rather than utilities (see
  * docs/storybook.md, "Styling: source, not the prebuilt sheet").
@@ -35,15 +37,16 @@
   --ring: #2f5bd3;
   --link: #2f5bd3;
   --radius: 6px;
-  /* The host's own panel: a hairline and no shadow. A style overrides these. */
-  --panel-fill: var(--card);
-  --panel-edge: var(--border);
-  --panel-edge-width: 1px;
-  --panel-shadow: none;
-  /* The host's own titles: light and slightly tight. A style overrides these. */
+  /*
+   * The host's own titles, light and slightly tight, and its own call to
+   * action, a plain fill: stated through the style tokens on the whole page,
+   * so a captured layout's titles and call to action wear them too, and a
+   * style overrides them. Its panel is not stated here: a captured layout's
+   * rail and cards keep their own look unless a style dresses them, and the
+   * host's panel falls back to its hairline below.
+   */
   --heading-weight: 300;
   --heading-tracking: -0.025em;
-  /* The host's own call to action: a plain fill, nothing around it. */
   --action-shadow: none;
 
   min-height: 100%;
@@ -80,7 +83,6 @@
   flex-direction: column;
   font-size: 15px;
   line-height: 1.5;
-  container: app / inline-size;
 }
 
 .af-band {
@@ -138,6 +140,9 @@
   font-size: 15px;
   font-weight: 500;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .af-band-btn {
   display: inline-flex;
@@ -183,16 +188,19 @@
   max-width: 62ch;
   text-wrap: pretty;
 }
-.af-panel {
+.af-panel,
+.af [data-style-panel] {
   /*
    * A style's field fill (`--panel-field`) is part of its panel treatment, so
-   * it reaches the fields inside the host's panel and no others: a captured
-   * layout's fields keep the host's fill on their own cards.
+   * it reaches the fields inside every panel the style dresses, the host's
+   * and a captured layout's rail and cards, and no others.
    */
   --input: var(--panel-field, var(--host-input));
-  background: var(--panel-fill);
-  border: var(--panel-edge-width) solid var(--panel-edge);
-  box-shadow: var(--panel-shadow);
+}
+.af-panel {
+  background: var(--panel-fill, var(--card));
+  border: var(--panel-edge-width, 1px) solid var(--panel-edge, var(--border));
+  box-shadow: var(--panel-shadow, none);
   border-radius: var(--panel-radius);
 }
 .af-comp {
@@ -209,8 +217,8 @@
   gap: 16px;
   margin: calc(28px * var(--d)) calc(var(--cp) * -1) calc(var(--cp) * -1);
   padding: calc(18px * var(--d)) var(--cp) var(--cp);
-  background: var(--panel-fill);
-  border-top: 1px solid var(--panel-edge);
+  background: var(--panel-fill, var(--card));
+  border-top: 1px solid var(--panel-edge, var(--border));
   border-radius: 0 0 var(--panel-radius) var(--panel-radius);
 }
 /* What scrolls under the action row fades into it, rather than being cut. */
@@ -221,7 +229,7 @@
   right: 0;
   bottom: calc(100% + 1px);
   height: 32px;
-  background: linear-gradient(to bottom, transparent, var(--panel-fill));
+  background: linear-gradient(to bottom, transparent, var(--panel-fill, var(--card)));
   pointer-events: none;
 }
 .af-eta {
@@ -246,6 +254,14 @@
   font-weight: 600;
   border: 0;
   cursor: pointer;
+}
+/*
+ * The page's one action wears the style's call-to-action shadow, as a
+ * captured layout's does, so a page's two calls to action match. The host's
+ * secondary buttons do not.
+ */
+.af-btn:not(.ghost, .link) {
+  box-shadow: var(--action-shadow, none);
 }
 .af-btn.ghost {
   background: transparent;
@@ -333,59 +349,80 @@
 .af-result {
   padding: calc(28px * var(--d));
 }
+/*
+ * A heading inside a result is the run's content, not a title of the page, so
+ * the host's light titles never reach it: on a page with no style, or
+ * `quiet`, it keeps the kernel's own weight and tracking. A style does reach
+ * it, so a style's result reads in the style's own type.
+ */
+.app-host:not(.app-style) .af-result,
+.app-style-quiet .af-result {
+  --heading-weight: initial;
+  --heading-tracking: initial;
+}
 
-@container app (max-width: 640px) {
-  .af-page {
-    padding: calc(28px * var(--d)) 16px 20px;
-    align-items: stretch;
-  }
-  .af-display {
-    font-size: 30px;
-  }
-  .af-res-title {
-    font-size: 26px;
-  }
-  .af-comp {
-    --cp: 18px;
-  }
-  .af-act {
-    flex-direction: column-reverse;
-    align-items: stretch;
-    gap: 10px;
-  }
-  .af-act .af-btn {
-    width: 100%;
-  }
-  .af-act .af-eta {
-    justify-content: center;
-  }
-  .af-stage {
-    padding: 24px 16px;
-  }
-  .af-req-i {
-    padding: 8px 16px;
-  }
-  .af-req-l {
-    display: none;
-  }
-  .af-req .af-btn.ghost {
-    margin-left: auto;
-  }
-  .af-res-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .af-result {
-    padding: 18px;
-  }
-  .af-band {
-    padding: 0 16px;
-  }
-  .af-band-btn {
-    min-height: 44px;
-  }
-  .af-band-app,
-  .af-band-sep {
-    display: none;
-  }
+/*
+ * A narrow frame, under 640px: marked by `data-narrow`, which the frame sets
+ * from its own width (frame.tsx). Not a container query: a size container
+ * contains its layout, and so becomes the containing block of every
+ * `position: fixed` descendant, which pinned the kernel's dialogs and sheets
+ * to the frame rather than the viewport.
+ */
+.af[data-narrow] .af-page {
+  padding: calc(28px * var(--d)) 16px 20px;
+  align-items: stretch;
+}
+.af[data-narrow] .af-display {
+  font-size: 30px;
+}
+.af[data-narrow] .af-res-title {
+  font-size: 26px;
+}
+.af[data-narrow] .af-comp {
+  --cp: 18px;
+}
+.af[data-narrow] .af-act {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  /* Room under the button for its shadow, so the duration below is not in it. */
+  gap: 16px;
+}
+.af[data-narrow] .af-act .af-btn {
+  width: 100%;
+}
+.af[data-narrow] .af-act .af-eta {
+  justify-content: center;
+}
+.af[data-narrow] .af-stage {
+  padding: 24px 16px;
+}
+.af[data-narrow] .af-req-i {
+  padding: 8px 16px;
+}
+.af[data-narrow] .af-req-l {
+  display: none;
+}
+.af[data-narrow] .af-req .af-btn.ghost {
+  margin-left: auto;
+}
+.af[data-narrow] .af-res-head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.af[data-narrow] .af-result {
+  padding: 18px;
+}
+.af[data-narrow] .af-band {
+  padding: 0 16px;
+}
+/* On a phone the product keeps its name beside the logo, and History is
+   its icon alone, a 44px target. */
+.af[data-narrow] .af-band-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.af[data-narrow] .af-band-btn-label {
+  display: none;
 }

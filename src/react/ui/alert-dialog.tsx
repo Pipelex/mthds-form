@@ -3,6 +3,7 @@
 import * as React from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 
+import { headingClass } from '../style-tokens';
 import { cn } from '../utils';
 import { closeAutoFocus, DialogSurface, type ReturnFocus } from './dialog';
 
@@ -44,7 +45,7 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Title
     ref={ref}
-    className={cn('text-[16px] font-semibold text-foreground', className)}
+    className={cn('text-[16px] text-foreground', headingClass(600), className)}
     {...props}
   />
 ));

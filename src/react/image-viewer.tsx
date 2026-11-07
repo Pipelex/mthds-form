@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, Loader2, X } from 'lucide-reac
 import { useFieldStrings } from './field-strings';
 import { InOverlayLayer } from './overlay-layer';
 import { focusOutlineClass } from './role-tokens';
+import { headingWeightClass } from './style-tokens';
 import {
   Dialog,
   DialogClose,
@@ -165,7 +166,9 @@ export function ImageViewer({
         >
           <div className="flex shrink-0 items-center gap-2 border-b border-border py-1.5 pr-1.5 pl-4">
             <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate text-[14px] font-medium">{picture.name}</DialogTitle>
+              <DialogTitle className={cn('truncate text-[14px]', headingWeightClass[500])}>
+                {picture.name}
+              </DialogTitle>
               {several && (
                 // A live region from the moment the viewer opens, so each move
                 // is announced: one inserted with its text already in it is not.

@@ -148,7 +148,7 @@ A seed is `#rrggbb` in any case, or `null` or `undefined` for unset, so a host p
 | `onAction` | Text and icons on the button colour | `#000000` or `#ffffff`, whichever contrasts more | `action` is set |
 | `accent` | The accent, as a fill: an active tab's underline, a progress bar | The seed itself | `accent` or `action` is set |
 | `accentFill` | A pale accent fill behind accent text: a pill, a badge | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page | `accent` or `action` is set |
-| `accentInk` | The accent as text | At least 4.5:1 on the page and on `accentFill` | `accent` or `action` is set |
+| `accentInk` | The accent as text | At least 4.5:1 on the page, on `accentFill` and on every other surface the host names (§ "The accent on a style's surfaces") | `accent` or `action` is set |
 | `header` | The header band, as a fill | The seed itself | `header` is set |
 | `onHeader` | Text on the band: the back link, a wordmark | `#000000` or `#ffffff`, whichever contrasts more | `header` is set |
 
@@ -184,6 +184,58 @@ Both judge only a colour the person set: with no button colour, `isActionFaint` 
 `readableTextOn(fill)` is the black-or-white rule on its own, for a host that paints text on a fill it derives itself, such as text on the ink.
 
 `src/brand/__tests__/seed-roles.test.ts` pins all of it across a deterministic sweep of seeds (a grid over hue, saturation and lightness, plus near white, near black, amber, pale yellow and navy) on light pages, dark pages and a mid-grey one: every text role at 4.5:1 or more on its background, the ink adjusted no further than it must be, exactly the roles each set of seeds produces and none for an unset one, the accent following a set button colour, lower-case output, and every set seed returned as its own fill.
+
+## App styles and typefaces
+
+A team brands its pages with more than colours: it picks a **style** from a closed list, and a **typeface** from a short one. A style is a handful of design values on top of the team's colours and logo: how its headings, its panels, its corners, its call to action and its rhythm look. A typeface replaces the style's body face. Neither adds a colour: every fill, edge and ink a style uses is a role the theme contract already has, or a shadow, so the readability guarantees stay the seed derivation's and the theme's.
+
+### The styles
+
+| Style | Its direction, as a designer reads it | Headings | Body face | Control radius | Panel | Call to action | Rhythm |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `quiet` | Calm and precise: light titles, hairline panels, generous air, nothing decorated. | the host's | the host's | the host's | the host's | the host's | the host's |
+| `soft` | Friendly and rounded: generous corners, panels that float on a soft shadow with no outline, warm medium-weight titles. | the body face, 500, −0.015em | DM Sans | 12px | the card, no visible edge, a two-layer shadow; on a dark page the card lifted 7% toward the foreground under a deeper shadow, with a faint highlight along its top edge; fields on the card (light) or the page (dark) | a short shadow in the button colour at 50% on a light page, none on a dark one | 1.08 |
+| `editorial` | Considered and literary: serif display titles, fine hairlines, wide margins and a reading rhythm. | Newsreader, 500, −0.01em | Source Sans 3 | 2px | the card on a 1px hairline, no shadow; fields on the card, so each reads as its hairline | none | 1.25 |
+| `bold` | Confident and graphic: heavy, tightly set titles, solid panels with firm edges, a compact rhythm. | the body face, 700, −0.03em | Space Grotesk | 6px | the muted fill on a 2px edge of the foreground at 62% (30% on a dark page), no shadow; fields on the card (light) or the page (dark) | none | 0.85 |
+
+**`quiet` sets nothing.** It is the host's own look, named, so that "no style" and "the default style" are one state: a team that has set no style is on `quiet`, and a page wearing it renders exactly as one wearing none. That holds only because the host states its own treatment of what a style changes, its titles, its panels and its call to action, through the same tokens a style sets; a style overrides them, and `quiet` leaves them.
+
+The values were tuned in the `Generative/App styles` stories before they were encoded here, and their history is the campaign's. A panel's radius is never a role: a host derives it from the control radius as it already does (the kernel's `calc(var(--radius) * 1.5)`).
+
+### The typefaces
+
+Inter, DM Sans, Plus Jakarta Sans, Manrope, IBM Plex Sans, Source Sans 3, Work Sans and Space Grotesk are the body faces a team picks from; Newsreader is `editorial`'s heading face, listed so a host loads it, and is not a team's choice. All are on Google Fonts under the SIL Open Font License, each loaded in the weights 300 to 700: 300 for a host's own light titles, which a team's face carries on `quiet`, and up to the 700 `bold` sets. Each `Typeface` carries its family, its category, its weights, the generic stack that renders while it loads or when it never does, and `stack`, the two together as a whole `font-family` value.
+
+A team's typeface replaces the style's body face, and its heading face wherever the style's headings follow the body (`quiet`, `soft`, `bold`). `editorial` keeps Newsreader for its headings, since the serif is that style's identity. The monospace face stays the host's. The list is closed on purpose: a host can self-host every face with no runtime request to a font service, keep them under its content security policy and know each face's weights.
+
+### Deriving the roles
+
+`deriveStyleRoles(style, typeface)` takes the two ids as a host stored them and returns the roles the choice sets, and nothing else:
+
+- `bodyFace` and `headingFace`, each a `Typeface`;
+- `headingWeight` and `headingTracking` (in `em`);
+- `radius`, a control's corner radius in pixels;
+- `panel`, the panel treatment in each theme (`{ light, dark }`, since a shadow that reads on a light page is lost on a dark one): its `fill`, its `edge` (or `null` for no visible edge, the width kept so the box does not move), its `edgeWidth` in pixels, its `shadow` (a CSS `box-shadow` in a neutral ink, or `null`), and the `field` fill of the fields set into it where the host's would sink into the panel;
+- `actionShadow`, the call to action's shadow in each theme (`{ light, dark }`, for the panel's reason: a shadow in the button colour that lifts a button on a light page smears under it on a dark one), each its geometry and a role colour, or `none`;
+- `density`, a multiple of the host's own margins, paddings and gaps around the form.
+
+**It returns roles, never custom property names**, as `deriveBrandRoles` does, and a colour is a `RoleColor`: the contract role it is (`card`, `muted`, `foreground`, `border`, `primary`), optionally mixed toward another role in Oklab by a share, or laid at an opacity. A host writes each onto its own tokens, `{ role: 'card', toward: { role: 'foreground', share: 0.07 } }` being `color-mix(in oklab, var(--card) 93%, var(--foreground))` on this package's contract.
+
+**An absent role is not a key**, and an unknown or absent id is unset: an unknown style is `quiet`, which sets nothing, and an unknown typeface, or Newsreader, is no typeface, so the style's own face (or the host's) stays. `isAppStyle(id)` and `isTypeface(id)` let a host check an id it received; `APP_STYLES` holds each style's id, name, direction and the roles it sets with no typeface, and `APP_STYLE_IDS` their order.
+
+**Density reaches the host's frame, never a control.** Scoping Tailwind's `--spacing` to a page, the first way tried, scaled every control's height with the rhythm (a text field 39.6px tall under `bold`, under the 44px a finger needs), so the rhythm multiplies the margins, paddings and gaps a host draws around the form, and nothing inside it.
+
+### Mapping the roles onto tokens
+
+The kernel's controls and the generative layer read a style through optional tokens, each with the look it had before as its fallback ([theming.md](theming.md) § "Style tokens"), so they map as: `bodyFace.stack` onto `--font-sans`, `headingFace.stack` onto `--font-heading`, `headingWeight` onto `--heading-weight`, `headingTracking` onto `--heading-tracking`, `radius` onto `--radius` in pixels, the theme's `panel` onto `--panel-fill`, `--panel-edge` (`transparent` for `null`), `--panel-edge-width` and `--panel-shadow` (`none` for `null`), and the theme's `actionShadow` onto `--action-shadow`. Set them on the same scope as the colour tokens, the theme's panel restated under `.dark`.
+
+Two roles are written by the host, since no token of the kernel carries either. The panel's `field` fill belongs to the fields inside every panel a style dresses: the host's own, and the generative layer's rail and card, which take the style's panel fill and mark themselves `data-style-panel`. A host turns it into `--input` on its own panel and on `[data-style-panel]`, and nowhere else, so a field inside a style's panel never sinks into it (under `bold`, whose panel is the muted fill a host's fields all but match) and a field anywhere else keeps the host's fill. `density` multiplies the host's own frame.
+
+**The call to action is the page's one action, whoever draws it.** The generative layer's reads `--action-shadow`, and a host gives its own main action (a run button) the same token, so the two calls to action of a branded page wear one treatment. A host's secondary buttons do not read it.
+
+### The accent on a style's surfaces
+
+A style can draw the form on a surface that is not the page: `bold`'s panel is the muted fill, and `soft`'s dark panel is lifted toward the foreground. A team's accent ink derived against the page alone falls just under 4.5:1 on those, in the dark theme, for every accent tried. So `deriveBrandRoles(seeds, page, surfaces)` takes the other surfaces accent text sits on, as `#rrggbb`, and moves the ink until it reads on all of them, the page and the pale fill included; and `resolveRoleColor(color, palette, behind?)` turns a style's role colour into the `#rrggbb` it paints over a host's palette, mixing in Oklab exactly as `color-mix()` does, so a host passes the panel's fill and its field fill (and its page canvas, where that is not the page). When there is an accent to derive, a surface on which not even the page's own text extreme (pure black on a light page, pure white on a dark one) reaches 4.5:1 is refused, since no ink moving the page's way could read there; with no accent, the surfaces are only checked to be colours. `src/brand/__tests__/styles.test.ts` holds every style's panel and field fills, in both themes, to the bar across a sweep of accents.
 
 ## Where a brand comes from
 

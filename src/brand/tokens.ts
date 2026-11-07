@@ -228,10 +228,16 @@ export function resolveColor(
   }
 }
 
+/**
+ * An sRGB channel, from 0 to 1, as linear light: the transfer function both
+ * WCAG's luminance and the Oklab mix in `./styles` start from.
+ */
+export function linearChannel(channel: number): number {
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
 function luminance(color: SrgbColor): number {
-  const [r, g, b] = color.components.map((channel) =>
-    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-  ) as [number, number, number];
+  const [r, g, b] = color.components.map(linearChannel) as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 

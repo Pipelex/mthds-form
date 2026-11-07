@@ -81,3 +81,22 @@ export {
   type BrandSeeds,
   type TextOnFill,
 } from './seed-roles';
+// A team's style and typeface in, the design roles a page wears out.
+export {
+  APP_STYLES,
+  APP_STYLE_IDS,
+  TYPEFACES,
+  deriveStyleRoles,
+  isAppStyle,
+  isTypeface,
+  resolveRoleColor,
+  type ActionShadow,
+  type AppStyle,
+  type AppStyleId,
+  type BodyTypefaceId,
+  type PanelRoles,
+  type RoleColor,
+  type StyleRoles,
+  type Typeface,
+  type TypefaceId,
+} from './styles';

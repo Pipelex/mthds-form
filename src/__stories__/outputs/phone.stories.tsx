@@ -4,7 +4,7 @@ import { CONTRACTS as COMPOSITES, OUTPUT_FORM as COMPOSITES_FORM } from '../_gen
 import { PAYLOADS as COMPOSITE_RUNS } from '../_generated/composites.payloads';
 import { CONTRACTS as RESULTS, OUTPUT_FORM as RESULTS_FORM } from '../_generated/results';
 import { PAYLOADS as RESULT_RUNS } from '../_generated/results.payloads';
-import { DEFAULT_FIELD_STRINGS as S } from '../../react';
+import { DEFAULT_FIELD_STRINGS as S, JsonView } from '../../react';
 import { ResultView } from '../result-view';
 import { atWidth, expectTouchTarget, pinnedTo } from '../touch-target';
 import { REPORT } from './media-payloads';
@@ -297,7 +297,8 @@ export const LaunchReportDesktop: Story = {
 /**
  * **The same report under the name a host gives it, with both views offered.**
  * Beside a title and a view switch the Download stays in the header, and the
- * switch's two buttons, like the Download, are 44 by 44 on a phone.
+ * switch's two buttons, like the Download, are 44 by 44 on a phone, and so is
+ * the JSON view's Copy JSON.
  */
 export const LaunchReportSwitchPhone: Story = {
   name: 'A named report and its view switch, phone',
@@ -314,6 +315,37 @@ export const LaunchReportSwitchPhone: Story = {
     ];
     await expect(controls).toHaveLength(6);
     for (const control of controls) await expectTouchTarget(control);
+    // The JSON view's one action, Copy JSON, is a target of its own.
+    for (const json of canvas.getAllByRole('button', { name: S.viewJson }))
+      await userEvent.click(json);
+    const copies = await canvas.findAllByRole('button', { name: S.copyJson });
+    await expect(copies).toHaveLength(2);
+    for (const copy of copies) await expectTouchTarget(copy);
+  },
+};
+
+/**
+ * **A scalar's JSON, on a phone.** One line of JSON is shorter than the 44
+ * pixel Copy JSON button and its inset, so the block keeps a floor that holds
+ * the button inside its border rather than hanging it past the edge.
+ */
+export const ScalarJsonPhone: Story = {
+  name: "A scalar's JSON, phone",
+  ...pinnedTo('phone'),
+  args: text,
+  render: () => <JsonView value="Lisbon" />,
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    const copies = await within(canvasElement).findAllByRole('button', { name: S.copyJson });
+    await expect(copies).toHaveLength(2);
+    for (const copy of copies) {
+      await expectTouchTarget(copy);
+      const block = copy.parentElement?.querySelector('pre');
+      await expect(block).toBeTruthy();
+      const button = copy.getBoundingClientRect();
+      const box = block!.getBoundingClientRect();
+      await expect(button.bottom).toBeLessThanOrEqual(box.bottom);
+    }
   },
 };
 

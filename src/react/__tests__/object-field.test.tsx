@@ -13,7 +13,7 @@
  */
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { BooleanRunField, ListRunField, ObjectRunField, TextRunField } from '../../core';
 import { ObjectField } from '../object-field';
 import { FieldRenderer } from '../field-renderer';
@@ -150,6 +150,45 @@ describe('how a structure groups its fields', () => {
     );
     expect(groupingAround(screen.getByDisplayValue('Ada'))).toBe('none');
     expect(groupingAround(screen.getByDisplayValue('London'))).toBe('rule');
+  });
+
+  it('makes each named structure a group its name labels, and a row no group', () => {
+    render(
+      <Harness
+        field={request}
+        initial={{
+          stay: { city: 'Lisbon' },
+          travellers: [{ name: 'Ada', home: { city: 'London' } }],
+        }}
+      />,
+    );
+    // The form's own structure, then the stay inside it, each named by what
+    // the reader sees over its fields.
+    const brief = screen.getByRole('group', { name: 'brief' });
+    const stay = within(brief).getByRole('group', { name: 'stay' });
+    expect(within(stay).getByDisplayValue('Lisbon')).toBeInTheDocument();
+    // A row's structure draws no name, so the row's fields belong to no group
+    // of their own, while the home inside the row is one.
+    const ada = screen.getByDisplayValue('Ada');
+    expect(ada.closest('[role="group"]')).toBe(brief);
+    const home = screen.getByRole('group', { name: 'home' });
+    expect(within(home).getByDisplayValue('London')).toBeInTheDocument();
+  });
+
+  it("names each form's structure by its own heading when the same method is mounted twice", () => {
+    const titled = (title: string): ObjectRunField => ({ ...structOf([stay]), title });
+    render(
+      <>
+        <Harness field={titled('Trip brief')} initial={{ stay: { city: 'Lisbon' } }} />
+        <Harness field={titled('Press brief')} initial={{ stay: { city: 'Porto' } }} />
+      </>,
+    );
+    // Both structures sit at the same path, so an id built from the path alone
+    // labels the second group with the first one's heading.
+    const trip = screen.getByRole('group', { name: 'Trip brief' });
+    const press = screen.getByRole('group', { name: 'Press brief' });
+    expect(within(trip).getByDisplayValue('Lisbon')).toBeInTheDocument();
+    expect(within(press).getByDisplayValue('Porto')).toBeInTheDocument();
   });
 
   it("counts a row's structure, so a structure in a form's own list is ruled and not boxed", () => {

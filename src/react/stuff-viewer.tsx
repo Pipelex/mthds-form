@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
@@ -209,6 +209,10 @@ function highlight(json: string) {
   return out;
 }
 
+/** The clipboard's presence never changes while a page is open. */
+const noSubscription = () => () => {};
+const hasClipboard = () => typeof navigator !== 'undefined' && Boolean(navigator.clipboard);
+
 /**
  * The payload as JSON — the receipt, with the whole of it one click from the
  * clipboard.
@@ -223,6 +227,11 @@ function highlight(json: string) {
 export function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
   const [copied, setCopied] = useState(false);
+  // Whether the page can copy: `false` on the server and while hydrating,
+  // the clipboard's answer after. Read while rendering, it drew the Copy JSON
+  // button and the block's room for it on the client alone, a hydration
+  // mismatch.
+  const canCopy = useSyncExternalStore(noSubscription, hasClipboard, () => false);
   // The check mark reverts after a moment. The timer belongs to the effect, so
   // it is cleared when the control unmounts rather than firing into a
   // component, or a document, that is gone.
@@ -246,7 +255,7 @@ export function JsonView({ value }: { value: unknown }) {
   }
   return (
     <div className="relative">
-      {typeof navigator !== 'undefined' && navigator.clipboard && (
+      {canCopy && (
         <button
           type="button"
           onClick={() => {
@@ -254,7 +263,8 @@ export function JsonView({ value }: { value: unknown }) {
           }}
           aria-label={s.copyJson}
           className={cn(
-            'absolute right-2 top-2 rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground',
+            // 44 by 44 on a phone, like every control a finger taps.
+            'absolute right-2 top-2 inline-flex items-center justify-center rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground max-sm:size-11',
             focusOutlineClass,
           )}
         >
@@ -265,7 +275,20 @@ export function JsonView({ value }: { value: unknown }) {
           )}
         </button>
       )}
-      <pre className="overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed">
+      {/* A region that scrolls sideways takes focus, so a keyboard can scroll
+          it, and is named, as a result table's is. On a phone, beside the
+          Copy JSON button, it is never shorter than the button's 44px and its
+          inset, so a scalar's one line keeps the button inside its border. */}
+      <pre
+        role="group"
+        aria-label={s.viewJson}
+        tabIndex={0}
+        className={cn(
+          'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed',
+          canCopy && 'max-sm:min-h-[60px] max-sm:pr-14',
+          focusOutlineClass,
+        )}
+      >
         {highlight(text)}
       </pre>
     </div>

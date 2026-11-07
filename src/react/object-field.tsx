@@ -7,9 +7,11 @@ import { ownProp } from '../core/own-property';
 import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
+import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { OptionalToggle } from './optional-toggle';
+import { headingFaceClass } from './style-tokens';
 
 interface ObjectFieldProps {
   field: ObjectRunField;
@@ -57,9 +59,15 @@ function structureGrouping(depth: number, labelled: boolean): StructureGrouping 
  */
 function structureNameClass(isApp: boolean, depth: number): string {
   if (!isApp) return 'font-mono text-[13px] font-medium leading-none';
-  return depth === 0
-    ? 'text-[16px] font-semibold leading-snug'
-    : 'text-[14.5px] font-semibold leading-snug';
+  // A structure's name takes the page's heading face, so a style's serif
+  // reaches the form's sections, and keeps the kernel's own weight: it labels
+  // a group of fields rather than titling the page.
+  return cn(
+    depth === 0
+      ? 'text-[16px] font-semibold leading-snug'
+      : 'text-[14.5px] font-semibold leading-snug',
+    headingFaceClass,
+  );
 }
 
 /**
@@ -87,6 +95,9 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   const data = value ?? {};
   const label = fieldLabel(field.title, field.name, presentation);
   const grouping = structureGrouping(depth, label.trim() !== '');
+  // Document-unique, as every control's id is: two forms mounting the same
+  // method must not label one structure with the other's name.
+  const domId = useFieldDomId(id);
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
@@ -116,14 +127,32 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
     }
   };
 
+  // A named structure is a group its name labels, so assistive technology
+  // hears the levels a reader sees: two cities in two structures are each
+  // announced inside their own. A list's row draws no name and is no group.
+  const nameId = `${domId}--name`;
+  const descriptionId = `${domId}--description`;
+  const group =
+    grouping === 'none'
+      ? {}
+      : {
+          role: 'group',
+          'aria-labelledby': nameId,
+          'aria-describedby': field.description ? descriptionId : undefined,
+        };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" {...group}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className={cn('text-foreground', structureNameClass(isApp, depth))}>{label}</span>
+        <span id={nameId} className={cn('text-foreground', structureNameClass(isApp, depth))}>
+          {label}
+        </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
       </div>
       {field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
+        <p id={descriptionId} className="text-[12px] leading-relaxed text-muted-foreground">
+          {field.description}
+        </p>
       )}
 
       <div

@@ -570,11 +570,54 @@ const UNUSED_BY_CONTROLS = [
  * They exist because the button colour (`--primary`) may be a fill no text
  * can be read on. Focus is not among them: every focus the controls draw is the
  * contract's own `--ring`. See docs/theming.md § "Link, selected and focus".
+ *
+ * The style tokens follow: what a host sets from the roles `deriveStyleRoles`
+ * returns (docs/theming.md § "Style tokens"). A panel's fill and edge stand
+ * for the contract's card and hairline, as `--link` stands for `--primary`.
+ * The rest fall back to a VALUE rather than to a token (`literal`): the weight,
+ * tracking, face or shadow the element painted before it read the token,
+ * which differs from one element to the next - a title's 700, a section's
+ * 600, the rail's large shadow, the card's none - or `revert-layer`, which
+ * undoes the declaration alone, where the element set no value of its own.
+ * Each rule says what shape that value must have, so an empty or a mistyped
+ * fallback still fails. A shadow's shape admits almost any value, so in
+ * source its fallback must also be one of the values listed (`exact`), the
+ * shadows the elements painted before; the built sheet, where lightningcss
+ * has rewritten every colour and space, is held to the shape alone.
  */
+const LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:em|px)$/;
 const OPTIONAL_TOKENS = new Map([
   ['--link', { stand: '--primary', tint: false }],
   ['--selected', { stand: '--primary', tint: true }],
+  ['--panel-fill', { stand: '--card', tint: false }],
+  ['--panel-edge', { stand: '--border', tint: false }],
+  ['--font-heading', { literal: /^revert-layer$/, shape: '`revert-layer`' }],
+  ['--heading-weight', { literal: /^[1-9]00$/, shape: 'a weight such as `600`' }],
+  ['--heading-tracking', { literal: /^(?:revert-layer|-?(?:\d+\.?\d*|\.\d+)em)$/, shape: '`revert-layer` or an `em` length' }],
+  ['--panel-edge-width', { literal: LENGTH, shape: 'a length' }],
+  [
+    '--panel-shadow',
+    {
+      literal: /^(?:none|\S.*\d.*)$/,
+      exact: ['none', '0 20px 25px -5px rgb(0 0 0/0.1),0 8px 10px -6px rgb(0 0 0/0.1)'],
+      shape: '`none` or the rail\'s large shadow',
+    },
+  ],
+  [
+    '--action-shadow',
+    {
+      literal: /^(?:none|\S.*\d.*)$/,
+      exact: [
+        '0 0 28px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 35%,transparent)',
+        '0 0 44px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 50%,transparent)',
+      ],
+      shape: 'the call to action\'s glow in the button colour',
+    },
+  ],
 ]);
+
+/** A value with its spaces collapsed and none around a comma, to compare it whole. */
+const normalizeValue = (value) => value.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
 
 /**
  * CSS with its comments removed, newlines kept so error messages stay readable.
@@ -774,9 +817,13 @@ function unescapeArbitrary(value) {
  * the mix. Source spells the fallback in Tailwind's escaped form, so it is
  * unescaped first; the built sheet's is already plain.
  */
-function fallsBackTo(fallback, { stand, tint }, { built }) {
+function fallsBackTo(fallback, { stand, tint, literal, exact }, { built }) {
   if (!fallback) return false;
   const value = unescapeArbitrary(fallback).trim();
+  if (literal) {
+    if (!built && exact) return exact.map(normalizeValue).includes(normalizeValue(value));
+    return literal.test(value) && !/var\(\s*--[^,)]*\)/.test(value.replace(/var\(\s*--[\w-]+\s*,/g, ''));
+  }
   if (!tint) return isWholeRead(value, stand);
   const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
   if (mix !== null) return isWholeRead(mix[1].trim(), stand);
@@ -799,7 +846,8 @@ function isWholeRead(value, token) {
 }
 
 /** How an optional token's fallback must read, in words, for a failure message. */
-function fallbackRule({ stand, tint }, { built }) {
+function fallbackRule({ stand, tint, literal, shape }, { built }) {
+  if (literal) return `${shape}, the value it painted before`;
   if (!tint) return `\`var(${stand}, …)\``;
   return built
     ? `a \`color-mix()\` tint of \`var(${stand}, …)\`, or that read alone on lightningcss's pre-\`color-mix()\` line`
@@ -948,20 +996,21 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
 {
   const optionalProblems = [];
   const themingText = readFileSync(resolve('docs/theming.md'), 'utf8');
-  for (const [name, { stand }] of OPTIONAL_TOKENS) {
+  for (const [name, { stand, literal }] of OPTIONAL_TOKENS) {
     // The chain of stand-ins must end at a token theme.css defines, and never
-    // loop back on itself.
+    // loop back on itself. A literal fallback has no chain.
     const chain = [name];
     let last = stand;
-    while (OPTIONAL_TOKENS.has(last) && !chain.includes(last)) {
+    while (!literal && OPTIONAL_TOKENS.has(last) && !chain.includes(last)) {
       chain.push(last);
       last = OPTIONAL_TOKENS.get(last).stand;
     }
-    if (!lightPalette.has(last)) {
+    if (!literal && !lightPalette.has(last)) {
       optionalProblems.push(`${name} falls back through ${chain.join(' → ')} to ${last}, which theme.css does not define`);
     }
     if (lightPalette.has(name) || darkPalette.has(name)) {
-      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${stand} never fires for a host that loads the file`);
+      const fallback = literal ? 'the value it painted before' : stand;
+      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${fallback} never fires for a host that loads the file`);
     }
     if (optionalReads.get(name) === 0) {
       optionalProblems.push(`nothing under ${ARBITRARY_SOURCES.join(', ')} reads ${name}, so listing it in OPTIONAL_TOKENS is stale`);
@@ -972,7 +1021,7 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
   }
   if (optionalProblems.length === 0) {
     console.log(
-      `ok  optional tokens are read, fall back toward the contract and are documented: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
+      `ok  optional tokens are read, fall back toward the contract or to the value they replaced, and are documented: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
     );
   } else {
     failures.push(`${optionalProblems.join('; ')}. See OPTIONAL_TOKENS in scripts/assert-bundle.mjs.`);

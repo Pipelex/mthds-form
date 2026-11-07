@@ -96,7 +96,10 @@ interface AccentRoles {
   accent: string;
   /** A pale accent fill (deep on a dark page), behind accent ink: a pill, a badge. */
   accentFill: string;
-  /** The accent as text, reading at 4.5:1 or more on the page and on `accentFill`. */
+  /**
+   * The accent as text, reading at 4.5:1 or more on the page, on `accentFill`
+   * and on every other surface the host named (`deriveBrandRoles`' `surfaces`).
+   */
   accentInk: string;
 }
 
@@ -124,9 +127,24 @@ export type BrandRoles = (ActionRoles | Absent<ActionRoles>) &
  * The roles a page paints with, from up to three seeds and the colour of the
  * page they render on. Throws when a seed or the page is not a `#rrggbb`
  * colour: a host validates what a person typed before it reaches here.
+ *
+ * `surfaces` are the other colours accent text sits on besides the page and
+ * the pale fill, each `#rrggbb`: a style's panel and the fields inside it
+ * (`resolveRoleColor` turns a style's role colour into one), or a canvas
+ * behind the page. The ink is moved until it reads on all of them. When
+ * there is an accent to derive, a surface on which not even the page's own
+ * text extreme, pure black on a light page or pure white on a dark one,
+ * reaches 4.5:1 throws, since no ink moving the page's way could read there.
+ * With no accent, no ink is derived, and the surfaces are only parsed.
  */
-export function deriveBrandRoles(seeds: BrandSeeds | null | undefined, page: string): BrandRoles {
+export function deriveBrandRoles(
+  seeds: BrandSeeds | null | undefined,
+  page: string,
+  surfaces: readonly string[] = [],
+): BrandRoles {
   const canvas = parseHex(page, 'The page colour');
+  const extreme = textOn(canvas) === '#000000' ? BLACK : WHITE;
+  const others = surfaces.map((surface, index) => parseHex(surface, `Surface ${index + 1}`));
   const action = seeds?.action == null ? null : parseHex(seeds.action, 'The action seed');
   // An unset accent follows the button colour, and is unset too when that is.
   const accent = seeds?.accent == null ? action : parseHex(seeds.accent, 'The accent seed');
@@ -135,20 +153,34 @@ export function deriveBrandRoles(seeds: BrandSeeds | null | undefined, page: str
   const actionRoles: ActionRoles | Absent<ActionRoles> =
     action === null ? {} : { action: colorHex(action), onAction: textOn(action) };
   const accentRoles: AccentRoles | Absent<AccentRoles> =
-    accent === null ? {} : accentRolesOf(accent, canvas);
+    accent === null ? {} : accentRolesOf(accent, canvas, extreme, others);
   const headerRoles: HeaderRoles | Absent<HeaderRoles> =
     header === null ? {} : { header: colorHex(header), onHeader: textOn(header) };
   return { ...actionRoles, ...accentRoles, ...headerRoles };
 }
 
-/** The accent as a fill, its pale fill on the page, and its ink on both. */
-function accentRolesOf(accent: SrgbColor, canvas: SrgbColor): AccentRoles {
-  // The way accent text moves is the way text on the page moves: toward
-  // whichever of black and white reads better there, which always reaches
-  // 4.58:1 on the page itself, so the ink's search always has an end.
-  const extreme = textOn(canvas) === '#000000' ? BLACK : WHITE;
+/**
+ * The accent as a fill, its pale fill on the page, and its ink on both and on
+ * every other surface. The way accent text moves is the way text on the page
+ * moves, toward `extreme`: whichever of black and white reads better there,
+ * which always reaches 4.58:1 on the page itself, and which is checked first
+ * to read on each surface, so the ink's search always has an end.
+ */
+function accentRolesOf(
+  accent: SrgbColor,
+  canvas: SrgbColor,
+  extreme: SrgbColor,
+  surfaces: readonly SrgbColor[],
+): AccentRoles {
+  for (const surface of surfaces) {
+    if (contrastRatio(extreme, surface) < MIN_CONTRAST) {
+      throw new Error(
+        `No accent ink can read on ${colorHex(surface)}: not even ${colorHex(extreme)}, the page's own text extreme, reaches ${MIN_CONTRAST}:1 there.`,
+      );
+    }
+  }
   const accentFill = paleFill(accent, canvas, extreme);
-  const accentInk = inkFor(accent, [canvas, accentFill], extreme);
+  const accentInk = inkFor(accent, [canvas, accentFill, ...surfaces], extreme);
   return {
     accent: colorHex(accent),
     accentFill: colorHex(accentFill),
@@ -169,12 +201,17 @@ export function isActionFaint(seeds: BrandSeeds | null | undefined, page: string
 
 /**
  * Whether the accent had to be darkened or lightened to become ink on the
- * page, so links read in a shade of it rather than in the colour itself. Only
+ * page (and on the `surfaces`, as `deriveBrandRoles` takes them), so links read
+ * in a shade of it rather than in the colour itself. Only
  * a colour the person set is judged, and the accent counts as set when it
  * follows a button colour the person set: with neither, the answer is `false`.
  */
-export function isAccentAdjusted(seeds: BrandSeeds | null | undefined, page: string): boolean {
-  const roles = deriveBrandRoles(seeds, page);
+export function isAccentAdjusted(
+  seeds: BrandSeeds | null | undefined,
+  page: string,
+  surfaces: readonly string[] = [],
+): boolean {
+  const roles = deriveBrandRoles(seeds, page, surfaces);
   return roles.accentInk !== undefined && roles.accentInk !== roles.accent;
 }
 
@@ -209,7 +246,8 @@ function textOn(fill: SrgbColor): TextOnFill {
   return contrastRatio(BLACK, fill) >= contrastRatio(WHITE, fill) ? '#000000' : '#ffffff';
 }
 
-function parseHex(value: string, what: string): SrgbColor {
+/** A `#rrggbb` colour, or a throw naming `what` it was meant to be. Module-internal: not on the entry. */
+export function parseHex(value: string, what: string): SrgbColor {
   if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) {
     throw new Error(`${what} must be a #rrggbb colour, not ${JSON.stringify(value)}.`);
   }

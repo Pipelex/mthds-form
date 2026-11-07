@@ -3,6 +3,7 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
+import { headingClass } from '../style-tokens';
 import { cn } from '../utils';
 
 /*
@@ -134,7 +135,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('text-[16px] font-semibold text-foreground', className)}
+    className={cn('text-[16px] text-foreground', headingClass(600), className)}
     {...props}
   />
 ));

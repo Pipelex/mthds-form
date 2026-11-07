@@ -6,6 +6,7 @@ import { marked, type Token, type Tokens } from 'marked';
 import { splitCitations, viewableUrl, webHref } from '../core/native-content';
 import { useProseImages, type ProseImages } from './result-env';
 import { focusOutlineClass } from './role-tokens';
+import { headingClass } from './style-tokens';
 import { cn } from './utils';
 
 /**
@@ -113,9 +114,12 @@ export function Markdown({ text, className, proseImages, citations }: MarkdownPr
  * Only the opening block is lexed, up to the first blank line, because only it
  * decides and a blank line ends every block that could begin there (one that
  * runs past it, such as a fence or a comment, is still that block when cut
- * short). That keeps the question cheap however long the text is, which
- * matters because it is asked on every render: a generative page re-renders
- * its result on each keystroke in an input beside it.
+ * short). That keeps the question cheap for a text written in paragraphs,
+ * which matters because it is asked on every render: a generative page
+ * re-renders its result on each keystroke in an input beside it. A text with
+ * no blank line at all is one block and is lexed whole, which costs about what
+ * re-rendering its typeset tree costs on the same render (a millisecond for 14
+ * KB, measured on marked 18).
  */
 export function opensWithHeading(text: string): boolean {
   const body = text.slice(LEADING_BLANK_LINES.exec(text)?.[0].length ?? 0);
@@ -142,13 +146,15 @@ const ProseImagesContext = React.createContext<ProseImages>('link');
 /** Where citations lead, threaded to the text arm for the reason the policy above is. */
 const CitationsContext = React.createContext<MarkdownProps['citations']>(undefined);
 
+// Every level reads the page's heading style (`./style-tokens`), falling
+// back to the semibold it was set in.
 const HEADING_CLASS: Record<number, string> = {
-  1: 'text-[16px] font-semibold',
-  2: 'text-[14.5px] font-semibold',
-  3: 'text-[13.5px] font-semibold',
-  4: 'text-[13px] font-semibold',
-  5: 'text-[13px] font-semibold',
-  6: 'text-[13px] font-semibold',
+  1: cn('text-[16px]', headingClass(600)),
+  2: cn('text-[14.5px]', headingClass(600)),
+  3: cn('text-[13.5px]', headingClass(600)),
+  4: cn('text-[13px]', headingClass(600)),
+  5: cn('text-[13px]', headingClass(600)),
+  6: cn('text-[13px]', headingClass(600)),
 };
 
 function Blocks({ tokens }: { tokens: readonly Token[] }) {

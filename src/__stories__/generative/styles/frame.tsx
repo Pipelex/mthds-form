@@ -1,3 +1,4 @@
+import * as React from 'react';
 import type { RunField } from '../../../core';
 import {
   buildResultField,
@@ -37,6 +38,36 @@ import { TEAMS, teamTokens, type TeamKey } from './teams';
  * how long a run takes, the result's actions - is stated here, once per app,
  * the way a host holds it.
  */
+
+/** Where the host's frame turns into its phone layout: frame.css's `data-narrow` rules. */
+const NARROW_PX = 640;
+
+/**
+ * The host's frame element, marked `data-narrow` while it is 640px wide or
+ * less. Measured with a ResizeObserver rather than queried as a size
+ * container: a size container contains its layout and becomes the containing
+ * block of every `position: fixed` descendant, which pinned the kernel's
+ * dialogs and sheets to the frame instead of the viewport. The first
+ * measure is taken before paint, so the first frame is already laid out.
+ */
+function AppFrame({ children }: { children: React.ReactNode }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const frame = ref.current;
+    if (!frame) return;
+    const measure = () => setNarrow(frame.getBoundingClientRect().width <= NARROW_PX);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="af" data-narrow={narrow ? '' : undefined}>
+      {children}
+    </div>
+  );
+}
 
 /** The host's upload, as a story stands it in. */
 async function upload(file: File) {
@@ -106,8 +137,8 @@ function Band({ appName, team }: { appName: string; team: TeamKey | null }) {
         <span className="af-band-sep" aria-hidden="true" />
         <span className="af-band-app">{appName}</span>
       </div>
-      <button type="button" className="af-band-btn">
-        <Icon d={HISTORY} /> History
+      <button type="button" className="af-band-btn" aria-label="History">
+        <Icon d={HISTORY} /> <span className="af-band-btn-label">History</span>
       </button>
     </header>
   );
@@ -240,10 +271,10 @@ export type Moment = 'compose' | 'result';
 
 export function Frame({ moment, team }: { moment: Moment; team: TeamKey | null }) {
   return (
-    <div className="af">
+    <AppFrame>
       <Band appName={moment === 'compose' ? TRIP_APP.appName : LAUNCH_APP.appName} team={team} />
       {moment === 'compose' ? <ComposeBody /> : <ResultBody />}
-    </div>
+    </AppFrame>
   );
 }
 
@@ -315,11 +346,11 @@ export function DesignedPage({
       </FieldPresentationProvider>
     </div>
   );
-  if (drawsItsOwnBar(fixture)) return <div className="af">{page}</div>;
+  if (drawsItsOwnBar(fixture)) return <AppFrame>{page}</AppFrame>;
   return (
-    <div className="af">
+    <AppFrame>
       <Band appName={appName} team={team} />
       <main className="af-stage">{page}</main>
-    </div>
+    </AppFrame>
   );
 }
