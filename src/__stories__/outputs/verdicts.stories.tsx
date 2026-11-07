@@ -5,7 +5,7 @@ import { PAYLOADS } from '../_generated/verdicts.payloads';
 import { DEFAULT_FIELD_STRINGS, FR_FIELD_STRINGS } from '../../react';
 // The kernel's own wording, read as an oracle. It is internal and not part of
 // the public API, which is why a story reaches it by its deep path.
-import { humanizeEnumValue } from '../../react/field-presentation';
+import { humanizeEnumValue } from '../../core';
 import { ResultView } from '../result-view';
 
 /**

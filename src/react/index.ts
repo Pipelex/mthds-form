@@ -138,8 +138,8 @@ export { FIELD_STRINGS_BY_LOCALE, SUPPORTED_LOCALES, fieldStringsFor } from './l
 export { FieldDomIdProvider, useFieldDomId } from './field-dom-id';
 
 export type { FieldPresentation } from './field-presentation';
-export {
-  FieldPresentationProvider,
-  humanizeFieldName,
-  useFieldPresentation,
-} from './field-presentation';
+export { FieldPresentationProvider, useFieldPresentation } from './field-presentation';
+// The kernel's wording of an identifier, re-exported beside the presentation
+// that applies it so a host labelling its own control in `app` needs one
+// import. Its home is the core entry, with the enum value's wording beside it.
+export { humanizeFieldName } from '../core/humanize';

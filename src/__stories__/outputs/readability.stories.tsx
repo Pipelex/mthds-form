@@ -9,7 +9,7 @@ import {
 import { PAYLOADS as RESULT_PAYLOADS } from '../_generated/results.payloads';
 // The kernel's own wording, read as an oracle. It is internal and not part of
 // the public API, which is why a story reaches it by its deep path.
-import { humanizeEnumValue } from '../../react/field-presentation';
+import { humanizeEnumValue } from '../../core';
 import { ResultView, itemsOf } from '../result-view';
 
 /**

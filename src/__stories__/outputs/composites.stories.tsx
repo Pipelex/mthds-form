@@ -4,7 +4,7 @@ import { CONTRACTS, OUTPUT_FORM } from '../_generated/composites';
 import { PAYLOADS } from '../_generated/composites.payloads';
 // The kernel's own wording, read as an oracle. It is internal and not part of
 // the public API, which is why a story reaches it by its deep path.
-import { humanizeFieldName } from '../../react/field-presentation';
+import { humanizeFieldName } from '../../core';
 import { ResultView } from '../result-view';
 
 /**
