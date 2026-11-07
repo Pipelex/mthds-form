@@ -16,7 +16,7 @@
  * left that only a sideways scroll could reach. The `Outputs/Stacked tables`
  * stories measure the result in Chromium at 343px and 720px.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
@@ -140,12 +140,30 @@ describe('tableLayout="stack"', () => {
     expect(box().hasAttribute('tabindex')).toBe(false);
   });
 
+  it('takes focus while its headers make the table wider than its box, and only then', () => {
+    // jsdom lays nothing out, so the box's widths are what the browser would
+    // measure when a box is too narrow for every header's longest word.
+    const scroll = vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(340);
+    const client = vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(307);
+    try {
+      renderTable(columns(3), { layout: 'stack' });
+      // The table scrolls inside its box, so the box is a place a keyboard
+      // must reach.
+      expect(box().getAttribute('tabindex')).toBe('0');
+    } finally {
+      scroll.mockRestore();
+      client.mockRestore();
+    }
+  });
+
   it('keeps a table of three columns a table at every width, wrapping above a share of the box', () => {
     const { container } = renderTable(columns(3), { layout: 'stack' });
     expect(table(container).className).not.toMatch(/(^|\s)(@max-\[640px\]:)?block(\s|$)/);
     for (const header of container.querySelectorAll('thead th')) {
+      // A header wraps between words, never inside one.
       expect(header.className).not.toContain('whitespace-nowrap');
-      expect(header.className).toContain('wrap-anywhere');
+      expect(header.className).toContain('wrap-normal');
+      expect(header.className).not.toContain('wrap-anywhere');
     }
     const values = [...firstRow(container).cells].map((cell) => {
       // The value alone: a table has headers, so a cell carries no label.
@@ -167,30 +185,58 @@ describe('tableLayout="stack"', () => {
     }
   });
 
-  it('floors each column beside the name at its longest word, up to its share of the box', () => {
+  it('floors each value beside the name at its longest word, up to its share of the box', () => {
     const { container } = renderTable(columns(3), { layout: 'stack' });
     // The share is set once, on the table: two columns split what the name's
-    // floor, the padding and the chevron leave.
+    // floor, the padding and the chevron, when there is one, leave.
     expect(table(container).className).toContain(
-      '[--fit-share:calc((72cqw_-_4.5rem_-_var(--expand-column,2rem))/2)]',
+      '[--fit-share:calc((72cqw_-_4.5rem_-_var(--fit-chevron,0px))/2)]',
     );
-    const headers = [...container.querySelectorAll('thead th')].filter(
-      (header) => header.textContent !== DEFAULT_FIELD_STRINGS.rowDetailsColumn,
-    );
-    const [nameHeader, ...otherHeaders] = headers;
     const [nameCell, ...otherCells] = [...firstRow(container).cells];
     // The name keeps its own floor and nothing more.
-    for (const cell of [nameHeader!, nameCell!]) {
-      expect(cell.hasAttribute('data-fit')).toBe(false);
-      expect(cell.className).not.toContain('after:content-[attr(data-fit)]');
-    }
-    // Every other header and cell carries its own text for the floor to lay out.
-    expect(otherHeaders.map((header) => header.getAttribute('data-fit'))).toEqual(['v1', 'v2']);
+    expect(nameCell!.hasAttribute('data-fit')).toBe(false);
+    expect(nameCell!.className).not.toContain('after:content-[attr(data-fit)]');
+    // Every other value carries its own text for the floor to lay out.
     expect(otherCells.map((cell) => cell.getAttribute('data-fit'))).toEqual(['1', '2']);
-    for (const cell of [...otherHeaders, ...otherCells]) {
+    for (const cell of otherCells) {
       expect(cell.className).toContain('after:content-[attr(data-fit)]');
       expect(cell.className).toContain('after:max-w-[var(--fit-share,0px)]');
     }
+    // A header needs no copy: its own words are its floor, since it never
+    // breaks inside one, and no share caps them.
+    for (const header of container.querySelectorAll('thead th')) {
+      expect(header.hasAttribute('data-fit')).toBe(false);
+      expect(header.className).not.toContain('after:content-[attr(data-fit)]');
+    }
+  });
+
+  it('takes a chevron column from the share only when the rows open', () => {
+    // A name and two numbers: every column fits a cell whole, so no row opens
+    // and no chevron column is drawn, and none is taken from the share.
+    const closed = renderTable(columns(3), { layout: 'stack' });
+    expect(
+      screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeNull();
+    expect(table(closed.container).className).not.toContain('--fit-chevron:');
+    closed.unmount();
+    // A column the budget hides: the rows open, and their chevron's width,
+    // whichever the viewport gives it, is taken from the share.
+    const open = renderTable(columns(4), { layout: 'stack', budget: 3 });
+    expect(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    ).toBeTruthy();
+    expect(table(open.container).className).toContain('[--fit-chevron:var(--expand-column,2rem)]');
+  });
+
+  it('lets a studio header wrap after each underscore, between the words of its identifier', () => {
+    const fields = [text('reference'), number('unit_price_differs'), number('quantity')];
+    const { container } = renderTable(fields, { layout: 'stack' });
+    const header = [...container.querySelectorAll('thead th')].find(
+      (th) => th.textContent === 'unit_price_differs',
+    )!;
+    // A break after each underscore and none elsewhere, and the text as written.
+    expect(header.querySelectorAll('wbr')).toHaveLength(2);
+    expect(screen.getByRole('columnheader', { name: 'unit_price_differs' })).toBe(header);
   });
 
   it('gives no word floor to a table that scrolls, or to one that is blocks at every width', () => {
