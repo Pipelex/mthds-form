@@ -9,11 +9,12 @@ import { cn } from '../utils';
  * it: a row holding a switch leaves that much room, so the area never covers
  * the control beside it.
  *
- * An off track is `--muted-foreground`, the one token the theme contract
- * holds to a readable contrast on the page and the field fill, so the track
- * shows its edge on the row it sits in (3:1, WCAG 1.4.11) and the thumb shows
- * on it. It was `--input`, the fill of the boolean's own row, and an off
- * switch read as a lone thumb on every host.
+ * An off track is `--muted-foreground`, the colour a field's description,
+ * an unselected pill's label and a placeholder are already set in on the
+ * field fill, so a palette in which those read gives the track its edge on
+ * the row it sits in (3:1, WCAG 1.4.11); the contract holds the thumb, in
+ * `--background`, to 4.5:1 on it. It was `--input`, the fill of the
+ * boolean's own row, and an off switch read as a lone thumb on every host.
  */
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
