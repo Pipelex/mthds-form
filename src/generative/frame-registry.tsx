@@ -93,12 +93,16 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
       >
         {/* Two columns flow the groups down one column and on into the next,
             balanced, rather than a grid's rows: a row as tall as its tallest
-            group left a hole beside every long list. The space between groups
-            is a top margin, which a column break truncates. */}
+            group left a hole beside every long list. A group may continue into
+            the next column between its fields, and a list between its rows,
+            but never inside a field or a row, and never right after a title.
+            The space between groups is a top margin, which a column break
+            truncates. */}
         <div
           className={cn(
             'grid gap-8',
-            two && 'md:block md:columns-2 md:gap-x-10 md:[&>*]:break-inside-avoid md:[&>*+*]:mt-8',
+            two &&
+              'md:block md:columns-2 md:gap-x-10 md:[&>*+*]:mt-8 md:[&>*>h2]:break-after-avoid md:[&>*>*:not(h2):not(:has([data-list-row]))]:break-inside-avoid md:[&_[data-list-row]]:break-inside-avoid',
           )}
         >
           {children}
