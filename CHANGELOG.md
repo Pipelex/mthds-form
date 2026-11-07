@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **The JSON view's block is a tab stop only while it scrolls**: it takes keyboard focus while a line is wider than it, as a result table's box does, rather than always, which left a stop per block that scrolled nothing. See [docs/result-view.md](docs/result-view.md).
 - **An off switch shows its track**: the switch's track, in the form and on a produced page, is `--muted-foreground` when off rather than `--input`, the fill of the boolean's own row, so it reads at 3:1 on its row and its thumb shows on it, where an off switch read as a lone thumb. See [docs/theming.md](docs/theming.md).
 
 ## [v0.30.0] - 2026-11-07

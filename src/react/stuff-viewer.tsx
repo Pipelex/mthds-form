@@ -250,6 +250,25 @@ export function JsonView({ value }: { value: unknown }) {
         ? stringifyValue(value)
         : JSON.stringify(value);
 
+  // Whether a line is wider than the block, so the block scrolls sideways: a
+  // scroll is a place a keyboard must reach, so the block takes focus while it
+  // overflows, and only then, as a result table's box does. A short value
+  // left a stop per block that scrolled nothing. Measured, because only the
+  // browser knows a line's width; it decides a tab stop, never the block's
+  // shape, so a server and the first paint render the same block.
+  const block = useRef<HTMLPreElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const pre = block.current;
+    if (!pre) return;
+    const measure = () => setOverflows(pre.scrollWidth > pre.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(pre);
+    return () => observer.disconnect();
+  }, [text]);
+
   if (text === undefined) {
     return <Absent />;
   }
@@ -275,14 +294,16 @@ export function JsonView({ value }: { value: unknown }) {
           )}
         </button>
       )}
-      {/* A region that scrolls sideways takes focus, so a keyboard can scroll
-          it, and is named, as a result table's is. On a phone, beside the
-          Copy JSON button, it is never shorter than the button's 44px and its
-          inset, so a scalar's one line keeps the button inside its border. */}
+      {/* A region that scrolls sideways takes focus while it does, so a
+          keyboard can scroll it, and is named, as a result table's is. On a
+          phone, beside the Copy JSON button, it is never shorter than the
+          button's 44px and its inset, so a scalar's one line keeps the button
+          inside its border. */}
       <pre
+        ref={block}
         role="group"
         aria-label={s.viewJson}
-        tabIndex={0}
+        {...(overflows ? { tabIndex: 0 } : {})}
         className={cn(
           'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed',
           canCopy && 'max-sm:min-h-[60px] max-sm:pr-14',
