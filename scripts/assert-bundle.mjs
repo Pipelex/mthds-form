@@ -1009,7 +1009,8 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
       optionalProblems.push(`${name} falls back through ${chain.join(' → ')} to ${last}, which theme.css does not define`);
     }
     if (lightPalette.has(name) || darkPalette.has(name)) {
-      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${stand} never fires for a host that loads the file`);
+      const fallback = literal ? 'the value it painted before' : stand;
+      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${fallback} never fires for a host that loads the file`);
     }
     if (optionalReads.get(name) === 0) {
       optionalProblems.push(`nothing under ${ARBITRARY_SOURCES.join(', ')} reads ${name}, so listing it in OPTIONAL_TOKENS is stale`);

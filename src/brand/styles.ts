@@ -320,11 +320,18 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
   },
 };
 
-export const APP_STYLE_IDS: readonly AppStyleId[] = ['quiet', 'soft', 'editorial', 'bold'];
+export const APP_STYLE_IDS: readonly AppStyleId[] = Object.freeze([
+  'quiet',
+  'soft',
+  'editorial',
+  'bold',
+]);
 
 /** Whether `value` names one of the app styles. */
 export function isAppStyle(value: unknown): value is AppStyleId {
-  return typeof value === 'string' && (APP_STYLE_IDS as readonly string[]).includes(value);
+  // Against the definitions themselves, which no caller can reach, rather
+  // than the exported list.
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(DEFINITIONS, value);
 }
 
 /**

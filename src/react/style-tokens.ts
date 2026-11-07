@@ -32,9 +32,11 @@
 
 /**
  * A heading's face: the style's heading face, or whatever the heading wore
- * before. `revert-layer` undoes this declaration alone, so a host's own
- * stylesheet for its headings, in an earlier layer, still applies, and a
- * heading no rule sets inherits its face, as it did.
+ * before. `revert-layer` rolls the property back past the utilities layer,
+ * so a host's own stylesheet for its headings, in an earlier layer, still
+ * applies, and a heading no rule sets inherits its face, as it did. It rolls
+ * back any other utility setting the same property on that element too, so a
+ * heading that reads it is given no other face or tracking utility.
  */
 export const headingFaceClass = '[font-family:var(--font-heading,revert-layer)]';
 

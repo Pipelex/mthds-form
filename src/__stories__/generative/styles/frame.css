@@ -140,6 +140,9 @@
   font-size: 15px;
   font-weight: 500;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .af-band-btn {
   display: inline-flex;
@@ -409,10 +412,14 @@
 .af[data-narrow] .af-band {
   padding: 0 16px;
 }
+/* On a phone the product keeps its name beside the logo, and History is
+   its icon alone, a 44px target. */
 .af[data-narrow] .af-band-btn {
   min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  justify-content: center;
 }
-.af[data-narrow] .af-band-app,
-.af[data-narrow] .af-band-sep {
+.af[data-narrow] .af-band-btn-label {
   display: none;
 }

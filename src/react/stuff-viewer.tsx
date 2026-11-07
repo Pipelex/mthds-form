@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Check, Copy, Download, Loader2 } from 'lucide-react';
 import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
@@ -213,9 +213,18 @@ function highlight(json: string) {
  * tab was — one labelled fallback, not one of three guesses offered as a
  * choice.
  */
+/** The clipboard's presence never changes while a page is open. */
+const noSubscription = () => () => {};
+const hasClipboard = () => typeof navigator !== 'undefined' && Boolean(navigator.clipboard);
+
 export function JsonView({ value }: { value: unknown }) {
   const s = useFieldStrings();
   const [copied, setCopied] = useState(false);
+  // Whether the page can copy: `false` on the server and while hydrating,
+  // the clipboard's answer after. Read while rendering, it drew the Copy JSON
+  // button and the block's room for it on the client alone, a hydration
+  // mismatch.
+  const canCopy = useSyncExternalStore(noSubscription, hasClipboard, () => false);
   // The check mark reverts after a moment. The timer belongs to the effect, so
   // it is cleared when the control unmounts rather than firing into a
   // component, or a document, that is gone.
@@ -237,7 +246,6 @@ export function JsonView({ value }: { value: unknown }) {
   if (text === undefined) {
     return <Absent />;
   }
-  const canCopy = typeof navigator !== 'undefined' && Boolean(navigator.clipboard);
   return (
     <div className="relative">
       {canCopy && (

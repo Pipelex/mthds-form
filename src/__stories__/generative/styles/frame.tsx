@@ -137,8 +137,8 @@ function Band({ appName, team }: { appName: string; team: TeamKey | null }) {
         <span className="af-band-sep" aria-hidden="true" />
         <span className="af-band-app">{appName}</span>
       </div>
-      <button type="button" className="af-band-btn">
-        <Icon d={HISTORY} /> History
+      <button type="button" className="af-band-btn" aria-label="History">
+        <Icon d={HISTORY} /> <span className="af-band-btn-label">History</span>
       </button>
     </header>
   );

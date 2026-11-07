@@ -34,8 +34,8 @@ import { useControlId } from './ui/shadcn';
  * the page's style panel (`--panel-*`), falling back to `bg-card` on
  * `border-border` and a large shadow; a title reads the style's heading face,
  * weight and tracking; a hairline is `border-border`; the call to action wears
- * the style's `--action-shadow`, falling back to a glow of the accent composed
- * with `color-mix()` (see `react/style-tokens`); the corners are
+ * the style's `--action-shadow`, falling back to a glow of the button colour
+ * (`--primary`) composed with `color-mix()` (see `react/style-tokens`); the corners are
  * `--radius` and its multiples, a tag is `font-mono`, the logo is the
  * manifest's pair. The running text names no face at all: it inherits the
  * page's, which a brand's compiled stylesheet sets on its scope from

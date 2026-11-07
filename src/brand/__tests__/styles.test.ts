@@ -152,6 +152,14 @@ describe('the typefaces', () => {
     for (const id of APP_STYLE_IDS) expect(isAppStyle(id)).toBe(true);
     expect(isAppStyle('glossy')).toBe(false);
     expect(isAppStyle(null)).toBe(false);
+    expect(isAppStyle('toString')).toBe(false);
+  });
+
+  it('keeps the list of styles frozen, so no caller can add one the definitions lack', () => {
+    expect(Object.isFrozen(APP_STYLE_IDS)).toBe(true);
+    expect(() => (APP_STYLE_IDS as string[]).push('glossy')).toThrow(TypeError);
+    expect(isAppStyle('glossy')).toBe(false);
+    expect(deriveStyleRoles('glossy')).toEqual({});
   });
 });
 
