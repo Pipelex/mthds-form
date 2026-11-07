@@ -5,7 +5,8 @@ import { cn } from './utils';
 import type { ConceptCategory } from '../core';
 import { ConceptPill } from './concept-pill';
 import { useFieldStrings } from './field-strings';
-import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { fieldLabel, shownDescription, useFieldPresentation } from './field-presentation';
+import { smallPrintClass } from './field-styles';
 
 interface FieldShellProps {
   name: string;
@@ -13,6 +14,12 @@ interface FieldShellProps {
   conceptRef?: string;
   category: ConceptCategory;
   description?: string;
+  /**
+   * What the control says in the description's place when there is no
+   * description to show: a number's range, the JSON escape hatch's syntax. It
+   * also stands in for a description `app` leaves out for restating the label.
+   */
+  hint?: string;
   required: boolean;
   /** Validation message; renders in danger text under the control. */
   error?: string;
@@ -33,13 +40,13 @@ export function FieldShell({
   conceptRef,
   category,
   description,
+  hint,
   required,
   error,
   htmlFor,
   children,
   className,
 }: FieldShellProps) {
-  const s = useFieldStrings();
   // Inside a method app the label is a question, not an identifier: sans,
   // humanised, and with no concept pill. Everywhere else it stays the exact
   // mono name a builder wrote. See `field-presentation.tsx`.
@@ -50,6 +57,7 @@ export function FieldShell({
   // the name and keep only the type pill to avoid a redundant header per row.
   const labelText = fieldLabel(title, name, presentation);
   const showLabel = labelText.trim() !== '';
+  const shownText = shownDescription(description, labelText, [category], presentation) ?? hint;
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -65,15 +73,9 @@ export function FieldShell({
           </Label>
         )}
         {!isApp && <ConceptPill conceptRef={conceptRef} category={category} />}
-        {!required && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {s.optionalBadge}
-          </span>
-        )}
+        {!required && <OptionalMark />}
       </div>
-      {description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{description}</p>
-      )}
+      {shownText && <FieldDescription>{shownText}</FieldDescription>}
       {/* A field in error is OUTLINED, not just annotated - inside an app the
           red caption alone is easy to miss on a tall form, and it is the only
           signal on controls whose `aria-invalid` sits on an element the user
@@ -101,4 +103,31 @@ export function FieldShell({
       )}
     </div>
   );
+}
+
+/**
+ * The mark at the end of an optional field's header row. A studio sets it as
+ * a small-caps tag, beside the field's mono name; an app sets it as a word in
+ * the page's face, "Optional", where a tag in capitals would read as a status.
+ */
+export function OptionalMark() {
+  const s = useFieldStrings();
+  const isApp = useFieldPresentation() === 'app';
+  return (
+    <span
+      className={cn(
+        'ml-auto',
+        isApp
+          ? smallPrintClass(true)
+          : 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground',
+      )}
+    >
+      {s.optionalBadge}
+    </span>
+  );
+}
+
+/** The line under a field's label that says what the field is for. */
+export function FieldDescription({ children }: { children: ReactNode }) {
+  return <p className="text-[12px] leading-relaxed text-muted-foreground">{children}</p>;
 }

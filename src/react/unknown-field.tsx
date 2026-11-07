@@ -31,7 +31,8 @@ export function UnknownField({ field, value, onChange, id, error, disabled }: Un
       title={field.title}
       conceptRef={field.conceptRef}
       category="structured"
-      description={field.description ?? s.jsonHint}
+      description={field.description}
+      hint={s.jsonHint}
       required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}

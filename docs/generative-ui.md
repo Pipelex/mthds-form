@@ -92,6 +92,8 @@ The store is **controlled**: the host creates it, seeds it with `seedInputs` (wh
 
 `scope` is what the escape hatches resolve against: `inputs` for an input page, `result` for a result page, plus the `env` the controls need (upload, disabled, a storage resolver) and an `idPrefix` when two pages share a screen.
 
+**The kernel's controls on a page speak in the app's voice.** A produced page is a product page, and its own fields already wear the app's labels, so `GenerativePage` mounts the `app` presentation around everything it renders, whatever presentation the host is in: a field the layout delegates reads "Arriving on", with no concept pill, rather than `arriving_on` under a `date` tag, and its chrome is the app's ([architecture.md](architecture.md) § "Presentation"). A host previewing a layout for a builder passes `presentation="studio"`.
+
 ### Uploads, which arrive by a different id here
 
 `env.onDropFile` is handed the DOM id of the field the file landed on, and on a generative page that id is not the dotted value path [the upload seam](upload-seam.md) describes for a plain form. `MthdsField` mints it from the store path it was given — `/inputs/request/city` becomes `gen-inputs-request-city`, with the `idPrefix` in front of it and the kernel's own `.`-joined suffix for a field nested inside the delegated one. `pathFromDomId` is the inverse, and it is what a host writes back through:

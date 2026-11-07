@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  descriptionAddsToLabel,
   enumLabeler,
   fieldLabel,
   humanizeEnumValue,
   humanizeFieldName,
+  shownDescription,
 } from '../field-presentation';
 
 describe('humanizeFieldName', () => {
@@ -159,5 +161,73 @@ describe('enumLabeler', () => {
     const distinct = ['foo_bar', 'baz'];
     expect(enumLabeler(distinct, 'app')('foo_bar')).toBe('Foo bar');
     expect(enumLabeler(distinct, 'app')('foo_bar')).toBe('Foo bar');
+  });
+});
+
+/**
+ * The description an `app` page shows is one that says something the label
+ * and the control do not. The cases are the trip planner's, where the rule
+ * was found wanting: three sentences restating "Arriving on" over a date.
+ */
+describe('descriptionAddsToLabel', () => {
+  it('drops a sentence that only restates the label, whatever its inflection', () => {
+    expect(descriptionAddsToLabel('The day they arrive', 'Arriving on', ['date'])).toBe(false);
+    expect(descriptionAddsToLabel('The day they leave', 'Leaving on', ['date'])).toBe(false);
+    expect(descriptionAddsToLabel('A name for the trip', 'Trip name', ['text'])).toBe(false);
+    expect(descriptionAddsToLabel('The city', 'City', ['text'])).toBe(false);
+    expect(descriptionAddsToLabel("Their team's name", 'Team name', ['text'])).toBe(false);
+  });
+
+  it("drops a concept's own definition, which the control already says", () => {
+    expect(descriptionAddsToLabel('An image', 'Inspiration', ['image'])).toBe(false);
+    expect(descriptionAddsToLabel('A document', 'Contract', ['document'])).toBe(false);
+    expect(descriptionAddsToLabel('Some images', 'Moodboard', ['list', 'image'])).toBe(false);
+  });
+
+  it('keeps a sentence holding any word the label does not', () => {
+    expect(descriptionAddsToLabel('Places they must not miss', 'Must see', ['list'])).toBe(true);
+    expect(descriptionAddsToLabel('Who is going', 'Travellers', ['list'])).toBe(true);
+    expect(descriptionAddsToLabel('The currency the budget is in', 'Currency', ['choice'])).toBe(
+      true,
+    );
+    expect(descriptionAddsToLabel('A photo of the receipt', 'Photo', ['image'])).toBe(true);
+  });
+
+  it('never counts a negation as filler', () => {
+    expect(descriptionAddsToLabel('Not the city', 'City', ['text'])).toBe(true);
+    expect(descriptionAddsToLabel('No city', 'City', ['text'])).toBe(true);
+  });
+
+  it('keeps a description in a language it has no filler words for', () => {
+    expect(descriptionAddsToLabel("Le jour de l'arrivée", 'Arrivée', ['date'])).toBe(true);
+  });
+
+  it('counts any description as adding to an empty label', () => {
+    expect(descriptionAddsToLabel('One person on the trip', '', ['structured'])).toBe(true);
+  });
+});
+
+describe('shownDescription', () => {
+  it('shows every description in studio, where it documents an identifier', () => {
+    expect(shownDescription('The day they arrive', 'arriving_on', ['date'], 'studio')).toBe(
+      'The day they arrive',
+    );
+    expect(shownDescription('One person on the trip', '', ['structured'], 'studio')).toBe(
+      'One person on the trip',
+    );
+  });
+
+  it('shows a description in app only when it adds to the label', () => {
+    expect(shownDescription('The day they arrive', 'Arriving on', ['date'], 'app')).toBeUndefined();
+    expect(shownDescription('Who is going', 'Travellers', ['list'], 'app')).toBe('Who is going');
+  });
+
+  it('shows no description on a list row in app, where the list said once what its rows are', () => {
+    expect(shownDescription('One person on the trip', '', ['structured'], 'app')).toBeUndefined();
+  });
+
+  it('answers undefined for no description, or an empty one', () => {
+    expect(shownDescription(undefined, 'City', ['text'], 'app')).toBeUndefined();
+    expect(shownDescription('', 'City', ['text'], 'studio')).toBeUndefined();
   });
 });

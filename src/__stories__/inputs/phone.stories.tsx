@@ -11,7 +11,7 @@ import { TOUCH_TARGET, atWidth, expectClearOf, expectTouchTarget, pinnedTo } fro
  *
  * Below the `sm` breakpoint every control a finger has to hit is given at
  * least 44 by 44 pixels: the file card's Preview and remove buttons, the
- * "paste a URL instead" link, a list's remove and add buttons, the optional
+ * "Paste a link instead" link, a list's remove and add buttons, the optional
  * fields' disclosure and a boolean's switch. Each grows where it stands,
  * except the switch, which keeps its look and reaches 44 pixels tall through
  * an invisible area that ends inside its own row. From `sm` up nothing moves,
@@ -175,8 +175,9 @@ export const DocumentListDesktop: Story = {
       }
     }
     for (const add of buttons(canvasElement, S.addItem)) await expect(size(add).height).toBe(36);
+    // A line of the app's 13px text, as tall as its line and no taller.
     for (const link of buttons(canvasElement, S.pasteUrlInstead)) {
-      await expect(size(link).height).toBeLessThan(20);
+      await expect(size(link).height).toBeLessThanOrEqual(20);
     }
   },
 };

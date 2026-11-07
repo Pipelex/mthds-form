@@ -82,7 +82,7 @@ describe('an optional structure behind the optional disclosure', () => {
     // No toggle and no badge of its own: the only button is the disclosure.
     expect(screen.getAllByRole('button')).toHaveLength(1);
     // The one badge is the plain optional field's; the structure carries none.
-    expect(screen.getAllByText('optional')).toHaveLength(1);
+    expect(screen.getAllByText('Optional')).toHaveLength(1);
 
     const hide = screen.getByRole('button', { name: 'Hide optional fields' });
     expect(hide).toHaveAttribute('aria-expanded', 'true');

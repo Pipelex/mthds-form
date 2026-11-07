@@ -67,3 +67,79 @@ describe('an error that clears as the user types keeps the control mounted', () 
     expect(input).toHaveValue('https://x');
   });
 });
+
+/**
+ * What `app` shows under a label: a description that adds to it, else the
+ * control's own hint (a number's range), and nothing when there is neither.
+ */
+describe('the line under a label, in an app', () => {
+  const renderIn = (field: RunField, presentation: FieldPresentation = 'app') =>
+    render(
+      <FieldPresentationProvider presentation={presentation}>
+        <FieldRenderer field={field} value={undefined} onChange={() => {}} id={field.name} />
+      </FieldPresentationProvider>,
+    );
+
+  const arriving: RunField = {
+    kind: 'date',
+    name: 'arriving_on',
+    conceptRef: 'native.Date',
+    required: true,
+    datetime: false,
+    description: 'The day they arrive',
+  };
+
+  it('leaves out a description that restates the label', () => {
+    renderIn(arriving);
+    expect(screen.getByLabelText('Arriving on')).toBeInTheDocument();
+    expect(screen.queryByText('The day they arrive')).toBeNull();
+  });
+
+  it('keeps it in studio', () => {
+    renderIn(arriving, 'studio');
+    expect(screen.getByText('The day they arrive')).toBeInTheDocument();
+  });
+
+  it("shows a number's range in place of a description it leaves out", () => {
+    renderIn({
+      kind: 'number',
+      name: 'age',
+      conceptRef: 'native.Number',
+      required: true,
+      integer: true,
+      min: 0,
+      max: 120,
+      description: 'Their age',
+    });
+    expect(screen.queryByText('Their age')).toBeNull();
+    expect(screen.getByText('0 – 120')).toBeInTheDocument();
+  });
+
+  it('marks an optional field with the word, not a tag', () => {
+    renderIn({ ...arriving, required: false });
+    expect(screen.getByText('Optional').className).not.toContain('uppercase');
+  });
+});
+
+/**
+ * The date's face: muted while it holds no whole date, so the browser's
+ * `mm/dd/yyyy` pattern does not read as a value someone typed.
+ */
+describe("the date's empty face", () => {
+  const date: RunField = {
+    kind: 'date',
+    name: 'arriving_on',
+    conceptRef: 'native.Date',
+    required: true,
+    datetime: false,
+  };
+
+  it('is marked empty with no value, and not once a date is in it', () => {
+    const { rerender } = render(
+      <FieldRenderer field={date} value={undefined} onChange={() => {}} id="d" />,
+    );
+    expect(screen.getByLabelText('arriving_on')).toHaveAttribute('data-empty');
+    rerender(<FieldRenderer field={date} value="2026-05-14" onChange={() => {}} id="d" />);
+    expect(screen.getByLabelText('arriving_on')).not.toHaveAttribute('data-empty');
+  });
+});

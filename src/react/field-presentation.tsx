@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use, type ReactNode } from 'react';
+import type { ConceptCategory } from '../core';
 
 /**
  * How a field's LABEL chrome, and the enum values a person reads, should read.
@@ -19,12 +20,19 @@ import { createContext, use, type ReactNode } from 'react';
  * An enum value is the only value the two presentations show differently. A
  * number, a text, a date and every other value render the same in both.
  *
+ * The chrome around a value follows it too: in `app` the optional mark, a
+ * list's count and a file's formats are set in the page's face rather than in
+ * mono, an empty list is its Add button, and a description that restates its
+ * label is left out (`shownDescription`). See docs/architecture.md, "The
+ * chrome in `app`".
+ *
  * Deliberately a context rather than a prop or a `FieldEnv` flag: only the
  * components that own label chrome or an enum value's wording read it -
  * `FieldShell`, `ObjectField`, `BooleanField`, `ListField`, `EnumField` and the
- * result view - plus the file control, whose card hides a storage reference in
- * `app`, and threading a prop would have meant editing every field control and
- * both recursive containers.
+ * result view - plus the controls whose own chrome follows it: the file
+ * control, whose card hides a storage reference in `app`, the date and number
+ * inputs, and a list's drop area. Threading a prop would have meant editing
+ * every field control and both recursive containers.
  */
 export type FieldPresentation = 'studio' | 'app';
 
@@ -179,3 +187,143 @@ export function fieldLabel(
   if (title !== undefined) return title;
   return presentation === 'app' ? humanizeFieldName(name) : name;
 }
+
+/**
+ * The description a field shows under its label, or `undefined` for none.
+ *
+ * In `studio` it is the description as stated, always: under an identifier
+ * such as `arriving_on`, it is the documentation a builder reads. In `app` it
+ * is shown only when it says something that the label and the control do not
+ * already say ({@link descriptionAddsToLabel}), because a page that reads
+ * "Arriving on" over "The day they arrive" over a date picker says one thing
+ * three times. The descriptor carries a concept's own definition as the
+ * description of an input that states none, so "An image" under an image
+ * field is the common case rather than an authoring slip.
+ *
+ * `kinds` are what the control itself says: a date picker already says "date",
+ * a dropzone already says "image". A list passes its own kind and its item's.
+ *
+ * A list ROW has no label (`fieldLabel` gives it the empty one), and in `app`
+ * it shows no description either: what a row holds is its item concept's
+ * definition, the same on every row, and the list has already said once,
+ * above its rows, what they are. "One person on the trip" under every
+ * traveller is the list's description repeated, not the row's.
+ */
+export function shownDescription(
+  description: string | undefined,
+  label: string,
+  kinds: readonly ConceptCategory[],
+  presentation: FieldPresentation,
+): string | undefined {
+  if (!description || presentation !== 'app') return description || undefined;
+  if (label.trim() === '') return undefined;
+  return descriptionAddsToLabel(description, label, kinds) ? description : undefined;
+}
+
+/**
+ * Whether a description says anything beyond its label and its control's kind.
+ *
+ * It does when it holds a word, other than a filler word, that neither the
+ * label nor the kind's own words hold, compared after a light stemming that
+ * makes "arrive" and "arriving" one word. The rule only ever HIDES a sentence
+ * whose every content word is already on the page, and it shows the
+ * description whenever it is unsure, so its failure is a restatement left in
+ * place, never a fact taken away: "Who is going" under "Travellers" stays,
+ * because no word of the one is a word of the other, while "Not before noon"
+ * under "Arrival" stays because `not` and `noon` are content words.
+ *
+ * The filler and kind words are English, as the descriptions it meets mostly
+ * are; in another language few words match, and the description is shown, as
+ * it was before the rule. An empty label says nothing, so any description
+ * adds to it; `shownDescription` decides a list row's case on its own.
+ */
+export function descriptionAddsToLabel(
+  description: string,
+  label: string,
+  kinds: readonly ConceptCategory[],
+): boolean {
+  if (label.trim() === '') return true;
+  const said = new Set(contentStems(label));
+  for (const kind of kinds) for (const word of KIND_WORDS[kind]) said.add(stem(word));
+  return contentStems(description).some((word) => !said.has(word));
+}
+
+/** The words a control of each kind says by being that control. */
+const KIND_WORDS: Record<ConceptCategory, readonly string[]> = {
+  text: ['text'],
+  date: ['date', 'day'],
+  document: ['document', 'file'],
+  image: ['image', 'picture', 'photo'],
+  number: ['number'],
+  boolean: [],
+  choice: [],
+  structured: [],
+  list: ['list'],
+};
+
+/**
+ * Words that carry no content of their own. Deliberately short, and without
+ * `not`, `no` or any question word: a word left out of it only keeps a
+ * description on the page.
+ */
+const FILLER = new Set([
+  'a',
+  'an',
+  'the',
+  'of',
+  'for',
+  'to',
+  'in',
+  'on',
+  'at',
+  'by',
+  'with',
+  'and',
+  'or',
+  'is',
+  'are',
+  'be',
+  'it',
+  'its',
+  'this',
+  'that',
+  'these',
+  'those',
+  'their',
+  'they',
+  'them',
+  'his',
+  'her',
+  'your',
+  'you',
+  'our',
+  'we',
+  'if',
+  'any',
+  'as',
+  'from',
+  'some',
+  'one',
+]);
+
+/** A text's content words, stemmed: lower-cased, possessives and filler words dropped. */
+function contentStems(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/['’]s\b/gu, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word !== '' && !FILLER.has(word))
+    .map(stem);
+}
+
+/** One suffix off, never below three letters: `arriving` and `arrive` both give `arriv`. */
+function stem(word: string): string {
+  for (const suffix of SUFFIXES) {
+    if (word.endsWith(suffix) && word.length - suffix.length >= 3) {
+      return word.slice(0, -suffix.length);
+    }
+  }
+  return word;
+}
+
+const SUFFIXES = ['ing', 'ed', 'es', 's', 'e'] as const;

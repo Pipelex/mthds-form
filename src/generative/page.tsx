@@ -3,6 +3,7 @@
 import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
+import { FieldPresentationProvider, type FieldPresentation } from '../react';
 import { BrandProvider } from './brand-context';
 import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
@@ -32,6 +33,14 @@ export interface GenerativePageProps {
    * brand components may omit it.
    */
   brand?: BrandManifest;
+  /**
+   * How the kernel's own controls and results on the page read: `app` unless
+   * a host says otherwise. A produced page is a product page, its own fields
+   * already wear the app's labels, and the kernel's under the studio's mono
+   * names and concept pills read as a builder's form dropped into it. A host
+   * previewing a layout for a builder may pass `studio`.
+   */
+  presentation?: FieldPresentation;
 }
 
 /**
@@ -50,6 +59,7 @@ export function GenerativePage({
   loading,
   registry = generativeRegistry,
   brand,
+  presentation = 'app',
 }: GenerativePageProps) {
   // The scope reaches every control through context, so a fresh object on each
   // render re-renders every field on the page - and a host naturally writes it
@@ -83,11 +93,13 @@ export function GenerativePage({
     },
   }));
   const page = (
-    <DescriptorProvider scope={stableScope}>
-      <JSONUIProvider registry={registry} store={store} handlers={handlers}>
-        <Renderer spec={spec} registry={registry} loading={loading} />
-      </JSONUIProvider>
-    </DescriptorProvider>
+    <FieldPresentationProvider presentation={presentation}>
+      <DescriptorProvider scope={stableScope}>
+        <JSONUIProvider registry={registry} store={store} handlers={handlers}>
+          <Renderer spec={spec} registry={registry} loading={loading} />
+        </JSONUIProvider>
+      </DescriptorProvider>
+    </FieldPresentationProvider>
   );
   return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;
 }

@@ -8,7 +8,8 @@ import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from 
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
-import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { fieldLabel, shownDescription, useFieldPresentation } from './field-presentation';
+import { FieldDescription } from './field-shell';
 import { OptionalToggle } from './optional-toggle';
 
 interface ObjectFieldProps {
@@ -39,6 +40,8 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
   const data = value ?? {};
+  const label = fieldLabel(field.title, field.name, presentation);
+  const description = shownDescription(field.description, label, ['structured'], presentation);
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
@@ -77,13 +80,11 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
             isApp ? 'text-[13.5px]' : 'font-mono',
           )}
         >
-          {fieldLabel(field.title, field.name, presentation)}
+          {label}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
       </div>
-      {field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
-      )}
+      {description && <FieldDescription>{description}</FieldDescription>}
 
       <div
         className={cn(

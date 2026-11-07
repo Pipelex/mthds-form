@@ -39,7 +39,7 @@ export interface FieldEnv {
   onDropFile?: (id: string, file: File) => void | PromiseLike<UploadedFile | void>;
   /**
    * Whether a file field offers a link input, the way in that needs no upload.
-   * `true` when absent; `false` hides the "paste a URL instead" toggle and the
+   * `true` when absent; `false` hides the "Paste a link instead" toggle and the
    * input behind it on every file field.
    *
    * It governs that input and nothing else. A file value is a URL whichever way

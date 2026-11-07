@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The controls' chrome reads as a product's in `app`**: the optional mark is the word "Optional" in the page's face rather than a tag in capitals; a list's count, its row numbers, a file field's formats and the line under an attached file's name are set in the page's face rather than in mono, as are a number and a date; an empty list shows its Add button alone, with no "0 items" and no "No items yet" box unless the method states an exact count; the Add button is a hairline row like "Choose from your team's files" rather than a dashed slot; and the link input under a drop zone is a control of the field family. `studio` keeps its mono and its dashed slot. See [docs/architecture.md](docs/architecture.md).
+- **A description that restates its label is left out in `app`**: a field's description is shown only when it holds a word that neither its label nor its control already says, so "The day they arrive" under "Arriving on", or "An image" over an image drop zone, are gone, and a list row shows no description, the list having said what its rows are; a number's range and the JSON hint take the place of one left out. `studio` shows every description. See [docs/architecture.md](docs/architecture.md).
+- **A generative page renders the kernel's controls in `app`**: `GenerativePage` mounts the `app` presentation around the page whatever the host's, so a delegated field reads with the app's label and chrome rather than under its identifier and concept pill; a new `presentation` prop takes `studio` for a builder's preview. See [docs/generative-ui.md](docs/generative-ui.md).
+- **The drop zone and the link under it speak in sentences (Breaking)**: the default `dropOrBrowse` is "Choose a file or drop it here", `dropFilesOrBrowse` "Choose files or drop them here", `pasteUrlInstead` "Paste a link instead" and `optionalBadge` "Optional", and the French set says the same; a host that matches a control by its English name, in a test for instance, updates it. See [docs/i18n.md](docs/i18n.md).
+
+### Fixed
+
+- **The date input reads as empty when it is, and its calendar follows a dark page**: its empty face, the browser's `mm/dd/yyyy` pattern, is muted until a whole date is entered, where it used to read as a value, and under `.dark` the input declares the dark colour scheme, so the browser's calendar icon is no longer a dark glyph on a dark field and the calendar it opens is dark. See [docs/architecture.md](docs/architecture.md).
+
 ## [v0.28.0] - 2026-11-05
 
 ### Added

@@ -42,7 +42,7 @@ Each way into a file value is offered exactly when the host can honour it, and e
 
 | `onDropFile` | `allowUrl` | What the control renders | With a `fileSource` as well |
 | --- | --- | --- | --- |
-| supplied | absent or `true` | The dropzone, and the "paste a URL instead" toggle under it. | The same, and the team's files under them. |
+| supplied | absent or `true` | The dropzone, and the "Paste a link instead" toggle under it. | The same, and the team's files under them. |
 | supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. | The dropzone, and the team's files under it. |
 | absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. | The same, and the team's files under them. |
 | absent | `false` | **A host's configuration error**: the control throws while rendering, naming the field's id path. | **The team's files only**, the one way in left, which is not an error. |
@@ -107,7 +107,7 @@ The cost of that choice is that a path can go stale, and the package pays it whe
 That has to mean every door into the value, and it did not always:
 
 - the dropzone,
-- the "paste a URL instead" toggle **and the URL input behind it** — leaving these live let a user paste a URL over a file that was still arriving, and let a host's started (and billed) run be abandoned client-side,
+- the "Paste a link instead" toggle **and the URL input behind it** — leaving these live let a user paste a URL over a file that was still arriving, and let a host's started (and billed) run be abandoned client-side,
 - **removing a row from the list the upload is in.** Removal renumbers every row after it, so the write-back would land on whichever row moved into that position — silently, with the form still looking correctly filled. For a batch pipe that is one candidate evaluated against another candidate's document.
 
 `ListField` reads the set by **prefix** (`cvs.`), not by exact match, because the busy row is not always the list's own row: a list of documents uploads at `cvs.1`, a list of structures holding one uploads at `cvs.1.resume`. The dot is what keeps the test off a sibling input called `cvs_extra`.
@@ -241,6 +241,6 @@ The tab stop is the `<input type="file">` itself, named by the field's label thr
 
 That is the opposite of react-dropzone's default, which puts `tabIndex: 0` and its own key handlers on the presentational div and leaves the input at `tabIndex: -1` — so the element a keyboard or voice-control user lands on is a generic with no role and no name. Giving that div a `role="button"` and a label of its own was the other option and was rejected: it would put a second named control in the accessibility tree for one value, when a file input already has exactly the right role and only ever lacked a name. Because the input is clip-hidden, the focus ring is drawn on the root with `focus-within`.
 
-The URL input behind "paste a URL instead" is named too, by `fileUrlAria`, which is given the field's label as the form shows it: "Link to the file for cv" in `studio`, "Link to the file for Cover letter" in `app`, and "Link to the file" in a list row. When the host uploads, the field's label is bound to the file input, so this input used to have no name at all, and its placeholder was the only thing a screen reader announced there. When it does not, there is no file input, and the label is bound to this input instead; its `fileUrlAria` name still says what it is for.
+The URL input behind "Paste a link instead" is named too, by `fileUrlAria`, which is given the field's label as the form shows it: "Link to the file for cv" in `studio`, "Link to the file for Cover letter" in `app`, and "Link to the file" in a list row. When the host uploads, the field's label is bound to the file input, so this input used to have no name at all, and its placeholder was the only thing a screen reader announced there. When it does not, there is no file input, and the label is bound to this input instead; its `fileUrlAria` name still says what it is for.
 
 **A list row's controls do not have distinct names yet.** The list drops each row's label to avoid repeating the field's name on every row, and the row number it shows instead is a bare glyph tied to no control. So every row's link input currently carries the same generic name, and the file input inside a row carries none at all. Giving each row a name of its own is a change to the list control that is tracked separately.

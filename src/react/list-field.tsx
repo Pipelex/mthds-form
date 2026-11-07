@@ -12,9 +12,12 @@ import { Plus, Trash2 } from 'lucide-react';
 import { focusOutlineClass, selectedHoverBorderClass } from './role-tokens';
 import { cn, isThenable } from './utils';
 import type { ListRunField, RunField } from '../core';
+import { conceptCategory } from '../core/descriptor';
 import { ConceptPill } from './concept-pill';
-import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { fieldLabel, shownDescription, useFieldPresentation } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
+import { FieldDescription, OptionalMark } from './field-shell';
+import { rowActionClass, smallPrintClass } from './field-styles';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
 import { firstFocusable, followingFocusable } from './focus';
@@ -291,6 +294,26 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     return count;
   };
 
+  const label = fieldLabel(field.title, field.name, presentation);
+  // "of N" is a claim about an EXACT count, so it needs both bounds and needs
+  // them equal. Read off `itemCount` alone - the LOWER bound - a model saying
+  // "at least two" was announced as a list of exactly two and then read
+  // `3 of 2 items` the moment a third row arrived. Every other list is a plain
+  // count, which is the honest thing to say about a slot with room to grow.
+  const exactCount =
+    field.itemCount !== undefined && field.maxItemCount === field.itemCount
+      ? field.itemCount
+      : undefined;
+  // In an app, an empty list's own count says nothing the Add button under it
+  // does not: "0 items" is shown only where the list says how many it wants.
+  const countShown = !isApp || items.length > 0 || exactCount !== undefined;
+  const description = shownDescription(
+    field.description,
+    label,
+    ['list', conceptCategory(field.item)],
+    presentation,
+  );
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -300,35 +323,28 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             isApp ? 'text-[13.5px]' : 'font-mono',
           )}
         >
-          {fieldLabel(field.title, field.name, presentation)}
+          {label}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="list" />}
-        <span className="font-mono text-[10.5px] text-muted-foreground">
-          {/* "of N" is a claim about an EXACT count, so it needs both bounds and
-              needs them equal. Read off `itemCount` alone - the LOWER bound - a
-              model saying "at least two" was announced as a list of exactly two
-              and then read `3 of 2 items` the moment a third row arrived. Every
-              other list is a plain count, which is the honest thing to say
-              about a slot with room to grow. */}
-          {field.itemCount !== undefined && field.maxItemCount === field.itemCount
-            ? s.itemsCountOf(items.length, field.itemCount)
-            : s.itemsCount(items.length)}
-        </span>
-        {shownAsOptional(field) && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {s.optionalBadge}
+        {countShown && (
+          <span className={smallPrintClass(isApp)}>
+            {exactCount !== undefined
+              ? s.itemsCountOf(items.length, exactCount)
+              : s.itemsCount(items.length)}
           </span>
         )}
+        {shownAsOptional(field) && <OptionalMark />}
       </div>
-      {field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
-      )}
+      {description && <FieldDescription>{description}</FieldDescription>}
 
       <div ref={rowsRef} className="space-y-2">
         {/* With a drop area, the area stands in for this line: its own words
             say what to do, and three dashed boxes one above another would read
-            as three equal choices. */}
-        {items.length === 0 && !dropOffered && (
+            as three equal choices. In an app the Add button stands in for it
+            too: an empty box over a button that says "Add item" is a slot
+            waiting to be filled, which is how a studio shows a list and not
+            how a product page does. */}
+        {items.length === 0 && !dropOffered && !isApp && (
           <p className="rounded-md border border-dashed border-border bg-input/50 px-3 py-4 text-center text-[12px] text-muted-foreground">
             {s.noItemsYet}
           </p>
@@ -340,7 +356,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               data-list-row
               className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
             >
-              <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
+              <span
+                className={cn(
+                  'mt-1 w-5 shrink-0 text-center text-muted-foreground',
+                  isApp ? 'text-[12px] tabular-nums' : 'font-mono text-[11px]',
+                )}
+              >
                 {index + 1}
               </span>
               <div className="min-w-0 flex-1">
@@ -379,7 +400,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         {dropOffered && fileItem && (
           <div ref={dropRef}>
             <ListFileDrop
-              label={fieldLabel(field.title, field.name, presentation)}
+              label={label}
               formats={fileItem.formats}
               shut={!dropOpen}
               onPlace={placeFiles}
@@ -392,22 +413,31 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
           onClick={addItem}
           disabled={env?.disabled || isFull}
           className={cn(
-            'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-[13px] text-muted-foreground transition-colors max-sm:h-11',
-            // The edge under the pointer is the accent's, as a selected pill's
-            // is; the fill under it stays neutral.
-            'hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-            selectedHoverBorderClass,
+            isApp
+              ? // A secondary action of the same family as the team's files
+                // row under it, and the field above it.
+                rowActionClass
+              : [
+                  'inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-[13px] text-muted-foreground transition-colors max-sm:h-11',
+                  // The edge under the pointer is the accent's, as a selected
+                  // pill's is; the fill under it stays neutral.
+                  'hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+                  selectedHoverBorderClass,
+                ],
             focusOutlineClass,
           )}
         >
-          <Plus className="h-4 w-4" />
+          <Plus
+            className={cn('h-4 w-4', isApp && 'shrink-0 text-muted-foreground')}
+            aria-hidden="true"
+          />
           {s.addItem}
         </button>
         {fileSource && fileItem && (
           <>
             <FilePickerEntry
               ref={pickerEntryRef}
-              label={fieldLabel(field.title, field.name, presentation)}
+              label={label}
               disabled={env?.disabled || busy || room === 0}
               onOpen={() => setPickerOpen(true)}
             />
