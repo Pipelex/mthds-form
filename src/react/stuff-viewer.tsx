@@ -126,7 +126,7 @@ export interface StuffViewerProps {
   downloadBaseName?: string;
   /**
    * Which download controls this panel draws, laid key by key over what
-   * `ResultEnvProvider` says: `{ result: false }` drops the header's Download
+   * `ResultEnvProvider` says: `{ result: false }` drops the panel's Download
    * and keeps each file's own button, `{ files: false }` the reverse. For a
    * surface where saving makes no sense (a preview inside an editor, say), set
    * both to `false`.
@@ -265,7 +265,7 @@ export function JsonView({ value }: { value: unknown }) {
   );
 }
 
-/** One press of the header's Download, and the result it saved. */
+/** One press of the panel's Download, and the result it saved. */
 interface DownloadAttempt {
   field: RunField;
   baseName: string;
@@ -440,9 +440,50 @@ function StuffPanel({
   // adds none.
   const titled = presentation !== 'app' || (name !== undefined && name !== '' && !page);
   const switchShown = offered.length > 1;
+  // A Download with nothing beside it - an app's result with no title, no view
+  // switch and no page - is drawn at the result's foot, where a reader who has
+  // read it takes it away. At the top it stood alone at the panel's right edge
+  // over an empty band, a corner the eye reads as chrome rather than as the
+  // result's action.
+  const downloadAtFoot = downloadShown && !titled && !switchShown && !page;
   // The row is left out when nothing is in it, so an app's result starts at
   // its first line rather than under an empty band.
-  const headerShown = titled || downloadShown || switchShown || (page && pdfName !== undefined);
+  const headerShown =
+    titled || (downloadShown && !downloadAtFoot) || switchShown || (page && pdfName !== undefined);
+  const downloadButton = downloadShown && (
+    <button
+      type="button"
+      onClick={() => void handleDownload()}
+      disabled={savingShown}
+      aria-label={page ? s.downloadHtml : s.download}
+      className={cn(
+        // 44 pixels tall below `sm`, as every control a finger hits is.
+        'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-60 max-sm:min-h-11 max-sm:px-3',
+        focusOutlineClass,
+      )}
+    >
+      {savingShown ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Download className="h-3.5 w-3.5" />
+      )}
+      {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
+    </button>
+  );
+  // Said, not swallowed: a reader expecting three attachments and getting two
+  // could not tell before. The JSON copy still carries each missing file's
+  // reference, when it was planned. The live region is there from the start
+  // and only its text changes, because a region inserted with its message
+  // already in it is not reliably announced. It sits under the Download,
+  // wherever that is drawn.
+  const missedStatus = downloadShown && (
+    <p
+      role="status"
+      className={cn('shrink-0 text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
+    >
+      {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
+    </p>
+  );
 
   return (
     <div
@@ -479,25 +520,7 @@ function StuffPanel({
                 {...(pdfName ? { fileName: pdfName } : {})}
               />
             )}
-            {downloadShown && (
-              <button
-                type="button"
-                onClick={() => void handleDownload()}
-                disabled={savingShown}
-                aria-label={page ? s.downloadHtml : s.download}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-60',
-                  focusOutlineClass,
-                )}
-              >
-                {savingShown ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Download className="h-3.5 w-3.5" />
-                )}
-                {savingShown ? s.downloading : page ? s.downloadHtml : s.download}
-              </button>
-            )}
+            {!downloadAtFoot && downloadButton}
             {switchShown && (
               <div
                 role="group"
@@ -527,22 +550,7 @@ function StuffPanel({
         </div>
       )}
 
-      {/* Said, not swallowed: a reader expecting three attachments and getting
-          two could not tell before. The JSON copy still carries each missing
-          file's reference, when it was planned. The live region is there from
-          the start and only its text changes, because a region inserted with
-          its message already in it is not reliably announced. */}
-      {downloadShown && (
-        <p
-          role="status"
-          className={cn(
-            'shrink-0 text-[12px] text-destructive',
-            missedShown.length === 0 && 'sr-only',
-          )}
-        >
-          {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
-        </p>
-      )}
+      {!downloadAtFoot && missedStatus}
 
       {view === 'json' ? (
         <JsonView value={value} />
@@ -561,6 +569,12 @@ function StuffPanel({
             <ResultField field={field} value={value} hideLabel />
           </PanelResult>
         </ResultRoot>
+      )}
+      {downloadAtFoot && (
+        <div className="space-y-1 pt-2">
+          {downloadButton}
+          {missedStatus}
+        </div>
       )}
     </div>
   );

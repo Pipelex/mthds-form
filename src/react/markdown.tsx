@@ -101,6 +101,21 @@ export function Markdown({ text, className, proseImages, citations }: MarkdownPr
 }
 
 /**
+ * Whether `text`, typeset here, opens with a heading of its own: its first
+ * block, blank lines aside, is a `#` heading or an underlined one.
+ *
+ * The result view asks it of a text it typesets in `app`, to leave out the
+ * field's label over a text that names itself: a summary that opens with
+ * "Launch Executive Summary" read as a stutter under "Executive summary". It
+ * reads the text the way `Markdown` will typeset it, with the same lexer and
+ * options, so the two cannot disagree about what the first block is.
+ */
+export function opensWithHeading(text: string): boolean {
+  const first = marked.lexer(text, LEX_OPTIONS).find((token) => token.type !== 'space');
+  return first?.type === 'heading';
+}
+
+/**
  * The policy, threaded to the one token that needs it.
  *
  * A context rather than a prop on every walker: `Block`, `Inline` and

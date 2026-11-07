@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { Markdown } from '../markdown';
+import { Markdown, opensWithHeading } from '../markdown';
 import { ResultEnvProvider } from '../result-env';
 
 describe('block structure', () => {
@@ -362,5 +362,20 @@ describe('inline citations', () => {
     const { container } = render(<Markdown text="Less water [1][2]." />);
     expect(container.querySelector('a')).toBeNull();
     expect(container.textContent).toBe('Less water [1][2].');
+  });
+});
+
+describe('whether a text opens with a heading of its own', () => {
+  it('answers yes for a first block that is a heading, of either kind', () => {
+    expect(opensWithHeading('# Launch\n\nThe launch is on track.')).toBe(true);
+    expect(opensWithHeading('\n\n## Launch Executive Summary\n\nWe are launching.')).toBe(true);
+    expect(opensWithHeading('Launch\n======\n\nThe launch is on track.')).toBe(true);
+  });
+
+  it('answers no for a text whose heading comes later, or that has none', () => {
+    expect(opensWithHeading('The launch is on track.\n\n## Why\n\nIt is.')).toBe(false);
+    expect(opensWithHeading('**Launch** is on track.')).toBe(false);
+    expect(opensWithHeading('#hashtag at the start')).toBe(false);
+    expect(opensWithHeading('')).toBe(false);
   });
 });

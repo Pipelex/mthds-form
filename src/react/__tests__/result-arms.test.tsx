@@ -10,7 +10,7 @@
  * presentations: `app` changes, and `studio` keeps what a builder reads.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type {
   ObjectRunField,
   OutputForm,
@@ -564,6 +564,89 @@ describe('a long text value', () => {
   });
 });
 
+// ─── A text that heads itself ────────────────────────────────────────────────
+
+describe('a typeset text that opens with a heading of its own', () => {
+  const text = (name: string, kind: 'text' | 'prose' = 'text'): RunField => ({
+    kind,
+    name,
+    conceptRef: kind === 'prose' ? 'demo.Memo' : 'native.Text',
+    required: true,
+  });
+  const record = (child: RunField): ObjectRunField => ({
+    kind: 'object',
+    name: 'output',
+    conceptRef: 'demo.Review',
+    required: true,
+    fields: [text('supplier'), child],
+  });
+  const headed = '## Invoice review\n\nHold for review: the supplier is new.';
+  const unheaded = 'Hold for review: the supplier is new.\n\n## Why\n\nIt is new.';
+
+  // A clipboard, so the copy control is drawn: without one it draws nothing.
+  beforeEach(() => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** The element a field's label is drawn in, by its words. */
+  const labelOf = (words: string) => screen.getByText(words, { selector: 'span' });
+
+  for (const kind of ['text', 'prose'] as const) {
+    it(`is named by its heading in an app, its ${kind} label said but not drawn`, () => {
+      inPresentation(
+        'app',
+        <ResultField
+          field={record(text('memo', kind))}
+          value={{ supplier: 'Acme', memo: headed }}
+        />,
+      );
+      expect(screen.getByRole('heading', { name: 'Invoice review' })).toBeTruthy();
+      expect(labelOf('Memo').className).toContain('sr-only');
+      // The other fields keep their labels, and the text keeps its copy control.
+      expect(labelOf('Supplier').className).not.toContain('sr-only');
+      expect(screen.getAllByRole('button', { name: s.copyText }).length).toBeGreaterThan(0);
+    });
+  }
+
+  it('keeps its label over a text whose heading comes later', () => {
+    inPresentation(
+      'app',
+      <ResultField field={record(text('memo'))} value={{ supplier: 'Acme', memo: unheaded }} />,
+    );
+    expect(labelOf('Memo').className).not.toContain('sr-only');
+  });
+
+  it('keeps its label in studio, where it is the identifier', () => {
+    inPresentation(
+      'studio',
+      <ResultField
+        field={record(text('memo', 'prose'))}
+        value={{ supplier: 'Acme', memo: headed }}
+      />,
+    );
+    expect(labelOf('memo').className).not.toContain('sr-only');
+  });
+
+  it('floats the copy control beside the text when no label is drawn', () => {
+    const { container } = inPresentation(
+      'app',
+      <ResultField field={text('output', 'prose')} value={headed} hideLabel />,
+    );
+    const copy = screen.getByRole('button', { name: s.copyText });
+    expect(copy.parentElement?.className).toContain('float-right');
+    // Before the text, so its first lines run beside the control.
+    const heading = screen.getByRole('heading', { name: 'Invoice review' });
+    expect(copy.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.firstElementChild?.className).toContain('flow-root');
+  });
+});
+
 // ─── The panel's title and count ─────────────────────────────────────────────
 
 describe("an app's result panel", () => {
@@ -696,6 +779,28 @@ describe('a native.Composite result', () => {
     expect(screen.getByRole('heading', { name: 'Launch' })).toBeTruthy();
     expect(container.querySelector('strong')?.textContent).toBe('on track');
     expect(container.textContent).not.toContain('## Launch');
+  });
+
+  it("says a member's name without drawing it over a text that opens with its own heading", () => {
+    // The run's summary opens with "Launch Executive Summary", which names it:
+    // "Executive summary" set over it read as the same title twice.
+    inPresentation('app', <StuffViewer field={report} value={value} />);
+    expect(screen.getByRole('heading', { name: 'Launch Executive Summary' })).toBeTruthy();
+    expect(screen.getByText('Executive summary').className).toContain('sr-only');
+    // A member that is not a text keeps its name drawn.
+    expect(screen.getByText('Main risks').className).not.toContain('sr-only');
+    // A text with no heading of its own keeps it too.
+    cleanup();
+    inPresentation(
+      'app',
+      <StuffViewer field={report} value={{ ...value, executive_summary: 'On **track**.' }} />,
+    );
+    expect(screen.getByText('Executive summary').className).not.toContain('sr-only');
+  });
+
+  it("draws every member's name for a builder", () => {
+    inPresentation('studio', <StuffViewer field={report} value={value} />);
+    expect(screen.getByText('executive_summary').className).not.toContain('sr-only');
   });
 
   it('names the picture rather than painting it when nothing resolves its reference', () => {
