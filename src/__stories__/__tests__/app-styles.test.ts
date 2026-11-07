@@ -65,7 +65,7 @@ describe('styleTokens', () => {
         const tokens = styleTokens(id, null, theme);
         expect('--action-shadow' in tokens).toBe(APP_STYLES[id].actionShadow !== null);
         // The tokens a style sets only where it departs from the host's.
-        const optional = ['--action-shadow', '--input'];
+        const optional = ['--action-shadow', '--panel-field'];
         const rest = Object.keys(tokens).filter((name) => !optional.includes(name));
         expect(rest.sort()).toEqual(
           [
@@ -110,11 +110,18 @@ describe('styleTokens', () => {
     }
   });
 
-  it('never fills a field from `--input`, the token the fill itself sets', () => {
+  it('never fills a field from `--panel-field`, the token the fill itself sets', () => {
     for (const id of APP_STYLE_IDS) {
       const field = APP_STYLES[id].panel?.field;
       if (!field) continue;
-      for (const theme of THEMES) expect(inTheme(field, theme), id).not.toMatch(/var\(--input\b/);
+      for (const theme of THEMES)
+        expect(inTheme(field, theme), id).not.toMatch(/var\(--panel-field\b/);
+    }
+  });
+
+  it('sets no `--input` on the page, so a field fill reaches the host panel alone', () => {
+    for (const id of APP_STYLE_IDS) {
+      for (const theme of THEMES) expect('--input' in styleTokens(id, null, theme), id).toBe(false);
     }
   });
 });

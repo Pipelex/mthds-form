@@ -29,7 +29,9 @@
   --accent: #eef1f5;
   --accent-foreground: var(--foreground);
   --border: #dde2e9;
-  --input: #f2f4f7;
+  /* The host's field fill, kept by name so its panel can fall back to it. */
+  --host-input: #f2f4f7;
+  --input: var(--host-input);
   --ring: #2f5bd3;
   --link: #2f5bd3;
   --radius: 6px;
@@ -63,7 +65,7 @@
   --muted-foreground: #a3acbb;
   --accent: #1c212b;
   --border: #353c49;
-  --input: #191d25;
+  --host-input: #191d25;
   --ring: #8aa7ff;
   --link: #8aa7ff;
   color-scheme: dark;
@@ -182,6 +184,12 @@
   text-wrap: pretty;
 }
 .af-panel {
+  /*
+   * A style's field fill (`--panel-field`) is part of its panel treatment, so
+   * it reaches the fields inside the host's panel and no others: a captured
+   * layout's fields keep the host's fill on their own cards.
+   */
+  --input: var(--panel-field, var(--host-input));
   background: var(--panel-fill);
   border: var(--panel-edge-width) solid var(--panel-edge);
   box-shadow: var(--panel-shadow);

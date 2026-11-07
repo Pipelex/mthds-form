@@ -152,8 +152,10 @@ export interface PanelTreatment {
   /** The panel's shadow in each theme, or none. */
   shadow: { light: string; dark: string } | null;
   /**
-   * The fields' own fill (the kernel's `--input`), where the host's would
-   * sink into the panel; absent, the host's.
+   * The fill of the fields inside the panel, where the host's would sink
+   * into it; absent, the host's. Set as `--panel-field`, which the host's
+   * panel alone turns into the kernel's `--input`, so a captured layout's
+   * fields keep the host's fill on their own cards.
    */
   field?: Themed;
 }
@@ -228,8 +230,8 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
         light: '0 1px 2px rgb(16 24 40 / 0.05), 0 12px 32px -10px rgb(16 24 40 / 0.16)',
         dark: '0 2px 4px rgb(0 0 0 / 0.55), 0 24px 56px -12px rgb(0 0 0 / 0.95)',
       },
-      // Fields set into the panel: white on a light page, the page itself
-      // under the lifted panel on a dark one.
+      // Fields set into the panel: the card's white on a light page, and on a
+      // dark one the host's background, below the lifted panel.
       field: { light: 'var(--card)', dark: 'var(--background)' },
     },
     actionShadow: '0 8px 20px -8px color-mix(in oklab, var(--primary) 60%, transparent)',
@@ -271,8 +273,8 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
       edgeWidth: '2px',
       shadow: null,
       // The panel is the host's `--muted`, which its fields' fill all but
-      // matches and a hovered option turns to: fields set into it read as
-      // the card on a light page and the page itself on a dark one.
+      // matches and a hovered option turns to: fields set into it take the
+      // card on a light page and the host's background on a dark one.
       field: { light: 'var(--card)', dark: 'var(--background)' },
     },
     actionShadow: 'none',
@@ -295,7 +297,8 @@ export type StyleTokens = Record<string, string>;
  * - `--radius`: the control radius; panels derive theirs from it.
  * - `--panel-fill`, `--panel-edge`, `--panel-edge-width`, `--panel-shadow`:
  *   the host's panel, read by `frame.css`.
- * - `--input`, the fields' fill, where a style sets one.
+ * - `--panel-field`: the fill of the fields inside the host's panel, where a
+ *   style sets one; the panel turns it into `--input` (`frame.css`).
  * - `--action-shadow`: the designed page's call to action.
  * - `--density`: the rhythm, read by the host's frame around the form.
  */
@@ -321,7 +324,7 @@ export function styleTokens(
     tokens['--panel-edge'] = inTheme(style.panel.edge, theme);
     tokens['--panel-edge-width'] = style.panel.edgeWidth;
     tokens['--panel-shadow'] = style.panel.shadow ? style.panel.shadow[theme] : 'none';
-    if (style.panel.field) tokens['--input'] = inTheme(style.panel.field, theme);
+    if (style.panel.field) tokens['--panel-field'] = inTheme(style.panel.field, theme);
   }
   if (style.actionShadow !== null) tokens['--action-shadow'] = style.actionShadow;
   if (style.density !== null) tokens['--density'] = String(style.density);
