@@ -49,14 +49,14 @@ describe('deriveStyleRoles', () => {
 
   it("replaces every style's body face with a team's typeface", () => {
     for (const id of APP_STYLE_IDS) {
-      for (const face of BODY_FACES) expect(deriveStyleRoles(id, face.id).bodyFace).toBe(face);
+      for (const face of BODY_FACES) expect(deriveStyleRoles(id, face.id).bodyFace).toEqual(face);
     }
   });
 
   it("replaces the heading face only where a style's headings follow its body", () => {
     const plex = TYPEFACES.find((face) => face.id === 'ibm-plex-sans')!;
-    expect(deriveStyleRoles('soft', plex.id).headingFace).toBe(plex);
-    expect(deriveStyleRoles('bold', plex.id).headingFace).toBe(plex);
+    expect(deriveStyleRoles('soft', plex.id).headingFace).toEqual(plex);
+    expect(deriveStyleRoles('bold', plex.id).headingFace).toEqual(plex);
     expect(deriveStyleRoles('editorial', plex.id).headingFace?.id).toBe('newsreader');
   });
 
@@ -91,11 +91,33 @@ describe('deriveStyleRoles', () => {
     expect(deriveStyleRoles('soft').panel!.light.edgeWidth).toBe(1);
   });
 
+  it('hands out its faces as copies too, and keeps the catalogue and the styles frozen', () => {
+    // A process serves many teams: what one host edits on the roles it got
+    // must reach neither the next derivation nor the lists every host reads.
+    const roles = deriveStyleRoles('soft', 'manrope');
+    roles.bodyFace!.stack = 'Comic Sans MS';
+    (roles.bodyFace!.weights as number[]).push(900);
+    expect(roles.headingFace!.stack).toMatch(/^"Manrope"/);
+    expect(deriveStyleRoles('soft', 'manrope').bodyFace!.stack).toMatch(/^"Manrope"/);
+    expect(TYPEFACES.find((face) => face.id === 'manrope')!.weights).not.toContain(900);
+    expect(Object.isFrozen(TYPEFACES)).toBe(true);
+    expect(Object.isFrozen(TYPEFACES[0]!.weights)).toBe(true);
+    expect(Object.isFrozen(APP_STYLES.soft.roles.panel!.dark)).toBe(true);
+  });
+
   it('draws a shadow per theme, never the light one on a dark page', () => {
     for (const id of APP_STYLE_IDS) {
       const panel = deriveStyleRoles(id).panel;
       if (!panel?.light.shadow) continue;
       expect(panel.dark.shadow, id).not.toBe(panel.light.shadow);
+    }
+  });
+
+  it("never lays a call to action's light shadow on a dark page", () => {
+    for (const id of APP_STYLE_IDS) {
+      const shadow = deriveStyleRoles(id).actionShadow;
+      if (!shadow || shadow.light === 'none') continue;
+      expect(shadow.dark, id).not.toEqual(shadow.light);
     }
   });
 

@@ -580,7 +580,10 @@ const UNUSED_BY_CONTROLS = [
  * 600, the rail's large shadow, the card's none - or `revert-layer`, which
  * undoes the declaration alone, where the element set no value of its own.
  * Each rule says what shape that value must have, so an empty or a mistyped
- * fallback still fails.
+ * fallback still fails. A shadow's shape admits almost any value, so in
+ * source its fallback must also be one of the values listed (`exact`), the
+ * shadows the elements painted before; the built sheet, where lightningcss
+ * has rewritten every colour and space, is held to the shape alone.
  */
 const LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:em|px)$/;
 const OPTIONAL_TOKENS = new Map([
@@ -592,9 +595,29 @@ const OPTIONAL_TOKENS = new Map([
   ['--heading-weight', { literal: /^[1-9]00$/, shape: 'a weight such as `600`' }],
   ['--heading-tracking', { literal: /^(?:revert-layer|-?(?:\d+\.?\d*|\.\d+)em)$/, shape: '`revert-layer` or an `em` length' }],
   ['--panel-edge-width', { literal: LENGTH, shape: 'a length' }],
-  ['--panel-shadow', { literal: /^(?:none|\S.*\d.*)$/, shape: '`none` or a shadow' }],
-  ['--action-shadow', { literal: /^(?:none|\S.*\d.*)$/, shape: '`none` or a shadow' }],
+  [
+    '--panel-shadow',
+    {
+      literal: /^(?:none|\S.*\d.*)$/,
+      exact: ['none', '0 20px 25px -5px rgb(0 0 0/0.1),0 8px 10px -6px rgb(0 0 0/0.1)'],
+      shape: '`none` or the rail\'s large shadow',
+    },
+  ],
+  [
+    '--action-shadow',
+    {
+      literal: /^(?:none|\S.*\d.*)$/,
+      exact: [
+        '0 0 28px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 35%,transparent)',
+        '0 0 44px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 50%,transparent)',
+      ],
+      shape: 'the call to action\'s glow in the button colour',
+    },
+  ],
 ]);
+
+/** A value with its spaces collapsed and none around a comma, to compare it whole. */
+const normalizeValue = (value) => value.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
 
 /**
  * CSS with its comments removed, newlines kept so error messages stay readable.
@@ -794,10 +817,13 @@ function unescapeArbitrary(value) {
  * the mix. Source spells the fallback in Tailwind's escaped form, so it is
  * unescaped first; the built sheet's is already plain.
  */
-function fallsBackTo(fallback, { stand, tint, literal }, { built }) {
+function fallsBackTo(fallback, { stand, tint, literal, exact }, { built }) {
   if (!fallback) return false;
   const value = unescapeArbitrary(fallback).trim();
-  if (literal) return literal.test(value) && !/var\(\s*--[^,)]*\)/.test(value.replace(/var\(\s*--[\w-]+\s*,/g, ''));
+  if (literal) {
+    if (!built && exact) return exact.map(normalizeValue).includes(normalizeValue(value));
+    return literal.test(value) && !/var\(\s*--[^,)]*\)/.test(value.replace(/var\(\s*--[\w-]+\s*,/g, ''));
+  }
   if (!tint) return isWholeRead(value, stand);
   const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
   if (mix !== null) return isWholeRead(mix[1].trim(), stand);

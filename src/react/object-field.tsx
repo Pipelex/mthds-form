@@ -11,6 +11,7 @@ import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
 import { OptionalToggle } from './optional-toggle';
+import { headingFaceClass } from './style-tokens';
 
 interface ObjectFieldProps {
   field: ObjectRunField;
@@ -58,9 +59,15 @@ function structureGrouping(depth: number, labelled: boolean): StructureGrouping 
  */
 function structureNameClass(isApp: boolean, depth: number): string {
   if (!isApp) return 'font-mono text-[13px] font-medium leading-none';
-  return depth === 0
-    ? 'text-[16px] font-semibold leading-snug'
-    : 'text-[14.5px] font-semibold leading-snug';
+  // A structure's name takes the page's heading face, so a style's serif
+  // reaches the form's sections, and keeps the kernel's own weight: it labels
+  // a group of fields rather than titling the page.
+  return cn(
+    depth === 0
+      ? 'text-[16px] font-semibold leading-snug'
+      : 'text-[14.5px] font-semibold leading-snug',
+    headingFaceClass,
+  );
 }
 
 /**

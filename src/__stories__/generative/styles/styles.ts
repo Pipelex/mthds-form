@@ -59,8 +59,7 @@ export function styleTokens(roles: StyleRoles, theme: 'light' | 'dark'): StyleTo
   if (roles.headingTracking !== undefined) tokens['--heading-tracking'] = roles.headingTracking;
   if (roles.radius !== undefined) tokens['--radius'] = `${roles.radius}px`;
   if (roles.panel) Object.assign(tokens, panelTokens(roles.panel[theme]));
-  if (roles.actionShadow !== undefined)
-    tokens['--action-shadow'] = actionShadowCss(roles.actionShadow);
+  if (roles.actionShadow) tokens['--action-shadow'] = actionShadowCss(roles.actionShadow[theme]);
   if (roles.density !== undefined) tokens['--density'] = String(roles.density);
   return tokens;
 }

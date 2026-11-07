@@ -5,8 +5,10 @@
  *
  * - `--font-heading`, `--heading-weight` and `--heading-tracking`: the face,
  *   the weight and the letter spacing of a heading - a page's title, a
- *   section's, a panel's, a structure's name over its fields, a heading in a
- *   typeset result. An uppercase eyebrow is not a title and reads none.
+ *   section's, a panel's, a dialog's, a heading in a typeset result. A
+ *   structure's name over its fields takes the face alone: it labels a group
+ *   rather than titling the page, so it keeps the kernel's weight. An
+ *   uppercase eyebrow is not a title and reads none.
  * - `--panel-fill`, `--panel-edge`, `--panel-edge-width` and `--panel-shadow`:
  *   a panel the generative layer draws on the page, its rail and its card.
  *   A group inside a panel is not a panel and reads none.
@@ -78,9 +80,10 @@ export const panelFlatShadowClass = '[box-shadow:var(--panel-shadow,none)]';
 
 /**
  * The call to action's shadow: the style's, or the glow in the button colour
- * it had, stronger under the pointer. Focus is drawn over it: the button's
- * focus ring is a `focus-visible:` box-shadow, which wins while it is focused,
- * so no style's shadow can hide where focus is.
+ * it had, stronger under the pointer. Focus is never drawn as a box-shadow
+ * beside it: this class would replace a `focus-visible:` ring, so a style's
+ * shadow would hide where focus is. The call to action wears
+ * `focusOutlineClass` instead, an outline no shadow touches.
  */
 export const actionShadowClass =
   '[box-shadow:var(--action-shadow,0_0_28px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_35%,transparent))] hover:[box-shadow:var(--action-shadow,0_0_44px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_50%,transparent))]';

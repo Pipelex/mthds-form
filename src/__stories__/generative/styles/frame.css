@@ -378,7 +378,8 @@
 .af[data-narrow] .af-act {
   flex-direction: column-reverse;
   align-items: stretch;
-  gap: 10px;
+  /* Room under the button for its shadow, so the duration below is not in it. */
+  gap: 16px;
 }
 .af[data-narrow] .af-act .af-btn {
   width: 100%;

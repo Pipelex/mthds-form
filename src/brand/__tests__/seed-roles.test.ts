@@ -293,6 +293,21 @@ describe('deriveBrandRoles leaves what the team did not set to the host', () => 
     expect(() => deriveBrandRoles({ accent: '#fff' }, '#ffffff')).toThrow(/accent seed/);
     expect(() => deriveBrandRoles({ header: '' }, '#ffffff')).toThrow(/header seed/);
     expect(() => deriveBrandRoles({}, 'white')).toThrow(/page colour/);
+    expect(() => deriveBrandRoles({}, '#ffffff', ['#eee'])).toThrow(/Surface 1/);
+  });
+
+  it('refuses a surface no accent ink can read on, only when there is an accent', () => {
+    // On a white page the ink moves toward black, which reaches only 3.94:1
+    // on #6b6b6b: no ink the search could reach reads there.
+    expect(() => deriveBrandRoles({ accent: '#2563eb' }, '#ffffff', ['#6b6b6b'])).toThrow(
+      /No accent ink can read on #6b6b6b/,
+    );
+    // With no accent no ink is derived, so the same surface costs the team
+    // nothing: its header is painted as it is without it.
+    expect(deriveBrandRoles({ header: '#14213d' }, '#ffffff', ['#6b6b6b'])).toStrictEqual(
+      deriveBrandRoles({ header: '#14213d' }, '#ffffff'),
+    );
+    expect(Object.keys(deriveBrandRoles(null, '#ffffff', ['#6b6b6b']))).toEqual([]);
   });
 });
 

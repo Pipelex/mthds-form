@@ -1,6 +1,6 @@
 import { isColorTokenName, type ColorTokenName } from './contract';
 import { parseHex } from './seed-roles';
-import { colorHex, type SrgbColor } from './tokens';
+import { colorHex, linearChannel, type SrgbColor } from './tokens';
 
 /**
  * The app styles and the typefaces, as data, and the roles a team's choice of
@@ -59,7 +59,7 @@ export interface Typeface {
 
 const SANS_FALLBACK = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
 const SERIF_FALLBACK = 'ui-serif, Georgia, Cambria, "Times New Roman", serif';
-const WEIGHTS = [300, 400, 500, 600, 700] as const;
+const WEIGHTS: readonly number[] = [300, 400, 500, 600, 700];
 
 function face(
   id: TypefaceId,
@@ -82,9 +82,11 @@ function face(
 /**
  * Every face a style or a team can set. The body faces are the list a team
  * picks from; Newsreader is the `editorial` style's heading face, listed so a
- * host loads it, and is not a team's choice.
+ * host loads it, and is not a team's choice. Frozen, like `APP_STYLES`: a
+ * process serves many teams, so the catalogue one of them reads cannot be
+ * one another has edited.
  */
-export const TYPEFACES: readonly Typeface[] = [
+export const TYPEFACES: readonly Typeface[] = deepFreeze([
   face('inter', 'Inter', 'sans-serif', 'body'),
   face('dm-sans', 'DM Sans', 'sans-serif', 'body'),
   face('plus-jakarta-sans', 'Plus Jakarta Sans', 'sans-serif', 'body'),
@@ -94,7 +96,7 @@ export const TYPEFACES: readonly Typeface[] = [
   face('work-sans', 'Work Sans', 'sans-serif', 'body'),
   face('space-grotesk', 'Space Grotesk', 'sans-serif', 'body'),
   face('newsreader', 'Newsreader', 'serif', 'heading'),
-];
+]);
 
 const FACES = new Map(TYPEFACES.map((candidate) => [candidate.id as string, candidate]));
 
@@ -163,8 +165,12 @@ export interface StyleRoles {
   radius?: number;
   /** The panel treatment in each theme: a shadow that reads on a light page is lost on a dark one. */
   panel?: { light: PanelRoles; dark: PanelRoles };
-  /** The call to action's shadow, or `none` for a plain fill. */
-  actionShadow?: ActionShadow | 'none';
+  /**
+   * The call to action's shadow in each theme, or `none` for a plain fill: a
+   * shadow in the button colour that lifts a button on a light page smears
+   * under it on a dark one.
+   */
+  actionShadow?: { light: ActionShadow | 'none'; dark: ActionShadow | 'none' };
   /** The rhythm: a multiple of the host's own margins, paddings and gaps around the form. Never a control's size. */
   density?: number;
 }
@@ -236,7 +242,13 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
           field: role('background'),
         },
       },
-      actionShadow: { x: 0, y: 8, blur: 20, spread: -8, color: role('primary', { alpha: 0.6 }) },
+      // A short shadow in the button colour on a light page, kept within the
+      // gap a host leaves under its button. On a dark page the panel is lifted
+      // by its fill, and a glow in a light button colour reads as a smear.
+      actionShadow: {
+        light: { x: 0, y: 6, blur: 14, spread: -6, color: role('primary', { alpha: 0.5 }) },
+        dark: 'none',
+      },
       density: 1.08,
     },
   },
@@ -250,11 +262,25 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
       headingWeight: 500,
       headingTracking: '-0.01em',
       radius: 2,
+      // Hairlines all the way in: the fields inside the panel take its own
+      // fill, so each reads as its fine edge rather than as a grey block.
       panel: {
-        light: { fill: role('card'), edge: role('border'), edgeWidth: 1, shadow: null },
-        dark: { fill: role('card'), edge: role('border'), edgeWidth: 1, shadow: null },
+        light: {
+          fill: role('card'),
+          edge: role('border'),
+          edgeWidth: 1,
+          shadow: null,
+          field: role('card'),
+        },
+        dark: {
+          fill: role('card'),
+          edge: role('border'),
+          edgeWidth: 1,
+          shadow: null,
+          field: role('card'),
+        },
       },
-      actionShadow: 'none',
+      actionShadow: { light: 'none', dark: 'none' },
       density: 1.25,
     },
   },
@@ -288,7 +314,7 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
           field: role('background'),
         },
       },
-      actionShadow: 'none',
+      actionShadow: { light: 'none', dark: 'none' },
       density: 0.85,
     },
   },
@@ -323,21 +349,50 @@ export function deriveStyleRoles(
   if (body) roles.bodyFace = body;
   const heading = definition.headingFace === 'body' ? body : faceOf(definition.headingFace);
   if (heading) roles.headingFace = heading;
-  return { ...roles, ...structuredClone(definition.roles) };
+  // A copy, faces included, so a host that edits what it got changes nothing
+  // for the next caller and nothing in the catalogue.
+  return copyData({ ...roles, ...definition.roles });
 }
 
 /** The styles, each with its own roles: what it sets for a team that picked no typeface. */
-export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = Object.fromEntries(
-  APP_STYLE_IDS.map((id) => [
-    id,
-    {
+export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = deepFreeze(
+  Object.fromEntries(
+    APP_STYLE_IDS.map((id) => [
       id,
-      name: DEFINITIONS[id].name,
-      direction: DEFINITIONS[id].direction,
-      roles: deriveStyleRoles(id),
-    },
-  ]),
-) as Record<AppStyleId, AppStyle>;
+      {
+        id,
+        name: DEFINITIONS[id].name,
+        direction: DEFINITIONS[id].direction,
+        roles: deriveStyleRoles(id),
+      },
+    ]),
+  ) as Record<AppStyleId, AppStyle>,
+);
+
+/**
+ * A deep copy of plain data - objects, arrays and primitives, which is all a
+ * style's roles are. Spelled out rather than `structuredClone`, which is a
+ * host API rather than the language's, and which this isomorphic entry would
+ * otherwise call at import time through `APP_STYLES`.
+ */
+function copyData<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(copyData) as T;
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, copyData(inner)]),
+    ) as T;
+  }
+  return value;
+}
+
+/** Freezes plain data all the way down, and hands it back. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const inner of Object.values(value)) deepFreeze(inner);
+    Object.freeze(value);
+  }
+  return value;
+}
 
 // ─── Measuring a role ────────────────────────────────────────────────────────
 
@@ -395,11 +450,10 @@ function mixOklab(a: Rgb, b: Rgb, share: number): Rgb {
   return fromOklab([at(l1, l2), at(a1, a2), at(b1, b2)]).map(clampUnit) as Rgb;
 }
 
-const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const fromLinear = (c: number) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
 
 function toOklab(rgb: Rgb): Rgb {
-  const [r, g, b] = rgb.map(toLinear) as Rgb;
+  const [r, g, b] = rgb.map(linearChannel) as Rgb;
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
