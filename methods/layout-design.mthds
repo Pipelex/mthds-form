@@ -220,7 +220,7 @@ What one run gives back, read from the result's own description:
 - {{ line }}
 {% endfor %}
 
-A person runs a tool more readily when they know what comes back: the page may say it once, in their words, under the panel.
+A person runs a tool more readily when they know what comes back: the page may say it once, in their words, as the Composer's notes - a few short lines, never the list above copied out.
 {% endif %}
 
 {% elif brief.frame == "result" %}
@@ -282,7 +282,11 @@ None. Emit no `/state` patches.
 ## Run
 
 {% if gating %}
+{% if brief.frame == "composer" %}
+The run waits for `{{ gating | map(attribute="name") | join("`, `") }}`. The host's action row says so by itself, so the page writes nothing about it.
+{% else %}
 The run waits for `{{ gating | map(attribute="name") | join("`, `") }}`; say so near the {{ brief.run_control }}, briefly.
+{% endif %}
 {% else %}
 Nothing gates the run.
 {% endif %}

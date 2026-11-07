@@ -1,0 +1,87 @@
+{
+ "id": "invoice--compose--claude-5-sonnet--s2--r3",
+ "method": "invoice",
+ "moment": "compose",
+ "frame": "composer",
+ "model": "claude-5-sonnet",
+ "seed": "Y8oEwVJHB6rkhoNHd5flqiZJTSm73kCw",
+ "round": "r3",
+ "runId": "run_af6d7a05-89de-48bc-8d1c-34e4df4ae321",
+ "costUsd": 0.041364,
+ "seconds": 45,
+ "valid": true,
+ "problems": [],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "A single, focused page for someone who just has a paper or PDF receipt in hand and wants its details pulled out automatically, without typing anything in themselves.",
+  "title": "Read my receipt",
+  "composition": "One centred column, as the frame dictates. The headline states what the person gets (the extracted invoice details) and one muted line under it sets expectation. Below sits a single raised Composer panel with one column, since there is exactly one input to hold - the document itself - so no grouping titles or two-column split are needed. The document upload sits as the first and only row of the panel, immediately visible on first screen. The host's action row sits fixed at the panel's foot with the run button and timing; the Composer's notes beneath name what comes back, in plain words, so the person knows what the run gives before they press it.",
+  "regions": [
+   {
+    "title": null,
+    "purpose": "The page's headline and supporting line, telling the person what they get from uploading a receipt, before any input is shown.",
+    "container": null,
+    "elements": [
+     "Heading: 'Read my receipt' (rendered as the Composer's h1, not a separate element)"
+    ]
+   },
+   {
+    "title": null,
+    "purpose": "The single raised panel holding the one input the run needs: the document to read. One column is enough since there is only one field.",
+    "container": "Composer",
+    "elements": [
+     "MthdsField: /inputs/document (document (a file)) - the receipt or invoice to upload"
+    ]
+   }
+  ],
+  "call_to_action": "Read my receipt",
+  "defaults": [],
+  "delegated": [
+   "/inputs/document — the brief marks it delegated; a file upload is rendered by MthdsField, not laid out by hand"
+  ]
+ },
+ "brief": "# Input page: invoice_extraction.process_invoice\n\nProcess relevant information from an invoice\n\n## Name\n\nThe method is called «Receipt reader», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\nThe action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as \"Waiting on the topic\" or \"Add a document to start\" - the controls show their own state.\n\nWhat one run gives back, read from the result's own description:\n- invoice id: Unique identifier for the invoice\n- invoice number: Invoice number as shown on the document\n- issue date: Date when the invoice was issued\n- time: Time of the transaction if available\n- amount incl tax: Total amount including taxes\n- amount excl tax: Net amount excluding taxes\n- vat amount: Total VAT/tax amount\n- vat rates: List of VAT rates applied\n- vendor: Name of the vendor/seller\n- vendor address: Complete address of the vendor\n- vendor siret: SIRET number of the vendor (French company registration)\n- vendor vat number: VAT registration number of the vendor\n- company name: Name of the purchasing company\n- company address: Address of the purchasing company\n- description: Description of goods or services purchased\n- category: Category or type of expense\n- text: Raw text extracted from the invoice\n\nA person runs a tool more readily when they know what comes back: the page may say it once, in their words, as the Composer's notes - a few short lines, never the list above copied out.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/document` — document (a file), required, gates the run — `document`: A document **[delegate: MthdsField]**\n\n## Delegated\n\nRender these with `MthdsField` at the path, and nothing else:\n\n- `/inputs/document` (document (a file))\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `document`. The host's action row says so by itself, so the page writes nothing about it.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"composer\"}\n{\"op\":\"add\",\"path\":\"/elements/composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Read my receipt\",\"lede\":\"Upload a receipt or invoice and get its details extracted automatically.\",\"runLabel\":\"Read my receipt\",\"columns\":\"1\",\"notes\":[\"Invoice number, date and time\",\"Amounts including and excluding tax, plus VAT\",\"Vendor name, address and registration numbers\",\"Your company details, description and category\",\"The raw extracted text\"]},\"children\":[\"document-field\"],\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]}}}\n{\"op\":\"add\",\"path\":\"/elements/document-field\",\"value\":{\"type\":\"MthdsField\",\"props\":{\"path\":\"/inputs/document\"},\"children\":[]}}",
+ "spec": {
+  "root": "composer",
+  "elements": {
+   "composer": {
+    "type": "Composer",
+    "props": {
+     "headline": "Read my receipt",
+     "lede": "Upload a receipt or invoice and get its details extracted automatically.",
+     "runLabel": "Read my receipt",
+     "columns": "1",
+     "notes": [
+      "Invoice number, date and time",
+      "Amounts including and excluding tax, plus VAT",
+      "Vendor name, address and registration numbers",
+      "Your company details, description and category",
+      "The raw extracted text"
+     ]
+    },
+    "children": [
+     "document-field"
+    ],
+    "on": {
+     "press": [
+      {
+       "action": "validateForm"
+      },
+      {
+       "action": "run"
+      }
+     ]
+    }
+   },
+   "document-field": {
+    "type": "MthdsField",
+    "props": {
+     "path": "/inputs/document"
+    },
+    "children": []
+   }
+  }
+ }
+}
