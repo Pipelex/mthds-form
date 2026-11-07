@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { googleFontsHref, styleTokens, type AppStyleId, type TypefaceId } from './styles';
-import { HOST_PAGE, TEAMS, teamTokens, type TeamKey } from './teams';
+import { TEAMS, teamTokens, type TeamKey } from './teams';
 import './frame.css';
 import './styles.css';
 
@@ -24,11 +24,16 @@ function useStyleFonts(): void {
   }, []);
 }
 
+/** How long a story waits on the font service before measuring the fallback faces. */
+const FONTS_PATIENCE_MS = 10_000;
+
 /**
  * Resolves once the faces a page uses have loaded, or failed to: first the
  * stylesheet that declares them, then the faces themselves. `document.fonts
  * .ready` alone resolves before a stylesheet an effect appended has declared
- * any face, so a measurement taken on it reads the fallback faces.
+ * any face, so a measurement taken on it reads the fallback faces. A font
+ * service that never answers is waited on for `FONTS_PATIENCE_MS`, after
+ * which the page is measured in its fallback faces rather than not at all.
  */
 export async function styleFontsReady(): Promise<void> {
   const link = document.querySelector<HTMLLinkElement>(FONTS_LINK);
@@ -36,6 +41,7 @@ export async function styleFontsReady(): Promise<void> {
     await new Promise<void>((resolve) => {
       link.addEventListener('load', () => resolve(), { once: true });
       link.addEventListener('error', () => resolve(), { once: true });
+      setTimeout(resolve, FONTS_PATIENCE_MS);
     });
   }
   // A layout pass is what requests the faces the page now declares.
@@ -79,7 +85,7 @@ export function AppScope({ style, team, typeface = null, children }: AppScopePro
         : typeface
           ? styleTokens('quiet', typeface, mode)
           : {}),
-      ...(team ? teamTokens(TEAMS[team], HOST_PAGE[mode]) : {}),
+      ...(team ? teamTokens(TEAMS[team], mode) : {}),
     });
     const light = declarations(theme('light'));
     const dark = declarations(theme('dark'));

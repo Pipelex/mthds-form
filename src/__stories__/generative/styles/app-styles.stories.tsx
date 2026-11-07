@@ -222,7 +222,9 @@ const CONTROLS =
  * every other control and leave those to the kernel's own phone stories.
  */
 function knownShort(control: Element): boolean {
-  return control.getAttribute('role') === 'radio' || control.textContent?.trim() === 'Download';
+  // An enum option is a toggle-group item; a file picker's choices, also radios, are held.
+  if (control.matches('[role="radio"][data-radix-collection-item]')) return true;
+  return control.textContent?.trim() === 'Download';
 }
 
 /**

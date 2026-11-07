@@ -2,13 +2,13 @@
  * The app styles, applied to the rendered page - story-only, and disposable.
  *
  * Every value comes from `styles.ts` as a custom property set on the style's
- * scope. Three of them the kernel already reads as theme tokens (`--radius`,
- * `--input`, and `--font-sans` through Tailwind's `font-sans`); the host's
- * frame reads the panel tokens and `--density` (`frame.css`); and this file
- * says where the rest land on the DOM the kernel's controls and the
- * generative layer draw today: the faces (`--font-sans`, `--font-heading`),
- * the titles (`--heading-weight`, `--heading-tracking`) and the call to
- * action (`--action-shadow`). It reaches that DOM by its utility classes,
+ * scope. The kernel already reads some of them as theme tokens (`--radius`,
+ * `--input`); the host's frame reads the body face (`--font-sans`, which
+ * every host page is set in), the panel tokens and `--density` (`frame.css`);
+ * and this file says where the rest land on the DOM the kernel's controls and
+ * the generative layer draw today: the heading face (`--font-heading`), the
+ * titles (`--heading-weight`, `--heading-tracking`) and the call to action
+ * (`--action-shadow`). It reaches that DOM by its utility classes,
  * which is exactly why it is disposable: the components are meant to read
  * these tokens themselves, each with today's value as its fallback, and this
  * file is deleted then.
@@ -16,12 +16,11 @@
  * Nothing here draws a box. A captured layout keeps its own cards, and a
  * group inside the host's panel keeps the kernel's own fill and hairline.
  *
- * The faces and the headings are turned on by a style's class. `quiet` has
- * none: it is the host's own look, and a page wearing it renders exactly as
- * one wearing no style, unless a team picked a typeface, which
- * `data-typeface` marks on any host page. The titles and the action are read
- * on every host page, because the host states its own treatment of both
- * through the same tokens.
+ * The heading face is turned on by a style's class. `quiet` has none: it is
+ * the host's own look, and a page wearing it renders exactly as one wearing
+ * no style, unless a team picked a typeface, which `data-typeface` marks on
+ * any host page. The titles and the action are read on every host page,
+ * because the host states its own treatment of both through the same tokens.
  *
  * Plain CSS, unlayered, so it outranks the utilities it overrides.
  */
@@ -31,10 +30,7 @@
  * small and tracked wide in the body face, and no style touches it.
  */
 
-/* ---- faces ---- */
-:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-host[data-typeface]) {
-  font-family: var(--font-sans);
-}
+/* ---- the heading face ---- */
 :is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-host[data-typeface])
   :is(h1, h2, h3):not([class~='uppercase']) {
   font-family: var(--font-heading, var(--font-sans));
@@ -63,8 +59,11 @@
  * ---- the designed page's action ----
  * The layer's call to action glows in the button colour. The host states its
  * own action treatment as `--action-shadow` (`frame.css`), and a style
- * overrides it.
+ * overrides it. Not while it has keyboard focus: the button draws its focus
+ * ring in the same `box-shadow`, and hides its outline, so replacing the
+ * shadow then would leave the focus invisible. While focused it wears the
+ * layer's own ring and glow.
  */
-.app-host [class*='shadow-[0_0_28px'] {
+.app-host [class*='shadow-[0_0_28px']:not(:focus-visible) {
   box-shadow: var(--action-shadow);
 }

@@ -16,7 +16,8 @@ import { HOST_PAGE, TEAMS, TEAM_KEYS, bandOn, teamTokens } from '../generative/s
 
 /**
  * The app styles' table, held to the rules the stories rely on: `quiet` sets
- * nothing, a team's typeface replaces what D3 says it replaces, a style adds
+ * nothing, a team's typeface replaces the body face and, where a style's
+ * headings follow the body, the heading face, a style adds
  * no colour of its own, and a team's colours land on the tokens docs/brand.md
  * maps them to. The rendering itself is the `Generative/App styles` stories'
  * to show.
@@ -154,13 +155,34 @@ describe('the typefaces', () => {
   });
 });
 
+/**
+ * docs/brand.md § "Mapping the roles onto tokens", as written there: each
+ * token a team's colours set, and the role it takes. The header's roles go to
+ * the host's band, which `bandOn` draws.
+ */
+const BRAND_MAPPING = {
+  '--primary': 'action',
+  '--primary-foreground': 'onAction',
+  '--link': 'accentInk',
+  '--selected': 'accentFill',
+  '--ring': 'accentInk',
+} as const;
+
 describe('teamTokens', () => {
+  it("measures each theme against the page the host's palette paints", () => {
+    const frame = readFileSync(new URL('../generative/styles/frame.css', import.meta.url), 'utf8');
+    const background = (selector: string) =>
+      new RegExp(`^${selector} \\{[^}]*?--background:\\s*([^;]+);`, 'm').exec(frame)?.[1];
+    expect(background('\\.app-host')).toBe(HOST_PAGE.light);
+    expect(background('\\.dark \\.app-host')).toBe(HOST_PAGE.dark);
+  });
+
   it('draws the band in the header colour on a light page, and as a rule under a dark page’s band', () => {
-    expect(bandOn('#1d70b8', '#ffffff', HOST_PAGE.light)).toEqual({
+    expect(bandOn('#1d70b8', '#ffffff', 'light')).toEqual({
       '--band': '#1d70b8',
       '--on-band': '#ffffff',
     });
-    expect(bandOn('#1d70b8', '#ffffff', HOST_PAGE.dark)).toEqual({
+    expect(bandOn('#1d70b8', '#ffffff', 'dark')).toEqual({
       '--band': 'initial',
       '--on-band': 'initial',
       '--band-rule': '#1d70b8',
@@ -170,20 +192,17 @@ describe('teamTokens', () => {
   it("maps a team's roles onto the tokens docs/brand.md names, and leaves the host's where a role is absent", () => {
     for (const key of TEAM_KEYS) {
       for (const theme of THEMES) {
-        const roles = deriveBrandRoles(TEAMS[key].seeds, HOST_PAGE[theme]);
-        const tokens = teamTokens(TEAMS[key], HOST_PAGE[theme]);
+        const roles: Record<string, string | undefined> = {
+          ...deriveBrandRoles(TEAMS[key].seeds, HOST_PAGE[theme]),
+        };
+        const tokens = teamTokens(TEAMS[key], theme);
         const expected: Record<string, string> = {};
-        if (roles.action !== undefined) {
-          expected['--primary'] = roles.action;
-          expected['--primary-foreground'] = roles.onAction;
+        for (const [token, role] of Object.entries(BRAND_MAPPING)) {
+          const value = roles[role];
+          if (value !== undefined) expected[token] = value;
         }
-        if (roles.accent !== undefined) {
-          expected['--link'] = roles.accentInk;
-          expected['--ring'] = roles.accentInk;
-          expected['--selected'] = roles.accentFill;
-        }
-        if (roles.header !== undefined) {
-          Object.assign(expected, bandOn(roles.header, roles.onHeader, HOST_PAGE[theme]));
+        if (roles.header !== undefined && roles.onHeader !== undefined) {
+          Object.assign(expected, bandOn(roles.header, roles.onHeader, theme));
         }
         expect(tokens).toEqual(expected);
         // Every team on the list has a button colour; only some have a band.
@@ -199,8 +218,8 @@ describe('teamTokens', () => {
 
   it('keeps the team’s button colour as read, and its accent ink legible on each theme’s page', () => {
     const govuk = TEAMS['gov-uk'];
-    const light = teamTokens(govuk, HOST_PAGE.light);
-    const dark = teamTokens(govuk, HOST_PAGE.dark);
+    const light = teamTokens(govuk, 'light');
+    const dark = teamTokens(govuk, 'dark');
     expect(light['--primary']).toBe(govuk.seeds.action);
     expect(light['--link']).not.toBe(dark['--link']);
   });

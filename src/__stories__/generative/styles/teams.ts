@@ -90,12 +90,29 @@ export const TEAMS: Readonly<Record<TeamKey, Team>> = {
 
 export const TEAM_KEYS = Object.keys(TEAMS) as TeamKey[];
 
+export type Theme = 'light' | 'dark';
+
 /**
  * The page colour a team's accent is measured against, in each theme: the
  * host's panel surface, where the form and the result are read. It is the
- * `--background` of the host's palette in `frame.css`.
+ * `--background` of the host's palette in `frame.css`, which a test holds it
+ * to.
  */
-export const HOST_PAGE = { light: '#ffffff', dark: '#12151c' } as const;
+export const HOST_PAGE: Readonly<Record<Theme, string>> = { light: '#ffffff', dark: '#12151c' };
+
+/**
+ * The band in `theme`: the team's header colour as the band's ground, or, on
+ * a dark page, the page itself with the header colour as a rule under it. A
+ * saturated band on a near-black page read as a different site's, and a band
+ * taken partway to the page left a logo drawn on the header colour as a tile.
+ */
+export function bandOn(header: string, onHeader: string, theme: Theme): Record<string, string> {
+  // `initial` unsets what the light page's rule set, which also applies on a
+  // dark page, so the band falls back to the host's own.
+  if (theme === 'dark')
+    return { '--band': 'initial', '--on-band': 'initial', '--band-rule': header };
+  return { '--band': header, '--on-band': onHeader };
+}
 
 /**
  * A team's colours as the kernel's tokens, in one theme, mapped as
@@ -105,22 +122,8 @@ export const HOST_PAGE = { light: '#ffffff', dark: '#12151c' } as const;
  * band, which the controls do not draw. An absent role sets nothing, so the
  * host's own token stays.
  */
-/**
- * The band on `page`: the team's header colour as the band's ground, or, on a
- * dark page, the page itself with the header colour as a rule under it. A
- * saturated band on a near-black page read as a different site's, and a band
- * taken partway to the page left a logo drawn on the header colour as a tile.
- */
-export function bandOn(header: string, onHeader: string, page: string): Record<string, string> {
-  // `initial` unsets what the light page's rule set, which also applies on a
-  // dark page, so the band falls back to the host's own.
-  if (page === HOST_PAGE.dark)
-    return { '--band': 'initial', '--on-band': 'initial', '--band-rule': header };
-  return { '--band': header, '--on-band': onHeader };
-}
-
-export function teamTokens(team: Team, page: string): Record<string, string> {
-  const roles = deriveBrandRoles(team.seeds, page);
+export function teamTokens(team: Team, theme: Theme): Record<string, string> {
+  const roles = deriveBrandRoles(team.seeds, HOST_PAGE[theme]);
   const tokens: Record<string, string> = {};
   if (roles.action !== undefined) {
     tokens['--primary'] = roles.action;
@@ -131,6 +134,7 @@ export function teamTokens(team: Team, page: string): Record<string, string> {
     tokens['--ring'] = roles.accentInk;
     tokens['--selected'] = roles.accentFill;
   }
-  if (roles.header !== undefined) Object.assign(tokens, bandOn(roles.header, roles.onHeader, page));
+  if (roles.header !== undefined)
+    Object.assign(tokens, bandOn(roles.header, roles.onHeader, theme));
   return tokens;
 }

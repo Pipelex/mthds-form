@@ -17,6 +17,7 @@ import {
   type SpecFixture,
 } from '../../generative';
 import { BRANDS, type BrandFixture } from './brands';
+import { standInUpload } from '../stand-in-upload';
 
 /**
  * The harness the `Generative` stories render through: a captured layout,
@@ -72,7 +73,7 @@ export function useLayoutStore(fields: RunField[], idPrefix: string) {
     () => ({
       onDropFile: (id, file) => {
         const path = pathFromDomId(idPrefix, id);
-        if (path) store.set(path, { url: URL.createObjectURL(file), filename: file.name });
+        if (path) store.set(path, standInUpload(file));
       },
     }),
     [idPrefix, store],

@@ -22,6 +22,7 @@ import {
 import { PAYLOADS as COMPOSITE_PAYLOADS } from '../../_generated/composites.payloads';
 import { STOCK } from '../brands';
 import { useLayoutStore } from '../layout-page';
+import { standInUpload } from '../../stand-in-upload';
 import { HOST_PAGE, TEAMS, type TeamKey } from './teams';
 
 /**
@@ -37,9 +38,9 @@ import { HOST_PAGE, TEAMS, type TeamKey } from './teams';
  * the way a host holds it.
  */
 
-/** The host's upload: a picked file becomes a local link, as a real upload becomes a stored one. */
+/** The host's upload, as a story stands it in. */
 async function upload(file: File) {
-  return { url: URL.createObjectURL(file), filename: file.name };
+  return standInUpload(file);
 }
 
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
@@ -266,7 +267,14 @@ function drawsItsOwnBar(fixture: SpecFixture): boolean {
     root: string;
     elements: Record<string, { type: string; children?: string[] }>;
   };
-  return (elements[root]?.children ?? []).some((child) => elements[child]?.type === 'AppBar');
+  const seen = new Set<string>();
+  const hasBar = (key: string): boolean => {
+    const element = elements[key];
+    if (!element || seen.has(key)) return false;
+    seen.add(key);
+    return element.type === 'AppBar' || (element.children ?? []).some(hasBar);
+  };
+  return hasBar(root);
 }
 
 /**
