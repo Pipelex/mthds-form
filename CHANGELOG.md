@@ -1,10 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [v0.30.0] - 2026-11-07
+
+### Highlights
+
+- **App styles a host derives**: `./brand` names the app styles and the typefaces a team picks from and returns the roles a choice sets, and the controls and the generative layer read them through optional tokens that fall back to what they painted before. Storybook's `Generative/App styles` stories show each style under a team's colours, in both themes, at a phone's width and a desktop's.
+- **A structure in the form reads as a heading over its fields, not a box inside a box**, and every control a finger taps is 44 pixels tall on a phone.
+- **The result view says a title once**: a text that opens with its own heading no longer has a field's label or a host's title drawn over it, and on a phone a stacked table never breaks a header inside a word.
 
 ### Added
 
-- **App styles and typefaces in `./brand`**: `APP_STYLES`, `TYPEFACES`, `deriveStyleRoles(style, typeface)`, `isAppStyle`, `isTypeface` and `resolveRoleColor` name four styles a team picks from (`quiet`, `soft`, `editorial`, `bold`) and a closed list of open-licence faces, and return the roles a choice sets (the heading face, weight and tracking, the body face, the control radius, the panel treatment and the call-to-action shadow in each theme, and the rhythm) as roles, never custom property names; `quiet` and an unknown id set nothing. See [docs/brand.md](docs/brand.md) § "App styles and typefaces".
+- **App styles and typefaces in `./brand`**: `APP_STYLES`, `TYPEFACES`, `deriveStyleRoles(style, typeface)`, `isAppStyle`, `isTypeface` and `resolveRoleColor` name the styles a team picks from (`quiet`, `soft`, `editorial`, `bold`) and a closed list of open-licence faces, and return the roles a choice sets (the heading face, weight and tracking, the body face, the control radius, the panel treatment and the call-to-action shadow in each theme, and the rhythm) as roles, never custom property names; `quiet` or an unknown style with no typeface sets nothing, and a typeface sets the body face under any style, and the heading face too where the style draws its headings in the body face. See [docs/brand.md](docs/brand.md) § "App styles and typefaces".
 - **Style tokens**: every heading the controls and the generative layer draw reads `--font-heading`, `--heading-weight` and `--heading-tracking`, and a structure's name in the form reads `--font-heading`, the generative layer's rail and card read `--panel-fill`, `--panel-edge`, `--panel-edge-width` and `--panel-shadow`, and its call to action reads `--action-shadow`, each falling back to what it painted before, so a host that sets none renders as it did. The rail and the card mark themselves `data-style-panel`, where a host writes a style's field fill onto `--input` as on its own panel. A Tailwind host that already defines `--font-heading` for its own `font-heading` utility sees the kernel's headings, and a structure's name in the form, take that face. See [docs/theming.md](docs/theming.md) § "Style tokens".
 - **`deriveBrandRoles` measures the accent's ink on more surfaces**: an optional third argument, `surfaces`, names the other `#rrggbb` colours accent text sits on (a style's panel and its fields, a canvas behind the page), and `accentInk` then reads at 4.5:1 on each of them too; `isAccentAdjusted` takes the same argument.
 
