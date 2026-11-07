@@ -13,7 +13,7 @@ import {
   useMethodForm,
 } from '../../../react';
 import { GenerativePage, type SpecFixture } from '../../../generative';
-import { deriveBrandRoles, type BrandManifest } from '../../../brand';
+import type { BrandManifest } from '../../../brand';
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../../_generated/trips';
 import {
   CONTRACTS as COMPOSITE_CONTRACTS,
@@ -23,7 +23,7 @@ import { PAYLOADS as COMPOSITE_PAYLOADS } from '../../_generated/composites.payl
 import { STOCK } from '../brands';
 import { useLayoutStore } from '../layout-page';
 import { standInUpload } from '../../stand-in-upload';
-import { HOST_PAGE, TEAMS, type TeamKey } from './teams';
+import { TEAMS, teamTokens, type TeamKey } from './teams';
 
 /**
  * A host's compose-then-result frame, drawn around the kernel: the band with
@@ -76,7 +76,7 @@ function Logo({ team }: { team: TeamKey | null }) {
   const { name, logo } = team
     ? TEAMS[team]
     : { name: STOCK.manifest.name, logo: { ...STOCK.manifest.logo, wide: true } };
-  const onBand = team ? deriveBrandRoles(TEAMS[team].seeds, HOST_PAGE.light).onHeader : undefined;
+  const onBand = team ? teamTokens(TEAMS[team], 'light')['--on-band'] : undefined;
   const marks: Array<['on-light' | 'on-dark', string]> = [
     ['on-light', onBand === '#ffffff' ? logo.onDark : logo.onLight],
     ['on-dark', logo.onDark],
@@ -314,7 +314,7 @@ export function DesignedPage({
   return (
     <div className="af">
       <Band appName={appName} team={team} />
-      <main className="af-stage af-designed">{page}</main>
+      <main className="af-stage">{page}</main>
     </div>
   );
 }

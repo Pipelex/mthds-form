@@ -31,7 +31,7 @@
  */
 
 /* ---- the heading face ---- */
-:is(.app-style-soft, .app-style-editorial, .app-style-bold, .app-host[data-typeface])
+:is(:where(.app-style):not(.app-style-quiet), .app-host[data-typeface])
   :is(h1, h2, h3):not([class~='uppercase']) {
   font-family: var(--font-heading, var(--font-sans));
 }
@@ -48,9 +48,7 @@
 }
 
 /* ---- a result's own headings, in a style ---- */
-:is(.app-style-soft, .app-style-editorial, .app-style-bold)
-  .af-result
-  :is(h1, h2, h3):not([class~='uppercase']) {
+:where(.app-style):not(.app-style-quiet) .af-result :is(h1, h2, h3):not([class~='uppercase']) {
   font-weight: var(--heading-weight);
   letter-spacing: var(--heading-tracking);
 }
