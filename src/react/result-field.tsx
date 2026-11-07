@@ -193,10 +193,12 @@ function Described({ description, children }: { description?: string; children: 
 
 /**
  * The label row of a result node — exported so the panel that owns the top-level
- * header draws the SAME one rather than a second that drifts from it.
+ * header draws the SAME one rather than a second that drifts from it. `unseen`
+ * says it to assistive technology without drawing it, as the panel does when
+ * its whole result names itself (`resultHeadsItself`).
  */
-export function ResultHeader({ field }: { field: RunField }) {
-  return <Label field={field} describe />;
+export function ResultHeader({ field, unseen = false }: { field: RunField; unseen?: boolean }) {
+  return <Label field={field} describe unseen={unseen} />;
 }
 
 function Label({
@@ -209,8 +211,10 @@ function Label({
   /**
    * Said to assistive technology and not drawn: the label of a text that
    * opens with a heading of its own, which names it on the page (the leaf arm
-   * of `ResultNode`). With `describe`, the description a drawn label carries
-   * in its tooltip is said after it, so a screen reader still hears it.
+   * of `ResultNode`), and the title a host gave a panel whose whole result is
+   * such a text (`StuffViewer`). With `describe`, the description a drawn
+   * label carries in its tooltip is said after it, so a screen reader still
+   * hears it.
    */
   unseen?: boolean;
 }) {
@@ -3340,6 +3344,38 @@ function typesetText(field: RunField, value: unknown, isApp: boolean): string | 
   return isApp && field.kind === 'text' && isLongText(value) ? value : undefined;
 }
 
+/**
+ * Whether a text names itself, in `app`: the view typesets it as Markdown
+ * (`typesetText`) and it opens with a heading of its own. `value` is the
+ * node's value as unwrapped by its content key.
+ */
+function namesItself(field: RunField, value: unknown, isApp: boolean): boolean {
+  const typeset = typesetText(field, value, isApp);
+  return isApp && typeset !== undefined && opensWithHeading(typeset);
+}
+
+/**
+ * Whether a whole result names itself, as a panel's title would: in `app`, a
+ * text the view typesets that opens with a heading of its own. `value` is the
+ * payload as it arrived, unwrapped here exactly as `ResultField` unwraps it.
+ *
+ * For `StuffViewer`, which then draws no title over it, even one its host
+ * named, for the reason a label gives way to such a text in the leaf arm: the
+ * name set over the heading read as the same title twice ("Executive summary"
+ * over "Launch Executive Summary"). The heading is the one kept because the
+ * run wrote it for this result, where a host's name is the output's for every
+ * run, and because dropping it would draw a text other than the one the copy
+ * control and the download hand over. One predicate for both, so the panel and
+ * the leaf arm cannot disagree about which texts head themselves.
+ */
+export function resultHeadsItself(
+  field: RunField,
+  value: unknown,
+  presentation: FieldPresentation,
+): boolean {
+  return namesItself(field, unwrap(field, value), presentation === 'app');
+}
+
 export interface ResultFieldProps {
   field: RunField;
   value: unknown;
@@ -3843,9 +3879,12 @@ function ResultNode({
       // itself, in `app`: its label is said rather than drawn, because the
       // label set over the heading read as the same title twice ("Executive
       // summary" over "Launch Executive Summary"). `studio` keeps it, since
-      // there the label is the identifier, not a title.
+      // there the label is the identifier, not a title. Under `hideLabel`
+      // there is no label to give way: a panel whose whole result this is has
+      // already left out its own title by the same predicate
+      // (`resultHeadsItself`), and says it rather than draws it.
       const typeset = typesetText(field, unwrapped, isApp);
-      const headed = isApp && !hideLabel && typeset !== undefined && opensWithHeading(typeset);
+      const headed = !hideLabel && namesItself(field, unwrapped, isApp);
       const labelDrawn = !hideLabel && !headed;
       return (
         <div

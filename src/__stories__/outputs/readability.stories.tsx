@@ -7,9 +7,11 @@ import {
   OUTPUT_FORM as RESULT_OUTPUT_FORM,
 } from '../_generated/results';
 import { PAYLOADS as RESULT_PAYLOADS } from '../_generated/results.payloads';
+import { PAYLOADS as COMPOSITE_PAYLOADS } from '../_generated/composites.payloads';
 // The kernel's own wording, read as an oracle, from the core entry that
 // exports it.
 import { humanizeEnumValue } from '../../core';
+import { DEFAULT_FIELD_STRINGS } from '../../react';
 import { ResultView, itemsOf } from '../result-view';
 
 /**
@@ -195,5 +197,58 @@ export const LongTextAsWrittenInStudio: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole('heading', { name: memoHeading() })).toBeNull();
     await expect(canvasElement.textContent).toContain(`## ${memoHeading()}`);
+  },
+};
+
+/**
+ * A launch report's executive summary, a `native.Text` member of a real
+ * parallel run, which the model opened with its own heading. Shown here as the
+ * whole result of a text pipe, the same concept, under the name a host gives it.
+ */
+const SUMMARY = (
+  COMPOSITE_PAYLOADS['composites.launch_report'] as { executive_summary: { text: string } }
+).executive_summary;
+
+function summaryHeading(): string {
+  const heading = /^#+ (.+)$/m.exec(SUMMARY.text)?.[1];
+  if (!heading) throw new Error('The summary holds no heading - re-read the fixture');
+  return heading;
+}
+
+/**
+ * **A host-named text that opens with its own heading, in `app`.** The host
+ * names the result `executive_summary`, and the text opens with its own
+ * heading, so the title and the heading read as the same title twice. The
+ * host's title gives way: it is said to assistive technology where it would
+ * have stood, the heading opens the result, and the Download, alone, follows
+ * the text.
+ */
+export const NamedTextThatNamesItself: Story = {
+  name: 'A named text that opens with its own heading, in app',
+  args: {
+    contracts: RESULT_CONTRACTS,
+    outputForm: RESULT_OUTPUT_FORM,
+    domain: 'results',
+    pipeCode: 'plain_text_result',
+    value: SUMMARY,
+    name: 'executive_summary',
+    presentation: 'app',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const headings = canvas.getAllByRole('heading', { name: summaryHeading() });
+    await expect(headings).toHaveLength(BOTH_THEMES);
+    // Said where the title would have stood, and not drawn.
+    const said = canvas.getAllByText(/^Executive summary/);
+    await expect(said).toHaveLength(BOTH_THEMES);
+    for (const name of said) await expect(name.className).toContain('sr-only');
+    const downloads = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.download });
+    await expect(downloads).toHaveLength(BOTH_THEMES);
+    for (const [index, download] of downloads.entries()) {
+      // The heading opens the result, and the Download follows the text.
+      await expect(
+        headings[index]!.compareDocumentPosition(download) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
   },
 };
