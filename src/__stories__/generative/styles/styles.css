@@ -1,0 +1,75 @@
+/*
+ * The app styles, applied to the rendered page - story-only, and disposable.
+ *
+ * Every value comes from `styles.ts` as a custom property set on the style's
+ * scope. The kernel already reads some of them as theme tokens (`--radius`,
+ * `--input`); the host's frame reads the body face (`--font-sans`, which
+ * every host page is set in), the panel tokens and `--density` (`frame.css`);
+ * and this file says where the rest land on the DOM the kernel's controls and
+ * the generative layer draw today: the heading face (`--font-heading`), the
+ * titles (`--heading-weight`, `--heading-tracking`) and the call to action
+ * (`--action-shadow`). It reaches that DOM by its utility classes,
+ * which is exactly why it is disposable: the components are meant to read
+ * these tokens themselves, each with today's value as its fallback, and this
+ * file is deleted then.
+ *
+ * Nothing here draws a box. A captured layout keeps its own cards, and a
+ * group inside the host's panel keeps the kernel's own fill and hairline.
+ *
+ * The heading face is turned on by a style's class. `quiet` has none: it is
+ * the host's own look, and a page wearing it renders exactly as one wearing
+ * no style, unless a team picked a typeface, which `data-typeface` marks on
+ * any host page. The titles and the action are read on every host page,
+ * because the host states its own treatment of both through the same tokens.
+ *
+ * Plain CSS, unlayered, so it outranks the utilities it overrides.
+ */
+
+/*
+ * A title is a heading set in words: an uppercase heading is an eyebrow, set
+ * small and tracked wide in the body face, and no style touches it.
+ */
+
+/* ---- the heading face ---- */
+:is(:where(.app-style):not(.app-style-quiet), .app-host[data-typeface])
+  :is(h1, h2, h3):not([class~='uppercase']) {
+  font-family: var(--font-heading, var(--font-sans));
+}
+
+/*
+ * ---- titles: the page's, and the layer's sections and cards ----
+ * Read on every host page: the host states its own title weight and tracking
+ * (`frame.css`), and a style overrides them. A heading inside a result is the
+ * run's content, not a title of the page, so the host's light titles never
+ * reach it: on a page with no style, or `quiet`, it keeps the result view's
+ * weight. A style does reach it, in the rule below, and the face rule above
+ * reaches it too, so a style's result reads in the style's own type.
+ */
+.app-host :is(h1, h2, h3):not([class~='uppercase']):not(.af-result *) {
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+}
+
+/* ---- a result's own headings, in a style ---- */
+:where(.app-style):not(.app-style-quiet) .af-result :is(h1, h2, h3):not([class~='uppercase']) {
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+}
+
+/*
+ * ---- the designed page's action ----
+ * The layer's call to action glows in the button colour. The host states its
+ * own action treatment as `--action-shadow` (`frame.css`), and a style
+ * overrides it. Not while it has keyboard focus: the button draws its focus
+ * ring in the same `box-shadow`, and hides its outline, so replacing the
+ * shadow then would leave the focus invisible. While focused it wears the
+ * layer's own ring and glow.
+ *
+ * Unlayered, it also outranks the layer's hover glow, which sits in
+ * Tailwind's utilities layer, so on a host page the action does not glow on
+ * hover either: the host's treatment holds in every state but focus, and the
+ * hover's change of fill is the feedback that remains.
+ */
+.app-host [class*='shadow-[0_0_28px']:not(:focus-visible) {
+  box-shadow: var(--action-shadow);
+}

@@ -17,11 +17,12 @@ import {
   type SpecFixture,
 } from '../../generative';
 import { BRANDS, type BrandFixture } from './brands';
+import { standInUpload } from '../stand-in-upload';
 import { expect } from 'storybook/test';
 import { atWidth, expectEveryTouchTarget, pinnedTo } from '../touch-target';
 
 /**
- * The one harness every generative story renders through: a captured layout,
+ * The harness the `Generative` stories render through: a captured layout,
  * painted in one brand, over the descriptor it was written for.
  *
  * It does what a host does and nothing more. It derives the descriptor from
@@ -53,27 +54,43 @@ export interface LayoutPageProps {
   brand: BrandFixture;
   fields: RunField[];
   fixture: SpecFixture;
-  /** Distinguishes the DOM ids of two pages on one document - the theme pair renders two. */
+  /**
+   * The prefix of the field paths the layer hands its controls, which a
+   * dropped file's id is read back through. Each control's DOM id is its own
+   * (`useId`), so the theme pair's two pages never share one.
+   */
   idPrefix: string;
+}
+
+/**
+ * The state a captured layout renders over, as a host holds it: a store
+ * seeded with the defaults the method authored, and an upload environment
+ * that writes a dropped file at the store path its field's id names, with a
+ * `blob:` URL standing in for the stored reference. Every story harness that
+ * renders a layout takes both from here.
+ */
+export function useLayoutStore(fields: RunField[], idPrefix: string) {
+  const store = React.useMemo(() => createStateStore({ inputs: seedInputs(fields) }), [fields]);
+  const env = React.useMemo<FieldEnv>(
+    () => ({
+      onDropFile: (id, file) => {
+        const path = pathFromDomId(idPrefix, id);
+        if (path) store.set(path, standInUpload(file));
+      },
+    }),
+    [idPrefix, store],
+  );
+  return { store, env };
 }
 
 const RECEIPT =
   'mt-10 border-t border-border px-6 py-4 font-mono text-[11px] text-muted-foreground sm:px-8';
 
 export function LayoutPage({ brand, fields, fixture, idPrefix }: LayoutPageProps) {
-  const store = React.useMemo(() => createStateStore({ inputs: seedInputs(fields) }), [fields]);
+  const { store, env } = useLayoutStore(fields, idPrefix);
   const state = useStoreSnapshot(store);
   const inputs = (state.inputs ?? {}) as Record<string, unknown>;
   const readiness = computeReadiness(fields, inputs);
-  const env = React.useMemo<FieldEnv>(
-    () => ({
-      onDropFile: (id, file) => {
-        const path = pathFromDomId(idPrefix, id);
-        if (path) store.set(path, { url: URL.createObjectURL(file), filename: file.name });
-      },
-    }),
-    [idPrefix, store],
-  );
 
   return (
     <div className={brand.scope ?? undefined}>
