@@ -79,11 +79,10 @@ import { ExtractedPageText } from './extracted-page-text';
 import { splitExtractedText } from './extracted-text';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
+import { humanizeEnumValue, humanizeFieldName } from '../core/humanize';
 import {
   enumLabeler,
   fieldLabel,
-  humanizeEnumValue,
-  humanizeFieldName,
   useFieldPresentation,
   type FieldPresentation,
 } from './field-presentation';
