@@ -105,7 +105,9 @@ export interface StuffViewerProps {
    * second heading under its own.
    *
    * It also supplies `downloadBaseName`'s default, so the file a reader saves
-   * is named after the thing they were reading rather than `output.json`.
+   * is named after the thing they were reading rather than `output.json`. It
+   * replaces a `title` the root carries as well: that names the output slot,
+   * not the stuff.
    */
   name?: string;
   /**
@@ -316,6 +318,13 @@ export function JsonView({ value }: { value: unknown }) {
   );
 }
 
+/** `field` under the name its host gave it, with no title of the descriptor's left to outrank it. */
+function underHostName(field: RunField, name: string): RunField {
+  const renamed = { ...field, name };
+  delete renamed.title;
+  return renamed;
+}
+
 /** One press of the panel's Download, and the result it saved. */
 interface DownloadAttempt {
   field: RunField;
@@ -388,8 +397,13 @@ function StuffPanel({
   // The caller's name wins over the descriptor's, and it is applied to the
   // FIELD rather than passed to the header alone: the download's default base
   // name reads the same property, and the two naming the item differently is
-  // exactly the drift this component exists to prevent.
-  const named = name ? { ...field, name } : field;
+  // exactly the drift this component exists to prevent. It wins over a title
+  // the descriptor's root carries too, which would otherwise outrank it in
+  // every label (`fieldLabel`): the root names the pipe's output slot, the
+  // same for every stuff a host shows through it, and only the caller knows
+  // which stuff this is. The host's name gives way to one thing alone, the
+  // heading a text the run wrote opens with (`headsItself`, below).
+  const named = name ? underHostName(field, name) : field;
   const baseName = downloadBaseName ?? named.name ?? 'result';
   const [chosen, setView] = useState<StuffViewerView>(defaultView);
   // A host may narrow the views after mounting (a presentation switched to
