@@ -61,8 +61,10 @@ describe('styleTokens', () => {
       for (const theme of THEMES) {
         const tokens = styleTokens(id, null, theme);
         expect('--action-shadow' in tokens).toBe(APP_STYLES[id].actionShadow !== null);
-        const { '--action-shadow': _optional, ...rest } = tokens;
-        expect(Object.keys(rest).sort()).toEqual(
+        // The tokens a style sets only where it departs from the host's.
+        const optional = ['--action-shadow', '--inset-nested-fill', '--input'];
+        const rest = Object.keys(tokens).filter((name) => !optional.includes(name));
+        expect(rest.sort()).toEqual(
           [
             '--density',
             '--font-heading',
@@ -137,12 +139,16 @@ describe('the typefaces', () => {
 });
 
 describe('teamTokens', () => {
-  it('takes a band with light text halfway to a dark page, and leaves every other band as set', () => {
-    expect(bandOn('#1d70b8', '#ffffff', HOST_PAGE.light)).toBe('#1d70b8');
-    expect(bandOn('#1d70b8', '#ffffff', HOST_PAGE.dark)).toBe(
-      `color-mix(in oklab, #1d70b8 50%, ${HOST_PAGE.dark})`,
-    );
-    expect(bandOn('#ffdd00', '#0b0c0c', HOST_PAGE.dark)).toBe('#ffdd00');
+  it('draws the band in the header colour on a light page, and as a rule under a dark page’s band', () => {
+    expect(bandOn('#1d70b8', '#ffffff', HOST_PAGE.light)).toEqual({
+      '--band': '#1d70b8',
+      '--on-band': '#ffffff',
+    });
+    expect(bandOn('#1d70b8', '#ffffff', HOST_PAGE.dark)).toEqual({
+      '--band': 'initial',
+      '--on-band': 'initial',
+      '--band-rule': '#1d70b8',
+    });
   });
 
   it("maps a team's roles onto the tokens docs/brand.md names, and leaves the host's where a role is absent", () => {
@@ -161,13 +167,16 @@ describe('teamTokens', () => {
           expected['--selected'] = roles.accentFill;
         }
         if (roles.header !== undefined) {
-          expected['--band'] = bandOn(roles.header, roles.onHeader, HOST_PAGE[theme]);
-          expected['--on-band'] = roles.onHeader;
+          Object.assign(expected, bandOn(roles.header, roles.onHeader, HOST_PAGE[theme]));
         }
         expect(tokens).toEqual(expected);
         // Every team on the list has a button colour; only some have a band.
         expect(tokens['--primary']).toBeDefined();
-        expect('--band' in tokens).toBe(TEAMS[key].seeds.header !== undefined);
+        const banded = TEAMS[key].seeds.header !== undefined;
+        expect(tokens['--band']).toBe(
+          banded ? (theme === 'light' ? TEAMS[key].seeds.header : 'initial') : undefined,
+        );
+        expect('--band-rule' in tokens).toBe(banded && theme === 'dark');
       }
     }
   });

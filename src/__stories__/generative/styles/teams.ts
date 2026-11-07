@@ -106,16 +106,17 @@ export const HOST_PAGE = { light: '#ffffff', dark: '#12151c' } as const;
  * host's own token stays.
  */
 /**
- * The band's ground on `page`. On a dark page, a band that carries light text
- * is taken halfway toward the page, so a saturated header does not sit on a
- * near-black page like a different site's; its text, already light, reads
- * better still. A band with dark text is left as the team set it.
+ * The band on `page`: the team's header colour as the band's ground, or, on a
+ * dark page, the page itself with the header colour as a rule under it. A
+ * saturated band on a near-black page read as a different site's, and a band
+ * taken partway to the page left a logo drawn on the header colour as a tile.
  */
-export function bandOn(header: string, onHeader: string, page: string): string {
-  const darkPage = page === HOST_PAGE.dark;
-  return darkPage && onHeader === '#ffffff'
-    ? `color-mix(in oklab, ${header} 50%, ${page})`
-    : header;
+export function bandOn(header: string, onHeader: string, page: string): Record<string, string> {
+  // `initial` unsets what the light page's rule set, which also applies on a
+  // dark page, so the band falls back to the host's own.
+  if (page === HOST_PAGE.dark)
+    return { '--band': 'initial', '--on-band': 'initial', '--band-rule': header };
+  return { '--band': header, '--on-band': onHeader };
 }
 
 export function teamTokens(team: Team, page: string): Record<string, string> {
@@ -130,9 +131,6 @@ export function teamTokens(team: Team, page: string): Record<string, string> {
     tokens['--ring'] = roles.accentInk;
     tokens['--selected'] = roles.accentFill;
   }
-  if (roles.header !== undefined) {
-    tokens['--band'] = bandOn(roles.header, roles.onHeader, page);
-    tokens['--on-band'] = roles.onHeader;
-  }
+  if (roles.header !== undefined) Object.assign(tokens, bandOn(roles.header, roles.onHeader, page));
   return tokens;
 }

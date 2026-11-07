@@ -44,6 +44,8 @@
   /* The host's own titles: light and slightly tight. A style overrides these. */
   --heading-weight: 300;
   --heading-tracking: -0.025em;
+  /* The host's own call to action: a plain fill, nothing around it. */
+  --action-shadow: none;
 
   min-height: 100%;
   background: var(--canvas);
@@ -93,6 +95,9 @@
   background: var(--band, var(--background));
   color: var(--on-band, var(--foreground));
   border-bottom: 1px solid var(--border);
+  /* A team's band colour as a rule under the band, where the band itself is
+     drawn as the page (a dark page). */
+  box-shadow: inset 0 -3px 0 var(--band-rule, transparent);
 }
 .af-band-l {
   display: flex;
@@ -165,6 +170,7 @@
 }
 .af-display {
   font-family: var(--font-heading, inherit);
+  text-wrap: balance;
   font-size: 36px;
   line-height: 1.1;
   font-weight: var(--heading-weight);
@@ -177,6 +183,7 @@
   color: var(--muted-foreground);
   margin: calc(12px * var(--d)) 0 0;
   max-width: 62ch;
+  text-wrap: pretty;
 }
 .af-panel {
   background: var(--panel-fill);
@@ -307,6 +314,7 @@
 }
 .af-res-title {
   font-family: var(--font-heading, inherit);
+  text-wrap: balance;
   font-size: 30px;
   line-height: 1.12;
   font-weight: var(--heading-weight);

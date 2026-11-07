@@ -5,7 +5,8 @@
  * scope (`--font-sans`, `--font-heading`, `--heading-weight`,
  * `--heading-tracking`, `--radius`, `--panel-fill`, `--panel-edge`,
  * `--panel-edge-width`, `--panel-shadow`, `--inset-fill`, `--inset-edge`,
- * `--action-shadow`); this file only says
+ * `--inset-nested-fill`, `--input`, `--action-shadow`, `--density`); this
+ * file only says
  * WHERE they land on the DOM the kernel's controls and the generative layer
  * draw today. It reaches
  * that DOM by its utility classes, which is exactly why it is disposable: the
@@ -36,18 +37,19 @@
 }
 
 /*
- * ---- the page's title ----
+ * ---- titles: the page's, and the layer's sections and cards ----
  * Read on every host page: the host states its own title weight and tracking
  * (`frame.css`), and a style overrides them. A heading inside a result is the
- * run's content, not the page's title, and keeps the result view's weight.
+ * run's content, not a title of the page, and keeps the result view's weight.
  */
-.app-host h1:not([class~='uppercase']):not(.af-result *) {
+.app-host :is(h1, h2, h3):not([class~='uppercase']):not(.af-result *) {
   font-weight: var(--heading-weight);
   letter-spacing: var(--heading-tracking);
 }
 
-/* ---- headings: the layer's hero, section and card titles ---- */
+/* ---- a result's own headings, in a style ---- */
 :is(.app-style-soft, .app-style-editorial, .app-style-bold)
+  .af-result
   :is(h1, h2, h3):not([class~='uppercase']) {
   font-weight: var(--heading-weight);
   letter-spacing: var(--heading-tracking);
@@ -55,29 +57,10 @@
 
 /*
  * ---- the designed page's action ----
- * The layer's call to action glows in the button colour. A style whose panels
- * cast no shadow sets `--action-shadow` to none, and the glow goes with them.
+ * The layer's call to action glows in the button colour. The host states its
+ * own action treatment as `--action-shadow` (`frame.css`), and a style
+ * overrides it.
  */
-:is(.app-style-editorial, .app-style-bold) [class*='shadow-[0_0_28px'] {
+.app-host [class*='shadow-[0_0_28px'] {
   box-shadow: var(--action-shadow);
-}
-
-/*
- * ---- panels: the layer's cards and rail ----
- * Read on every host page, not only a styled one: the host states its own
- * panel treatment as tokens (`frame.css`), which is what a page with no
- * style - and `quiet` - wears, and a style overrides them.
- */
-.app-host [class~='bg-card'][class~='border'] {
-  background: var(--panel-fill);
-  border-color: var(--panel-edge);
-  border-width: var(--panel-edge-width);
-  box-shadow: var(--panel-shadow);
-}
-
-/* ---- a group inside a panel: the kernel's structure box and list rows ---- */
-.app-host [class~='bg-card/40'][class~='border'] {
-  background: var(--inset-fill);
-  border-color: var(--inset-edge);
-  box-shadow: none;
 }

@@ -128,6 +128,14 @@ export interface PanelTreatment {
    * its edge, never a shadow, so a panel never floats inside another.
    */
   inset: { fill: Themed; edge: Themed };
+  /**
+   * A group inside a group: its fill, where it must differ from its parent's
+   * to read as a container rather than an indent; absent, it takes the
+   * group's.
+   */
+  nested?: Themed;
+  /** The fields' own fill inside the panel, where the host's would sink into it; absent, the host's. */
+  field?: Themed;
 }
 
 export interface AppStyle {
@@ -145,15 +153,16 @@ export interface AppStyle {
   radius: string | null;
   panel: PanelTreatment | null;
   /**
-   * The designed page's call to action: `none` takes the glow the layer gives
-   * it away, for a style whose panels cast no shadow; null keeps the layer's.
+   * The designed page's call to action: its shadow, `none` for a plain fill,
+   * or null for the host's.
    */
-  actionShadow: 'none' | null;
+  actionShadow: string | null;
   /**
-   * The rhythm, as a multiple of the host's own margins and gaps around the
-   * form - the composer's padding, the column's gap, the page's margins - or
-   * null for the host's own. It never reaches a control: scoping Tailwind's
-   * `--spacing` to carry it, the first way tried, scaled every control's
+   * The rhythm, as a multiple of the gaps and paddings of the page - the
+   * host's margins around the form, and the form's and the layer's own gaps
+   * through Tailwind's `--spacing` - or null for the host's own. It never
+   * reaches a control: every control resets `--spacing` to the base, because
+   * scoping it to the page, the first way tried, scaled every control's
    * height with the rhythm (a text field 39.6px tall under `bold`, under the
    * 44px a finger needs; 52.8px under `editorial`).
    */
@@ -207,8 +216,11 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
         },
         edge: 'transparent',
       },
+      // White fields on the tinted groups, dark ones on the lifted panel: a
+      // field the same tint as its group lost its edge.
+      field: { light: 'var(--card)', dark: 'var(--background)' },
     },
-    actionShadow: null,
+    actionShadow: '0 8px 20px -8px color-mix(in oklab, var(--primary) 60%, transparent)',
     density: 1.08,
   },
   editorial: {
@@ -278,7 +290,9 @@ export type StyleTokens = Record<string, string>;
  * - `--radius`: the control radius; panels derive theirs from it.
  * - `--panel-fill`, `--panel-edge`, `--panel-edge-width`, `--panel-shadow`; `--inset-fill` and
  *   `--inset-edge` for a group inside a panel.
- * - `--action-shadow`: the designed page's call to action, where a style takes its glow away.
+ * - `--inset-nested-fill`, a group inside a group, and `--input`, the
+ *   fields' fill, where a style sets them.
+ * - `--action-shadow`: the designed page's call to action.
  * - `--density`: the rhythm, read by the host's frame around the form.
  */
 export function styleTokens(
@@ -305,6 +319,8 @@ export function styleTokens(
     tokens['--panel-shadow'] = style.panel.shadow ? style.panel.shadow[theme] : 'none';
     tokens['--inset-fill'] = inTheme(style.panel.inset.fill, theme);
     tokens['--inset-edge'] = inTheme(style.panel.inset.edge, theme);
+    if (style.panel.nested) tokens['--inset-nested-fill'] = inTheme(style.panel.nested, theme);
+    if (style.panel.field) tokens['--input'] = inTheme(style.panel.field, theme);
   }
   if (style.actionShadow !== null) tokens['--action-shadow'] = style.actionShadow;
   if (style.density !== null) tokens['--density'] = String(style.density);
