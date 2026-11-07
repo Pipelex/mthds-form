@@ -270,6 +270,10 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
       edge: { light: FIRM_EDGE, dark: 'color-mix(in oklab, var(--foreground) 30%, transparent)' },
       edgeWidth: '2px',
       shadow: null,
+      // The panel is the host's `--muted`, which its fields' fill all but
+      // matches and a hovered option turns to: fields set into it read as
+      // the card on a light page and the page itself on a dark one.
+      field: { light: 'var(--card)', dark: 'var(--background)' },
     },
     actionShadow: 'none',
     density: 0.85,

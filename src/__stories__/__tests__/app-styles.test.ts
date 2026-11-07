@@ -109,6 +109,14 @@ describe('styleTokens', () => {
       }
     }
   });
+
+  it('never fills a field from `--input`, the token the fill itself sets', () => {
+    for (const id of APP_STYLE_IDS) {
+      const field = APP_STYLES[id].panel?.field;
+      if (!field) continue;
+      for (const theme of THEMES) expect(inTheme(field, theme), id).not.toMatch(/var\(--input\b/);
+    }
+  });
 });
 
 describe('the typefaces', () => {
