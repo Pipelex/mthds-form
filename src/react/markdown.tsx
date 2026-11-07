@@ -113,9 +113,12 @@ export function Markdown({ text, className, proseImages, citations }: MarkdownPr
  * Only the opening block is lexed, up to the first blank line, because only it
  * decides and a blank line ends every block that could begin there (one that
  * runs past it, such as a fence or a comment, is still that block when cut
- * short). That keeps the question cheap however long the text is, which
- * matters because it is asked on every render: a generative page re-renders
- * its result on each keystroke in an input beside it.
+ * short). That keeps the question cheap for a text written in paragraphs,
+ * which matters because it is asked on every render: a generative page
+ * re-renders its result on each keystroke in an input beside it. A text with
+ * no blank line at all is one block and is lexed whole, which costs about what
+ * re-rendering its typeset tree costs on the same render (a millisecond for 14
+ * KB, measured on marked 18).
  */
 export function opensWithHeading(text: string): boolean {
   const body = text.slice(LEADING_BLANK_LINES.exec(text)?.[0].length ?? 0);

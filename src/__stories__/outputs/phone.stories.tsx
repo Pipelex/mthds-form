@@ -297,7 +297,8 @@ export const LaunchReportDesktop: Story = {
 /**
  * **The same report under the name a host gives it, with both views offered.**
  * Beside a title and a view switch the Download stays in the header, and the
- * switch's two buttons, like the Download, are 44 by 44 on a phone.
+ * switch's two buttons, like the Download, are 44 by 44 on a phone, and so is
+ * the JSON view's Copy JSON.
  */
 export const LaunchReportSwitchPhone: Story = {
   name: 'A named report and its view switch, phone',
@@ -314,6 +315,12 @@ export const LaunchReportSwitchPhone: Story = {
     ];
     await expect(controls).toHaveLength(6);
     for (const control of controls) await expectTouchTarget(control);
+    // The JSON view's one action, Copy JSON, is a target of its own.
+    for (const json of canvas.getAllByRole('button', { name: S.viewJson }))
+      await userEvent.click(json);
+    const copies = await canvas.findAllByRole('button', { name: S.copyJson });
+    await expect(copies).toHaveLength(2);
+    for (const copy of copies) await expectTouchTarget(copy);
   },
 };
 

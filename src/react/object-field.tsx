@@ -116,14 +116,32 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
     }
   };
 
+  // A named structure is a group its name labels, so assistive technology
+  // hears the levels a reader sees: two cities in two structures are each
+  // announced inside their own. A list's row draws no name and is no group.
+  const nameId = `${id}--name`;
+  const descriptionId = `${id}--description`;
+  const group =
+    grouping === 'none'
+      ? {}
+      : {
+          role: 'group',
+          'aria-labelledby': nameId,
+          'aria-describedby': field.description ? descriptionId : undefined,
+        };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" {...group}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className={cn('text-foreground', structureNameClass(isApp, depth))}>{label}</span>
+        <span id={nameId} className={cn('text-foreground', structureNameClass(isApp, depth))}>
+          {label}
+        </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
       </div>
       {field.description && (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
+        <p id={descriptionId} className="text-[12px] leading-relaxed text-muted-foreground">
+          {field.description}
+        </p>
       )}
 
       <div

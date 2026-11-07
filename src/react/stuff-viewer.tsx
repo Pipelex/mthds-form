@@ -247,7 +247,8 @@ export function JsonView({ value }: { value: unknown }) {
           }}
           aria-label={s.copyJson}
           className={cn(
-            'absolute right-2 top-2 rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground',
+            // 44 by 44 on a phone, like every control a finger taps.
+            'absolute right-2 top-2 inline-flex items-center justify-center rounded border border-border bg-card p-1 text-muted-foreground hover:text-foreground max-sm:size-11',
             focusOutlineClass,
           )}
         >
@@ -258,7 +259,17 @@ export function JsonView({ value }: { value: unknown }) {
           )}
         </button>
       )}
-      <pre className="overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed">
+      {/* A region that scrolls sideways takes focus, so a keyboard can scroll
+          it, and is named, as a result table's is. */}
+      <pre
+        role="group"
+        aria-label={s.viewJson}
+        tabIndex={0}
+        className={cn(
+          'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed max-sm:pr-14',
+          focusOutlineClass,
+        )}
+      >
         {highlight(text)}
       </pre>
     </div>
