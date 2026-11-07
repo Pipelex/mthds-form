@@ -1769,9 +1769,17 @@ const TOGGLE = cn(
  * When a table under `tableLayout="stack"` turns its rows into blocks of label
  * and value pairs, counted in the columns it SHOWS (after the budget).
  *
- * - **Up to three: never.** Three columns that wrap, with no fixed width
- *   floor, fit the 343px a 375px phone leaves, and a table is how three values
- *   per row are read best.
+ * - **Up to three: never**, but for one case. Three columns that wrap, with no
+ *   fixed width floor, fit the 343px a 375px phone leaves, and a table is how
+ *   three values per row are read best.
+ * - **Three whose rows open: on a phone**, below `sm`. There the chevron's
+ *   column is 3.25rem around the 44px a finger is given, a fourth column in
+ *   all but name, and it leaves the two columns beside the name about 48px
+ *   each in a host's padded panel at 375px: a header such as "Obligation"
+ *   could be held whole only by pushing the table past its box, and the
+ *   values beside it were a column of broken words. A viewport rule rather
+ *   than a container query, because the chevron's width is one; below `sm`
+ *   every box is narrower than 640px anyway.
  * - **Four to six: while the table's own box is narrower than 640px**, a
  *   container query rather than the viewport, so a narrow panel on a wide
  *   screen stacks too. The 640 is written into the classes below rather than
@@ -1783,10 +1791,12 @@ const TOGGLE = cn(
 const STACK_NEVER_UP_TO = 3;
 const STACK_ALWAYS_BEYOND = 6;
 
-type Stacking = 'never' | 'narrow' | 'always';
+type Stacking = 'never' | 'phone' | 'narrow' | 'always';
 
-function stackingFor(columns: number): Stacking {
-  if (columns <= STACK_NEVER_UP_TO) return 'never';
+function stackingFor(columns: number, rowsOpen: boolean): Stacking {
+  if (columns <= STACK_NEVER_UP_TO) {
+    return columns === STACK_NEVER_UP_TO && rowsOpen ? 'phone' : 'never';
+  }
   return columns > STACK_ALWAYS_BEYOND ? 'always' : 'narrow';
 }
 
@@ -1819,9 +1829,11 @@ interface StackClasses {
 }
 
 /**
- * The same layout twice, once behind the container query and once without it.
- * Spelled out in full both times, because Tailwind reads class names out of the
- * source and would find no `@max-[640px]:block` assembled from parts.
+ * The same layout three times: behind the container query, behind the phone's
+ * viewport (`max-sm:`, where the chevron is always 44px, so its margin and
+ * corner need no second condition), and without either. Spelled out in full
+ * each time, because Tailwind reads class names out of the source and would
+ * find no `@max-[640px]:block` assembled from parts.
  *
  * A label beside its value, not above it: one line per field keeps a row of
  * five fields five lines tall, and one label column for every line of a block
@@ -1829,7 +1841,19 @@ interface StackClasses {
  * labels take two fifths of the block up to 10rem, so a block in a desktop
  * column does not leave its values a long way from short labels.
  */
-const STACKED: Record<'narrow' | 'always', StackClasses> = {
+const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
+  phone: {
+    table: 'max-sm:block',
+    head: 'max-sm:hidden',
+    body: 'max-sm:block',
+    row: 'max-sm:relative max-sm:block max-sm:px-3 max-sm:py-2',
+    rowWithToggle: 'max-sm:pl-12',
+    toggle: 'max-sm:absolute max-sm:top-0 max-sm:left-0 max-sm:p-0',
+    cell: 'max-sm:grid max-sm:grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] max-sm:items-baseline max-sm:gap-x-3 max-sm:px-0 max-sm:py-0.5 max-sm:after:hidden',
+    label: 'max-sm:block',
+    detail: 'max-sm:block',
+    detailInner: 'max-sm:px-0 max-sm:py-1',
+  },
   narrow: {
     table: '@max-[640px]:block',
     head: '@max-[640px]:hidden',
@@ -2089,7 +2113,7 @@ function ObjectTable({
   // or as blocks, so there is no scroll for any of the scroller's machinery to
   // serve. `stacked` is what turns it into blocks, and when.
   const fits = layout === 'stack';
-  const stacking = fits ? stackingFor(shown.length) : 'never';
+  const stacking = fits ? stackingFor(shown.length, canExpand) : 'never';
   const stacked = stacking === 'never' ? undefined : STACKED[stacking];
   // The share a column beside the name may claim for its values' longest word,
   // and whether a value cell has a word floor at all: only while it can be a

@@ -18,6 +18,7 @@ import { REPORT } from './media-payloads';
  * | The table shows… | At 343px | At 720px |
  * | --- | --- | --- |
  * | up to three columns | a table, wrapping | a table, wrapping |
+ * | three columns whose rows open, on a phone | blocks | (no phone is 720px wide) |
  * | four to six columns | one block of label and value pairs per row | a table, wrapping |
  * | more than six columns | blocks | blocks |
  *
@@ -30,9 +31,7 @@ import { REPORT } from './media-payloads';
  * there.
  *
  * Every story asserts the one promise first, in a browser because jsdom lays
- * nothing out: no table's box is wider inside than out. The one exception is a
- * box too narrow for its headers' words, where a header keeps its words whole
- * and the table scrolls inside its box instead. Then each asserts which
+ * nothing out: no table's box is wider inside than out. Then it asserts which
  * of the two shapes the table took, from computed styles, since a class name
  * says what was asked for and only the browser says what the container query
  * answered.
@@ -426,17 +425,16 @@ export const InvoiceLinesPhone: Story = {
 };
 
 /**
- * **A contract's clauses on a 375px phone, in a host's panel.** Three columns of
- * sentences whose rows open, so the chevron column takes 3.25rem around the
- * 44px a finger is given, and the two columns beside the subject are left
- * little. A header still
- * never breaks inside a word: "Obligation" and "Exception" used to break in the
- * middle. Where the box cannot hold every header's longest word, the table
- * scrolls inside its box instead, and the box takes focus exactly while it does,
- * so a keyboard reaches what is past its edge. The page itself never scrolls.
+ * **A contract's clauses on a 375px phone, in a host's panel.** Three columns
+ * of sentences whose rows open: on a phone the chevron's column takes 3.25rem
+ * around the 44px a finger is given, which leaves the two columns beside the
+ * subject about 48px each. As a table, its headers "Obligation" and
+ * "Exception" broke in the middle of the word, and kept whole they pushed the
+ * table past its box. So on a phone three columns whose rows open are blocks,
+ * as four to six are, each value labelled by the header it replaces.
  */
-export const HeadersOfRowsThatOpenPhone: Story = {
-  name: 'Headers of rows that open, 375px → whole words',
+export const ThreeColumnsThatOpenPhone: Story = {
+  name: 'Three columns whose rows open, 375px → blocks',
   ...pinnedTo('phone'),
   args: {
     pipeCode: 'clauses',
@@ -446,15 +444,8 @@ export const HeadersOfRowsThatOpenPhone: Story = {
   },
   play: async ({ canvasElement }) => {
     await atWidth('phone');
-    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
-    for (const table of tablesIn(canvasElement)) {
-      await expectTable(table, 3);
-      await expect(brokenHeaderWords(table)).toEqual([]);
-      const box = table.parentElement as HTMLElement;
-      await waitFor(() =>
-        expect(box.getAttribute('tabindex')).toBe(box.scrollWidth > box.clientWidth ? '0' : null),
-      );
-    }
+    await expectNothingScrollsSideways(canvasElement);
+    for (const table of tablesIn(canvasElement)) await expectStacked(table, 3);
   },
 };
 

@@ -6,7 +6,8 @@
  * Without the option a table wider than its panel scrolls, which is right for a
  * builder's panel and wrong for a phone, so the layout is a host's choice and
  * the default renders exactly what it rendered before. With it, a table of up
- * to three columns stays a table and wraps, one of four to six becomes a block
+ * to three columns stays a table and wraps (but for three whose rows open,
+ * which are blocks on a phone), one of four to six becomes a block
  * of label and value pairs per row while its own container is narrower than
  * 640px, and one of more than six does so at every width.
  *
@@ -247,6 +248,26 @@ describe('tableLayout="stack"', () => {
     const blocks = renderTable(columns(7), { layout: 'stack', budget: 7 });
     expect(blocks.container.querySelector('[data-fit]')).toBeNull();
     expect(table(blocks.container).className).not.toContain('--fit-share');
+  });
+
+  it('stacks three columns whose rows open on a phone, and nowhere else', () => {
+    // A column the budget hides: three shown, and the rows open onto the rest.
+    const open = renderTable(columns(4), { layout: 'stack', budget: 3 });
+    expect(table(open.container).className).toContain('max-sm:block');
+    expect(open.container.querySelector('thead')!.className).toContain('max-sm:hidden');
+    for (const cell of [...firstRow(open.container).cells].slice(1)) {
+      expect(cell.className).toContain('max-sm:grid');
+      const label = cell.firstElementChild as HTMLElement;
+      expect(label.className).toContain('hidden');
+      expect(label.className).toContain('max-sm:block');
+    }
+    // No container query: below `sm` every box is narrower than 640px.
+    expect(table(open.container).className).not.toContain('@max-[640px]');
+    open.unmount();
+    // Three columns whose rows cannot open stay a table on a phone too.
+    const closed = renderTable(columns(3), { layout: 'stack' });
+    expect(table(closed.container).className).not.toContain('max-sm:block');
+    expect(closed.container.querySelector('thead')!.className).toBe('');
   });
 
   it('stacks four to six columns while the container is narrower than 640px', () => {
