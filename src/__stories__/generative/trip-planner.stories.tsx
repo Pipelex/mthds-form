@@ -12,22 +12,19 @@ import {
 } from './layout-page';
 
 /**
- * The trip planner, as three models laid it out.
+ * The trip planner, as the designer method lays out a whole page for it on
+ * the model it pins.
  *
  * The synthesized carrier with the widest input surface in the corpus: text,
  * a number, enums, a boolean, a nested structure, two dates and a list, plus
- * an optional image. It is the case a layout has the most room to get wrong,
- * which is why three models were run over the same brief - the pages are free
- * to differ in their composition, since the method prescribes none, and every
- * one of them binds the same paths, because the paths are the descriptor's and
- * not theirs.
+ * an optional image. It is the case a layout has the most room to get wrong:
+ * the page is free in its composition, since the method prescribes none, and
+ * binds the descriptor's paths, which are not its own.
  *
- * Two stories are the pinned layout under someone else's tokens. A page that
- * only reads in the stock palette is a page with a problem the palette is
- * hiding. The last two are two of the layouts on a phone, where every control
- * the page draws is held to the 44 pixels a finger needs: the pinned one's
- * segmented choices, number, radios and switch, and the steps another model
- * laid the request out in, with their Next.
+ * Two stories are the layout under someone else's tokens. A page that only
+ * reads in the stock palette is a page with a problem the palette is hiding.
+ * The last is the layout on a phone, where every control the page draws is
+ * held to the 44 pixels a finger needs.
  */
 
 const fields = heroFields(CONTRACTS, INPUT_FORM, 'trips', 'plan_trip');
@@ -43,13 +40,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const PINNED = 'pipelex-method--claude-4.8-opus';
+const PINNED = 'pipelex-method--gpt-6.1-sol';
 
-export const Opus48: Story = layoutStory(layout(PINNED), STOCK);
-export const Sonnet5: Story = layoutStory(layout('pipelex-method--claude-5-sonnet'), STOCK);
-export const Gpt55: Story = layoutStory(layout('pipelex-method--gpt-5.5'), STOCK);
+export const Gpt61Sol: Story = layoutStory(layout(PINNED), STOCK);
 export const MthdsTokens: Story = layoutStory(layout(PINNED), MTHDS);
 export const PipelexTokens: Story = layoutStory(layout(PINNED), PIPELEX);
 
-export const Opus48Phone: Story = onAPhone(layoutStory(layout(PINNED), STOCK));
-export const Gpt55Phone: Story = onAPhone(layoutStory(layout('pipelex-method--gpt-5.5'), STOCK));
+export const Gpt61SolPhone: Story = onAPhone(layoutStory(layout(PINNED), STOCK));

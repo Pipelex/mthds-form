@@ -44,7 +44,7 @@ import { TEAM_KEYS, type TeamKey } from './teams';
 type Subject =
   'compose' | 'result' | 'trip-planner' | 'extract-invoice' | 'summarize-people' | 'design-slides';
 
-const PINNED = 'pipelex-method--claude-4.8-opus';
+const PINNED = 'pipelex-method--gpt-6.1-sol';
 
 interface Layout {
   /** The app's name, as the host's band shows it. */

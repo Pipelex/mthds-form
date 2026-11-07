@@ -15,8 +15,10 @@ import {
   INPUT_FORM as STRUCTURED_INPUT_FORM,
 } from '../_generated/structured';
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../_generated/trips';
-import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
-import { GENERATIVE_STORY_PARAMETERS, heroFields, makeLayoutPage } from '../generative/layout-page';
+import type { Spec } from '@json-render/core';
+import { GenerativePage, catalog } from '../../generative';
+import { STOCK } from '../generative/brands';
+import { GENERATIVE_STORY_PARAMETERS, heroFields, useLayoutStore } from '../generative/layout-page';
 import { exampleSourceOf, fileSourceOf } from '../host-sources';
 import { REPORT } from '../outputs/media-payloads';
 import { ResultView } from '../result-view';
@@ -231,27 +233,81 @@ export const ChosenFileWithBrand: Story = {
   },
 };
 
-const Trip = makeLayoutPage(
-  heroFields(TRIP_CONTRACTS, TRIP_INPUT_FORM, 'trips', 'plan_trip'),
-  TRIP_SPECS,
-);
+const TRIP_FIELDS = heroFields(TRIP_CONTRACTS, TRIP_INPUT_FORM, 'trips', 'plan_trip');
+
+/** A component's own example, as the catalog declares it beside its schema. */
+function exampleOf(name: string): Record<string, unknown> {
+  const components = catalog.data.components as Record<
+    string,
+    { example?: Record<string, unknown> }
+  >;
+  const example = components[name]?.example;
+  if (!example) throw new Error(`The catalog declares no example for ${name}.`);
+  return example;
+}
+
+const APP_BAR = exampleOf('AppBar');
+const STEPS = exampleOf('Steps') as { steps: string[] };
 
 /**
- * Two captured trip-planner layouts, in the stock palette: one opens on an
- * app bar carrying the method's tag, the other stages the form in steps.
+ * The two components that draw a chip, each with the props the catalog's own
+ * example gives it: the app bar's tag, and a journey's numbered steps, whose
+ * first panel holds the trip's name, so a field's focus border is read beside
+ * them. The corpus's captured layouts are a model's choice of components, and
+ * none of them has to use either, so the chips are drawn here rather than
+ * looked for there.
  */
-function TripPages() {
+const CHIPS: Spec = {
+  root: 'page',
+  elements: {
+    page: {
+      type: 'Stack',
+      props: { direction: 'vertical', gap: 'lg', align: 'stretch', justify: null },
+      children: ['bar', 'journey'],
+    },
+    bar: { type: 'AppBar', props: { links: null, tag: null, ...APP_BAR }, children: [] },
+    journey: {
+      type: 'Steps',
+      props: { nextLabel: null, backLabel: null, ...STEPS },
+      children: STEPS.steps.map((_, index) => `step-${index}`),
+    },
+    ...Object.fromEntries(
+      STEPS.steps.map((_, index) => [
+        `step-${index}`,
+        index === 0
+          ? {
+              type: 'Input',
+              props: {
+                label: 'Trip name',
+                name: 'title',
+                type: null,
+                placeholder: null,
+                value: { $bindState: '/inputs/request/title' },
+              },
+              children: [],
+            }
+          : { type: 'Text', props: { text: `Step ${index + 1}`, variant: null }, children: [] },
+      ]),
+    ),
+  },
+};
+
+/** The chips, on a page in the stock palette. */
+function ChipsPage() {
+  const { store, env } = useLayoutStore(TRIP_FIELDS, 'chips');
   return (
-    <div className="flex flex-col gap-12">
-      <Trip layout="pipelex-method--claude-4.8-opus" brand="stock" />
-      <Trip layout="pipelex-method--gpt-5.5" brand="stock" />
-    </div>
+    <GenerativePage
+      spec={CHIPS}
+      store={store}
+      scope={{ inputs: TRIP_FIELDS, idPrefix: 'chips', env }}
+      brand={STOCK.manifest}
+    />
   );
 }
 
 function tags(canvasElement: HTMLElement): HTMLElement[] {
   const found = [...canvasElement.querySelectorAll<HTMLElement>('header span')].filter(
-    (span) => span.textContent === 'trips.plan_trip',
+    (span) => span.textContent === APP_BAR.tag,
   );
   expect(found.length).toBeGreaterThan(0);
   return found;
@@ -296,7 +352,7 @@ async function tabTo(field: HTMLElement) {
  */
 export const ChipsWithoutBrand: Story = {
   parameters: GENERATIVE_STORY_PARAMETERS,
-  render: () => <TripPages />,
+  render: () => <ChipsPage />,
   play: async ({ canvasElement }) => {
     for (const field of titleFields(canvasElement)) {
       await tabTo(field);
@@ -328,7 +384,7 @@ export const ChipsWithBrand: Story = {
   parameters: GENERATIVE_STORY_PARAMETERS,
   render: () => (
     <Branded>
-      <TripPages />
+      <ChipsPage />
     </Branded>
   ),
   play: async ({ canvasElement }) => {
