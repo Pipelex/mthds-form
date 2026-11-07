@@ -82,6 +82,7 @@ import type { RunField } from '../core';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
 import { linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
+import { enumLabeler, useFieldPresentation } from '../react/field-presentation';
 import { ResultRoot } from '../react/result-location';
 import {
   Select as SelectRoot,
@@ -291,6 +292,7 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
   const id = shadcn.useControlId(props.name);
+  const labelOf = enumLabeler(props.options ?? [], useFieldPresentation());
   return (
     <div className="space-y-2">
       <label htmlFor={id} className="block text-sm leading-none font-medium">
@@ -314,7 +316,7 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
               option now, upstream of every renderer. */}
           {(props.options ?? []).map((option, index) => (
             <SelectItem key={`${index}-${option}`} value={option}>
-              {option}
+              {labelOf(option)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -682,9 +684,10 @@ interface SegmentedProps {
 
 /**
  * A choice as a row of pills, over the package's own toggle group. The group
- * is named by its visible label; each pill is a button with its option as its
- * text. Deselecting is ignored, as shadcn's toggle group does, so the bound
- * path never holds an empty string.
+ * is named by its visible label; each pill is a button whose text is its
+ * option as the kernel words it (`enumLabeler`), while the value it writes
+ * stays the option. Deselecting is ignored, as shadcn's toggle group does, so
+ * the bound path never holds an empty string.
  */
 function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>) {
   const [boundValue, setBoundValue] = useBoundProp<string>(
@@ -696,6 +699,7 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
   const value = isBound ? (boundValue ?? '') : localValue;
   const setValue = isBound ? setBoundValue : setLocalValue;
   const labelId = shadcn.useControlId(props.name);
+  const labelOf = enumLabeler(props.options ?? [], useFieldPresentation());
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-sm leading-none font-medium">
@@ -720,7 +724,7 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
             size="sm"
             className="rounded-full px-3.5 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
           >
-            {option}
+            {labelOf(option)}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>

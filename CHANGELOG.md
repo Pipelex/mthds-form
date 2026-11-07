@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A choice's label, from the core entry**: `humanizeEnumValue` words one enum code (`keynote` → "Keynote", `HIGH_RISK` → "High risk") and `enumValueLabeler(options)` words one enum's values, falling back to the codes when two options would read the same or a value is not one the enum declares; `humanizeFieldName` is exported beside them, and stays exported from `./react`. A host drawing a choice of its own reads its options exactly as the package does, with no React. See [docs/result-view.md](docs/result-view.md#labels-and-enum-values-follow-the-presentation-exactly-as-the-form-does).
+
+### Changed
+
+- **A generative layout's choices read as words in `app`**: `Select`, `Radio` and `Segmented` show each option as the kernel words it under the presentation the page is mounted in, as the kernel's own choice control does, and still write the option as the brief spells it; `studio` keeps the codes. See [docs/generative-ui.md](docs/generative-ui.md#rendering-a-page).
+
 ## [v0.28.0] - 2026-11-05
 
 ### Added
