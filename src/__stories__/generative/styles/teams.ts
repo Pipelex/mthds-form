@@ -97,10 +97,12 @@ export const TEAM_KEYS = Object.keys(TEAMS) as TeamKey[];
 export type Theme = 'light' | 'dark';
 
 /**
- * The page colour a team's accent is measured against, in each theme: the
- * host's page, the `--background` of its palette in `frame.css`, which a test
- * holds it to. It is the host's own panel and a captured layout's cards too,
- * but not every surface a style draws: `bold`'s panel is the host's `--muted`
+ * The surface a team's accent is measured against, in each theme: the
+ * `--background` of the host's palette in `frame.css`, which a test holds it
+ * to. It fills the host's own panel, a captured layout's cards and the band;
+ * the page behind them is the host's `--canvas`, a shade darker in light and
+ * in dark, where the ink reads better still. It is not every surface a style
+ * draws, though: `bold`'s panel is the host's `--muted`
  * and `soft`'s dark panel is lifted toward the foreground, and on both of
  * those, in the dark theme, the accent's ink falls a little under 4.5:1.
  * Nothing draws the ink as text on a panel today (it is the ring, the
