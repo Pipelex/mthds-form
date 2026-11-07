@@ -3259,8 +3259,10 @@ function isLongText(value: unknown): value is string {
 /**
  * The text a leaf node typesets as Markdown, or `undefined` for one it prints
  * plain: a `prose` value in either presentation, as `LeafValue` sets it, and a
- * long `text` value in `app` (see `isLongText`). The kind is the descriptor's;
- * the value is read only for what is written in it.
+ * long `text` value in `app` (see `isLongText`). The leaf arm of `ResultNode`
+ * draws the text from this answer and hides a label over a text that heads
+ * itself from the same one, so the two cannot drift apart. The kind is the
+ * descriptor's; the value is read only for what is written in it.
  */
 function typesetText(field: RunField, value: unknown, isApp: boolean): string | undefined {
   if (typeof value !== 'string' || value === '') return undefined;
@@ -3798,11 +3800,9 @@ function ResultNode({
               first lines run beside it, where a row of its own left it alone
               in a corner over an empty band. */}
           {copyText === undefined ? (
-            headed ? (
-              <Label field={field} unseen />
-            ) : (
-              header
-            )
+            // A text that heads itself always has something to copy, so this
+            // arm draws the label exactly when it is not hidden.
+            header
           ) : labelDrawn ? (
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">{header}</div>
@@ -3817,13 +3817,16 @@ function ResultNode({
             </>
           )}
           {/* The RAW value: `LeafValue` owns the unwrap, so that a chip, a line,
-              a table cell and this stacked row cannot disagree about it. A long
-              `text` value in `app` is the exception, typeset as the prose it
-              is (see `isLongText`); a chip and a cell keep it plain. So is a
-              document that is the whole result a panel shows, which is told
-              so: a PDF there opens without a click (see `DocumentValue`). */}
-          {isApp && field.kind === 'text' && isLongText(unwrapped) ? (
-            <Markdown text={unwrapped} />
+              a table cell and this stacked row cannot disagree about it. A text
+              typeset as Markdown is the exception, drawn from the one decision
+              (`typesetText`) that also decides whether it heads itself: a
+              `prose` value, as `LeafValue` would set it, and a long `text`
+              value in `app`, typeset as the prose it is (see `isLongText`),
+              where a chip and a cell keep it plain. So is a document that is
+              the whole result a panel shows, which is told so: a PDF there
+              opens without a click (see `DocumentValue`). */}
+          {typeset !== undefined ? (
+            <Markdown text={typeset} />
           ) : field.kind === 'document' && whole ? (
             <DocumentValue value={unwrapped} whole />
           ) : (

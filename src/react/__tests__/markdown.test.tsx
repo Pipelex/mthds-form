@@ -378,4 +378,15 @@ describe('whether a text opens with a heading of its own', () => {
     expect(opensWithHeading('#hashtag at the start')).toBe(false);
     expect(opensWithHeading('')).toBe(false);
   });
+
+  it('reads the opening block as the whole text would be read, though it lexes only that block', () => {
+    // A block that runs past a blank line is still that block when cut short,
+    // and a definition is a block of its own.
+    expect(opensWithHeading('```\n\n# Not a heading\n```\n\n# Later')).toBe(false);
+    expect(opensWithHeading('<!--\n\n# A comment\n-->\n\n# Later')).toBe(false);
+    expect(opensWithHeading('[launch]: https://example.com\n\n# Later')).toBe(false);
+    expect(opensWithHeading('    # Indented code\n\n# Later')).toBe(false);
+    expect(opensWithHeading('- An item\n\n# Later')).toBe(false);
+    expect(opensWithHeading('\r\n  \r\n  # Launch\r\n\r\nThe launch.')).toBe(true);
+  });
 });
