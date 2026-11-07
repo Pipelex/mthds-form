@@ -32,16 +32,28 @@ const FONTS_PATIENCE_MS = 10_000;
  * stylesheet that declares them, then the faces themselves. `document.fonts
  * .ready` alone resolves before a stylesheet an effect appended has declared
  * any face, so a measurement taken on it reads the fallback faces. A font
- * service that never answers is waited on for `FONTS_PATIENCE_MS`, after
- * which the page is measured in its fallback faces rather than not at all.
+ * service that never answers, for the stylesheet or for a face, is waited on
+ * for `FONTS_PATIENCE_MS` in all, after which the page is measured in its
+ * fallback faces rather than not at all.
  */
 export async function styleFontsReady(): Promise<void> {
+  let patience: ReturnType<typeof setTimeout> | undefined;
+  const outOfPatience = new Promise<void>((resolve) => {
+    patience = setTimeout(resolve, FONTS_PATIENCE_MS);
+  });
+  try {
+    await Promise.race([fontsSettled(), outOfPatience]);
+  } finally {
+    clearTimeout(patience);
+  }
+}
+
+async function fontsSettled(): Promise<void> {
   const link = document.querySelector<HTMLLinkElement>(FONTS_LINK);
   if (link?.dataset.appStyleFonts === 'loading') {
     await new Promise<void>((resolve) => {
       link.addEventListener('load', () => resolve(), { once: true });
       link.addEventListener('error', () => resolve(), { once: true });
-      setTimeout(resolve, FONTS_PATIENCE_MS);
     });
   }
   // A layout pass is what requests the faces the page now declares.
