@@ -1,0 +1,89 @@
+{
+ "id": "invoice--compose--gpt-6.1-sol--s1--r3",
+ "method": "invoice",
+ "moment": "compose",
+ "frame": "composer",
+ "model": "gpt-6.1-sol",
+ "seed": "vlsE4R90B1NK03fh0rTp627KfYvgIFVD",
+ "round": "r3",
+ "runId": "run_eb4c97d8-2bcc-4259-a50d-c76ccda9e1df",
+ "costUsd": 0.029863999999999998,
+ "seconds": 27,
+ "valid": true,
+ "problems": [],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "Help someone handling an invoice extract its details without copying them by hand.",
+  "title": "Get the details from your invoice",
+  "composition": "Use one compact, centred Composer within the host's frame, with a prominent headline and the muted line “Turn an invoice into structured information.” Keep its raised panel in one column: a single untitled FieldGroup holds the document control, with no extra section heading or decorative elements. The Composer's persistent action row is the only place to run the method; bind on.press to validateForm then run and leave timing and readiness to the host. Beneath the panel, arrange three short output notes in the Composer's two-column notes layout. Use theme-aware text and surface colours, with a restrained accent on the run control; add no surrounding navigation or footer.",
+  "regions": [
+   {
+    "title": null,
+    "purpose": "Present the outcome, collect the invoice, and keep the extraction action close to the only input.",
+    "container": "Composer",
+    "elements": [
+     "Composer: title “Get the details from your invoice”; description “Turn an invoice into structured information.”; columns “1”; runLabel “Extract invoice details”; on.press: validateForm then run; contains the FieldGroup and the host action row.",
+     "FieldGroup: untitled; contains the document control.",
+     "MthdsField: path /inputs/document; label “Invoice”; hint empty; retain the required file descriptor and its validation.",
+     "Composer notes: “Invoice details, totals and VAT”; “Vendor and purchasing company details”; “Purchase description, category and extracted text”."
+    ]
+   }
+  ],
+  "call_to_action": "Extract invoice details",
+  "defaults": null,
+  "delegated": [
+   "/inputs/document — file input explicitly delegated to MthdsField by the brief."
+  ]
+ },
+ "brief": "# Input page: invoice_extraction.process_invoice\n\nProcess relevant information from an invoice\n\n## Name\n\nThe method is called «Receipt reader», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\nThe action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as \"Waiting on the topic\" or \"Add a document to start\" - the controls show their own state.\n\nWhat one run gives back, read from the result's own description:\n- invoice id: Unique identifier for the invoice\n- invoice number: Invoice number as shown on the document\n- issue date: Date when the invoice was issued\n- time: Time of the transaction if available\n- amount incl tax: Total amount including taxes\n- amount excl tax: Net amount excluding taxes\n- vat amount: Total VAT/tax amount\n- vat rates: List of VAT rates applied\n- vendor: Name of the vendor/seller\n- vendor address: Complete address of the vendor\n- vendor siret: SIRET number of the vendor (French company registration)\n- vendor vat number: VAT registration number of the vendor\n- company name: Name of the purchasing company\n- company address: Address of the purchasing company\n- description: Description of goods or services purchased\n- category: Category or type of expense\n- text: Raw text extracted from the invoice\n\nA person runs a tool more readily when they know what comes back: the page may say it once, in their words, as the Composer's notes - a few short lines, never the list above copied out.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/document` — document (a file), required, gates the run — `document`: A document **[delegate: MthdsField]**\n\n## Delegated\n\nRender these with `MthdsField` at the path, and nothing else:\n\n- `/inputs/document` (document (a file))\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `document`. The host's action row says so by itself, so the page writes nothing about it.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"invoice-composer\"}\n{\"op\":\"add\",\"path\":\"/elements/invoice-composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Get the details from your invoice\",\"lede\":\"Turn an invoice into structured information.\",\"runLabel\":\"Extract invoice details\",\"columns\":\"1\",\"notes\":[\"Invoice details, totals and VAT\",\"Vendor and purchasing company details\",\"Purchase description, category and extracted text\"]},\"children\":[\"invoice-fields\"],\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]}}}\n{\"op\":\"add\",\"path\":\"/elements/invoice-fields\",\"value\":{\"type\":\"FieldGroup\",\"props\":{},\"children\":[\"invoice-document\"]}}\n{\"op\":\"add\",\"path\":\"/elements/invoice-document\",\"value\":{\"type\":\"MthdsField\",\"props\":{\"path\":\"/inputs/document\",\"label\":\"Invoice\",\"hint\":\"\"},\"children\":[]}}",
+ "spec": {
+  "root": "invoice-composer",
+  "elements": {
+   "invoice-composer": {
+    "type": "Composer",
+    "props": {
+     "headline": "Get the details from your invoice",
+     "lede": "Turn an invoice into structured information.",
+     "runLabel": "Extract invoice details",
+     "columns": "1",
+     "notes": [
+      "Invoice details, totals and VAT",
+      "Vendor and purchasing company details",
+      "Purchase description, category and extracted text"
+     ]
+    },
+    "children": [
+     "invoice-fields"
+    ],
+    "on": {
+     "press": [
+      {
+       "action": "validateForm"
+      },
+      {
+       "action": "run"
+      }
+     ]
+    }
+   },
+   "invoice-fields": {
+    "type": "FieldGroup",
+    "props": {},
+    "children": [
+     "invoice-document"
+    ]
+   },
+   "invoice-document": {
+    "type": "MthdsField",
+    "props": {
+     "path": "/inputs/document",
+     "label": "Invoice",
+     "hint": ""
+    },
+    "children": []
+   }
+  }
+ }
+}
