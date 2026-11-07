@@ -1,0 +1,8 @@
+{
+  "origin": "https://github.com/Pipelex/mthds-form/blob/dev/data/methods/slide_directions/bundle.mthds",
+  "license": "MIT",
+  "title": "Slide directions",
+  "heroes": [
+    "generate_design_proposals_from_rough_brief"
+  ]
+}

@@ -11,9 +11,8 @@ import {
   getPipeOutputForm,
 } from '../../core';
 import { inputBrief, isDelegatedResult, resultBrief } from '../../generative/brief';
-import { catalog } from '../../generative/catalog';
+import { layoutCheckProblems } from '../../generative/designer-run';
 import { fixtureId } from '../../generative/fixture';
-import { layoutProblems } from '../../generative/layout-fits';
 import {
   absoluteHatchPath,
   inputFieldAtPath,
@@ -30,19 +29,33 @@ import * as designSlides from '../_generated/design_slides';
 import { SPECS as SLIDES_SPECS } from '../_generated/design_slides.specs';
 import * as extractInvoice from '../_generated/extract_invoice';
 import { SPECS as INVOICE_SPECS } from '../_generated/extract_invoice.specs';
+import * as planTrip from '../_generated/plan_trip';
+import { SPECS as PLANNER_SPECS } from '../_generated/plan_trip.specs';
 import * as files from '../_generated/files';
 import * as lists from '../_generated/lists';
 import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import * as results from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
+import { SPECS as RESULT_SPECS } from '../_generated/results.specs';
 import * as scalars from '../_generated/scalars';
+import * as slideDirections from '../_generated/slide_directions';
+import { SPECS as DIRECTIONS_SPECS } from '../_generated/slide_directions.specs';
 import * as states from '../_generated/states';
 import * as structured from '../_generated/structured';
+import { SPECS as STRUCTURED_SPECS } from '../_generated/structured.specs';
 import * as summarizePeople from '../_generated/summarize_people';
 import { SPECS as PEOPLE_SPECS } from '../_generated/summarize_people.specs';
 import * as trips from '../_generated/trips';
 import { SPECS as TRIP_SPECS } from '../_generated/trips.specs';
-import { HEROES, pipeRefOf } from '../heroes';
+import {
+  HEROES,
+  briefKey,
+  framesOf,
+  heroOfCapture,
+  pipeRefOf,
+  variantsOf,
+  type Hero,
+} from '../heroes';
 
 /**
  * The layer against the corpus: the briefs a model is handed, the state a run
@@ -79,17 +92,28 @@ const CASES: Record<string, CaseModule> = {
   extract_invoice: extractInvoice,
   design_slides: designSlides,
   summarize_people: summarizePeople,
+  plan_trip: planTrip,
+  slide_directions: slideDirections,
 };
 
-/** The input descriptor of a hero's pipe, as a host derives it. */
-function inputsOf(pipeRef: string) {
-  const hero = HEROES.find((candidate) => pipeRefOf(candidate) === pipeRef)!;
+/** The half of a hero's descriptor its layouts bind, as a host derives it. */
+function descriptorOf(hero: Hero) {
   const mod = CASES[hero.caseName]!;
   const contract = getPipeIOContract(mod.CONTRACTS, hero.domain, hero.pipeCode)!;
-  return buildRunFields(
-    getPipeInputForm(mod.INPUT_FORM, hero.domain, hero.pipeCode)!,
-    contract.inputs,
-  );
+  if (hero.side === 'input') {
+    return {
+      inputs: buildRunFields(
+        getPipeInputForm(mod.INPUT_FORM, hero.domain, hero.pipeCode)!,
+        contract.inputs,
+      ),
+    };
+  }
+  return {
+    result: buildResultField(
+      getPipeOutputForm(mod.OUTPUT_FORM, hero.domain, hero.pipeCode)!,
+      contract.output.json_schema,
+    ),
+  };
 }
 
 describe('the result loader', () => {
@@ -161,11 +185,28 @@ describe('the result loader', () => {
 });
 
 describe('the briefs', () => {
-  it('are on disk for every hero, against the prompt the package ships', () => {
+  it("are on disk for every hero's variant, against the prompt the package ships", () => {
     for (const hero of HEROES) {
-      const briefPath = path.join(BRIEFS_DIR, `${pipeRefOf(hero)}.md`);
-      expect(existsSync(briefPath), pipeRefOf(hero)).toBe(true);
-      expect(readFileSync(briefPath, 'utf8').split('\n')[0]).toContain(PROMPT_HASH);
+      for (const variant of variantsOf(hero)) {
+        const key = briefKey(hero, variant);
+        const briefPath = path.join(BRIEFS_DIR, `${key}.md`);
+        expect(existsSync(briefPath), key).toBe(true);
+        expect(readFileSync(briefPath, 'utf8').split('\n')[0]).toContain(PROMPT_HASH);
+      }
+    }
+  });
+
+  it("carry the style a moment of a host's app is designed in, and a whole page none", () => {
+    for (const hero of HEROES) {
+      for (const variant of variantsOf(hero)) {
+        const text = readFileSync(path.join(BRIEFS_DIR, `${briefKey(hero, variant)}.md`), 'utf8');
+        const laidOut = text.slice(0, text.indexOf('<!-- The laid-out brief ends here.'));
+        if (variant.frame === 'page') expect(laidOut).not.toContain('\n## Style\n');
+        else
+          expect(laidOut, briefKey(hero, variant)).toMatch(
+            /\n## Style\n\nThe team's apps wear the \w+ style: /,
+          );
+      }
     }
   });
 
@@ -325,24 +366,51 @@ describe('a hatch path inside a repeat', () => {
 });
 
 describe('the captured layouts', () => {
-  const fixtures = [...TRIP_SPECS, ...INVOICE_SPECS, ...SLIDES_SPECS, ...PEOPLE_SPECS];
-  /** The run that answered the question the study was run to answer. */
-  const PINNED = 'pipelex-method--claude-4.8-opus';
+  const fixtures = [
+    ...TRIP_SPECS,
+    ...STRUCTURED_SPECS,
+    ...INVOICE_SPECS,
+    ...SLIDES_SPECS,
+    ...PEOPLE_SPECS,
+    ...PLANNER_SPECS,
+    ...RESULT_SPECS,
+    ...DIRECTIONS_SPECS,
+  ];
+  /** The model the designer method pins, which every hero's layouts are captured on. */
+  const PINNED = 'pipelex-method--gpt-6.1-sol';
 
-  it('include the run that answered the question', () => {
-    expect(fixtures.map(fixtureId)).toContain(PINNED);
+  it("have, for every hero's whole page, the designer method's layout on the pinned model", () => {
+    for (const hero of HEROES.filter((candidate) => framesOf(candidate).includes('page'))) {
+      const ids = fixtures
+        .filter((fixture) => fixture.pipeRef === pipeRefOf(hero) && !fixture.frame)
+        .map(fixtureId);
+      expect(ids, pipeRefOf(hero)).toContain(PINNED);
+    }
   });
 
-  it("have, for every authored method's hero, the designer method's layout on the pinned model", () => {
-    for (const hero of HEROES.filter((candidate) => candidate.source === 'methods')) {
-      const ids = fixtures.filter((fixture) => fixture.pipeRef === pipeRefOf(hero)).map(fixtureId);
-      expect(ids, pipeRefOf(hero)).toContain(PINNED);
+  it("have, for every moment of a host's app a hero is, a seeded layout in every style", () => {
+    for (const hero of HEROES) {
+      for (const variant of variantsOf(hero)) {
+        if (variant.frame === 'page') continue;
+        const id = `${PINNED}--${variant.frame}--${variant.style}--seeded`;
+        const ids = fixtures
+          .filter((fixture) => fixture.pipeRef === pipeRefOf(hero))
+          .map(fixtureId);
+        expect(ids, briefKey(hero, variant)).toContain(id);
+      }
     }
   });
 
   for (const fixture of fixtures) {
     describe(`${fixture.pipeRef} (${fixtureId(fixture)})`, () => {
-      const inputs = inputsOf(fixture.pipeRef);
+      const hero = heroOfCapture(fixture)!;
+      const frame = fixture.frame ?? 'page';
+      const descriptor = descriptorOf(hero);
+      const inputs = descriptor.inputs ?? [];
+
+      it('belongs to a hero designed in its frame', () => {
+        expect(hero, `${fixture.pipeRef} in the ${frame} frame`).toBeDefined();
+      });
 
       it('names a brief that is on disk', () => {
         expect(existsSync(path.join(REPO, fixture.brief)), fixture.brief).toBe(true);
@@ -366,13 +434,8 @@ describe('the captured layouts', () => {
         expect(specFromJsonl(fixture.jsonl)).toEqual(fixture.spec);
       });
 
-      it('validates against the catalog', () => {
-        const verdict = validateAgainstCatalog(fixture.spec, catalog);
-        expect(verdict.ok, formatProblems(verdict.problems)).toBe(true);
-      });
-
-      it('fits the descriptor it was written for, in both directions', () => {
-        expect(layoutProblems({ inputs }, fixture.spec)).toEqual([]);
+      it("passes a host's checks: its frame's catalog, and the descriptor in both directions", () => {
+        expect(layoutCheckProblems(fixture.spec, { frame, descriptor })).toEqual([]);
       });
 
       it('never quotes its seed on the page', () => {
@@ -390,14 +453,16 @@ describe('the captured layouts', () => {
       it('runs the method from exactly one control, and has no other Button', () => {
         const elements = Object.values(fixture.spec.elements);
         expect(elements.filter((element) => element.type === 'Button')).toHaveLength(0);
-        const ctas = elements.filter((element) => element.type === 'Cta');
+        // A whole page runs from a Cta; a composer from its own action row.
+        const runs = elements.filter((element) => ['Cta', 'Composer'].includes(element.type));
         const brief = readFileSync(path.join(REPO, fixture.brief), 'utf8');
         if (!brief.includes('# Input page:')) {
-          expect(ctas).toHaveLength(0);
+          expect(runs).toHaveLength(0);
           return;
         }
-        expect(ctas).toHaveLength(1);
-        const press = ctas[0]!.on?.press;
+        expect(runs).toHaveLength(1);
+        expect(runs[0]!.type).toBe(frame === 'composer' ? 'Composer' : 'Cta');
+        const press = runs[0]!.on?.press;
         const actions = (Array.isArray(press) ? press : [press]).map((binding) => binding?.action);
         expect(actions).toEqual(['validateForm', 'run']);
       });
@@ -408,67 +473,73 @@ describe('the captured layouts', () => {
        * render; this is the same fact read off the corpus, so a capture with
        * no title, as the slide designer's once was, is refused twice over.
        */
-      it('has exactly one h1, counting a Hero as one', () => {
+      it('has exactly one h1, counting a Hero, a Composer and a ResultHeader as one', () => {
         const elements = Object.values(fixture.spec.elements);
-        const heroes = elements.filter((element) => element.type === 'Hero').length;
+        const heroes = elements.filter((element) =>
+          ['Hero', 'Composer', 'ResultHeader'].includes(element.type),
+        ).length;
         const headings = elements.filter(
           (element) => element.type === 'Heading' && element.props.level === 'h1',
         ).length;
         expect(heroes + headings).toBe(1);
       });
 
-      /**
-       * A SummaryRow restates a VALUE. One bound to `/inputs/document`, a
-       * structure of a url and a filename, rendered `[object Object]`: the
-       * path existed, the spec validated, and the renderer stringified what
-       * it was handed. The fit gate now refuses it; this reads the same fact
-       * off the corpus, in the terms the defect was filed in.
-       */
-      it('binds a SummaryRow only to scalar paths the descriptor has', () => {
-        for (const [key, element] of Object.entries(fixture.spec.elements)) {
-          if (element.type !== 'SummaryRow') continue;
-          for (const prop of ['value', 'detail'] as const) {
-            const bound = (element.props as Record<string, { $state?: unknown }>)[prop]?.$state;
-            if (bound === undefined) continue;
-            const field = typeof bound === 'string' ? inputFieldAtPath(inputs, bound) : undefined;
-            expect(field, `${key}.${prop}`).toBeDefined();
-            expect(field!.kind, `${key}.${prop} shows ${String(bound)}`).not.toMatch(
-              /^(object|list|document|image)$/,
-            );
+      // What an input page binds, held to the inputs it binds: a result page's
+      // reads are held by the fit, which knows the result's kinds.
+      if (hero?.side === 'input') {
+        /**
+         * A SummaryRow restates a VALUE. One bound to `/inputs/document`, a
+         * structure of a url and a filename, rendered `[object Object]`: the
+         * path existed, the spec validated, and the renderer stringified what
+         * it was handed. The fit gate now refuses it; this reads the same fact
+         * off the corpus, in the terms the defect was filed in.
+         */
+        it('binds a SummaryRow only to scalar paths the descriptor has', () => {
+          for (const [key, element] of Object.entries(fixture.spec.elements)) {
+            if (element.type !== 'SummaryRow') continue;
+            for (const prop of ['value', 'detail'] as const) {
+              const bound = (element.props as Record<string, { $state?: unknown }>)[prop]?.$state;
+              if (bound === undefined) continue;
+              const field = typeof bound === 'string' ? inputFieldAtPath(inputs, bound) : undefined;
+              expect(field, `${key}.${prop}`).toBeDefined();
+              expect(field!.kind, `${key}.${prop} shows ${String(bound)}`).not.toMatch(
+                /^(object|list|document|image)$/,
+              );
+            }
           }
-        }
-      });
-
-      /**
-       * The rules ask for a `NumberInput` on a number path, so the value
-       * arrives as a NUMBER rather than the text an `Input` writes. The trip
-       * planner's budget is the path that proved it.
-       */
-      it('binds every number path through a NumberInput', () => {
-        const bound = Object.values(fixture.spec.elements).flatMap((element) => {
-          const path = (element.props as { value?: { $bindState?: unknown } }).value?.$bindState;
-          return typeof path === 'string' ? [{ element, path }] : [];
         });
-        const numbers = bound.filter(
-          ({ path }) => inputFieldAtPath(inputs, path)?.kind === 'number',
-        );
-        for (const { element, path } of numbers) expect(element.type, path).toBe('NumberInput');
-        if (fixture.pipeRef === 'trips.plan_trip') {
-          expect(numbers.map(({ path }) => path)).toContain('/inputs/request/budget');
-        }
-      });
 
-      it("lists exactly the brief's choices wherever it offers a choice", () => {
-        for (const [key, element] of Object.entries(fixture.spec.elements)) {
-          if (!['Segmented', 'Radio', 'Select'].includes(element.type)) continue;
-          const props = element.props as { options?: unknown; value?: { $bindState?: string } };
-          const path = props.value?.$bindState;
-          if (!path) continue;
-          const field = inputFieldAtPath(inputs, path);
-          expect(field?.kind, `${key} binds ${path}`).toBe('enum');
-          if (field?.kind === 'enum') expect(props.options, key).toEqual(field.options);
-        }
-      });
+        /**
+         * The rules ask for a `NumberInput` on a number path, so the value
+         * arrives as a NUMBER rather than the text an `Input` writes. The trip
+         * planner's budget is the path that proved it.
+         */
+        it('binds every number path through a NumberInput', () => {
+          const bound = Object.values(fixture.spec.elements).flatMap((element) => {
+            const path = (element.props as { value?: { $bindState?: unknown } }).value?.$bindState;
+            return typeof path === 'string' ? [{ element, path }] : [];
+          });
+          const numbers = bound.filter(
+            ({ path }) => inputFieldAtPath(inputs, path)?.kind === 'number',
+          );
+          for (const { element, path } of numbers) expect(element.type, path).toBe('NumberInput');
+          if (fixture.pipeRef === 'trips.plan_trip') {
+            expect(numbers.map(({ path }) => path)).toContain('/inputs/request/budget');
+          }
+        });
+
+        it("lists exactly the brief's choices wherever it offers a choice", () => {
+          for (const [key, element] of Object.entries(fixture.spec.elements)) {
+            if (!['Segmented', 'Radio', 'Select'].includes(element.type)) continue;
+            const props = element.props as { options?: unknown; value?: { $bindState?: string } };
+            const path = props.value?.$bindState;
+            if (!path) continue;
+            const field = inputFieldAtPath(inputs, path);
+            expect(field?.kind, `${key} binds ${path}`).toBe('enum');
+            if (field?.kind === 'enum') expect(props.options, key).toEqual(field.options);
+          }
+        });
+      }
     });
   }
 });

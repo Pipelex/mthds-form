@@ -5,9 +5,10 @@ import {
   isNativeHtmlNode,
   isNativeValueNode,
 } from '../core/native-content';
-import type { Brief, PathEntry } from '../generated/layout-design/types';
+import { APP_STYLES, type AppStyleId } from '../brand/styles';
+import type { Brief, PathEntry, Style } from '../generated/layout-design/types';
+import type { Frame } from './frame-definitions';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
-import type { Frame } from './spike-definitions';
 
 /**
  * The brief: the model's view of the descriptor, as DATA.
@@ -43,6 +44,8 @@ import type { Frame } from './spike-definitions';
 export type DesignerBrief = Brief;
 /** One path of the brief: where it is, what it holds, what constrains it, whether the kernel keeps it. */
 export type DesignerPathEntry = PathEntry;
+/** The style a brief carries: its name and its direction, as `APP_STYLES` states them. */
+export type DesignerStyle = Style;
 
 /** The concept a run request names for the `brief` input: the method's own, domain-qualified. */
 export const DESIGNER_BRIEF_CONCEPT = 'generative.Brief';
@@ -56,7 +59,7 @@ export const DESIGNER_BRIEF_CONCEPT = 'generative.Brief';
  * the pass that made it.
  */
 const RUN_COMPONENT = 'Cta';
-/** SPIKE (L-261107-a6a35f): in a host's composer frame, the composer itself runs the method. */
+/** In a host's composer frame the composer itself runs the method: its foot is the host's action row. */
 const COMPOSER_RUN_COMPONENT = 'Composer';
 
 export interface BriefSubject {
@@ -83,15 +86,7 @@ export interface BriefSubject {
  * empty one into a layout the validator then refuses, so the brief hands the
  * input back to the kernel's own control instead.
  */
-export function isDelegatedInput(field: RunField, frame: Frame = 'page'): boolean {
-  // SPIKE (L-261107-a6a35f): the composer frame's vocabulary enters a date
-  // (DateRange), a list of short texts (Chips) and a list of structures
-  // (CompactList, which opens the kernel's own form for one item).
-  if (frame === 'composer') {
-    if (field.kind === 'date') return false;
-    if (field.kind === 'list' && (field.item.kind === 'text' || field.item.kind === 'object'))
-      return false;
-  }
+export function isDelegatedInput(field: RunField): boolean {
   return (
     field.kind === 'document' ||
     field.kind === 'image' ||
@@ -109,11 +104,13 @@ export function isDelegatedInput(field: RunField, frame: Frame = 'page'): boolea
  * predicates refuse a `list` node, because a list of dates is a list and not a
  * date, but no catalog component reads a date's `{date, time}` either, so the
  * kernel renders the list whole - one value per line, as the result view does.
+ *
+ * The result frame's vocabulary shows two of them itself: a picture
+ * (`Picture`) and a date in words (`DateText`), so on a result page written
+ * for that frame neither is delegated.
  */
 export function isDelegatedResult(field: RunField, frame: Frame = 'page'): boolean {
   if (isNativeValueNode(field)) return true;
-  // SPIKE (L-261107-a6a35f): the result frame's vocabulary shows a picture
-  // (Picture) and a date in words (DateText).
   if (frame === 'result' && (field.kind === 'image' || field.kind === 'date')) return false;
   if (field.kind === 'list' && isNativeValueNode(field.item)) return true;
   return (
@@ -224,7 +221,7 @@ function entryOf(
     notes: notes.length > 0 ? notes : undefined,
     default:
       seeded || field.defaultValue === undefined ? undefined : JSON.stringify(field.defaultValue),
-    delegated: side === 'input' ? isDelegatedInput(field, frame) : isDelegatedResult(field, frame),
+    delegated: side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field, frame),
     relative: relative ? true : undefined,
   };
 }
@@ -258,13 +255,11 @@ function describe(
       describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow, frame);
     }
   }
-  // SPIKE (L-261107-a6a35f): in the composer frame, a list of structures the
-  // page lays out names its item's members too, relative to one item.
-  if (field.kind === 'list' && (side === 'result' || frame === 'composer')) {
+  if (field.kind === 'list' && side === 'result') {
     const item = field.item;
     entry.item_kind = kindLabel(item);
     entry.item_description = item.description;
-    if (item.kind === 'object' && (side === 'input' || !isDelegatedResult(item, frame))) {
+    if (item.kind === 'object' && !isDelegatedResult(item, frame)) {
       entry.item_laid_out = true;
       for (const child of item.fields) {
         describeRelative(child, child.name, depth + 2, entries, side, frame);
@@ -310,11 +305,10 @@ function describeRelative(
   }
 }
 
-/** The brief for an INPUT page: the form a run is started from. */
 /**
- * SPIKE (L-261107-a6a35f): what one run gives back, one line per member of the
- * result (of one item, for a list), from the result's own titles and
- * descriptions - so a composer can say what comes back before the run.
+ * What one run gives back, one line per member of the result (of one item,
+ * for a list), from the result's own titles and descriptions - so a composer
+ * can say what comes back before the run.
  */
 function returnsOf(result: RunField): string[] {
   const shape = result.kind === 'list' ? result.item : result;
@@ -327,11 +321,41 @@ function returnsOf(result: RunField): string[] {
   });
 }
 
+/** The style a brief carries, read off `APP_STYLES`: its name and its direction, as data. */
+function styleOf(style: AppStyleId | undefined): DesignerStyle | undefined {
+  if (!style) return undefined;
+  const { name, direction } = APP_STYLES[style];
+  return { name, direction };
+}
+
+/** How an input page's brief is built: the frame it is written for, the team's style, and what a run returns. */
+export interface InputBriefOptions {
+  /** `page` (the default), a whole product page; `composer`, the inputs of a host's compose-then-result app. */
+  frame?: Extract<Frame, 'page' | 'composer'>;
+  /**
+   * The style the team's apps wear. The brief carries its name and its
+   * direction, which the composition follows; its faces, radii and panels are
+   * the components' to draw and never reach the brief. Absent, the brief
+   * names no style.
+   */
+  style?: AppStyleId;
+  /** The result's descriptor, from which a composer's brief says what one run gives back. */
+  result?: RunField;
+}
+
+/** How a result page's brief is built: the frame it is written for and the team's style. */
+export interface ResultBriefOptions {
+  /** `page` (the default), a whole product page; `result`, the result page of a host's compose-then-result app. */
+  frame?: Extract<Frame, 'page' | 'result'>;
+  /** The style the team's apps wear (see `InputBriefOptions.style`). */
+  style?: AppStyleId;
+}
+
+/** The brief for an INPUT page: the form a run is started from. */
 export function inputBrief(
   subject: BriefSubject,
   fields: readonly RunField[],
-  frame: Extract<Frame, 'page' | 'composer'> = 'page',
-  result?: RunField,
+  { frame = 'page', style, result }: InputBriefOptions = {},
 ): DesignerBrief {
   const paths: DesignerPathEntry[] = [];
   for (const field of fields) {
@@ -346,6 +370,7 @@ export function inputBrief(
     paths,
     run_control: frame === 'composer' ? COMPOSER_RUN_COMPONENT : RUN_COMPONENT,
     ...(frame === 'composer' && result ? { returns: returnsOf(result) } : {}),
+    ...(style ? { style: styleOf(style) } : {}),
   };
 }
 
@@ -354,7 +379,7 @@ export function resultBrief(
   subject: BriefSubject,
   field: RunField,
   state: unknown,
-  frame: Extract<Frame, 'page' | 'result'> = 'page',
+  { frame = 'page', style }: ResultBriefOptions = {},
 ): DesignerBrief {
   const paths: DesignerPathEntry[] = [];
   if (field.kind === 'object' && !isDelegatedResult(field, frame)) {
@@ -379,6 +404,7 @@ export function resultBrief(
     pipe_ref: subject.pipeRef,
     description: subject.description,
     paths,
+    ...(style ? { style: styleOf(style) } : {}),
     sample_state: JSON.stringify(state, null, 2),
   };
 }

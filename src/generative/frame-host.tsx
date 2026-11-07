@@ -3,8 +3,8 @@
 import * as React from 'react';
 
 /**
- * SPIKE (L-261107-a6a35f): what a host's compose-then-result frame tells the
- * frame components of a layout - the facts no descriptor carries.
+ * What a host's compose-then-result frame tells the frame components of a
+ * layout - the facts no descriptor carries.
  *
  * A layout written for the `composer` frame places the host's action row
  * through `Composer`, and one written for the `result` frame places the

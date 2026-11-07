@@ -1,7 +1,9 @@
 {
-  "origin": "spike L-261107-a6a35f: written for the designer-reach spike, never merged",
+  "origin": "https://github.com/Pipelex/mthds-form/blob/dev/data/methods/plan_trip/bundle.mthds",
   "license": "MIT",
   "title": "Trip planner",
-  "heroes": ["plan_trip"],
+  "heroes": [
+    "plan_trip"
+  ],
   "inputs": "inputs.json"
 }

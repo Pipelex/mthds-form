@@ -233,7 +233,7 @@ function MthdsField({
   const scope = React.useContext(DescriptorContext);
   const path = useAbsolutePath(props.path) ?? '';
   const found = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
-  // SPIKE (L-261107-a6a35f): the page's own words for the label and the line under it.
+  // The page's own words for the label and the line under it, where it wrote them.
   const field = React.useMemo(
     () =>
       found && (props.label || props.hint)
@@ -365,7 +365,7 @@ function formatCell(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** SPIKE (L-261107-a6a35f): a cell in a column the layout stated a format for. */
+/** A cell in a column the layout stated a format for. */
 function formatColumnCell(value: unknown, format: string | null | undefined): string {
   if (format === 'date' && typeof value === 'string') {
     const date = new Date(value.length === 10 ? `${value}T00:00:00Z` : value);

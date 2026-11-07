@@ -545,6 +545,20 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
         problems.push(`${key}: MthdsResult delegates ${String(written)}, which no result has`);
       }
     }
+    // A picture names its path literally, as a hatch does, because an image is
+    // a file the kind check refuses to read into a prop; so it is held here to
+    // what a hatch is held to, and to the one kind it can show. Inside a repeat
+    // over a list of images, "" is the item itself.
+    if (element.type === 'Picture') {
+      const shown = written === '' ? repeatBasePathOf(spec, key, parents) : (path ?? undefined);
+      const field =
+        shown && descriptor.result ? resultFieldAtPath(descriptor.result, shown) : undefined;
+      if (!field) {
+        problems.push(`${key}: Picture shows ${JSON.stringify(written)}, which no result has`);
+      } else if (field.kind !== 'image') {
+        problems.push(`${key}: Picture shows ${shown}, which holds a ${field.kind}, not an image`);
+      }
+    }
   }
 
   const { bound, read, adrift } = mentionedPaths(spec, parents);

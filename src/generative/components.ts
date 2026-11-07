@@ -272,7 +272,7 @@ const components = {
   MthdsField: {
     props: z.object({
       path: z.string(),
-      // SPIKE (L-261107-a6a35f): the page words the label, as it words every other control.
+      // The page words the label and the line under it, as it words every other control.
       label: z.string().nullable(),
       hint: z.string().nullable(),
     }),
@@ -294,7 +294,7 @@ const components = {
   DataTable: {
     props: z.object({
       rows: z.any(),
-      // SPIKE (L-261107-a6a35f): a column says how its cells read, from the kind the brief states.
+      // A column says how its cells read, from the kind the brief states.
       columns: z.array(
         z.object({
           path: z.string(),

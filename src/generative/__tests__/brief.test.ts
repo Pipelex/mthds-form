@@ -277,3 +277,67 @@ describe('the brief of a result page', () => {
     expect(entry('/result/issued_on')).toMatchObject({ kind: 'date', delegated: true });
   });
 });
+
+describe("the brief of a moment of a host's app", () => {
+  const fields: RunField[] = [
+    { kind: 'text', name: 'topic', required: true },
+    { kind: 'date', name: 'due', required: false, datetime: false },
+  ];
+  const result: RunField = {
+    kind: 'object',
+    name: 'report',
+    required: true,
+    fields: [
+      { kind: 'text', name: 'headline', title: 'The headline', required: true },
+      {
+        kind: 'image',
+        name: 'cover',
+        description: 'A cover picture',
+        required: false,
+        formats: IMAGE_FORMATS,
+      },
+    ],
+  };
+
+  it('names the Composer as the control that runs a composer, and says what one run returns', () => {
+    const brief = inputBrief({ pipeRef: 'a.b' }, fields, {
+      frame: 'composer',
+      style: 'soft',
+      result,
+    });
+    expect(brief.frame).toBe('composer');
+    expect(brief.run_control).toBe('Composer');
+    expect(brief.returns?.length).toBe(2);
+    expect(brief.returns?.join('\n')).toContain('The headline');
+  });
+
+  it('carries the style by its name and its direction, and nothing when none is chosen', () => {
+    const styled = inputBrief({ pipeRef: 'a.b' }, fields, {
+      frame: 'composer',
+      style: 'editorial',
+    });
+    expect(styled.style?.name).toBe('Editorial');
+    expect(styled.style?.direction.length).toBeGreaterThan(20);
+    expect(inputBrief({ pipeRef: 'a.b' }, fields).style).toBeUndefined();
+  });
+
+  it('keeps a whole page as it was: a Cta, and no account of the result', () => {
+    const brief = inputBrief({ pipeRef: 'a.b' }, fields, { result });
+    expect(brief.run_control).toBe('Cta');
+    expect(brief.returns).toBeUndefined();
+  });
+
+  it('lets a result page lay out its own pictures and dates, which a whole page delegates', () => {
+    const state = { headline: 'Q4', cover: { url: 'https://example.com/c.png' } };
+    const page = resultBrief({ pipeRef: 'a.b' }, result, state);
+    const framed = resultBrief({ pipeRef: 'a.b' }, result, state, {
+      frame: 'result',
+      style: 'bold',
+    });
+    const cover = (brief: typeof page) =>
+      brief.paths.find((candidate) => candidate.path === '/result/cover');
+    expect(cover(page)?.delegated).toBe(true);
+    expect(cover(framed)?.delegated).toBe(false);
+    expect(framed.style?.name).toBe('Bold');
+  });
+});

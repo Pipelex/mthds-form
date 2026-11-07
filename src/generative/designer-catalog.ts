@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import type { Action, Catalog, Component } from '../generated/layout-design/types';
 import { catalog, componentNamesFor } from './catalog';
-import type { Frame } from './spike-definitions';
+import type { Frame } from './frame-definitions';
 import { propsSignature } from './props-signature';
 import { generativeSchema } from './schema';
 
@@ -44,7 +44,24 @@ interface ComponentDefinition {
   description?: string;
 }
 
-export function designerCatalog(frame: Frame = 'page'): DesignerCatalog {
+/** What a catalog is built for. */
+export interface DesignerCatalogOptions {
+  /**
+   * The frame the layout is written for: `page` (the default), a whole
+   * product page; `composer` or `result`, a moment of a host's
+   * compose-then-result app, whose vocabulary leaves out what that host draws
+   * and adds the frame's own components (`componentNamesFor`).
+   */
+  frame?: Frame;
+}
+
+/**
+ * The catalog as the designer method's `catalog` input, for one frame. The
+ * same frame's `frameCatalog` is what the layout it produces is validated
+ * against, so the vocabulary a model was shown and the one it is held to are
+ * one list.
+ */
+export function designerCatalog({ frame = 'page' }: DesignerCatalogOptions = {}): DesignerCatalog {
   const definitions = catalog.data.components as Record<string, ComponentDefinition>;
   const components = componentNamesFor(frame).map((name): DesignerComponent => {
     const definition = definitions[name];

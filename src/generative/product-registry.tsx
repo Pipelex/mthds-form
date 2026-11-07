@@ -23,8 +23,8 @@ import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
 import { catalog } from './catalog';
+import { frameRenderers } from './frame-registry';
 import { generativeRenderers } from './registry';
-import { spikeRenderers } from './spike-registry';
 import { useResultSlot } from './result-slot';
 import { useControlId } from './ui/shadcn';
 
@@ -484,7 +484,6 @@ export const { registry: generativeRegistry } = defineRegistry(catalog, {
     SummaryRow: (ctx) => <SummaryRow {...ctx} />,
     Cta: (ctx) => <Cta {...ctx} />,
     Footer: (ctx) => <Footer {...ctx} />,
-    // SPIKE (L-261107-a6a35f)
-    ...spikeRenderers,
+    ...frameRenderers,
   },
 } as RegistryOptions);

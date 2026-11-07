@@ -1,7 +1,7 @@
-# SPIKE ONLY (L-261107-a6a35f, never merged): a trip planner whose input is the
-# trips case's TripRequest, so the composer brief matches the trip hero's, and
-# whose output is a structured Itinerary, so a result page has a real payload
-# to be designed over. Written for the designer-reach spike; not a cookbook method.
+# Written in this repository, not taken from the cookbook: a trip planner whose
+# input is the trips case's TripRequest, so its composer brief matches the trip
+# hero's, and whose output is a structured Itinerary, so a result page has a
+# real payload to be designed over. Origin: https://github.com/Pipelex/mthds-form/blob/dev/data/methods/plan_trip/bundle.mthds
 
 domain      = "trip_planner"
 description = "Plans a trip day by day from who is going, where and when, the budget and the spirit of it."

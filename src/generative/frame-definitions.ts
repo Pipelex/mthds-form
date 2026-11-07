@@ -1,28 +1,36 @@
 import { z } from 'zod';
 
 /**
- * SPIKE (L-261107-a6a35f): the least vocabulary the compose-then-result
- * mockups need, each addition tried here and recorded at Checkpoint G with the
- * screen that needed it and whether it belongs in the layout's catalog or is a
- * better kernel control.
+ * The frames a layout is written for, and the vocabulary each adds.
+ *
+ * `page` is a whole product page of its own, the frame every layout had
+ * before a host drew one around it. `composer` and `result` are the two
+ * moments of a host's compose-then-result app: the inputs before a run, in a
+ * centred column whose host draws the band above it and the action row's
+ * mechanics, and the result after one, under the host's bar restating the
+ * request. The two moments carry their own components, found by measuring the
+ * designer against hand-drawn screens of three methods: the composer's frame
+ * (`Composer`, with the page's h1, the panel and the host's action row) and a
+ * group of inputs inside it, and a result's header, a proportion bar, colour
+ * swatches, a picture, a fact, a labelled detail, a date in words and a list
+ * of short texts. A date range, chips for a list of texts and compact rows
+ * for a list of structures were found too, and went to the kernel's own
+ * controls instead, since they improve the plain form as much as a designed
+ * one: a composer delegates those inputs to `MthdsField`.
  *
  * Zod only, importable from node: `designerCatalog()` renders these into the
  * data the designer method takes. Each description says what the component IS
  * and how it renders, never where a page must put it.
  */
 
-/** The frame a layout is written for: today's whole product page, or one of the two moments of a host's compose-then-result frame. */
+/** The frame a layout is written for: a whole product page, or one of the two moments of a host's compose-then-result app. */
 export const FRAMES = ['page', 'composer', 'result'] as const;
 export type Frame = (typeof FRAMES)[number];
 
-export const SPIKE_COMPOSER_COMPONENTS = [
-  'Composer',
-  'FieldGroup',
-  'DateRange',
-  'Chips',
-  'CompactList',
-] as const;
-export const SPIKE_RESULT_COMPONENTS = [
+/** The components the composer frame adds to the catalog. */
+export const COMPOSER_COMPONENTS = ['Composer', 'FieldGroup'] as const;
+/** The components the result frame adds to the catalog. */
+export const RESULT_COMPONENTS = [
   'ResultHeader',
   'ProportionBar',
   'Swatches',
@@ -32,9 +40,10 @@ export const SPIKE_RESULT_COMPONENTS = [
   'DateText',
   'TextList',
 ] as const;
-export const SPIKE_COMPONENTS = [...SPIKE_COMPOSER_COMPONENTS, ...SPIKE_RESULT_COMPONENTS] as const;
+/** Every component a frame adds, which the `page` frame's vocabulary leaves out. */
+export const FRAME_COMPONENTS = [...COMPOSER_COMPONENTS, ...RESULT_COMPONENTS] as const;
 
-export const spikeComponents = {
+export const frameComponents = {
   Composer: {
     props: z.object({
       headline: z.string(),
@@ -60,55 +69,6 @@ export const spikeComponents = {
     description:
       'A quiet group of inputs inside a panel: an optional small h2 title, then its children stacked with even spacing. No box, no rule: the panel around it is the surface.',
     example: { title: 'Where and when' },
-  },
-  DateRange: {
-    props: z.object({
-      label: z.string(),
-      from: z.string().nullable(),
-      to: z.string().nullable(),
-    }),
-    slots: [],
-    description:
-      'Two dates entered as one range - a start and an end side by side, each with a calendar picker, and under them the span in words ("Wednesday to Monday, 5 nights"). Bind "from" and "to" with { "$bindState": ... } to two date paths of the brief.',
-    example: {
-      label: 'Dates',
-      from: { $bindState: '/inputs/request/stay/arriving_on' },
-      to: { $bindState: '/inputs/request/stay/leaving_on' },
-    },
-  },
-  Chips: {
-    props: z.object({
-      label: z.string(),
-      value: z.array(z.string()).nullable(),
-      placeholder: z.string().nullable(),
-    }),
-    slots: [],
-    description:
-      'A list of short texts entered as chips: each entry a removable pill, and an inline field that adds one on Enter. Bind "value" with { "$bindState": ... } to a list of text path of the brief.',
-    example: {
-      label: 'Places not to miss',
-      value: { $bindState: '/inputs/request/stay/must_see' },
-      placeholder: 'Add a place',
-    },
-  },
-  CompactList: {
-    props: z.object({
-      label: z.string(),
-      items: z.array(z.any()).nullable(),
-      primary: z.string(),
-      secondary: z.array(z.string()).nullable(),
-      addLabel: z.string(),
-    }),
-    slots: [],
-    description:
-      'A list of structures as compact rows: each item one line with a round avatar of its initials, its "primary" member and, muted under it, its "secondary" members joined by " · ", and an Edit link that opens the kernel\'s own form for that item in place; a last row adds one. Bind "items" with { "$bindState": ... } to a list of structures of the brief; "primary" and "secondary" name members of one item, relative to it ("name", "age").',
-    example: {
-      label: 'Travellers',
-      items: { $bindState: '/inputs/request/travellers' },
-      primary: 'name',
-      secondary: ['age', 'dietary'],
-      addLabel: 'Add a traveller',
-    },
   },
   ResultHeader: {
     props: z.object({

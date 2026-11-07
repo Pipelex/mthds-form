@@ -360,9 +360,9 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         continue;
       }
       const parsed = propSchema.safeParse(value);
-      // SPIKE (L-261107-a6a35f): json-render resolves an expression wherever it
-      // sits in a prop, inside an array or an object included, so an issue
-      // raised AT a nested expression is the literal check misreading it.
+      // json-render resolves an expression wherever it sits in a prop, inside
+      // an array or an object included, so an issue raised AT a nested
+      // expression is the literal check misreading it.
       const issues = parsed.success
         ? []
         : parsed.error.issues.filter((issue) => !isExpression(valueAt(value, issue.path)));

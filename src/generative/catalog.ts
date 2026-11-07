@@ -8,13 +8,13 @@ import {
 } from './components';
 import { generativeSchema } from './schema';
 import {
-  SPIKE_COMPONENTS,
-  SPIKE_COMPOSER_COMPONENTS,
-  SPIKE_RESULT_COMPONENTS,
-  spikeComponents,
+  COMPOSER_COMPONENTS,
+  FRAME_COMPONENTS,
+  RESULT_COMPONENTS,
+  frameComponents,
   type Frame,
-} from './spike-definitions';
-import type { ComponentRendering } from './validate';
+} from './frame-definitions';
+import type { ComponentRendering, ValidationCatalog } from './validate';
 
 /**
  * The catalog: everything the base vocabulary has, plus the chrome of a
@@ -149,7 +149,6 @@ export const COMPONENT_RENDERINGS: Readonly<Record<string, ComponentRendering>> 
   Workspace: { children: { count: 2, roles: 'work, rail' } },
   Tabs: { panels: { prop: 'tabs', noun: 'tab' } },
   Steps: { panels: { prop: 'steps', noun: 'step' } },
-  // SPIKE (L-261107-a6a35f)
   Composer: { heading: { level: 1 }, once: 'the composer' },
   ResultHeader: { heading: { level: 1 }, once: "the result's header" },
   FieldGroup: { heading: { level: 2, when: 'title' } },
@@ -157,7 +156,7 @@ export const COMPONENT_RENDERINGS: Readonly<Record<string, ComponentRendering>> 
 
 export const catalog = Object.assign(
   defineCatalog(generativeSchema, {
-    components: { ...generativeComponents, ...product, ...spikeComponents },
+    components: { ...generativeComponents, ...product, ...frameComponents },
     actions: generativeActions,
   }),
   { renders: COMPONENT_RENDERINGS },
@@ -179,18 +178,19 @@ export const COMPONENT_NAMES: readonly string[] = [
 ];
 
 /**
- * SPIKE (L-261107-a6a35f): the vocabulary of each frame, in the order the
- * designer method lists it. `page` is today's: the product page, with none of
- * the spike's additions, so the captured corpus and its prompt hash stay what
- * they were. `composer` and `result` are the two moments of a host's
- * compose-then-result frame, whose host draws the band, the action row's
- * mechanics, the request bar and the result's actions - so they leave out the
- * product chrome and the side panel (`AppBar`, `Footer`, `Workspace`, `Rail`),
- * the stand-alone run controls (`Cta`, `Button`) and the hero the composer
- * already carries, and each leaves out the other moment's components.
+ * The vocabulary of each frame, in the order the designer method lists it.
+ * `page` is the product page: the base vocabulary and the product chrome, with
+ * none of the frames' own components. `composer` and `result` are the two
+ * moments of a host's compose-then-result app, whose host draws the band, the
+ * action row's mechanics, the request bar and the result's actions - so they
+ * leave out the product chrome and the side panel (`AppBar`, `Footer`,
+ * `Workspace`, `Rail`), the stand-alone run controls (`Cta`, `Button`) and
+ * the hero the composer already carries, and each leaves out the other
+ * moment's components: a composer reads no result, a result page enters no
+ * input.
  */
 const FRAME_EXCLUDED: Record<Frame, readonly string[]> = {
-  page: [...SPIKE_COMPONENTS],
+  page: [...FRAME_COMPONENTS],
   composer: [
     'AppBar',
     'Footer',
@@ -204,7 +204,7 @@ const FRAME_EXCLUDED: Record<Frame, readonly string[]> = {
     'DataTable',
     'Metric',
     'Progress',
-    ...SPIKE_RESULT_COMPONENTS.filter((name) => name !== 'TextList'),
+    ...RESULT_COMPONENTS.filter((name) => name !== 'TextList'),
   ],
   result: [
     'AppBar',
@@ -224,12 +224,30 @@ const FRAME_EXCLUDED: Record<Frame, readonly string[]> = {
     'Segmented',
     'NumberInput',
     'Steps',
-    ...SPIKE_COMPOSER_COMPONENTS,
+    ...COMPOSER_COMPONENTS,
   ],
 };
 
+/** The component names a layout written for `frame` may use, in the order the designer method lists them. */
 export function componentNamesFor(frame: Frame): readonly string[] {
   const excluded = new Set(FRAME_EXCLUDED[frame]);
-  const own = frame === 'page' ? [] : [...SPIKE_COMPONENTS];
+  const own = frame === 'page' ? [] : [...FRAME_COMPONENTS];
   return [...COMPONENT_NAMES, ...own].filter((name) => !excluded.has(name));
+}
+
+/**
+ * The catalog a layout written for `frame` is validated against: the same
+ * definitions and renderings as `catalog`, held to the frame's vocabulary. A
+ * composer that names an `AppBar` is refused here as an unknown component,
+ * though the entry's registry could render one, because the host's frame
+ * already draws what it stands for.
+ */
+export function frameCatalog(frame: Frame): ValidationCatalog {
+  return {
+    componentNames: componentNamesFor(frame),
+    actionNames: catalog.actionNames,
+    data: catalog.data,
+    schema: catalog.schema,
+    renders: COMPONENT_RENDERINGS,
+  };
 }

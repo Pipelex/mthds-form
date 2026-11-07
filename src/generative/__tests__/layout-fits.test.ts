@@ -833,3 +833,57 @@ describe('a path the layout binds', () => {
     ]);
   });
 });
+
+describe('a Picture on a result page', () => {
+  const result: RunField = {
+    kind: 'object',
+    name: 'deck',
+    required: true,
+    fields: [
+      text('title', true),
+      {
+        kind: 'list',
+        name: 'slides',
+        required: true,
+        item: {
+          kind: 'object',
+          name: 'slide',
+          required: true,
+          fields: [
+            { kind: 'image', name: 'mockup', required: true, formats: [] },
+            text('name', true),
+          ],
+        },
+      },
+    ],
+  };
+  const picture = (path: string, repeated: boolean): Spec => ({
+    root: 'page',
+    elements: {
+      page: {
+        type: 'Stack',
+        props: {},
+        children: ['pic'],
+        ...(repeated ? { repeat: { statePath: '/result/slides', key: 'name' } } : {}),
+      },
+      pic: { type: 'Picture', props: { path, alt: 'x' }, children: [] },
+    },
+  });
+
+  it('is accepted when it shows an image the result has, inside a repeat or by its absolute path', () => {
+    expect(layoutProblems({ result }, picture('mockup', true))).toEqual([]);
+    expect(layoutProblems({ result }, picture('/result/slides/0/mockup', false))).toEqual([]);
+  });
+
+  it('is refused when its path names nothing the result has', () => {
+    expect(layoutProblems({ result }, picture('poster', true))).toContain(
+      'pic: Picture shows "poster", which no result has',
+    );
+  });
+
+  it('is refused when its path holds something other than an image', () => {
+    expect(layoutProblems({ result }, picture('name', true))).toContain(
+      'pic: Picture shows /result/slides/0/name, which holds a text, not an image',
+    );
+  });
+});

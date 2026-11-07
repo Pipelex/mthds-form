@@ -1,37 +1,52 @@
 'use client';
 
-import * as React from 'react';
+import { type BaseComponentProps, useRepeatScope, useStateValue } from '@json-render/react';
+import { ArrowRight, Clock } from 'lucide-react';
+import { viewableUrl } from '../core/native-content';
+import { useResolvedUrl } from '../react';
+import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
-  type BaseComponentProps,
-  useBoundProp,
-  useRepeatScope,
-  useStateStore,
-  useStateValue,
-} from '@json-render/react';
-import { Calendar, Clock, ArrowRight, X, Plus } from 'lucide-react';
-import { FieldRenderer } from '../react';
+  actionShadowClass,
+  headingClass,
+  panelFlatShadowClass,
+  panelRaisedShadowClass,
+  panelSurfaceClass,
+} from '../react/style-tokens';
 import { cn } from '../react/utils';
 import { useFrameHost } from './frame-host';
-import { domIdFor, useDescriptorScope } from './registry';
-import { inputFieldAtPath } from './paths';
 
 /**
- * SPIKE (L-261107-a6a35f): the renderers of `spike-definitions.ts`. Each reads
- * the theme contract's tokens only, so a host's style reaches it as it
- * reaches the kernel's controls.
+ * The renderers of the two frames' vocabularies (`frame-definitions.ts`): the
+ * composer of a host's compose-then-result app and its result page.
+ *
+ * Each reads the theme contract's tokens and the style tokens only, as the
+ * product chrome does (`product-registry.tsx`): a title reads the style's
+ * heading face, weight and tracking, a raised surface is the style's panel and
+ * marks itself `data-style-panel`, the composer's run button wears the
+ * style's call-to-action shadow. So a team's style reaches a designed page as
+ * it reaches the kernel's controls, and a host that sets no style token sees
+ * the look these components had before they read one.
+ *
+ * What the host knows and no descriptor says - how long a run takes, the
+ * result's actions - comes in through `FrameHostProvider`; a picture the run
+ * produced goes through the host's resolver and the kernel's URL gate, as
+ * every file the result view shows does.
  */
 
-const PANEL =
-  'rounded-[calc(var(--radius,0.5rem)*1.6)] border border-border bg-card text-card-foreground shadow-[0_1px_2px_rgb(0_0_0/0.05),0_10px_28px_-10px_rgb(0_0_0/0.16)]';
-const LABEL = 'block text-sm font-medium text-foreground';
-const CONTROL =
-  'flex h-11 w-full items-center gap-2 rounded-[var(--radius,0.5rem)] border border-border bg-background px-3 text-[15px] text-foreground';
+const RADIUS = 'rounded-[calc(var(--radius,0.5rem)*1.5)]';
 
 function useAbsolute(path: string): string {
   const repeat = useRepeatScope();
   if (path.startsWith('/')) return path;
   if (!repeat) return path;
   return path === '' ? repeat.basePath : `${repeat.basePath}/${path}`;
+}
+
+/** A date path's value as a date at noon UTC, so no time zone moves its day; `undefined` for anything else. */
+function asDate(value: unknown): Date | undefined {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value)) return undefined;
+  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 // ─── Composer ────────────────────────────────────────────────────────────────
@@ -52,7 +67,12 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
       className={cn('mx-auto flex w-full flex-col gap-7', two ? 'max-w-[980px]' : 'max-w-[740px]')}
     >
       <div>
-        <h1 className="text-[length:var(--h1,36px)] leading-[1.08] tracking-tight text-balance text-foreground">
+        <h1
+          className={cn(
+            'text-[32px] leading-[1.1] text-balance text-foreground sm:text-[38px] sm:leading-[1.08]',
+            headingClass(700, true),
+          )}
+        >
           {props.headline}
         </h1>
         {props.lede ? (
@@ -61,9 +81,12 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           </p>
         ) : null}
       </div>
-      <div className={cn(PANEL, 'p-7 max-sm:p-5')}>
+      <div
+        data-style-panel=""
+        className={cn(RADIUS, panelSurfaceClass, panelRaisedShadowClass, 'p-7 max-sm:p-5')}
+      >
         <div className={cn('grid gap-8', two && 'md:grid-cols-2 md:gap-x-10')}>{children}</div>
-        <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.6)] border-t border-border bg-card px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
+        <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
           {host.eta ? (
             <span className="inline-flex items-center gap-2 text-sm text-muted-foreground max-sm:justify-center">
               <Clock className="size-4" aria-hidden="true" /> {host.eta}
@@ -74,7 +97,11 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           <button
             type="button"
             onClick={() => emit('press')}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius,0.5rem)] bg-primary px-[22px] text-[15px] font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden"
+            className={cn(
+              'inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius,0.5rem)] bg-primary px-[22px] text-[15px] font-semibold text-primary-foreground transition-all hover:bg-primary/90',
+              actionShadowClass,
+              focusOutlineClass,
+            )}
           >
             {props.runLabel} <ArrowRight className="size-4" aria-hidden="true" />
           </button>
@@ -84,7 +111,7 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
         <ul className="grid gap-x-8 gap-y-2.5 px-1 sm:grid-cols-2">
           {props.notes.map((note, index) => (
             <li key={index} className="flex items-start gap-2.5 text-sm text-muted-foreground">
-              <span aria-hidden="true" className="text-[var(--link,var(--primary))]">
+              <span aria-hidden="true" className={linkTextClass}>
                 ✓
               </span>
               <span className="min-w-0">{note}</span>
@@ -100,233 +127,12 @@ function FieldGroup({ props, children }: BaseComponentProps<{ title?: string | n
   return (
     <section className="flex min-w-0 flex-col gap-5">
       {props.title ? (
-        <h2 className="text-[17px] leading-snug font-semibold text-foreground">{props.title}</h2>
+        <h2 className={cn('text-[17px] leading-snug text-foreground', headingClass(600))}>
+          {props.title}
+        </h2>
       ) : null}
       {children}
     </section>
-  );
-}
-
-// ─── DateRange ───────────────────────────────────────────────────────────────
-
-const DAY = 86_400_000;
-
-function asDate(value: unknown): Date | undefined {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value)) return undefined;
-  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
-  return Number.isNaN(date.getTime()) ? undefined : date;
-}
-
-function shortDate(date: Date): string {
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-function DateBox({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string | undefined;
-  onChange: (next: string) => void;
-}) {
-  const date = asDate(value);
-  return (
-    <label className={cn(CONTROL, 'relative min-w-0 flex-1 cursor-pointer')}>
-      <Calendar className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className={cn('truncate', !date && 'text-muted-foreground')}>
-        {date ? shortDate(date) : 'Pick a date'}
-      </span>
-      <input
-        type="date"
-        aria-label={label}
-        value={value?.slice(0, 10) ?? ''}
-        onChange={(event) => onChange(event.target.value)}
-        className="absolute inset-0 cursor-pointer opacity-0"
-      />
-    </label>
-  );
-}
-
-interface DateRangeProps {
-  label: string;
-  from?: string | null;
-  to?: string | null;
-}
-
-function DateRange({ props, bindings }: BaseComponentProps<DateRangeProps>) {
-  const [from, setFrom] = useBoundProp<string>(props.from ?? undefined, bindings?.from);
-  const [to, setTo] = useBoundProp<string>(props.to ?? undefined, bindings?.to);
-  const a = asDate(from);
-  const b = asDate(to);
-  const nights = a && b ? Math.round((b.getTime() - a.getTime()) / DAY) : undefined;
-  const weekday = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
-  return (
-    <div className="flex flex-col gap-2">
-      <span className={LABEL}>{props.label}</span>
-      <div className="flex items-center gap-2.5">
-        <DateBox label={`${props.label}: from`} value={from} onChange={(v) => setFrom(v)} />
-        <span className="text-sm text-muted-foreground">to</span>
-        <DateBox label={`${props.label}: to`} value={to} onChange={(v) => setTo(v)} />
-      </div>
-      {a && b && nights !== undefined && nights >= 0 ? (
-        <p className="text-[13px] text-muted-foreground">
-          {weekday(a)} to {weekday(b)}, {nights} {nights === 1 ? 'night' : 'nights'}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-// ─── Chips ───────────────────────────────────────────────────────────────────
-
-interface ChipsProps {
-  label: string;
-  value?: string[] | null;
-  placeholder?: string | null;
-}
-
-function Chips({ props, bindings }: BaseComponentProps<ChipsProps>) {
-  const [value, setValue] = useBoundProp<string[]>(props.value ?? undefined, bindings?.value);
-  const [draft, setDraft] = React.useState('');
-  const items = Array.isArray(value) ? value : [];
-  const id = React.useId();
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className={LABEL}>
-        {props.label}
-      </label>
-      <div className={cn(CONTROL, 'h-auto min-h-11 flex-wrap py-1.5')}>
-        {items.map((item, i) => (
-          <span
-            key={`${item}-${i}`}
-            className="inline-flex h-7 items-center gap-1 rounded-full bg-muted pr-1.5 pl-2.5 text-sm text-foreground"
-          >
-            {item}
-            <button
-              type="button"
-              aria-label={`Remove ${item}`}
-              onClick={() => setValue(items.filter((_, j) => j !== i))}
-              className="grid size-5 place-items-center rounded-full text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3" aria-hidden="true" />
-            </button>
-          </span>
-        ))}
-        <input
-          id={id}
-          value={draft}
-          placeholder={props.placeholder ?? 'Add one'}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && draft.trim()) {
-              event.preventDefault();
-              setValue([...items, draft.trim()]);
-              setDraft('');
-            }
-          }}
-          className="h-7 min-w-[8ch] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-      </div>
-    </div>
-  );
-}
-
-// ─── CompactList ─────────────────────────────────────────────────────────────
-
-interface CompactListProps {
-  label: string;
-  items?: unknown[] | null;
-  primary: string;
-  secondary?: string[] | null;
-  addLabel: string;
-}
-
-function initials(text: string): string {
-  return text
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join('');
-}
-
-function CompactList({ props, bindings }: BaseComponentProps<CompactListProps>) {
-  const scope = useDescriptorScope();
-  const path = bindings?.items ?? '';
-  const listField = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
-  const itemField = listField?.kind === 'list' ? listField.item : undefined;
-  const raw = useStateValue<unknown>(path);
-  const items = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
-  const { set } = useStateStore();
-  const [open, setOpen] = React.useState<number | null>(null);
-  const read = (item: Record<string, unknown>, key: string) => {
-    const v = item[key];
-    return v === undefined || v === null || v === '' ? undefined : String(v);
-  };
-  return (
-    <div className="flex flex-col gap-2">
-      <span className={LABEL}>{props.label}</span>
-      <div className="overflow-hidden rounded-[var(--radius,0.5rem)] border border-border bg-background">
-        {items.map((item, i) => {
-          const name = read(item, props.primary) ?? `Item ${i + 1}`;
-          const sub = (props.secondary ?? [])
-            .map((k) => read(item, k))
-            .filter(Boolean)
-            .join(' · ');
-          return (
-            <div key={i} className="border-b border-border last:border-b-0">
-              <div className="flex items-center gap-3 px-3 py-2.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-[12px] font-semibold text-foreground">
-                  {initials(name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] text-foreground">{name}</span>
-                  {sub ? (
-                    <span className="block truncate text-[13px] text-muted-foreground">{sub}</span>
-                  ) : null}
-                </span>
-                <button
-                  type="button"
-                  aria-expanded={open === i}
-                  onClick={() => setOpen(open === i ? null : i)}
-                  className="min-h-9 px-1 text-sm font-medium text-[var(--link,var(--primary))]"
-                >
-                  {open === i ? 'Done' : 'Edit'}
-                  <span className="sr-only"> {name}</span>
-                </button>
-              </div>
-              {open === i && itemField ? (
-                <div className="border-t border-border bg-muted/30 px-3 py-3">
-                  <FieldRenderer
-                    field={itemField}
-                    value={item}
-                    onChange={(next) => set(`${path}/${i}`, next)}
-                    id={domIdFor(scope.idPrefix, `${path}/${i}`)}
-                    env={scope.env}
-                  />
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-        <button
-          type="button"
-          onClick={() => {
-            set(path, [...items, {}]);
-            setOpen(items.length);
-          }}
-          className="flex min-h-11 w-full items-center gap-2 px-4 text-sm font-medium text-[var(--link,var(--primary))]"
-        >
-          <Plus className="size-4" aria-hidden="true" /> {props.addLabel}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -344,11 +150,14 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
     <div className="flex items-start justify-between gap-6 max-sm:flex-col">
       <div className="min-w-0">
         {props.eyebrow ? (
-          <p className="mb-1.5 text-[13px] font-semibold text-[var(--link,var(--primary))]">
-            {props.eyebrow}
-          </p>
+          <p className={cn('mb-1.5 text-[13px] font-semibold', linkTextClass)}>{props.eyebrow}</p>
         ) : null}
-        <h1 className="text-[length:var(--h2,28px)] leading-[1.12] tracking-tight text-balance text-foreground">
+        <h1
+          className={cn(
+            'text-[28px] leading-[1.12] text-balance text-foreground sm:text-[32px]',
+            headingClass(700, true),
+          )}
+        >
           {props.title}
         </h1>
         {props.subtitle ? (
@@ -363,7 +172,8 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
               type="button"
               onClick={() => host.onAction?.(label)}
               className={cn(
-                'inline-flex min-h-9 items-center rounded-[var(--radius,0.5rem)] px-4 text-sm font-semibold',
+                'inline-flex min-h-11 items-center rounded-[var(--radius,0.5rem)] px-4 text-sm font-semibold sm:min-h-9',
+                focusOutlineClass,
                 i === 0
                   ? 'bg-primary text-primary-foreground'
                   : 'border border-border bg-background text-foreground',
@@ -421,7 +231,15 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
   const scale = Math.max(sum, total, typeof props.of === 'number' ? props.of : 0) || 1;
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   return (
-    <div className={cn(PANEL, 'flex flex-col gap-3.5 px-6 py-5')}>
+    <div
+      data-style-panel=""
+      className={cn(
+        RADIUS,
+        panelSurfaceClass,
+        panelFlatShadowClass,
+        'flex flex-col gap-3.5 px-6 py-5',
+      )}
+    >
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <span className="text-[15px] text-muted-foreground">{props.label}</span>
         <strong className="text-2xl font-semibold tabular-nums text-foreground">
@@ -439,7 +257,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
             key={p.label}
             style={{
               width: `${(p.value / scale) * 100}%`,
-              background: `color-mix(in oklab, var(--link, var(--primary)) ${SEGMENT_MIX[i % SEGMENT_MIX.length]}%, var(--muted))`,
+              background: `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${SEGMENT_MIX[i % SEGMENT_MIX.length]}%, var(--muted, hsl(240 4.8% 95.9%)))`,
             }}
           />
         ))}
@@ -453,7 +271,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
             <span
               className="size-2 rounded-[2px]"
               style={{
-                background: `color-mix(in oklab, var(--link, var(--primary)) ${SEGMENT_MIX[i % SEGMENT_MIX.length]}%, var(--muted))`,
+                background: `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${SEGMENT_MIX[i % SEGMENT_MIX.length]}%, var(--muted, hsl(240 4.8% 95.9%)))`,
               }}
               aria-hidden="true"
             />
@@ -495,8 +313,11 @@ function Picture({
 }: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>) {
   const path = useAbsolute(props.path);
   const value = useStateValue<unknown>(path);
-  const file = value as { url?: string; public_url?: string } | undefined;
-  const src = file?.public_url ?? file?.url;
+  const file = value as { url?: unknown } | undefined;
+  const stored = typeof file?.url === 'string' ? file.url : '';
+  // The host's resolver first, then the kernel's gate: a picture is shown
+  // only at a URL the result view would show it at.
+  const src = viewableUrl(useResolvedUrl(stored));
   const aspect = props.aspect && props.aspect !== 'auto' ? ASPECT[props.aspect] : undefined;
   if (!src) return null;
   return (
@@ -558,7 +379,7 @@ function DateText({ props }: BaseComponentProps<DateTextProps>) {
   if (!date) return null;
   const tone =
     props.tone === 'accent'
-      ? 'text-[13px] font-semibold text-[var(--link,var(--primary))]'
+      ? cn('text-[13px] font-semibold', linkTextClass)
       : props.tone === 'muted'
         ? 'text-sm text-muted-foreground'
         : 'text-[15px] text-foreground';
@@ -588,10 +409,11 @@ function TextList({ props }: BaseComponentProps<TextListProps>) {
             aria-hidden="true"
             className={cn(
               'mt-[0.55em] shrink-0',
-              marker === 'bullet' && 'size-1.5 rounded-full bg-[var(--link,var(--primary))]',
+              marker === 'bullet' &&
+                'size-1.5 rounded-full bg-[color:var(--link,var(--primary,hsl(240_5.9%_10%)))]',
               marker === 'number' &&
-                'mt-0 min-w-5 text-sm font-semibold tabular-nums text-[var(--link,var(--primary))]',
-              marker === 'check' && 'mt-0 text-[var(--link,var(--primary))]',
+                cn('mt-0 min-w-5 text-sm font-semibold tabular-nums', linkTextClass),
+              marker === 'check' && cn('mt-0', linkTextClass),
             )}
           >
             {marker === 'number' ? `${index + 1}.` : marker === 'check' ? '✓' : null}
@@ -603,14 +425,11 @@ function TextList({ props }: BaseComponentProps<TextListProps>) {
   );
 }
 
-export const spikeRenderers = {
+export const frameRenderers = {
   TextList: (ctx: BaseComponentProps<TextListProps>) => <TextList {...ctx} />,
   DateText: (ctx: BaseComponentProps<DateTextProps>) => <DateText {...ctx} />,
   Composer: (ctx: BaseComponentProps<ComposerProps>) => <Composer {...ctx} />,
   FieldGroup: (ctx: BaseComponentProps<{ title?: string | null }>) => <FieldGroup {...ctx} />,
-  DateRange: (ctx: BaseComponentProps<DateRangeProps>) => <DateRange {...ctx} />,
-  Chips: (ctx: BaseComponentProps<ChipsProps>) => <Chips {...ctx} />,
-  CompactList: (ctx: BaseComponentProps<CompactListProps>) => <CompactList {...ctx} />,
   ResultHeader: (ctx: BaseComponentProps<ResultHeaderProps>) => <ResultHeader {...ctx} />,
   ProportionBar: (ctx: BaseComponentProps<ProportionBarProps>) => <ProportionBar {...ctx} />,
   Swatches: (ctx: BaseComponentProps<{ colors: string[] }>) => <Swatches {...ctx} />,
