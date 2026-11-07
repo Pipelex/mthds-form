@@ -202,6 +202,19 @@ describe('descriptionAddsToLabel', () => {
     expect(descriptionAddsToLabel("Le jour de l'arrivée", 'Arrivée', ['date'])).toBe(true);
   });
 
+  it('keeps a description it has no content word to judge by', () => {
+    // "Or" is gold in French, and only English filler to the rule.
+    expect(descriptionAddsToLabel('Or', 'Matière', ['choice'])).toBe(true);
+    expect(descriptionAddsToLabel('If any', 'Allergies', ['text'])).toBe(true);
+    expect(descriptionAddsToLabel('In %', 'Discount', ['number'])).toBe(true);
+  });
+
+  it('counts a symbol as a word', () => {
+    expect(descriptionAddsToLabel('Rate in %', 'Rate', ['number'])).toBe(true);
+    expect(descriptionAddsToLabel('In €', 'Budget', ['number'])).toBe(true);
+    expect(descriptionAddsToLabel('Budget in €', 'Budget (€)', ['number'])).toBe(false);
+  });
+
   it('counts any description as adding to an empty label', () => {
     expect(descriptionAddsToLabel('One person on the trip', '', ['structured'])).toBe(true);
   });

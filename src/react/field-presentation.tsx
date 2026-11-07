@@ -232,6 +232,12 @@ export function shownDescription(
  * because no word of the one is a word of the other, while "Not before noon"
  * under "Arrival" stays because `not` and `noon` are content words.
  *
+ * A symbol is a word here: `%` and `€` say a unit the control does not, so
+ * "Rate in %" under "Rate" stays. A description left with no content word at
+ * all is one the rule cannot judge, and it is shown: "In %" under "Discount",
+ * or "Or" (gold) under the French "Matière", whose only word reads as English
+ * filler.
+ *
  * The filler and kind words are English, as the descriptions it meets mostly
  * are; in another language few words match, and the description is shown, as
  * it was before the rule. An empty label says nothing, so any description
@@ -243,9 +249,11 @@ export function descriptionAddsToLabel(
   kinds: readonly ConceptCategory[],
 ): boolean {
   if (label.trim() === '') return true;
+  const words = contentStems(description);
+  if (words.length === 0) return true;
   const said = new Set(contentStems(label));
   for (const kind of kinds) for (const word of KIND_WORDS[kind]) said.add(stem(word));
-  return contentStems(description).some((word) => !said.has(word));
+  return words.some((word) => !said.has(word));
 }
 
 /** The words a control of each kind says by being that control. */
@@ -306,15 +314,23 @@ const FILLER = new Set([
   'one',
 ]);
 
-/** A text's content words, stemmed: lower-cased, possessives and filler words dropped. */
+/**
+ * A text's content words, stemmed: lower-cased, possessives and filler words
+ * dropped. A word is a run of letters and digits, or one symbol (`€`, `%`,
+ * `+`, an emoji); sentence punctuation is not a word.
+ */
 function contentStems(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/['’]s\b/gu, '')
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word !== '' && !FILLER.has(word))
+  return (
+    text
+      .toLowerCase()
+      .replace(/['’]s\b/gu, '')
+      .match(WORD) ?? []
+  )
+    .filter((word) => !FILLER.has(word))
     .map(stem);
 }
+
+const WORD = /[\p{L}\p{N}]+|[\p{S}%‰#@]/gu;
 
 /** One suffix off, never below three letters: `arriving` and `arrive` both give `arriv`. */
 function stem(word: string): string {
