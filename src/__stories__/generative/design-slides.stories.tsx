@@ -8,6 +8,7 @@ import {
   heroFields,
   layoutStory,
   makeLayoutPage,
+  onAPhone,
 } from './layout-page';
 
 /**
@@ -45,3 +46,6 @@ type Story = StoryObj<typeof meta>;
 export const Opus48: Story = layoutStory(layout, STOCK);
 export const MthdsTokens: Story = layoutStory(layout, MTHDS);
 export const PipelexTokens: Story = layoutStory(layout, PIPELEX);
+
+/** The pinned layout on a phone: its segmented choices at the 44 pixels a finger needs. */
+export const Opus48Phone: Story = onAPhone(layoutStory(layout, STOCK));
