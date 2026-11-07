@@ -6,12 +6,22 @@
 
 - **The controls' chrome reads as a product's in `app`**: the optional mark is the word "Optional" in the page's face rather than a tag in capitals; a list's count, its row numbers, a file field's formats and the line under an attached file's name are set in the page's face rather than in mono, as are a number and a date; an empty list shows its Add button alone, with no "No items yet" box, and with no "0 items" either unless the method states an exact count, which it announces from the start ("0 of 3 items"); the Add button is a hairline row like "Choose from your team's files" rather than a dashed slot; and the link input under a drop zone is a control of the field family. `studio` keeps its mono and its dashed slot. See [docs/architecture.md](docs/architecture.md).
 - **A description that restates its label is left out in `app`**: a field's description is shown only when it holds a word, a symbol such as `%` included, that neither its label nor its control already says, and whenever the rule cannot judge it, so "The day they arrive" under "Arriving on", or "An image" over an image drop zone, are gone, and a list row shows no description, the list saying once, under its own, what its item's description adds; a number's range and the JSON hint take the place of one left out. `studio` shows every description. See [docs/architecture.md](docs/architecture.md).
-- **A generative page renders the kernel's controls in `app`**: `GenerativePage` mounts the `app` presentation around the page whatever the host's, so a delegated field reads with the app's label and chrome rather than under its identifier and concept pill; a new `presentation` prop takes `studio` for a builder's preview. See [docs/generative-ui.md](docs/generative-ui.md).
+- **A generative page renders the kernel's controls in `app`**: `GenerativePage` mounts the `app` presentation around the page whatever the host's, so a delegated field reads with the app's label and chrome rather than under its identifier and concept pill, and a layout's `Select`, `Radio` and `Segmented` word their options; a new `presentation` prop takes `studio` for a builder's preview. See [docs/generative-ui.md](docs/generative-ui.md).
 - **The drop zone and the link under it speak in sentences (Breaking)**: the default `dropOrBrowse` is "Choose a file or drop it here", `dropFilesOrBrowse` "Choose files or drop them here", `pasteUrlInstead` "Paste a link instead" and `optionalBadge` "Optional", and the French set says the same; a host that matches a control by its English name, in a test for instance, updates it. See [docs/i18n.md](docs/i18n.md).
 
 ### Fixed
 
 - **The date input reads as empty when it is, and its calendar follows a dark page**: its empty face, the browser's `mm/dd/yyyy` pattern, is muted until a whole date is entered, where it used to read as a value, and under `.dark` the input declares the dark colour scheme, so the browser's calendar icon is no longer a dark glyph on a dark field and the calendar it opens is dark. See [docs/architecture.md](docs/architecture.md).
+
+## [v0.29.0] - 2026-11-07
+
+### Added
+
+- **A choice's label, from the core entry**: `humanizeEnumValue` words one enum code (`keynote` → "Keynote", `HIGH_RISK` → "High risk") and `enumValueLabeler(options)` words one enum's values, falling back to the codes when two options would read the same or a value is not one the enum declares; `humanizeFieldName` is exported beside them, and stays exported from `./react`. A host drawing a choice of its own reads its options exactly as the package does, with no React. See [docs/result-view.md](docs/result-view.md#labels-and-enum-values-follow-the-presentation-exactly-as-the-form-does).
+
+### Changed
+
+- **A generative layout's choices read as words in `app`**: `Select`, `Radio` and `Segmented` show each option as the kernel words it under the presentation the page is mounted in, as the kernel's own choice control does, and still write the option as the brief spells it; `studio` keeps the codes. See [docs/generative-ui.md](docs/generative-ui.md#rendering-a-page).
 
 ## [v0.28.0] - 2026-11-05
 

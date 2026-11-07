@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { type BaseComponentProps, useBoundProp, useFieldValidation } from '@json-render/react';
 import { hasOwnProp } from '../../core/own-property';
+import { enumLabeler, useFieldPresentation } from '../../react/field-presentation';
 import { fieldControlClass } from '../../react/field-styles';
 import { checkedAccentClass, focusOutlineClass } from '../../react/role-tokens';
 import { cn } from '../../react/utils';
@@ -497,6 +498,7 @@ export function Radio({
 >) {
   const id = useControlId(props.name);
   const field = useBoundField<string>(props.value, bindings?.value, '', props);
+  const labelOf = enumLabeler(props.options ?? [], useFieldPresentation());
   return (
     <fieldset className="space-y-2" aria-invalid={field.error ? true : undefined}>
       <legend className={LABEL}>{props.label}</legend>
@@ -515,7 +517,7 @@ export function Radio({
                 emit('change');
               }}
             />
-            <span>{option}</span>
+            <span>{labelOf(option)}</span>
           </label>
         ))}
       </div>

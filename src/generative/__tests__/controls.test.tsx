@@ -111,6 +111,88 @@ describe('the run handler', () => {
 });
 
 /**
+ * A choice's options are its codes - the descriptor carries nothing else, and
+ * a layout copies them out of the brief spelled exactly, because the value a
+ * control writes must be one the enum declares. What a person reads is the
+ * kernel's wording of each code under the presentation the page renders in -
+ * `app` unless its host passes `presentation="studio"` - exactly as the
+ * kernel's own choice control words it, so a produced screen no longer offers
+ * `keynote` where a designed one says "Keynote".
+ */
+describe('the options a catalog choice offers', () => {
+  const OPTIONS = ['keynote', 'executives', 'formal'];
+  const WORDED = ['Keynote', 'Executives', 'Formal'];
+  const choice = (type: string): Spec => ({
+    root: 'choice',
+    elements: {
+      choice: {
+        type,
+        props: {
+          label: 'Talk',
+          name: 'talk',
+          options: OPTIONS,
+          value: { $bindState: '/inputs/talk' },
+        },
+        children: [],
+      },
+    },
+  });
+
+  it.each(['Segmented', 'Radio'])('%s reads as words in an app and writes the code', (type) => {
+    const store = createStateStore({ inputs: { talk: 'formal' } });
+    render(
+      <FieldPresentationProvider presentation="app">
+        <GenerativePage spec={choice(type)} store={store} scope={{}} brand={BRAND} />
+      </FieldPresentationProvider>,
+    );
+    for (const word of WORDED) expect(screen.getByText(word)).toBeInTheDocument();
+    for (const code of OPTIONS) expect(screen.queryByText(code)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Executives'));
+    expect(store.get('/inputs/talk')).toBe('executives');
+  });
+
+  it.each(['Segmented', 'Radio'])('%s shows the codes in studio', (type) => {
+    render(
+      <GenerativePage
+        spec={choice(type)}
+        store={createStateStore({ inputs: {} })}
+        scope={{}}
+        brand={BRAND}
+        presentation="studio"
+      />,
+    );
+    for (const code of OPTIONS) expect(screen.getByText(code)).toBeInTheDocument();
+  });
+
+  it('Select shows the chosen option as words in an app', () => {
+    render(
+      <FieldPresentationProvider presentation="app">
+        <GenerativePage
+          spec={choice('Select')}
+          store={createStateStore({ inputs: { talk: 'executives' } })}
+          scope={{}}
+          brand={BRAND}
+        />
+      </FieldPresentationProvider>,
+    );
+    expect(screen.getByRole('combobox', { name: 'Talk' })).toHaveTextContent('Executives');
+  });
+
+  it('Select shows the chosen option as its code in studio', () => {
+    render(
+      <GenerativePage
+        spec={choice('Select')}
+        store={createStateStore({ inputs: { talk: 'executives' } })}
+        scope={{}}
+        brand={BRAND}
+        presentation="studio"
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Talk' })).toHaveTextContent('executives');
+  });
+});
+
+/**
  * A layout lays a list out as a `repeat`, and every row of it mounts the same
  * controls. Five of the catalog's controls minted their DOM ids from
  * `props.name` alone, so every row minted the same id: clicking row three's

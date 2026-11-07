@@ -27,6 +27,13 @@ export type {
 } from './descriptor';
 export { conceptCategory } from './descriptor';
 
+// What a person reads in place of an identifier. The descriptor carries an
+// enum's values and no display label, and the standard is not asked for one:
+// a choice's label is derived from its value, by this rule, wherever it is
+// drawn - the control set's form and result view, the generative layer's
+// choice controls, and a host's own. What a control stores stays the code.
+export { enumValueLabeler, humanizeEnumValue, humanizeFieldName } from './humanize';
+
 // The ONE derivation function - the wire input-form descriptor mapped
 // structurally onto RunField, with the contract beside it for the two
 // schema-derived facts (contentKey, nested list bounds). The wire types are
