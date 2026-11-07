@@ -491,8 +491,9 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   return (
     <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
       {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
-          however short its label, and the list around it with it. */}
-      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto">
+          however short its label, and the list around it with it, wrapping
+          onto a second row rather than pushing the page sideways. */}
+      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto max-sm:flex-wrap">
         {tabs.map((tab) => (
           <TabsPrimitive.Trigger
             key={tab.value}
