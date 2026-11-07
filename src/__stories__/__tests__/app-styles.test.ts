@@ -97,12 +97,15 @@ describe('styleTokens', () => {
     );
   });
 
-  it('sets no `--input` on the page, so a field fill reaches the host panel alone', () => {
+  it("sets no `--input` on the page, so a field fill reaches a style's panels alone", () => {
     for (const id of APP_STYLE_IDS) {
       for (const theme of THEMES)
         expect('--input' in styleTokens(deriveStyleRoles(id), theme), id).toBe(false);
     }
-    expect(FRAME).toMatch(/\.af-panel \{[^}]*--input: var\(--panel-field, var\(--host-input\)\)/);
+    // The host's own panel and every panel a style dresses on a produced page.
+    expect(FRAME).toMatch(
+      /\.af-panel,\s*\.af \[data-style-panel\] \{[^}]*--input: var\(--panel-field, var\(--host-input\)\)/,
+    );
   });
 });
 
