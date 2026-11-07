@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { BooleanRunField, ListRunField, ObjectRunField, TextRunField } from '../../core';
 import { ObjectField } from '../object-field';
+import { FieldRenderer } from '../field-renderer';
 
 const flag = (name: string): BooleanRunField => ({
   kind: 'boolean',
@@ -147,6 +148,19 @@ describe('how a structure groups its fields', () => {
         }}
       />,
     );
+    expect(groupingAround(screen.getByDisplayValue('Ada'))).toBe('none');
+    expect(groupingAround(screen.getByDisplayValue('London'))).toBe('rule');
+  });
+
+  it("counts a row's structure, so a structure in a form's own list is ruled and not boxed", () => {
+    // The list is the form's own field, so nothing above it is a structure.
+    // Were the row's structure not counted, the one inside it would read as a
+    // form's own and draw a card inside the row's box.
+    function ListHarness() {
+      const [value, setValue] = useState<unknown>([{ name: 'Ada', home: { city: 'London' } }]);
+      return <FieldRenderer field={travellers} value={value} onChange={setValue} id="travellers" />;
+    }
+    render(<ListHarness />);
     expect(groupingAround(screen.getByDisplayValue('Ada'))).toBe('none');
     expect(groupingAround(screen.getByDisplayValue('London'))).toBe('rule');
   });

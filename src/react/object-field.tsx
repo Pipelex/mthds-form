@@ -22,8 +22,10 @@ interface ObjectFieldProps {
 
 /**
  * How many structures a field sits inside: 0 for a form's own field, one more
- * inside each structure. A list's rows do not add to it, because a row is a
- * box the list draws, not a structure. Only `ObjectField` reads it.
+ * inside each structure. A list adds nothing to it, while the structure a
+ * list's row holds counts like any other and draws nothing around its fields
+ * (`none`, below), so a structure inside that row hangs from a rule rather
+ * than drawing a card in the row's box. Only `ObjectField` reads it.
  */
 const StructureDepthContext = createContext(0);
 
