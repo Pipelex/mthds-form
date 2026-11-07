@@ -207,7 +207,7 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
       edgeWidth: '1px',
       shadow: {
         light: '0 1px 2px rgb(16 24 40 / 0.05), 0 12px 32px -10px rgb(16 24 40 / 0.16)',
-        dark: '0 1px 2px rgb(0 0 0 / 0.5), 0 18px 44px -12px rgb(0 0 0 / 0.8)',
+        dark: '0 2px 4px rgb(0 0 0 / 0.55), 0 24px 56px -12px rgb(0 0 0 / 0.95)',
       },
       inset: {
         fill: {
@@ -257,7 +257,7 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = {
       // One firm edge around a solid panel, and groups inside it set apart by
       // their fill alone: an edge on every level read as a wireframe.
       fill: 'var(--muted)',
-      edge: { light: FIRM_EDGE, dark: 'color-mix(in oklab, var(--foreground) 42%, transparent)' },
+      edge: { light: FIRM_EDGE, dark: 'color-mix(in oklab, var(--foreground) 30%, transparent)' },
       edgeWidth: '2px',
       shadow: null,
       inset: {
