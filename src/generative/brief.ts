@@ -7,6 +7,7 @@ import {
 } from '../core/native-content';
 import type { Brief, PathEntry } from '../generated/layout-design/types';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
+import type { Frame } from './spike-definitions';
 
 /**
  * The brief: the model's view of the descriptor, as DATA.
@@ -55,6 +56,8 @@ export const DESIGNER_BRIEF_CONCEPT = 'generative.Brief';
  * the pass that made it.
  */
 const RUN_COMPONENT = 'Cta';
+/** SPIKE (L-261107-a6a35f): in a host's composer frame, the composer itself runs the method. */
+const COMPOSER_RUN_COMPONENT = 'Composer';
 
 export interface BriefSubject {
   /** `results.nested_result`. */
@@ -80,7 +83,15 @@ export interface BriefSubject {
  * empty one into a layout the validator then refuses, so the brief hands the
  * input back to the kernel's own control instead.
  */
-export function isDelegatedInput(field: RunField): boolean {
+export function isDelegatedInput(field: RunField, frame: Frame = 'page'): boolean {
+  // SPIKE (L-261107-a6a35f): the composer frame's vocabulary enters a date
+  // (DateRange), a list of short texts (Chips) and a list of structures
+  // (CompactList, which opens the kernel's own form for one item).
+  if (frame === 'composer') {
+    if (field.kind === 'date') return false;
+    if (field.kind === 'list' && (field.item.kind === 'text' || field.item.kind === 'object'))
+      return false;
+  }
   return (
     field.kind === 'document' ||
     field.kind === 'image' ||
@@ -99,8 +110,11 @@ export function isDelegatedInput(field: RunField): boolean {
  * date, but no catalog component reads a date's `{date, time}` either, so the
  * kernel renders the list whole - one value per line, as the result view does.
  */
-export function isDelegatedResult(field: RunField): boolean {
+export function isDelegatedResult(field: RunField, frame: Frame = 'page'): boolean {
   if (isNativeValueNode(field)) return true;
+  // SPIKE (L-261107-a6a35f): the result frame's vocabulary shows a picture
+  // (Picture) and a date in words (DateText).
+  if (frame === 'result' && (field.kind === 'image' || field.kind === 'date')) return false;
   if (field.kind === 'list' && isNativeValueNode(field.item)) return true;
   return (
     field.kind === 'document' ||
@@ -195,6 +209,7 @@ function entryOf(
   side: Side,
   relative: boolean,
   seeded: boolean,
+  frame: Frame = 'page',
 ): DesignerPathEntry {
   const notes = constraints(field);
   return {
@@ -209,7 +224,7 @@ function entryOf(
     notes: notes.length > 0 ? notes : undefined,
     default:
       seeded || field.defaultValue === undefined ? undefined : JSON.stringify(field.defaultValue),
-    delegated: side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field),
+    delegated: side === 'input' ? isDelegatedInput(field, frame) : isDelegatedResult(field, frame),
     relative: relative ? true : undefined,
   };
 }
@@ -227,8 +242,9 @@ function describe(
   side: Side,
   entries: DesignerPathEntry[],
   seeded = false,
+  frame: Frame = 'page',
 ): void {
-  const entry = entryOf(field, path, depth, side, false, seeded);
+  const entry = entryOf(field, path, depth, side, false, seeded, frame);
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
@@ -239,17 +255,19 @@ function describe(
     const seededBelow =
       seeded || field.defaultValue !== undefined || (side === 'input' && !field.required);
     for (const child of field.fields) {
-      describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow);
+      describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow, frame);
     }
   }
-  if (field.kind === 'list' && side === 'result') {
+  // SPIKE (L-261107-a6a35f): in the composer frame, a list of structures the
+  // page lays out names its item's members too, relative to one item.
+  if (field.kind === 'list' && (side === 'result' || frame === 'composer')) {
     const item = field.item;
     entry.item_kind = kindLabel(item);
     entry.item_description = item.description;
-    if (item.kind === 'object' && !isDelegatedResult(item)) {
+    if (item.kind === 'object' && (side === 'input' || !isDelegatedResult(item, frame))) {
       entry.item_laid_out = true;
       for (const child of item.fields) {
-        describeRelative(child, child.name, depth + 2, entries);
+        describeRelative(child, child.name, depth + 2, entries, side, frame);
       }
     }
   }
@@ -261,46 +279,85 @@ function describeRelative(
   relativePath: string,
   depth: number,
   entries: DesignerPathEntry[],
+  side: Side = 'result',
+  frame: Frame = 'page',
 ): void {
-  const entry = entryOf(field, relativePath, depth, 'result', true, false);
+  const entry = entryOf(field, relativePath, depth, side, true, false, frame);
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
     for (const child of field.fields) {
-      describeRelative(child, joinPath(relativePath, child.name), depth + 1, entries);
+      describeRelative(child, joinPath(relativePath, child.name), depth + 1, entries, side, frame);
     }
   }
-  if (field.kind === 'list') {
+  if (field.kind === 'list' && side === 'result') {
     const item = field.item;
     entry.item_kind = kindLabel(item);
     entry.item_description = item.description;
-    if (item.kind === 'object' && !isDelegatedResult(item)) {
+    if (item.kind === 'object' && !isDelegatedResult(item, frame)) {
       entry.item_laid_out = true;
       for (const child of item.fields) {
-        describeRelative(child, joinPath(relativePath, '<i>', child.name), depth + 2, entries);
+        describeRelative(
+          child,
+          joinPath(relativePath, '<i>', child.name),
+          depth + 2,
+          entries,
+          side,
+          frame,
+        );
       }
     }
   }
 }
 
 /** The brief for an INPUT page: the form a run is started from. */
-export function inputBrief(subject: BriefSubject, fields: readonly RunField[]): DesignerBrief {
+/**
+ * SPIKE (L-261107-a6a35f): what one run gives back, one line per member of the
+ * result (of one item, for a list), from the result's own titles and
+ * descriptions - so a composer can say what comes back before the run.
+ */
+function returnsOf(result: RunField): string[] {
+  const shape = result.kind === 'list' ? result.item : result;
+  const members = shape.kind === 'object' ? shape.fields : [shape];
+  return members.map((member) => {
+    const title = member.title ?? member.name.replace(/_/g, ' ');
+    return member.description && member.description !== title
+      ? `${title}: ${member.description}`
+      : title;
+  });
+}
+
+export function inputBrief(
+  subject: BriefSubject,
+  fields: readonly RunField[],
+  frame: Extract<Frame, 'page' | 'composer'> = 'page',
+  result?: RunField,
+): DesignerBrief {
   const paths: DesignerPathEntry[] = [];
-  for (const field of fields) describe(field, joinPath(INPUTS_ROOT, field.name), 0, 'input', paths);
+  for (const field of fields) {
+    describe(field, joinPath(INPUTS_ROOT, field.name), 0, 'input', paths, false, frame);
+  }
   return {
     side: 'input',
+    frame,
     pipe_ref: subject.pipeRef,
     description: subject.description,
     name: subject.name,
     paths,
-    run_control: RUN_COMPONENT,
+    run_control: frame === 'composer' ? COMPOSER_RUN_COMPONENT : RUN_COMPONENT,
+    ...(frame === 'composer' && result ? { returns: returnsOf(result) } : {}),
   };
 }
 
 /** The brief for a RESULT page: what one run produced, laid out. */
-export function resultBrief(subject: BriefSubject, field: RunField, state: unknown): DesignerBrief {
+export function resultBrief(
+  subject: BriefSubject,
+  field: RunField,
+  state: unknown,
+  frame: Extract<Frame, 'page' | 'result'> = 'page',
+): DesignerBrief {
   const paths: DesignerPathEntry[] = [];
-  if (field.kind === 'object' && !isDelegatedResult(field)) {
+  if (field.kind === 'object' && !isDelegatedResult(field, frame)) {
     // The result itself is the root, and its line names no member: it IS the
     // structure, whose members then follow one level down.
     paths.push({
@@ -311,13 +368,14 @@ export function resultBrief(subject: BriefSubject, field: RunField, state: unkno
       delegated: false,
     });
     for (const child of field.fields) {
-      describe(child, joinPath(RESULT_ROOT, child.name), 1, 'result', paths);
+      describe(child, joinPath(RESULT_ROOT, child.name), 1, 'result', paths, false, frame);
     }
   } else {
-    describe(field, RESULT_ROOT, 0, 'result', paths);
+    describe(field, RESULT_ROOT, 0, 'result', paths, false, frame);
   }
   return {
     side: 'result',
+    frame,
     pipe_ref: subject.pipeRef,
     description: subject.description,
     paths,

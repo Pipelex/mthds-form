@@ -1,0 +1,80 @@
+{
+  "id": "invoice--compose--claude-5.5-opus--s2--r1",
+  "method": "invoice",
+  "moment": "compose",
+  "frame": "composer",
+  "model": "claude-5.5-opus",
+  "seed": "bfrbvXcN6pgDLISPgULnmqAWS5XVSKbs",
+  "round": "r1",
+  "runId": "run_1a43795b-9f6e-4ef8-97c1-dd6edcbb235f",
+  "costUsd": 0.07703199999999999,
+  "seconds": 25,
+  "valid": true,
+  "problems": [],
+  "outside": [],
+  "fitProblems": [],
+  "plan": {
+    "purpose": "Someone holding an invoice or receipt wants to drop it in once and get its details read back to them, quickly and without any fuss.",
+    "title": "Read any invoice in one go",
+    "composition": "One centred column with a single Composer. Its headline is the page's h1, and one muted line under it says what to bring: \"Add an invoice or receipt and get its details pulled out for you.\" The raised panel holds just one input, so it uses one column with no group titles. The delegated document field fills the panel, and the panel needs nothing more. A short muted Text below the field says the run waits for the document. The action row at the panel's foot holds the host's run time and the one button. No headings, cards, separators or icons are added: with a single input, the page stays plain and spacious.",
+    "regions": [
+      {
+        "title": "Read any invoice in one go",
+        "purpose": "Carries the headline and its one line, collects the invoice file, and runs the method from the action row at its foot.",
+        "container": "Composer",
+        "elements": [
+          "Composer — headline \"Read any invoice in one go\", muted line \"Add an invoice or receipt and get its details pulled out for you.\", one column, runLabel \"Read my invoice\", on.press bound to validateForm then run",
+          "MthdsField — path /inputs/document (delegated file, required)",
+          "Text (muted) — \"Add a document to start.\""
+        ]
+      }
+    ],
+    "call_to_action": "Read my invoice — muted hint just above the action row: \"Add a document to start.\"",
+    "defaults": [],
+    "delegated": [
+      "/inputs/document — the brief marks this file as delegated, so MthdsField handles the upload."
+    ]
+  },
+  "brief": "# Input page: invoice_extraction.process_invoice\n\nProcess relevant information from an invoice\n\n## Name\n\nThe method is called «Receipt reader», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/document` — document (a file), required, gates the run — `document`: A document **[delegate: MthdsField]**\n\n## Delegated\n\nRender these with `MthdsField` at the path, and nothing else:\n\n- `/inputs/document` (document (a file))\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `document`; say so near the Composer, briefly.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+  "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"composer\"}\n{\"op\":\"add\",\"path\":\"/elements/composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Read any invoice in one go\",\"lede\":\"Add an invoice or receipt and get its details pulled out for you.\",\"runLabel\":\"Read my invoice\",\"columns\":\"1\"},\"children\":[\"document-field\",\"run-hint\"],\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]}}}\n{\"op\":\"add\",\"path\":\"/elements/document-field\",\"value\":{\"type\":\"MthdsField\",\"props\":{\"path\":\"/inputs/document\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/run-hint\",\"value\":{\"type\":\"Text\",\"props\":{\"text\":\"Add a document to start.\",\"variant\":\"muted\"},\"children\":[]}}",
+  "spec": {
+    "root": "composer",
+    "elements": {
+      "composer": {
+        "type": "Composer",
+        "props": {
+          "headline": "Read any invoice in one go",
+          "lede": "Add an invoice or receipt and get its details pulled out for you.",
+          "runLabel": "Read my invoice",
+          "columns": "1"
+        },
+        "children": ["document-field", "run-hint"],
+        "on": {
+          "press": [
+            {
+              "action": "validateForm"
+            },
+            {
+              "action": "run"
+            }
+          ]
+        }
+      },
+      "document-field": {
+        "type": "MthdsField",
+        "props": {
+          "path": "/inputs/document"
+        },
+        "children": []
+      },
+      "run-hint": {
+        "type": "Text",
+        "props": {
+          "text": "Add a document to start.",
+          "variant": "muted"
+        },
+        "children": []
+      }
+    }
+  }
+}

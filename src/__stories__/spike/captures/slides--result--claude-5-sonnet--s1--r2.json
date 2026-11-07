@@ -1,0 +1,287 @@
+{
+ "id": "slides--result--claude-5-sonnet--s1--r2",
+ "method": "slides",
+ "moment": "result",
+ "frame": "result",
+ "model": "claude-5-sonnet",
+ "seed": "GLcxXgggP03CbI4ZfXKjJKw1ZEWY0Ovx",
+ "round": "r2",
+ "runId": "run_23360d46-c8ea-441b-bba3-3e237c7b0892",
+ "costUsd": 0.11738599999999999,
+ "seconds": 59,
+ "valid": false,
+ "problems": [
+  "[tabs-root] Tabs.tabs: Too small: expected array to have >=2 items"
+ ],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "A designer who sketched a rough brief now stands in front of the result, comparing the visual directions the system proposed - so they can see each theme's title slide and personality at a glance and pick the one that fits.",
+  "title": "Your visual directions",
+  "composition": "Full width, no side panel. A short header names the result. Below it, the body is a set of Tabs - one per direction, labelled by theme name - since these are options of equal weight meant to be compared one at a time rather than scanned as a grid. Each tab opens on its title-slide mockup large and edge to edge at the top (the figure a person looks for first), then the theme's identity beneath it in two halves via Split: the palette as Swatches on the left, the typography, layout and style details as a column of Detail lines on the right, with the exclusions given its own line at the bottom. Nothing from the request is restated - the host's bar already carries the topic. The first tab opens by default.",
+  "regions": [
+   {
+    "title": null,
+    "purpose": "Names the result in the page's own words, as the single h1 the host's frame expects above the body.",
+    "container": "ResultHeader",
+    "elements": [
+     "ResultHeader — title: \"Your visual directions\", subtitle: a short line noting these are the proposed themes"
+    ]
+   },
+   {
+    "title": null,
+    "purpose": "One tab per proposed direction, so a person compares them one at a time instead of hunting through a long scroll; each tab's theme name is its own label.",
+    "container": "Tabs",
+    "elements": [
+     "Stack (one per item in /result/directions, labelled with theme/name) — holds this tab's panel: the mockup, the palette and the theme details"
+    ]
+   },
+   {
+    "title": null,
+    "purpose": "The title slide drawn in this theme - the figure a person looks for first - shown large and whole above the theme's details.",
+    "container": "Stack",
+    "elements": [
+     "Picture — mockup, aspect \"16:9\""
+    ]
+   },
+   {
+    "title": null,
+    "purpose": "The theme's identity set side by side: its colours to see at a glance, its type, layout and style to read in words.",
+    "container": "Split (1:1)",
+    "elements": [
+     "Swatches — colors: theme/colors/primary, theme/colors/secondary, theme/colors/accent, theme/colors/background, theme/colors/text_primary, theme/colors/text_secondary",
+     "Stack — Detail: theme/typography/font_family (label \"Font\"); Detail: theme/typography/heading_style (label \"Headings\"); Detail: theme/typography/body_style (label \"Body\"); Detail: theme/layout/aspect_ratio (label \"Aspect ratio\"); Detail: theme/layout/margins (label \"Margins\"); Detail: theme/layout/alignment (label \"Alignment\"); Detail: theme/style/overall (label \"Style\"); Detail: theme/style/icon_style (label \"Icons\"); Detail: theme/style/graphic_style (label \"Graphics\"); Detail: theme/exclusions (label \"Avoid\")"
+    ]
+   }
+  ],
+  "call_to_action": null,
+  "defaults": null,
+  "delegated": []
+ },
+ "brief": "# Result page: slide_designer.generate_design_proposals_from_rough_brief\n\nTransform a design brief into multiple visual directions, each a theme with a title slide drawn in it\n\n## Frame\n\nThis page is the result page of an app that is composed, then shows its result: what the person sees after one run. The host draws what surrounds it: the band with the team's logo and the app's name, then a bar restating the request with a way back to edit it and to run again. The host also owns the actions on the result, such as downloading or sharing it, and places them where the page's header puts them. There is no side panel, no app bar and no footer to build, and nothing restates the request.\n\nThe page is the result across the full width. It opens on its header, which names the result in a person's words, read from the result itself where it can be (the page's h1). Then the figure or the fact a person looks for first, then the body of the result in the shape it naturally has: a plan day by day, options side by side to compare, a record's details. Lay out what a person reads; leave out what only a machine would.\n\nShow each value once: a figure a component already states, such as the total inside a ProportionBar, is not repeated beside it. When the result carries the request back - the same facts the person entered, such as the topic or the tone they chose - leave that part out: the host's bar already restates the request. Write a value as a person reads it: a date in words, an amount beside its currency when the result has one.\n\n## State\n\nThe host loads the run's result under `/result` before the page renders. Read every value with `$state`; emit no `/state` patches. Paths:\n\n- `/result` — structure slide_designer.DesignDirections: The visual directions proposed for a deck, each a theme with a title slide drawn in it\n  - `/result/directions` — list of structure slide_designer.Direction — `directions`: The directions, one per theme\n    - each item is a structure slide_designer.Direction (One visual direction for a deck: its theme, and a title slide drawn in it), with these members (paths relative to one item, for DataTable columns or $item):\n      - `theme` — structure slide_designer.Theme — `theme`: The direction's theme: name, palette, type, layout and style\n        - `theme/name` — text — `name`: Theme name identifier\n        - `theme/colors` — structure slide_designer.ColorPalette — `colors`: Color palette for the theme\n          - `theme/colors/primary` — text — `primary`: Primary brand color (hex or name)\n          - `theme/colors/secondary` — text — `secondary`: Secondary color for accents\n          - `theme/colors/accent` — text — `accent`: Accent color for highlights\n          - `theme/colors/background` — text — `background`: Background color\n          - `theme/colors/text_primary` — text — `text_primary`: Primary text color\n          - `theme/colors/text_secondary` — text — `text_secondary`: Secondary text color for subtitles\n        - `theme/typography` — structure slide_designer.Typography — `typography`: Typography settings\n          - `theme/typography/font_family` — text — `font_family`: Primary font family name\n          - `theme/typography/heading_style` — text — `heading_style`: Style description for headings (e.g., bold, uppercase)\n          - `theme/typography/body_style` — text — `body_style`: Style description for body text\n        - `theme/layout` — structure slide_designer.LayoutSettings — `layout`: Layout configuration\n          - `theme/layout/aspect_ratio` — choice of \"16:9\" | \"4:3\" | \"1:1\" — `aspect_ratio`: Slide aspect ratio\n          - `theme/layout/margins` — text — `margins`: Margin style (e.g., narrow, standard, wide)\n          - `theme/layout/alignment` — text — `alignment`: Default content alignment (e.g., left, center, right)\n        - `theme/style` — structure slide_designer.StyleSettings — `style`: Visual style settings\n          - `theme/style/overall` — text — `overall`: Overall visual style (e.g., minimal, corporate, creative)\n          - `theme/style/icon_style` — text — `icon_style`: Style for icons (e.g., outline, filled, flat)\n          - `theme/style/graphic_style` — text — `graphic_style`: Style for graphics and illustrations\n        - `theme/exclusions` — text — `exclusions`: Elements to avoid in the design (e.g., no gradients, no stock photos)\n      - `mockup` — image (a file) — `mockup`: A title slide drawn in the theme\n\n## Delegated\n\nNone. `MthdsResult` remains available for any structure you choose not to lay out.\n\n## One real run, as loaded\n\nThe state of one actual run, so you can judge magnitudes and lengths. Bind to the paths; do not copy these values into the spec.\n\n```json\n{\n  \"directions\": [\n    {\n      \"theme\": {\n        \"name\": \"Executive Ledger\",\n        \"colors\": {\n          \"primary\": \"#102A43\",\n          \"secondary\": \"#486581\",\n          \"accent\": \"#B7791F\",\n          \"background\": \"#F7F9FC\",\n          \"text_primary\": \"#102A43\",\n          \"text_secondary\": \"#52606D\"\n        },\n        \"typography\": {\n          \"font_family\": \"Helvetica\",\n          \"heading_style\": \"Bold, sentence case, restrained hierarchy\",\n          \"body_style\": \"Regular, highly legible, concise\"\n        },\n        \"layout\": {\n          \"aspect_ratio\": \"16:9\",\n          \"margins\": \"wide\",\n          \"alignment\": \"left\"\n        },\n        \"style\": {\n          \"overall\": \"Minimal executive financial reporting with disciplined whitespace and clear data hierarchy\",\n          \"icon_style\": \"Fine-line outline icons\",\n          \"graphic_style\": \"Clean flat charts, precise grids, and restrained callout highlights\"\n        },\n        \"exclusions\": \"Avoid gradients, decorative illustrations, stock photography, dense dashboard layouts, playful colors, and 3D effects.\"\n      },\n      \"mockup\": {\n        \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_417a280b-436a-4296-bad7-844825af0b69/generated/e9e57a5e8b311782.jpg\",\n        \"public_url\": \"https://pipelex-app-prod.s3.amazonaws.com/org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_417a280b-436a-4296-bad7-844825af0b69/generated/e9e57a5e8b311782.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA6GBMGUQL7WJ5FADD%2F20261107%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261107T140611Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEC0aCXVzLXdlc3QtMiJGMEQCIDf7BlFA%2BR5SCAeke6%2FpuGcBwBf4f3C9tzNaWlDAWcD%2FAiA60K4xuy0wKmFzq7mqs%2FkcQ7UdtUVDgGFbPyGfv8qxeSqaBAj2%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAEaDDk3NTA1MDI4NjEwMyIMUJQojnVszU4XaKAHKu4DK3zGVbRCP7e7V9zojnor7tMoT7ZmKRs5JasSAFkSN6meuQtH3rYGt94ROwcpzgXEnRPZiInJqzhpxBKsWOMT9AH3wUVxlfz0UHJXPlfnG9cQeusnvfEP0GOOkHdJx5cARepYIvBaw1cbTGBiWLNXmatnIPSA4hYeGjb7VzIJjMWPN8Cwd2eFmjonejP6Rz7NI7yo6bESp1dssIb%2Bj2MZq%2F6wFAzPM8ZP%2F5PcC%2BQHOQWHC5PNgKyIvknlQoTqG2qBE1g4oCOX6e3eBMbWCF8JVIbjraDRFDke7HF9hh4kqf09sbl1qsUK3%2FVn2h5AWn5MOHZ%2B4BCARJ3edeVOyVqIx7EUsBNUJGxprPkiT441GVHOeYYhEmFN1YRTmTIfss6govpXd%2FQZro8%2B7w3jjRTAijbwQEThdWwWhEx6jnUwuKlBwLp%2F0RAFlwBUAvDFfCkWJfbpgVvdEGkiVETOWXbph0k5mzTo3SLUk5b3o6i4BtfRylGJM9xDuelDlZ7sRe5A5dqq33STWbsO58UWYOTZHdXUnx8Uy2CfBoboS3rRU4dM5tQDJIM6h3rJ0oxe2cahnlJnxBDk%2B8ddAT9TkDKUEgBkbrsWGWl8cbCt%2FsPZt69biUYc87CQzvli94sW5Rux6K7C5AndSLP2gBvM1BUw7cO81wY6pwFEyQDadlPsEbWpesTI%2BHIBVqu3bYtg2vx7lFPfzR8Obo62WFRnWWK3%2FEGN8Cn%2ByjoFJTW7NQusKbtiIKZ6%2BjyzfgzcYRh6lMyaz1Iw3VDIQwsnnMTux%2FK6QyddUzz2HPnbcED4Uu4Ug5bINTX4uJ2hHe2EZ23FCMOj%2FFweMFJw3neoACRVsnoV8crQl%2FrCD1VAsa32JdfRGex%2FqgPFpM4o5w1rrg2%2FSw%3D%3D&X-Amz-Signature=845e8fabebec610804b41fb87f877e3de2f4a27d8851e1a1b1ebb1dc0e062c40\",\n        \"source_prompt\": \"Render the title slide of a presentation, edge to edge. The presentation is about: Q4 2025 Financial Results\\n\\nDesign it in the following theme:\\n\\n# name: Executive Ledger\\n\\n# colors\\n\\n## primary: #102A43\\n\\n## secondary: #486581\\n\\n## accent: #B7791F\\n\\n## background: #F7F9FC\\n\\n## text_primary: #102A43\\n\\n## text_secondary: #52606D\\n\\n# typography\\n\\n## font_family: Helvetica\\n\\n## heading_style: Bold, sentence case, restrained hierarchy\\n\\n## body_style: Regular, highly legible, concise\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: wide\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Minimal executive financial reporting with disciplined whitespace and clear data hierarchy\\n\\n## icon_style: Fine-line outline icons\\n\\n## graphic_style: Clean flat charts, precise grids, and restrained callout highlights\\n\\n# exclusions: Avoid gradients, decorative illustrations, stock photography, dense dashboard layouts, playful colors, and 3D effects.\\n\\n---\\n\\nOne slide only, filling the whole image: the deck's title large, taken from its topic word for word, a short subtitle, and the theme's palette, type and graphic style. No device frame, no mosaic, no border around the slide.\",\n        \"source_negative_prompt\": null,\n        \"caption\": null,\n        \"mime_type\": \"image/jpeg\",\n        \"width\": null,\n        \"height\": null,\n        \"filename\": null\n      }\n    },\n    {\n      \"theme\": {\n        \"name\": \"Boardroom Slate\",\n        \"colors\": {\n          \"primary\": \"#1F2933\",\n          \"secondary\": \"#627D98\",\n          \"accent\": \"#2F855A\",\n          \"background\": \"#FFFFFF\",\n          \"text_primary\": \"#1F2933\",\n          \"text_secondary\": \"#616E7C\"\n        },\n        \"typography\": {\n          \"font_family\": \"Georgia\",\n          \"heading_style\": \"Bold serif headings with measured sentence case\",\n          \"body_style\": \"Clean sans-serif companion text, regular weight, generous leading\"\n        },\n        \"layout\": {\n          \"aspect_ratio\": \"16:9\",\n          \"margins\": \"standard\",\n          \"alignment\": \"left\"\n        },\n        \"style\": {\n          \"overall\": \"Formal boardroom editorial style balancing authoritative narrative with financial evidence\",\n          \"icon_style\": \"Minimal monochrome outline icons\",\n          \"graphic_style\": \"Editorial tables, understated bar and line charts, and subtle rule-based dividers\"\n        },\n        \"exclusions\": \"Avoid gradients, saturated multicolor charts, novelty fonts, casual imagery, excessive animation, and ornamental graphics.\"\n      },\n      \"mockup\": {\n        \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_417a280b-436a-4296-bad7-844825af0b69/generated/0955adedea2a3132.jpg\",\n        \"public_url\": \"https://pipelex-app-prod.s3.amazonaws.com/org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_417a280b-436a-4296-bad7-844825af0b69/generated/0955adedea2a3132.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA6GBMGUQL7WJ5FADD%2F20261107%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261107T140611Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEC0aCXVzLXdlc3QtMiJGMEQCIDf7BlFA%2BR5SCAeke6%2FpuGcBwBf4f3C9tzNaWlDAWcD%2FAiA60K4xuy0wKmFzq7mqs%2FkcQ7UdtUVDgGFbPyGfv8qxeSqaBAj2%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAEaDDk3NTA1MDI4NjEwMyIMUJQojnVszU4XaKAHKu4DK3zGVbRCP7e7V9zojnor7tMoT7ZmKRs5JasSAFkSN6meuQtH3rYGt94ROwcpzgXEnRPZiInJqzhpxBKsWOMT9AH3wUVxlfz0UHJXPlfnG9cQeusnvfEP0GOOkHdJx5cARepYIvBaw1cbTGBiWLNXmatnIPSA4hYeGjb7VzIJjMWPN8Cwd2eFmjonejP6Rz7NI7yo6bESp1dssIb%2Bj2MZq%2F6wFAzPM8ZP%2F5PcC%2BQHOQWHC5PNgKyIvknlQoTqG2qBE1g4oCOX6e3eBMbWCF8JVIbjraDRFDke7HF9hh4kqf09sbl1qsUK3%2FVn2h5AWn5MOHZ%2B4BCARJ3edeVOyVqIx7EUsBNUJGxprPkiT441GVHOeYYhEmFN1YRTmTIfss6govpXd%2FQZro8%2B7w3jjRTAijbwQEThdWwWhEx6jnUwuKlBwLp%2F0RAFlwBUAvDFfCkWJfbpgVvdEGkiVETOWXbph0k5mzTo3SLUk5b3o6i4BtfRylGJM9xDuelDlZ7sRe5A5dqq33STWbsO58UWYOTZHdXUnx8Uy2CfBoboS3rRU4dM5tQDJIM6h3rJ0oxe2cahnlJnxBDk%2B8ddAT9TkDKUEgBkbrsWGWl8cbCt%2FsPZt69biUYc87CQzvli94sW5Rux6K7C5AndSLP2gBvM1BUw7cO81wY6pwFEyQDadlPsEbWpesTI%2BHIBVqu3bYtg2vx7lFPfzR8Obo62WFRnWWK3%2FEGN8Cn%2ByjoFJTW7NQusKbtiIKZ6%2BjyzfgzcYRh6lMyaz1Iw3VDIQwsnnMTux%2FK6QyddUzz2HPnbcED4Uu4Ug5bINTX4uJ2hHe2EZ23FCMOj%2FFweMFJw3neoACRVsnoV8crQl%2FrCD1VAsa32JdfRGex%2FqgPFpM4o5w1rrg2%2FSw%3D%3D&X-Amz-Signature=c82769e8d9e9183bac86284ec02cc437c170263cf4006c0e8981c1acdceb0dea\",\n        \"source_prompt\": \"Render the title slide of a presentation, edge to edge. The presentation is about: Q4 2025 Financial Results\\n\\nDesign it in the following theme:\\n\\n# name: Boardroom Slate\\n\\n# colors\\n\\n## primary: #1F2933\\n\\n## secondary: #627D98\\n\\n## accent: #2F855A\\n\\n## background: #FFFFFF\\n\\n## text_primary: #1F2933\\n\\n## text_secondary: #616E7C\\n\\n# typography\\n\\n## font_family: Georgia\\n\\n## heading_style: Bold serif headings with measured sentence case\\n\\n## body_style: Clean sans-serif companion text, regular weight, generous leading\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: standard\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Formal boardroom editorial style balancing authoritative narrative with financial evidence\\n\\n## icon_style: Minimal monochrome outline icons\\n\\n## graphic_style: Editorial tables, understated bar and line charts, and subtle rule-based dividers\\n\\n# exclusions: Avoid gradients, saturated multicolor charts, novelty fonts, casual imagery, excessive animation, and ornamental graphics.\\n\\n---\\n\\nOne slide only, filling the whole image: the deck's title large, taken from its topic word for word, a short subtitle, and the theme's palette, type and graphic style. No device frame, no mosaic, no border around the slide.\",\n        \"source_negative_prompt\": null,\n        \"caption\": null,\n        \"mime_type\": \"image/jpeg\",\n        \"width\": null,\n        \"height\": null,\n        \"filename\": null\n      }\n    },\n    {\n      \"theme\": {\n        \"name\": \"Midnight Metrics\",\n        \"colors\": {\n          \"primary\": \"#0B1F3A\",\n          \"secondary\": \"#334E68\",\n          \"accent\": \"#38A169\",\n          \"background\": \"#0B1F3A\",\n          \"text_primary\": \"#F5F7FA\",\n          \"text_secondary\": \"#B8C5D1\"\n        },\n        \"typography\": {\n          \"font_family\": \"Helvetica\",\n          \"heading_style\": \"Bold, high-contrast sans-serif headings with tabular numerals\",\n          \"body_style\": \"Regular sans-serif text with concise labels and clear numeric hierarchy\"\n        },\n        \"layout\": {\n          \"aspect_ratio\": \"16:9\",\n          \"margins\": \"wide\",\n          \"alignment\": \"left\"\n        },\n        \"style\": {\n          \"overall\": \"Premium dark-mode keynote aesthetic for concise executive performance storytelling\",\n          \"icon_style\": \"Simple thin-line icons in light neutral tones\",\n          \"graphic_style\": \"High-contrast data visualizations, restrained green performance indicators, and spacious metric cards\"\n        },\n        \"exclusions\": \"Avoid gradients, bright neon colors, heavy shadows, photographic backgrounds, cluttered tables, and decorative textures.\"\n      },\n      \"mockup\": {\n        \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_417a280b-436a-4296-bad7-844825af0b69/generated/7ab648bf89a21b4e.jpg\",\n        \"public_url\": \"https://pipelex-app-prod.s3.amazonaws.com/org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_417a280b-436a-4296-bad7-844825af0b69/generated/7ab648bf89a21b4e.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA6GBMGUQL7WJ5FADD%2F20261107%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261107T140611Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEC0aCXVzLXdlc3QtMiJGMEQCIDf7BlFA%2BR5SCAeke6%2FpuGcBwBf4f3C9tzNaWlDAWcD%2FAiA60K4xuy0wKmFzq7mqs%2FkcQ7UdtUVDgGFbPyGfv8qxeSqaBAj2%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAEaDDk3NTA1MDI4NjEwMyIMUJQojnVszU4XaKAHKu4DK3zGVbRCP7e7V9zojnor7tMoT7ZmKRs5JasSAFkSN6meuQtH3rYGt94ROwcpzgXEnRPZiInJqzhpxBKsWOMT9AH3wUVxlfz0UHJXPlfnG9cQeusnvfEP0GOOkHdJx5cARepYIvBaw1cbTGBiWLNXmatnIPSA4hYeGjb7VzIJjMWPN8Cwd2eFmjonejP6Rz7NI7yo6bESp1dssIb%2Bj2MZq%2F6wFAzPM8ZP%2F5PcC%2BQHOQWHC5PNgKyIvknlQoTqG2qBE1g4oCOX6e3eBMbWCF8JVIbjraDRFDke7HF9hh4kqf09sbl1qsUK3%2FVn2h5AWn5MOHZ%2B4BCARJ3edeVOyVqIx7EUsBNUJGxprPkiT441GVHOeYYhEmFN1YRTmTIfss6govpXd%2FQZro8%2B7w3jjRTAijbwQEThdWwWhEx6jnUwuKlBwLp%2F0RAFlwBUAvDFfCkWJfbpgVvdEGkiVETOWXbph0k5mzTo3SLUk5b3o6i4BtfRylGJM9xDuelDlZ7sRe5A5dqq33STWbsO58UWYOTZHdXUnx8Uy2CfBoboS3rRU4dM5tQDJIM6h3rJ0oxe2cahnlJnxBDk%2B8ddAT9TkDKUEgBkbrsWGWl8cbCt%2FsPZt69biUYc87CQzvli94sW5Rux6K7C5AndSLP2gBvM1BUw7cO81wY6pwFEyQDadlPsEbWpesTI%2BHIBVqu3bYtg2vx7lFPfzR8Obo62WFRnWWK3%2FEGN8Cn%2ByjoFJTW7NQusKbtiIKZ6%2BjyzfgzcYRh6lMyaz1Iw3VDIQwsnnMTux%2FK6QyddUzz2HPnbcED4Uu4Ug5bINTX4uJ2hHe2EZ23FCMOj%2FFweMFJw3neoACRVsnoV8crQl%2FrCD1VAsa32JdfRGex%2FqgPFpM4o5w1rrg2%2FSw%3D%3D&X-Amz-Signature=539cbca39bc5e094fd2a5d744ed43aa9d13777a36519c5546f7cc59b4c0392a1\",\n        \"source_prompt\": \"Render the title slide of a presentation, edge to edge. The presentation is about: Q4 2025 Financial Results\\n\\nDesign it in the following theme:\\n\\n# name: Midnight Metrics\\n\\n# colors\\n\\n## primary: #0B1F3A\\n\\n## secondary: #334E68\\n\\n## accent: #38A169\\n\\n## background: #0B1F3A\\n\\n## text_primary: #F5F7FA\\n\\n## text_secondary: #B8C5D1\\n\\n# typography\\n\\n## font_family: Helvetica\\n\\n## heading_style: Bold, high-contrast sans-serif headings with tabular numerals\\n\\n## body_style: Regular sans-serif text with concise labels and clear numeric hierarchy\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: wide\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Premium dark-mode keynote aesthetic for concise executive performance storytelling\\n\\n## icon_style: Simple thin-line icons in light neutral tones\\n\\n## graphic_style: High-contrast data visualizations, restrained green performance indicators, and spacious metric cards\\n\\n# exclusions: Avoid gradients, bright neon colors, heavy shadows, photographic backgrounds, cluttered tables, and decorative textures.\\n\\n---\\n\\nOne slide only, filling the whole image: the deck's title large, taken from its topic word for word, a short subtitle, and the theme's palette, type and graphic style. No device frame, no mosaic, no border around the slide.\",\n        \"source_negative_prompt\": null,\n        \"caption\": null,\n        \"mime_type\": \"image/jpeg\",\n        \"width\": null,\n        \"height\": null,\n        \"filename\": null\n      }\n    }\n  ]\n}\n```\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"page\"}\n{\"op\":\"add\",\"path\":\"/elements/page\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"children\":[\"header\",\"tabs-root\"]}}\n{\"op\":\"add\",\"path\":\"/elements/header\",\"value\":{\"type\":\"ResultHeader\",\"props\":{\"title\":\"Your visual directions\",\"subtitle\":\"Proposed visual directions, each with its own title slide.\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/tabs-root\",\"value\":{\"type\":\"Tabs\",\"props\":{\"tabs\":[{\"label\":{\"$item\":\"theme/name\"},\"value\":{\"$item\":\"theme/name\"}}]},\"repeat\":{\"statePath\":\"/result/directions\",\"key\":\"theme/name\"},\"children\":[\"direction-panel\"]}}\n{\"op\":\"add\",\"path\":\"/elements/direction-panel\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"children\":[\"mockup-picture\",\"identity-split\"]}}\n{\"op\":\"add\",\"path\":\"/elements/mockup-picture\",\"value\":{\"type\":\"Picture\",\"props\":{\"path\":\"mockup\",\"alt\":{\"$item\":\"theme/name\"},\"aspect\":\"16:9\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/identity-split\",\"value\":{\"type\":\"Split\",\"props\":{\"ratio\":\"1:1\",\"gap\":\"xl\"},\"children\":[\"palette-swatches\",\"details-column\"]}}\n{\"op\":\"add\",\"path\":\"/elements/palette-swatches\",\"value\":{\"type\":\"Swatches\",\"props\":{\"colors\":[{\"$item\":\"theme/colors/primary\"},{\"$item\":\"theme/colors/secondary\"},{\"$item\":\"theme/colors/accent\"},{\"$item\":\"theme/colors/background\"},{\"$item\":\"theme/colors/text_primary\"},{\"$item\":\"theme/colors/text_secondary\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/details-column\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"detail-font\",\"detail-headings\",\"detail-body\",\"detail-aspect\",\"detail-margins\",\"detail-alignment\",\"detail-style\",\"detail-icons\",\"detail-graphics\",\"detail-exclusions\"]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-font\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Font\",\"value\":{\"$item\":\"theme/typography/font_family\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-headings\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Headings\",\"value\":{\"$item\":\"theme/typography/heading_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-body\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Body\",\"value\":{\"$item\":\"theme/typography/body_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-aspect\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Aspect ratio\",\"value\":{\"$item\":\"theme/layout/aspect_ratio\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-margins\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Margins\",\"value\":{\"$item\":\"theme/layout/margins\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-alignment\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Alignment\",\"value\":{\"$item\":\"theme/layout/alignment\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-style\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Style\",\"value\":{\"$item\":\"theme/style/overall\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-icons\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Icons\",\"value\":{\"$item\":\"theme/style/icon_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-graphics\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Graphics\",\"value\":{\"$item\":\"theme/style/graphic_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-exclusions\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Avoid\",\"value\":{\"$item\":\"theme/exclusions\"}},\"children\":[]}}",
+ "spec": {
+  "root": "page",
+  "elements": {
+   "page": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "lg"
+    },
+    "children": [
+     "header",
+     "tabs-root"
+    ]
+   },
+   "header": {
+    "type": "ResultHeader",
+    "props": {
+     "title": "Your visual directions",
+     "subtitle": "Proposed visual directions, each with its own title slide."
+    },
+    "children": []
+   },
+   "tabs-root": {
+    "type": "Tabs",
+    "props": {
+     "tabs": [
+      {
+       "label": {
+        "$item": "theme/name"
+       },
+       "value": {
+        "$item": "theme/name"
+       }
+      }
+     ]
+    },
+    "repeat": {
+     "statePath": "/result/directions",
+     "key": "theme/name"
+    },
+    "children": [
+     "direction-panel"
+    ]
+   },
+   "direction-panel": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "lg"
+    },
+    "children": [
+     "mockup-picture",
+     "identity-split"
+    ]
+   },
+   "mockup-picture": {
+    "type": "Picture",
+    "props": {
+     "path": "mockup",
+     "alt": {
+      "$item": "theme/name"
+     },
+     "aspect": "16:9"
+    },
+    "children": []
+   },
+   "identity-split": {
+    "type": "Split",
+    "props": {
+     "ratio": "1:1",
+     "gap": "xl"
+    },
+    "children": [
+     "palette-swatches",
+     "details-column"
+    ]
+   },
+   "palette-swatches": {
+    "type": "Swatches",
+    "props": {
+     "colors": [
+      {
+       "$item": "theme/colors/primary"
+      },
+      {
+       "$item": "theme/colors/secondary"
+      },
+      {
+       "$item": "theme/colors/accent"
+      },
+      {
+       "$item": "theme/colors/background"
+      },
+      {
+       "$item": "theme/colors/text_primary"
+      },
+      {
+       "$item": "theme/colors/text_secondary"
+      }
+     ]
+    },
+    "children": []
+   },
+   "details-column": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "none"
+    },
+    "children": [
+     "detail-font",
+     "detail-headings",
+     "detail-body",
+     "detail-aspect",
+     "detail-margins",
+     "detail-alignment",
+     "detail-style",
+     "detail-icons",
+     "detail-graphics",
+     "detail-exclusions"
+    ]
+   },
+   "detail-font": {
+    "type": "Detail",
+    "props": {
+     "label": "Font",
+     "value": {
+      "$item": "theme/typography/font_family"
+     }
+    },
+    "children": []
+   },
+   "detail-headings": {
+    "type": "Detail",
+    "props": {
+     "label": "Headings",
+     "value": {
+      "$item": "theme/typography/heading_style"
+     }
+    },
+    "children": []
+   },
+   "detail-body": {
+    "type": "Detail",
+    "props": {
+     "label": "Body",
+     "value": {
+      "$item": "theme/typography/body_style"
+     }
+    },
+    "children": []
+   },
+   "detail-aspect": {
+    "type": "Detail",
+    "props": {
+     "label": "Aspect ratio",
+     "value": {
+      "$item": "theme/layout/aspect_ratio"
+     }
+    },
+    "children": []
+   },
+   "detail-margins": {
+    "type": "Detail",
+    "props": {
+     "label": "Margins",
+     "value": {
+      "$item": "theme/layout/margins"
+     }
+    },
+    "children": []
+   },
+   "detail-alignment": {
+    "type": "Detail",
+    "props": {
+     "label": "Alignment",
+     "value": {
+      "$item": "theme/layout/alignment"
+     }
+    },
+    "children": []
+   },
+   "detail-style": {
+    "type": "Detail",
+    "props": {
+     "label": "Style",
+     "value": {
+      "$item": "theme/style/overall"
+     }
+    },
+    "children": []
+   },
+   "detail-icons": {
+    "type": "Detail",
+    "props": {
+     "label": "Icons",
+     "value": {
+      "$item": "theme/style/icon_style"
+     }
+    },
+    "children": []
+   },
+   "detail-graphics": {
+    "type": "Detail",
+    "props": {
+     "label": "Graphics",
+     "value": {
+      "$item": "theme/style/graphic_style"
+     }
+    },
+    "children": []
+   },
+   "detail-exclusions": {
+    "type": "Detail",
+    "props": {
+     "label": "Avoid",
+     "value": {
+      "$item": "theme/exclusions"
+     }
+    },
+    "children": []
+   }
+  }
+ }
+}

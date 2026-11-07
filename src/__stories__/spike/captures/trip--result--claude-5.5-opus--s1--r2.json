@@ -1,0 +1,263 @@
+{
+ "id": "trip--result--claude-5.5-opus--s1--r2",
+ "method": "trip",
+ "moment": "result",
+ "frame": "result",
+ "model": "claude-5.5-opus",
+ "seed": "X1SBPtJPfeTguObIohL61NBz30i0Xwvp",
+ "round": "r2",
+ "runId": "run_66ee3e6d-c3cd-4396-ab93-f36c9cc9a670",
+ "costUsd": 0.144348,
+ "seconds": 50,
+ "valid": true,
+ "problems": [],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "For the person who just asked for a trip: they want to read the days in order, see at a glance where the money goes, and keep the practical tips close.",
+  "title": "Lisbon in April (the trip's name, read from /result/title)",
+  "composition": "The page opens on a ResultHeader across the full width: the trip's name as the h1 and the short overview as the muted line under it, with the host's actions at the right. Below it, a Split \"2:1\" splits the page. The wide left column holds the day-by-day plan as one calm vertical run of days. Each day starts with its date in words as an accent eyebrow and its title as an h2, then up to four labelled Detail lines (Morning, Midday, Afternoon, Evening). Empty moments hide themselves, so arrival and departure days stay short. A hairline Separator sits between days. The narrow right rail holds the money first: a ProportionBar of the costs by category with the currency. It already states the total, so estimated_total is not repeated. Under it, the practical notes are a dotted TextList under a small h2. Nothing is boxed except the ProportionBar's own panel. The page uses only two heading levels, and the request is never restated.",
+  "regions": [
+   {
+    "title": null,
+    "purpose": "Names the trip and gives the two-sentence overview of the plan. The host's download and share actions sit at its right.",
+    "container": "ResultHeader",
+    "elements": [
+     "ResultHeader: eyebrow \"Your trip\"; title read with $state /result/title (the page's h1); description read with $state /result/overview"
+    ]
+   },
+   {
+    "title": "Day by day",
+    "purpose": "The main body: each day of the plan in order, written to be read top to bottom like a travel diary. It takes the wide left column of the Split \"2:1\" because it is what the person came for.",
+    "container": "Stack",
+    "elements": [
+     "Repeat over /result/days, one vertical Stack per day, with a Separator between days:",
+     "  DateText: value $item day, format \"weekday\", tone accent (eyebrow)",
+     "  Heading h2: $item title",
+     "  Detail: label \"Morning\", value $item morning (hides when empty)",
+     "  Detail: label \"Midday\", value $item midday (hides when empty)",
+     "  Detail: label \"Afternoon\", value $item afternoon (hides when empty)",
+     "  Detail: label \"Evening\", value $item evening (hides when empty)"
+    ]
+   },
+   {
+    "title": null,
+    "purpose": "The narrow right rail of the Split \"2:1\". It answers the money question first and keeps the practical tips in reach beside the days.",
+    "container": "Stack",
+    "elements": [
+     "ProportionBar: label \"Estimated cost\"; items $state /result/costs; labelKey \"category\"; valueKey \"amount\"; unit $state /result/currency (it states the total, so /result/estimated_total is not shown again)",
+     "Heading h2: \"Good to know\"",
+     "TextList: items $state /result/practical_notes, marker dot"
+    ]
+   }
+  ],
+  "call_to_action": null,
+  "defaults": null,
+  "delegated": []
+ },
+ "brief": "# Result page: trip_planner.plan_trip\n\nPlan the trip day by day, within the budget\n\n## Frame\n\nThis page is the result page of an app that is composed, then shows its result: what the person sees after one run. The host draws what surrounds it: the band with the team's logo and the app's name, then a bar restating the request with a way back to edit it and to run again. The host also owns the actions on the result, such as downloading or sharing it, and places them where the page's header puts them. There is no side panel, no app bar and no footer to build, and nothing restates the request.\n\nThe page is the result across the full width. It opens on its header, which names the result in a person's words, read from the result itself where it can be (the page's h1). Then the figure or the fact a person looks for first, then the body of the result in the shape it naturally has: a plan day by day, options side by side to compare, a record's details. Lay out what a person reads; leave out what only a machine would.\n\nShow each value once: a figure a component already states, such as the total inside a ProportionBar, is not repeated beside it. When the result carries the request back - the same facts the person entered, such as the topic or the tone they chose - leave that part out: the host's bar already restates the request. Write a value as a person reads it: a date in words, an amount beside its currency when the result has one.\n\n## State\n\nThe host loads the run's result under `/result` before the page renders. Read every value with `$state`; emit no `/state` patches. Paths:\n\n- `/result` — structure trip_planner.Itinerary: A day-by-day plan for a trip, with its estimated cost\n  - `/result/title` — text — `title`: The trip's name\n  - `/result/overview` — text — `overview`: The plan in two or three sentences\n  - `/result/days` — list of structure trip_planner.DayPlan — `days`: The plan for each day, in order\n    - each item is a structure trip_planner.DayPlan (One day of the trip), with these members (paths relative to one item, for DataTable columns or $item):\n      - `day` — date — `day`: The day\n      - `title` — text — `title`: What the day is about, in a few words\n      - `morning` — text — `morning`: What to do in the morning\n      - `midday` — text — `midday`: Where and what to eat at midday\n      - `afternoon` — text — `afternoon`: What to do in the afternoon\n      - `evening` — text — `evening`: What to do in the evening\n  - `/result/costs` — list of structure trip_planner.CostLine — `costs`: The estimated cost, by category\n    - each item is a structure trip_planner.CostLine (One line of the estimated cost), with these members (paths relative to one item, for DataTable columns or $item):\n      - `category` — choice of \"stay\" | \"food\" | \"tickets\" | \"transport\" | \"buffer\" — `category`: What the money goes on\n      - `amount` — number — `amount`: The estimated amount, in the trip's currency\n  - `/result/estimated_total` — number — `estimated_total`: The estimated total cost of the trip\n  - `/result/currency` — text — `currency`: The currency of every amount\n  - `/result/practical_notes` — list of text — `practical_notes`: Notes for getting around and staying comfortable\n    - each item is a text\n\n## Delegated\n\nNone. `MthdsResult` remains available for any structure you choose not to lay out.\n\n## One real run, as loaded\n\nThe state of one actual run, so you can judge magnitudes and lengths. Bind to the paths; do not copy these values into the spec.\n\n```json\n{\n  \"title\": \"Lisbon in April\",\n  \"overview\": \"A balanced, family-focused six-day Lisbon stay with tram rides, pastry stops and a full-day Sintra outing. The itinerary includes Belém Tower and LX Factory, with flexible meals that work for Maya’s vegetarian diet.\",\n  \"days\": [\n    {\n      \"day\": \"2027-04-14\",\n      \"title\": \"Arrival and Baixa introduction\",\n      \"morning\": null,\n      \"midday\": null,\n      \"afternoon\": \"Arrive and check in; keep the first outing easy with a 16:00 walk through Praça do Comércio and Rua Augusta.\",\n      \"evening\": \"18:30 ride Tram 28 for Ada, then have dinner in Baixa; choose a restaurant with vegetarian options for Maya.\"\n    },\n    {\n      \"day\": \"2027-04-15\",\n      \"title\": \"Historic Lisbon by tram\",\n      \"morning\": \"09:30 take Tram 28 to Graça and walk to the Miradouro da Senhora do Monte for city views.\",\n      \"midday\": \"12:30 lunch in Alfama; order a vegetarian dish for Maya and simple Portuguese food for Tom and Ada.\",\n      \"afternoon\": \"14:00 explore Alfama at an unhurried pace, including Sé Cathedral and a pastry stop.\",\n      \"evening\": \"18:30 return to the hotel to rest; 20:00 family dinner near the accommodation.\"\n    },\n    {\n      \"day\": \"2027-04-16\",\n      \"title\": \"Belém and LX Factory\",\n      \"morning\": \"09:30 travel to Belém; visit Belém Tower, then stop at Pastéis de Belém for pastries.\",\n      \"midday\": \"12:30 have lunch in Belém, selecting vegetarian-friendly dishes for Maya.\",\n      \"afternoon\": \"14:30 go to LX Factory; browse the shops, street art and bookshop, with time for a snack.\",\n      \"evening\": \"18:30 dinner at LX Factory or return to central Lisbon for a relaxed meal.\"\n    },\n    {\n      \"day\": \"2027-04-17\",\n      \"title\": \"Day trip to Sintra\",\n      \"morning\": \"08:30 take the train from Rossio to Sintra; visit Pena Palace in the morning.\",\n      \"midday\": \"12:30 lunch in Sintra’s historic centre; choose a café or restaurant with vegetarian options.\",\n      \"afternoon\": \"14:00 explore the historic centre and try travesseiros pastries; take the train back to Lisbon by about 17:30.\",\n      \"evening\": \"19:30 easy dinner near the hotel and an early night.\"\n    },\n    {\n      \"day\": \"2027-04-18\",\n      \"title\": \"Waterfront and flexible family time\",\n      \"morning\": \"10:00 visit the Oceanário de Lisboa in Parque das Nações, a child-friendly indoor activity.\",\n      \"midday\": \"12:30 lunch at Parque das Nações, with a vegetarian option for Maya.\",\n      \"afternoon\": \"14:00 stroll along the riverside promenade; leave time for Ada to revisit a preferred tram route or for family shopping in Chiado.\",\n      \"evening\": \"18:30 final Lisbon dinner in Chiado; include a last pastel de nata stop.\"\n    },\n    {\n      \"day\": \"2027-04-19\",\n      \"title\": \"Departure day\",\n      \"morning\": \"Pack, check out and allow time for a nearby bakery breakfast before leaving for the airport.\",\n      \"midday\": null,\n      \"afternoon\": null,\n      \"evening\": null\n    }\n  ],\n  \"costs\": [\n    {\n      \"category\": \"stay\",\n      \"amount\": 1100\n    },\n    {\n      \"category\": \"food\",\n      \"amount\": 700\n    },\n    {\n      \"category\": \"tickets\",\n      \"amount\": 390\n    },\n    {\n      \"category\": \"transport\",\n      \"amount\": 260\n    },\n    {\n      \"category\": \"buffer\",\n      \"amount\": 350\n    }\n  ],\n  \"estimated_total\": 2800,\n  \"currency\": \"EUR\",\n  \"practical_notes\": [\n    \"The stay cost is an estimate for five nights; confirm the accommodation before booking.\",\n    \"Use contactless payment or a rechargeable public-transport card for trams, metro and buses; Tram 28 can be crowded, so board early.\",\n    \"Book timed entry for Pena Palace and Belém Tower in advance, and check opening hours closer to April 2027.\",\n    \"Lisbon and Sintra have steep cobbled streets; use taxis or ride-hailing for uphill stretches if the family prefers.\",\n    \"Ask restaurants about vegetarian dishes and ingredients for Maya; pastries may contain eggs and dairy.\"\n  ]\n}\n```\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"page\"}\n{\"op\":\"add\",\"path\":\"/elements/page\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"xl\"},\"children\":[\"header\",\"body-split\"]}}\n{\"op\":\"add\",\"path\":\"/elements/header\",\"value\":{\"type\":\"ResultHeader\",\"props\":{\"eyebrow\":\"Your trip\",\"title\":{\"$state\":\"/result/title\"},\"subtitle\":{\"$state\":\"/result/overview\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/body-split\",\"value\":{\"type\":\"Split\",\"props\":{\"ratio\":\"2:1\",\"gap\":\"xl\"},\"children\":[\"days-column\",\"rail\"]}}\n{\"op\":\"add\",\"path\":\"/elements/days-column\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"repeat\":{\"statePath\":\"/result/days\",\"key\":\"day\"},\"children\":[\"day-block\"]}}\n{\"op\":\"add\",\"path\":\"/elements/day-block\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"md\"},\"children\":[\"day-date\",\"day-title\",\"day-moments\",\"day-separator\"]}}\n{\"op\":\"add\",\"path\":\"/elements/day-date\",\"value\":{\"type\":\"DateText\",\"props\":{\"value\":{\"$item\":\"day\"},\"style\":\"weekday\",\"tone\":\"accent\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/day-title\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":{\"$item\":\"title\"},\"level\":\"h2\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/day-moments\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"day-morning\",\"day-midday\",\"day-afternoon\",\"day-evening\"]}}\n{\"op\":\"add\",\"path\":\"/elements/day-morning\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Morning\",\"value\":{\"$item\":\"morning\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/day-midday\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Midday\",\"value\":{\"$item\":\"midday\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/day-afternoon\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Afternoon\",\"value\":{\"$item\":\"afternoon\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/day-evening\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Evening\",\"value\":{\"$item\":\"evening\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/day-separator\",\"value\":{\"type\":\"Separator\",\"props\":{\"orientation\":\"horizontal\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/rail\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"children\":[\"cost-bar\",\"notes-block\"]}}\n{\"op\":\"add\",\"path\":\"/elements/cost-bar\",\"value\":{\"type\":\"ProportionBar\",\"props\":{\"label\":\"Estimated cost\",\"items\":{\"$state\":\"/result/costs\"},\"labelKey\":\"category\",\"valueKey\":\"amount\",\"unit\":{\"$state\":\"/result/currency\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/notes-block\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"sm\"},\"children\":[\"notes-heading\",\"notes-list\"]}}\n{\"op\":\"add\",\"path\":\"/elements/notes-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":\"Good to know\",\"level\":\"h2\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/notes-list\",\"value\":{\"type\":\"TextList\",\"props\":{\"items\":{\"$state\":\"/result/practical_notes\"},\"marker\":\"bullet\"},\"children\":[]}}",
+ "spec": {
+  "root": "page",
+  "elements": {
+   "page": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "xl"
+    },
+    "children": [
+     "header",
+     "body-split"
+    ]
+   },
+   "header": {
+    "type": "ResultHeader",
+    "props": {
+     "eyebrow": "Your trip",
+     "title": {
+      "$state": "/result/title"
+     },
+     "subtitle": {
+      "$state": "/result/overview"
+     }
+    },
+    "children": []
+   },
+   "body-split": {
+    "type": "Split",
+    "props": {
+     "ratio": "2:1",
+     "gap": "xl"
+    },
+    "children": [
+     "days-column",
+     "rail"
+    ]
+   },
+   "days-column": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "lg"
+    },
+    "repeat": {
+     "statePath": "/result/days",
+     "key": "day"
+    },
+    "children": [
+     "day-block"
+    ]
+   },
+   "day-block": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "md"
+    },
+    "children": [
+     "day-date",
+     "day-title",
+     "day-moments",
+     "day-separator"
+    ]
+   },
+   "day-date": {
+    "type": "DateText",
+    "props": {
+     "value": {
+      "$item": "day"
+     },
+     "style": "weekday",
+     "tone": "accent"
+    },
+    "children": []
+   },
+   "day-title": {
+    "type": "Heading",
+    "props": {
+     "text": {
+      "$item": "title"
+     },
+     "level": "h2"
+    },
+    "children": []
+   },
+   "day-moments": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "none"
+    },
+    "children": [
+     "day-morning",
+     "day-midday",
+     "day-afternoon",
+     "day-evening"
+    ]
+   },
+   "day-morning": {
+    "type": "Detail",
+    "props": {
+     "label": "Morning",
+     "value": {
+      "$item": "morning"
+     }
+    },
+    "children": []
+   },
+   "day-midday": {
+    "type": "Detail",
+    "props": {
+     "label": "Midday",
+     "value": {
+      "$item": "midday"
+     }
+    },
+    "children": []
+   },
+   "day-afternoon": {
+    "type": "Detail",
+    "props": {
+     "label": "Afternoon",
+     "value": {
+      "$item": "afternoon"
+     }
+    },
+    "children": []
+   },
+   "day-evening": {
+    "type": "Detail",
+    "props": {
+     "label": "Evening",
+     "value": {
+      "$item": "evening"
+     }
+    },
+    "children": []
+   },
+   "day-separator": {
+    "type": "Separator",
+    "props": {
+     "orientation": "horizontal"
+    },
+    "children": []
+   },
+   "rail": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "lg"
+    },
+    "children": [
+     "cost-bar",
+     "notes-block"
+    ]
+   },
+   "cost-bar": {
+    "type": "ProportionBar",
+    "props": {
+     "label": "Estimated cost",
+     "items": {
+      "$state": "/result/costs"
+     },
+     "labelKey": "category",
+     "valueKey": "amount",
+     "unit": {
+      "$state": "/result/currency"
+     }
+    },
+    "children": []
+   },
+   "notes-block": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "sm"
+    },
+    "children": [
+     "notes-heading",
+     "notes-list"
+    ]
+   },
+   "notes-heading": {
+    "type": "Heading",
+    "props": {
+     "text": "Good to know",
+     "level": "h2"
+    },
+    "children": []
+   },
+   "notes-list": {
+    "type": "TextList",
+    "props": {
+     "items": {
+      "$state": "/result/practical_notes"
+     },
+     "marker": "bullet"
+    },
+    "children": []
+   }
+  }
+ }
+}

@@ -120,6 +120,8 @@ description  = { type = "text", description = "One sentence on what the page is 
 name         = { type = "text", description = "On an input page, the method's name as the host lists it - the one product name the page may carry. Absent when the host lists none." }
 paths        = { type = "list", item_type = "concept", item_concept_ref = "PathEntry", description = "Every path in the state the page binds or reads, in reading order and flattened: a structure's members follow it one level deeper, and a list's item members follow the list, spelled relative to one item.", required = true }
 run_control  = { type = "text", description = "On an input page, the catalog component that runs the method, by name; the page has exactly one of it." }
+returns      = { type = "list", item_type = "text", description = "On a composer, what one run gives back, one line per member of the result, read from the result's own titles and descriptions. Absent elsewhere." }
+frame        = { choices = ["page", "composer", "result"], description = "Where the page sits: `page`, a whole product page of its own; `composer`, the inputs of a host's compose-then-result app, before a run; `result`, the result page of that app, after one. Absent reads as `page`." }
 sample_state = { type = "text", description = "On a result page, the state of one real run as the host loads it, as JSON - what `/result` held after one actual run, so magnitudes and lengths can be judged. Never copied into a page." }
 
 [concept.PathEntry]
@@ -201,6 +203,34 @@ The result of a method, described below.
 ## Name
 
 The method is called «{{ brief.name }}», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.
+
+{% endif %}
+{% if brief.frame == "composer" %}
+## Frame
+
+This page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.
+
+The column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.
+
+The action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as "Waiting on the topic" or "Add a document to start" - the controls show their own state.
+{% if brief.returns %}
+
+What one run gives back, read from the result's own description:
+{% for line in brief.returns %}
+- {{ line }}
+{% endfor %}
+
+A person runs a tool more readily when they know what comes back: the page may say it once, in their words, under the panel.
+{% endif %}
+
+{% elif brief.frame == "result" %}
+## Frame
+
+This page is the result page of an app that is composed, then shows its result: what the person sees after one run. The host draws what surrounds it: the band with the team's logo and the app's name, then a bar restating the request with a way back to edit it and to run again. The host also owns the actions on the result, such as downloading or sharing it, and places them where the page's header puts them. There is no side panel, no app bar and no footer to build, and nothing restates the request.
+
+The page is the result across the full width. It opens on its header, which names the result in a person's words, read from the result itself where it can be (the page's h1). Then the figure or the fact a person looks for first, then the body of the result in the shape it naturally has: a plan day by day, options side by side to compare, a record's details. Lay out what a person reads; leave out what only a machine would.
+
+Show each value once: a figure a component already states, such as the total inside a ProportionBar, is not repeated beside it. When the result carries the request back - the same facts the person entered, such as the topic or the tone they chose - leave that part out: the host's bar already restates the request. Write a value as a person reads it: a date in words, an amount beside its currency when the result has one.
 
 {% endif %}
 ## State
@@ -293,6 +323,7 @@ DESIGN DIRECTION:
 - Restraint reads premium. No label that restates the obvious, no card inside a card, no paragraph that explains the form, no more than two levels of heading. Every element must earn its place; when in doubt, remove it.
 - Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The control that runs names the job ("Plan my trip"), never "Submit".
 - Every value binds to a path the brief lists, and the page reads clearly in both a light and a dark theme.
+- When the brief has a Frame section, the host has already drawn the rest of the screen: plan only the page that section describes, inside that frame - never a side panel, never a bar or a footer the host draws, never a second place the method is run from or a second copy of the request.
 
 AVAILABLE COMPONENTS ({{ catalog.components | length }}):
 
