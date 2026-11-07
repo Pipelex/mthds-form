@@ -345,7 +345,7 @@ describe('a list in an app', () => {
     expect(screen.getByText('No items yet')).toBeInTheDocument();
   });
 
-  it("leaves a row's description out, and the list's own in when it adds to the label", () => {
+  it("says a row's description once, under the list's, rather than on every row", () => {
     const traveller: ObjectRunField = {
       kind: 'object',
       name: 'traveller',
@@ -354,8 +354,25 @@ describe('a list in an app', () => {
       description: 'One person on the trip',
       fields: [textItem],
     };
-    renderIn('app', listOf(traveller, { name: 'travellers', description: 'Who is going' }), [{}]);
+    renderIn('app', listOf(traveller, { name: 'travellers', description: 'Who is going' }), [
+      {},
+      {},
+    ]);
     expect(screen.getByText('Who is going')).toBeInTheDocument();
-    expect(screen.queryByText('One person on the trip')).toBeNull();
+    expect(screen.getAllByText('One person on the trip')).toHaveLength(1);
+  });
+
+  it("leaves a row's description out when the list has already said it", () => {
+    const guest: ObjectRunField = {
+      kind: 'object',
+      name: 'guest',
+      conceptRef: 'trips.Guest',
+      required: true,
+      description: 'A guest',
+      fields: [textItem],
+    };
+    renderIn('app', listOf(guest, { name: 'guests', description: 'Who is invited' }), [{}, {}]);
+    expect(screen.getByText('Who is invited')).toBeInTheDocument();
+    expect(screen.queryByText('A guest')).toBeNull();
   });
 });

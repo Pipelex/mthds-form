@@ -70,6 +70,8 @@ export const Empty: Story = {
     await expect(canvas.queryAllByText('The day they arrive')).toHaveLength(0);
     await expect(canvas.queryAllByText('An image')).toHaveLength(0);
     await expect(canvas.getAllByText('Who is going')).toHaveLength(2);
+    // What a traveller is, the list says once, rather than on every row.
+    await expect(canvas.getAllByText('One person on the trip')).toHaveLength(2);
     // The date's face reads as empty until a whole date is in it.
     for (const input of canvas.getAllByLabelText('Arriving on')) {
       await expect(input).toHaveAttribute('data-empty');

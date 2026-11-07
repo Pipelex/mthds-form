@@ -205,9 +205,9 @@ export function fieldLabel(
  *
  * A list ROW has no label (`fieldLabel` gives it the empty one), and in `app`
  * it shows no description either: what a row holds is its item concept's
- * definition, the same on every row, and the list has already said once,
- * above its rows, what they are. "One person on the trip" under every
- * traveller is the list's description repeated, not the row's.
+ * definition, the same on every row, so the list says it once, above its
+ * rows, instead ({@link shownItemDescription}). "One person on the trip"
+ * under every traveller is one sentence said once per traveller.
  */
 export function shownDescription(
   description: string | undefined,
@@ -218,6 +218,32 @@ export function shownDescription(
   if (!description || presentation !== 'app') return description || undefined;
   if (label.trim() === '') return undefined;
   return descriptionAddsToLabel(description, label, kinds) ? description : undefined;
+}
+
+/**
+ * What a list says once about its rows, under its own description, or
+ * `undefined` for nothing.
+ *
+ * In `app` a row shows no description ({@link shownDescription}), so the item's
+ * description is said here when it says something the list's label and the
+ * list's own description do not: "Email address the invoice is sent to" under
+ * "Contacts" and "Who receives the invoice". A top-level plural slot carries
+ * one string as both its description and its item's, and says it once.
+ * `studio` shows it on every row, and says nothing here. A list that is
+ * itself a row has no label, and leaves its item's description to the list
+ * above it, as any row does.
+ */
+export function shownItemDescription(
+  itemDescription: string | undefined,
+  listLabel: string,
+  listDescription: string | undefined,
+  kinds: readonly ConceptCategory[],
+  presentation: FieldPresentation,
+): string | undefined {
+  if (!itemDescription || presentation !== 'app' || listLabel.trim() === '') return undefined;
+  if (itemDescription === listDescription) return undefined;
+  const said = listDescription ? `${listLabel} ${listDescription}` : listLabel;
+  return descriptionAddsToLabel(itemDescription, said, kinds) ? itemDescription : undefined;
 }
 
 /**

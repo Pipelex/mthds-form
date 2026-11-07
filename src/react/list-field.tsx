@@ -14,7 +14,12 @@ import { cn, isThenable } from './utils';
 import type { ListRunField, RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import { ConceptPill } from './concept-pill';
-import { fieldLabel, shownDescription, useFieldPresentation } from './field-presentation';
+import {
+  fieldLabel,
+  shownDescription,
+  shownItemDescription,
+  useFieldPresentation,
+} from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { FieldDescription, OptionalMark } from './field-shell';
 import { rowActionClass, smallPrintClass } from './field-styles';
@@ -307,10 +312,15 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // In an app, an empty list's own count says nothing the Add button under it
   // does not: "0 items" is shown only where the list says how many it wants.
   const countShown = !isApp || items.length > 0 || exactCount !== undefined;
-  const description = shownDescription(
-    field.description,
+  const kinds = ['list', conceptCategory(field.item)] as const;
+  const description = shownDescription(field.description, label, kinds, presentation);
+  // A row says no description of its own in an app, so what the item's says
+  // beyond the list's label and description is said here, once.
+  const itemDescription = shownItemDescription(
+    field.item.description,
     label,
-    ['list', conceptCategory(field.item)],
+    field.description,
+    kinds,
     presentation,
   );
 
@@ -336,6 +346,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         {shownAsOptional(field) && <OptionalMark />}
       </div>
       {description && <FieldDescription>{description}</FieldDescription>}
+      {itemDescription && <FieldDescription>{itemDescription}</FieldDescription>}
 
       <div ref={rowsRef} className="space-y-2">
         {/* With a drop area, the area stands in for this line: its own words

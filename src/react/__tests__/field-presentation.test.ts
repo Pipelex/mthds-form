@@ -6,6 +6,7 @@ import {
   humanizeEnumValue,
   humanizeFieldName,
   shownDescription,
+  shownItemDescription,
 } from '../field-presentation';
 
 describe('humanizeFieldName', () => {
@@ -242,5 +243,40 @@ describe('shownDescription', () => {
   it('answers undefined for no description, or an empty one', () => {
     expect(shownDescription(undefined, 'City', ['text'], 'app')).toBeUndefined();
     expect(shownDescription('', 'City', ['text'], 'studio')).toBeUndefined();
+  });
+});
+
+describe('shownItemDescription', () => {
+  const kinds = ['list', 'text'] as const;
+
+  it("says once in app what an item's description adds to the list's label and description", () => {
+    expect(
+      shownItemDescription(
+        'Email address the invoice is sent to',
+        'Contacts',
+        'Who receives the invoice',
+        kinds,
+        'app',
+      ),
+    ).toBe('Email address the invoice is sent to');
+  });
+
+  it("leaves out an item description the list's label or description already says", () => {
+    expect(shownItemDescription('A contact', 'Contacts', undefined, kinds, 'app')).toBeUndefined();
+    expect(
+      shownItemDescription('A text', 'Must see', 'Places they must not miss', kinds, 'app'),
+    ).toBeUndefined();
+  });
+
+  it("says nothing for a slot whose item carries the list's own description", () => {
+    expect(
+      shownItemDescription('One photo', 'Gallery', 'One photo', ['list', 'image'], 'app'),
+    ).toBeUndefined();
+  });
+
+  it('says nothing in studio, where every row shows it, nor for a list that is a row', () => {
+    const note = 'Email address the invoice is sent to';
+    expect(shownItemDescription(note, 'contacts', undefined, kinds, 'studio')).toBeUndefined();
+    expect(shownItemDescription(note, '', undefined, kinds, 'app')).toBeUndefined();
   });
 });
