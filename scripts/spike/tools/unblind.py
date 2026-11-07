@@ -19,6 +19,6 @@ for moment in ['compose','result']:
     sel=[r for r in rows if r[0]=='produced' and r[2]==moment and r[1]==app]
     best=max(sel,key=lambda r:r[5]+r[6])
     print(f"   {app:8} mean designed={st.mean(r[5] for r in sel):.2f} job={st.mean(r[6] for r in sel):.2f} | best {best[5]}/{best[6]} {best[3]}")
-  for model in ['claude-5.5-opus','claude-5-sonnet']:
+  for model in sorted({r[3] for r in rows if r[0]=='produced'}):
     sel=[r for r in rows if r[0]=='produced' and r[2]==moment and r[3]==model]
     print(f"   {model:17} designed={st.mean(r[5] for r in sel):.2f} job={st.mean(r[6] for r in sel):.2f}")
