@@ -79,6 +79,8 @@ export {
 export { generativeRegistry } from './product-registry';
 export { ResultSlotProvider, useResultSlot, type ResultSlot } from './result-slot';
 export { BrandProvider, useBrand } from './brand-context';
+// SPIKE (L-261107-a6a35f): what a host's compose-then-result frame tells a layout's frame components.
+export { FrameHostProvider, useFrameHost, type FrameHost } from './frame-host';
 // The manifest lives with the rest of the brand in `./brand`, and is re-exported
 // here because the app bar reads it and `GenerativePage` takes it.
 export { brandManifestSchema, type BrandManifest } from '../brand/manifest';

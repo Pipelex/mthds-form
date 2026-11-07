@@ -1,0 +1,184 @@
+{
+  "id": "slides--compose--claude-5.5-opus--s2--r1",
+  "method": "slides",
+  "moment": "compose",
+  "frame": "composer",
+  "model": "claude-5.5-opus",
+  "seed": "Vpr0UqJGmYEPL4ytcB2eSir8bnVgV9Qv",
+  "round": "r1",
+  "runId": "run_45d4d273-e628-4a75-85e9-a58b3ed8d460",
+  "costUsd": 0.1043,
+  "seconds": 34,
+  "valid": true,
+  "problems": [],
+  "outside": [],
+  "fitProblems": [],
+  "plan": {
+    "purpose": "A designer or marketer with a rough idea for a talk drops in what the deck is about and who it's for, and gets back several visual directions to choose from.",
+    "title": "Turn a rough brief into deck directions",
+    "composition": "One centred column inside the host's frame. A single Composer carries the h1 and one muted line, then one raised panel set in two columns: the left column holds the substance of the talk (the topic first and largest as a Textarea, then the brand and reference notes), and the right column holds the feel, meaning goal, audience and tone, as rows of Segmented pills so the person can tap through the whole mood quickly. The left column is for writing and the right for picking, so the panel reads as a quick creative intake rather than a form. The host's action row sits at the panel's foot with the run button. A short muted line just above it says the run only needs a topic.",
+    "regions": [
+      {
+        "title": "What's the talk?",
+        "purpose": "Collects what the deck is about and any brand or past material to work from. The topic is the one thing the run needs, so it comes first and gets the most room.",
+        "container": "FieldGroup",
+        "elements": [
+          "Textarea /inputs/brief/topic — label \"Topic\", placeholder \"e.g. Our Series A story: why now, why us\", required check",
+          "Textarea /inputs/brief/brand_guidelines — label \"Brand guidelines\", placeholder \"Colours, fonts, logo rules…\"",
+          "Textarea /inputs/brief/existing_references — label \"References\", helper \"Past decks or templates to echo, or to steer clear of.\""
+        ]
+      },
+      {
+        "title": "Who's it for?",
+        "purpose": "Sets the purpose, the room and the mood with quick one-tap choices, beside the writing.",
+        "container": "FieldGroup",
+        "elements": [
+          "Segmented /inputs/brief/goal — label \"Goal\", options \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\"",
+          "Segmented /inputs/brief/audience — label \"Audience\", options \"executives\" | \"technical team\" | \"general public\"",
+          "Segmented /inputs/brief/tone — label \"Tone\", options \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\""
+        ]
+      },
+      {
+        "title": null,
+        "purpose": "A short note just above the host's action row saying what the run needs.",
+        "container": null,
+        "elements": [
+          "Text — muted: \"Only the topic is needed. Everything else sharpens the directions.\""
+        ]
+      }
+    ],
+    "call_to_action": "Sketch my directions. Composer runLabel, on.press bound to validateForm then run. Hint above it: \"Only the topic is needed. Everything else sharpens the directions.\"",
+    "defaults": [],
+    "delegated": []
+  },
+  "brief": "# Input page: slide_designer.generate_design_proposals_from_rough_brief\n\nTransform a design brief into multiple themes with visual mockups and HTML report\n\n## Name\n\nThe method is called «Deck directions», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/brief` — structure slide_designer.SlideDesignBrief, required, gates the run — `brief`: Client brief for slide deck design\n  - `/inputs/brief/topic` — text, required — `topic`: The main topic or subject of the presentation\n  - `/inputs/brief/brand_guidelines` — text, optional — `brand_guidelines`: The client's brand guidelines (colors, fonts, logo usage, etc.)\n  - `/inputs/brief/tone` — choice of \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\", optional — `tone`: The tone of the presentation\n  - `/inputs/brief/existing_references` — text, optional — `existing_references`: Existing templates or past decks to reference or avoid\n  - `/inputs/brief/goal` — choice of \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\", optional — `goal`: The goal of the presentation\n  - `/inputs/brief/audience` — choice of \"executives\" | \"technical team\" | \"general public\", optional — `audience`: The target audience\n\n## Delegated\n\nNone: every input can be entered with the catalog's own inputs. `MthdsField` remains available for any you would rather not style.\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `brief`; say so near the Composer, briefly.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+  "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"composer\"}\n{\"op\":\"add\",\"path\":\"/elements/composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Turn a rough brief into deck directions\",\"lede\":\"Say what the talk is about and who it's for, and get several visual directions to choose from.\",\"runLabel\":\"Sketch my directions\",\"columns\":\"2\"},\"children\":[\"group-talk\",\"group-audience\",\"run-note\"],\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]}}}\n{\"op\":\"add\",\"path\":\"/elements/group-talk\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"What's the talk?\"},\"children\":[\"topic-field\",\"brand-field\",\"references-field\"]}}\n{\"op\":\"add\",\"path\":\"/elements/topic-field\",\"value\":{\"type\":\"Textarea\",\"props\":{\"label\":\"Topic\",\"name\":\"topic\",\"placeholder\":\"e.g. Our Series A story: why now, why us\",\"rows\":5,\"value\":{\"$bindState\":\"/inputs/brief/topic\"},\"checks\":[{\"type\":\"required\",\"message\":\"Tell us what the talk is about.\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/brand-field\",\"value\":{\"type\":\"Textarea\",\"props\":{\"label\":\"Brand guidelines\",\"name\":\"brand_guidelines\",\"placeholder\":\"Colours, fonts, logo rules…\",\"rows\":3,\"value\":{\"$bindState\":\"/inputs/brief/brand_guidelines\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/references-field\",\"value\":{\"type\":\"Textarea\",\"props\":{\"label\":\"References\",\"name\":\"existing_references\",\"placeholder\":\"Past decks or templates to echo, or to steer clear of.\",\"rows\":3,\"value\":{\"$bindState\":\"/inputs/brief/existing_references\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/group-audience\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Who's it for?\"},\"children\":[\"goal-field\",\"audience-field\",\"tone-field\"]}}\n{\"op\":\"add\",\"path\":\"/elements/goal-field\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Goal\",\"name\":\"goal\",\"options\":[\"pitch investors\",\"sell to clients\",\"internal training\",\"keynote\"],\"value\":{\"$bindState\":\"/inputs/brief/goal\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/audience-field\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Audience\",\"name\":\"audience\",\"options\":[\"executives\",\"technical team\",\"general public\"],\"value\":{\"$bindState\":\"/inputs/brief/audience\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/tone-field\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Tone\",\"name\":\"tone\",\"options\":[\"formal\",\"playful\",\"innovative\",\"trustworthy\",\"artsy\"],\"value\":{\"$bindState\":\"/inputs/brief/tone\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/run-note\",\"value\":{\"type\":\"Text\",\"props\":{\"text\":\"Only the topic is needed. Everything else sharpens the directions.\",\"variant\":\"muted\"},\"children\":[]}}",
+  "spec": {
+    "root": "composer",
+    "elements": {
+      "composer": {
+        "type": "Composer",
+        "props": {
+          "headline": "Turn a rough brief into deck directions",
+          "lede": "Say what the talk is about and who it's for, and get several visual directions to choose from.",
+          "runLabel": "Sketch my directions",
+          "columns": "2"
+        },
+        "children": ["group-talk", "group-audience", "run-note"],
+        "on": {
+          "press": [
+            {
+              "action": "validateForm"
+            },
+            {
+              "action": "run"
+            }
+          ]
+        }
+      },
+      "group-talk": {
+        "type": "FieldGroup",
+        "props": {
+          "title": "What's the talk?"
+        },
+        "children": ["topic-field", "brand-field", "references-field"]
+      },
+      "topic-field": {
+        "type": "Textarea",
+        "props": {
+          "label": "Topic",
+          "name": "topic",
+          "placeholder": "e.g. Our Series A story: why now, why us",
+          "rows": 5,
+          "value": {
+            "$bindState": "/inputs/brief/topic"
+          },
+          "checks": [
+            {
+              "type": "required",
+              "message": "Tell us what the talk is about."
+            }
+          ]
+        },
+        "children": []
+      },
+      "brand-field": {
+        "type": "Textarea",
+        "props": {
+          "label": "Brand guidelines",
+          "name": "brand_guidelines",
+          "placeholder": "Colours, fonts, logo rules…",
+          "rows": 3,
+          "value": {
+            "$bindState": "/inputs/brief/brand_guidelines"
+          }
+        },
+        "children": []
+      },
+      "references-field": {
+        "type": "Textarea",
+        "props": {
+          "label": "References",
+          "name": "existing_references",
+          "placeholder": "Past decks or templates to echo, or to steer clear of.",
+          "rows": 3,
+          "value": {
+            "$bindState": "/inputs/brief/existing_references"
+          }
+        },
+        "children": []
+      },
+      "group-audience": {
+        "type": "FieldGroup",
+        "props": {
+          "title": "Who's it for?"
+        },
+        "children": ["goal-field", "audience-field", "tone-field"]
+      },
+      "goal-field": {
+        "type": "Segmented",
+        "props": {
+          "label": "Goal",
+          "name": "goal",
+          "options": ["pitch investors", "sell to clients", "internal training", "keynote"],
+          "value": {
+            "$bindState": "/inputs/brief/goal"
+          }
+        },
+        "children": []
+      },
+      "audience-field": {
+        "type": "Segmented",
+        "props": {
+          "label": "Audience",
+          "name": "audience",
+          "options": ["executives", "technical team", "general public"],
+          "value": {
+            "$bindState": "/inputs/brief/audience"
+          }
+        },
+        "children": []
+      },
+      "tone-field": {
+        "type": "Segmented",
+        "props": {
+          "label": "Tone",
+          "name": "tone",
+          "options": ["formal", "playful", "innovative", "trustworthy", "artsy"],
+          "value": {
+            "$bindState": "/inputs/brief/tone"
+          }
+        },
+        "children": []
+      },
+      "run-note": {
+        "type": "Text",
+        "props": {
+          "text": "Only the topic is needed. Everything else sharpens the directions.",
+          "variant": "muted"
+        },
+        "children": []
+      }
+    }
+  }
+}

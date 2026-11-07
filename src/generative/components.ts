@@ -272,10 +272,13 @@ const components = {
   MthdsField: {
     props: z.object({
       path: z.string(),
+      // SPIKE (L-261107-a6a35f): the page words the label, as it words every other control.
+      label: z.string().nullable(),
+      hint: z.string().nullable(),
     }),
     slots: [],
     description:
-      'The kernel\'s own control for ONE input, bound two-way at "path" (a /inputs path from the brief). Use it for every path the brief marks as delegated - a file, a date, a list, a structure you would rather not lay out - and for any scalar you would rather not style. It renders its own label and description. Inside a repeat, "path" is the item\'s field name relative to the item ("lines"), never an $item expression.',
+      'The kernel\'s own control for ONE input, bound two-way at "path" (a /inputs path from the brief). Use it for every path the brief marks as delegated - a file, a date, a list, a structure you would rather not lay out - and for any scalar you would rather not style. It renders the descriptor\'s label and description unless the page words them: "label" replaces the label, "hint" the line under it. Inside a repeat, "path" is the item\'s field name relative to the item ("lines"), never an $item expression.',
     example: { path: '/inputs/source' },
   },
   MthdsResult: {
@@ -291,12 +294,19 @@ const components = {
   DataTable: {
     props: z.object({
       rows: z.any(),
-      columns: z.array(z.object({ path: z.string(), label: z.string() })),
+      // SPIKE (L-261107-a6a35f): a column says how its cells read, from the kind the brief states.
+      columns: z.array(
+        z.object({
+          path: z.string(),
+          label: z.string(),
+          format: z.enum(['text', 'date', 'number']).nullable().optional(),
+        }),
+      ),
       caption: z.string().nullable(),
     }),
     slots: [],
     description:
-      'A table over a list of structures. "rows" MUST be { "$state": "/path/to/the/list" } (never inline rows); each column names a field of one item by its relative path ("label", "unit_price") and the header to show for it.',
+      'A table over a list of structures. "rows" MUST be { "$state": "/path/to/the/list" } (never inline rows); each column names a field of one item by its relative path ("label", "unit_price"), the header to show for it, and how its cells read: "date" for a date path (written "9 Mar 2025"), "number" for a number path (digits grouped), "text" otherwise.',
     example: {
       rows: { $state: '/result/lines' },
       columns: [

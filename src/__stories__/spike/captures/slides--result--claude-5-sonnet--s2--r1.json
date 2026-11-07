@@ -1,0 +1,743 @@
+{
+  "id": "slides--result--claude-5-sonnet--s2--r1",
+  "method": "slides",
+  "moment": "result",
+  "frame": "result",
+  "model": "claude-5-sonnet",
+  "seed": "09z7vBAWppS0ImdStE7oxvjs9uTAU56i",
+  "round": "r1",
+  "runId": "run_ec2df1a0-68f0-4ac7-9f66-7eb807d23619",
+  "costUsd": 0.149204,
+  "seconds": 99,
+  "valid": true,
+  "problems": [],
+  "outside": [],
+  "fitProblems": [],
+  "plan": {
+    "purpose": "Let someone who sent off a rough brief compare the finished design directions side by side - the mood, the palette, the type, the mockups - and pick the one that feels right for their deck.",
+    "title": "Three directions for your deck",
+    "composition": "Full-width result. The header names the topic as the h1 with a muted line giving tone, goal and audience. Beneath it, a brief strip restates the polished brief in a few compact facts - not the request bar the host already draws, but the content of the brief itself, since the brief is itself part of the result. The body is the main event: a Tabs region, one tab per theme (named after the theme), each tab opening onto that theme's full picture - its title-slide mockup large at the top, then its palette as swatches, then its typography and layout and style spelled out as a column of details, then its exclusions as a closing note. Tabs read naturally as \"compare directions side by side\" without needing three columns fighting for width, and let each theme breathe at full size when chosen. No card-in-card: each tab panel is a flat Stack of sections.",
+    "regions": [
+      {
+        "title": null,
+        "purpose": "Names the result in the brief's own words and sets the tone before anything else - the h1 is the topic, the line under it gives the shape of the brief at a glance.",
+        "container": "ResultHeader",
+        "elements": [
+          "ResultHeader title bound to $state /result/brief/topic",
+          "ResultHeader subtitle as a $template combining /result/brief/goal, /result/brief/audience and /result/brief/tone"
+        ]
+      },
+      {
+        "title": "The brief, as polished",
+        "purpose": "A short, scannable restatement of the brief that was turned into these directions, sitting above the themes since it's what they all answer to.",
+        "container": "Grid",
+        "elements": [
+          "Fact value bound to $state /result/brief/tone, label \"Tone\"",
+          "Fact value bound to $state /result/brief/goal, label \"Goal\"",
+          "Fact value bound to $state /result/brief/audience, label \"Audience\"",
+          "Detail value bound to $state /result/brief/brand_guidelines, label \"Brand guidelines\"",
+          "Detail value bound to $state /result/brief/existing_references, label \"References\""
+        ]
+      },
+      {
+        "title": "Pick a direction",
+        "purpose": "The heart of the result: each theme laid out in full, one at a time, so a person can study its mockup and its details without the others crowding the screen.",
+        "container": "Tabs",
+        "elements": [
+          "Tab per item of /result/themes, labelled with the item's name — each panel a Stack containing:",
+          "Picture bound to the matching item of /result/visuals (same index as the theme), aspect 16:9 — the title slide drawn in this theme",
+          "Heading (h2) reading the theme's name via $item name",
+          "Swatches colors bound to $item colors/primary, colors/secondary, colors/accent, colors/background, colors/text_primary, colors/text_secondary",
+          "Detail label \"Font\" value $item typography/font_family",
+          "Detail label \"Headings\" value $item typography/heading_style",
+          "Detail label \"Body text\" value $item typography/body_style",
+          "Detail label \"Aspect ratio\" value $item layout/aspect_ratio",
+          "Detail label \"Margins\" value $item layout/margins",
+          "Detail label \"Alignment\" value $item layout/alignment",
+          "Detail label \"Overall style\" value $item style/overall",
+          "Detail label \"Icons\" value $item style/icon_style",
+          "Detail label \"Graphics\" value $item style/graphic_style",
+          "Text reading $item exclusions, styled as a muted closing note headed \"Avoid\""
+        ]
+      }
+    ],
+    "call_to_action": null,
+    "defaults": null,
+    "delegated": []
+  },
+  "brief": "# Result page: slide_designer.generate_design_proposals_from_rough_brief\n\nTransform a design brief into multiple themes with visual mockups and HTML report\n\n## Frame\n\nThis page is the result page of an app that is composed, then shows its result: what the person sees after one run. The host draws what surrounds it: the band with the team's logo and the app's name, then a bar restating the request with a way back to edit it and to run again. The host also owns the actions on the result, such as downloading or sharing it, and places them where the page's header puts them. There is no side panel, no app bar and no footer to build, and nothing restates the request.\n\nThe page is the result across the full width. It opens on its header, which names the result in a person's words, read from the result itself where it can be (the page's h1). Then the figure or the fact a person looks for first, then the body of the result in the shape it naturally has: a plan day by day, options side by side to compare, a record's details. Lay out what a person reads; leave out what only a machine would.\n\n## State\n\nThe host loads the run's result under `/result` before the page renders. Read every value with `$state`; emit no `/state` patches. Paths:\n\n- `/result` — structure slide_designer.DesignDirections: The visual directions proposed for a deck: the brief as polished, each theme, and a title slide drawn in each\n  - `/result/brief` — structure slide_designer.SlideDesignBrief — `brief`: The brief, as polished\n    - `/result/brief/topic` — text — `topic`: The main topic or subject of the presentation\n    - `/result/brief/brand_guidelines` — text — `brand_guidelines`: The client's brand guidelines (colors, fonts, logo usage, etc.)\n    - `/result/brief/tone` — choice of \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\" — `tone`: The tone of the presentation\n    - `/result/brief/existing_references` — text — `existing_references`: Existing templates or past decks to reference or avoid\n    - `/result/brief/goal` — choice of \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\" — `goal`: The goal of the presentation\n    - `/result/brief/audience` — choice of \"executives\" | \"technical team\" | \"general public\" — `audience`: The target audience\n  - `/result/themes` — list of structure slide_designer.Theme — `themes`: The themes, one per direction\n    - each item is a structure slide_designer.Theme (Complete presentation theme with colors, typography, layout, and style), with these members (paths relative to one item, for DataTable columns or $item):\n      - `name` — text — `name`: Theme name identifier\n      - `colors` — structure slide_designer.ColorPalette — `colors`: Color palette for the theme\n        - `colors/primary` — text — `primary`: Primary brand color (hex or name)\n        - `colors/secondary` — text — `secondary`: Secondary color for accents\n        - `colors/accent` — text — `accent`: Accent color for highlights\n        - `colors/background` — text — `background`: Background color\n        - `colors/text_primary` — text — `text_primary`: Primary text color\n        - `colors/text_secondary` — text — `text_secondary`: Secondary text color for subtitles\n      - `typography` — structure slide_designer.Typography — `typography`: Typography settings\n        - `typography/font_family` — text — `font_family`: Primary font family name\n        - `typography/heading_style` — text — `heading_style`: Style description for headings (e.g., bold, uppercase)\n        - `typography/body_style` — text — `body_style`: Style description for body text\n      - `layout` — structure slide_designer.LayoutSettings — `layout`: Layout configuration\n        - `layout/aspect_ratio` — choice of \"16:9\" | \"4:3\" | \"1:1\" — `aspect_ratio`: Slide aspect ratio\n        - `layout/margins` — text — `margins`: Margin style (e.g., narrow, standard, wide)\n        - `layout/alignment` — text — `alignment`: Default content alignment (e.g., left, center, right)\n      - `style` — structure slide_designer.StyleSettings — `style`: Visual style settings\n        - `style/overall` — text — `overall`: Overall visual style (e.g., minimal, corporate, creative)\n        - `style/icon_style` — text — `icon_style`: Style for icons (e.g., outline, filled, flat)\n        - `style/graphic_style` — text — `graphic_style`: Style for graphics and illustrations\n      - `exclusions` — text — `exclusions`: Elements to avoid in the design (e.g., no gradients, no stock photos)\n  - `/result/visuals` — list of image (a file) — `visuals`: A title slide drawn in each theme, in the same order\n    - each item is a image (a file) (An image)\n\n## Delegated\n\nNone. `MthdsResult` remains available for any structure you choose not to lay out.\n\n## One real run, as loaded\n\nThe state of one actual run, so you can judge magnitudes and lengths. Bind to the paths; do not copy these values into the spec.\n\n```json\n{\n  \"brief\": {\n    \"topic\": \"Q4 2025 Financial Results\",\n    \"brand_guidelines\": null,\n    \"tone\": \"formal\",\n    \"existing_references\": null,\n    \"goal\": \"keynote\",\n    \"audience\": \"executives\"\n  },\n  \"themes\": [\n    {\n      \"name\": \"Boardroom Ledger\",\n      \"colors\": {\n        \"primary\": \"#102A43\",\n        \"secondary\": \"#52606D\",\n        \"accent\": \"#B7791F\",\n        \"background\": \"#F7F9FC\",\n        \"text_primary\": \"#102A43\",\n        \"text_secondary\": \"#52606D\"\n      },\n      \"typography\": {\n        \"font_family\": \"Helvetica Neue\",\n        \"heading_style\": \"Bold, sentence case, navy headings with clear numeric emphasis\",\n        \"body_style\": \"Regular sans-serif, restrained sizing, high-contrast data labels\"\n      },\n      \"layout\": {\n        \"aspect_ratio\": \"16:9\",\n        \"margins\": \"wide\",\n        \"alignment\": \"left\"\n      },\n      \"style\": {\n        \"overall\": \"Formal executive financial reporting with disciplined whitespace and data-first hierarchy\",\n        \"icon_style\": \"Minimal monoline icons\",\n        \"graphic_style\": \"Clean bar, line, and waterfall charts; muted gridlines; gold reserved for material highlights\"\n      },\n      \"exclusions\": \"Avoid decorative gradients, playful illustrations, stock photography, dense text blocks, 3D charts, and excessive use of accent color.\"\n    },\n    {\n      \"name\": \"Capital Slate\",\n      \"colors\": {\n        \"primary\": \"#1E293B\",\n        \"secondary\": \"#64748B\",\n        \"accent\": \"#0F766E\",\n        \"background\": \"#FFFFFF\",\n        \"text_primary\": \"#0F172A\",\n        \"text_secondary\": \"#64748B\"\n      },\n      \"typography\": {\n        \"font_family\": \"Arial\",\n        \"heading_style\": \"Bold, compact sans-serif headings; key metrics in prominent tabular figures\",\n        \"body_style\": \"Regular sans-serif with concise executive annotations\"\n      },\n      \"layout\": {\n        \"aspect_ratio\": \"16:9\",\n        \"margins\": \"standard\",\n        \"alignment\": \"left\"\n      },\n      \"style\": {\n        \"overall\": \"Crisp, contemporary corporate keynote design focused on clarity, comparability, and investor-grade confidence\",\n        \"icon_style\": \"Geometric outline icons\",\n        \"graphic_style\": \"Flat financial charts with teal performance callouts, slate baselines, and structured metric cards\"\n      },\n      \"exclusions\": \"Avoid serif display type, bright multi-color palettes, ornamental patterns, chart shadows, unnecessary animation cues, and unverified visual metaphors.\"\n    },\n    {\n      \"name\": \"Quarterline\",\n      \"colors\": {\n        \"primary\": \"#172554\",\n        \"secondary\": \"#475569\",\n        \"accent\": \"#C2410C\",\n        \"background\": \"#F8FAFC\",\n        \"text_primary\": \"#172554\",\n        \"text_secondary\": \"#475569\"\n      },\n      \"typography\": {\n        \"font_family\": \"Georgia\",\n        \"heading_style\": \"Semibold serif headlines paired with strong numeric callouts\",\n        \"body_style\": \"Clean, readable supporting text with concise labels and generous line spacing\"\n      },\n      \"layout\": {\n        \"aspect_ratio\": \"16:9\",\n        \"margins\": \"wide\",\n        \"alignment\": \"left\"\n      },\n      \"style\": {\n        \"overall\": \"Premium annual-report-inspired executive narrative, balancing formal authority with focused Q4 performance storytelling\",\n        \"icon_style\": \"Fine-line, understated icons\",\n        \"graphic_style\": \"Editorial metric panels, precise rules, and restrained financial charts; orange used only for variance or decision-critical emphasis\"\n      },\n      \"exclusions\": \"Avoid casual typefaces, full-bleed stock imagery, loud color fields, excessive rounded shapes, gradients, and crowded dashboard-style slides.\"\n    }\n  ],\n  \"visuals\": [\n    {\n      \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_8d466b1f-a84c-4dac-893c-e23d25e2b92d/generated/8bf3e4e322bf392f.jpg\",\n      \"source_prompt\": \"Render a composition of 4 slide mockups based on the following theme:\\n\\n# name: Boardroom Ledger\\n\\n# colors\\n\\n## primary: #102A43\\n\\n## secondary: #52606D\\n\\n## accent: #B7791F\\n\\n## background: #F7F9FC\\n\\n## text_primary: #102A43\\n\\n## text_secondary: #52606D\\n\\n# typography\\n\\n## font_family: Helvetica Neue\\n\\n## heading_style: Bold, sentence case, navy headings with clear numeric emphasis\\n\\n## body_style: Regular sans-serif, restrained sizing, high-contrast data labels\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: wide\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Formal executive financial reporting with disciplined whitespace and data-first hierarchy\\n\\n## icon_style: Minimal monoline icons\\n\\n## graphic_style: Clean bar, line, and waterfall charts; muted gridlines; gold reserved for material highlights\\n\\n# exclusions: Avoid decorative gradients, playful illustrations, stock photography, dense text blocks, 3D charts, and excessive use of accent color.\\n\\n---\\n\\nThe composition should be a grid of 4 slides, each with the following layout:\\n- Title slide\\n- Content slide\\n- Comparison slide\\n- Process slide\\n\\nMake the mosaic edge to edge, no space between the slides.\",\n      \"source_negative_prompt\": null,\n      \"caption\": null,\n      \"mime_type\": \"image/jpeg\",\n      \"width\": null,\n      \"height\": null,\n      \"filename\": null\n    },\n    {\n      \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_8d466b1f-a84c-4dac-893c-e23d25e2b92d/generated/23e1fc958a5105f2.jpg\",\n      \"source_prompt\": \"Render a composition of 4 slide mockups based on the following theme:\\n\\n# name: Capital Slate\\n\\n# colors\\n\\n## primary: #1E293B\\n\\n## secondary: #64748B\\n\\n## accent: #0F766E\\n\\n## background: #FFFFFF\\n\\n## text_primary: #0F172A\\n\\n## text_secondary: #64748B\\n\\n# typography\\n\\n## font_family: Arial\\n\\n## heading_style: Bold, compact sans-serif headings; key metrics in prominent tabular figures\\n\\n## body_style: Regular sans-serif with concise executive annotations\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: standard\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Crisp, contemporary corporate keynote design focused on clarity, comparability, and investor-grade confidence\\n\\n## icon_style: Geometric outline icons\\n\\n## graphic_style: Flat financial charts with teal performance callouts, slate baselines, and structured metric cards\\n\\n# exclusions: Avoid serif display type, bright multi-color palettes, ornamental patterns, chart shadows, unnecessary animation cues, and unverified visual metaphors.\\n\\n---\\n\\nThe composition should be a grid of 4 slides, each with the following layout:\\n- Title slide\\n- Content slide\\n- Comparison slide\\n- Process slide\\n\\nMake the mosaic edge to edge, no space between the slides.\",\n      \"source_negative_prompt\": null,\n      \"caption\": null,\n      \"mime_type\": \"image/jpeg\",\n      \"width\": null,\n      \"height\": null,\n      \"filename\": null\n    },\n    {\n      \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_8d466b1f-a84c-4dac-893c-e23d25e2b92d/generated/ac787a213514a95f.jpg\",\n      \"source_prompt\": \"Render a composition of 4 slide mockups based on the following theme:\\n\\n# name: Quarterline\\n\\n# colors\\n\\n## primary: #172554\\n\\n## secondary: #475569\\n\\n## accent: #C2410C\\n\\n## background: #F8FAFC\\n\\n## text_primary: #172554\\n\\n## text_secondary: #475569\\n\\n# typography\\n\\n## font_family: Georgia\\n\\n## heading_style: Semibold serif headlines paired with strong numeric callouts\\n\\n## body_style: Clean, readable supporting text with concise labels and generous line spacing\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: wide\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Premium annual-report-inspired executive narrative, balancing formal authority with focused Q4 performance storytelling\\n\\n## icon_style: Fine-line, understated icons\\n\\n## graphic_style: Editorial metric panels, precise rules, and restrained financial charts; orange used only for variance or decision-critical emphasis\\n\\n# exclusions: Avoid casual typefaces, full-bleed stock imagery, loud color fields, excessive rounded shapes, gradients, and crowded dashboard-style slides.\\n\\n---\\n\\nThe composition should be a grid of 4 slides, each with the following layout:\\n- Title slide\\n- Content slide\\n- Comparison slide\\n- Process slide\\n\\nMake the mosaic edge to edge, no space between the slides.\",\n      \"source_negative_prompt\": null,\n      \"caption\": null,\n      \"mime_type\": \"image/jpeg\",\n      \"width\": null,\n      \"height\": null,\n      \"filename\": null\n    }\n  ]\n}\n```\n",
+  "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"page\"}\n{\"op\":\"add\",\"path\":\"/elements/page\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"xl\"},\"children\":[\"header\",\"brief-grid\",\"directions-tabs\"]}}\n{\"op\":\"add\",\"path\":\"/elements/header\",\"value\":{\"type\":\"ResultHeader\",\"props\":{\"title\":{\"$state\":\"/result/brief/topic\"},\"subtitle\":{\"$template\":\"A ${/result/brief/goal} for ${/result/brief/audience}, in a ${/result/brief/tone} tone\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/brief-grid\",\"value\":{\"type\":\"Grid\",\"props\":{\"columns\":3,\"gap\":\"md\"},\"children\":[\"fact-tone\",\"fact-goal\",\"fact-audience\",\"detail-brand\",\"detail-references\"]}}\n{\"op\":\"add\",\"path\":\"/elements/fact-tone\",\"value\":{\"type\":\"Fact\",\"props\":{\"label\":\"Tone\",\"value\":{\"$state\":\"/result/brief/tone\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/fact-goal\",\"value\":{\"type\":\"Fact\",\"props\":{\"label\":\"Goal\",\"value\":{\"$state\":\"/result/brief/goal\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/fact-audience\",\"value\":{\"type\":\"Fact\",\"props\":{\"label\":\"Audience\",\"value\":{\"$state\":\"/result/brief/audience\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-brand\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Brand guidelines\",\"value\":{\"$state\":\"/result/brief/brand_guidelines\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/detail-references\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"References\",\"value\":{\"$state\":\"/result/brief/existing_references\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/directions-tabs\",\"value\":{\"type\":\"Tabs\",\"props\":{\"tabs\":[{\"label\":{\"$state\":\"/result/themes/0/name\"},\"value\":\"theme-0\"},{\"label\":{\"$state\":\"/result/themes/1/name\"},\"value\":\"theme-1\"},{\"label\":{\"$state\":\"/result/themes/2/name\"},\"value\":\"theme-2\"}]},\"children\":[\"panel-0\",\"panel-1\",\"panel-2\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"children\":[\"panel-0-picture\",\"panel-0-heading\",\"panel-0-swatches\",\"panel-0-details\",\"panel-0-avoid-heading\",\"panel-0-avoid-text\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-picture\",\"value\":{\"type\":\"Picture\",\"props\":{\"path\":\"/result/visuals/0\",\"alt\":{\"$state\":\"/result/themes/0/name\"},\"aspect\":\"16:9\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":{\"$state\":\"/result/themes/0/name\"},\"level\":\"h2\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-swatches\",\"value\":{\"type\":\"Swatches\",\"props\":{\"colors\":[{\"$state\":\"/result/themes/0/colors/primary\"},{\"$state\":\"/result/themes/0/colors/secondary\"},{\"$state\":\"/result/themes/0/colors/accent\"},{\"$state\":\"/result/themes/0/colors/background\"},{\"$state\":\"/result/themes/0/colors/text_primary\"},{\"$state\":\"/result/themes/0/colors/text_secondary\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-details\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"panel-0-detail-font\",\"panel-0-detail-headings\",\"panel-0-detail-body\",\"panel-0-detail-aspect\",\"panel-0-detail-margins\",\"panel-0-detail-alignment\",\"panel-0-detail-overall\",\"panel-0-detail-icons\",\"panel-0-detail-graphics\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-font\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Font\",\"value\":{\"$state\":\"/result/themes/0/typography/font_family\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-headings\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Headings\",\"value\":{\"$state\":\"/result/themes/0/typography/heading_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-body\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Body text\",\"value\":{\"$state\":\"/result/themes/0/typography/body_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-aspect\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Aspect ratio\",\"value\":{\"$state\":\"/result/themes/0/layout/aspect_ratio\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-margins\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Margins\",\"value\":{\"$state\":\"/result/themes/0/layout/margins\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-alignment\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Alignment\",\"value\":{\"$state\":\"/result/themes/0/layout/alignment\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-overall\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Overall style\",\"value\":{\"$state\":\"/result/themes/0/style/overall\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-icons\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Icons\",\"value\":{\"$state\":\"/result/themes/0/style/icon_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-detail-graphics\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Graphics\",\"value\":{\"$state\":\"/result/themes/0/style/graphic_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-avoid-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":\"Avoid\",\"level\":\"h3\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-0-avoid-text\",\"value\":{\"type\":\"Text\",\"props\":{\"text\":{\"$state\":\"/result/themes/0/exclusions\"},\"variant\":\"muted\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"children\":[\"panel-1-picture\",\"panel-1-heading\",\"panel-1-swatches\",\"panel-1-details\",\"panel-1-avoid-heading\",\"panel-1-avoid-text\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-picture\",\"value\":{\"type\":\"Picture\",\"props\":{\"path\":\"/result/visuals/1\",\"alt\":{\"$state\":\"/result/themes/1/name\"},\"aspect\":\"16:9\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":{\"$state\":\"/result/themes/1/name\"},\"level\":\"h2\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-swatches\",\"value\":{\"type\":\"Swatches\",\"props\":{\"colors\":[{\"$state\":\"/result/themes/1/colors/primary\"},{\"$state\":\"/result/themes/1/colors/secondary\"},{\"$state\":\"/result/themes/1/colors/accent\"},{\"$state\":\"/result/themes/1/colors/background\"},{\"$state\":\"/result/themes/1/colors/text_primary\"},{\"$state\":\"/result/themes/1/colors/text_secondary\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-details\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"panel-1-detail-font\",\"panel-1-detail-headings\",\"panel-1-detail-body\",\"panel-1-detail-aspect\",\"panel-1-detail-margins\",\"panel-1-detail-alignment\",\"panel-1-detail-overall\",\"panel-1-detail-icons\",\"panel-1-detail-graphics\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-font\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Font\",\"value\":{\"$state\":\"/result/themes/1/typography/font_family\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-headings\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Headings\",\"value\":{\"$state\":\"/result/themes/1/typography/heading_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-body\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Body text\",\"value\":{\"$state\":\"/result/themes/1/typography/body_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-aspect\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Aspect ratio\",\"value\":{\"$state\":\"/result/themes/1/layout/aspect_ratio\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-margins\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Margins\",\"value\":{\"$state\":\"/result/themes/1/layout/margins\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-alignment\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Alignment\",\"value\":{\"$state\":\"/result/themes/1/layout/alignment\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-overall\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Overall style\",\"value\":{\"$state\":\"/result/themes/1/style/overall\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-icons\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Icons\",\"value\":{\"$state\":\"/result/themes/1/style/icon_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-detail-graphics\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Graphics\",\"value\":{\"$state\":\"/result/themes/1/style/graphic_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-avoid-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":\"Avoid\",\"level\":\"h3\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-1-avoid-text\",\"value\":{\"type\":\"Text\",\"props\":{\"text\":{\"$state\":\"/result/themes/1/exclusions\"},\"variant\":\"muted\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\"},\"children\":[\"panel-2-picture\",\"panel-2-heading\",\"panel-2-swatches\",\"panel-2-details\",\"panel-2-avoid-heading\",\"panel-2-avoid-text\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-picture\",\"value\":{\"type\":\"Picture\",\"props\":{\"path\":\"/result/visuals/2\",\"alt\":{\"$state\":\"/result/themes/2/name\"},\"aspect\":\"16:9\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":{\"$state\":\"/result/themes/2/name\"},\"level\":\"h2\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-swatches\",\"value\":{\"type\":\"Swatches\",\"props\":{\"colors\":[{\"$state\":\"/result/themes/2/colors/primary\"},{\"$state\":\"/result/themes/2/colors/secondary\"},{\"$state\":\"/result/themes/2/colors/accent\"},{\"$state\":\"/result/themes/2/colors/background\"},{\"$state\":\"/result/themes/2/colors/text_primary\"},{\"$state\":\"/result/themes/2/colors/text_secondary\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-details\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"panel-2-detail-font\",\"panel-2-detail-headings\",\"panel-2-detail-body\",\"panel-2-detail-aspect\",\"panel-2-detail-margins\",\"panel-2-detail-alignment\",\"panel-2-detail-overall\",\"panel-2-detail-icons\",\"panel-2-detail-graphics\"]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-font\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Font\",\"value\":{\"$state\":\"/result/themes/2/typography/font_family\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-headings\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Headings\",\"value\":{\"$state\":\"/result/themes/2/typography/heading_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-body\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Body text\",\"value\":{\"$state\":\"/result/themes/2/typography/body_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-aspect\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Aspect ratio\",\"value\":{\"$state\":\"/result/themes/2/layout/aspect_ratio\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-margins\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Margins\",\"value\":{\"$state\":\"/result/themes/2/layout/margins\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-alignment\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Alignment\",\"value\":{\"$state\":\"/result/themes/2/layout/alignment\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-overall\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Overall style\",\"value\":{\"$state\":\"/result/themes/2/style/overall\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-icons\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Icons\",\"value\":{\"$state\":\"/result/themes/2/style/icon_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-detail-graphics\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Graphics\",\"value\":{\"$state\":\"/result/themes/2/style/graphic_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-avoid-heading\",\"value\":{\"type\":\"Heading\",\"props\":{\"text\":\"Avoid\",\"level\":\"h3\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/panel-2-avoid-text\",\"value\":{\"type\":\"Text\",\"props\":{\"text\":{\"$state\":\"/result/themes/2/exclusions\"},\"variant\":\"muted\"},\"children\":[]}}",
+  "spec": {
+    "root": "page",
+    "elements": {
+      "page": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "xl"
+        },
+        "children": ["header", "brief-grid", "directions-tabs"]
+      },
+      "header": {
+        "type": "ResultHeader",
+        "props": {
+          "title": {
+            "$state": "/result/brief/topic"
+          },
+          "subtitle": {
+            "$template": "A ${/result/brief/goal} for ${/result/brief/audience}, in a ${/result/brief/tone} tone"
+          }
+        },
+        "children": []
+      },
+      "brief-grid": {
+        "type": "Grid",
+        "props": {
+          "columns": 3,
+          "gap": "md"
+        },
+        "children": ["fact-tone", "fact-goal", "fact-audience", "detail-brand", "detail-references"]
+      },
+      "fact-tone": {
+        "type": "Fact",
+        "props": {
+          "label": "Tone",
+          "value": {
+            "$state": "/result/brief/tone"
+          }
+        },
+        "children": []
+      },
+      "fact-goal": {
+        "type": "Fact",
+        "props": {
+          "label": "Goal",
+          "value": {
+            "$state": "/result/brief/goal"
+          }
+        },
+        "children": []
+      },
+      "fact-audience": {
+        "type": "Fact",
+        "props": {
+          "label": "Audience",
+          "value": {
+            "$state": "/result/brief/audience"
+          }
+        },
+        "children": []
+      },
+      "detail-brand": {
+        "type": "Detail",
+        "props": {
+          "label": "Brand guidelines",
+          "value": {
+            "$state": "/result/brief/brand_guidelines"
+          }
+        },
+        "children": []
+      },
+      "detail-references": {
+        "type": "Detail",
+        "props": {
+          "label": "References",
+          "value": {
+            "$state": "/result/brief/existing_references"
+          }
+        },
+        "children": []
+      },
+      "directions-tabs": {
+        "type": "Tabs",
+        "props": {
+          "tabs": [
+            {
+              "label": {
+                "$state": "/result/themes/0/name"
+              },
+              "value": "theme-0"
+            },
+            {
+              "label": {
+                "$state": "/result/themes/1/name"
+              },
+              "value": "theme-1"
+            },
+            {
+              "label": {
+                "$state": "/result/themes/2/name"
+              },
+              "value": "theme-2"
+            }
+          ]
+        },
+        "children": ["panel-0", "panel-1", "panel-2"]
+      },
+      "panel-0": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "lg"
+        },
+        "children": [
+          "panel-0-picture",
+          "panel-0-heading",
+          "panel-0-swatches",
+          "panel-0-details",
+          "panel-0-avoid-heading",
+          "panel-0-avoid-text"
+        ]
+      },
+      "panel-0-picture": {
+        "type": "Picture",
+        "props": {
+          "path": "/result/visuals/0",
+          "alt": {
+            "$state": "/result/themes/0/name"
+          },
+          "aspect": "16:9"
+        },
+        "children": []
+      },
+      "panel-0-heading": {
+        "type": "Heading",
+        "props": {
+          "text": {
+            "$state": "/result/themes/0/name"
+          },
+          "level": "h2"
+        },
+        "children": []
+      },
+      "panel-0-swatches": {
+        "type": "Swatches",
+        "props": {
+          "colors": [
+            {
+              "$state": "/result/themes/0/colors/primary"
+            },
+            {
+              "$state": "/result/themes/0/colors/secondary"
+            },
+            {
+              "$state": "/result/themes/0/colors/accent"
+            },
+            {
+              "$state": "/result/themes/0/colors/background"
+            },
+            {
+              "$state": "/result/themes/0/colors/text_primary"
+            },
+            {
+              "$state": "/result/themes/0/colors/text_secondary"
+            }
+          ]
+        },
+        "children": []
+      },
+      "panel-0-details": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "none"
+        },
+        "children": [
+          "panel-0-detail-font",
+          "panel-0-detail-headings",
+          "panel-0-detail-body",
+          "panel-0-detail-aspect",
+          "panel-0-detail-margins",
+          "panel-0-detail-alignment",
+          "panel-0-detail-overall",
+          "panel-0-detail-icons",
+          "panel-0-detail-graphics"
+        ]
+      },
+      "panel-0-detail-font": {
+        "type": "Detail",
+        "props": {
+          "label": "Font",
+          "value": {
+            "$state": "/result/themes/0/typography/font_family"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-headings": {
+        "type": "Detail",
+        "props": {
+          "label": "Headings",
+          "value": {
+            "$state": "/result/themes/0/typography/heading_style"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-body": {
+        "type": "Detail",
+        "props": {
+          "label": "Body text",
+          "value": {
+            "$state": "/result/themes/0/typography/body_style"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-aspect": {
+        "type": "Detail",
+        "props": {
+          "label": "Aspect ratio",
+          "value": {
+            "$state": "/result/themes/0/layout/aspect_ratio"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-margins": {
+        "type": "Detail",
+        "props": {
+          "label": "Margins",
+          "value": {
+            "$state": "/result/themes/0/layout/margins"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-alignment": {
+        "type": "Detail",
+        "props": {
+          "label": "Alignment",
+          "value": {
+            "$state": "/result/themes/0/layout/alignment"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-overall": {
+        "type": "Detail",
+        "props": {
+          "label": "Overall style",
+          "value": {
+            "$state": "/result/themes/0/style/overall"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-icons": {
+        "type": "Detail",
+        "props": {
+          "label": "Icons",
+          "value": {
+            "$state": "/result/themes/0/style/icon_style"
+          }
+        },
+        "children": []
+      },
+      "panel-0-detail-graphics": {
+        "type": "Detail",
+        "props": {
+          "label": "Graphics",
+          "value": {
+            "$state": "/result/themes/0/style/graphic_style"
+          }
+        },
+        "children": []
+      },
+      "panel-0-avoid-heading": {
+        "type": "Heading",
+        "props": {
+          "text": "Avoid",
+          "level": "h3"
+        },
+        "children": []
+      },
+      "panel-0-avoid-text": {
+        "type": "Text",
+        "props": {
+          "text": {
+            "$state": "/result/themes/0/exclusions"
+          },
+          "variant": "muted"
+        },
+        "children": []
+      },
+      "panel-1": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "lg"
+        },
+        "children": [
+          "panel-1-picture",
+          "panel-1-heading",
+          "panel-1-swatches",
+          "panel-1-details",
+          "panel-1-avoid-heading",
+          "panel-1-avoid-text"
+        ]
+      },
+      "panel-1-picture": {
+        "type": "Picture",
+        "props": {
+          "path": "/result/visuals/1",
+          "alt": {
+            "$state": "/result/themes/1/name"
+          },
+          "aspect": "16:9"
+        },
+        "children": []
+      },
+      "panel-1-heading": {
+        "type": "Heading",
+        "props": {
+          "text": {
+            "$state": "/result/themes/1/name"
+          },
+          "level": "h2"
+        },
+        "children": []
+      },
+      "panel-1-swatches": {
+        "type": "Swatches",
+        "props": {
+          "colors": [
+            {
+              "$state": "/result/themes/1/colors/primary"
+            },
+            {
+              "$state": "/result/themes/1/colors/secondary"
+            },
+            {
+              "$state": "/result/themes/1/colors/accent"
+            },
+            {
+              "$state": "/result/themes/1/colors/background"
+            },
+            {
+              "$state": "/result/themes/1/colors/text_primary"
+            },
+            {
+              "$state": "/result/themes/1/colors/text_secondary"
+            }
+          ]
+        },
+        "children": []
+      },
+      "panel-1-details": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "none"
+        },
+        "children": [
+          "panel-1-detail-font",
+          "panel-1-detail-headings",
+          "panel-1-detail-body",
+          "panel-1-detail-aspect",
+          "panel-1-detail-margins",
+          "panel-1-detail-alignment",
+          "panel-1-detail-overall",
+          "panel-1-detail-icons",
+          "panel-1-detail-graphics"
+        ]
+      },
+      "panel-1-detail-font": {
+        "type": "Detail",
+        "props": {
+          "label": "Font",
+          "value": {
+            "$state": "/result/themes/1/typography/font_family"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-headings": {
+        "type": "Detail",
+        "props": {
+          "label": "Headings",
+          "value": {
+            "$state": "/result/themes/1/typography/heading_style"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-body": {
+        "type": "Detail",
+        "props": {
+          "label": "Body text",
+          "value": {
+            "$state": "/result/themes/1/typography/body_style"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-aspect": {
+        "type": "Detail",
+        "props": {
+          "label": "Aspect ratio",
+          "value": {
+            "$state": "/result/themes/1/layout/aspect_ratio"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-margins": {
+        "type": "Detail",
+        "props": {
+          "label": "Margins",
+          "value": {
+            "$state": "/result/themes/1/layout/margins"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-alignment": {
+        "type": "Detail",
+        "props": {
+          "label": "Alignment",
+          "value": {
+            "$state": "/result/themes/1/layout/alignment"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-overall": {
+        "type": "Detail",
+        "props": {
+          "label": "Overall style",
+          "value": {
+            "$state": "/result/themes/1/style/overall"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-icons": {
+        "type": "Detail",
+        "props": {
+          "label": "Icons",
+          "value": {
+            "$state": "/result/themes/1/style/icon_style"
+          }
+        },
+        "children": []
+      },
+      "panel-1-detail-graphics": {
+        "type": "Detail",
+        "props": {
+          "label": "Graphics",
+          "value": {
+            "$state": "/result/themes/1/style/graphic_style"
+          }
+        },
+        "children": []
+      },
+      "panel-1-avoid-heading": {
+        "type": "Heading",
+        "props": {
+          "text": "Avoid",
+          "level": "h3"
+        },
+        "children": []
+      },
+      "panel-1-avoid-text": {
+        "type": "Text",
+        "props": {
+          "text": {
+            "$state": "/result/themes/1/exclusions"
+          },
+          "variant": "muted"
+        },
+        "children": []
+      },
+      "panel-2": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "lg"
+        },
+        "children": [
+          "panel-2-picture",
+          "panel-2-heading",
+          "panel-2-swatches",
+          "panel-2-details",
+          "panel-2-avoid-heading",
+          "panel-2-avoid-text"
+        ]
+      },
+      "panel-2-picture": {
+        "type": "Picture",
+        "props": {
+          "path": "/result/visuals/2",
+          "alt": {
+            "$state": "/result/themes/2/name"
+          },
+          "aspect": "16:9"
+        },
+        "children": []
+      },
+      "panel-2-heading": {
+        "type": "Heading",
+        "props": {
+          "text": {
+            "$state": "/result/themes/2/name"
+          },
+          "level": "h2"
+        },
+        "children": []
+      },
+      "panel-2-swatches": {
+        "type": "Swatches",
+        "props": {
+          "colors": [
+            {
+              "$state": "/result/themes/2/colors/primary"
+            },
+            {
+              "$state": "/result/themes/2/colors/secondary"
+            },
+            {
+              "$state": "/result/themes/2/colors/accent"
+            },
+            {
+              "$state": "/result/themes/2/colors/background"
+            },
+            {
+              "$state": "/result/themes/2/colors/text_primary"
+            },
+            {
+              "$state": "/result/themes/2/colors/text_secondary"
+            }
+          ]
+        },
+        "children": []
+      },
+      "panel-2-details": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "none"
+        },
+        "children": [
+          "panel-2-detail-font",
+          "panel-2-detail-headings",
+          "panel-2-detail-body",
+          "panel-2-detail-aspect",
+          "panel-2-detail-margins",
+          "panel-2-detail-alignment",
+          "panel-2-detail-overall",
+          "panel-2-detail-icons",
+          "panel-2-detail-graphics"
+        ]
+      },
+      "panel-2-detail-font": {
+        "type": "Detail",
+        "props": {
+          "label": "Font",
+          "value": {
+            "$state": "/result/themes/2/typography/font_family"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-headings": {
+        "type": "Detail",
+        "props": {
+          "label": "Headings",
+          "value": {
+            "$state": "/result/themes/2/typography/heading_style"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-body": {
+        "type": "Detail",
+        "props": {
+          "label": "Body text",
+          "value": {
+            "$state": "/result/themes/2/typography/body_style"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-aspect": {
+        "type": "Detail",
+        "props": {
+          "label": "Aspect ratio",
+          "value": {
+            "$state": "/result/themes/2/layout/aspect_ratio"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-margins": {
+        "type": "Detail",
+        "props": {
+          "label": "Margins",
+          "value": {
+            "$state": "/result/themes/2/layout/margins"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-alignment": {
+        "type": "Detail",
+        "props": {
+          "label": "Alignment",
+          "value": {
+            "$state": "/result/themes/2/layout/alignment"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-overall": {
+        "type": "Detail",
+        "props": {
+          "label": "Overall style",
+          "value": {
+            "$state": "/result/themes/2/style/overall"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-icons": {
+        "type": "Detail",
+        "props": {
+          "label": "Icons",
+          "value": {
+            "$state": "/result/themes/2/style/icon_style"
+          }
+        },
+        "children": []
+      },
+      "panel-2-detail-graphics": {
+        "type": "Detail",
+        "props": {
+          "label": "Graphics",
+          "value": {
+            "$state": "/result/themes/2/style/graphic_style"
+          }
+        },
+        "children": []
+      },
+      "panel-2-avoid-heading": {
+        "type": "Heading",
+        "props": {
+          "text": "Avoid",
+          "level": "h3"
+        },
+        "children": []
+      },
+      "panel-2-avoid-text": {
+        "type": "Text",
+        "props": {
+          "text": {
+            "$state": "/result/themes/2/exclusions"
+          },
+          "variant": "muted"
+        },
+        "children": []
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
 import { catalog } from './catalog';
 import { generativeRenderers } from './registry';
+import { spikeRenderers } from './spike-registry';
 import { useResultSlot } from './result-slot';
 import { useControlId } from './ui/shadcn';
 
@@ -483,5 +484,7 @@ export const { registry: generativeRegistry } = defineRegistry(catalog, {
     SummaryRow: (ctx) => <SummaryRow {...ctx} />,
     Cta: (ctx) => <Cta {...ctx} />,
     Footer: (ctx) => <Footer {...ctx} />,
+    // SPIKE (L-261107-a6a35f)
+    ...spikeRenderers,
   },
 } as RegistryOptions);

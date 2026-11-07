@@ -227,10 +227,24 @@ function useAbsolutePath(path: string): string | undefined {
 
 // ─── The escape hatches ──────────────────────────────────────────────────────
 
-function MthdsField({ props }: BaseComponentProps<{ path: string }>) {
+function MthdsField({
+  props,
+}: BaseComponentProps<{ path: string; label?: string | null; hint?: string | null }>) {
   const scope = React.useContext(DescriptorContext);
   const path = useAbsolutePath(props.path) ?? '';
-  const field = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
+  const found = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
+  // SPIKE (L-261107-a6a35f): the page's own words for the label and the line under it.
+  const field = React.useMemo(
+    () =>
+      found && (props.label || props.hint)
+        ? {
+            ...found,
+            title: props.label || found.title,
+            description: props.hint || found.description,
+          }
+        : found,
+    [found, props.label, props.hint],
+  );
   const value = useStateValue<unknown>(path);
   const { set } = useStateStore();
   const onChange = React.useCallback((next: unknown) => set(path, next), [set, path]);
@@ -351,9 +365,24 @@ function formatCell(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** SPIKE (L-261107-a6a35f): a cell in a column the layout stated a format for. */
+function formatColumnCell(value: unknown, format: string | null | undefined): string {
+  if (format === 'date' && typeof value === 'string') {
+    const date = new Date(value.length === 10 ? `${value}T00:00:00Z` : value);
+    if (!Number.isNaN(date.getTime()))
+      return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+      });
+  }
+  return formatCell(value);
+}
+
 interface DataTableProps {
   rows: unknown;
-  columns: { path: string; label: string }[];
+  columns: { path: string; label: string; format?: 'text' | 'date' | 'number' | null }[];
   caption?: string | null;
 }
 
@@ -386,7 +415,7 @@ function DataTable({ props }: BaseComponentProps<DataTableProps>) {
             <tr key={index} className="border-b border-border/60 last:border-b-0">
               {columns.map((column) => (
                 <td key={column.path} className="px-2.5 py-1.5 align-top text-foreground">
-                  {formatCell(valueAt(row, column.path))}
+                  {formatColumnCell(valueAt(row, column.path), column.format)}
                 </td>
               ))}
             </tr>

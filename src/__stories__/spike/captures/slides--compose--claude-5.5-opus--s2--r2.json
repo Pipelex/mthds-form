@@ -1,0 +1,234 @@
+{
+ "id": "slides--compose--claude-5.5-opus--s2--r2",
+ "method": "slides",
+ "moment": "compose",
+ "frame": "composer",
+ "model": "claude-5.5-opus",
+ "seed": "EFiT10rVtPYfBVgKQyCPnyPjM62WxBZE",
+ "round": "r2",
+ "runId": "run_9c7ea88d-ec88-4b52-a571-28b1bcbd0592",
+ "costUsd": 0.128724,
+ "seconds": 38,
+ "valid": true,
+ "problems": [],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "A presenter or designer with a talk coming up comes here to describe it in a few strokes and get back visual directions for the deck, so the page should feel like a quick creative brief, not paperwork.",
+  "title": "Find the look for your next deck",
+  "composition": "The page is one centred column with exactly one Composer. Its headline is the h1, with one muted line under it. Under that is one raised panel set in two columns (columns \"2\"). The left column is \"The talk\": what the deck is about, what it is for and who will watch it. The person decides these first, so the topic sits at the top left, on the first screen. The right column is \"The look\": the tone and anything that should shape the style. It is mostly pill controls, so the panel reads as a set of quick, decisive picks, not typing. Both groups are flat FieldGroups inside the panel. They have no boxes and no extra headings. The host's action row at the panel's foot runs the method. Below the panel, one quiet line says what comes back and that only the topic is needed.",
+  "regions": [
+   {
+    "title": null,
+    "purpose": "Holds the headline, the line under it and the single panel of inputs, and its action row runs the method.",
+    "container": "Composer",
+    "elements": [
+     "Composer: headline \"Find the look for your next deck\", muted line \"Tell us about the talk, and we'll sketch the looks it could wear.\", columns \"2\", runLabel \"Draw my directions\", on.press bound to validateForm then run. It holds the two FieldGroups below."
+    ]
+   },
+   {
+    "title": "The talk",
+    "purpose": "Left column, read first: what the deck is about, its goal and its audience. The person decides these first, and the required topic sits here.",
+    "container": "FieldGroup",
+    "elements": [
+     "Input bound to /inputs/brief/topic, label \"Topic\", placeholder \"e.g. Our Series A story\", check required",
+     "Segmented bound to /inputs/brief/goal, label \"Goal\", options \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\"",
+     "Segmented bound to /inputs/brief/audience, label \"Audience\", options \"executives\" | \"technical team\" | \"general public\""
+    ]
+   },
+   {
+    "title": "The look",
+    "purpose": "Right column: the tone and the constraints that shape the visual style.",
+    "container": "FieldGroup",
+    "elements": [
+     "Segmented bound to /inputs/brief/tone, label \"Tone\", options \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\"",
+     "Input bound to /inputs/brief/brand_guidelines, label \"Brand guidelines\", placeholder \"Colours, fonts, logo rules\"",
+     "Input bound to /inputs/brief/existing_references, label \"References\", helper \"Past decks or templates to follow or avoid.\""
+    ]
+   },
+   {
+    "title": null,
+    "purpose": "Says once what comes back and that only the topic is needed to run. It sits right under the panel, next to the action row.",
+    "container": "Stack",
+    "elements": [
+     "Text (muted, small): \"You'll get several directions, each a theme with its title slide drawn in it. Only the topic is needed to start.\""
+    ]
+   }
+  ],
+  "call_to_action": "Draw my directions",
+  "defaults": [],
+  "delegated": []
+ },
+ "brief": "# Input page: slide_designer.generate_design_proposals_from_rough_brief\n\nTransform a design brief into multiple visual directions, each a theme with a title slide drawn in it\n\n## Name\n\nThe method is called «Deck directions», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\nThe action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as \"Waiting on the topic\" or \"Add a document to start\" - the controls show their own state.\n\nWhat one run gives back, read from the result's own description:\n- directions: The directions, one per theme\n\nA person runs a tool more readily when they know what comes back: the page may say it once, in their words, under the panel.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/brief` — structure slide_designer.SlideDesignBrief, required, gates the run — `brief`: Client brief for slide deck design\n  - `/inputs/brief/topic` — text, required — `topic`: The main topic or subject of the presentation\n  - `/inputs/brief/brand_guidelines` — text, optional — `brand_guidelines`: The client's brand guidelines (colors, fonts, logo usage, etc.)\n  - `/inputs/brief/tone` — choice of \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\", optional — `tone`: The tone of the presentation\n  - `/inputs/brief/existing_references` — text, optional — `existing_references`: Existing templates or past decks to reference or avoid\n  - `/inputs/brief/goal` — choice of \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\", optional — `goal`: The goal of the presentation\n  - `/inputs/brief/audience` — choice of \"executives\" | \"technical team\" | \"general public\", optional — `audience`: The target audience\n\n## Delegated\n\nNone: every input can be entered with the catalog's own inputs. `MthdsField` remains available for any you would rather not style.\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `brief`; say so near the Composer, briefly.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"page\"}\n{\"op\":\"add\",\"path\":\"/elements/page\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"md\"},\"children\":[\"composer\",\"run-note\"]}}\n{\"op\":\"add\",\"path\":\"/elements/composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Find the look for your next deck\",\"lede\":\"Tell us about the talk, and we'll sketch the looks it could wear.\",\"runLabel\":\"Draw my directions\",\"columns\":\"2\"},\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]},\"children\":[\"group-talk\",\"group-look\"]}}\n{\"op\":\"add\",\"path\":\"/elements/group-talk\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"The talk\"},\"children\":[\"topic-input\",\"goal-segmented\",\"audience-segmented\"]}}\n{\"op\":\"add\",\"path\":\"/elements/topic-input\",\"value\":{\"type\":\"Input\",\"props\":{\"label\":\"Topic\",\"name\":\"topic\",\"placeholder\":\"e.g. Our Series A story\",\"value\":{\"$bindState\":\"/inputs/brief/topic\"},\"checks\":[{\"type\":\"required\",\"message\":\"Tell us what the talk is about.\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/goal-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Goal\",\"name\":\"goal\",\"options\":[\"pitch investors\",\"sell to clients\",\"internal training\",\"keynote\"],\"value\":{\"$bindState\":\"/inputs/brief/goal\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/audience-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Audience\",\"name\":\"audience\",\"options\":[\"executives\",\"technical team\",\"general public\"],\"value\":{\"$bindState\":\"/inputs/brief/audience\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/group-look\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"The look\"},\"children\":[\"tone-segmented\",\"brand-input\",\"references-input\"]}}\n{\"op\":\"add\",\"path\":\"/elements/tone-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Tone\",\"name\":\"tone\",\"options\":[\"formal\",\"playful\",\"innovative\",\"trustworthy\",\"artsy\"],\"value\":{\"$bindState\":\"/inputs/brief/tone\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/brand-input\",\"value\":{\"type\":\"Input\",\"props\":{\"label\":\"Brand guidelines\",\"name\":\"brand_guidelines\",\"placeholder\":\"Colours, fonts, logo rules\",\"value\":{\"$bindState\":\"/inputs/brief/brand_guidelines\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/references-input\",\"value\":{\"type\":\"MthdsField\",\"props\":{\"path\":\"/inputs/brief/existing_references\",\"label\":\"References\",\"hint\":\"Past decks or templates to follow or avoid.\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/run-note\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"sm\",\"align\":\"center\"},\"children\":[\"run-note-text\"]}}\n{\"op\":\"add\",\"path\":\"/elements/run-note-text\",\"value\":{\"type\":\"Text\",\"props\":{\"text\":\"You'll get several directions, each a theme with its title slide drawn in it. Only the topic is needed to start.\",\"variant\":\"muted\"},\"children\":[]}}",
+ "spec": {
+  "root": "page",
+  "elements": {
+   "page": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "md"
+    },
+    "children": [
+     "composer",
+     "run-note"
+    ]
+   },
+   "composer": {
+    "type": "Composer",
+    "props": {
+     "headline": "Find the look for your next deck",
+     "lede": "Tell us about the talk, and we'll sketch the looks it could wear.",
+     "runLabel": "Draw my directions",
+     "columns": "2"
+    },
+    "on": {
+     "press": [
+      {
+       "action": "validateForm"
+      },
+      {
+       "action": "run"
+      }
+     ]
+    },
+    "children": [
+     "group-talk",
+     "group-look"
+    ]
+   },
+   "group-talk": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "The talk"
+    },
+    "children": [
+     "topic-input",
+     "goal-segmented",
+     "audience-segmented"
+    ]
+   },
+   "topic-input": {
+    "type": "Input",
+    "props": {
+     "label": "Topic",
+     "name": "topic",
+     "placeholder": "e.g. Our Series A story",
+     "value": {
+      "$bindState": "/inputs/brief/topic"
+     },
+     "checks": [
+      {
+       "type": "required",
+       "message": "Tell us what the talk is about."
+      }
+     ]
+    },
+    "children": []
+   },
+   "goal-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Goal",
+     "name": "goal",
+     "options": [
+      "pitch investors",
+      "sell to clients",
+      "internal training",
+      "keynote"
+     ],
+     "value": {
+      "$bindState": "/inputs/brief/goal"
+     }
+    },
+    "children": []
+   },
+   "audience-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Audience",
+     "name": "audience",
+     "options": [
+      "executives",
+      "technical team",
+      "general public"
+     ],
+     "value": {
+      "$bindState": "/inputs/brief/audience"
+     }
+    },
+    "children": []
+   },
+   "group-look": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "The look"
+    },
+    "children": [
+     "tone-segmented",
+     "brand-input",
+     "references-input"
+    ]
+   },
+   "tone-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Tone",
+     "name": "tone",
+     "options": [
+      "formal",
+      "playful",
+      "innovative",
+      "trustworthy",
+      "artsy"
+     ],
+     "value": {
+      "$bindState": "/inputs/brief/tone"
+     }
+    },
+    "children": []
+   },
+   "brand-input": {
+    "type": "Input",
+    "props": {
+     "label": "Brand guidelines",
+     "name": "brand_guidelines",
+     "placeholder": "Colours, fonts, logo rules",
+     "value": {
+      "$bindState": "/inputs/brief/brand_guidelines"
+     }
+    },
+    "children": []
+   },
+   "references-input": {
+    "type": "MthdsField",
+    "props": {
+     "path": "/inputs/brief/existing_references",
+     "label": "References",
+     "hint": "Past decks or templates to follow or avoid."
+    },
+    "children": []
+   },
+   "run-note": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "sm",
+     "align": "center"
+    },
+    "children": [
+     "run-note-text"
+    ]
+   },
+   "run-note-text": {
+    "type": "Text",
+    "props": {
+     "text": "You'll get several directions, each a theme with its title slide drawn in it. Only the topic is needed to start.",
+     "variant": "muted"
+    },
+    "children": []
+   }
+  }
+ }
+}

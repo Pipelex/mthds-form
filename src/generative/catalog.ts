@@ -7,6 +7,13 @@ import {
   generativeComponents,
 } from './components';
 import { generativeSchema } from './schema';
+import {
+  SPIKE_COMPONENTS,
+  SPIKE_COMPOSER_COMPONENTS,
+  SPIKE_RESULT_COMPONENTS,
+  spikeComponents,
+  type Frame,
+} from './spike-definitions';
 import type { ComponentRendering } from './validate';
 
 /**
@@ -142,11 +149,15 @@ export const COMPONENT_RENDERINGS: Readonly<Record<string, ComponentRendering>> 
   Workspace: { children: { count: 2, roles: 'work, rail' } },
   Tabs: { panels: { prop: 'tabs', noun: 'tab' } },
   Steps: { panels: { prop: 'steps', noun: 'step' } },
+  // SPIKE (L-261107-a6a35f)
+  Composer: { heading: { level: 1 }, once: 'the composer' },
+  ResultHeader: { heading: { level: 1 }, once: "the result's header" },
+  FieldGroup: { heading: { level: 2, when: 'title' } },
 };
 
 export const catalog = Object.assign(
   defineCatalog(generativeSchema, {
-    components: { ...generativeComponents, ...product },
+    components: { ...generativeComponents, ...product, ...spikeComponents },
     actions: generativeActions,
   }),
   { renders: COMPONENT_RENDERINGS },
@@ -166,3 +177,59 @@ export const COMPONENT_NAMES: readonly string[] = [
   ...CUSTOM_COMPONENTS,
   ...PRODUCT_COMPONENTS,
 ];
+
+/**
+ * SPIKE (L-261107-a6a35f): the vocabulary of each frame, in the order the
+ * designer method lists it. `page` is today's: the product page, with none of
+ * the spike's additions, so the captured corpus and its prompt hash stay what
+ * they were. `composer` and `result` are the two moments of a host's
+ * compose-then-result frame, whose host draws the band, the action row's
+ * mechanics, the request bar and the result's actions - so they leave out the
+ * product chrome and the side panel (`AppBar`, `Footer`, `Workspace`, `Rail`),
+ * the stand-alone run controls (`Cta`, `Button`) and the hero the composer
+ * already carries, and each leaves out the other moment's components.
+ */
+const FRAME_EXCLUDED: Record<Frame, readonly string[]> = {
+  page: [...SPIKE_COMPONENTS],
+  composer: [
+    'AppBar',
+    'Footer',
+    'Workspace',
+    'Rail',
+    'Cta',
+    'Button',
+    'Hero',
+    'SummaryRow',
+    'MthdsResult',
+    'DataTable',
+    'Metric',
+    'Progress',
+    ...SPIKE_RESULT_COMPONENTS.filter((name) => name !== 'TextList'),
+  ],
+  result: [
+    'AppBar',
+    'Footer',
+    'Workspace',
+    'Rail',
+    'Cta',
+    'Button',
+    'Hero',
+    'MthdsField',
+    'Input',
+    'Textarea',
+    'Select',
+    'Radio',
+    'Checkbox',
+    'Switch',
+    'Segmented',
+    'NumberInput',
+    'Steps',
+    ...SPIKE_COMPOSER_COMPONENTS,
+  ],
+};
+
+export function componentNamesFor(frame: Frame): readonly string[] {
+  const excluded = new Set(FRAME_EXCLUDED[frame]);
+  const own = frame === 'page' ? [] : [...SPIKE_COMPONENTS];
+  return [...COMPONENT_NAMES, ...own].filter((name) => !excluded.has(name));
+}

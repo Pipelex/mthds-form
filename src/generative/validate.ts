@@ -100,6 +100,16 @@ function isExpression(value: unknown): boolean {
   );
 }
 
+/** The value a zod issue path points at inside a prop's raw value. */
+function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {
+  let at: unknown = value;
+  for (const step of path) {
+    if (typeof at !== 'object' || at === null) return undefined;
+    at = (at as Record<PropertyKey, unknown>)[step];
+  }
+  return at;
+}
+
 /**
  * The closed vocabularies a prop can be declared with, unwrapped through the
  * `.optional()` / `.nullable()` most of them carry.
@@ -350,10 +360,16 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         continue;
       }
       const parsed = propSchema.safeParse(value);
-      if (!parsed.success) {
+      // SPIKE (L-261107-a6a35f): json-render resolves an expression wherever it
+      // sits in a prop, inside an array or an object included, so an issue
+      // raised AT a nested expression is the literal check misreading it.
+      const issues = parsed.success
+        ? []
+        : parsed.error.issues.filter((issue) => !isExpression(valueAt(value, issue.path)));
+      if (issues.length > 0) {
         problems.push({
           elementKey: key,
-          message: `${element.type}.${name}: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+          message: `${element.type}.${name}: ${issues.map((issue) => issue.message).join('; ')}`,
         });
       }
     }

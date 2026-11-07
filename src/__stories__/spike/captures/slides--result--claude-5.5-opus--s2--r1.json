@@ -1,0 +1,413 @@
+{
+  "id": "slides--result--claude-5.5-opus--s2--r1",
+  "method": "slides",
+  "moment": "result",
+  "frame": "result",
+  "model": "claude-5.5-opus",
+  "seed": "541CuuLWO9kXFgmmlTgJfaiisA25hnbp",
+  "round": "r1",
+  "runId": "run_4cb3f25d-22d1-407b-92b2-93ce90f4a9de",
+  "costUsd": 0.192264,
+  "seconds": 48,
+  "valid": true,
+  "problems": [],
+  "outside": [],
+  "fitProblems": [],
+  "plan": {
+    "purpose": "A designer or deck owner who just sent a rough brief comes here to see the proposed visual directions next to each other, judge them by eye first, then by palette and type, and pick one to build the deck in.",
+    "title": "Directions for your deck",
+    "composition": "One full-width editorial column, gallery first. The ResultHeader opens it: an accent eyebrow, the deck's topic as the h1, and a muted line saying these are the directions to choose from, with the host's actions at the right. Right under it, a slim band of three Facts restates how the brief was read (tone, goal, audience), so the reader knows what the directions answer to. Then the largest thing on the page: the mockups, one per direction, in a three-column Grid of Pictures cropped to 16:9 and edge to edge, so the reader compares them at a glance. Below that, the same directions taken apart: a three-column Grid with one Card per theme, in the same order as the mockups, holding its palette as Swatches over a tight list of Details for type, layout, style and what to avoid. Placing the cards in the same column order as the mockups lets each one sit under its picture on a wide screen. The rest of the polished brief, brand guidelines and references, is folded into a Collapsible at the end because it is reference material, not something to decide on. Everything is flat Sections divided by hairlines, with no card inside a card, and the only colour comes from the swatches and the mockups themselves.",
+    "regions": [
+      {
+        "title": null,
+        "purpose": "Names the result after the deck it is for, and gives the host a place for its download and share actions.",
+        "container": "ResultHeader",
+        "elements": [
+          "ResultHeader: eyebrow \"Design directions\", title read with { \"$state\": \"/result/brief/topic\" }, muted line \"Pick a direction and build the deck in it.\""
+        ]
+      },
+      {
+        "title": null,
+        "purpose": "How the brief was read, in three quick facts, so the directions below can be judged against it before the reader looks at any picture.",
+        "container": "Grid",
+        "elements": [
+          "Grid (3 columns) holding:",
+          "Fact: label \"Tone\", value /result/brief/tone",
+          "Fact: label \"Goal\", value /result/brief/goal",
+          "Fact: label \"Audience\", value /result/brief/audience"
+        ]
+      },
+      {
+        "title": "See them on a slide",
+        "purpose": "The first thing a reader looks for: each direction drawn as slides, side by side, at the largest size on the page.",
+        "container": "Section",
+        "elements": [
+          "Section: title \"See them on a slide\", muted line \"One mockup per direction, in the same order as the details below.\"",
+          "Grid (3 columns) repeating over /result/visuals:",
+          "Picture: path \"\" (the item itself), aspect 16:9"
+        ]
+      },
+      {
+        "title": "Compare the directions",
+        "purpose": "Each direction broken down into the choices a designer would carry into the deck, laid out in the same column order as the mockups so they can be compared across.",
+        "container": "Section",
+        "elements": [
+          "Section: title \"Compare the directions\"",
+          "Grid (3 columns) repeating over /result/themes, one Card per item:",
+          "Card: title read with { \"$item\": \"name\" }",
+          "Swatches: colors from { \"$item\": \"colors/primary\" }, { \"$item\": \"colors/secondary\" }, { \"$item\": \"colors/accent\" }, { \"$item\": \"colors/background\" }, { \"$item\": \"colors/text_primary\" }, { \"$item\": \"colors/text_secondary\" }",
+          "Detail: label \"Typeface\", value { \"$item\": \"typography/font_family\" }",
+          "Detail: label \"Headings\", value { \"$item\": \"typography/heading_style\" }",
+          "Detail: label \"Body\", value { \"$item\": \"typography/body_style\" }",
+          "Detail: label \"Format\", value { \"$item\": \"layout/aspect_ratio\" }",
+          "Detail: label \"Margins\", value { \"$item\": \"layout/margins\" }",
+          "Detail: label \"Alignment\", value { \"$item\": \"layout/alignment\" }",
+          "Detail: label \"Feel\", value { \"$item\": \"style/overall\" }",
+          "Detail: label \"Icons\", value { \"$item\": \"style/icon_style\" }",
+          "Detail: label \"Graphics\", value { \"$item\": \"style/graphic_style\" }",
+          "Detail: label \"Avoid\", value { \"$item\": \"exclusions\" }"
+        ]
+      },
+      {
+        "title": "The brief, as polished",
+        "purpose": "The remaining parts of the polished brief, kept for reference and folded away. Each line hides itself when the run left it empty.",
+        "container": "Collapsible",
+        "elements": [
+          "Collapsible: trigger \"The brief, as polished\", holding:",
+          "Detail: label \"Topic\", value /result/brief/topic",
+          "Detail: label \"Brand guidelines\", value /result/brief/brand_guidelines",
+          "Detail: label \"References\", value /result/brief/existing_references"
+        ]
+      }
+    ],
+    "call_to_action": null,
+    "defaults": null,
+    "delegated": []
+  },
+  "brief": "# Result page: slide_designer.generate_design_proposals_from_rough_brief\n\nTransform a design brief into multiple themes with visual mockups and HTML report\n\n## Frame\n\nThis page is the result page of an app that is composed, then shows its result: what the person sees after one run. The host draws what surrounds it: the band with the team's logo and the app's name, then a bar restating the request with a way back to edit it and to run again. The host also owns the actions on the result, such as downloading or sharing it, and places them where the page's header puts them. There is no side panel, no app bar and no footer to build, and nothing restates the request.\n\nThe page is the result across the full width. It opens on its header, which names the result in a person's words, read from the result itself where it can be (the page's h1). Then the figure or the fact a person looks for first, then the body of the result in the shape it naturally has: a plan day by day, options side by side to compare, a record's details. Lay out what a person reads; leave out what only a machine would.\n\n## State\n\nThe host loads the run's result under `/result` before the page renders. Read every value with `$state`; emit no `/state` patches. Paths:\n\n- `/result` — structure slide_designer.DesignDirections: The visual directions proposed for a deck: the brief as polished, each theme, and a title slide drawn in each\n  - `/result/brief` — structure slide_designer.SlideDesignBrief — `brief`: The brief, as polished\n    - `/result/brief/topic` — text — `topic`: The main topic or subject of the presentation\n    - `/result/brief/brand_guidelines` — text — `brand_guidelines`: The client's brand guidelines (colors, fonts, logo usage, etc.)\n    - `/result/brief/tone` — choice of \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\" — `tone`: The tone of the presentation\n    - `/result/brief/existing_references` — text — `existing_references`: Existing templates or past decks to reference or avoid\n    - `/result/brief/goal` — choice of \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\" — `goal`: The goal of the presentation\n    - `/result/brief/audience` — choice of \"executives\" | \"technical team\" | \"general public\" — `audience`: The target audience\n  - `/result/themes` — list of structure slide_designer.Theme — `themes`: The themes, one per direction\n    - each item is a structure slide_designer.Theme (Complete presentation theme with colors, typography, layout, and style), with these members (paths relative to one item, for DataTable columns or $item):\n      - `name` — text — `name`: Theme name identifier\n      - `colors` — structure slide_designer.ColorPalette — `colors`: Color palette for the theme\n        - `colors/primary` — text — `primary`: Primary brand color (hex or name)\n        - `colors/secondary` — text — `secondary`: Secondary color for accents\n        - `colors/accent` — text — `accent`: Accent color for highlights\n        - `colors/background` — text — `background`: Background color\n        - `colors/text_primary` — text — `text_primary`: Primary text color\n        - `colors/text_secondary` — text — `text_secondary`: Secondary text color for subtitles\n      - `typography` — structure slide_designer.Typography — `typography`: Typography settings\n        - `typography/font_family` — text — `font_family`: Primary font family name\n        - `typography/heading_style` — text — `heading_style`: Style description for headings (e.g., bold, uppercase)\n        - `typography/body_style` — text — `body_style`: Style description for body text\n      - `layout` — structure slide_designer.LayoutSettings — `layout`: Layout configuration\n        - `layout/aspect_ratio` — choice of \"16:9\" | \"4:3\" | \"1:1\" — `aspect_ratio`: Slide aspect ratio\n        - `layout/margins` — text — `margins`: Margin style (e.g., narrow, standard, wide)\n        - `layout/alignment` — text — `alignment`: Default content alignment (e.g., left, center, right)\n      - `style` — structure slide_designer.StyleSettings — `style`: Visual style settings\n        - `style/overall` — text — `overall`: Overall visual style (e.g., minimal, corporate, creative)\n        - `style/icon_style` — text — `icon_style`: Style for icons (e.g., outline, filled, flat)\n        - `style/graphic_style` — text — `graphic_style`: Style for graphics and illustrations\n      - `exclusions` — text — `exclusions`: Elements to avoid in the design (e.g., no gradients, no stock photos)\n  - `/result/visuals` — list of image (a file) — `visuals`: A title slide drawn in each theme, in the same order\n    - each item is a image (a file) (An image)\n\n## Delegated\n\nNone. `MthdsResult` remains available for any structure you choose not to lay out.\n\n## One real run, as loaded\n\nThe state of one actual run, so you can judge magnitudes and lengths. Bind to the paths; do not copy these values into the spec.\n\n```json\n{\n  \"brief\": {\n    \"topic\": \"Q4 2025 Financial Results\",\n    \"brand_guidelines\": null,\n    \"tone\": \"formal\",\n    \"existing_references\": null,\n    \"goal\": \"keynote\",\n    \"audience\": \"executives\"\n  },\n  \"themes\": [\n    {\n      \"name\": \"Boardroom Ledger\",\n      \"colors\": {\n        \"primary\": \"#102A43\",\n        \"secondary\": \"#52606D\",\n        \"accent\": \"#B7791F\",\n        \"background\": \"#F7F9FC\",\n        \"text_primary\": \"#102A43\",\n        \"text_secondary\": \"#52606D\"\n      },\n      \"typography\": {\n        \"font_family\": \"Helvetica Neue\",\n        \"heading_style\": \"Bold, sentence case, navy headings with clear numeric emphasis\",\n        \"body_style\": \"Regular sans-serif, restrained sizing, high-contrast data labels\"\n      },\n      \"layout\": {\n        \"aspect_ratio\": \"16:9\",\n        \"margins\": \"wide\",\n        \"alignment\": \"left\"\n      },\n      \"style\": {\n        \"overall\": \"Formal executive financial reporting with disciplined whitespace and data-first hierarchy\",\n        \"icon_style\": \"Minimal monoline icons\",\n        \"graphic_style\": \"Clean bar, line, and waterfall charts; muted gridlines; gold reserved for material highlights\"\n      },\n      \"exclusions\": \"Avoid decorative gradients, playful illustrations, stock photography, dense text blocks, 3D charts, and excessive use of accent color.\"\n    },\n    {\n      \"name\": \"Capital Slate\",\n      \"colors\": {\n        \"primary\": \"#1E293B\",\n        \"secondary\": \"#64748B\",\n        \"accent\": \"#0F766E\",\n        \"background\": \"#FFFFFF\",\n        \"text_primary\": \"#0F172A\",\n        \"text_secondary\": \"#64748B\"\n      },\n      \"typography\": {\n        \"font_family\": \"Arial\",\n        \"heading_style\": \"Bold, compact sans-serif headings; key metrics in prominent tabular figures\",\n        \"body_style\": \"Regular sans-serif with concise executive annotations\"\n      },\n      \"layout\": {\n        \"aspect_ratio\": \"16:9\",\n        \"margins\": \"standard\",\n        \"alignment\": \"left\"\n      },\n      \"style\": {\n        \"overall\": \"Crisp, contemporary corporate keynote design focused on clarity, comparability, and investor-grade confidence\",\n        \"icon_style\": \"Geometric outline icons\",\n        \"graphic_style\": \"Flat financial charts with teal performance callouts, slate baselines, and structured metric cards\"\n      },\n      \"exclusions\": \"Avoid serif display type, bright multi-color palettes, ornamental patterns, chart shadows, unnecessary animation cues, and unverified visual metaphors.\"\n    },\n    {\n      \"name\": \"Quarterline\",\n      \"colors\": {\n        \"primary\": \"#172554\",\n        \"secondary\": \"#475569\",\n        \"accent\": \"#C2410C\",\n        \"background\": \"#F8FAFC\",\n        \"text_primary\": \"#172554\",\n        \"text_secondary\": \"#475569\"\n      },\n      \"typography\": {\n        \"font_family\": \"Georgia\",\n        \"heading_style\": \"Semibold serif headlines paired with strong numeric callouts\",\n        \"body_style\": \"Clean, readable supporting text with concise labels and generous line spacing\"\n      },\n      \"layout\": {\n        \"aspect_ratio\": \"16:9\",\n        \"margins\": \"wide\",\n        \"alignment\": \"left\"\n      },\n      \"style\": {\n        \"overall\": \"Premium annual-report-inspired executive narrative, balancing formal authority with focused Q4 performance storytelling\",\n        \"icon_style\": \"Fine-line, understated icons\",\n        \"graphic_style\": \"Editorial metric panels, precise rules, and restrained financial charts; orange used only for variance or decision-critical emphasis\"\n      },\n      \"exclusions\": \"Avoid casual typefaces, full-bleed stock imagery, loud color fields, excessive rounded shapes, gradients, and crowded dashboard-style slides.\"\n    }\n  ],\n  \"visuals\": [\n    {\n      \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_8d466b1f-a84c-4dac-893c-e23d25e2b92d/generated/8bf3e4e322bf392f.jpg\",\n      \"source_prompt\": \"Render a composition of 4 slide mockups based on the following theme:\\n\\n# name: Boardroom Ledger\\n\\n# colors\\n\\n## primary: #102A43\\n\\n## secondary: #52606D\\n\\n## accent: #B7791F\\n\\n## background: #F7F9FC\\n\\n## text_primary: #102A43\\n\\n## text_secondary: #52606D\\n\\n# typography\\n\\n## font_family: Helvetica Neue\\n\\n## heading_style: Bold, sentence case, navy headings with clear numeric emphasis\\n\\n## body_style: Regular sans-serif, restrained sizing, high-contrast data labels\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: wide\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Formal executive financial reporting with disciplined whitespace and data-first hierarchy\\n\\n## icon_style: Minimal monoline icons\\n\\n## graphic_style: Clean bar, line, and waterfall charts; muted gridlines; gold reserved for material highlights\\n\\n# exclusions: Avoid decorative gradients, playful illustrations, stock photography, dense text blocks, 3D charts, and excessive use of accent color.\\n\\n---\\n\\nThe composition should be a grid of 4 slides, each with the following layout:\\n- Title slide\\n- Content slide\\n- Comparison slide\\n- Process slide\\n\\nMake the mosaic edge to edge, no space between the slides.\",\n      \"source_negative_prompt\": null,\n      \"caption\": null,\n      \"mime_type\": \"image/jpeg\",\n      \"width\": null,\n      \"height\": null,\n      \"filename\": null\n    },\n    {\n      \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_8d466b1f-a84c-4dac-893c-e23d25e2b92d/generated/23e1fc958a5105f2.jpg\",\n      \"source_prompt\": \"Render a composition of 4 slide mockups based on the following theme:\\n\\n# name: Capital Slate\\n\\n# colors\\n\\n## primary: #1E293B\\n\\n## secondary: #64748B\\n\\n## accent: #0F766E\\n\\n## background: #FFFFFF\\n\\n## text_primary: #0F172A\\n\\n## text_secondary: #64748B\\n\\n# typography\\n\\n## font_family: Arial\\n\\n## heading_style: Bold, compact sans-serif headings; key metrics in prominent tabular figures\\n\\n## body_style: Regular sans-serif with concise executive annotations\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: standard\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Crisp, contemporary corporate keynote design focused on clarity, comparability, and investor-grade confidence\\n\\n## icon_style: Geometric outline icons\\n\\n## graphic_style: Flat financial charts with teal performance callouts, slate baselines, and structured metric cards\\n\\n# exclusions: Avoid serif display type, bright multi-color palettes, ornamental patterns, chart shadows, unnecessary animation cues, and unverified visual metaphors.\\n\\n---\\n\\nThe composition should be a grid of 4 slides, each with the following layout:\\n- Title slide\\n- Content slide\\n- Comparison slide\\n- Process slide\\n\\nMake the mosaic edge to edge, no space between the slides.\",\n      \"source_negative_prompt\": null,\n      \"caption\": null,\n      \"mime_type\": \"image/jpeg\",\n      \"width\": null,\n      \"height\": null,\n      \"filename\": null\n    },\n    {\n      \"url\": \"pipelex-storage://org_c5e4bcdd-37d5-4abc-b062-32facaf38931/runs/run_8d466b1f-a84c-4dac-893c-e23d25e2b92d/generated/ac787a213514a95f.jpg\",\n      \"source_prompt\": \"Render a composition of 4 slide mockups based on the following theme:\\n\\n# name: Quarterline\\n\\n# colors\\n\\n## primary: #172554\\n\\n## secondary: #475569\\n\\n## accent: #C2410C\\n\\n## background: #F8FAFC\\n\\n## text_primary: #172554\\n\\n## text_secondary: #475569\\n\\n# typography\\n\\n## font_family: Georgia\\n\\n## heading_style: Semibold serif headlines paired with strong numeric callouts\\n\\n## body_style: Clean, readable supporting text with concise labels and generous line spacing\\n\\n# layout\\n\\n## aspect_ratio: 16:9\\n\\n## margins: wide\\n\\n## alignment: left\\n\\n# style\\n\\n## overall: Premium annual-report-inspired executive narrative, balancing formal authority with focused Q4 performance storytelling\\n\\n## icon_style: Fine-line, understated icons\\n\\n## graphic_style: Editorial metric panels, precise rules, and restrained financial charts; orange used only for variance or decision-critical emphasis\\n\\n# exclusions: Avoid casual typefaces, full-bleed stock imagery, loud color fields, excessive rounded shapes, gradients, and crowded dashboard-style slides.\\n\\n---\\n\\nThe composition should be a grid of 4 slides, each with the following layout:\\n- Title slide\\n- Content slide\\n- Comparison slide\\n- Process slide\\n\\nMake the mosaic edge to edge, no space between the slides.\",\n      \"source_negative_prompt\": null,\n      \"caption\": null,\n      \"mime_type\": \"image/jpeg\",\n      \"width\": null,\n      \"height\": null,\n      \"filename\": null\n    }\n  ]\n}\n```\n",
+  "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"page\"}\n{\"op\":\"add\",\"path\":\"/elements/page\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"xl\"},\"children\":[\"header\",\"brief-facts\",\"mockups-section\",\"themes-section\",\"brief-collapsible\"]}}\n{\"op\":\"add\",\"path\":\"/elements/header\",\"value\":{\"type\":\"ResultHeader\",\"props\":{\"eyebrow\":\"Design directions\",\"title\":{\"$state\":\"/result/brief/topic\"},\"subtitle\":\"Pick a direction and build the deck in it.\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/brief-facts\",\"value\":{\"type\":\"Grid\",\"props\":{\"columns\":3,\"gap\":\"md\"},\"children\":[\"fact-tone\",\"fact-goal\",\"fact-audience\"]}}\n{\"op\":\"add\",\"path\":\"/elements/fact-tone\",\"value\":{\"type\":\"Fact\",\"props\":{\"label\":\"Tone\",\"value\":{\"$state\":\"/result/brief/tone\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/fact-goal\",\"value\":{\"type\":\"Fact\",\"props\":{\"label\":\"Goal\",\"value\":{\"$state\":\"/result/brief/goal\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/fact-audience\",\"value\":{\"type\":\"Fact\",\"props\":{\"label\":\"Audience\",\"value\":{\"$state\":\"/result/brief/audience\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/mockups-section\",\"value\":{\"type\":\"Section\",\"props\":{\"title\":\"See them on a slide\",\"lede\":\"One mockup per direction, in the same order as the details below.\"},\"children\":[\"mockups-grid\"]}}\n{\"op\":\"add\",\"path\":\"/elements/mockups-grid\",\"value\":{\"type\":\"Grid\",\"props\":{\"columns\":3,\"gap\":\"md\"},\"repeat\":{\"statePath\":\"/result/visuals\",\"key\":\"url\"},\"children\":[\"mockup-picture\"]}}\n{\"op\":\"add\",\"path\":\"/elements/mockup-picture\",\"value\":{\"type\":\"Picture\",\"props\":{\"path\":\"\",\"alt\":\"Slide mockup for one direction\",\"aspect\":\"16:9\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/themes-section\",\"value\":{\"type\":\"Section\",\"props\":{\"title\":\"Compare the directions\"},\"children\":[\"themes-grid\"]}}\n{\"op\":\"add\",\"path\":\"/elements/themes-grid\",\"value\":{\"type\":\"Grid\",\"props\":{\"columns\":3,\"gap\":\"md\"},\"repeat\":{\"statePath\":\"/result/themes\",\"key\":\"name\"},\"children\":[\"theme-card\"]}}\n{\"op\":\"add\",\"path\":\"/elements/theme-card\",\"value\":{\"type\":\"Card\",\"props\":{\"title\":{\"$item\":\"name\"}},\"children\":[\"theme-body\"]}}\n{\"op\":\"add\",\"path\":\"/elements/theme-body\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"md\"},\"children\":[\"theme-swatches\",\"theme-details\"]}}\n{\"op\":\"add\",\"path\":\"/elements/theme-swatches\",\"value\":{\"type\":\"Swatches\",\"props\":{\"colors\":[{\"$item\":\"colors/primary\"},{\"$item\":\"colors/secondary\"},{\"$item\":\"colors/accent\"},{\"$item\":\"colors/background\"},{\"$item\":\"colors/text_primary\"},{\"$item\":\"colors/text_secondary\"}]},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/theme-details\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"d-typeface\",\"d-headings\",\"d-body\",\"d-format\",\"d-margins\",\"d-alignment\",\"d-feel\",\"d-icons\",\"d-graphics\",\"d-avoid\"]}}\n{\"op\":\"add\",\"path\":\"/elements/d-typeface\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Typeface\",\"value\":{\"$item\":\"typography/font_family\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-headings\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Headings\",\"value\":{\"$item\":\"typography/heading_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-body\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Body\",\"value\":{\"$item\":\"typography/body_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-format\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Format\",\"value\":{\"$item\":\"layout/aspect_ratio\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-margins\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Margins\",\"value\":{\"$item\":\"layout/margins\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-alignment\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Alignment\",\"value\":{\"$item\":\"layout/alignment\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-feel\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Feel\",\"value\":{\"$item\":\"style/overall\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-icons\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Icons\",\"value\":{\"$item\":\"style/icon_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-graphics\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Graphics\",\"value\":{\"$item\":\"style/graphic_style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/d-avoid\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Avoid\",\"value\":{\"$item\":\"exclusions\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/brief-collapsible\",\"value\":{\"type\":\"Collapsible\",\"props\":{\"title\":\"The brief, as polished\",\"defaultOpen\":false},\"children\":[\"brief-details\"]}}\n{\"op\":\"add\",\"path\":\"/elements/brief-details\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"none\"},\"children\":[\"b-topic\",\"b-brand\",\"b-references\"]}}\n{\"op\":\"add\",\"path\":\"/elements/b-topic\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Topic\",\"value\":{\"$state\":\"/result/brief/topic\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/b-brand\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"Brand guidelines\",\"value\":{\"$state\":\"/result/brief/brand_guidelines\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/b-references\",\"value\":{\"type\":\"Detail\",\"props\":{\"label\":\"References\",\"value\":{\"$state\":\"/result/brief/existing_references\"}},\"children\":[]}}",
+  "spec": {
+    "root": "page",
+    "elements": {
+      "page": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "xl"
+        },
+        "children": [
+          "header",
+          "brief-facts",
+          "mockups-section",
+          "themes-section",
+          "brief-collapsible"
+        ]
+      },
+      "header": {
+        "type": "ResultHeader",
+        "props": {
+          "eyebrow": "Design directions",
+          "title": {
+            "$state": "/result/brief/topic"
+          },
+          "subtitle": "Pick a direction and build the deck in it."
+        },
+        "children": []
+      },
+      "brief-facts": {
+        "type": "Grid",
+        "props": {
+          "columns": 3,
+          "gap": "md"
+        },
+        "children": ["fact-tone", "fact-goal", "fact-audience"]
+      },
+      "fact-tone": {
+        "type": "Fact",
+        "props": {
+          "label": "Tone",
+          "value": {
+            "$state": "/result/brief/tone"
+          }
+        },
+        "children": []
+      },
+      "fact-goal": {
+        "type": "Fact",
+        "props": {
+          "label": "Goal",
+          "value": {
+            "$state": "/result/brief/goal"
+          }
+        },
+        "children": []
+      },
+      "fact-audience": {
+        "type": "Fact",
+        "props": {
+          "label": "Audience",
+          "value": {
+            "$state": "/result/brief/audience"
+          }
+        },
+        "children": []
+      },
+      "mockups-section": {
+        "type": "Section",
+        "props": {
+          "title": "See them on a slide",
+          "lede": "One mockup per direction, in the same order as the details below."
+        },
+        "children": ["mockups-grid"]
+      },
+      "mockups-grid": {
+        "type": "Grid",
+        "props": {
+          "columns": 3,
+          "gap": "md"
+        },
+        "repeat": {
+          "statePath": "/result/visuals",
+          "key": "url"
+        },
+        "children": ["mockup-picture"]
+      },
+      "mockup-picture": {
+        "type": "Picture",
+        "props": {
+          "path": "",
+          "alt": "Slide mockup for one direction",
+          "aspect": "16:9"
+        },
+        "children": []
+      },
+      "themes-section": {
+        "type": "Section",
+        "props": {
+          "title": "Compare the directions"
+        },
+        "children": ["themes-grid"]
+      },
+      "themes-grid": {
+        "type": "Grid",
+        "props": {
+          "columns": 3,
+          "gap": "md"
+        },
+        "repeat": {
+          "statePath": "/result/themes",
+          "key": "name"
+        },
+        "children": ["theme-card"]
+      },
+      "theme-card": {
+        "type": "Card",
+        "props": {
+          "title": {
+            "$item": "name"
+          }
+        },
+        "children": ["theme-body"]
+      },
+      "theme-body": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "md"
+        },
+        "children": ["theme-swatches", "theme-details"]
+      },
+      "theme-swatches": {
+        "type": "Swatches",
+        "props": {
+          "colors": [
+            {
+              "$item": "colors/primary"
+            },
+            {
+              "$item": "colors/secondary"
+            },
+            {
+              "$item": "colors/accent"
+            },
+            {
+              "$item": "colors/background"
+            },
+            {
+              "$item": "colors/text_primary"
+            },
+            {
+              "$item": "colors/text_secondary"
+            }
+          ]
+        },
+        "children": []
+      },
+      "theme-details": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "none"
+        },
+        "children": [
+          "d-typeface",
+          "d-headings",
+          "d-body",
+          "d-format",
+          "d-margins",
+          "d-alignment",
+          "d-feel",
+          "d-icons",
+          "d-graphics",
+          "d-avoid"
+        ]
+      },
+      "d-typeface": {
+        "type": "Detail",
+        "props": {
+          "label": "Typeface",
+          "value": {
+            "$item": "typography/font_family"
+          }
+        },
+        "children": []
+      },
+      "d-headings": {
+        "type": "Detail",
+        "props": {
+          "label": "Headings",
+          "value": {
+            "$item": "typography/heading_style"
+          }
+        },
+        "children": []
+      },
+      "d-body": {
+        "type": "Detail",
+        "props": {
+          "label": "Body",
+          "value": {
+            "$item": "typography/body_style"
+          }
+        },
+        "children": []
+      },
+      "d-format": {
+        "type": "Detail",
+        "props": {
+          "label": "Format",
+          "value": {
+            "$item": "layout/aspect_ratio"
+          }
+        },
+        "children": []
+      },
+      "d-margins": {
+        "type": "Detail",
+        "props": {
+          "label": "Margins",
+          "value": {
+            "$item": "layout/margins"
+          }
+        },
+        "children": []
+      },
+      "d-alignment": {
+        "type": "Detail",
+        "props": {
+          "label": "Alignment",
+          "value": {
+            "$item": "layout/alignment"
+          }
+        },
+        "children": []
+      },
+      "d-feel": {
+        "type": "Detail",
+        "props": {
+          "label": "Feel",
+          "value": {
+            "$item": "style/overall"
+          }
+        },
+        "children": []
+      },
+      "d-icons": {
+        "type": "Detail",
+        "props": {
+          "label": "Icons",
+          "value": {
+            "$item": "style/icon_style"
+          }
+        },
+        "children": []
+      },
+      "d-graphics": {
+        "type": "Detail",
+        "props": {
+          "label": "Graphics",
+          "value": {
+            "$item": "style/graphic_style"
+          }
+        },
+        "children": []
+      },
+      "d-avoid": {
+        "type": "Detail",
+        "props": {
+          "label": "Avoid",
+          "value": {
+            "$item": "exclusions"
+          }
+        },
+        "children": []
+      },
+      "brief-collapsible": {
+        "type": "Collapsible",
+        "props": {
+          "title": "The brief, as polished",
+          "defaultOpen": false
+        },
+        "children": ["brief-details"]
+      },
+      "brief-details": {
+        "type": "Stack",
+        "props": {
+          "direction": "vertical",
+          "gap": "none"
+        },
+        "children": ["b-topic", "b-brand", "b-references"]
+      },
+      "b-topic": {
+        "type": "Detail",
+        "props": {
+          "label": "Topic",
+          "value": {
+            "$state": "/result/brief/topic"
+          }
+        },
+        "children": []
+      },
+      "b-brand": {
+        "type": "Detail",
+        "props": {
+          "label": "Brand guidelines",
+          "value": {
+            "$state": "/result/brief/brand_guidelines"
+          }
+        },
+        "children": []
+      },
+      "b-references": {
+        "type": "Detail",
+        "props": {
+          "label": "References",
+          "value": {
+            "$state": "/result/brief/existing_references"
+          }
+        },
+        "children": []
+      }
+    }
+  }
+}

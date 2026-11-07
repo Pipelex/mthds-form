@@ -1,0 +1,223 @@
+{
+ "id": "slides--compose--claude-5-sonnet--s1--r3",
+ "method": "slides",
+ "moment": "compose",
+ "frame": "composer",
+ "model": "claude-5-sonnet",
+ "seed": "oV54WU2SPrg3VtauhnDUUuVDdwVTqlzS",
+ "round": "r3",
+ "runId": "run_a5891f82-67de-4d9d-a7b4-3295271eec25",
+ "costUsd": 0.05143,
+ "seconds": 49,
+ "valid": true,
+ "problems": [],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "A one-page composer for a designer or founder who has a rough brief in their head and wants several distinct visual directions for a deck, generated from it.",
+  "title": "Turn your brief into deck directions",
+  "composition": "A single centred column, as the frame dictates. It opens on the headline and its one-line promise, then one raised Composer panel holding the inputs grouped into two short-titled clusters set in two columns (the panel has enough fields to fill two), with the required topic given its own full-width line at the top of the panel since it is what a person decides first and gates the run. The panel's foot carries the host's action row and the single run control. Nothing beside the panel, nothing below it.",
+  "regions": [
+   {
+    "title": null,
+    "purpose": "The core subject of the deck - the one thing a person must decide first and the only required field, given its own full-width row above the two-column grouping.",
+    "container": "FieldGroup",
+    "elements": [
+     "Input /inputs/brief/topic"
+    ]
+   },
+   {
+    "title": "Direction",
+    "purpose": "The qualities that shape the visual direction itself - tone and goal - grouped together since they both describe what the deck is trying to feel and do.",
+    "container": "FieldGroup",
+    "elements": [
+     "Radio /inputs/brief/tone - choices: formal, playful, innovative, trustworthy, artsy",
+     "Radio /inputs/brief/goal - choices: pitch investors, sell to clients, internal training, keynote"
+    ]
+   },
+   {
+    "title": "Context",
+    "purpose": "Who the deck is for and what material already exists to reference or avoid - supporting context grouped separately from the core direction choices.",
+    "container": "FieldGroup",
+    "elements": [
+     "Segmented /inputs/brief/audience - choices: executives, technical team, general public",
+     "Textarea /inputs/brief/brand_guidelines",
+     "Textarea /inputs/brief/existing_references"
+    ]
+   }
+  ],
+  "call_to_action": "Generate deck directions",
+  "defaults": null,
+  "delegated": null
+ },
+ "brief": "# Input page: slide_designer.generate_design_proposals_from_rough_brief\n\nTransform a design brief into multiple visual directions, each a theme with a title slide drawn in it\n\n## Name\n\nThe method is called «Deck directions», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\nThe action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as \"Waiting on the topic\" or \"Add a document to start\" - the controls show their own state.\n\nWhat one run gives back, read from the result's own description:\n- directions: The directions, one per theme\n\nA person runs a tool more readily when they know what comes back: the page may say it once, in their words, as the Composer's notes - a few short lines, never the list above copied out.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/brief` — structure slide_designer.SlideDesignBrief, required, gates the run — `brief`: Client brief for slide deck design\n  - `/inputs/brief/topic` — text, required — `topic`: The main topic or subject of the presentation\n  - `/inputs/brief/brand_guidelines` — text, optional — `brand_guidelines`: The client's brand guidelines (colors, fonts, logo usage, etc.)\n  - `/inputs/brief/tone` — choice of \"formal\" | \"playful\" | \"innovative\" | \"trustworthy\" | \"artsy\", optional — `tone`: The tone of the presentation\n  - `/inputs/brief/existing_references` — text, optional — `existing_references`: Existing templates or past decks to reference or avoid\n  - `/inputs/brief/goal` — choice of \"pitch investors\" | \"sell to clients\" | \"internal training\" | \"keynote\", optional — `goal`: The goal of the presentation\n  - `/inputs/brief/audience` — choice of \"executives\" | \"technical team\" | \"general public\", optional — `audience`: The target audience\n\n## Delegated\n\nNone: every input can be entered with the catalog's own inputs. `MthdsField` remains available for any you would rather not style.\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `brief`. The host's action row says so by itself, so the page writes nothing about it.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"page\"}\n{\"op\":\"add\",\"path\":\"/elements/page\",\"value\":{\"type\":\"Stack\",\"props\":{\"direction\":\"vertical\",\"gap\":\"lg\",\"align\":\"center\"},\"children\":[\"composer\"]}}\n{\"op\":\"add\",\"path\":\"/elements/composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Turn your brief into deck directions\",\"lede\":\"Describe the deck you need and get several distinct visual directions to choose from.\",\"runLabel\":\"Generate deck directions\",\"columns\":\"2\",\"notes\":[\"A handful of distinct visual directions\",\"Each built around a theme with its own title slide\"]},\"children\":[\"topic-group\",\"direction-group\",\"context-group\"],\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]}}}\n{\"op\":\"add\",\"path\":\"/elements/topic-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{},\"children\":[\"topic-input\"]}}\n{\"op\":\"add\",\"path\":\"/elements/topic-input\",\"value\":{\"type\":\"Input\",\"props\":{\"label\":\"Topic\",\"name\":\"topic\",\"placeholder\":\"What is the presentation about?\",\"value\":{\"$bindState\":\"/inputs/brief/topic\"},\"checks\":[{\"type\":\"required\",\"message\":\"Topic is required\"}],\"validateOn\":\"submit\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/direction-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Direction\"},\"children\":[\"tone-radio\",\"goal-radio\"]}}\n{\"op\":\"add\",\"path\":\"/elements/tone-radio\",\"value\":{\"type\":\"Radio\",\"props\":{\"label\":\"Tone\",\"name\":\"tone\",\"options\":[\"formal\",\"playful\",\"innovative\",\"trustworthy\",\"artsy\"],\"value\":{\"$bindState\":\"/inputs/brief/tone\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/goal-radio\",\"value\":{\"type\":\"Radio\",\"props\":{\"label\":\"Goal\",\"name\":\"goal\",\"options\":[\"pitch investors\",\"sell to clients\",\"internal training\",\"keynote\"],\"value\":{\"$bindState\":\"/inputs/brief/goal\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/context-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Context\"},\"children\":[\"audience-segmented\",\"brand-textarea\",\"references-textarea\"]}}\n{\"op\":\"add\",\"path\":\"/elements/audience-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Audience\",\"name\":\"audience\",\"options\":[\"executives\",\"technical team\",\"general public\"],\"value\":{\"$bindState\":\"/inputs/brief/audience\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/brand-textarea\",\"value\":{\"type\":\"Textarea\",\"props\":{\"label\":\"Brand guidelines\",\"name\":\"brand_guidelines\",\"placeholder\":\"Colors, fonts, logo usage...\",\"rows\":3,\"value\":{\"$bindState\":\"/inputs/brief/brand_guidelines\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/references-textarea\",\"value\":{\"type\":\"Textarea\",\"props\":{\"label\":\"Existing references\",\"name\":\"existing_references\",\"placeholder\":\"Templates or past decks to reference or avoid\",\"rows\":3,\"value\":{\"$bindState\":\"/inputs/brief/existing_references\"}},\"children\":[]}}",
+ "spec": {
+  "root": "page",
+  "elements": {
+   "page": {
+    "type": "Stack",
+    "props": {
+     "direction": "vertical",
+     "gap": "lg",
+     "align": "center"
+    },
+    "children": [
+     "composer"
+    ]
+   },
+   "composer": {
+    "type": "Composer",
+    "props": {
+     "headline": "Turn your brief into deck directions",
+     "lede": "Describe the deck you need and get several distinct visual directions to choose from.",
+     "runLabel": "Generate deck directions",
+     "columns": "2",
+     "notes": [
+      "A handful of distinct visual directions",
+      "Each built around a theme with its own title slide"
+     ]
+    },
+    "children": [
+     "topic-group",
+     "direction-group",
+     "context-group"
+    ],
+    "on": {
+     "press": [
+      {
+       "action": "validateForm"
+      },
+      {
+       "action": "run"
+      }
+     ]
+    }
+   },
+   "topic-group": {
+    "type": "FieldGroup",
+    "props": {},
+    "children": [
+     "topic-input"
+    ]
+   },
+   "topic-input": {
+    "type": "Input",
+    "props": {
+     "label": "Topic",
+     "name": "topic",
+     "placeholder": "What is the presentation about?",
+     "value": {
+      "$bindState": "/inputs/brief/topic"
+     },
+     "checks": [
+      {
+       "type": "required",
+       "message": "Topic is required"
+      }
+     ],
+     "validateOn": "submit"
+    },
+    "children": []
+   },
+   "direction-group": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "Direction"
+    },
+    "children": [
+     "tone-radio",
+     "goal-radio"
+    ]
+   },
+   "tone-radio": {
+    "type": "Radio",
+    "props": {
+     "label": "Tone",
+     "name": "tone",
+     "options": [
+      "formal",
+      "playful",
+      "innovative",
+      "trustworthy",
+      "artsy"
+     ],
+     "value": {
+      "$bindState": "/inputs/brief/tone"
+     }
+    },
+    "children": []
+   },
+   "goal-radio": {
+    "type": "Radio",
+    "props": {
+     "label": "Goal",
+     "name": "goal",
+     "options": [
+      "pitch investors",
+      "sell to clients",
+      "internal training",
+      "keynote"
+     ],
+     "value": {
+      "$bindState": "/inputs/brief/goal"
+     }
+    },
+    "children": []
+   },
+   "context-group": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "Context"
+    },
+    "children": [
+     "audience-segmented",
+     "brand-textarea",
+     "references-textarea"
+    ]
+   },
+   "audience-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Audience",
+     "name": "audience",
+     "options": [
+      "executives",
+      "technical team",
+      "general public"
+     ],
+     "value": {
+      "$bindState": "/inputs/brief/audience"
+     }
+    },
+    "children": []
+   },
+   "brand-textarea": {
+    "type": "Textarea",
+    "props": {
+     "label": "Brand guidelines",
+     "name": "brand_guidelines",
+     "placeholder": "Colors, fonts, logo usage...",
+     "rows": 3,
+     "value": {
+      "$bindState": "/inputs/brief/brand_guidelines"
+     }
+    },
+    "children": []
+   },
+   "references-textarea": {
+    "type": "Textarea",
+    "props": {
+     "label": "Existing references",
+     "name": "existing_references",
+     "placeholder": "Templates or past decks to reference or avoid",
+     "rows": 3,
+     "value": {
+      "$bindState": "/inputs/brief/existing_references"
+     }
+    },
+    "children": []
+   }
+  }
+ }
+}

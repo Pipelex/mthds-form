@@ -1,0 +1,341 @@
+{
+ "id": "trip--compose--claude-5-sonnet--s1--r3",
+ "method": "trip",
+ "moment": "compose",
+ "frame": "composer",
+ "model": "claude-5-sonnet",
+ "seed": "gAlqE9xYpQm1zpkc8XzbwQC2qTSvaUAf",
+ "round": "r3",
+ "runId": "run_0589171a-9030-4b1f-8e3d-21b8954a0db2",
+ "costUsd": 0.06514,
+ "seconds": 29,
+ "valid": true,
+ "problems": [],
+ "outside": [],
+ "fitProblems": [],
+ "plan": {
+  "purpose": "Give someone planning a trip a single, focused place to describe it - where, when, who's going, what it should feel like, and what it can cost - so a day-by-day itinerary can be drafted within budget.",
+  "title": "Plan the trip",
+  "composition": "One centred column inside the host's frame. It opens with the headline and its one muted line, then a single raised Composer panel in two columns. Inside the panel, FieldGroups stage the request the way a person thinks it through: first the trip's name and where/when (the things decided first and promised by the headline), then who's going, then the budget and the feel of the trip, then the optional extras folded toward the end. The inspiration image sits last, as a light extra rather than a core decision. The action row (run time + the one button) stays fixed at the panel's foot as the rest scrolls.",
+  "regions": [
+   {
+    "title": "Trip basics",
+    "purpose": "The name of the trip and where/when it happens - the first things a person decides, set first and in the headline's promise.",
+    "container": "FieldGroup",
+    "elements": [
+     "Input — /inputs/request/title",
+     "Input — /inputs/request/stay/city",
+     "Segmented — /inputs/request/stay/country, options: \"France\" | \"Italy\" | \"Japan\" | \"Portugal\" | \"Spain\" | \"United States\"",
+     "DateRange — from: /inputs/request/stay/arriving_on, to: /inputs/request/stay/leaving_on",
+     "Chips — /inputs/request/stay/must_see"
+    ]
+   },
+   {
+    "title": "Who's going",
+    "purpose": "The travellers on the trip, each with their name, age and any dietary needs - laid out as a compact editable list.",
+    "container": "FieldGroup",
+    "elements": [
+     "CompactList — /inputs/request/travellers, primary: name, secondary: age, dietary"
+    ]
+   },
+   {
+    "title": "Budget & style",
+    "purpose": "The money and the shape of the days - what the plan must respect and what it's mostly about.",
+    "container": "FieldGroup",
+    "elements": [
+     "NumberInput — /inputs/request/budget",
+     "Segmented — /inputs/request/currency, options: \"EUR\" | \"USD\" | \"GBP\" | \"JPY\"",
+     "Segmented — /inputs/request/pace, options: \"slow\" | \"balanced\" | \"packed\"",
+     "Segmented — /inputs/request/style, options: \"culture\" | \"food\" | \"nature\" | \"nightlife\" | \"family\""
+    ]
+   },
+   {
+    "title": "Good to know",
+    "purpose": "Extras that shape the plan but aren't decided first: children travelling, accessibility needs, free-form notes, and an optional image for inspiration.",
+    "container": "FieldGroup",
+    "elements": [
+     "Switch — /inputs/request/with_children",
+     "Input — /inputs/request/accessibility",
+     "Textarea — /inputs/request/notes",
+     "MthdsField — /inputs/inspiration"
+    ]
+   }
+  ],
+  "call_to_action": "Plan my trip — runs once every traveller and the basics are in; the host shows how long it takes.",
+  "defaults": [],
+  "delegated": [
+   "/inputs/inspiration — marked delegated in the brief, rendered with MthdsField and nothing else"
+  ]
+ },
+ "brief": "# Input page: trip_planner.plan_trip\n\nPlan the trip day by day, within the budget\n\n## Name\n\nThe method is called «Trip planner», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.\n\n## Frame\n\nThis page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.\n\nThe column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.\n\nThe action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as \"Waiting on the topic\" or \"Add a document to start\" - the controls show their own state.\n\nWhat one run gives back, read from the result's own description:\n- title: The trip's name\n- overview: The plan in two or three sentences\n- days: The plan for each day, in order\n- costs: The estimated cost, by category\n- estimated total: The estimated total cost of the trip\n- currency: The currency of every amount\n- practical notes: Notes for getting around and staying comfortable\n\nA person runs a tool more readily when they know what comes back: the page may say it once, in their words, as the Composer's notes - a few short lines, never the list above copied out.\n\n## State\n\nThe form's values live under `/inputs`, one member per input, exactly as listed. Bind each input with `$bindState` at its path; a structure's members bind at their own paths beneath it.\n\n- `/inputs/request` — structure trip_planner.TripRequest, required, gates the run — `request`: Everything the planner needs to draft an itinerary\n  - `/inputs/request/title` — text, required — `title`: A name for the trip (hints intent=label)\n  - `/inputs/request/stay` — structure trip_planner.Stay, required — `stay`: Where and when\n    - `/inputs/request/stay/city` — text, required — `city`: The city (hints intent=label)\n    - `/inputs/request/stay/country` — choice of \"France\" | \"Italy\" | \"Japan\" | \"Portugal\" | \"Spain\" | \"United States\", required — `country`: The country\n    - `/inputs/request/stay/arriving_on` — date, required — `arriving_on`: The day they arrive\n    - `/inputs/request/stay/leaving_on` — date, required — `leaving_on`: The day they leave\n    - `/inputs/request/stay/must_see` — list of text, optional — `must_see`: Places they must not miss\n      - each item is a text\n  - `/inputs/request/travellers` — list of structure trip_planner.Traveller, required — `travellers`: Who is going\n    - each item is a structure trip_planner.Traveller (One person on the trip), with these members (paths relative to one item, for DataTable columns or $item):\n      - `name` — text, required — `name`: Their name (hints intent=label)\n      - `age` — integer, optional — `age`: Their age (hints intent=quantity)\n      - `dietary` — text, optional — `dietary`: Dietary needs, if any\n  - `/inputs/request/budget` — number, required — `budget`: The total budget for the whole trip (hints intent=quantity)\n  - `/inputs/request/currency` — choice of \"EUR\" | \"USD\" | \"GBP\" | \"JPY\", required — `currency`: The currency the budget is in\n  - `/inputs/request/pace` — choice of \"slow\" | \"balanced\" | \"packed\", required — `pace`: How full the days should be\n  - `/inputs/request/style` — choice of \"culture\" | \"food\" | \"nature\" | \"nightlife\" | \"family\", required — `style`: What the trip is mostly about\n  - `/inputs/request/with_children` — boolean, optional — `with_children`: Whether children are travelling\n  - `/inputs/request/accessibility` — text, optional — `accessibility`: Mobility or accessibility needs the plan must respect\n  - `/inputs/request/notes` — prose (markdown), optional — `notes`: Anything else the planner should know (hints intent=prose)\n- `/inputs/inspiration` — image (a file), optional — `inspiration`: An image **[delegate: MthdsField]**\n\n## Delegated\n\nRender these with `MthdsField` at the path, and nothing else:\n\n- `/inputs/inspiration` (image (a file))\n\n## Defaults\n\nNone. Emit no `/state` patches.\n\n## Run\n\nThe run waits for `request`. The host's action row says so by itself, so the page writes nothing about it.\nThe page has exactly one `Composer`, `on.press` bound to `validateForm` then `run`; label it with what the method does, in a person's words.\n",
+ "jsonl": "{\"op\":\"add\",\"path\":\"/root\",\"value\":\"composer\"}\n{\"op\":\"add\",\"path\":\"/elements/composer\",\"value\":{\"type\":\"Composer\",\"props\":{\"headline\":\"Plan the trip\",\"lede\":\"Describe the trip and we'll draft a day-by-day itinerary within budget.\",\"runLabel\":\"Plan my trip\",\"columns\":\"2\",\"notes\":[\"A two or three sentence overview\",\"A day-by-day plan\",\"Estimated costs by category and total\",\"Practical notes for getting around\"]},\"children\":[\"basics-group\",\"travellers-group\",\"budget-group\",\"extras-group\"],\"on\":{\"press\":[{\"action\":\"validateForm\"},{\"action\":\"run\"}]}}}\n{\"op\":\"add\",\"path\":\"/elements/basics-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Trip basics\"},\"children\":[\"title-input\",\"city-input\",\"country-segmented\",\"dates-range\",\"must-see-chips\"]}}\n{\"op\":\"add\",\"path\":\"/elements/title-input\",\"value\":{\"type\":\"Input\",\"props\":{\"label\":\"Trip name\",\"name\":\"title\",\"type\":\"text\",\"value\":{\"$bindState\":\"/inputs/request/title\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/city-input\",\"value\":{\"type\":\"Input\",\"props\":{\"label\":\"City\",\"name\":\"city\",\"type\":\"text\",\"value\":{\"$bindState\":\"/inputs/request/stay/city\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/country-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Country\",\"name\":\"country\",\"options\":[\"France\",\"Italy\",\"Japan\",\"Portugal\",\"Spain\",\"United States\"],\"value\":{\"$bindState\":\"/inputs/request/stay/country\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/dates-range\",\"value\":{\"type\":\"DateRange\",\"props\":{\"label\":\"Dates\",\"from\":{\"$bindState\":\"/inputs/request/stay/arriving_on\"},\"to\":{\"$bindState\":\"/inputs/request/stay/leaving_on\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/must-see-chips\",\"value\":{\"type\":\"Chips\",\"props\":{\"label\":\"Must-see places\",\"value\":{\"$bindState\":\"/inputs/request/stay/must_see\"},\"placeholder\":\"Add a place\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/travellers-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Who's going\"},\"children\":[\"travellers-list\"]}}\n{\"op\":\"add\",\"path\":\"/elements/travellers-list\",\"value\":{\"type\":\"CompactList\",\"props\":{\"label\":\"Travellers\",\"items\":{\"$bindState\":\"/inputs/request/travellers\"},\"primary\":\"name\",\"secondary\":[\"age\",\"dietary\"],\"addLabel\":\"Add traveller\"},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/budget-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Budget & style\"},\"children\":[\"budget-input\",\"currency-segmented\",\"pace-segmented\",\"style-segmented\"]}}\n{\"op\":\"add\",\"path\":\"/elements/budget-input\",\"value\":{\"type\":\"NumberInput\",\"props\":{\"label\":\"Budget\",\"name\":\"budget\",\"value\":{\"$bindState\":\"/inputs/request/budget\"},\"min\":0},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/currency-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Currency\",\"name\":\"currency\",\"options\":[\"EUR\",\"USD\",\"GBP\",\"JPY\"],\"value\":{\"$bindState\":\"/inputs/request/currency\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/pace-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Pace\",\"name\":\"pace\",\"options\":[\"slow\",\"balanced\",\"packed\"],\"value\":{\"$bindState\":\"/inputs/request/pace\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/style-segmented\",\"value\":{\"type\":\"Segmented\",\"props\":{\"label\":\"Style\",\"name\":\"style\",\"options\":[\"culture\",\"food\",\"nature\",\"nightlife\",\"family\"],\"value\":{\"$bindState\":\"/inputs/request/style\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/extras-group\",\"value\":{\"type\":\"FieldGroup\",\"props\":{\"title\":\"Good to know\"},\"children\":[\"children-switch\",\"accessibility-input\",\"notes-textarea\",\"inspiration-field\"]}}\n{\"op\":\"add\",\"path\":\"/elements/children-switch\",\"value\":{\"type\":\"Switch\",\"props\":{\"label\":\"Children travelling\",\"name\":\"with_children\",\"checked\":{\"$bindState\":\"/inputs/request/with_children\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/accessibility-input\",\"value\":{\"type\":\"Input\",\"props\":{\"label\":\"Accessibility needs\",\"name\":\"accessibility\",\"type\":\"text\",\"value\":{\"$bindState\":\"/inputs/request/accessibility\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/notes-textarea\",\"value\":{\"type\":\"Textarea\",\"props\":{\"label\":\"Notes\",\"name\":\"notes\",\"value\":{\"$bindState\":\"/inputs/request/notes\"}},\"children\":[]}}\n{\"op\":\"add\",\"path\":\"/elements/inspiration-field\",\"value\":{\"type\":\"MthdsField\",\"props\":{\"path\":\"/inputs/inspiration\"},\"children\":[]}}",
+ "spec": {
+  "root": "composer",
+  "elements": {
+   "composer": {
+    "type": "Composer",
+    "props": {
+     "headline": "Plan the trip",
+     "lede": "Describe the trip and we'll draft a day-by-day itinerary within budget.",
+     "runLabel": "Plan my trip",
+     "columns": "2",
+     "notes": [
+      "A two or three sentence overview",
+      "A day-by-day plan",
+      "Estimated costs by category and total",
+      "Practical notes for getting around"
+     ]
+    },
+    "children": [
+     "basics-group",
+     "travellers-group",
+     "budget-group",
+     "extras-group"
+    ],
+    "on": {
+     "press": [
+      {
+       "action": "validateForm"
+      },
+      {
+       "action": "run"
+      }
+     ]
+    }
+   },
+   "basics-group": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "Trip basics"
+    },
+    "children": [
+     "title-input",
+     "city-input",
+     "country-segmented",
+     "dates-range",
+     "must-see-chips"
+    ]
+   },
+   "title-input": {
+    "type": "Input",
+    "props": {
+     "label": "Trip name",
+     "name": "title",
+     "type": "text",
+     "value": {
+      "$bindState": "/inputs/request/title"
+     }
+    },
+    "children": []
+   },
+   "city-input": {
+    "type": "Input",
+    "props": {
+     "label": "City",
+     "name": "city",
+     "type": "text",
+     "value": {
+      "$bindState": "/inputs/request/stay/city"
+     }
+    },
+    "children": []
+   },
+   "country-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Country",
+     "name": "country",
+     "options": [
+      "France",
+      "Italy",
+      "Japan",
+      "Portugal",
+      "Spain",
+      "United States"
+     ],
+     "value": {
+      "$bindState": "/inputs/request/stay/country"
+     }
+    },
+    "children": []
+   },
+   "dates-range": {
+    "type": "DateRange",
+    "props": {
+     "label": "Dates",
+     "from": {
+      "$bindState": "/inputs/request/stay/arriving_on"
+     },
+     "to": {
+      "$bindState": "/inputs/request/stay/leaving_on"
+     }
+    },
+    "children": []
+   },
+   "must-see-chips": {
+    "type": "Chips",
+    "props": {
+     "label": "Must-see places",
+     "value": {
+      "$bindState": "/inputs/request/stay/must_see"
+     },
+     "placeholder": "Add a place"
+    },
+    "children": []
+   },
+   "travellers-group": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "Who's going"
+    },
+    "children": [
+     "travellers-list"
+    ]
+   },
+   "travellers-list": {
+    "type": "CompactList",
+    "props": {
+     "label": "Travellers",
+     "items": {
+      "$bindState": "/inputs/request/travellers"
+     },
+     "primary": "name",
+     "secondary": [
+      "age",
+      "dietary"
+     ],
+     "addLabel": "Add traveller"
+    },
+    "children": []
+   },
+   "budget-group": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "Budget & style"
+    },
+    "children": [
+     "budget-input",
+     "currency-segmented",
+     "pace-segmented",
+     "style-segmented"
+    ]
+   },
+   "budget-input": {
+    "type": "NumberInput",
+    "props": {
+     "label": "Budget",
+     "name": "budget",
+     "value": {
+      "$bindState": "/inputs/request/budget"
+     },
+     "min": 0
+    },
+    "children": []
+   },
+   "currency-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Currency",
+     "name": "currency",
+     "options": [
+      "EUR",
+      "USD",
+      "GBP",
+      "JPY"
+     ],
+     "value": {
+      "$bindState": "/inputs/request/currency"
+     }
+    },
+    "children": []
+   },
+   "pace-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Pace",
+     "name": "pace",
+     "options": [
+      "slow",
+      "balanced",
+      "packed"
+     ],
+     "value": {
+      "$bindState": "/inputs/request/pace"
+     }
+    },
+    "children": []
+   },
+   "style-segmented": {
+    "type": "Segmented",
+    "props": {
+     "label": "Style",
+     "name": "style",
+     "options": [
+      "culture",
+      "food",
+      "nature",
+      "nightlife",
+      "family"
+     ],
+     "value": {
+      "$bindState": "/inputs/request/style"
+     }
+    },
+    "children": []
+   },
+   "extras-group": {
+    "type": "FieldGroup",
+    "props": {
+     "title": "Good to know"
+    },
+    "children": [
+     "children-switch",
+     "accessibility-input",
+     "notes-textarea",
+     "inspiration-field"
+    ]
+   },
+   "children-switch": {
+    "type": "Switch",
+    "props": {
+     "label": "Children travelling",
+     "name": "with_children",
+     "checked": {
+      "$bindState": "/inputs/request/with_children"
+     }
+    },
+    "children": []
+   },
+   "accessibility-input": {
+    "type": "Input",
+    "props": {
+     "label": "Accessibility needs",
+     "name": "accessibility",
+     "type": "text",
+     "value": {
+      "$bindState": "/inputs/request/accessibility"
+     }
+    },
+    "children": []
+   },
+   "notes-textarea": {
+    "type": "Textarea",
+    "props": {
+     "label": "Notes",
+     "name": "notes",
+     "value": {
+      "$bindState": "/inputs/request/notes"
+     }
+    },
+    "children": []
+   },
+   "inspiration-field": {
+    "type": "MthdsField",
+    "props": {
+     "path": "/inputs/inspiration"
+    },
+    "children": []
+   }
+  }
+ }
+}

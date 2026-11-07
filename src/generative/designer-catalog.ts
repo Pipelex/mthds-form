@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { Action, Catalog, Component } from '../generated/layout-design/types';
-import { COMPONENT_NAMES, catalog } from './catalog';
+import { catalog, componentNamesFor } from './catalog';
+import type { Frame } from './spike-definitions';
 import { propsSignature } from './props-signature';
 import { generativeSchema } from './schema';
 
@@ -43,9 +44,9 @@ interface ComponentDefinition {
   description?: string;
 }
 
-export function designerCatalog(): DesignerCatalog {
+export function designerCatalog(frame: Frame = 'page'): DesignerCatalog {
   const definitions = catalog.data.components as Record<string, ComponentDefinition>;
-  const components = COMPONENT_NAMES.map((name): DesignerComponent => {
+  const components = componentNamesFor(frame).map((name): DesignerComponent => {
     const definition = definitions[name];
     if (!definition) throw new Error(`the catalog defines no component named '${name}'`);
     const slots = definition.slots ?? [];
