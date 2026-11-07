@@ -490,14 +490,14 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const [value, setValue] = React.useState(tabs[0]?.value ?? '');
   return (
     <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
-      {/* Below `sm` each tab grows to the 44 pixels a finger needs, and the
-          list around it with it. */}
+      {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
+          however short its label, and the list around it with it. */}
       <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto">
         {tabs.map((tab) => (
           <TabsPrimitive.Trigger
             key={tab.value}
             value={tab.value}
-            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm max-sm:min-h-11"
+            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm max-sm:min-h-11 max-sm:min-w-11"
           >
             {tab.label}
           </TabsPrimitive.Trigger>
