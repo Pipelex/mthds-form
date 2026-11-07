@@ -193,10 +193,12 @@ function Described({ description, children }: { description?: string; children: 
 
 /**
  * The label row of a result node — exported so the panel that owns the top-level
- * header draws the SAME one rather than a second that drifts from it.
+ * header draws the SAME one rather than a second that drifts from it. `unseen`
+ * says it to assistive technology without drawing it, as the panel does when
+ * its whole result names itself (`resultHeadsItself`).
  */
-export function ResultHeader({ field }: { field: RunField }) {
-  return <Label field={field} describe />;
+export function ResultHeader({ field, unseen = false }: { field: RunField; unseen?: boolean }) {
+  return <Label field={field} describe unseen={unseen} />;
 }
 
 function Label({
@@ -209,8 +211,10 @@ function Label({
   /**
    * Said to assistive technology and not drawn: the label of a text that
    * opens with a heading of its own, which names it on the page (the leaf arm
-   * of `ResultNode`). With `describe`, the description a drawn label carries
-   * in its tooltip is said after it, so a screen reader still hears it.
+   * of `ResultNode`), and the title a host gave a panel whose whole result is
+   * such a text (`StuffViewer`). With `describe`, the description a drawn
+   * label carries in its tooltip is said after it, so a screen reader still
+   * hears it.
    */
   unseen?: boolean;
 }) {
@@ -224,15 +228,19 @@ function Label({
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
   const labelText = fieldLabel(field.title, field.name, presentation);
-  if (labelText.trim() === '') {
-    return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
-  }
+  // An unseen label draws nothing, an empty one included: the pill below
+  // stands in for a missing label where one is drawn, and drawing it here
+  // would put a visible mark over the heading the label gave way to.
   if (unseen) {
+    if (labelText.trim() === '') return null;
     return (
       <span className="sr-only">
         {describe && field.description ? `${labelText}: ${field.description}` : labelText}
       </span>
     );
+  }
+  if (labelText.trim() === '') {
+    return <ConceptPill conceptRef={field.conceptRef} category={conceptCategory(field)} />;
   }
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
@@ -1765,9 +1773,17 @@ const TOGGLE = cn(
  * When a table under `tableLayout="stack"` turns its rows into blocks of label
  * and value pairs, counted in the columns it SHOWS (after the budget).
  *
- * - **Up to three: never.** Three columns that wrap, with no fixed width
- *   floor, fit the 343px a 375px phone leaves, and a table is how three values
- *   per row are read best.
+ * - **Up to three: never**, but for one case. Three columns that wrap, with no
+ *   fixed width floor, fit the 343px a 375px phone leaves, and a table is how
+ *   three values per row are read best.
+ * - **Three whose rows open: on a phone**, below `sm`. There the chevron's
+ *   column is 3.25rem around the 44px a finger is given, a fourth column in
+ *   all but name, and it leaves the two columns beside the name about 48px
+ *   each in a host's padded panel at 375px: a header such as "Obligation"
+ *   could be held whole only by pushing the table past its box, and the
+ *   values beside it were a column of broken words. A viewport rule rather
+ *   than a container query, because the chevron's width is one; below `sm`
+ *   every box is narrower than 640px anyway.
  * - **Four to six: while the table's own box is narrower than 640px**, a
  *   container query rather than the viewport, so a narrow panel on a wide
  *   screen stacks too. The 640 is written into the classes below rather than
@@ -1779,10 +1795,12 @@ const TOGGLE = cn(
 const STACK_NEVER_UP_TO = 3;
 const STACK_ALWAYS_BEYOND = 6;
 
-type Stacking = 'never' | 'narrow' | 'always';
+type Stacking = 'never' | 'phone' | 'narrow' | 'always';
 
-function stackingFor(columns: number): Stacking {
-  if (columns <= STACK_NEVER_UP_TO) return 'never';
+function stackingFor(columns: number, rowsOpen: boolean): Stacking {
+  if (columns <= STACK_NEVER_UP_TO) {
+    return columns === STACK_NEVER_UP_TO && rowsOpen ? 'phone' : 'never';
+  }
   return columns > STACK_ALWAYS_BEYOND ? 'always' : 'narrow';
 }
 
@@ -1815,9 +1833,11 @@ interface StackClasses {
 }
 
 /**
- * The same layout twice, once behind the container query and once without it.
- * Spelled out in full both times, because Tailwind reads class names out of the
- * source and would find no `@max-[640px]:block` assembled from parts.
+ * The same layout three times: behind the container query, behind the phone's
+ * viewport (`max-sm:`, where the chevron is always 44px, so its margin and
+ * corner need no second condition), and without either. Spelled out in full
+ * each time, because Tailwind reads class names out of the source and would
+ * find no `@max-[640px]:block` assembled from parts.
  *
  * A label beside its value, not above it: one line per field keeps a row of
  * five fields five lines tall, and one label column for every line of a block
@@ -1825,7 +1845,19 @@ interface StackClasses {
  * labels take two fifths of the block up to 10rem, so a block in a desktop
  * column does not leave its values a long way from short labels.
  */
-const STACKED: Record<'narrow' | 'always', StackClasses> = {
+const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
+  phone: {
+    table: 'max-sm:block',
+    head: 'max-sm:hidden',
+    body: 'max-sm:block',
+    row: 'max-sm:relative max-sm:block max-sm:px-3 max-sm:py-2',
+    rowWithToggle: 'max-sm:pl-12',
+    toggle: 'max-sm:absolute max-sm:top-0 max-sm:left-0 max-sm:p-0',
+    cell: 'max-sm:grid max-sm:grid-cols-[minmax(0,min(40%,10rem))_minmax(0,1fr)] max-sm:items-baseline max-sm:gap-x-3 max-sm:px-0 max-sm:py-0.5 max-sm:after:hidden',
+    label: 'max-sm:block',
+    detail: 'max-sm:block',
+    detailInner: 'max-sm:px-0 max-sm:py-1',
+  },
   narrow: {
     table: '@max-[640px]:block',
     head: '@max-[640px]:hidden',
@@ -1883,9 +1915,11 @@ const FIT_CELL = 'min-w-[min(8ch,14cqw)] wrap-anywhere [&>span]:whitespace-norma
 const FIT_NAME = 'min-w-[min(16ch,28cqw)] wrap-anywhere [&>span]:whitespace-normal';
 
 /**
- * A header or value cell's floor at its longest word, on a table that fits its
- * box: an invisible, zero-height copy of the cell's text (`data-fit`), laid out
- * where words do not break, and capped at the column's share (`--fit-share`).
+ * A value cell's floor at its longest word, on a table that fits its box: an
+ * invisible, zero-height copy of the cell's text (`data-fit`), laid out where
+ * words do not break, and capped at the column's share (`--fit-share`). A
+ * header needs no copy, since it never wraps inside a word (see `ObjectTable`'s
+ * header row).
  *
  * The cell itself still wraps anywhere, and that is what keeps an over-long
  * token from widening the table. What it gives up is the column's width: a
@@ -1904,28 +1938,67 @@ const WORD_FLOOR =
 /**
  * `--fit-share`, set on a table that fits its box: an equal split, between the
  * columns beside the name, of what the name's floor, the cells' padding
- * (`1.5rem` each) and the chevron column (`EXPAND_COLUMN`, reserved whether or
- * not the rows open) leave of the box. The name's floor is counted at `28cqw`, the
- * larger it can be, so the shares and the floors never add up to more than the
- * box. A table with no name splits the whole box. Spelled out per column count,
- * because Tailwind finds a class only where it is written whole; a table of
- * more than six columns is blocks at every width and has no columns to share.
+ * (`1.5rem` each) and the chevron column leave of the box. The name's floor is
+ * counted at `28cqw`, the larger it can be, so the shares and the floors never
+ * add up to more than the box. A table with no name splits the whole box.
+ * Spelled out per column count, because Tailwind finds a class only where it is
+ * written whole; a table of more than six columns is blocks at every width and
+ * has no columns to share.
+ *
+ * The chevron column is counted only when the rows open (`FIT_CHEVRON`, which
+ * sets `--fit-chevron` to `EXPAND_COLUMN`). It used to be reserved whether or
+ * not they did, so a table whose rows cannot open, as an invoice's lines of a
+ * name and two numbers, took a part of a chevron column that was not there
+ * from every column beside the name, and on a 375px phone, where the chevron
+ * is 3.25rem, its header "Quantity" broke as "Quantit" over "y".
+ *
+ * A fitting table whose rows cannot open sets it to nothing (`FIT_NO_CHEVRON`)
+ * rather than leaving it unset: a custom property inherits, and a table drawn
+ * inside an open row's record is a descendant of the outer table, which does
+ * open, so an unset variable would hand the inner table the outer one's
+ * chevron and take it from the inner columns' share.
  */
+const FIT_CHEVRON = '[--fit-chevron:var(--expand-column,2rem)]';
+const FIT_NO_CHEVRON = '[--fit-chevron:0px]';
 const FIT_SHARE_BESIDE_NAME: Readonly<Record<number, string>> = {
-  2: '[--fit-share:calc(72cqw_-_3rem_-_var(--expand-column,2rem))]',
-  3: '[--fit-share:calc((72cqw_-_4.5rem_-_var(--expand-column,2rem))/2)]',
-  4: '[--fit-share:calc((72cqw_-_6rem_-_var(--expand-column,2rem))/3)]',
-  5: '[--fit-share:calc((72cqw_-_7.5rem_-_var(--expand-column,2rem))/4)]',
-  6: '[--fit-share:calc((72cqw_-_9rem_-_var(--expand-column,2rem))/5)]',
+  2: '[--fit-share:calc(72cqw_-_3rem_-_var(--fit-chevron,0px))]',
+  3: '[--fit-share:calc((72cqw_-_4.5rem_-_var(--fit-chevron,0px))/2)]',
+  4: '[--fit-share:calc((72cqw_-_6rem_-_var(--fit-chevron,0px))/3)]',
+  5: '[--fit-share:calc((72cqw_-_7.5rem_-_var(--fit-chevron,0px))/4)]',
+  6: '[--fit-share:calc((72cqw_-_9rem_-_var(--fit-chevron,0px))/5)]',
 };
 const FIT_SHARE_WITHOUT_NAME: Readonly<Record<number, string>> = {
-  1: '[--fit-share:calc(100cqw_-_1.5rem_-_var(--expand-column,2rem))]',
-  2: '[--fit-share:calc((100cqw_-_3rem_-_var(--expand-column,2rem))/2)]',
-  3: '[--fit-share:calc((100cqw_-_4.5rem_-_var(--expand-column,2rem))/3)]',
-  4: '[--fit-share:calc((100cqw_-_6rem_-_var(--expand-column,2rem))/4)]',
-  5: '[--fit-share:calc((100cqw_-_7.5rem_-_var(--expand-column,2rem))/5)]',
-  6: '[--fit-share:calc((100cqw_-_9rem_-_var(--expand-column,2rem))/6)]',
+  1: '[--fit-share:calc(100cqw_-_1.5rem_-_var(--fit-chevron,0px))]',
+  2: '[--fit-share:calc((100cqw_-_3rem_-_var(--fit-chevron,0px))/2)]',
+  3: '[--fit-share:calc((100cqw_-_4.5rem_-_var(--fit-chevron,0px))/3)]',
+  4: '[--fit-share:calc((100cqw_-_6rem_-_var(--fit-chevron,0px))/4)]',
+  5: '[--fit-share:calc((100cqw_-_7.5rem_-_var(--fit-chevron,0px))/5)]',
+  6: '[--fit-share:calc((100cqw_-_9rem_-_var(--fit-chevron,0px))/6)]',
 };
+
+/**
+ * A header's text, free to wrap after each `_`. In `studio` a header is the
+ * identifier the author wrote (`checked_on`, `unit_price_differs_from_po`),
+ * whose words are joined by underscores rather than spaces, and a header that
+ * wraps only between words would otherwise hold the whole identifier on one
+ * line. `<wbr>` adds the break and nothing to the text, so the header still
+ * reads, copies and is named exactly as written. In `app` a header is a
+ * humanised name or an authored title, whose words are spaced already, so it
+ * is left as it is.
+ */
+function identifierWords(label: string): React.ReactNode {
+  const words = label.split('_');
+  if (words.length === 1) return label;
+  return words.map((word, index) =>
+    index === words.length - 1 ? (
+      word
+    ) : (
+      <Fragment key={index}>
+        {word}_<wbr />
+      </Fragment>
+    ),
+  );
+}
 
 /**
  * The text a cell's word floor is laid out from: what a text or number cell
@@ -2053,11 +2126,11 @@ function ObjectTable({
   // or as blocks, so there is no scroll for any of the scroller's machinery to
   // serve. `stacked` is what turns it into blocks, and when.
   const fits = layout === 'stack';
-  const stacking = fits ? stackingFor(shown.length) : 'never';
+  const stacking = fits ? stackingFor(shown.length, canExpand) : 'never';
   const stacked = stacking === 'never' ? undefined : STACKED[stacking];
-  // The share a column beside the name may claim for its longest word, and
-  // whether a column has a word floor at all: only while it can be a table
-  // that fits, and never the name, which keeps its own floor.
+  // The share a column beside the name may claim for its values' longest word,
+  // and whether a value cell has a word floor at all: only while it can be a
+  // table that fits, and never the name, which keeps its own floor.
   const nameShown = name !== undefined && shown.includes(name);
   const fitShare = fits
     ? (nameShown ? FIT_SHARE_BESIDE_NAME : FIT_SHARE_WITHOUT_NAME)[shown.length]
@@ -2084,6 +2157,30 @@ function ObjectTable({
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [fits]);
+
+  // Whether a table that fits its box is wider than it after all. Its values
+  // wrap, so only its headers can make it so: a header never breaks inside a
+  // word, and a box too narrow for every header's longest word beside the
+  // name's floor lets the table scroll inside it rather than split one. A
+  // scroll is then a place a keyboard must reach, so the box takes focus for as
+  // long as it overflows, and only then. Measured, because only the browser
+  // knows a word's width; what it decides is a tab stop, never the table's
+  // shape, so a server and the first paint render the same table.
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || !fits) return;
+    const measure = () => setOverflows(scroller.scrollWidth > scroller.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    // The table too: a row opening, or a host's new rows, changes what the box
+    // holds without changing the box.
+    const content = scroller.firstElementChild;
+    if (content) observer.observe(content);
     return () => observer.disconnect();
   }, [fits]);
 
@@ -2115,14 +2212,14 @@ function ObjectTable({
     //
     // Under `tableLayout="stack"` the box is the SIZE CONTAINER its stacking
     // rules query, so the table answers to its own width rather than the
-    // viewport's, and it takes no focus: nothing scrolls, so the stop would have
-    // nothing to do. It still clips to its rounded border, and should anything
-    // ever overflow it, the a11y gate names the scroll a keyboard cannot reach.
+    // viewport's, and it takes no focus while nothing scrolls, since the stop
+    // would have nothing to do. It still clips to its rounded border, and takes
+    // focus again only while its headers' words make it overflow (`overflows`).
     <div
       ref={scrollerRef}
       role="group"
       aria-label={label}
-      {...(fits ? {} : { tabIndex: 0 })}
+      {...(fits && !overflows ? {} : { tabIndex: 0 })}
       className={cn(
         'overflow-x-auto rounded-lg border border-border',
         focusOutlineInsetClass,
@@ -2139,9 +2236,15 @@ function ObjectTable({
           and once the columns need more than that, auto table layout grows past
           both rather than crushing them (headers are `whitespace-nowrap` and
           cells `truncate`, so nothing wraps to buy the space back). A table
-          that fits its box wraps instead, so it never grows past either. */}
+          that fits its box wraps instead, so it grows past either only when
+          its headers' longest words do not fit beside one another. */}
       <table
-        className={cn('w-full min-w-full border-collapse text-[13px]', stacked?.table, fitShare)}
+        className={cn(
+          'w-full min-w-full border-collapse text-[13px]',
+          stacked?.table,
+          fitShare,
+          fitShare !== undefined && (canExpand ? FIT_CHEVRON : FIT_NO_CHEVRON),
+        )}
       >
         {/* Gone while the rows are blocks: each value then carries its own
             label, so the header row would only repeat them out of place. */}
@@ -2165,22 +2268,26 @@ function ObjectTable({
               <th
                 key={column.name}
                 scope="col"
-                {...(floorsWords(column)
-                  ? { 'data-fit': fieldLabel(column.title, column.name, presentation) }
-                  : {})}
                 className={cn(
-                  // One line, or wrapped anywhere so a header is never what
-                  // widens a table that has to fit its box. See `FIT_CELL`.
-                  fits ? 'wrap-anywhere' : 'whitespace-nowrap',
+                  // One line, or, in a table that fits its box, wrapped between
+                  // words and never inside one: "Quantity" over three digits is
+                  // a header, "Quantit" over "y" is damage. So a header's
+                  // longest word is its column's floor, with no share capping
+                  // it, as a value's is capped: a header's words are the label
+                  // the descriptor states, not a payload's token of any length.
+                  // Where the box cannot hold every header's longest word, the
+                  // table scrolls inside it (see `overflows`).
+                  fits ? 'wrap-normal' : 'whitespace-nowrap',
                   'px-3 py-2 text-[12px] font-semibold text-foreground',
                   presentation === 'app' ? undefined : 'font-mono',
-                  floorsWords(column) && WORD_FLOOR,
                 )}
               >
                 {/* The authored description, once, on the header - it is worth
                     having and not worth repeating under every value. */}
                 <Described description={column.description}>
-                  {fieldLabel(column.title, column.name, presentation)}
+                  {presentation === 'studio'
+                    ? identifierWords(fieldLabel(column.title, column.name, presentation))
+                    : fieldLabel(column.title, column.name, presentation)}
                 </Described>
               </th>
             ))}
@@ -3276,6 +3383,38 @@ function typesetText(field: RunField, value: unknown, isApp: boolean): string | 
   return isApp && field.kind === 'text' && isLongText(value) ? value : undefined;
 }
 
+/**
+ * Whether a text names itself, in `app`: the view typesets it as Markdown
+ * (`typesetText`) and it opens with a heading of its own. `value` is the
+ * node's value as unwrapped by its content key.
+ */
+function namesItself(field: RunField, value: unknown, isApp: boolean): boolean {
+  const typeset = typesetText(field, value, isApp);
+  return isApp && typeset !== undefined && opensWithHeading(typeset);
+}
+
+/**
+ * Whether a whole result names itself, as a panel's title would: in `app`, a
+ * text the view typesets that opens with a heading of its own. `value` is the
+ * payload as it arrived, unwrapped here exactly as `ResultField` unwraps it.
+ *
+ * For `StuffViewer`, which then draws no title over it, even one its host
+ * named, for the reason a label gives way to such a text in the leaf arm: the
+ * name set over the heading read as the same title twice ("Executive summary"
+ * over "Launch Executive Summary"). The heading is the one kept because the
+ * run wrote it for this result, where a host's name is the output's for every
+ * run, and because dropping it would draw a text other than the one the copy
+ * control and the download hand over. One predicate for both, so the panel and
+ * the leaf arm cannot disagree about which texts head themselves.
+ */
+export function resultHeadsItself(
+  field: RunField,
+  value: unknown,
+  presentation: FieldPresentation,
+): boolean {
+  return namesItself(field, unwrap(field, value), presentation === 'app');
+}
+
 export interface ResultFieldProps {
   field: RunField;
   value: unknown;
@@ -3779,9 +3918,12 @@ function ResultNode({
       // itself, in `app`: its label is said rather than drawn, because the
       // label set over the heading read as the same title twice ("Executive
       // summary" over "Launch Executive Summary"). `studio` keeps it, since
-      // there the label is the identifier, not a title.
+      // there the label is the identifier, not a title. Under `hideLabel`
+      // there is no label to give way: a panel whose whole result this is has
+      // already left out its own title by the same predicate
+      // (`resultHeadsItself`), and says it rather than draws it.
       const typeset = typesetText(field, unwrapped, isApp);
-      const headed = isApp && !hideLabel && typeset !== undefined && opensWithHeading(typeset);
+      const headed = !hideLabel && namesItself(field, unwrapped, isApp);
       const labelDrawn = !hideLabel && !headed;
       return (
         <div

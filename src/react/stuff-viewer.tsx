@@ -7,7 +7,14 @@ import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
 import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
 import { readStuffFile } from '../core/stuff-files';
-import { Absent, PanelResult, ResultField, ResultHeader, stringifyValue } from './result-field';
+import {
+  Absent,
+  PanelResult,
+  ResultField,
+  ResultHeader,
+  resultHeadsItself,
+  stringifyValue,
+} from './result-field';
 import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { HtmlPreview } from './html-preview';
@@ -437,14 +444,20 @@ function StuffPanel({
   // and "Output" over a result is a word that tells its reader nothing; a host
   // that heads the result itself passes no name and gets no second heading. A
   // one-page result in an app carries its own title on the page, so the panel
-  // adds none.
-  const titled = presentation !== 'app' || (name !== undefined && name !== '' && !page);
+  // adds none, and neither does a text that opens with a heading of its own
+  // (`resultHeadsItself`): the host's name over it read as the same title
+  // twice, so the name gives way to the heading, and is said rather than
+  // drawn, as a field's label gives way to one inside a result.
+  const headsItself = !page && resultHeadsItself(field, value, presentation);
+  const hostNamed = name !== undefined && name !== '';
+  const titled = presentation !== 'app' || (hostNamed && !page && !headsItself);
   const switchShown = offered.length > 1;
   // A Download with nothing beside it - an app's result with no title, no view
   // switch and no page - is drawn at the result's foot, where a reader who has
   // read it takes it away. At the top it stood alone at the panel's right edge
   // over an empty band, a corner the eye reads as chrome rather than as the
-  // result's action.
+  // result's action. A host-named text whose heading took the title's place is
+  // one of these: the heading opens the result, and the Download follows it.
   const downloadAtFoot = downloadShown && !titled && !switchShown && !page;
   // The row is left out when nothing is in it, so an app's result starts at
   // its first line rather than under an empty band.
@@ -502,6 +515,10 @@ function StuffPanel({
           own - two headers that agree today drift tomorrow. It stays put across
           both views, so switching does not move the thing you are reading. */}
       {dialog}
+      {/* The host's name for a result that names itself: said first, where
+          the title would have stood, and in both views, so the panel's
+          opening does not change with the view. */}
+      {hostNamed && headsItself && <ResultHeader field={named} unseen />}
       {headerShown && (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
           {titled ? (
@@ -565,7 +582,10 @@ function StuffPanel({
           {/* The whole result, where a verdict is drawn large. Its host heads
               it when the panel draws no title of its own, and then in `app` it
               draws no count under the host's heading; under the panel's own
-              title, which says no count, it keeps its count. */}
+              title, which says no count, it keeps its count. A text that names
+              itself draws no panel title either, so it counts as host-headed
+              here, though its own heading is what opens it; a text has no
+              count to draw in any case. */}
           <PanelResult hostHeaded={!titled}>
             <ResultField field={field} value={value} hideLabel />
           </PanelResult>
