@@ -58,9 +58,11 @@ It also reads the `on` field, which says as much about a page as its props do. E
 
 Like the validator, it answers with problems and never throws, whatever shape the layout arrived in: a malformed spec is one line naming what the walk tripped on. The two are exported separately and a host may run them in either order, so neither assumes the other refused the shape first.
 
-The **prompt hash** is the third condition and the cheapest. `PROMPT_HASH` is the first twelve hex digits of the SHA-256 of the designer method's text and the catalog data this entry ships, taken together — the two things a run is actually given, so a reworded rule and a renamed prop each move it; every stored layout records the hash it was produced against. A layout whose hash is not this one is not rendered, because the vocabulary it was written in is no longer the vocabulary this entry renders. It is a pinned constant rather than a computation, so the entry stays importable from a browser and a host can compare it synchronously.
+The **prompt hash** is the third condition and the cheapest. `PROMPT_HASH` is the first twelve hex digits of the SHA-256 of `promptHashSubject(method)`: the designer method's text, a newline, then the JSON of every frame's catalog data in `FRAMES` order (`page`, `composer`, `result`) — what a run is actually given, so a reworded rule and a renamed prop each move it, whichever frame the prop belongs to; every stored layout records the hash it was produced against. The recipe is exported so a host that stamps the layouts it stores computes the same twelve digits from the method file it sent, and `src/generative/__tests__/prompt.test.ts` holds the pin to it. A layout whose hash is not this one is not rendered, because the vocabulary it was written in is no longer the vocabulary this entry renders. It is a pinned constant rather than a computation, so the entry stays importable from a browser and a host can compare it synchronously.
 
 So the fallback rule, in full: **the kernel's plain form renders when there is no layout, a stale prompt hash, an invalid layout, `layoutFits` false, or a render error.** A produced page is an enhancement over a form that always works, never a replacement for one.
+
+A layout written for one of a host's frames (below) is checked against that frame's vocabulary rather than the whole catalog's, and `layoutCheckProblems(spec, { frame, descriptor })` runs the two checks in one call: the frame catalog's verdict (`frameCatalog(frame)`) then `layoutProblems(descriptor, spec)`, one problem a line. An empty list means the layout may render; anything else means the plain form, and the same lines are what the method's repair pass reads.
 
 ## The two escape hatches
 
@@ -121,13 +123,63 @@ Kept beside `domIdFor` in the same module so the two cannot drift, and exact for
 
 Which ways into a file value the page offers follows the same rule as a plain form, because `MthdsField` renders through `FieldRenderer` with the scope's `env`: a scope with no `onDropFile` gets a link-only file field rather than a dropzone that drops what it takes, and `allowUrl: false` takes the link away ([the upload seam](upload-seam.md) § "Which ways into a file value a host offers"). A scope that offers neither makes the field throw as it does on a plain form, but json-render catches the throw in the boundary it wraps around every element: the error, naming the field's id, is what the boundary logs, and the field renders nothing while the rest of the page stays.
 
+## A host's frames: the composer and the result page
+
+A layout may be a whole product page — its own app bar, hero, side panel and footer, the vocabulary above — or one moment of a host's **compose-then-result app**, where the host draws everything around the method and the layout fills the middle. That is the **frame** a layout is written for, one of `FRAMES`:
+
+| Frame      | What the host draws                                                                              | What the layout places                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`     | nothing: the layout is the whole page                                                            | everything, from the product components                                                                                                     |
+| `composer` | the band with the team's logo and the app's name; how long a run takes; what the run button does | a `Composer` — the page's headline, its lede, the inputs in one raised panel, and the action row at its foot — with `FieldGroup`s inside it |
+| `result`   | the band, the request bar over the page, and what each of the result's actions does              | a `ResultHeader` — the page's title, with the host's actions beside it — then the result, in the result frame's own figures                 |
+
+Each frame has its own vocabulary. `designerCatalog({ frame })` is what the designer method is handed, and `frameCatalog(frame)` what a layout is validated against: the composer keeps the inputs and leaves out every result component, the result page keeps its figures and leaves out every input, and neither has the components the host already draws (`AppBar`, `Footer`, `Workspace`, `Rail`, `Cta`, `Hero`) nor a bare `Button`. `componentNamesFor(frame)` lists the names; `COMPOSER_COMPONENTS` and `RESULT_COMPONENTS` are each frame's own. On a composer, a date and a list are delegated to `MthdsField` as on a whole page. On a result page the frame lays out what the whole page delegates: a picture through `Picture`, a date through `DateText`, a list of short texts through `TextList`, a share through `ProportionBar`, a palette through `Swatches`, and the rest through `Fact` and `Detail`. `Picture` reads a stored file the way the kernel's result view does — through the host's resolver (`useResolvedUrl`, from `ResultEnvProvider`) and then `viewableUrl`, which draws nothing for a URL a browser should not load — and `layoutFits` holds its `path` to an image the result has, resolved through the repeats above it, so a picture of a renamed member is refused rather than drawn empty.
+
+What only the host knows travels beside the layout, never in it. `FrameHostProvider` hands the frame components the host's facts: `eta`, how long a run usually takes, which the `Composer`'s action row shows; `actions`, the result's actions primary first, which the `ResultHeader` draws; and `onAction`, what each does. The layout names where they go and the host fills them, so a stored layout never says "Takes about 30 seconds" about an app whose runs got slower.
+
+The brief says which frame and which **style** a page is written for. `inputBrief(subject, fields, { frame, style, result })` and `resultBrief(subject, field, state, { frame, style })` take the frame (`page` when omitted) and an `AppStyleId` from the `./brand` entry. The brief then carries the style as data, its name and its one-sentence direction from `APP_STYLES`, and the method's `render_brief` lays out a Style section asking for a composition that reads as that style — how much air, how large a headline, how many groups — while saying the look itself, the faces, radii, panels and colour, is the components'. A composer's brief carries `returns` too, read from the result's own titles and descriptions when `result` is passed, so the page may say once what one run gives back. The style is a fact about the team, not the method, so a host that lets a team change its style designs that team's layouts again.
+
+The **store** a host renders a layout over is json-render's, re-exported here so a host needs no second dependency to make one: `createStateStore`, with the `Spec`, `StateStore` and `StateModel` types. A composer's store holds `{ inputs }`, seeded with `seedInputs` or with the values a person is resuming; a result page's holds `{ result: payloadToState(field, payload) }`.
+
+So a host rendering a stored layout for a moment, with the plain form as its fallback, does this:
+
+```tsx
+import {
+  FrameHostProvider,
+  GenerativePage,
+  PROMPT_HASH,
+  createStateStore,
+  layoutCheckProblems,
+  payloadToState,
+} from '@pipelex/mthds-form/generative';
+
+const usable =
+  stored &&
+  stored.promptHash === PROMPT_HASH &&
+  layoutCheckProblems(stored.spec, { frame: 'result', descriptor: { result: field } }).length === 0;
+
+usable ? (
+  <FrameHostProvider host={{ actions: ['Download PDF', 'Share'], onAction }}>
+    <GenerativePage
+      spec={stored.spec}
+      store={createStateStore({ result: payloadToState(field, payload) })}
+      scope={{ result: field }}
+    />
+  </FrameHostProvider>
+) : (
+  <PlainResultPage field={field} payload={payload} />
+);
+```
+
+A render error is the last condition, and json-render's per-element boundary catches it without failing the rest of the page; a host that wants the whole page to fall back wraps the page in its own boundary too.
+
 ## Producing a layout
 
 The producer is outside this package, but the package ships what a producer needs.
 
 The **designer method** is the prompt. It ships as data at `@pipelex/mthds-form/layout-design.mthds`: a `.mthds` bundle whose main pipe, `design_layout`, takes three inputs — `catalog`, `brief` and an optional `seed`, the first two as data — and runs three stages. `render_brief` lays the brief out: a Jinja2 template over the brief's data, with no model behind it, whose Markdown is the text both model stages then read — so every sentence a model reads about the page, the headings, how a path line is worded, what "delegated" says, is in that file too. `plan_page` reads that text and the catalog and writes a `PagePlan`, a structure the bundle declares: what the page is for, its title and composition, its regions with the elements and paths each holds, what runs the method, the defaults and what is delegated. It alone sees the seed, because the plan is where two runs of the same brief diverge. Neither model stage prescribes a composition: the shape of the page is the planner's decision, written into the plan, and the prose names none of the product chrome — what a component is for travels in its catalog description, as data, the control that runs the method is named by the brief, as data, and a test holds the method to naming none — so two layouts of one brief may differ in their bones and not only in their copy. `emit_page` is handed the plan, the catalog with every props signature and the laid-out brief, and emits the JSONL patches. Every paragraph either model reads — the brief's own prose, the design direction and the planning rules on one side, the output format, the state contract and the numbered rules on the other — is authored in that file. It ships as a file rather than as a string baked into a module because it is still being iterated on — a newer method is then a package upgrade rather than a code change — and because nothing in the entry may read it, which is what keeps the entry importable from a browser. Improving the prompt is editing that file; nothing in TypeScript renders a prompt string, and nothing in TypeScript writes a sentence of the brief. Three things to know before editing it: a literal dollar sign is written `$$`, because `$name` is the language's inline substitution, so every json-render expression key in the prose (`$$state`, `$$bindState`, `$$item`, ...) is spelled that way, in the brief's template too; the component and action sections, like the plan the builder reads, are Jinja2 loops in the two prompts, which keep every newline they are written with, so a heading that follows a loop sits directly under its `{% endfor %}` to render one blank line rather than two; and the brief's template is a `markdown` template, whose category trims a line holding only a `{% %}` tag, so a line that ends with such a tag closes it with `+%}` to keep its newline, and every `{% set %}` sits at the top of the template — the runtime reads a name set inside a loop or a condition as an input the pipe never declared.
 
-The **catalog as data** (`designerCatalog()`) is the `catalog` input: every component with its name, its props signature rendered from its zod schema (`{ label: string, value?: string }`, the shape json-render's own prompt uses), its description, whether it accepts children, its named slots and the events it emits — then every action, the runtime's four built-in ones first. The method lays both lists out itself, so a component added to the catalog appears in the prompt with no change to the method, while the rules and the direction that name components stay the method's own prose. The value travels as the content of a structured input, under the concept `DESIGNER_CATALOG_CONCEPT` (`generative.Catalog`), whose structure the method declares.
+The **catalog as data** (`designerCatalog({ frame })`, the `page` frame's when called with nothing) is the `catalog` input: every component with its name, its props signature rendered from its zod schema (`{ label: string, value?: string }`, the shape json-render's own prompt uses), its description, whether it accepts children, its named slots and the events it emits — then every action, the runtime's four built-in ones first. The method lays both lists out itself, so a component added to the catalog appears in the prompt with no change to the method, while the rules and the direction that name components stay the method's own prose. The value travels as the content of a structured input, under the concept `DESIGNER_CATALOG_CONCEPT` (`generative.Catalog`), whose structure the method declares.
 
 The **brief as data** (`inputBrief`, `resultBrief`) is the per-method half, projected from the descriptor and nothing else into the method's own `Brief` structure (`DesignerBrief`, sent under the concept `DESIGNER_BRIEF_CONCEPT`, `generative.Brief`): which page it is and for which pipe, every path flattened in reading order with its depth, its kind in words, its constraints in words, whether the kernel keeps it and what gates the run, the control that runs the method, and on a result page the state of one real run as JSON, so a model can judge magnitudes. The defaults it lists are the seeds, and they are the outermost default of each subtree and never a member's beneath it — exactly what `seedInputs` seeds, so nothing beneath an optional input structure without a default of its own is listed as a seed, and a model following the brief in order lands on the state the kernel would have seeded; a member's own default stays in its notes, as a fact about the field. What only code can state is here; what a model reads about it is the method's `render_brief` template over this value, so the wording of the brief is edited in the method file like the rest of the prompt. An input is marked delegated when the catalog's own inputs cannot enter it: a file, a date, a list, and a choice that carries an empty option, since the standard puts no floor on a choice while the catalog refuses an empty one — a model told to list the brief's choices exactly would otherwise write a layout the validator refuses. A result is marked delegated when no catalog component can show it: a file, a date, prose, an `unknown`, one of the three native concepts the kind vocabulary cannot name (`native.Date`, `native.Html` and `native.Composite`), and a list of one of those. That last is a list and not a native value, which is why the native predicates refuse it, but its items are values no catalog component reads, so the kernel renders the whole list, one value per line as the result view does, and `payloadToState` hands the hatch the array of whole values it reads. A `native.SearchResult` is not delegated to its arm yet: the brief walks into it as into any structure, so its answer is a text path and each of its sources a delegated document, drawn as a file row rather than as a link, the way a page of an extracted document and a verdict are walked into too; delegating each of them to the kernel's own arm is tracked as separate work. A delegated path ends the walk: the kernel renders it whole, so its members are nobody else's to bind.
 
@@ -146,18 +198,27 @@ import {
 const method = createRequire(import.meta.url).resolve('@pipelex/mthds-form/layout-design.mthds');
 const request = {
   mthds_contents: [readFileSync(method, 'utf8')],
-  pipe_code: 'design_layout',
+  pipe_code: 'generative.design_layout',
   inputs: {
-    catalog: { concept: DESIGNER_CATALOG_CONCEPT, content: designerCatalog() },
+    catalog: { concept: DESIGNER_CATALOG_CONCEPT, content: designerCatalog({ frame: 'composer' }) },
     brief: {
       concept: DESIGNER_BRIEF_CONCEPT,
-      content: inputBrief({ pipeRef, description, name }, fields),
+      content: inputBrief({ pipeRef, description, name }, fields, {
+        frame: 'composer',
+        style: 'soft',
+        result,
+      }),
     },
+    seed: seedLine(seed),
   },
 };
 ```
 
-A produced layout is stored with its provenance: who produced it, on which model, with which seed, against which prompt hash, from which brief. `SpecFixture` is that record's shape, and `fixtureLabel` renders it — deliberately by **what made the page**, never by a role like "authored" or "generated". A layout the designer method produced also carries the planner's `PagePlan` as `plan`, read from the run's working memory: the intermediate the builder was handed, which is where a page got its shape and the one stage at which two runs of one brief can be compared in words rather than in elements.
+The **seed** is optional and travels as the one labelled line `seedLine(seed)` writes, the line the planner's seed procedure was written against: two runs of one brief with different seeds diverge in their composition, and a host that wants a page it can reproduce stores the seed beside the layout.
+
+**The repair pass.** A layout the checks refuse is not lost. The method's second entry, `generative.repair_layout`, takes the same `catalog` and `brief`, the refused JSONL as `page`, and the problems as `problems` — `layoutCheckProblems(spec, check).join('\n')` — and emits the whole page again with those problems fixed and nothing else changed. The loop is the producer's, because the checks are this package's TypeScript and the method cannot run them: check, repair, check again, at most `REPAIR_ATTEMPTS` times, and keep the plain form when the last pass is still refused. The refusals the designer makes are slips of one prop or one child key, which one pass told what it broke fixes; each pass is one model call on the model the method pins, about what the builder stage of a design costs, and its usage comes back with the run like a design's. A layout that needed passes records how many as `repairs`.
+
+A produced layout is stored with its provenance: who produced it, on which model, with which seed, for which frame and style, after how many repair passes, against which prompt hash, from which brief. `SpecFixture` is that record's shape, and `fixtureLabel` renders it — deliberately by **what made the page**, never by a role like "authored" or "generated". A layout the designer method produced also carries the planner's `PagePlan` as `plan`, read from the run's working memory: the intermediate the builder was handed, which is where a page got its shape and the one stage at which two runs of one brief can be compared in words rather than in elements.
 
 ### The typed contract
 
@@ -169,9 +230,9 @@ The worked example of a call is `scripts/pipelex/layout-design.ts`, the fixture 
 
 ## Where the corpus lives
 
-The layouts in this repo are real: produced by the designer method on the hosted API — the path a product's producer takes — over briefs rendered from real methods, validated on the way in, and committed with their provenance under `src/__stories__/_generated/<case>.specs.ts`. `make briefs` writes what a producer was handed; `make fixtures-specs` produces layouts; `--capture` takes in one another producer wrote, under the same discipline. None of them repairs a layout that does not validate — the repair is to the prompt, the method or the producer. See [storybook.md](storybook.md) § "The passes, and which of them cost anything".
+The layouts in this repo are real: produced by the designer method on the hosted API — the path a product's producer takes — over briefs rendered from real methods, validated on the way in, and committed with their provenance under `src/__stories__/_generated/<case>.specs.ts`. Each hero is designed in each of its frames (`framesOf` in `src/__stories__/heroes.ts`): a whole page with no style, and the moment of a host's app it is — the composer for an input hero, the result page for a result one — once in every app style, with a seed. `make briefs` writes what a producer was handed, one brief a variant (`data/briefs/<pipeRef>.md` for a whole page, `<pipeRef>.<frame>.<style>.md` for a moment); `make fixtures-specs` produces layouts, running the method's repair pass on one the checks refuse exactly as a host's producer does, and keeps one still refused after `REPAIR_ATTEMPTS` passes under `data/briefs/` rather than storing it; `--capture` takes in one another producer wrote, under the same discipline. A layout that is refused however many passes it is given is a fact about the method, and the repair is to the method, never to the fixture. See [storybook.md](storybook.md) § "The passes, and which of them cost anything".
 
-`src/__stories__/__tests__/generative.test.ts` is what those layouts are for: every one of them is asked whether it still compiles from its own JSONL, validates against the catalog, fits its descriptor in both directions, and was produced against the prompt this entry ships.
+`src/__stories__/__tests__/generative.test.ts` is what those layouts are for: every one of them is asked whether it still compiles from its own JSONL, passes a host's checks for its frame, and was produced against the prompt this entry ships.
 
 ### Working on the method
 
@@ -182,3 +243,5 @@ The prompt is the method's text, hashed whole, so any edit to it — a rule rewo
 - **`METHOD_WIP=1 make test`** stands the two stamp assertions down — the fixture's hash against the pin, and the brief's opening line against the fixture's hash — and holds every other one. A captured layout still has to compile, validate against the catalog and fit its descriptor, because a prompt edit staled its provenance and nothing about the page. The skips show in the reporter and the hatch names itself on stderr.
 
 `METHOD_WIP` is local: under `CI` it is ignored and the stamps are held, so a branch cannot merge with a corpus the entry would refuse to render. One `make fixtures-specs` sweep before the pull request opens pays for every edit that came before it. The reasoning is written out in `src/__stories__/__tests__/method-wip.ts`.
+
+**An edit to the method is never a patch release.** The file ships as `./layout-design.mthds`, and a consumer may ship it again as a copy taken from the kernel it resolves; a host sends that copy to its runner and stamps each layout with the `PROMPT_HASH` of the kernel it installed. The two agree only while the method cannot change inside the caret range the consumer declares, and any edit — a reworded rule as much as a new pipe — moves the hash and stales every layout a host has stored. So a release whose diff touches the method, or anything `promptHashSubject` reads, is a minor at minimum; the release skill (`.claude/skills/release/SKILL.md`) says the same.

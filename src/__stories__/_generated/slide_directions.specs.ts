@@ -1574,14 +1574,14 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'slide_directions.generate_design_proposals_from_rough_brief',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'UT13QlPsMYz7juY2KyCzInVZh3RJP0Oq',
+    seed: 'MVGqGKuWEJjW9aCO1iFEJ2gEwpYrbOf3',
     frame: 'result',
     style: 'soft',
     promptHash: '30cf9bc059f6',
     date: '2026-11-07',
     brief: 'data/briefs/slide_directions.generate_design_proposals_from_rough_brief.result.soft.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["header-region","directions-gallery"]}}\n{"op":"add","path":"/elements/header-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["result-header"]}}\n{"op":"add","path":"/elements/result-header","value":{"type":"ResultHeader","props":{"title":"Choose a visual direction","subtitle":"Compare the slides, then explore the details."},"children":[]}}\n{"op":"add","path":"/elements/directions-gallery","value":{"type":"Grid","props":{"columns":3,"gap":"xl"},"children":["direction"]}}\n{"op":"add","path":"/elements/direction","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"repeat":{"statePath":"/result/directions"},"children":["theme-name","title-slide","style-description","brand-palette","design-details"]}}\n{"op":"add","path":"/elements/theme-name","value":{"type":"Heading","props":{"text":{"$item":"theme/name"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/title-slide","value":{"type":"Picture","props":{"path":"mockup","aspect":"auto","alt":{"$template":"Title slide for ${theme/name}"}},"children":[]}}\n{"op":"add","path":"/elements/style-description","value":{"type":"Text","props":{"text":{"$item":"theme/style/overall"},"variant":"body"},"children":[]}}\n{"op":"add","path":"/elements/brand-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["brand-palette-label","brand-swatches"]}}\n{"op":"add","path":"/elements/brand-palette-label","value":{"type":"Text","props":{"text":"Primary · Secondary · Accent","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/brand-swatches","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/primary"},{"$item":"theme/colors/secondary"},{"$item":"theme/colors/accent"}]},"children":[]}}\n{"op":"add","path":"/elements/design-details","value":{"type":"Collapsible","props":{"title":"Design details","defaultOpen":false},"children":["details-stack"]}}\n{"op":"add","path":"/elements/details-stack","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["support-palette-label","support-swatches","typeface","headings-style","body-style","slide-ratio","margins","alignment","icons","graphics","exclusions"]}}\n{"op":"add","path":"/elements/support-palette-label","value":{"type":"Text","props":{"text":"Background · Primary text · Secondary text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/support-swatches","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/background"},{"$item":"theme/colors/text_primary"},{"$item":"theme/colors/text_secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/typeface","value":{"type":"Detail","props":{"label":"Typeface","value":{"$item":"theme/typography/font_family"}},"children":[]}}\n{"op":"add","path":"/elements/headings-style","value":{"type":"Detail","props":{"label":"Headings","value":{"$item":"theme/typography/heading_style"}},"children":[]}}\n{"op":"add","path":"/elements/body-style","value":{"type":"Detail","props":{"label":"Body text","value":{"$item":"theme/typography/body_style"}},"children":[]}}\n{"op":"add","path":"/elements/slide-ratio","value":{"type":"Detail","props":{"label":"Slide ratio","value":{"$item":"theme/layout/aspect_ratio"}},"children":[]}}\n{"op":"add","path":"/elements/margins","value":{"type":"Detail","props":{"label":"Margins","value":{"$item":"theme/layout/margins"}},"children":[]}}\n{"op":"add","path":"/elements/alignment","value":{"type":"Detail","props":{"label":"Alignment","value":{"$item":"theme/layout/alignment"}},"children":[]}}\n{"op":"add","path":"/elements/icons","value":{"type":"Detail","props":{"label":"Icons","value":{"$item":"theme/style/icon_style"}},"children":[]}}\n{"op":"add","path":"/elements/graphics","value":{"type":"Detail","props":{"label":"Graphics","value":{"$item":"theme/style/graphic_style"}},"children":[]}}\n{"op":"add","path":"/elements/exclusions","value":{"type":"Detail","props":{"label":"Avoid","value":{"$item":"theme/exclusions"}},"children":[]}}',
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["header-region","directions-gallery"]}}\n{"op":"add","path":"/elements/header-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["result-header"]}}\n{"op":"add","path":"/elements/result-header","value":{"type":"ResultHeader","props":{"title":"Compare visual directions"},"children":[]}}\n{"op":"add","path":"/elements/directions-gallery","value":{"type":"Grid","props":{"columns":3,"gap":"lg"},"repeat":{"statePath":"/result/directions"},"children":["direction-card"]}}\n{"op":"add","path":"/elements/direction-card","value":{"type":"Card","props":{},"children":["direction-content"]}}\n{"op":"add","path":"/elements/direction-content","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["direction-name","slide-preview","overall-style","palette-grid","design-details"]}}\n{"op":"add","path":"/elements/direction-name","value":{"type":"Heading","props":{"text":{"$item":"theme/name"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/slide-preview","value":{"type":"Picture","props":{"path":"mockup","alt":{"$template":"Title slide in ${theme/name}"}},"children":[]}}\n{"op":"add","path":"/elements/overall-style","value":{"type":"Text","props":{"text":{"$item":"theme/style/overall"},"variant":"body"},"children":[]}}\n{"op":"add","path":"/elements/palette-grid","value":{"type":"Grid","props":{"columns":3,"gap":"md"},"children":["primary-color","secondary-color","accent-color","background-color","main-text-color","secondary-text-color"]}}\n{"op":"add","path":"/elements/primary-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["primary-label","primary-swatch"]}}\n{"op":"add","path":"/elements/primary-label","value":{"type":"Text","props":{"text":"Primary","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/primary-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/primary"}]},"children":[]}}\n{"op":"add","path":"/elements/secondary-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["secondary-label","secondary-swatch"]}}\n{"op":"add","path":"/elements/secondary-label","value":{"type":"Text","props":{"text":"Secondary","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/secondary-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/accent-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["accent-label","accent-swatch"]}}\n{"op":"add","path":"/elements/accent-label","value":{"type":"Text","props":{"text":"Accent","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/accent-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/accent"}]},"children":[]}}\n{"op":"add","path":"/elements/background-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["background-label","background-swatch"]}}\n{"op":"add","path":"/elements/background-label","value":{"type":"Text","props":{"text":"Background","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/background-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/background"}]},"children":[]}}\n{"op":"add","path":"/elements/main-text-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["main-text-label","main-text-swatch"]}}\n{"op":"add","path":"/elements/main-text-label","value":{"type":"Text","props":{"text":"Main text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/main-text-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/text_primary"}]},"children":[]}}\n{"op":"add","path":"/elements/secondary-text-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["secondary-text-label","secondary-text-swatch"]}}\n{"op":"add","path":"/elements/secondary-text-label","value":{"type":"Text","props":{"text":"Secondary text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/secondary-text-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/text_secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/design-details","value":{"type":"Collapsible","props":{"title":"Design details","defaultOpen":false},"children":["details-stack"]}}\n{"op":"add","path":"/elements/details-stack","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["font-detail","headings-detail","body-detail","ratio-detail","margins-detail","alignment-detail","icons-detail","graphics-detail","avoid-detail"]}}\n{"op":"add","path":"/elements/font-detail","value":{"type":"Detail","props":{"label":"Font","value":{"$item":"theme/typography/font_family"}},"children":[]}}\n{"op":"add","path":"/elements/headings-detail","value":{"type":"Detail","props":{"label":"Headings","value":{"$item":"theme/typography/heading_style"}},"children":[]}}\n{"op":"add","path":"/elements/body-detail","value":{"type":"Detail","props":{"label":"Body text","value":{"$item":"theme/typography/body_style"}},"children":[]}}\n{"op":"add","path":"/elements/ratio-detail","value":{"type":"Detail","props":{"label":"Slide ratio","value":{"$item":"theme/layout/aspect_ratio"}},"children":[]}}\n{"op":"add","path":"/elements/margins-detail","value":{"type":"Detail","props":{"label":"Margins","value":{"$item":"theme/layout/margins"}},"children":[]}}\n{"op":"add","path":"/elements/alignment-detail","value":{"type":"Detail","props":{"label":"Alignment","value":{"$item":"theme/layout/alignment"}},"children":[]}}\n{"op":"add","path":"/elements/icons-detail","value":{"type":"Detail","props":{"label":"Icons","value":{"$item":"theme/style/icon_style"}},"children":[]}}\n{"op":"add","path":"/elements/graphics-detail","value":{"type":"Detail","props":{"label":"Graphics","value":{"$item":"theme/style/graphic_style"}},"children":[]}}\n{"op":"add","path":"/elements/avoid-detail","value":{"type":"Detail","props":{"label":"Avoid","value":{"$item":"theme/exclusions"}},"children":[]}}',
     spec: {
       root: 'page',
       elements: {
@@ -1598,15 +1598,14 @@ export const SPECS: SpecFixture[] = [
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'md',
+            gap: 'sm',
           },
           children: ['result-header'],
         },
         'result-header': {
           type: 'ResultHeader',
           props: {
-            title: 'Choose a visual direction',
-            subtitle: 'Compare the slides, then explore the details.',
+            title: 'Compare visual directions',
           },
           children: [],
         },
@@ -1614,346 +1613,32 @@ export const SPECS: SpecFixture[] = [
           type: 'Grid',
           props: {
             columns: 3,
-            gap: 'xl',
+            gap: 'lg',
           },
-          children: ['direction'],
+          repeat: {
+            statePath: '/result/directions',
+          },
+          children: ['direction-card'],
         },
-        direction: {
+        'direction-card': {
+          type: 'Card',
+          props: {},
+          children: ['direction-content'],
+        },
+        'direction-content': {
           type: 'Stack',
           props: {
             direction: 'vertical',
             gap: 'lg',
             align: 'stretch',
           },
-          repeat: {
-            statePath: '/result/directions',
-          },
           children: [
-            'theme-name',
-            'title-slide',
-            'style-description',
-            'brand-palette',
+            'direction-name',
+            'slide-preview',
+            'overall-style',
+            'palette-grid',
             'design-details',
           ],
-        },
-        'theme-name': {
-          type: 'Heading',
-          props: {
-            text: {
-              $item: 'theme/name',
-            },
-            level: 'h2',
-          },
-          children: [],
-        },
-        'title-slide': {
-          type: 'Picture',
-          props: {
-            path: 'mockup',
-            aspect: 'auto',
-            alt: {
-              $template: 'Title slide for ${theme/name}',
-            },
-          },
-          children: [],
-        },
-        'style-description': {
-          type: 'Text',
-          props: {
-            text: {
-              $item: 'theme/style/overall',
-            },
-            variant: 'body',
-          },
-          children: [],
-        },
-        'brand-palette': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['brand-palette-label', 'brand-swatches'],
-        },
-        'brand-palette-label': {
-          type: 'Text',
-          props: {
-            text: 'Primary · Secondary · Accent',
-            variant: 'caption',
-          },
-          children: [],
-        },
-        'brand-swatches': {
-          type: 'Swatches',
-          props: {
-            colors: [
-              {
-                $item: 'theme/colors/primary',
-              },
-              {
-                $item: 'theme/colors/secondary',
-              },
-              {
-                $item: 'theme/colors/accent',
-              },
-            ],
-          },
-          children: [],
-        },
-        'design-details': {
-          type: 'Collapsible',
-          props: {
-            title: 'Design details',
-            defaultOpen: false,
-          },
-          children: ['details-stack'],
-        },
-        'details-stack': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'md',
-          },
-          children: [
-            'support-palette-label',
-            'support-swatches',
-            'typeface',
-            'headings-style',
-            'body-style',
-            'slide-ratio',
-            'margins',
-            'alignment',
-            'icons',
-            'graphics',
-            'exclusions',
-          ],
-        },
-        'support-palette-label': {
-          type: 'Text',
-          props: {
-            text: 'Background · Primary text · Secondary text',
-            variant: 'caption',
-          },
-          children: [],
-        },
-        'support-swatches': {
-          type: 'Swatches',
-          props: {
-            colors: [
-              {
-                $item: 'theme/colors/background',
-              },
-              {
-                $item: 'theme/colors/text_primary',
-              },
-              {
-                $item: 'theme/colors/text_secondary',
-              },
-            ],
-          },
-          children: [],
-        },
-        typeface: {
-          type: 'Detail',
-          props: {
-            label: 'Typeface',
-            value: {
-              $item: 'theme/typography/font_family',
-            },
-          },
-          children: [],
-        },
-        'headings-style': {
-          type: 'Detail',
-          props: {
-            label: 'Headings',
-            value: {
-              $item: 'theme/typography/heading_style',
-            },
-          },
-          children: [],
-        },
-        'body-style': {
-          type: 'Detail',
-          props: {
-            label: 'Body text',
-            value: {
-              $item: 'theme/typography/body_style',
-            },
-          },
-          children: [],
-        },
-        'slide-ratio': {
-          type: 'Detail',
-          props: {
-            label: 'Slide ratio',
-            value: {
-              $item: 'theme/layout/aspect_ratio',
-            },
-          },
-          children: [],
-        },
-        margins: {
-          type: 'Detail',
-          props: {
-            label: 'Margins',
-            value: {
-              $item: 'theme/layout/margins',
-            },
-          },
-          children: [],
-        },
-        alignment: {
-          type: 'Detail',
-          props: {
-            label: 'Alignment',
-            value: {
-              $item: 'theme/layout/alignment',
-            },
-          },
-          children: [],
-        },
-        icons: {
-          type: 'Detail',
-          props: {
-            label: 'Icons',
-            value: {
-              $item: 'theme/style/icon_style',
-            },
-          },
-          children: [],
-        },
-        graphics: {
-          type: 'Detail',
-          props: {
-            label: 'Graphics',
-            value: {
-              $item: 'theme/style/graphic_style',
-            },
-          },
-          children: [],
-        },
-        exclusions: {
-          type: 'Detail',
-          props: {
-            label: 'Avoid',
-            value: {
-              $item: 'theme/exclusions',
-            },
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help the person shaping a presentation compare the proposed visual directions by their title slides, then inspect the design rules behind each one.',
-      title: 'Choose a visual direction',
-      composition:
-        "Open with a short ResultHeader and the host's result actions, followed by a full-width comparison gallery: three equal columns on wide screens, two on medium screens and one on narrow screens. Repeat one flat Stack per direction in source order, keeping the theme name, uncropped title-slide image, style description and brand palette visible; the images are the dominant content. Give each direction its own initially closed 'Design details' Collapsible beneath the palette, so typography, layout and constraints remain available without overwhelming the comparison. Use generous space between columns and groups, h2 theme names beneath the single h1, and no nested cards, additional controls or surrounding host chrome; retain component-native styling in both themes.",
-      regions: [
-        {
-          title: null,
-          purpose:
-            "Name the comparison task and provide the host's designated position for download and share actions without repeating the request.",
-          container: 'Stack',
-          elements: [
-            "ResultHeader — static title 'Choose a visual direction' (h1); muted line 'Compare the slides, then explore the details.'; host result actions at the right.",
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            'Show every proposed direction at equal weight, with its rendered slide first and its implementation details available immediately below.',
-          container: 'Grid',
-          elements: [
-            'Grid — repeat over { "$state": "/result/directions" }; three columns on wide screens, two on medium screens, one on narrow screens; one Stack per item in source order. All item bindings below are relative $item reads, except Picture\'s literal relative path.',
-            'Stack — repeated item; holds Heading, Picture, Text, palette Stack and Collapsible in that order; no Card wrapper.',
-            'Heading — { "$item": "theme/name" }; h2.',
-            "Picture — path 'mockup'; show the whole image at its natural proportions, with no aspect crop.",
-            'Text — { "$item": "theme/style/overall" }; the direction\'s description beneath the image.',
-            "Stack — holds Text 'Primary · Secondary · Accent' and Swatches in that order.",
-            'Swatches — colors [{ "$item": "theme/colors/primary" }, { "$item": "theme/colors/secondary" }, { "$item": "theme/colors/accent" }], in that order.',
-            "Collapsible — trigger 'Design details'; initially closed; holds one Stack containing the following remaining elements in order.",
-            "Text — static 'Background · Primary text · Secondary text'.",
-            'Swatches — colors [{ "$item": "theme/colors/background" }, { "$item": "theme/colors/text_primary" }, { "$item": "theme/colors/text_secondary" }], in that order.',
-            'Detail — label \'Typeface\'; value { "$item": "theme/typography/font_family" }.',
-            'Detail — label \'Headings\'; value { "$item": "theme/typography/heading_style" }.',
-            'Detail — label \'Body text\'; value { "$item": "theme/typography/body_style" }.',
-            'Detail — label \'Slide ratio\'; value { "$item": "theme/layout/aspect_ratio" }.',
-            'Detail — label \'Margins\'; value { "$item": "theme/layout/margins" }.',
-            'Detail — label \'Alignment\'; value { "$item": "theme/layout/alignment" }.',
-            'Detail — label \'Icons\'; value { "$item": "theme/style/icon_style" }.',
-            'Detail — label \'Graphics\'; value { "$item": "theme/style/graphic_style" }.',
-            'Detail — label \'Avoid\'; value { "$item": "theme/exclusions" }.',
-          ],
-        },
-      ],
-      call_to_action: null,
-      defaults: null,
-      delegated: null,
-    },
-  },
-  {
-    pipeRef: 'slide_directions.generate_design_proposals_from_rough_brief',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
-    seed: 'gXT5n2cPjy1JK479M9CGd12Ne9J7Q9w6',
-    frame: 'result',
-    style: 'editorial',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief:
-      'data/briefs/slide_directions.generate_design_proposals_from_rough_brief.result.editorial.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["header-region","directions-grid"]}}\n{"op":"add","path":"/elements/header-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["result-header"]}}\n{"op":"add","path":"/elements/result-header","value":{"type":"ResultHeader","props":{"eyebrow":"Design proposals","title":"Compare visual directions"},"children":[]}}\n{"op":"add","path":"/elements/directions-grid","value":{"type":"Grid","props":{"columns":3,"gap":"xl"},"children":["direction"]}}\n{"op":"add","path":"/elements/direction","value":{"type":"Stack","props":{"direction":"vertical","gap":"md","align":"stretch"},"repeat":{"statePath":"/result/directions"},"children":["direction-name","title-slide","overall-style","design-details"]}}\n{"op":"add","path":"/elements/direction-name","value":{"type":"Heading","props":{"text":{"$item":"theme/name"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/title-slide","value":{"type":"Picture","props":{"path":"mockup","alt":{"$template":"Title slide for ${theme/name}"}},"children":[]}}\n{"op":"add","path":"/elements/overall-style","value":{"type":"Text","props":{"text":{"$item":"theme/style/overall"},"variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/design-details","value":{"type":"Collapsible","props":{"title":"Design details","defaultOpen":false},"children":["details-content"]}}\n{"op":"add","path":"/elements/details-content","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["palette-grid","specification-lines"]}}\n{"op":"add","path":"/elements/palette-grid","value":{"type":"Grid","props":{"columns":3,"gap":"md"},"children":["primary-color","secondary-color","accent-color","background-color","main-text-color","secondary-text-color"]}}\n{"op":"add","path":"/elements/primary-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["primary-label","primary-swatch"]}}\n{"op":"add","path":"/elements/primary-label","value":{"type":"Text","props":{"text":"Primary","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/primary-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/primary"}]},"children":[]}}\n{"op":"add","path":"/elements/secondary-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["secondary-label","secondary-swatch"]}}\n{"op":"add","path":"/elements/secondary-label","value":{"type":"Text","props":{"text":"Secondary","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/secondary-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/accent-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["accent-label","accent-swatch"]}}\n{"op":"add","path":"/elements/accent-label","value":{"type":"Text","props":{"text":"Accent","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/accent-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/accent"}]},"children":[]}}\n{"op":"add","path":"/elements/background-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["background-label","background-swatch"]}}\n{"op":"add","path":"/elements/background-label","value":{"type":"Text","props":{"text":"Background","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/background-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/background"}]},"children":[]}}\n{"op":"add","path":"/elements/main-text-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["main-text-label","main-text-swatch"]}}\n{"op":"add","path":"/elements/main-text-label","value":{"type":"Text","props":{"text":"Main text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/main-text-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/text_primary"}]},"children":[]}}\n{"op":"add","path":"/elements/secondary-text-color","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["secondary-text-label","secondary-text-swatch"]}}\n{"op":"add","path":"/elements/secondary-text-label","value":{"type":"Text","props":{"text":"Secondary text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/secondary-text-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/text_secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/specification-lines","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["typeface-detail","headings-detail","body-text-detail","slide-ratio-detail","margins-detail","alignment-detail","icons-detail","graphics-detail","avoid-detail"]}}\n{"op":"add","path":"/elements/typeface-detail","value":{"type":"Detail","props":{"label":"Typeface","value":{"$item":"theme/typography/font_family"}},"children":[]}}\n{"op":"add","path":"/elements/headings-detail","value":{"type":"Detail","props":{"label":"Headings","value":{"$item":"theme/typography/heading_style"}},"children":[]}}\n{"op":"add","path":"/elements/body-text-detail","value":{"type":"Detail","props":{"label":"Body text","value":{"$item":"theme/typography/body_style"}},"children":[]}}\n{"op":"add","path":"/elements/slide-ratio-detail","value":{"type":"Detail","props":{"label":"Slide ratio","value":{"$item":"theme/layout/aspect_ratio"}},"children":[]}}\n{"op":"add","path":"/elements/margins-detail","value":{"type":"Detail","props":{"label":"Margins","value":{"$item":"theme/layout/margins"}},"children":[]}}\n{"op":"add","path":"/elements/alignment-detail","value":{"type":"Detail","props":{"label":"Alignment","value":{"$item":"theme/layout/alignment"}},"children":[]}}\n{"op":"add","path":"/elements/icons-detail","value":{"type":"Detail","props":{"label":"Icons","value":{"$item":"theme/style/icon_style"}},"children":[]}}\n{"op":"add","path":"/elements/graphics-detail","value":{"type":"Detail","props":{"label":"Graphics","value":{"$item":"theme/style/graphic_style"}},"children":[]}}\n{"op":"add","path":"/elements/avoid-detail","value":{"type":"Detail","props":{"label":"Avoid","value":{"$item":"theme/exclusions"}},"children":[]}}',
-    spec: {
-      root: 'page',
-      elements: {
-        page: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-            align: 'stretch',
-          },
-          children: ['header-region', 'directions-grid'],
-        },
-        'header-region': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['result-header'],
-        },
-        'result-header': {
-          type: 'ResultHeader',
-          props: {
-            eyebrow: 'Design proposals',
-            title: 'Compare visual directions',
-          },
-          children: [],
-        },
-        'directions-grid': {
-          type: 'Grid',
-          props: {
-            columns: 3,
-            gap: 'xl',
-          },
-          children: ['direction'],
-        },
-        direction: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'md',
-            align: 'stretch',
-          },
-          repeat: {
-            statePath: '/result/directions',
-          },
-          children: ['direction-name', 'title-slide', 'overall-style', 'design-details'],
         },
         'direction-name': {
           type: 'Heading',
@@ -1965,12 +1650,12 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'title-slide': {
+        'slide-preview': {
           type: 'Picture',
           props: {
             path: 'mockup',
             alt: {
-              $template: 'Title slide for ${theme/name}',
+              $template: 'Title slide in ${theme/name}',
             },
           },
           children: [],
@@ -1981,25 +1666,9 @@ export const SPECS: SpecFixture[] = [
             text: {
               $item: 'theme/style/overall',
             },
-            variant: 'muted',
+            variant: 'body',
           },
           children: [],
-        },
-        'design-details': {
-          type: 'Collapsible',
-          props: {
-            title: 'Design details',
-            defaultOpen: false,
-          },
-          children: ['details-content'],
-        },
-        'details-content': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['palette-grid', 'specification-lines'],
         },
         'palette-grid': {
           type: 'Grid',
@@ -2178,17 +1847,25 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'specification-lines': {
+        'design-details': {
+          type: 'Collapsible',
+          props: {
+            title: 'Design details',
+            defaultOpen: false,
+          },
+          children: ['details-stack'],
+        },
+        'details-stack': {
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'sm',
+            gap: 'md',
           },
           children: [
-            'typeface-detail',
+            'font-detail',
             'headings-detail',
-            'body-text-detail',
-            'slide-ratio-detail',
+            'body-detail',
+            'ratio-detail',
             'margins-detail',
             'alignment-detail',
             'icons-detail',
@@ -2196,10 +1873,10 @@ export const SPECS: SpecFixture[] = [
             'avoid-detail',
           ],
         },
-        'typeface-detail': {
+        'font-detail': {
           type: 'Detail',
           props: {
-            label: 'Typeface',
+            label: 'Font',
             value: {
               $item: 'theme/typography/font_family',
             },
@@ -2216,7 +1893,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'body-text-detail': {
+        'body-detail': {
           type: 'Detail',
           props: {
             label: 'Body text',
@@ -2226,7 +1903,7 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'slide-ratio-detail': {
+        'ratio-detail': {
           type: 'Detail',
           props: {
             label: 'Slide ratio',
@@ -2290,54 +1967,527 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'Help a presentation maker compare the proposed visual directions at a glance, then inspect the design rules behind each title slide.',
+        'Help a presentation maker compare the proposed visual directions at a glance, then inspect the design rules behind the strongest candidates.',
       title: 'Compare visual directions',
       composition:
-        'Open with a spacious ResultHeader, then a full-width, three-column comparison grid repeating the directions in their supplied order; use two columns at intermediate widths and one on narrow screens. Each flat, unboxed column begins with its theme name as an h2, followed by the uncropped title-slide image and a short description of its overall style. Align the tops of the columns, keep the images visually dominant, and give each direction its own initially closed “Design details” Collapsible containing the palette and specification lines. Use generous space above the grid and a tighter reading rhythm within each direction; add no request summary, selection controls, run control, or surrounding host chrome.',
+        "Open with a compact ResultHeader and generous space before a full-width comparison gallery. Repeat one equally weighted Card per direction in /result/directions, in source order: three columns on wide screens, two on medium screens and one on narrow screens. Each card presents the theme name, a large uncropped title-slide preview, the overall style and six labelled palette swatches; keep previews top-aligned and do not impose a shared crop on different slide proportions. Fold the remaining specifications into one independently controlled Collapsible per card so the first view stays visual. Use only the components' own Soft styling, with comfortable spacing and no nested cards; do not apply the proposed theme colors or fonts to the app itself. The header accommodates the host's result actions; add no request summary, run control or surrounding chrome.",
       regions: [
         {
           title: null,
           purpose:
-            'Name the comparison and provide the header position for the host-owned result actions.',
+            "Name the comparison task and provide the header location for the host's result actions.",
           container: 'Stack',
           elements: [
-            'ResultHeader: title “Compare visual directions” as the page’s only h1; eyebrow “Design proposals”; no subtitle; retain the host-owned action placement.',
+            'ResultHeader — title "Compare visual directions" as the sole h1; no eyebrow or subtitle; host result actions at the right.',
           ],
         },
         {
           title: null,
           purpose:
-            'Put the generated slides side by side before offering the details needed to judge or reproduce each direction.',
+            'Show every proposed direction side by side, with its rendered slide as the main evidence and its underlying design rules available on demand.',
           container: 'Grid',
           elements: [
-            'Grid: repeat /result/directions in supplied order, three columns on wide screens, two at intermediate widths, one on narrow screens; each item is one vertical Stack, with all member bindings relative to that item using $item.',
-            'Heading: read theme/name; h2; no prefix.',
-            'Picture: path mockup relative to the repeated item; show the complete image at its intrinsic aspect ratio, without cropping or an imposed aspect.',
-            'Text: read theme/style/overall; muted supporting description beneath the image.',
-            'Collapsible: trigger “Design details”; initially closed; contains the palette Grid followed by a Stack of Detail lines; open state belongs to the component.',
-            'Grid inside Collapsible: three columns; six Stack children in the following order, each holding its static Text role label and a Swatches component with one bound color.',
-            'Text “Primary” and Swatches: colors [{$item: theme/colors/primary}].',
-            'Text “Secondary” and Swatches: colors [{$item: theme/colors/secondary}].',
-            'Text “Accent” and Swatches: colors [{$item: theme/colors/accent}].',
-            'Text “Background” and Swatches: colors [{$item: theme/colors/background}].',
-            'Text “Main text” and Swatches: colors [{$item: theme/colors/text_primary}].',
-            'Text “Secondary text” and Swatches: colors [{$item: theme/colors/text_secondary}].',
-            'Stack inside Collapsible: contains the following Detail lines in order, after the palette Grid.',
-            'Detail: label “Typeface”; value theme/typography/font_family.',
-            'Detail: label “Headings”; value theme/typography/heading_style.',
-            'Detail: label “Body text”; value theme/typography/body_style.',
-            'Detail: label “Slide ratio”; value theme/layout/aspect_ratio; display the supplied value unchanged.',
-            'Detail: label “Margins”; value theme/layout/margins.',
-            'Detail: label “Alignment”; value theme/layout/alignment.',
-            'Detail: label “Icons”; value theme/style/icon_style.',
-            'Detail: label “Graphics”; value theme/style/graphic_style.',
-            'Detail: label “Avoid”; value theme/exclusions.',
+            'Grid — repeat over $state /result/directions, preserving list order; three columns on wide screens, two on medium screens, one on narrow screens; each item is one Card.',
+            'Card — contains a Stack with Heading, Picture, Text, palette Grid and Collapsible in that order; no Card title.',
+            'Heading — h2, read $item theme/name.',
+            'Picture — path "mockup" relative to each repeated item; show the whole image without an aspect crop.',
+            'Text — read $item theme/style/overall.',
+            'Grid — three columns within each card, containing six Stacks in the following order; each Stack holds its static Text label followed by its single-color Swatches.',
+            'Stack — Text "Primary"; Swatches colors: [$item theme/colors/primary].',
+            'Stack — Text "Secondary"; Swatches colors: [$item theme/colors/secondary].',
+            'Stack — Text "Accent"; Swatches colors: [$item theme/colors/accent].',
+            'Stack — Text "Background"; Swatches colors: [$item theme/colors/background].',
+            'Stack — Text "Main text"; Swatches colors: [$item theme/colors/text_primary].',
+            'Stack — Text "Secondary text"; Swatches colors: [$item theme/colors/text_secondary].',
+            'Collapsible — trigger "Design details", initially closed; contains one Stack of the following Detail elements, in order; open state belongs to the component.',
+            'Detail — label "Font", value $item theme/typography/font_family.',
+            'Detail — label "Headings", value $item theme/typography/heading_style.',
+            'Detail — label "Body text", value $item theme/typography/body_style.',
+            'Detail — label "Slide ratio", value $item theme/layout/aspect_ratio.',
+            'Detail — label "Margins", value $item theme/layout/margins.',
+            'Detail — label "Alignment", value $item theme/layout/alignment.',
+            'Detail — label "Icons", value $item theme/style/icon_style.',
+            'Detail — label "Graphics", value $item theme/style/graphic_style.',
+            'Detail — label "Avoid", value $item theme/exclusions.',
           ],
         },
       ],
       call_to_action: null,
       defaults: null,
       delegated: null,
+    },
+  },
+  {
+    pipeRef: 'slide_directions.generate_design_proposals_from_rough_brief',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'byE7BbGqjrE4ZhUSibCqfUUxJwMkvBDx',
+    frame: 'result',
+    style: 'editorial',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-07',
+    brief:
+      'data/briefs/slide_directions.generate_design_proposals_from_rough_brief.result.editorial.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["header-region","directions-gallery"]}}\n{"op":"add","path":"/elements/header-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["result-header"]}}\n{"op":"add","path":"/elements/result-header","value":{"type":"ResultHeader","props":{"eyebrow":"Visual directions","title":"Compare the visual directions"},"children":[]}}\n{"op":"add","path":"/elements/directions-gallery","value":{"type":"Grid","props":{"columns":3,"gap":"xl"},"repeat":{"statePath":"/result/directions"},"children":["direction"]}}\n{"op":"add","path":"/elements/direction","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["direction-name","direction-preview","direction-style","design-details"]}}\n{"op":"add","path":"/elements/direction-name","value":{"type":"Heading","props":{"text":{"$item":"theme/name"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/direction-preview","value":{"type":"Picture","props":{"path":"mockup","alt":{"$template":"Title slide in ${theme/name}"},"aspect":"auto"},"children":[]}}\n{"op":"add","path":"/elements/direction-style","value":{"type":"Text","props":{"text":{"$item":"theme/style/overall"},"variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/design-details","value":{"type":"Collapsible","props":{"title":"Design details","defaultOpen":false},"children":["details-content"]}}\n{"op":"add","path":"/elements/details-content","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["palette-label","palette-grid","typography-label","font-detail","headings-detail","body-detail","layout-label","ratio-detail","margins-detail","alignment-detail","visual-language-label","icons-detail","graphics-detail","exclusions-detail"]}}\n{"op":"add","path":"/elements/palette-label","value":{"type":"Text","props":{"text":"Palette"},"children":[]}}\n{"op":"add","path":"/elements/palette-grid","value":{"type":"Grid","props":{"columns":3,"gap":"lg"},"children":["primary-palette","secondary-palette","accent-palette","background-palette","primary-text-palette","secondary-text-palette"]}}\n{"op":"add","path":"/elements/primary-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["primary-label","primary-swatch"]}}\n{"op":"add","path":"/elements/primary-label","value":{"type":"Text","props":{"text":"Primary","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/primary-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/primary"}]},"children":[]}}\n{"op":"add","path":"/elements/secondary-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["secondary-label","secondary-swatch"]}}\n{"op":"add","path":"/elements/secondary-label","value":{"type":"Text","props":{"text":"Secondary","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/secondary-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/accent-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["accent-label","accent-swatch"]}}\n{"op":"add","path":"/elements/accent-label","value":{"type":"Text","props":{"text":"Accent","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/accent-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/accent"}]},"children":[]}}\n{"op":"add","path":"/elements/background-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["background-label","background-swatch"]}}\n{"op":"add","path":"/elements/background-label","value":{"type":"Text","props":{"text":"Background","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/background-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/background"}]},"children":[]}}\n{"op":"add","path":"/elements/primary-text-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["primary-text-label","primary-text-swatch"]}}\n{"op":"add","path":"/elements/primary-text-label","value":{"type":"Text","props":{"text":"Primary text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/primary-text-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/text_primary"}]},"children":[]}}\n{"op":"add","path":"/elements/secondary-text-palette","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["secondary-text-label","secondary-text-swatch"]}}\n{"op":"add","path":"/elements/secondary-text-label","value":{"type":"Text","props":{"text":"Secondary text","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/secondary-text-swatch","value":{"type":"Swatches","props":{"colors":[{"$item":"theme/colors/text_secondary"}]},"children":[]}}\n{"op":"add","path":"/elements/typography-label","value":{"type":"Text","props":{"text":"Typography"},"children":[]}}\n{"op":"add","path":"/elements/font-detail","value":{"type":"Detail","props":{"label":"Font","value":{"$item":"theme/typography/font_family"}},"children":[]}}\n{"op":"add","path":"/elements/headings-detail","value":{"type":"Detail","props":{"label":"Headings","value":{"$item":"theme/typography/heading_style"}},"children":[]}}\n{"op":"add","path":"/elements/body-detail","value":{"type":"Detail","props":{"label":"Body text","value":{"$item":"theme/typography/body_style"}},"children":[]}}\n{"op":"add","path":"/elements/layout-label","value":{"type":"Text","props":{"text":"Layout"},"children":[]}}\n{"op":"add","path":"/elements/ratio-detail","value":{"type":"Detail","props":{"label":"Slide ratio","value":{"$item":"theme/layout/aspect_ratio"}},"children":[]}}\n{"op":"add","path":"/elements/margins-detail","value":{"type":"Detail","props":{"label":"Margins","value":{"$item":"theme/layout/margins"}},"children":[]}}\n{"op":"add","path":"/elements/alignment-detail","value":{"type":"Detail","props":{"label":"Alignment","value":{"$item":"theme/layout/alignment"}},"children":[]}}\n{"op":"add","path":"/elements/visual-language-label","value":{"type":"Text","props":{"text":"Visual language"},"children":[]}}\n{"op":"add","path":"/elements/icons-detail","value":{"type":"Detail","props":{"label":"Icons","value":{"$item":"theme/style/icon_style"}},"children":[]}}\n{"op":"add","path":"/elements/graphics-detail","value":{"type":"Detail","props":{"label":"Graphics","value":{"$item":"theme/style/graphic_style"}},"children":[]}}\n{"op":"add","path":"/elements/exclusions-detail","value":{"type":"Detail","props":{"label":"Avoid","value":{"$item":"theme/exclusions"}},"children":[]}}',
+    spec: {
+      root: 'page',
+      elements: {
+        page: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          children: ['header-region', 'directions-gallery'],
+        },
+        'header-region': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          children: ['result-header'],
+        },
+        'result-header': {
+          type: 'ResultHeader',
+          props: {
+            eyebrow: 'Visual directions',
+            title: 'Compare the visual directions',
+          },
+          children: [],
+        },
+        'directions-gallery': {
+          type: 'Grid',
+          props: {
+            columns: 3,
+            gap: 'xl',
+          },
+          repeat: {
+            statePath: '/result/directions',
+          },
+          children: ['direction'],
+        },
+        direction: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['direction-name', 'direction-preview', 'direction-style', 'design-details'],
+        },
+        'direction-name': {
+          type: 'Heading',
+          props: {
+            text: {
+              $item: 'theme/name',
+            },
+            level: 'h2',
+          },
+          children: [],
+        },
+        'direction-preview': {
+          type: 'Picture',
+          props: {
+            path: 'mockup',
+            alt: {
+              $template: 'Title slide in ${theme/name}',
+            },
+            aspect: 'auto',
+          },
+          children: [],
+        },
+        'direction-style': {
+          type: 'Text',
+          props: {
+            text: {
+              $item: 'theme/style/overall',
+            },
+            variant: 'muted',
+          },
+          children: [],
+        },
+        'design-details': {
+          type: 'Collapsible',
+          props: {
+            title: 'Design details',
+            defaultOpen: false,
+          },
+          children: ['details-content'],
+        },
+        'details-content': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: [
+            'palette-label',
+            'palette-grid',
+            'typography-label',
+            'font-detail',
+            'headings-detail',
+            'body-detail',
+            'layout-label',
+            'ratio-detail',
+            'margins-detail',
+            'alignment-detail',
+            'visual-language-label',
+            'icons-detail',
+            'graphics-detail',
+            'exclusions-detail',
+          ],
+        },
+        'palette-label': {
+          type: 'Text',
+          props: {
+            text: 'Palette',
+          },
+          children: [],
+        },
+        'palette-grid': {
+          type: 'Grid',
+          props: {
+            columns: 3,
+            gap: 'lg',
+          },
+          children: [
+            'primary-palette',
+            'secondary-palette',
+            'accent-palette',
+            'background-palette',
+            'primary-text-palette',
+            'secondary-text-palette',
+          ],
+        },
+        'primary-palette': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['primary-label', 'primary-swatch'],
+        },
+        'primary-label': {
+          type: 'Text',
+          props: {
+            text: 'Primary',
+            variant: 'caption',
+          },
+          children: [],
+        },
+        'primary-swatch': {
+          type: 'Swatches',
+          props: {
+            colors: [
+              {
+                $item: 'theme/colors/primary',
+              },
+            ],
+          },
+          children: [],
+        },
+        'secondary-palette': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['secondary-label', 'secondary-swatch'],
+        },
+        'secondary-label': {
+          type: 'Text',
+          props: {
+            text: 'Secondary',
+            variant: 'caption',
+          },
+          children: [],
+        },
+        'secondary-swatch': {
+          type: 'Swatches',
+          props: {
+            colors: [
+              {
+                $item: 'theme/colors/secondary',
+              },
+            ],
+          },
+          children: [],
+        },
+        'accent-palette': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['accent-label', 'accent-swatch'],
+        },
+        'accent-label': {
+          type: 'Text',
+          props: {
+            text: 'Accent',
+            variant: 'caption',
+          },
+          children: [],
+        },
+        'accent-swatch': {
+          type: 'Swatches',
+          props: {
+            colors: [
+              {
+                $item: 'theme/colors/accent',
+              },
+            ],
+          },
+          children: [],
+        },
+        'background-palette': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['background-label', 'background-swatch'],
+        },
+        'background-label': {
+          type: 'Text',
+          props: {
+            text: 'Background',
+            variant: 'caption',
+          },
+          children: [],
+        },
+        'background-swatch': {
+          type: 'Swatches',
+          props: {
+            colors: [
+              {
+                $item: 'theme/colors/background',
+              },
+            ],
+          },
+          children: [],
+        },
+        'primary-text-palette': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['primary-text-label', 'primary-text-swatch'],
+        },
+        'primary-text-label': {
+          type: 'Text',
+          props: {
+            text: 'Primary text',
+            variant: 'caption',
+          },
+          children: [],
+        },
+        'primary-text-swatch': {
+          type: 'Swatches',
+          props: {
+            colors: [
+              {
+                $item: 'theme/colors/text_primary',
+              },
+            ],
+          },
+          children: [],
+        },
+        'secondary-text-palette': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['secondary-text-label', 'secondary-text-swatch'],
+        },
+        'secondary-text-label': {
+          type: 'Text',
+          props: {
+            text: 'Secondary text',
+            variant: 'caption',
+          },
+          children: [],
+        },
+        'secondary-text-swatch': {
+          type: 'Swatches',
+          props: {
+            colors: [
+              {
+                $item: 'theme/colors/text_secondary',
+              },
+            ],
+          },
+          children: [],
+        },
+        'typography-label': {
+          type: 'Text',
+          props: {
+            text: 'Typography',
+          },
+          children: [],
+        },
+        'font-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Font',
+            value: {
+              $item: 'theme/typography/font_family',
+            },
+          },
+          children: [],
+        },
+        'headings-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Headings',
+            value: {
+              $item: 'theme/typography/heading_style',
+            },
+          },
+          children: [],
+        },
+        'body-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Body text',
+            value: {
+              $item: 'theme/typography/body_style',
+            },
+          },
+          children: [],
+        },
+        'layout-label': {
+          type: 'Text',
+          props: {
+            text: 'Layout',
+          },
+          children: [],
+        },
+        'ratio-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Slide ratio',
+            value: {
+              $item: 'theme/layout/aspect_ratio',
+            },
+          },
+          children: [],
+        },
+        'margins-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Margins',
+            value: {
+              $item: 'theme/layout/margins',
+            },
+          },
+          children: [],
+        },
+        'alignment-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Alignment',
+            value: {
+              $item: 'theme/layout/alignment',
+            },
+          },
+          children: [],
+        },
+        'visual-language-label': {
+          type: 'Text',
+          props: {
+            text: 'Visual language',
+          },
+          children: [],
+        },
+        'icons-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Icons',
+            value: {
+              $item: 'theme/style/icon_style',
+            },
+          },
+          children: [],
+        },
+        'graphics-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Graphics',
+            value: {
+              $item: 'theme/style/graphic_style',
+            },
+          },
+          children: [],
+        },
+        'exclusions-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Avoid',
+            value: {
+              $item: 'theme/exclusions',
+            },
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help the person choosing a deck’s visual direction compare the proposed title slides first, then inspect the design rules behind each option.',
+      title: 'Compare the visual directions',
+      composition:
+        'Open with a spacious ResultHeader, then a flat, three-column gallery spanning the available width, with two columns on medium screens and one on narrow screens. Repeat the same arrangement for every direction in source order: its name, a large uncropped title-slide image, and its overall visual style. Keep each direction’s detailed specification in an independently collapsed “Design details” section beneath its preview, so the first view feels like an editorial comparison rather than a settings sheet. Use generous spacing between directions, no cards, and only h1 and h2 headings; the host’s result actions live in ResultHeader, with no page-owned actions or request summary.',
+      regions: [
+        {
+          title: null,
+          purpose:
+            'Name the comparison without inventing an aggregate title or repeating the request, and provide the host’s placement for result actions.',
+          container: 'Stack',
+          elements: [
+            'ResultHeader — static title “Compare the visual directions” as the page’s sole h1; eyebrow “Visual directions”; no subtitle; host-owned result actions at the right.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            'Put the visual options side by side, with each theme’s specification available directly beneath its slide.',
+          container: 'Grid',
+          elements: [
+            'Grid — repeat /result/directions in source order; three columns on wide screens, two on medium screens, one on narrow screens; each item is a Stack containing the following elements, with relative paths read using $item.',
+            'Heading — theme/name; h2.',
+            'Picture — mockup; show the complete image at its intrinsic aspect ratio, without cropping or a device frame.',
+            'Text — theme/style/overall; muted supporting text beneath the image.',
+            'Collapsible — static trigger “Design details”; initially closed independently for each direction; contains a Stack holding palette, typography, layout, visual language, and exclusions in that order.',
+            'Text — static label “Palette” inside Design details.',
+            'Grid — three columns inside the palette; holds six Stacks in the following order, each with its static role label and one Swatches value.',
+            'Stack — Text “Primary”; Swatches colors: theme/colors/primary.',
+            'Stack — Text “Secondary”; Swatches colors: theme/colors/secondary.',
+            'Stack — Text “Accent”; Swatches colors: theme/colors/accent.',
+            'Stack — Text “Background”; Swatches colors: theme/colors/background.',
+            'Stack — Text “Primary text”; Swatches colors: theme/colors/text_primary.',
+            'Stack — Text “Secondary text”; Swatches colors: theme/colors/text_secondary.',
+            'Text — static label “Typography” inside Design details.',
+            'Detail — theme/typography/font_family; label “Font”.',
+            'Detail — theme/typography/heading_style; label “Headings”.',
+            'Detail — theme/typography/body_style; label “Body text”.',
+            'Text — static label “Layout” inside Design details.',
+            'Detail — theme/layout/aspect_ratio; label “Slide ratio”; display the stored choice unchanged: "16:9" | "4:3" | "1:1".',
+            'Detail — theme/layout/margins; label “Margins”.',
+            'Detail — theme/layout/alignment; label “Alignment”.',
+            'Text — static label “Visual language” inside Design details.',
+            'Detail — theme/style/icon_style; label “Icons”.',
+            'Detail — theme/style/graphic_style; label “Graphics”.',
+            'Detail — theme/exclusions; label “Avoid”.',
+          ],
+        },
+      ],
+      call_to_action: null,
+      defaults: null,
+      delegated: [],
     },
   },
 ];

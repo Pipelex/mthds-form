@@ -2314,252 +2314,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'trip_planner.plan_trip',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'NTFyFwuPDFQnbIP96J26k7mGC7V6NaEp',
-    frame: 'result',
-    style: 'editorial',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/trip_planner.plan_trip.result.editorial.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["intro","cost-section","days-grid","practical-section"]}}\n{"op":"add","path":"/elements/intro","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["result-header"]}}\n{"op":"add","path":"/elements/result-header","value":{"type":"ResultHeader","props":{"eyebrow":"Your itinerary","title":{"$state":"/result/title"},"subtitle":{"$state":"/result/overview"}},"children":[]}}\n{"op":"add","path":"/elements/cost-section","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["cost-breakdown"]}}\n{"op":"add","path":"/elements/cost-breakdown","value":{"type":"ProportionBar","props":{"label":"Estimated trip cost","total":{"$state":"/result/estimated_total"},"items":{"$state":"/result/costs"},"labelKey":"category","valueKey":"amount","unit":{"$state":"/result/currency"}},"children":[]}}\n{"op":"add","path":"/elements/days-grid","value":{"type":"Grid","props":{"columns":2,"gap":"xl"},"children":["day"]}}\n{"op":"add","path":"/elements/day","value":{"type":"Stack","props":{"direction":"vertical","gap":"md","align":"stretch"},"repeat":{"statePath":"/result/days","key":"day"},"children":["day-date","day-title","day-morning","day-lunch","day-afternoon","day-evening","day-separator"]}}\n{"op":"add","path":"/elements/day-date","value":{"type":"DateText","props":{"value":{"$item":"day"},"style":"long","tone":"accent"},"children":[]}}\n{"op":"add","path":"/elements/day-title","value":{"type":"Heading","props":{"text":{"$item":"title"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/day-morning","value":{"type":"Detail","props":{"label":"Morning","value":{"$item":"morning"}},"children":[]}}\n{"op":"add","path":"/elements/day-lunch","value":{"type":"Detail","props":{"label":"Lunch","value":{"$item":"midday"}},"children":[]}}\n{"op":"add","path":"/elements/day-afternoon","value":{"type":"Detail","props":{"label":"Afternoon","value":{"$item":"afternoon"}},"children":[]}}\n{"op":"add","path":"/elements/day-evening","value":{"type":"Detail","props":{"label":"Evening","value":{"$item":"evening"}},"children":[]}}\n{"op":"add","path":"/elements/day-separator","value":{"type":"Separator","props":{"orientation":"horizontal"},"children":[]}}\n{"op":"add","path":"/elements/practical-section","value":{"type":"Section","props":{"title":"Before you go"},"children":["practical-notes"]}}\n{"op":"add","path":"/elements/practical-notes","value":{"type":"TextList","props":{"items":{"$state":"/result/practical_notes"},"marker":"bullet"},"children":[]}}',
-    spec: {
-      root: 'page',
-      elements: {
-        page: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-            align: 'stretch',
-          },
-          children: ['intro', 'cost-section', 'days-grid', 'practical-section'],
-        },
-        intro: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['result-header'],
-        },
-        'result-header': {
-          type: 'ResultHeader',
-          props: {
-            eyebrow: 'Your itinerary',
-            title: {
-              $state: '/result/title',
-            },
-            subtitle: {
-              $state: '/result/overview',
-            },
-          },
-          children: [],
-        },
-        'cost-section': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-            align: 'stretch',
-          },
-          children: ['cost-breakdown'],
-        },
-        'cost-breakdown': {
-          type: 'ProportionBar',
-          props: {
-            label: 'Estimated trip cost',
-            total: {
-              $state: '/result/estimated_total',
-            },
-            items: {
-              $state: '/result/costs',
-            },
-            labelKey: 'category',
-            valueKey: 'amount',
-            unit: {
-              $state: '/result/currency',
-            },
-          },
-          children: [],
-        },
-        'days-grid': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'xl',
-          },
-          children: ['day'],
-        },
-        day: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'md',
-            align: 'stretch',
-          },
-          repeat: {
-            statePath: '/result/days',
-            key: 'day',
-          },
-          children: [
-            'day-date',
-            'day-title',
-            'day-morning',
-            'day-lunch',
-            'day-afternoon',
-            'day-evening',
-            'day-separator',
-          ],
-        },
-        'day-date': {
-          type: 'DateText',
-          props: {
-            value: {
-              $item: 'day',
-            },
-            style: 'long',
-            tone: 'accent',
-          },
-          children: [],
-        },
-        'day-title': {
-          type: 'Heading',
-          props: {
-            text: {
-              $item: 'title',
-            },
-            level: 'h2',
-          },
-          children: [],
-        },
-        'day-morning': {
-          type: 'Detail',
-          props: {
-            label: 'Morning',
-            value: {
-              $item: 'morning',
-            },
-          },
-          children: [],
-        },
-        'day-lunch': {
-          type: 'Detail',
-          props: {
-            label: 'Lunch',
-            value: {
-              $item: 'midday',
-            },
-          },
-          children: [],
-        },
-        'day-afternoon': {
-          type: 'Detail',
-          props: {
-            label: 'Afternoon',
-            value: {
-              $item: 'afternoon',
-            },
-          },
-          children: [],
-        },
-        'day-evening': {
-          type: 'Detail',
-          props: {
-            label: 'Evening',
-            value: {
-              $item: 'evening',
-            },
-          },
-          children: [],
-        },
-        'day-separator': {
-          type: 'Separator',
-          props: {
-            orientation: 'horizontal',
-          },
-          children: [],
-        },
-        'practical-section': {
-          type: 'Section',
-          props: {
-            title: 'Before you go',
-          },
-          children: ['practical-notes'],
-        },
-        'practical-notes': {
-          type: 'TextList',
-          props: {
-            items: {
-              $state: '/result/practical_notes',
-            },
-            marker: 'bullet',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help the traveller turn a finished trip plan into an easy daily rhythm, with its estimated cost visible before they start reading.',
-      title: 'Your trip, day by day',
-      composition:
-        'Use the full-width result canvas as an editorial spread, with generous outer space and no enclosing cards. Open with the result’s own title and overview, then a single full-width cost breakdown showing the estimated total. Below it, lay out the days in an ordered two-column Grid, read left to right and then down, with generous gaps and a hairline after each day; collapse to one column on narrow screens. Each day has a date eyebrow, an h2 title and a compact vertical sequence of activities. Finish with practical notes in a quiet, full-width section. Keep everything open, with no tabs, sidebar, request summary or run control; leave the header’s action area to the host.',
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Name this particular trip and introduce its character without repeating the host’s request summary.',
-          container: 'Stack',
-          elements: [
-            'ResultHeader: eyebrow "Your itinerary"; title reads { "$state": "/result/title" } and is the page’s only h1; description reads { "$state": "/result/overview" }; retain the host-owned result actions.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            'Answer the cost question first and show where the estimate goes without repeating the total in another figure.',
-          container: 'Stack',
-          elements: [
-            'ProportionBar: label "Estimated trip cost"; total reads { "$state": "/result/estimated_total" }; items reads { "$state": "/result/costs" }; labelKey "category", valueKey "amount"; unit reads { "$state": "/result/currency" }; no ceiling. The legend uses the supplied category values: "stay", "food", "tickets", "transport", "buffer". Show amounts with the supplied currency.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            'Make every day readable as a small, self-contained itinerary while preserving the trip’s chronological order.',
-          container: 'Grid',
-          elements: [
-            'Grid: two columns on wide screens, one on narrow screens; repeat { "$state": "/result/days" } in source order, with one Stack per item and generous space between items.',
-            'Stack, repeated day: holds DateText, Heading, the four Detail lines and Separator in that order; do not box the day.',
-            'DateText: value reads { "$item": "day" }; format "long", tone "accent".',
-            'Heading: h2 reads { "$item": "title" }.',
-            'Detail: label "Morning"; value reads { "$item": "morning" }; hide when empty.',
-            'Detail: label "Lunch"; value reads { "$item": "midday" }; hide when empty.',
-            'Detail: label "Afternoon"; value reads { "$item": "afternoon" }; hide when empty.',
-            'Detail: label "Evening"; value reads { "$item": "evening" }; hide when empty.',
-            'Separator: closes each repeated day.',
-          ],
-        },
-        {
-          title: 'Before you go',
-          purpose:
-            'Leave the traveller with the practical details worth checking before setting out.',
-          container: 'Section',
-          elements: [
-            'Section: h2 title "Before you go"; holds TextList, with no subtitle or enclosing Card.',
-            'TextList: items reads { "$state": "/result/practical_notes" }; dot markers; display every note in source order.',
-          ],
-        },
-      ],
-      call_to_action: null,
-      defaults: null,
-      delegated: [],
-    },
-  },
-  {
-    pipeRef: 'trip_planner.plan_trip',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: 'bgvhRLhaCj57pEwO4VqdwQmH5SGjLKI3',
     frame: 'result',
     style: 'bold',
@@ -2799,6 +2553,261 @@ export const SPECS: SpecFixture[] = [
       call_to_action: null,
       defaults: null,
       delegated: [],
+    },
+  },
+  {
+    pipeRef: 'trip_planner.plan_trip',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: '6UFrVYVVF8wNR45NcbvpYsJzTRVf0f1F',
+    frame: 'result',
+    style: 'editorial',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-07',
+    brief: 'data/briefs/trip_planner.plan_trip.result.editorial.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"itinerary-page"}\n{"op":"add","path":"/elements/itinerary-page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["itinerary-introduction","cost-band","daily-plan","practical-notes"]}}\n{"op":"add","path":"/elements/itinerary-introduction","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["itinerary-header"]}}\n{"op":"add","path":"/elements/itinerary-header","value":{"type":"ResultHeader","props":{"eyebrow":"Your itinerary","title":{"$state":"/result/title"},"subtitle":{"$state":"/result/overview"}},"children":[]}}\n{"op":"add","path":"/elements/cost-band","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["estimated-cost"]}}\n{"op":"add","path":"/elements/estimated-cost","value":{"type":"ProportionBar","props":{"label":"Estimated trip cost","total":{"$state":"/result/estimated_total"},"items":{"$state":"/result/costs"},"labelKey":"category","valueKey":"amount","unit":{"$state":"/result/currency"}},"children":[]}}\n{"op":"add","path":"/elements/daily-plan","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["day-spread"]}}\n{"op":"add","path":"/elements/day-spread","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"repeat":{"statePath":"/result/days"},"children":["day-columns","day-separator"]}}\n{"op":"add","path":"/elements/day-columns","value":{"type":"Split","props":{"ratio":"1:2","gap":"xl"},"children":["day-identity","day-agenda"]}}\n{"op":"add","path":"/elements/day-identity","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm","align":"start"},"children":["day-date","day-title"]}}\n{"op":"add","path":"/elements/day-date","value":{"type":"DateText","props":{"value":{"$item":"day"},"style":"long","tone":"accent"},"children":[]}}\n{"op":"add","path":"/elements/day-title","value":{"type":"Heading","props":{"text":{"$item":"title"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/day-agenda","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["morning-detail","lunch-detail","afternoon-detail","evening-detail"]}}\n{"op":"add","path":"/elements/morning-detail","value":{"type":"Detail","props":{"label":"Morning","value":{"$item":"morning"}},"children":[]}}\n{"op":"add","path":"/elements/lunch-detail","value":{"type":"Detail","props":{"label":"Lunch","value":{"$item":"midday"}},"children":[]}}\n{"op":"add","path":"/elements/afternoon-detail","value":{"type":"Detail","props":{"label":"Afternoon","value":{"$item":"afternoon"}},"children":[]}}\n{"op":"add","path":"/elements/evening-detail","value":{"type":"Detail","props":{"label":"Evening","value":{"$item":"evening"}},"children":[]}}\n{"op":"add","path":"/elements/day-separator","value":{"type":"Separator","props":{"orientation":"horizontal"},"children":[]}}\n{"op":"add","path":"/elements/practical-notes","value":{"type":"Section","props":{"title":"Before you go"},"children":["practical-notes-list"]}}\n{"op":"add","path":"/elements/practical-notes-list","value":{"type":"TextList","props":{"items":{"$state":"/result/practical_notes"},"marker":"bullet"},"children":[]}}',
+    spec: {
+      root: 'itinerary-page',
+      elements: {
+        'itinerary-page': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+            align: 'stretch',
+          },
+          children: ['itinerary-introduction', 'cost-band', 'daily-plan', 'practical-notes'],
+        },
+        'itinerary-introduction': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['itinerary-header'],
+        },
+        'itinerary-header': {
+          type: 'ResultHeader',
+          props: {
+            eyebrow: 'Your itinerary',
+            title: {
+              $state: '/result/title',
+            },
+            subtitle: {
+              $state: '/result/overview',
+            },
+          },
+          children: [],
+        },
+        'cost-band': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['estimated-cost'],
+        },
+        'estimated-cost': {
+          type: 'ProportionBar',
+          props: {
+            label: 'Estimated trip cost',
+            total: {
+              $state: '/result/estimated_total',
+            },
+            items: {
+              $state: '/result/costs',
+            },
+            labelKey: 'category',
+            valueKey: 'amount',
+            unit: {
+              $state: '/result/currency',
+            },
+          },
+          children: [],
+        },
+        'daily-plan': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          children: ['day-spread'],
+        },
+        'day-spread': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          repeat: {
+            statePath: '/result/days',
+          },
+          children: ['day-columns', 'day-separator'],
+        },
+        'day-columns': {
+          type: 'Split',
+          props: {
+            ratio: '1:2',
+            gap: 'xl',
+          },
+          children: ['day-identity', 'day-agenda'],
+        },
+        'day-identity': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+            align: 'start',
+          },
+          children: ['day-date', 'day-title'],
+        },
+        'day-date': {
+          type: 'DateText',
+          props: {
+            value: {
+              $item: 'day',
+            },
+            style: 'long',
+            tone: 'accent',
+          },
+          children: [],
+        },
+        'day-title': {
+          type: 'Heading',
+          props: {
+            text: {
+              $item: 'title',
+            },
+            level: 'h2',
+          },
+          children: [],
+        },
+        'day-agenda': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['morning-detail', 'lunch-detail', 'afternoon-detail', 'evening-detail'],
+        },
+        'morning-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Morning',
+            value: {
+              $item: 'morning',
+            },
+          },
+          children: [],
+        },
+        'lunch-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Lunch',
+            value: {
+              $item: 'midday',
+            },
+          },
+          children: [],
+        },
+        'afternoon-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Afternoon',
+            value: {
+              $item: 'afternoon',
+            },
+          },
+          children: [],
+        },
+        'evening-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Evening',
+            value: {
+              $item: 'evening',
+            },
+          },
+          children: [],
+        },
+        'day-separator': {
+          type: 'Separator',
+          props: {
+            orientation: 'horizontal',
+          },
+          children: [],
+        },
+        'practical-notes': {
+          type: 'Section',
+          props: {
+            title: 'Before you go',
+          },
+          children: ['practical-notes-list'],
+        },
+        'practical-notes-list': {
+          type: 'TextList',
+          props: {
+            items: {
+              $state: '/result/practical_notes',
+            },
+            marker: 'bullet',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help a traveller turn a finished trip plan into a readable daily agenda, with the estimated spend clear before they start exploring the days.',
+      title: 'Your trip, day by day',
+      composition:
+        "Use a full-width editorial reading sequence with generous margins: a large result title and overview, a single cost breakdown, the days in order, then practical notes. The cost breakdown is a shallow full-width band, not a sidebar; its total is the only headline cost figure. Give each day a flat, hairline-separated spread using Split at 1:2: the date and day title on the left, the chronological agenda on the right; stack these columns on narrow screens. Keep every day and the closing notes open, with generous space between days and tighter spacing within their agendas. Use only h1 and h2 headings, no nested cards, no request recap, and no page-owned actions; leave the result header's action area to the host.",
+      regions: [
+        {
+          title: null,
+          purpose:
+            'Name the returned itinerary and introduce its character without repeating the request.',
+          container: 'Stack',
+          elements: [
+            'ResultHeader — title reads /result/title with $state and supplies the page\'s only h1; subtitle reads /result/overview with $state; eyebrow "Your itinerary"; host-owned result actions occupy its action area.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            'Make the estimated spend and its allocation immediately legible before the daily plan.',
+          container: 'Stack',
+          elements: [
+            'ProportionBar — label "Estimated trip cost"; total reads /result/estimated_total with $state; items read /result/costs with $state; labelKey "category", valueKey "amount"; unit reads /result/currency with $state; no ceiling. The legend displays the returned category values unchanged: "stay", "food", "tickets", "transport", "buffer". Do not add a second total or a separate cost table.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            'Present every day as a small reading spread, with its identity beside an easy-to-scan chronological agenda.',
+          container: 'Stack',
+          elements: [
+            'Stack — repeat over /result/days read with $state, preserving list order; each item holds one Split at 1:2; separate adjacent days with Separator.',
+            'Split — exactly two Stack children: date and title first, agenda second; stack vertically on narrow screens.',
+            'First Stack — DateText reads relative member day with $item, format "long", tone "accent"; Heading h2 reads relative member title with $item.',
+            'Second Stack — Detail labelled "Morning" reads relative member morning with $item; Detail labelled "Lunch" reads relative member midday with $item; Detail labelled "Afternoon" reads relative member afternoon with $item; Detail labelled "Evening" reads relative member evening with $item. Hide each empty Detail without a placeholder.',
+          ],
+        },
+        {
+          title: 'Before you go',
+          purpose:
+            'Close the itinerary with useful booking, transport and comfort advice in one compact reading list.',
+          container: 'Section',
+          elements: [
+            'Section — h2 title "Before you go"; contains TextList.',
+            'TextList — items read /result/practical_notes with $state; dot markers; preserve list order.',
+          ],
+        },
+      ],
+      call_to_action: null,
+      defaults: null,
+      delegated: null,
     },
   },
 ];

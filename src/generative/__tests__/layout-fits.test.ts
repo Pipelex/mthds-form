@@ -887,3 +887,46 @@ describe('a Picture on a result page', () => {
     );
   });
 });
+
+describe('a repeat inside a Grid', () => {
+  const RESULT: RunField = {
+    kind: 'object',
+    name: 'plan',
+    required: true,
+    fields: [
+      {
+        kind: 'list',
+        name: 'days',
+        required: true,
+        item: { kind: 'object', name: 'day', required: true, fields: [text('title', true)] },
+      },
+    ],
+  };
+  const grid = (repeatOn: 'grid' | 'child'): Spec => ({
+    root: 'days',
+    elements: {
+      days: {
+        type: 'Grid',
+        props: { columns: 2, gap: null },
+        ...(repeatOn === 'grid' ? { repeat: { statePath: '/result/days' } } : {}),
+        children: ['day'],
+      },
+      day: {
+        type: 'Heading',
+        props: { text: { $item: 'title' }, level: 'h3' },
+        ...(repeatOn === 'child' ? { repeat: { statePath: '/result/days' } } : {}),
+        children: [],
+      },
+    },
+  });
+
+  it('refuses a Grid whose only child carries the repeat, which puts every item in one cell', () => {
+    expect(layoutProblems({ result: RESULT }, grid('child'))).toEqual([
+      expect.stringContaining("days: Grid's only child day carries the repeat"),
+    ]);
+  });
+
+  it('accepts the repeat on the Grid itself', () => {
+    expect(layoutProblems({ result: RESULT }, grid('grid'))).toEqual([]);
+  });
+});
