@@ -534,7 +534,8 @@ function StuffPanel({
                     onClick={() => setView(id)}
                     aria-pressed={view === id}
                     className={cn(
-                      'rounded px-2 py-0.5 text-[12px]',
+                      // 44 by 44 below `sm`, as every control a finger hits is.
+                      'rounded px-2 py-0.5 text-[12px] max-sm:min-h-11 max-sm:min-w-11 max-sm:px-3',
                       focusOutlineClass,
                       view === id
                         ? 'bg-card font-medium text-foreground'

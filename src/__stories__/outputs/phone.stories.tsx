@@ -294,6 +294,29 @@ export const LaunchReportDesktop: Story = {
   },
 };
 
+/**
+ * **The same report under the name a host gives it, with both views offered.**
+ * Beside a title and a view switch the Download stays in the header, and the
+ * switch's two buttons, like the Download, are 44 by 44 on a phone.
+ */
+export const LaunchReportSwitchPhone: Story = {
+  name: 'A named report and its view switch, phone',
+  ...pinnedTo('phone'),
+  args: { ...launch, name: 'launch_report', views: ['rendered', 'json'] },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNoSidewaysScroll(canvasElement);
+    const canvas = within(canvasElement);
+    const controls = [
+      ...canvas.getAllByRole('button', { name: S.download }),
+      ...canvas.getAllByRole('button', { name: S.viewRendered }),
+      ...canvas.getAllByRole('button', { name: S.viewJson }),
+    ];
+    await expect(controls).toHaveLength(6);
+    for (const control of controls) await expectTouchTarget(control);
+  },
+};
+
 /** Whether two elements are drawn in the same theme pane. */
 function sameCanvas(a: Element, b: Element): boolean {
   const pane = (element: Element) => element.closest('.dark') !== null;
