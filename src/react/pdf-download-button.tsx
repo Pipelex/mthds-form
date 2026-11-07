@@ -116,7 +116,8 @@ export function PdfDownloadButton({
         title={failed ? s.downloadPdfFailed : name}
         {...(failed ? { 'aria-describedby': statusId } : {})}
         className={cn(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium disabled:opacity-70',
+          // 44 pixels tall below `sm`, as every control a finger hits is.
+          'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium disabled:opacity-70 max-sm:min-h-11 max-sm:px-3',
           focusOutlineClass,
           primary
             ? 'bg-primary text-primary-foreground hover:bg-primary/90'

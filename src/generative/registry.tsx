@@ -306,7 +306,9 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
           emit('change');
         }}
       >
-        <SelectTrigger id={id} className="w-full">
+        {/* As tall as the layer's text input beside it, and the 44 pixels a
+            finger needs. */}
+        <SelectTrigger id={id} className="h-11 w-full">
           <SelectValue placeholder={props.placeholder ?? 'Select...'} />
         </SelectTrigger>
         <SelectContent>
@@ -488,12 +490,15 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const [value, setValue] = React.useState(tabs[0]?.value ?? '');
   return (
     <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
-      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground">
+      {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
+          however short its label, and the list around it with it, wrapping
+          onto a second row rather than pushing the page sideways. */}
+      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto max-sm:flex-wrap">
         {tabs.map((tab) => (
           <TabsPrimitive.Trigger
             key={tab.value}
             value={tab.value}
-            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm max-sm:min-h-11 max-sm:min-w-11"
           >
             {tab.label}
           </TabsPrimitive.Trigger>
@@ -512,8 +517,9 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   );
 }
 
+// As tall as the layer's own `Button`, which is the 44 pixels a finger needs.
 const BUTTON_BASE =
-  'inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50';
 const PRIMARY_BUTTON = cn(BUTTON_BASE, 'bg-primary text-primary-foreground hover:bg-primary/90');
 const SECONDARY_BUTTON = cn(
   BUTTON_BASE,
@@ -722,7 +728,9 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
             value={option}
             variant="outline"
             size="sm"
-            className="rounded-full px-3.5 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            // Below `sm`, the 44 pixels a finger needs, as the kernel's own
+            // choice control grows there.
+            className="rounded-full px-3.5 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground max-sm:h-11 max-sm:min-w-11"
           >
             {labelOf(option)}
           </ToggleGroupItem>
@@ -779,9 +787,11 @@ function NumberInput({ props, bindings, emit }: BaseComponentProps<NumberInputPr
             setValue(raw === '' ? undefined : Number(raw));
             emit('change');
           }}
+          // As tall as the layer's text input and the kernel's number field,
+          // which is the 44 pixels a finger needs.
           className={cn(
             fieldControlClass,
-            'h-10 px-3 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none',
+            'h-11 px-3 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none',
           )}
         />
         {props.unit ? <span className="text-sm text-muted-foreground">{props.unit}</span> : null}
