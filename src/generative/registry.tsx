@@ -5,11 +5,11 @@ import {
   type BaseComponentProps,
   type Components,
   useBoundProp,
-  useFieldValidation,
   useRepeatScope,
   useStateStore,
   useStateValue,
 } from '@json-render/react';
+import { useCheckedField } from './checked-fields';
 import {
   Accessibility,
   AlertCircle,
@@ -317,7 +317,7 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'change';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );

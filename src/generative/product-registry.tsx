@@ -1,12 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import {
-  type BaseComponentProps,
-  defineRegistry,
-  useBoundProp,
-  useFieldValidation,
-} from '@json-render/react';
+import { type BaseComponentProps, defineRegistry, useBoundProp } from '@json-render/react';
+import { useCheckedField } from './checked-fields';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
@@ -303,7 +299,7 @@ function useTextField(
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'blur';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );

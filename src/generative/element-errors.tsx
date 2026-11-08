@@ -1,8 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { getByPath, resolveRepeatStatePath } from '@json-render/core';
-import { useRepeatScope, useStateStore } from '@json-render/react';
+import {
+  evaluateVisibility,
+  getByPath,
+  resolveElementProps,
+  resolveRepeatStatePath,
+} from '@json-render/core';
+import { useRepeatScope, useVisibility } from '@json-render/react';
 
 /**
  * How a page tells its host that one of its elements failed to render.
@@ -22,14 +27,18 @@ import { useRepeatScope, useStateStore } from '@json-render/react';
  * the host's own boundary. The wrapping does not depend on whether there is a
  * handler, so a host that starts or stops passing one remounts nothing.
  *
- * Unlike json-render's, a failed boundary tries again when what its element
- * renders from changes - for an element, its resolved props and, for one that
- * repeats, the list it repeats over; for the root, the layout - so an element
- * that threw on a word where its list belongs draws once the store holds the
- * list, without remounting the page. What changed is judged by content, and
- * only while the boundary has failed, so a host that hands an equal value as
+ * Unlike json-render's, a failed boundary tries again when what it caught a
+ * throw from changes - for an element, its resolved props, the list it
+ * repeats over when it repeats, and each child's props and visibility as they
+ * resolve, since a child's props are resolved in the child's render and a
+ * throw there is the element above's to catch; for the root, the layout and
+ * the root's own resolved props - so an element that threw on a word where
+ * its list belongs draws once the store holds the list, without remounting
+ * the page. What changed is judged by content, read when the boundary fails
+ * and again only while it has failed, so a host that hands an equal value as
  * a new object at every render - a spec parsed inline, props resolved afresh
- * - does not retry, throw and report again at every render. And while the
+ * - does not retry, throw and report again at every render, and one that
+ * corrects its layout in place is judged against what failed. And while the
  * page is `loading`, a failure is neither reported nor logged: a layout still
  * streaming may be caught half-written, so the boundary tries again with each
  * new value and once more when the stream ends, and reports only what still
@@ -62,10 +71,18 @@ interface BoundaryProps {
   /** Whether the layout is still streaming: a failure is held, and tried again when it ends. */
   loading?: boolean;
   /**
-   * What the element renders from. A failed boundary tries again when it
-   * changes - by identity while the page is loading, by content after.
+   * A value that changes whenever what the element renders from may have:
+   * the cue to read `inputOf` again, while the boundary has failed. A list
+   * is compared entry by entry, so the cue can be written inline.
    */
   resetOn?: unknown;
+  /**
+   * What the element renders from, read only while the boundary has failed:
+   * once when it fails, and again at each new `resetOn`. A failed boundary
+   * tries again when it reads differently - at each new `resetOn` while the
+   * page is loading.
+   */
+  inputOf?: () => unknown;
   /** The root's boundary: with no handler, it throws the error on to the host's boundary rather than logging it. */
   root?: boolean;
   children: React.ReactNode;
@@ -74,6 +91,15 @@ interface BoundaryProps {
 interface BoundaryState {
   failed: boolean;
   error: unknown;
+}
+
+/** An error as text, for a failure the input itself raises; never throws. */
+function said(error: unknown): string {
+  try {
+    return String(error);
+  } catch {
+    return 'an error that cannot be written out';
+  }
 }
 
 /**
@@ -90,10 +116,21 @@ function contentOf(value: unknown): unknown {
   }
 }
 
+/** Whether two cues are the same: a list entry by entry, anything else by identity. */
+function sameCue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((entry, index) => Object.is(entry, b[index]));
+  }
+  return Object.is(a, b);
+}
+
 /** One element's boundary: reports a render error to the host, or logs it, and tries again when its element's input changes. */
 export class ElementBoundary extends React.Component<BoundaryProps, BoundaryState> {
-  /** What the element rendered from when it failed, and that value's content, worked out when first compared. */
-  private failedOn: { value: unknown; content?: unknown } | undefined;
+  /**
+   * The content of what the element rendered from when it failed, read at
+   * the catch: a spec patched in place afterwards must not move it.
+   */
+  private failedOn: unknown;
 
   constructor(props: BoundaryProps) {
     super(props);
@@ -104,10 +141,23 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
     return { failed: true, error };
   }
 
+  /** What the element renders from, as text; total, since it reads a model's layout and the store. */
+  private input(): unknown {
+    try {
+      return contentOf(this.props.inputOf ? this.props.inputOf() : this.props.resetOn);
+    } catch (error) {
+      return `the input could not be read: ${said(error)}`;
+    }
+  }
+
   override componentDidCatch(error: unknown, info: React.ErrorInfo): void {
-    this.failedOn = { value: this.props.resetOn };
-    // Held while the layout streams; tried again when it ends.
-    if (this.props.loading) return;
+    // Held while the layout streams; tried again with each new value and
+    // when it ends, so its content is not read at every patch.
+    if (this.props.loading) {
+      this.failedOn = undefined;
+      return;
+    }
+    this.failedOn = this.input();
     const componentStack = info.componentStack ?? undefined;
     if (this.props.reporting) {
       this.props.report.current?.(error, {
@@ -130,7 +180,7 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
   }
 
   override componentDidUpdate(previous: BoundaryProps): void {
-    if (!this.state.failed || !this.failedOn) return;
+    if (!this.state.failed) return;
     const streamEnded = previous.loading === true && !this.props.loading;
     if (streamEnded || this.inputChanged(previous)) {
       this.failedOn = undefined;
@@ -140,13 +190,11 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
 
   /** Whether what the element renders from is no longer what it failed on. */
   private inputChanged(previous: BoundaryProps): boolean {
-    const failedOn = this.failedOn;
-    if (!failedOn || Object.is(this.props.resetOn, previous.resetOn)) return false;
+    if (sameCue(this.props.resetOn, previous.resetOn)) return false;
     // While a layout streams, each new value is a new layout; after, an equal
     // one handed as a new object is the same input, and is not tried again.
-    if (this.props.loading) return true;
-    if (!('content' in failedOn)) failedOn.content = contentOf(failedOn.value);
-    return !Object.is(contentOf(this.props.resetOn), failedOn.content);
+    if (this.props.loading || this.failedOn === undefined) return true;
+    return !Object.is(this.input(), this.failedOn);
   }
 
   // Whether the root throws the error on is decided as it renders its
@@ -162,21 +210,138 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
   }
 }
 
+/** An element as json-render hands it to a renderer, or as it carries a child: what is read of it here. */
+interface ElementLike {
+  props?: Record<string, unknown>;
+  visible?: unknown;
+  repeat?: { statePath?: unknown };
+  children?: unknown;
+  slots?: unknown;
+}
+
+type ResolveContext = Parameters<typeof resolveElementProps>[1];
+
+/**
+ * An element's props and visibility as json-render resolves them under
+ * `ctx`, or the throw resolving them raises, written out: what tells a
+ * corrected input from the one that threw, for an element whose resolution
+ * is what failed.
+ */
+function resolvedOf(element: ElementLike | undefined, ctx: ResolveContext): unknown {
+  if (!element) return undefined;
+  try {
+    return {
+      props: resolveElementProps(element.props ?? {}, ctx),
+      visible:
+        element.visible === undefined ? true : evaluateVisibility(element.visible as never, ctx),
+    };
+  } catch (error) {
+    return `throws: ${said(error)}`;
+  }
+}
+
+/**
+ * The raw element a child node carries, when json-render rendered it for one
+ * of the spec's elements - which it names by its key. The node a repeating
+ * element gets in its children's place names none, and carries the
+ * element's own props, already resolved.
+ */
+function childElementOf(node: React.ReactNode): ElementLike | undefined {
+  if (!React.isValidElement(node)) return undefined;
+  const { element, elementKey } = node.props as { element?: unknown; elementKey?: unknown };
+  if (typeof elementKey !== 'string') return undefined;
+  return typeof element === 'object' && element !== null ? (element as ElementLike) : undefined;
+}
+
 /**
  * What one element renders from, for its boundary to tell a corrected input
- * from the one it failed on: its resolved props and, when it repeats, the
- * list it repeats over, which json-render reads inside the element's render.
+ * from the one it failed on: its own props as resolved; for one that
+ * repeats, the list it repeats over, which json-render reads inside the
+ * element's render; and each child json-render renders under it, as written
+ * and as resolved, since a child's props are resolved inside the child's
+ * render and a throw there is caught by this boundary, the element above.
+ * Read only while the boundary has failed, so a render that does not fail
+ * pays for none of it.
  */
-function useRenderedFrom(element: unknown): unknown {
-  const { state } = useStateStore();
-  const scope = useRepeatScope();
-  const { props, repeat } = (element ?? {}) as {
-    props?: unknown;
-    repeat?: { statePath?: Parameters<typeof resolveRepeatStatePath>[0] };
+function inputOfElement(
+  props: Record<string, unknown>,
+  visibility: ResolveContext,
+  scope: ReturnType<typeof useRepeatScope>,
+): unknown {
+  const element = props.element as ElementLike | undefined;
+  const state = visibility.stateModel;
+  const ctx: ResolveContext = {
+    ...visibility,
+    ...(scope
+      ? { repeatItem: scope.item, repeatIndex: scope.index, repeatBasePath: scope.basePath }
+      : {}),
   };
-  if (repeat?.statePath === undefined) return props;
-  const path = resolveRepeatStatePath(repeat.statePath, scope?.basePath);
-  return { props, list: path === undefined ? undefined : getByPath(state, path) };
+  const statePath = element?.repeat?.statePath;
+  let list: unknown;
+  if (statePath !== undefined) {
+    try {
+      const path = resolveRepeatStatePath(statePath as never, scope?.basePath);
+      list = path === undefined ? undefined : getByPath(state, path);
+    } catch (error) {
+      list = `throws: ${said(error)}`;
+    }
+  }
+  const under = (nodes: unknown) =>
+    React.Children.toArray(nodes as React.ReactNode).map((node) => {
+      const child = childElementOf(node);
+      return child ? { element: child, resolved: resolvedOf(child, ctx) } : null;
+    });
+  const slots =
+    typeof props.slots === 'object' && props.slots !== null
+      ? Object.fromEntries(Object.entries(props.slots).map(([name, nodes]) => [name, under(nodes)]))
+      : undefined;
+  return { props: element?.props, list, children: under(props.children), slots };
+}
+
+/**
+ * What the page's root renders from: the layout, and the root element's
+ * props and visibility as resolved against the store, since json-render
+ * resolves them before any boundary of an element's, and a throw there is
+ * the root boundary's to catch.
+ */
+function inputOfRoot(spec: SpecLike | null | undefined, visibility: ResolveContext): unknown {
+  const root = spec?.elements?.[spec.root as string] as ElementLike | undefined;
+  return { spec, root: resolvedOf(root, visibility) };
+}
+
+/** A layout, as far as the root's boundary reads one. */
+interface SpecLike {
+  root?: unknown;
+  elements?: Record<string, unknown>;
+}
+
+/**
+ * The boundary around a page's root. It is placed inside json-render's
+ * provider, to read the store: a root whose props threw on what the store
+ * held tries again when the store changes, as an element does.
+ */
+export function RootBoundary(props: {
+  type: string;
+  report: React.RefObject<ElementErrorHandler | undefined>;
+  reporting: boolean;
+  loading: boolean;
+  spec: SpecLike | null | undefined;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const { ctx } = useVisibility();
+  return (
+    <ElementBoundary
+      type={props.type}
+      report={props.report}
+      reporting={props.reporting}
+      loading={props.loading}
+      resetOn={[props.spec, ctx]}
+      inputOf={() => inputOfRoot(props.spec, ctx)}
+      root
+    >
+      {props.children}
+    </ElementBoundary>
+  );
 }
 
 /** The wrappers a page has made, by component type, with the renderer each wraps. */
@@ -206,14 +371,18 @@ export function reportingRegistry<R extends Record<string, unknown>>(
     const Component = Renderer as React.ComponentType<Record<string, unknown>>;
     const Reported = (props: Record<string, unknown>) => {
       const reporting = React.useContext(ReportingContext);
-      const renderedFrom = useRenderedFrom(props.element);
+      const { ctx } = useVisibility();
+      const scope = useRepeatScope();
       return (
         <ElementBoundary
           type={type}
           report={report}
           reporting={reporting}
           loading={props.loading === true}
-          resetOn={renderedFrom}
+          // A new element or a new store is the cue; what changed is read
+          // only once the boundary has failed.
+          resetOn={[props.element, props.children, props.slots, ctx, scope]}
+          inputOf={() => inputOfElement(props, ctx, scope)}
         >
           <Component {...props} />
         </ElementBoundary>

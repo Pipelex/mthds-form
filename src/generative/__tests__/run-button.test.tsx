@@ -1,6 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { GenerativePage } from '../page';
@@ -106,6 +106,27 @@ describe('a run pressed while a field fails its own checks', () => {
     expect(onRun).not.toHaveBeenCalled();
     expect(await screen.findByText('Name a city')).toBeTruthy();
     await userEvent.type(screen.getByRole('textbox', { name: /City/ }), 'Lyon');
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+  });
+
+  it('is not refused by a field hidden since it registered its checks', async () => {
+    // json-render's validation never forgets a field: a field hidden by its
+    // `visible` condition kept its checks, and a run gated on all of them was
+    // refused by a field nobody could see or correct.
+    const hideable: Spec = {
+      ...CHECKED,
+      elements: {
+        ...CHECKED.elements,
+        city: { ...CHECKED.elements.city!, visible: { $state: '/ui/city' } },
+      },
+    };
+    const onRun = vi.fn();
+    const store = createStateStore({ inputs: { city: '' }, ui: { city: true } });
+    render(<GenerativePage spec={hideable} store={store} scope={{}} onRun={onRun} />);
+    expect(screen.getByRole('textbox', { name: /City/ })).toBeTruthy();
+    act(() => store.set('/ui/city', false));
+    expect(screen.queryByRole('textbox', { name: /City/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
   });

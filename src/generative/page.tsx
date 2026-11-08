@@ -9,9 +9,10 @@ import {
   type ValidationContextValue,
 } from '@json-render/react';
 import { BrandProvider } from './brand-context';
+import { CheckedFieldsContext, checksPass, type CheckedFields } from './checked-fields';
 import {
-  ElementBoundary,
   ReportingContext,
+  RootBoundary,
   reportingRegistry,
   type ElementErrorHandler,
   type ReportedRenderers,
@@ -127,17 +128,20 @@ export function GenerativePage({
   );
   // json-render resolves an element's props before its renderer runs, so a
   // throw there is caught by the boundary of the element above - and the root
-  // has none. Its own boundary is given another try with each new layout,
-  // judged by its content once the page is not loading: a host that parses
-  // its spec inline hands a new object at every render, and one whose report
-  // sets its state would otherwise retry, throw and report until React gave
-  // up. The content is read only while the root has failed, so a streamed
-  // layout is not written out whole at every patch.
+  // has none. Its own boundary is given another try when the layout or the
+  // root's resolved props change, judged by their content once the page is
+  // not loading: a host that parses its spec inline hands a new object at
+  // every render, and one whose report sets its state would otherwise retry,
+  // throw and report until React gave up. The content is read only while the
+  // root has failed, so a streamed layout is not written out whole at every
+  // patch.
   const rootType = spec?.elements?.[spec.root]?.type ?? 'root';
   const reporting = onElementError !== undefined;
-  // The page's own checks, as json-render's `validateForm` runs them, read at
-  // the press that runs it (below).
+  // The page's checks, read at the press that runs it (below): json-render's
+  // validation, which runs a field's checks and shows its message, and the
+  // page's own record of which checked fields are mounted now.
   const validation = React.useRef<ValidationContextValue | null>(null);
+  const [checkedFields] = React.useState<CheckedFields>(() => new Set());
 
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
@@ -163,11 +167,12 @@ export function GenerativePage({
         // runs and records - and json-render runs the next binding whatever it
         // recorded, so `[validateForm, run]` ran a form its own checks had just
         // refused, and only the host's run gate stood between it and a billed
-        // run. A run is started only when every field's checks pass, and
-        // running them shows each failing field its message, as `validateForm`
-        // does.
+        // run. A run is started only when the checks of every field mounted
+        // now pass - not those of every field ever registered, which
+        // json-render keeps for a field hidden or dropped since - and running
+        // them shows each failing field its message, as `validateForm` does.
         const checks = validation.current;
-        if (checks && !checks.validateAll()) return undefined;
+        if (checks && !checksPass(checkedFields, checks)) return undefined;
         running.current = true;
         let pending: unknown;
         try {
@@ -193,17 +198,18 @@ export function GenerativePage({
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
         <ReportingContext.Provider value={reporting}>
-          <ValidationBridge into={validation} />
-          <ElementBoundary
-            type={rootType}
-            report={report}
-            reporting={reporting}
-            loading={loading === true}
-            resetOn={spec}
-            root
-          >
-            <Renderer spec={spec} registry={pageRegistry} loading={loading} />
-          </ElementBoundary>
+          <CheckedFieldsContext.Provider value={checkedFields}>
+            <ValidationBridge into={validation} />
+            <RootBoundary
+              type={rootType}
+              report={report}
+              reporting={reporting}
+              loading={loading === true}
+              spec={spec}
+            >
+              <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+            </RootBoundary>
+          </CheckedFieldsContext.Provider>
         </ReportingContext.Provider>
       </JSONUIProvider>
     </DescriptorProvider>

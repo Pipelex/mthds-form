@@ -159,6 +159,41 @@ describe('an element that throws while rendering', () => {
     expect(onElementError.mock.calls[0]![1]).toMatchObject({ type: 'Heading' });
   });
 
+  it('is reported by the element it is in, when a repeat path cannot be resolved', () => {
+    // A repeat path relative to the list around it, written without its
+    // member, throws as json-render resolves it - inside the element's render,
+    // where its own boundary catches it and reports it.
+    const spec: Spec = {
+      root: 'rows',
+      elements: {
+        rows: {
+          type: 'Stack',
+          props: { direction: 'vertical' },
+          repeat: { statePath: '/rows' },
+          children: ['cells'],
+        },
+        cells: {
+          type: 'Stack',
+          props: { direction: 'horizontal' },
+          repeat: { statePath: {} as { $item: string } },
+          children: ['cell'],
+        },
+        cell: { type: 'Text', props: { text: 'cell', variant: null }, children: [] },
+      },
+    };
+    const onElementError = vi.fn();
+    render(
+      <GenerativePage
+        spec={spec}
+        store={createStateStore({ rows: [{ cells: [1] }] })}
+        scope={{}}
+        onElementError={onElementError}
+      />,
+    );
+    expect(onElementError).toHaveBeenCalledTimes(1);
+    expect(onElementError.mock.calls[0]![1]).toMatchObject({ type: 'Stack' });
+  });
+
   it('keeps every element mounted when the host starts or stops passing the callback', () => {
     const store = createStateStore({});
     const page = (onElementError?: () => void) => (
@@ -327,6 +362,80 @@ describe('an element that threw, once what it renders from is corrected', () => 
     act(() => store.set('/result/lines', [{ name: 'Lyon' }]));
     expect(screen.getByText('Lyon')).toBeTruthy();
     if (withHandler) expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a child whose props threw, once the store holds what they read', () => {
+    // A child's props are resolved inside the child's render, so its throw is
+    // caught by the element above, whose own props have not changed.
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: STACK, children: ['title'] },
+        title: {
+          type: 'Heading',
+          props: { text: { $template: 'For ${/result/name}' }, level: 'h1' },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({ result: { name: { toString: 1 } } });
+    const onElementError = vi.fn();
+    render(<GenerativePage spec={spec} store={store} scope={{}} onElementError={onElementError} />);
+    expect(onElementError).toHaveBeenCalledTimes(1);
+    act(() => store.set('/result/name', 'Lyon'));
+    expect(screen.getByRole('heading', { name: 'For Lyon' })).toBeTruthy();
+    expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a root whose props threw, once the store holds what they read', () => {
+    const spec: Spec = {
+      root: 'title',
+      elements: {
+        title: {
+          type: 'Heading',
+          props: { text: { $template: 'For ${/result/name}' }, level: 'h1' },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({ result: { name: { toString: 1 } } });
+    const onElementError = vi.fn();
+    render(<GenerativePage spec={spec} store={store} scope={{}} onElementError={onElementError} />);
+    expect(onElementError).toHaveBeenCalledTimes(1);
+    act(() => store.set('/result/name', 'Lyon'));
+    expect(screen.getByRole('heading', { name: 'For Lyon' })).toBeTruthy();
+  });
+
+  it('draws once a layout patched in place is handed again, judged against what failed', () => {
+    // What the root failed on is read when it fails: read later, a layout the
+    // host corrected in place before its next render was taken for the one
+    // that failed, and the correction never drew.
+    const spec: Spec = {
+      root: 'title',
+      elements: {
+        title: {
+          type: 'Heading',
+          props: { text: { $template: 'For ${/result/name}' }, level: 'h1' },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({ result: { name: { toString: 1 } } });
+    const onElementError = vi.fn();
+    const { rerender } = render(
+      <GenerativePage spec={spec} store={store} scope={{}} onElementError={onElementError} />,
+    );
+    expect(onElementError).toHaveBeenCalledTimes(1);
+    spec.elements.title!.props = { text: 'For anyone', level: 'h1' };
+    rerender(
+      <GenerativePage
+        spec={{ ...spec }}
+        store={store}
+        scope={{}}
+        onElementError={onElementError}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'For anyone' })).toBeTruthy();
   });
 
   it('neither tries again nor reports again while what it renders from is unchanged', () => {
