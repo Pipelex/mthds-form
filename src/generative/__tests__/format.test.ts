@@ -4,7 +4,7 @@ import { formatAmount, formatDay, formatNumber } from '../format';
 /**
  * The one way the generative layer writes a number, an amount and a day.
  * Every result component asks here, so a `DataTable`, a `Metric` and a
- * `ProportionBar` on one page write one currency one way.
+ * `ProportionBar` on one page share one locale.
  */
 describe('the layout formatter', () => {
   it('keeps a currency’s own cents, so the parts of a share add up on screen', () => {
@@ -24,12 +24,12 @@ describe('the layout formatter', () => {
     expect(formatAmount(0.1 + 0.2, 'EUR')).toBe('€0.30');
     // Rounded as `Intl` rounds, which binary arithmetic would not.
     expect(formatAmount(1.005, 'EUR')).toBe('€1.01');
-    expect(formatAmount(3.995, 'EUR')).toBe('€4');
+    expect(formatAmount(8.995, 'EUR')).toBe('€9');
   });
 
   it('writes every currency in the one locale, whichever component asks', () => {
-    // en-GB names the dollar it means; en-US would write "$5" in one
-    // component and en-GB "US$5" in another, as they did.
+    // en-GB names the dollar it means, as a `ProportionBar`, the one
+    // component that formatted a currency before this formatter, always did.
     expect(formatAmount(5, 'USD')).toBe('US$5');
     expect(formatAmount(5, 'GBP')).toBe('£5');
   });
