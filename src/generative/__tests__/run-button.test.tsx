@@ -2,8 +2,15 @@ import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import type { ValidationConfig } from '@json-render/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useCheckedField } from '../checked-fields';
 import { GenerativePage } from '../page';
+import { generativeRegistry } from '../product-registry';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /**
  * The control that starts a run is held while one is going. A host says so
@@ -168,7 +175,9 @@ describe('a run pressed while a field fails its own checks', () => {
 
   it('holds two fields bound to one path to both their checks, and shows the failure', async () => {
     // Each registered its own checks over the other's at every render, a loop
-    // React stopped, and the result written last hid the other's failure.
+    // React stopped, and the result written last hid the other's failure. The
+    // spy is restored after each test, so a failing assertion here leaves the
+    // console as it found it for the rest of the file.
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const twice: Spec = {
       ...CHECKED,
@@ -199,7 +208,6 @@ describe('a run pressed while a field fails its own checks', () => {
     expect(onRun).not.toHaveBeenCalled();
     expect((await screen.findAllByText('Name a city')).length).toBeGreaterThan(0);
     expect(errors.mock.calls.flat().join(' ')).not.toMatch(/Maximum update depth/);
-    errors.mockRestore();
   });
 
   it('is refused by a field on a step left behind, which stays mounted and hidden', async () => {
@@ -233,5 +241,350 @@ describe('a run pressed while a field fails its own checks', () => {
     await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
     await waitFor(() => expect(screen.getByText('Name a city')).toBeTruthy());
     expect(onRun).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A tab, a step or a closed section keeps its fields mounted and hidden, so
+ * their checks hold the run - and a run refused by one of them showed its
+ * message inside a panel nobody could see. A refused run takes the person to
+ * the first failing field instead: its panel opened, its message shown, the
+ * focus on it.
+ */
+describe('a run refused by a field the person cannot see', () => {
+  const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+  const input = (name: string, label: string, message: string) => ({
+    type: 'Input',
+    props: {
+      label,
+      name,
+      type: null,
+      placeholder: null,
+      value: { $bindState: `/inputs/${name}` },
+      checks: [{ type: 'required', message }],
+      validateOn: null,
+    },
+    children: [],
+  });
+  const cta = {
+    type: 'Cta',
+    props: { label: 'Plan my trip', hint: null },
+    children: [],
+    on: { press: [{ action: 'validateForm' }, { action: 'run' }] },
+  };
+  const note = { type: 'Text', props: { text: 'The trip', variant: null }, children: [] };
+  const TABS = {
+    type: 'Tabs',
+    props: {
+      tabs: [
+        { label: 'Trip', value: 'trip' },
+        { label: 'Where', value: 'where' },
+      ],
+    },
+    children: ['first', 'second'],
+  };
+
+  function press(spec: Spec, inputs: Record<string, unknown> = { city: '' }) {
+    const onRun = vi.fn();
+    render(
+      <GenerativePage spec={spec} store={createStateStore({ inputs })} scope={{}} onRun={onRun} />,
+    );
+    return onRun;
+  }
+
+  it('opens the tab holding the failing field, shows its message and puts the focus on it', async () => {
+    const onRun = press({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: STACK, children: ['tabs', 'cta'] },
+        tabs: TABS,
+        first: { type: 'Stack', props: STACK, children: ['note'] },
+        second: { type: 'Stack', props: STACK, children: ['city'] },
+        note,
+        city: input('city', 'City', 'Name a city'),
+        cta,
+      },
+    });
+    const field = screen.getByRole('textbox', { name: /City/, hidden: true });
+    expect(field).not.toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    expect(onRun).not.toHaveBeenCalled();
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field).toBeVisible();
+    expect(screen.getByText('Name a city')).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Where' })).toHaveAttribute('aria-selected', 'true');
+    // The message is the field's description, so it is heard with the focus.
+    expect(field).toHaveAccessibleDescription('Name a city');
+  });
+
+  it('goes back to the step holding the failing field', async () => {
+    const onRun = press({
+      root: 'steps',
+      elements: {
+        steps: {
+          type: 'Steps',
+          props: { steps: ['Where', 'Go'], nextLabel: 'Next', backLabel: 'Back' },
+          children: ['first', 'second'],
+        },
+        first: { type: 'Stack', props: STACK, children: ['city'] },
+        second: { type: 'Stack', props: STACK, children: ['cta'] },
+        city: input('city', 'City', 'Name a city'),
+        cta,
+      },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const field = screen.getByRole('textbox', { name: /City/, hidden: true });
+    expect(field).not.toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field).toBeVisible();
+    expect(screen.getByText('Name a city')).toBeVisible();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('opens a closed section holding the failing field', async () => {
+    const onRun = press({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: STACK, children: ['more', 'cta'] },
+        more: {
+          type: 'Collapsible',
+          props: { title: 'More details', defaultOpen: false },
+          children: ['city'],
+        },
+        city: input('city', 'City', 'Name a city'),
+        cta,
+      },
+    });
+    const field = screen.getByRole('textbox', { name: /City/, hidden: true });
+    expect(field).not.toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field).toBeVisible();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('opens every panel around the failing field: a tab inside a step left behind', async () => {
+    const onRun = press({
+      root: 'steps',
+      elements: {
+        steps: {
+          type: 'Steps',
+          props: { steps: ['Where', 'Go'], nextLabel: 'Next', backLabel: 'Back' },
+          children: ['tabs', 'last'],
+        },
+        tabs: TABS,
+        first: { type: 'Stack', props: STACK, children: ['note'] },
+        second: { type: 'Stack', props: STACK, children: ['city'] },
+        last: { type: 'Stack', props: STACK, children: ['cta'] },
+        note,
+        city: input('city', 'City', 'Name a city'),
+        cta,
+      },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const field = screen.getByRole('textbox', { name: /City/, hidden: true });
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field).toBeVisible();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('takes the person to the first failing field in the page, not the open one', async () => {
+    press(
+      {
+        root: 'page',
+        elements: {
+          page: { type: 'Stack', props: STACK, children: ['tabs', 'cta'] },
+          tabs: TABS,
+          first: { type: 'Stack', props: STACK, children: ['city'] },
+          second: { type: 'Stack', props: STACK, children: ['country'] },
+          city: input('city', 'City', 'Name a city'),
+          country: input('country', 'Country', 'Name a country'),
+          cta,
+        },
+      },
+      { city: '', country: '' },
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Where' }));
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    const city = screen.getByRole('textbox', { name: /City/, hidden: true });
+    await waitFor(() => expect(city).toHaveFocus());
+    expect(city).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Trip' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it("puts the focus on a host's own checked control that hands over its element", async () => {
+    // A raw registry entry, as a host writes one beside this entry's.
+    function HostCity() {
+      const field = useCheckedField('/inputs/city', {
+        checks: [{ type: 'required', message: 'Name a city' }],
+      });
+      return (
+        <label>
+          City
+          <input ref={field.focusRef} aria-invalid={field.errors.length > 0 || undefined} />
+        </label>
+      );
+    }
+    const onRun = vi.fn();
+    render(
+      <GenerativePage
+        spec={{
+          root: 'page',
+          elements: {
+            page: { type: 'Stack', props: STACK, children: ['tabs', 'cta'] },
+            tabs: TABS,
+            first: { type: 'Stack', props: STACK, children: ['note'] },
+            second: { type: 'Stack', props: STACK, children: ['city'] },
+            note,
+            city: { type: 'HostCity', props: { label: 'City' }, children: [] },
+            cta,
+          },
+        }}
+        store={createStateStore({ inputs: { city: '' } })}
+        scope={{}}
+        onRun={onRun}
+        registry={{ ...generativeRegistry, HostCity: () => <HostCity /> }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    const field = screen.getByRole('textbox', { name: /City/, hidden: true });
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field).toBeVisible();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+});
+
+/** A journey shows one step, and its own Back and Next move from the one shown. */
+describe('a journey whose layout loses steps', () => {
+  const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+  const journey = (names: string[]): Spec => ({
+    root: 'steps',
+    elements: {
+      steps: {
+        type: 'Steps',
+        props: { steps: names, nextLabel: 'Next', backLabel: 'Back' },
+        children: names.map((_name, index) => `panel${index}`),
+      },
+      ...Object.fromEntries(
+        names.map((_name, index) => [
+          `panel${index}`,
+          { type: 'Stack', props: STACK, children: [`text${index}`] },
+        ]),
+      ),
+      ...Object.fromEntries(
+        names.map((name, index) => [
+          `text${index}`,
+          { type: 'Text', props: { text: `On ${name}`, variant: null }, children: [] },
+        ]),
+      ),
+    },
+  });
+
+  it('goes back one step from the step it shows, after a new layout removed the one reached', async () => {
+    const store = createStateStore({});
+    const { rerender } = render(
+      <GenerativePage spec={journey(['A', 'B', 'C', 'D'])} store={store} scope={{}} />,
+    );
+    for (let step = 0; step < 3; step += 1) {
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    }
+    expect(screen.getByText('On D')).toBeVisible();
+    rerender(<GenerativePage spec={journey(['A', 'B'])} store={store} scope={{}} />);
+    expect(screen.getByText('On B')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('On A')).toBeVisible();
+  });
+});
+
+/**
+ * A host's own checked control may make its checks conditional, as
+ * json-render's validation config allows (`enabled`): the page's record must
+ * not drop the condition when it combines a path's checks.
+ */
+describe("a host's conditional checks on a page", () => {
+  const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+
+  function host(config: ValidationConfig) {
+    return function HostCity() {
+      const field = useCheckedField('/inputs/city', config);
+      return (
+        <label>
+          City
+          <input ref={field.focusRef} />
+        </label>
+      );
+    };
+  }
+
+  function renderWith(config: ValidationConfig, state: Record<string, unknown>, extra = false) {
+    const HostCity = host(config);
+    const onRun = vi.fn();
+    render(
+      <GenerativePage
+        spec={{
+          root: 'page',
+          elements: {
+            page: {
+              type: 'Stack',
+              props: STACK,
+              children: extra ? ['city', 'again', 'cta'] : ['city', 'cta'],
+            },
+            city: { type: 'HostCity', props: { label: 'City' }, children: [] },
+            again: {
+              type: 'Input',
+              props: {
+                label: 'City again',
+                name: 'again',
+                type: null,
+                placeholder: null,
+                value: { $bindState: '/inputs/city' },
+                checks: [{ type: 'maxLength', args: { max: 10 }, message: 'Ten letters at most' }],
+                validateOn: null,
+              },
+              children: [],
+            },
+            cta: {
+              type: 'Cta',
+              props: { label: 'Plan my trip', hint: null },
+              children: [],
+              on: { press: { action: 'run' } },
+            },
+          },
+        }}
+        store={createStateStore(state)}
+        scope={{}}
+        onRun={onRun}
+        registry={{ ...generativeRegistry, HostCity: () => <HostCity /> }}
+      />,
+    );
+    return onRun;
+  }
+
+  const conditional: ValidationConfig = {
+    checks: [{ type: 'required', message: 'Name a city' }],
+    enabled: { $state: '/ui/strict' },
+  };
+
+  it('does not hold the run while its condition is off', async () => {
+    const onRun = renderWith(conditional, { inputs: { city: '' }, ui: { strict: false } });
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+  });
+
+  it('holds the run while its condition is on', async () => {
+    const onRun = renderWith(conditional, { inputs: { city: '' }, ui: { strict: true } });
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /City$/ })).toHaveFocus());
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('keeps each condition to its own checks when a catalog field shares the path', async () => {
+    // The catalog's field asks for ten letters at most, always; the host's
+    // asks for a city only while strict, which it is not.
+    const onRun = renderWith(conditional, { inputs: { city: '' }, ui: { strict: false } }, true);
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
   });
 });

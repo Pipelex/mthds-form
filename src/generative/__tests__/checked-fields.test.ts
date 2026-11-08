@@ -52,3 +52,53 @@ describe("the page's record of its checked fields", () => {
     expect(told.registerField).toHaveBeenLastCalledWith('/inputs/city', { checks: [] });
   });
 });
+
+/**
+ * json-render's `validateAll` reads what it was told as of its provider's last
+ * render. Read beside the record's own checks, a field hidden the task before
+ * a press still refused the run by the checks it no longer carried.
+ */
+describe("the run's verdict on each path", () => {
+  /** A validation whose `validateAll` judges `judged` by what json-render was last told. */
+  function lagging(judged: Record<string, boolean>): ValidationContextValue {
+    let states: ValidationContextValue['fieldStates'] = {};
+    const told = validation(true);
+    return {
+      ...told,
+      get fieldStates() {
+        return states;
+      },
+      validateAll: vi.fn(() => {
+        for (const [path, valid] of Object.entries(judged)) {
+          states = {
+            ...states,
+            [path]: {
+              touched: true,
+              validated: true,
+              result: { valid, errors: valid ? [] : ['stale'], checks: [] },
+            },
+          };
+        }
+        return Object.values(judged).every(Boolean);
+      }),
+    };
+  }
+
+  it('is not refused by a field that has left, though json-render still holds its checks', () => {
+    const fields = new CheckedFields();
+    const stale = lagging({ '/inputs/city': false });
+    fields.attach(stale);
+    const leave = fields.enter('/inputs/city', required);
+    leave();
+    expect(fields.check(stale)).toBe(true);
+    // Its stale verdict is cleared, so a field mounted there later shows none.
+    expect(stale.clear).toHaveBeenCalledWith('/inputs/city');
+  });
+
+  it("is refused by a host's control that registered its checks with json-render directly", () => {
+    const fields = new CheckedFields();
+    const direct = lagging({ '/inputs/notes': false });
+    fields.attach(direct);
+    expect(fields.check(direct)).toBe(false);
+  });
+});
