@@ -4,7 +4,12 @@ import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
 import { BrandProvider } from './brand-context';
-import { ElementBoundary, reportingRegistry, type ElementErrorHandler } from './element-errors';
+import {
+  ElementBoundary,
+  reportingRegistry,
+  type ElementErrorHandler,
+  type ReportedRenderers,
+} from './element-errors';
 import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
@@ -93,9 +98,10 @@ export function GenerativePage({
   React.useEffect(() => {
     latest.current = { onRun, store };
   });
-  // Every renderer is wrapped in a reporting boundary, once per registry, so
-  // no element remounts on a new callback or on a host that starts or stops
-  // passing one; without a callback the boundary throws the error on, and the
+  // Every renderer is wrapped in a reporting boundary, once per type and
+  // renderer, so no element remounts on a new callback, on a host that starts
+  // or stops passing one, or on a registry object rebuilt with the same
+  // renderers; without a callback the boundary throws the error on, and the
   // page renders exactly as json-render does. The callback is read through a
   // ref at the error, refreshed in an insertion effect, which runs before the
   // layout phase a boundary reports in, so an element that fails in the same
@@ -104,7 +110,11 @@ export function GenerativePage({
   React.useInsertionEffect(() => {
     report.current = onElementError;
   });
-  const pageRegistry = React.useMemo(() => reportingRegistry(registry, report), [registry]);
+  const [made] = React.useState<ReportedRenderers>(() => new Map());
+  const pageRegistry = React.useMemo(
+    () => reportingRegistry(registry, report, made),
+    [registry, made],
+  );
   // json-render resolves an element's props before its renderer runs, so a
   // throw there is caught by the boundary of the element above - and the root
   // has none. Its own boundary is given another try with every new spec.

@@ -44,6 +44,8 @@ interface BoundaryProps {
 interface BoundaryState {
   failed: boolean;
   error: unknown;
+  /** Whether the error goes on to the boundary above, decided once it is caught. */
+  rethrow: boolean;
   resetOn: unknown;
 }
 
@@ -51,7 +53,7 @@ interface BoundaryState {
 export class ElementBoundary extends React.Component<BoundaryProps, BoundaryState> {
   constructor(props: BoundaryProps) {
     super(props);
-    this.state = { failed: false, error: undefined, resetOn: props.resetOn };
+    this.state = { failed: false, error: undefined, rethrow: false, resetOn: props.resetOn };
   }
 
   static getDerivedStateFromError(error: unknown): Partial<BoundaryState> {
@@ -63,38 +65,56 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
     state: BoundaryState,
   ): Partial<BoundaryState> | null {
     if (Object.is(props.resetOn, state.resetOn)) return null;
-    return { failed: false, error: undefined, resetOn: props.resetOn };
+    return { failed: false, error: undefined, rethrow: false, resetOn: props.resetOn };
   }
 
+  // Whether to report or to throw the error on is decided here, in the
+  // commit, where the page has already refreshed its callback: read during
+  // the render that failed, the callback is the previous render's, so one the
+  // host started passing in that render would never hear of the error.
   override componentDidCatch(error: unknown, info: React.ErrorInfo): void {
+    const report = this.props.report.current;
+    if (!report) {
+      // No host to tell: the error goes on to json-render's boundary, or the
+      // host's around the page, exactly as if this one were not here.
+      this.setState({ rethrow: true });
+      return;
+    }
     const componentStack = info.componentStack ?? undefined;
-    this.props.report.current?.(error, {
-      type: this.props.type,
-      ...(componentStack ? { componentStack } : {}),
-    });
+    report(error, { type: this.props.type, ...(componentStack ? { componentStack } : {}) });
   }
 
   override render(): React.ReactNode {
     if (!this.state.failed) return this.props.children;
-    // No host to tell: the error goes on to json-render's boundary, or the
-    // host's around the page, exactly as if this one were not here.
-    if (!this.props.report.current) throw this.state.error;
+    if (this.state.rethrow) throw this.state.error;
     return null;
   }
 }
 
+/** The wrappers a page has made, by component type, with the renderer each wraps. */
+export type ReportedRenderers = Map<string, { renderer: unknown; wrapper: unknown }>;
+
 /**
- * The registry with every renderer wrapped in a reporting boundary. Built once
- * per registry, so a renderer keeps its identity across renders and no element
- * remounts; the handler is read through `report` at the moment of the error,
- * so the host's latest callback is the one called.
+ * The registry with every renderer wrapped in a reporting boundary. A wrapper
+ * is made once per type and renderer, and kept in `made` across registries,
+ * so a host that hands a registry object rebuilt on each render - its own
+ * spread over this entry's, written inline - keeps every component's identity
+ * and remounts nothing, as json-render alone would. The handler is read
+ * through `report` at the moment of the error, so the host's latest callback
+ * is the one called.
  */
 export function reportingRegistry<R extends Record<string, unknown>>(
   registry: R,
   report: React.RefObject<ElementErrorHandler | undefined>,
+  made: ReportedRenderers,
 ): R {
   const wrapped: Record<string, unknown> = {};
   for (const [type, Renderer] of Object.entries(registry)) {
+    const kept = made.get(type);
+    if (kept && kept.renderer === Renderer) {
+      wrapped[type] = kept.wrapper;
+      continue;
+    }
     const Component = Renderer as React.ComponentType<Record<string, unknown>>;
     const Reported = (props: Record<string, unknown>) => (
       <ElementBoundary type={type} report={report}>
@@ -102,6 +122,7 @@ export function reportingRegistry<R extends Record<string, unknown>>(
       </ElementBoundary>
     );
     Reported.displayName = `Reported(${type})`;
+    made.set(type, { renderer: Renderer, wrapper: Reported });
     wrapped[type] = Reported;
   }
   return wrapped as R;

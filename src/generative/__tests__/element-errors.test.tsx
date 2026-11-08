@@ -5,7 +5,7 @@ import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrandManifest } from '../../brand/manifest';
 import { BrandProvider } from '../brand-context';
-import { BrandBar, GenerativePage } from '../index';
+import { BrandBar, GenerativePage, generativeRegistry } from '../index';
 import type { ElementErrorInfo } from '../index';
 
 /**
@@ -176,6 +176,46 @@ describe('an element that throws while rendering', () => {
     expect(screen.getByRole('heading', { name: 'Plan the trip' })).toBe(heading);
     rerender(page());
     expect(screen.getByRole('heading', { name: 'Plan the trip' })).toBe(heading);
+  });
+
+  it('keeps every element mounted when the host hands a registry rebuilt on each render', () => {
+    const store = createStateStore({});
+    const page = () => (
+      <GenerativePage
+        spec={BARRED}
+        store={store}
+        scope={{}}
+        brand={BRAND}
+        registry={{ ...generativeRegistry }}
+      />
+    );
+    const { rerender } = render(page());
+    const heading = screen.getByRole('heading', { name: 'Plan the trip' });
+    rerender(page());
+    expect(screen.getByRole('heading', { name: 'Plan the trip' })).toBe(heading);
+  });
+
+  it('reports to a callback the host starts passing in the very render that fails', () => {
+    const onElementError = vi.fn();
+    const store = createStateStore({});
+    const { rerender } = render(<GenerativePage spec={null} store={store} scope={{}} />);
+    rerender(
+      <GenerativePage spec={BARRED} store={store} scope={{}} onElementError={onElementError} />,
+    );
+    expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands the error on to json-render when the host stops passing the callback in the render that fails', () => {
+    const store = createStateStore({});
+    const { rerender } = render(
+      <GenerativePage spec={null} store={store} scope={{}} onElementError={() => {}} />,
+    );
+    rerender(<GenerativePage spec={BARRED} store={store} scope={{}} />);
+    expect(
+      logged.some(
+        (args) => typeof args[0] === 'string' && args[0].includes('Rendering error in <AppBar>'),
+      ),
+    ).toBe(true);
   });
 
   it('reports nothing for a page that renders cleanly', () => {
