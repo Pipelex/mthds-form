@@ -265,7 +265,7 @@ function memberWords(name: string): string {
 function kindWords(kind: RunFieldKind): string {
   if (kind === 'object') return 'a structure';
   if (kind === 'document' || kind === 'image') return 'a file';
-  return `a ${kind} value`;
+  return `${/^[aeiou]/i.test(kind) ? 'an' : 'a'} ${kind} value`;
 }
 
 /**

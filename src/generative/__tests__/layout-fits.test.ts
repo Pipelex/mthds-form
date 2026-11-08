@@ -1127,6 +1127,18 @@ describe('a repeat over a path that holds no list', () => {
     ]);
   });
 
+  it('names a choice with the article its kind takes', () => {
+    const tone: RunField = {
+      kind: 'enum',
+      name: 'tone',
+      required: false,
+      options: ['dry', 'warm'],
+    } as RunField;
+    expect(layoutProblems({ inputs: [tone] }, repeating('/inputs/tone'))).toEqual([
+      'rows: repeats over /inputs/tone, which holds an enum value, not a list',
+    ]);
+  });
+
   it('is accepted over the list itself', () => {
     expect(layoutProblems({ result }, repeating('/result/lines'))).toEqual([]);
   });
