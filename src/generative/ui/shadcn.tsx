@@ -557,8 +557,9 @@ const NATIVE_CHECK = cn('size-4 shrink-0', checkedAccentClass, focusOutlineClass
 /**
  * The label a native radio or check box sits in, which is where a finger
  * lands: a tap anywhere on a label activates the control it wraps. The box
- * keeps its 16 pixels, and below `sm` its row grows to 44 pixels tall across
- * the column, so the target is the whole row rather than the box.
+ * keeps its 16 pixels, and on a page narrower than 512 pixels its row grows to
+ * 44 pixels tall across the column, so the target is the whole row rather than
+ * the box.
  */
 const NATIVE_CHECK_ROW = 'flex items-center gap-2 text-sm @max-lg:min-h-11';
 
@@ -658,7 +659,7 @@ export function Switch({
   const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props, id);
   return (
     <div className="space-y-2">
-      {/* Room for the switch's 44px hit area below `sm`, inside its own row. */}
+      {/* Room for the switch's 44px hit area on a narrow page, inside its own row. */}
       <div className="flex items-center gap-3 @max-lg:py-2.5">
         <SwitchPrimitive
           id={id}
