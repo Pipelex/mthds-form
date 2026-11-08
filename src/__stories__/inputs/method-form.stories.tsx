@@ -27,6 +27,8 @@ interface MethodFormStoryProps {
   foldOptional?: boolean;
   locale?: string;
   presentation?: FieldPresentation;
+  /** Draws the form in a host's panel and says so through `framed`. */
+  framed?: boolean;
 }
 
 function MethodFormStory({
@@ -38,6 +40,7 @@ function MethodFormStory({
   foldOptional,
   locale,
   presentation = 'app',
+  framed,
 }: MethodFormStoryProps) {
   const contract = getPipeIOContract(contracts, domain, pipeCode);
   const descriptor = getPipeInputForm(inputForm, domain, pipeCode);
@@ -50,14 +53,25 @@ function MethodFormStory({
     // The object URL is never revoked: a story's page is short-lived.
     uploadFile: upload ? async (file) => URL.createObjectURL(file) : undefined,
   });
+  const fields = (
+    <MethodForm
+      form={form}
+      foldOptional={foldOptional}
+      locale={locale}
+      presentation={presentation}
+      framed={framed}
+    />
+  );
   return (
     <div style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
-      <MethodForm
-        form={form}
-        foldOptional={foldOptional}
-        locale={locale}
-        presentation={presentation}
-      />
+      {framed ? (
+        // The host's own panel, as a method app draws its composer.
+        <div className="rounded-xl border border-border bg-card p-6" data-testid="host-panel">
+          {fields}
+        </div>
+      ) : (
+        fields
+      )}
       <button
         type="button"
         onClick={() => form.attempt()}
@@ -122,5 +136,54 @@ export const FilesWithFoldingOff: Story = {
     domain: 'files',
     pipeCode: 'required_vs_optional',
     foldOptional: false,
+  },
+};
+
+/**
+ * The form inside a host's own panel, which `framed` tells it about: the shop
+ * is a section under its heading rather than a card in the panel, and once
+ * the refund account is open a hairline across the form's width sets each
+ * structure off from what follows it, drawn on the section's own edge. One
+ * rule stands between two sections, and none above the form's first element
+ * or under its last, where the host's own action row would sit.
+ */
+export const FramedByTheHost: Story = {
+  args: { pipeCode: 'shop_with_bank', framed: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const more of canvas.getAllByRole('button', { name: '1 optional input' }))
+      await userEvent.click(more);
+    for (const panel of canvas.getAllByTestId('host-panel')) {
+      await expect(panel.querySelector('[data-structure-group="box"]')).toBeNull();
+      const sections = [...panel.querySelectorAll<HTMLElement>('[data-form-section]')];
+      await expect(sections).toHaveLength(2);
+      const stack = sections[0]!.parentElement!;
+      const children = [...stack.children] as HTMLElement[];
+      const edge = (child: HTMLElement, side: 'Top' | 'Bottom') =>
+        parseFloat(getComputedStyle(child)[`border${side}Width`]);
+      // Nothing over the form's first element or under its last.
+      await expect(edge(children[0]!, 'Top')).toBe(0);
+      await expect(edge(children.at(-1)!, 'Bottom')).toBe(0);
+      // Between two neighbours, one rule where either is a section, and it is
+      // the section's, spanning the form.
+      for (const [above, below] of children
+        .slice(1)
+        .map((child, index) => [children[index]!, child])) {
+        const drawn = [edge(above!, 'Bottom'), edge(below!, 'Top')].filter((width) => width > 0);
+        const sectioned = [above, below].some((child) => child!.hasAttribute('data-form-section'));
+        await expect(drawn).toEqual(sectioned ? [1] : []);
+        for (const child of [above!, below!].filter((one) =>
+          one.hasAttribute('data-form-section'),
+        )) {
+          await expect(child.getBoundingClientRect().width).toBe(
+            stack.getBoundingClientRect().width,
+          );
+        }
+      }
+      // The disclosure under the last section is untouched by the rule.
+      const disclosure = children.at(-1)!;
+      await expect(disclosure.hasAttribute('data-form-section')).toBe(false);
+      await expect(edge(disclosure, 'Top')).toBe(0);
+    }
   },
 };
