@@ -1,6 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrandManifest } from '../../brand/manifest';
@@ -283,6 +283,86 @@ describe('an element that throws while rendering', () => {
         (args) => typeof args[0] === 'string' && args[0].includes('Rendering error in <AppBar>'),
       ),
     ).toBe(true);
+  });
+});
+
+/**
+ * json-render's own boundary latches: an element that threw once stays blank
+ * for as long as it is mounted. A host that keeps a designed page up while
+ * its state changes - a run's payload arriving, a field corrected - could not
+ * recover it without remounting the page, so this boundary tries again when
+ * what the element renders from changes, and only then.
+ */
+describe('an element that threw, once what it renders from is corrected', () => {
+  const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+  const LINES: Spec = {
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: STACK, children: ['list'] },
+      list: {
+        type: 'Stack',
+        props: STACK,
+        repeat: { statePath: '/result/lines' },
+        children: ['line'],
+      },
+      line: { type: 'Text', props: { text: { $item: 'name' }, variant: null }, children: [] },
+    },
+  };
+
+  it.each([
+    ['with a handler', true],
+    ['without one', false],
+  ])('draws again without remounting the page, %s', (_name, withHandler) => {
+    const store = createStateStore({ result: { lines: 'not a list' } });
+    const onElementError = vi.fn();
+    render(
+      <GenerativePage
+        spec={LINES}
+        store={store}
+        scope={{}}
+        onElementError={withHandler ? onElementError : undefined}
+      />,
+    );
+    expect(screen.queryByText('Lyon')).toBeNull();
+    act(() => store.set('/result/lines', [{ name: 'Lyon' }]));
+    expect(screen.getByText('Lyon')).toBeTruthy();
+    if (withHandler) expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
+  it('neither tries again nor reports again while what it renders from is unchanged', () => {
+    const store = createStateStore({ result: { lines: 'not a list' } });
+    const onElementError = vi.fn();
+    render(
+      <GenerativePage spec={LINES} store={store} scope={{}} onElementError={onElementError} />,
+    );
+    act(() => store.set('/ui/elsewhere', 1));
+    act(() => store.set('/ui/elsewhere', 2));
+    expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports nothing while the layout is loading, and what still fails once it ends', () => {
+    const store = createStateStore({ result: { lines: 'not a list' } });
+    const onElementError = vi.fn();
+    const { rerender } = render(
+      <GenerativePage
+        spec={LINES}
+        store={store}
+        scope={{}}
+        loading
+        onElementError={onElementError}
+      />,
+    );
+    expect(onElementError).not.toHaveBeenCalled();
+    rerender(
+      <GenerativePage
+        spec={LINES}
+        store={store}
+        scope={{}}
+        loading={false}
+        onElementError={onElementError}
+      />,
+    );
+    expect(onElementError).toHaveBeenCalledTimes(1);
   });
 });
 

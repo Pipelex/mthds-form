@@ -1,7 +1,8 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { GenerativePage } from '../page';
 
 /**
@@ -58,4 +59,54 @@ describe('the run button of a produced page', () => {
       expect(screen.getByRole('button', { name: /Plan my trip/ })).toBeDisabled();
     });
   }
+});
+
+/**
+ * A field may carry checks of its own, which `validateForm` runs - and
+ * json-render runs the binding after it whatever it recorded, so
+ * `[validateForm, run]` started a billed run of a form its own checks had just
+ * refused. The run is started only when every field's checks pass.
+ */
+describe('a run pressed while a field fails its own checks', () => {
+  const CHECKED: Spec = {
+    root: 'page',
+    elements: {
+      page: {
+        type: 'Stack',
+        props: { direction: 'vertical', gap: null, align: null, justify: null, className: null },
+        children: ['city', 'cta'],
+      },
+      city: {
+        type: 'Input',
+        props: {
+          label: 'City',
+          name: 'city',
+          type: null,
+          placeholder: null,
+          value: { $bindState: '/inputs/city' },
+          checks: [{ type: 'required', message: 'Name a city' }],
+          validateOn: null,
+        },
+        children: [],
+      },
+      cta: {
+        type: 'Cta',
+        props: { label: 'Plan my trip', hint: null },
+        children: [],
+        on: { press: [{ action: 'validateForm' }, { action: 'run' }] },
+      },
+    },
+  };
+
+  it('starts nothing, and shows the field its message, until the field passes', async () => {
+    const onRun = vi.fn();
+    const store = createStateStore({ inputs: { city: '' } });
+    render(<GenerativePage spec={CHECKED} store={store} scope={{}} onRun={onRun} />);
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    expect(onRun).not.toHaveBeenCalled();
+    expect(await screen.findByText('Name a city')).toBeTruthy();
+    await userEvent.type(screen.getByRole('textbox', { name: /City/ }), 'Lyon');
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+  });
 });

@@ -2,7 +2,12 @@
 
 import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
-import { JSONUIProvider, Renderer } from '@json-render/react';
+import {
+  JSONUIProvider,
+  Renderer,
+  useOptionalValidation,
+  type ValidationContextValue,
+} from '@json-render/react';
 import { BrandProvider } from './brand-context';
 import {
   ElementBoundary,
@@ -29,7 +34,8 @@ export interface GenerativePageProps {
   /**
    * What `run` does. Receives the state at the moment the call to action was
    * pressed. Return the run's promise and a press while it is pending starts
-   * nothing.
+   * nothing. Not called while a field's own checks (its `checks` prop) fail:
+   * the press shows each failing field its message instead.
    */
   onRun?: (state: StateModel) => void | Promise<unknown>;
   /** Whether a stream is still arriving. */
@@ -50,7 +56,10 @@ export interface GenerativePageProps {
    * the page and catches its throw in a boundary of its own, so a boundary
    * around the page never fires; this is how a host hears of it, and falls
    * back to its plain view if it wants the whole page to. The element renders
-   * nothing in its place either way. Without it, json-render logs the error.
+   * nothing in its place either way, and draws again once what it renders
+   * from changes. Not called while `loading`: what still fails when the stream
+   * ends is reported then. Without it, the error is logged as json-render logs
+   * it, and the root's goes on to the host's own boundary around the page.
    */
   onElementError?: ElementErrorHandler;
 }
@@ -118,13 +127,17 @@ export function GenerativePage({
   );
   // json-render resolves an element's props before its renderer runs, so a
   // throw there is caught by the boundary of the element above - and the root
-  // has none. Its own boundary is given another try with every new spec - a
-  // new layout, judged by its content: a host that parses its spec inline
-  // hands a new object at every render, and one whose report sets its state
-  // would otherwise retry, throw and report until React gave up.
+  // has none. Its own boundary is given another try with each new layout,
+  // judged by its content once the page is not loading: a host that parses
+  // its spec inline hands a new object at every render, and one whose report
+  // sets its state would otherwise retry, throw and report until React gave
+  // up. The content is read only while the root has failed, so a streamed
+  // layout is not written out whole at every patch.
   const rootType = spec?.elements?.[spec.root]?.type ?? 'root';
-  const specContent = React.useMemo(() => contentOf(spec), [spec]);
   const reporting = onElementError !== undefined;
+  // The page's own checks, as json-render's `validateForm` runs them, read at
+  // the press that runs it (below).
+  const validation = React.useRef<ValidationContextValue | null>(null);
 
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
@@ -146,6 +159,15 @@ export function GenerativePage({
     return {
       run: () => {
         if (running.current) return undefined;
+        // A layout's fields may carry checks of their own, which `validateForm`
+        // runs and records - and json-render runs the next binding whatever it
+        // recorded, so `[validateForm, run]` ran a form its own checks had just
+        // refused, and only the host's run gate stood between it and a billed
+        // run. A run is started only when every field's checks pass, and
+        // running them shows each failing field its message, as `validateForm`
+        // does.
+        const checks = validation.current;
+        if (checks && !checks.validateAll()) return undefined;
         running.current = true;
         let pending: unknown;
         try {
@@ -171,11 +193,14 @@ export function GenerativePage({
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
         <ReportingContext.Provider value={reporting}>
+          <ValidationBridge into={validation} />
           <ElementBoundary
             type={rootType}
             report={report}
             reporting={reporting}
-            resetOn={specContent}
+            loading={loading === true}
+            resetOn={spec}
+            root
           >
             <Renderer spec={spec} registry={pageRegistry} loading={loading} />
           </ElementBoundary>
@@ -187,16 +212,17 @@ export function GenerativePage({
 }
 
 /**
- * A spec as the text of its content, for telling a new layout from the same
- * one handed again as a new object. A spec is JSON a model wrote, so it always
- * has one; anything that does not stringify is compared as itself.
+ * Hands the page's validation - the checks its fields registered with
+ * json-render, which `validateForm` runs - to the run handler, which is
+ * created above the provider that holds it. Refreshed in an insertion effect,
+ * before any press can reach the handler.
  */
-function contentOf(spec: Spec | null): unknown {
-  try {
-    return JSON.stringify(spec);
-  } catch {
-    return spec;
-  }
+function ValidationBridge({ into }: { into: React.RefObject<ValidationContextValue | null> }) {
+  const validation = useOptionalValidation();
+  React.useInsertionEffect(() => {
+    into.current = validation;
+  });
+  return null;
 }
 
 /** The store's current state, re-rendering on every change. For a receipt beside a page. */
