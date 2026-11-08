@@ -112,6 +112,80 @@ describe('writtenSampleOf', () => {
     ]);
   });
 
+  it('refuses a day the calendar does not have', () => {
+    for (const day of ['2026-02-30', '2026-13-01']) {
+      expect(writtenSampleOf(invoice, JSON.stringify({ issued: day })).problems).toEqual([
+        '/result/issued should hold a day written as YYYY-MM-DD',
+      ]);
+    }
+    expect(writtenSampleOf(invoice, '{"issued":"2024-02-29"}').problems).toEqual([]);
+  });
+
+  describe('the limits the method states', () => {
+    const bounded: RunField = {
+      ...common,
+      kind: 'object',
+      name: 'bounded',
+      fields: [
+        { ...common, kind: 'number', name: 'score', integer: true, min: 0, max: 100 },
+        { ...common, kind: 'text', name: 'code', minLength: 2, maxLength: 3 },
+        {
+          ...common,
+          kind: 'list',
+          name: 'tags',
+          item: text('item'),
+          itemCount: 2,
+          maxItemCount: 3,
+        },
+      ],
+    } as RunField;
+    const problemsOf = (sample: object) =>
+      writtenSampleOf(bounded, JSON.stringify(sample)).problems;
+
+    it('accepts a value on either limit', () => {
+      expect(problemsOf({ score: 0, code: 'ab', tags: ['a', 'b'] })).toEqual([]);
+      expect(problemsOf({ score: 100, code: 'abc', tags: ['a', 'b', 'c'] })).toEqual([]);
+    });
+
+    it('refuses a value below the least, naming the limit', () => {
+      expect(problemsOf({ score: -1, code: 'a', tags: ['a'] })).toEqual([
+        '/result/score should hold at least 0',
+        '/result/code should hold at least 2 characters',
+        '/result/tags should hold at least 2 items',
+      ]);
+    });
+
+    it('refuses a value above the most, naming the limit', () => {
+      expect(problemsOf({ score: 101, code: 'abcd', tags: ['a', 'b', 'c', 'd'] })).toEqual([
+        '/result/score should hold at most 100',
+        '/result/code should hold at most 3 characters',
+        '/result/tags should hold at most 3 items',
+      ]);
+    });
+
+    it('counts the characters a person reads rather than UTF-16 units', () => {
+      expect(problemsOf({ code: '😀😀😀' })).toEqual([]);
+    });
+
+    it('still walks the items of a list whose count is wrong', () => {
+      expect(problemsOf({ tags: [1] })).toEqual([
+        '/result/tags should hold at least 2 items',
+        '/result/tags/0 should hold a text',
+      ]);
+    });
+
+    it('asks for no count on a list of what a sample leaves out', () => {
+      const files: RunField = {
+        ...common,
+        kind: 'list',
+        name: 'result',
+        item: { ...common, kind: 'image', name: 'item', formats: [] },
+        itemCount: 2,
+      } as RunField;
+      expect(writtenSampleOf(files, '[]').problems).toEqual([]);
+    });
+  });
+
   it('wants a file, an image, prose and a date with a time left out, even where the result frame draws one', () => {
     const { problems } = writtenSampleOf(
       invoice,

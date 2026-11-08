@@ -1,4 +1,5 @@
 import type { RunField } from '../core';
+import { isAcceptableDate } from '../core/date-format';
 import { isDelegatedResult } from './brief';
 import { RESULT_ROOT, joinPath } from './paths';
 
@@ -27,9 +28,11 @@ export interface WrittenSample {
 const CODE_FENCE = /^```[\w-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/;
 
 /**
- * What a sample must leave out: what the page hands to the kernel, and every
- * file. A file is left out even where the result frame draws it itself,
- * because a link a model made up draws nothing or, worse, fetches something.
+ * What a sample must leave out: what the result frame hands to the kernel, and
+ * every file. A file is left out even where that frame draws it itself, because
+ * a link a model made up draws nothing or, worse, fetches something. The check
+ * reads the result frame's delegation whatever frame the brief named, since a
+ * page with no run to read is a result page.
  */
 function isLeftOut(field: RunField): boolean {
   return field.kind === 'document' || field.kind === 'image' || isDelegatedResult(field, 'result');
@@ -38,9 +41,6 @@ function isLeftOut(field: RunField): boolean {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-/** A day written as text, the way a real run's state holds one. */
-const WRITTEN_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** What a kind is called in a problem, in the words a person would use. */
 function kindInWords(field: RunField): string {
@@ -86,7 +86,7 @@ function holdsKind(field: RunField, value: unknown): boolean {
     case 'enum':
       return typeof value === 'string' && field.options.includes(value);
     case 'date':
-      return typeof value === 'string' && WRITTEN_DAY.test(value);
+      return typeof value === 'string' && isAcceptableDate(value);
     case 'object':
       return isRecord(value);
     case 'list':
@@ -97,6 +97,41 @@ function holdsKind(field: RunField, value: unknown): boolean {
       return false;
     default:
       return field satisfies never;
+  }
+}
+
+/** Where an amount falls outside the limits a method states, in words; nothing when it is inside. */
+function limitInWords(
+  amount: number,
+  least: number | undefined,
+  most: number | undefined,
+  unit: string,
+): string | undefined {
+  if (least !== undefined && amount < least) return `should hold at least ${least}${unit}`;
+  if (most !== undefined && amount > most) return `should hold at most ${most}${unit}`;
+  return undefined;
+}
+
+/**
+ * What is wrong with a value of the right kind by the limits the method
+ * states. A pattern is the runner's to judge. A list of what a sample leaves
+ * out has no count to keep: each of its items is already a problem.
+ */
+function outsideLimits(field: RunField, value: unknown): string | undefined {
+  switch (field.kind) {
+    case 'number':
+      return typeof value === 'number' ? limitInWords(value, field.min, field.max, '') : undefined;
+    case 'text':
+    case 'prose':
+      return typeof value === 'string'
+        ? limitInWords([...value].length, field.minLength, field.maxLength, ' characters')
+        : undefined;
+    case 'list':
+      return Array.isArray(value) && !isLeftOut(field.item)
+        ? limitInWords(value.length, field.itemCount, field.maxItemCount, ' items')
+        : undefined;
+    default:
+      return undefined;
   }
 }
 
@@ -116,6 +151,8 @@ function check(field: RunField, value: unknown, path: string, problems: string[]
     problems.push(`${path} should hold ${kindInWords(field)}`);
     return;
   }
+  const limit = outsideLimits(field, value);
+  if (limit !== undefined) problems.push(`${path} ${limit}`);
   if (field.kind === 'object' && isRecord(value)) {
     const members = new Map(field.fields.map((member) => [member.name, member]));
     for (const [key, held] of Object.entries(value)) {
@@ -133,8 +170,9 @@ function check(field: RunField, value: unknown, path: string, problems: string[]
 
 /**
  * Parse a written sample, a code fence around it tolerated, and compare it
- * with the descriptor of the result: known members only, kinds that match, and
- * what a sample must leave out absent. It never throws, and it asks for no
+ * with the descriptor of the result: known members only, kinds that match
+ * within the limits the method states, and what a sample must leave out
+ * absent. It never throws, and it asks for no
  * member to be present: a sample that says less than the method can is still
  * one a page draws from.
  */

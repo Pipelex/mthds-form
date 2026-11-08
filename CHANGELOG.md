@@ -5,7 +5,7 @@
 ### Added
 
 - **A designer entry that writes its own sample**: the new `./layout-sample.mthds` ships beside `./layout-design.mthds`, and its pipe `layout_sample.design_from_written_sample` designs a result page with no run to read by inventing one state of the result first, leaving `PROMPT_HASH` where it was. A host sends both files and starts that pipe, and `resultBrief` takes an `undefined` state, which omits `sample_state`.
-- **`writtenSampleOf(field, text)`**: exported from `./generative/headless` and `./generative`, it parses a written sample (a code fence around it is tolerated) and answers `{ state, problems }`: known members only, kinds that match, delegated paths and every file absent. A sample with problems never blocks a layout.
+- **`writtenSampleOf(field, text)`**: exported from `./generative/headless` and `./generative`, it parses a written sample (a code fence around it is tolerated) and answers `{ state, problems }`: known members only, kinds that match within the limits the method states, delegated paths and every file absent. A sample with problems never blocks a layout.
 
 ### Changed
 
