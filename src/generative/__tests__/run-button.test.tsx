@@ -201,4 +201,37 @@ describe('a run pressed while a field fails its own checks', () => {
     expect(errors.mock.calls.flat().join(' ')).not.toMatch(/Maximum update depth/);
     errors.mockRestore();
   });
+
+  it('is refused by a field on a step left behind, which stays mounted and hidden', async () => {
+    // A step's panel used to unmount, taking its fields' checks out of the
+    // page's record, so a run pressed on the last step started past them.
+    const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+    const stepped: Spec = {
+      root: 'steps',
+      elements: {
+        steps: {
+          type: 'Steps',
+          props: { steps: ['Where', 'Go'], nextLabel: 'Next', backLabel: 'Back' },
+          children: ['first', 'second'],
+        },
+        first: { type: 'Stack', props: STACK, children: ['city'] },
+        second: { type: 'Stack', props: STACK, children: ['cta'] },
+        city: CHECKED.elements.city!,
+        cta: CHECKED.elements.cta!,
+      },
+    };
+    const onRun = vi.fn();
+    render(
+      <GenerativePage
+        spec={stepped}
+        store={createStateStore({ inputs: { city: '' } })}
+        scope={{}}
+        onRun={onRun}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    await waitFor(() => expect(screen.getByText('Name a city')).toBeTruthy());
+    expect(onRun).not.toHaveBeenCalled();
+  });
 });

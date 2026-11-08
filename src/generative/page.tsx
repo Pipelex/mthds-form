@@ -173,8 +173,14 @@ export function GenerativePage({
         // `validateForm` does. The checks are those of the fields mounted now,
         // which the page's record keeps json-render told of, so a field
         // hidden or dropped since does not hold the run.
+        // The record's own checks run too, as it holds them now, since the
+        // provider's may lag a field mounted the task before.
         const checks = validation.current;
-        if (checks && !checks.validateAll()) return undefined;
+        if (checks) {
+          const registered = checks.validateAll();
+          const mounted = checkedFields.check(checks);
+          if (!registered || !mounted) return undefined;
+        }
         running.current = true;
         let pending: unknown;
         try {

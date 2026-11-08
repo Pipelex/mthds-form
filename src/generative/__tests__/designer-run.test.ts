@@ -246,6 +246,15 @@ describe('an answer that holds the checks failing', () => {
     });
   });
 
+  it('answers a spec it cannot write out with a line, never a throw', () => {
+    for (const spec of [BigInt(1), Symbol('page')]) {
+      const check = () =>
+        layoutCheck(spec as unknown as Spec, { frame: 'composer', descriptor: { inputs } });
+      expect(check).not.toThrow();
+      expect(check().problems).toHaveLength(1);
+    }
+  });
+
   it('runs the shape check once, and answers the same lines as before', () => {
     expect(layoutCheckProblems(composer, { frame: 'composer', descriptor: { inputs } })).toEqual(
       layoutCheck(composer, { frame: 'composer', descriptor: { inputs } }).problems,

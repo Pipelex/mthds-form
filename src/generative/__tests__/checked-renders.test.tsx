@@ -375,8 +375,8 @@ describe('tabs that share a value', () => {
       },
     };
     render(<GenerativePage spec={spec} store={createStateStore({})} scope={{}} brand={BRAND} />);
-    expect(screen.getByText('First panel')).toBeTruthy();
-    expect(screen.queryByText('Second panel')).toBeNull();
+    expect(screen.getByText('First panel').closest('[hidden]')).toBeNull();
+    expect(screen.getByText('Second panel').closest('[hidden]')).not.toBeNull();
     expect(logged.flat().join(' ')).not.toMatch(/same key/);
   });
 
@@ -428,6 +428,37 @@ describe('tabs that share a value', () => {
       },
     };
     rerender(<GenerativePage spec={two} store={store} scope={{}} brand={BRAND} />);
-    expect(screen.getByText('First panel')).toBeTruthy();
+    expect(screen.getByText('First panel').closest('[hidden]')).toBeNull();
+  });
+
+  it('keep the open tab open when a new layout inserts one before it', async () => {
+    const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+    const text = (t: string) => ({ type: 'Text', props: { text: t, variant: null }, children: [] });
+    const tabsOf = (values: string[]): Spec => ({
+      root: 'tabs',
+      elements: {
+        tabs: {
+          type: 'Tabs',
+          props: { tabs: values.map((value) => ({ label: value, value })) },
+          children: values.map((value) => `p-${value}`),
+        },
+        ...Object.fromEntries(
+          values.flatMap((value) => [
+            [`p-${value}`, { type: 'Stack', props: STACK, children: [`t-${value}`] }],
+            [`t-${value}`, text(`Panel ${value}`)],
+          ]),
+        ),
+      },
+    });
+    const store = createStateStore({});
+    const { rerender } = render(
+      <GenerativePage spec={tabsOf(['A', 'B', 'C'])} store={store} scope={{}} brand={BRAND} />,
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'B' }));
+    rerender(
+      <GenerativePage spec={tabsOf(['X', 'A', 'B', 'C'])} store={store} scope={{}} brand={BRAND} />,
+    );
+    expect(screen.getByText('Panel B').closest('[hidden]')).toBeNull();
+    expect(screen.getByText('Panel A').closest('[hidden]')).not.toBeNull();
   });
 });

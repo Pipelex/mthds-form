@@ -26,7 +26,9 @@ import {
  * what `validateForm` and the run decide agree.
  */
 export class CheckedFields {
-  private readonly byPath = new Map<string, Set<ValidationConfig>>();
+  // One entry per mounted field, so two fields handed one config object are
+  // two entries, and one leaving does not take the other's checks with it.
+  private readonly byPath = new Map<string, Set<{ config: ValidationConfig }>>();
   private validation: ValidationContextValue | null = null;
 
   /** Hands the record json-render's validation, and tells it what is already mounted. */
@@ -39,12 +41,13 @@ export class CheckedFields {
 
   /** Enters one mounted field's checks; what it returns leaves them again. */
   enter(path: string, config: ValidationConfig): () => void {
-    const configs = this.byPath.get(path) ?? new Set<ValidationConfig>();
+    const configs = this.byPath.get(path) ?? new Set<{ config: ValidationConfig }>();
     this.byPath.set(path, configs);
-    configs.add(config);
+    const entry = { config };
+    configs.add(entry);
     this.publish(path);
     return () => {
-      configs.delete(config);
+      configs.delete(entry);
       if (configs.size === 0) this.byPath.delete(path);
       this.publish(path);
     };
@@ -56,9 +59,25 @@ export class CheckedFields {
     if (!configs || configs.size === 0) return undefined;
     const [first] = configs;
     return {
-      checks: [...configs].flatMap((config) => config.checks ?? []),
-      ...(first?.validateOn ? { validateOn: first.validateOn } : {}),
+      checks: [...configs].flatMap(({ config }) => config.checks ?? []),
+      ...(first?.config.validateOn ? { validateOn: first.config.validateOn } : {}),
     };
+  }
+
+  /**
+   * Runs the checks of every path a mounted field carries, as the record
+   * holds them now, and answers whether they all pass; every path is checked,
+   * so each failing field shows its message. json-render's own `validateAll`
+   * reads what it was told as of its provider's last render, which a press
+   * can beat by one task when a field has just mounted.
+   */
+  check(validation: ValidationContextValue): boolean {
+    let pass = true;
+    for (const path of this.byPath.keys()) {
+      const combined = this.configFor(path);
+      if (combined && !validation.validate(path, combined).valid) pass = false;
+    }
+    return pass;
   }
 
   private publish(path: string): void {

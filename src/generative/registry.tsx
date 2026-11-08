@@ -533,21 +533,32 @@ interface TabsProps {
 /**
  * Tabs whose panels follow the active tab - the reason shadcn's is not in the
  * catalog. The nth child is the nth tab's panel; the active tab is local
- * state, so a spec never touches /state for it. Radix unmounts an inactive
- * panel, and the inputs in it keep their values in the store.
+ * state, so a spec never touches /state for it. An inactive panel stays
+ * mounted and hidden, so the checks of the fields in it still hold the run:
+ * unmounted, as Radix does by default, they left the page's record, and a
+ * run pressed from another tab started past a field that refused it.
  */
 function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const tabs = props.tabs ?? [];
   const panels = React.Children.toArray(children);
   // Each tab is told apart by its position, which is unique where a layout's
   // values need not be: two tabs written with one value would otherwise be
-  // one tab to Radix, opening both panels, and one key to React.
-  const [chosen, setValue] = React.useState('0');
-  // A layout patched or swapped while a tab is open may have fewer tabs than
-  // the position chosen: the first opens rather than none.
-  const value = Number(chosen) < tabs.length ? chosen : '0';
+  // one tab to Radix, opening both panels, and one key to React. The open
+  // tab is remembered by its value, and which of the tabs sharing it, so it
+  // stays open when a patched layout inserts or removes a tab before it; one
+  // the layout no longer has gives way to the first.
+  const [chosen, setChosen] = React.useState<{ value: string; occurrence: number } | null>(null);
+  const open = chosen ? openIndex(tabs, chosen) : 0;
+  const value = String(open);
+  const choose = (next: string) => {
+    const index = Number(next);
+    const tab = tabs[index];
+    if (!tab) return;
+    const occurrence = tabs.slice(0, index).filter((t) => t.value === tab.value).length;
+    setChosen({ value: tab.value, occurrence });
+  };
   return (
-    <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
+    <TabsPrimitive.Root value={value} onValueChange={choose} className="w-full">
       {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
           however short its label, and the list around it with it, wrapping
           onto a second row rather than pushing the page sideways. */}
@@ -566,6 +577,8 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
         <TabsPrimitive.Content
           key={index}
           value={String(index)}
+          forceMount
+          hidden={index !== open}
           className="mt-4 focus-visible:outline-hidden"
         >
           {panels[index] ?? null}
@@ -573,6 +586,20 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
       ))}
     </TabsPrimitive.Root>
   );
+}
+
+/** The position of the `occurrence`th tab carrying `value`, or the first tab's when none does. */
+function openIndex(
+  tabs: readonly { value: string }[],
+  { value, occurrence }: { value: string; occurrence: number },
+): number {
+  let seen = 0;
+  for (const [index, tab] of tabs.entries()) {
+    if (tab.value !== value) continue;
+    if (seen === occurrence) return index;
+    seen += 1;
+  }
+  return 0;
 }
 
 // As tall as the layer's own `Button`, which is the 44 pixels a finger needs.
@@ -594,8 +621,9 @@ interface StepsProps {
  * A journey: a numbered indicator, one panel at a time, and its own Back and
  * Next. The nth child is the nth step's panel; the spec's one Button sits
  * inside the last one, which is why Next disappears there. The current step
- * is local state. A hidden panel is unmounted, and its inputs keep their
- * values in the store - a step hides from the eye, never from the run.
+ * is local state. A hidden panel stays mounted, so its inputs keep their
+ * values in the store and their checks hold the run - a step hides from the
+ * eye, never from the run.
  */
 function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const steps = props.steps ?? [];
@@ -633,7 +661,11 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
           </li>
         ))}
       </ol>
-      <div>{panels[index] ?? null}</div>
+      {steps.map((_step, position) => (
+        <div key={position} hidden={position !== index}>
+          {panels[position] ?? null}
+        </div>
+      ))}
       {index > 0 || index < last ? (
         <div className="flex items-center justify-between gap-3">
           {index > 0 ? (

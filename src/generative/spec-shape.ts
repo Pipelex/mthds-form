@@ -14,6 +14,18 @@
  * element key - so a producer stops rather than repairs.
  */
 
+/** A value that is no spec, in words for the line that says so; never throws. */
+function shown(value: unknown): string {
+  if (Array.isArray(value)) return 'a list';
+  if (typeof value === 'bigint') return String(value);
+  if (typeof value === 'symbol' || typeof value === 'function') return `a ${typeof value}`;
+  try {
+    return String(JSON.stringify(value ?? null));
+  } catch {
+    return 'a value that cannot be written out';
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -29,8 +41,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * run.
  */
 export function specMalformation(spec: unknown): string | undefined {
-  if (!isRecord(spec))
-    return `it is ${Array.isArray(spec) ? 'a list' : String(JSON.stringify(spec ?? null))}, not a structure`;
+  if (!isRecord(spec)) return `it is ${shown(spec)}, not a structure`;
   if (!isRecord(spec.elements)) return 'it has no "elements" map';
   for (const [key, element] of Object.entries(spec.elements)) {
     const at = JSON.stringify(key);
