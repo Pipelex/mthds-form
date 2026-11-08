@@ -191,7 +191,7 @@ async function expectEveryFocusOutlined(canvasElement: HTMLElement) {
 
 /**
  * Every error mark reads at 3:1 on what it is drawn over: a field's outline,
- * standing off the field, on the panel round it, and a structure's card
+ * standing off the field, on what surrounds it, and a structure's card
  * outline on the page the card stands on.
  */
 async function expectEveryErrorMarkReads(canvasElement: HTMLElement) {
@@ -199,15 +199,21 @@ async function expectEveryErrorMarkReads(canvasElement: HTMLElement) {
   await expect(all.length, 'style blocks').toBeGreaterThan(0);
   for (const block of all) {
     const outlines = [...block.querySelectorAll<HTMLElement>('[data-error-outline]')];
-    // The headline, the body and the document, in the panel.
-    await expect(outlines.length, `${where(block)}: field outlines`).toBe(3);
+    // The headline, the body and the document in the panel, and the empty
+    // required member of the structure on the page, which its refused
+    // structure marks.
+    await expect(outlines.length, `${where(block)}: field outlines`).toBe(4);
+    await expect(
+      outlines.filter((outline) => outline.closest('.af-panel')).length,
+      `${where(block)}: field outlines in the panel`,
+    ).toBe(3);
     for (const outline of outlines) {
       const drawn = getComputedStyle(outline);
       await expect(drawn.boxShadow, `${where(outline)}: no painted ring`).toBe('none');
       await expect(drawn.outlineStyle, `${where(outline)}: outline style`).toBe('solid');
       await expect(
-        paintedContrast(drawn.outlineColor, backgroundOf(outline.closest('.af-panel')!)),
-        `${where(outline)}: a field's error outline on the panel`,
+        paintedContrast(drawn.outlineColor, backgroundOf(outline.parentElement!)),
+        `${where(outline)}: a field's error outline on what surrounds it`,
       ).toBeGreaterThanOrEqual(3);
     }
     // A card in error sets its message under itself, beside it in its group.
