@@ -17,6 +17,7 @@ import { render, screen, within } from '@testing-library/react';
 import type { BooleanRunField, ListRunField, ObjectRunField, TextRunField } from '../../core';
 import { FramedFormContext, ObjectField } from '../object-field';
 import { FieldRenderer } from '../field-renderer';
+import { FieldPresentationProvider } from '../field-presentation';
 
 const flag = (name: string): BooleanRunField => ({
   kind: 'boolean',
@@ -307,5 +308,36 @@ describe('a structure in error', () => {
     calm.unmount();
     const failed = renderShop({ framed: true, error: 'Required' });
     expect(boxes(failed.container)).toEqual(before);
+  });
+});
+
+/**
+ * A structure names its description to assistive technology only when the
+ * description is drawn: in `app` one that restates the name is left out, and a
+ * group still pointing at it would point at nothing.
+ */
+describe("a structure's description in an app", () => {
+  const renderWith = (description: string) =>
+    render(
+      <FieldPresentationProvider presentation="app">
+        <ObjectField
+          field={{ ...structOf([note('body')]), description }}
+          value={{}}
+          onChange={() => {}}
+          id="brief"
+        />
+      </FieldPresentationProvider>,
+    );
+
+  it('describes the group by the description it draws', () => {
+    renderWith('Who it is written for and what they already know');
+    expect(screen.getByRole('group', { name: 'Brief' })).toHaveAccessibleDescription(
+      'Who it is written for and what they already know',
+    );
+  });
+
+  it('points at nothing when the description restates the name and is left out', () => {
+    renderWith('The brief');
+    expect(screen.getByRole('group', { name: 'Brief' })).not.toHaveAttribute('aria-describedby');
   });
 });
