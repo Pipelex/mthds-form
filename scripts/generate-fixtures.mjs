@@ -1180,16 +1180,20 @@ async function pinPromptHash() {
  * The variants of a hero this pass designs (`variantsOf`): each of its frames,
  * a whole product page with no style, and a moment of a host's
  * compose-then-result app in every app style. One brief file and one capture
- * per variant; `FRAME=` and `STYLE=` narrow a pass to some of them.
+ * per variant; `FRAME=` and `STYLE=` narrow a pass to some of them, as
+ * `selectVariants` reads them: a style drops the unstyled pages unless
+ * `FRAME=page`, and a frame or a style that is not one stops the pass before
+ * anything is spent.
  */
 function variantsOf(hero, g) {
-  return g
-    .variantsOf(hero)
-    .filter(
-      (variant) =>
-        (!process.env.FRAME || variant.frame === process.env.FRAME) &&
-        (!process.env.STYLE || variant.frame === 'page' || variant.style === process.env.STYLE),
-    );
+  try {
+    return g.selectVariants(g.variantsOf(hero), {
+      frame: process.env.FRAME,
+      style: process.env.STYLE,
+    });
+  } catch (error) {
+    die(error.message);
+  }
 }
 
 /**
@@ -1898,18 +1902,25 @@ async function reemitModules() {
     process.stdout.write('generate-fixtures: no specs or payloads modules to re-emit.\n');
     return;
   }
+  const g = specsModules.length > 0 ? await loadGenerative() : undefined;
   for (const caseName of specsModules) {
-    // A framed capture's brief is keyed by its frame and style as well, as
-    // `briefKey` names it when the sweep stores one; a page capture's by its
-    // pipe alone.
-    const specs = (await loadSpecs(caseName)).map((fixture) => ({
-      ...fixture,
-      brief: briefRelPath(
+    // Each capture's brief under the key the sweep stored it by, `briefKey`
+    // over the hero it was written for and its variant, so the two cannot
+    // name a brief differently: a framed capture's by its frame and style as
+    // well, a page capture's by its pipe alone.
+    const specs = (await loadSpecs(caseName)).map((fixture) => {
+      const hero = g.heroOfCapture(fixture);
+      if (!hero) {
+        die(
+          `${caseName}: a capture of ${fixture.pipeRef} in the ${fixture.frame ?? 'page'} frame names no hero of src/__stories__/heroes.ts.`,
+        );
+      }
+      const variant =
         fixture.frame && fixture.frame !== 'page'
-          ? `${fixture.pipeRef}.${fixture.frame}.${fixture.style}`
-          : fixture.pipeRef,
-      ),
-    }));
+          ? { frame: fixture.frame, style: fixture.style }
+          : { frame: 'page' };
+      return { ...fixture, brief: briefRelPath(g.briefKey(hero, variant)) };
+    });
     writeSpecsModule(caseName, specs);
   }
   // A payloads module is its fixtures under a header, so it re-emits the same

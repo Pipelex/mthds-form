@@ -16,7 +16,7 @@
  */
 
 import { APP_STYLE_IDS, type AppStyleId } from '../brand/styles';
-import type { Frame } from '../generative/frame-definitions';
+import { FRAMES, type Frame } from '../generative/frame-definitions';
 
 /** Where a hero's case lives, and what the fixtures pass did to it. */
 export type HeroSource = 'structures' | 'methods';
@@ -66,6 +66,40 @@ export type Variant =
 export function variantsOf(hero: Hero): Variant[] {
   return framesOf(hero).flatMap((frame): Variant[] =>
     frame === 'page' ? [{ frame }] : APP_STYLE_IDS.map((style) => ({ frame, style })),
+  );
+}
+
+/** What narrows a sweep to some variants: the `FRAME=` and `STYLE=` it was given, unset or empty for none. */
+export interface VariantFilter {
+  frame?: string;
+  style?: string;
+}
+
+/**
+ * The variants a paid sweep designs, out of `variants`, narrowed by `filter`.
+ *
+ * A frame keeps the variants in it. A style keeps the moments of a host's app
+ * in that style and drops every whole page, which has no style, unless the
+ * frame asked for is `page`: `STYLE=soft` alone is a pass over `soft`, and
+ * used to buy each hero's unstyled page beside it. Both are checked before
+ * anything is filtered, since the sweep spends inference on what is left: a
+ * misspelt style (`STYLE=sotf`) matched no moment, kept the pages, and so
+ * never reached the sweep's "no variant left" refusal. Throws, naming the
+ * values it takes, on a frame or a style that is not one.
+ */
+export function selectVariants(variants: readonly Variant[], filter: VariantFilter): Variant[] {
+  const frame = filter.frame || undefined;
+  const style = filter.style || undefined;
+  if (frame !== undefined && !(FRAMES as readonly string[]).includes(frame)) {
+    throw new Error(`FRAME=${frame} is no frame; it is one of ${FRAMES.join(', ')}.`);
+  }
+  if (style !== undefined && !(APP_STYLE_IDS as readonly string[]).includes(style)) {
+    throw new Error(`STYLE=${style} is no app style; it is one of ${APP_STYLE_IDS.join(', ')}.`);
+  }
+  return variants.filter(
+    (variant) =>
+      (frame === undefined || variant.frame === frame) &&
+      (style === undefined || frame === 'page' || variant.style === style),
   );
 }
 

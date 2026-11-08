@@ -6,6 +6,7 @@
 
 - **`framed` on `StuffViewer` and `ResultEnvProvider`**: a host that draws the result inside a panel of its own says so, and a table of records then draws no outline of its own inside it, keeping its header band, its row rules and a `rounded-md` corner for its band; a table inside an open row keeps its box. The box is on the DOM as `data-table-box` (`box` or `framed`). A host that sets nothing renders as before.
 - **`data-error-outline`**: the wrapper that outlines a field in error, in `app`, carries the attribute, so a host's stylesheet and a test can find the mark.
+- **`STYLE=` and `FRAME=` narrow the paid fixture sweep**: `make fixtures-specs` with `STYLE=soft` designs that style's framed moments and no unstyled page (a page is designed under `FRAME=page` whatever the style), an unknown style or frame stops the sweep before it spends anything, and `ONLY=` matches a pipe code or a case.
 
 ### Changed
 
