@@ -2,7 +2,10 @@ import type { Spec } from '@json-render/core';
 import type { RunField, RunFieldKind } from '../core';
 import { hasOwnProp } from '../core/own-property';
 import { catalog } from './catalog';
-import { isExpression } from './expressions';
+import { condBranches, expressionForm, isExpression } from './expressions';
+import { shareAmount } from './share-amount';
+import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
+import { unwrapped } from './zod-definition';
 import {
   INPUTS_ROOT,
   RESULT_ROOT,
@@ -14,6 +17,12 @@ import {
   repeatListPathOf,
   resultFieldAtPath,
 } from './paths';
+
+/**
+ * How many `$cond`s deep a ProportionBar part is followed into its branches;
+ * one nested deeper is read as an expression that reads nothing.
+ */
+const MAX_COND_DEPTH = 8;
 
 /**
  * Whether a stored layout still fits the descriptor it will be rendered over.
@@ -256,16 +265,24 @@ function staleRepeats(
   return problems;
 }
 
-/** A member name as a refusal writes it, with its article: `a "category"`, `an "amount"`. */
-function memberWords(name: string): string {
-  return `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${JSON.stringify(name)}`;
+/** A word with its indefinite article: `a "category"`, `an "amount"`, `an image value`. */
+function withArticle(word: string): string {
+  return `${/^["']?[aeiou]/i.test(word) ? 'an' : 'a'} ${word}`;
 }
 
-/** What a path of `kind` holds, in the words of a refusal: "a structure", "a file", "a text value". */
+/** A member name as a refusal writes it, with its article: `a "category"`, `an "amount"`. */
+function memberWords(name: string): string {
+  return withArticle(JSON.stringify(name));
+}
+
+/**
+ * What a path of `kind` holds, in the words of a refusal: what `NOT_A_VALUE`
+ * calls the kinds a value cannot be - "a structure", "a file", "a list" - and
+ * "a text value", "a number value" for the rest.
+ */
 function kindWords(kind: RunFieldKind): string {
-  if (kind === 'object') return 'a structure';
-  if (kind === 'document' || kind === 'image') return 'a file';
-  return `${/^[aeiou]/i.test(kind) ? 'an' : 'a'} ${kind} value`;
+  const wrong = hasOwnProp(NOT_A_VALUE, kind) ? NOT_A_VALUE[kind] : undefined;
+  return wrong ? wrong.what : withArticle(`${kind} value`);
 }
 
 /**
@@ -328,19 +345,6 @@ function listProps(): Map<string, Map<string, ListItems>> {
 
 /** The zod schemas whose values a list-taking prop can render as they are. */
 const VALUE_SCHEMAS = new Set(['string', 'number', 'boolean', 'enum', 'literal']);
-
-/** A zod definition, under the `.nullable()` / `.optional()` / `.default()` most props carry. */
-function unwrapped(schema: unknown): { type?: string; element?: unknown } | undefined {
-  let current: unknown = schema;
-  for (let depth = 0; depth < 8; depth += 1) {
-    const def = (current as { def?: { type?: string; innerType?: unknown; element?: unknown } })
-      .def;
-    if (!def) return undefined;
-    if (def.innerType === undefined) return def;
-    current = def.innerType;
-  }
-  return undefined;
-}
 
 /** What a prop declared as an array takes as its items, or nothing for a prop that is not one. */
 function listItemsOf(schema: unknown): ListItems | undefined {
@@ -446,32 +450,112 @@ function nonScalarReads(
         );
       }
     };
+    // The path an expression reads, resolved: `$state` and `$bindState` name
+    // it, `$item` and `$bindItem` name it relative to the repeat's item, and
+    // all four resolve to the value there. Nothing for any other value.
+    const readPath = (value: unknown): string | undefined => {
+      const form = expressionForm(value);
+      const record = value as Record<string, string>;
+      if (form === '$state' || form === '$bindState') return record[form];
+      if (form === '$item' || form === '$bindItem') return itemPath(record[form]!);
+      return undefined;
+    };
+    // Whether json-render resolves `value` to the repeat's index, a number.
+    const readsIndex = (value: unknown): boolean => expressionForm(value) === '$index';
+    // Every value `value` can resolve to, a `$cond` being either of its
+    // branches, each resolved again; the value itself for anything else.
+    const outcomes = (value: unknown, depth = 0): unknown[] => {
+      const branches = depth < MAX_COND_DEPTH ? condBranches(value) : undefined;
+      return branches ? branches.flatMap((branch) => outcomes(branch, depth + 1)) : [value];
+    };
     // Parts written out inline. The catalog takes a share's items as a list
-    // of anything, and the renderer reads each by member name, so every
-    // entry must be a structure naming both members; a member may itself be
-    // an expression, which `walk` holds to a value. What comes back is the
-    // entries left to walk: a refused one is named once, here.
+    // of anything, and the renderer reads each by member name and its value
+    // member as a number, so every entry must be a structure naming both
+    // members whose value member is a number - written as one, or read from
+    // a path that holds one - or a read of a structure that has both members,
+    // its value member a number. A part or an amount under a `$cond` is held
+    // to that in each branch, since either may be the one drawn. A part that
+    // is neither draws no share, silently. The label member may be any
+    // expression, which `walk` holds to a value. A path under no root the
+    // descriptor owns is the layout's own scratch state and left alone, and
+    // one the descriptor does not have is the staleness check's to name.
+    // What comes back is the entries left to walk: a refused one is named
+    // once, here, and a read part has nothing in it to walk.
     const inlineShares = (entries: readonly unknown[]): readonly unknown[] => {
       if (element.type !== 'ProportionBar') return entries;
       const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
       if (typeof labelKey !== 'string' || typeof valueKey !== 'string') return entries;
-      const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member, or the whole list is read with { "$state" }`;
-      return entries.filter((entry, index) => {
-        const part = `${key}: ProportionBar's part ${index + 1}`;
+      const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member holding a number, or the whole list is read with { "$state" }`;
+      // Whether an amount draws no share, naming why when it does not.
+      const amountRefused = (part: string, amount: unknown): boolean => {
+        // What the renderer draws a share from: a number, or a text that
+        // writes one out (`shareAmount`).
+        if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return false;
+        const path = readPath(amount);
+        if (path === undefined) {
+          const shown = isExpression(amount)
+            ? 'an expression that reads no number'
+            : String(JSON.stringify(amount ?? null));
+          problems.push(`${part}'s ${JSON.stringify(valueKey)} is ${shown}, not a number; ${how}`);
+          return true;
+        }
+        const field = isUnder(root, path) ? fieldAt(path) : undefined;
+        if (field && field.kind !== 'number' && field.kind !== 'unknown') {
+          problems.push(
+            `${part}'s ${JSON.stringify(valueKey)} reads ${path}, which holds ${kindWords(field.kind)}, not a number; ${how}`,
+          );
+          return true;
+        }
+        return false;
+      };
+      // One value a part can resolve to, held to the rule above.
+      const sharePart = (part: string, entry: unknown): unknown[] => {
         if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
           const shown = Array.isArray(entry) ? 'a list' : String(JSON.stringify(entry ?? null));
           problems.push(`${part} is ${shown}, not a structure; ${how}`);
-          return false;
+          return [];
         }
         if (isExpression(entry)) {
-          problems.push(`${part} is an expression, not a structure; ${how}`);
-          return false;
+          const path = readPath(entry);
+          if (path === undefined) {
+            problems.push(`${part} is an expression that reads no structure; ${how}`);
+            return [];
+          }
+          const field = isUnder(root, path) ? fieldAt(path) : undefined;
+          if (!field || field.kind === 'unknown') return [];
+          if (field.kind !== 'object') {
+            problems.push(`${part} reads ${path}, which holds ${kindWords(field.kind)}; ${how}`);
+            return [];
+          }
+          for (const name of [labelKey, valueKey]) {
+            const member = field.fields.find((m) => m.name === name);
+            if (!member) {
+              problems.push(
+                `${part} reads ${path}, which has no ${JSON.stringify(name)} member; ${how}`,
+              );
+            } else if (name === valueKey && member.kind !== 'number' && member.kind !== 'unknown') {
+              problems.push(
+                `${part} reads ${path}, whose ${JSON.stringify(name)} member holds ${kindWords(member.kind)}, not a number; ${how}`,
+              );
+            }
+          }
+          return [];
         }
         const missing = [labelKey, valueKey].find((name) => !hasOwnProp(entry, name));
         if (missing !== undefined) {
           problems.push(`${part} has no ${JSON.stringify(missing)} member; ${how}`);
+          return [entry];
         }
-        return true;
+        // A refused amount is named here, and the rest of the part is walked.
+        const { [valueKey]: amount, ...rest } = entry as Record<string, unknown>;
+        const refused = outcomes(amount)
+          .map((outcome) => amountRefused(part, outcome))
+          .some(Boolean);
+        return refused ? [rest] : [entry];
+      };
+      return entries.flatMap((entry, index) => {
+        const part = `${key}: ProportionBar's part ${index + 1}`;
+        return outcomes(entry).flatMap((outcome) => sharePart(part, outcome));
       });
     };
     const walk = (prop: string, value: unknown): void => {
@@ -618,10 +702,66 @@ function uncoveredUnder(field: RunField, path: string, offered: Offered): string
  * throw was not.
  */
 export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string[] {
+  const misshapen = descriptorMalformation(descriptor);
+  if (misshapen !== undefined) return [misshapen];
+  const malformed = specMalformation(spec);
+  if (malformed !== undefined) return [malformedLine(malformed)];
+  return fitCheck(descriptor, spec).problems;
+}
+
+/**
+ * What makes `descriptor` no descriptor the fit check can read, in words, or
+ * nothing. A descriptor is the host's, derived from the method; one of the
+ * wrong shape is answered as such, never as the checks' own failure. An
+ * absent half - `null` written for it included, which is how JSON carries one
+ * - is a descriptor with nothing on that side.
+ */
+export function descriptorMalformation(descriptor: unknown): string | undefined {
+  if (typeof descriptor !== 'object' || descriptor === null) {
+    return 'the layout has no descriptor to be checked against';
+  }
+  const { inputs, result } = descriptor as { inputs?: unknown; result?: unknown };
+  if (inputs != null && !Array.isArray(inputs)) {
+    return 'the descriptor\'s "inputs" is not a list of fields';
+  }
+  if (
+    result != null &&
+    (typeof result !== 'object' ||
+      Array.isArray(result) ||
+      typeof (result as { kind?: unknown }).kind !== 'string')
+  ) {
+    return 'the descriptor\'s "result" is not a field';
+  }
+  return undefined;
+}
+
+/**
+ * The fit check on a descriptor and a spec already known to have the shapes
+ * it reads, and whether the check itself failed on them - said beside the
+ * problems, so no reader has to recognise the failure by its words.
+ */
+export function fitCheck(
+  descriptor: LayoutDescriptor,
+  spec: Spec,
+): { problems: string[]; checksFailed: boolean } {
   try {
-    return collectLayoutProblems(descriptor, spec);
+    return { problems: collectLayoutProblems(descriptor, spec), checksFailed: false };
   } catch (error) {
-    return [`the layout is not a well-formed spec: ${String(error)}`];
+    return { problems: [checksFailedLine(error)], checksFailed: true };
+  }
+}
+
+/**
+ * A value a layout wrote, as text for a problem line: a text as it is,
+ * anything else as its JSON. Never throws, for a value whose own `toString`
+ * would.
+ */
+function shownAs(value: unknown): string {
+  if (typeof value === 'string') return value;
+  try {
+    return String(JSON.stringify(value ?? null));
+  } catch {
+    return 'a value that cannot be written out';
   }
 }
 
@@ -636,14 +776,14 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
       typeof written === 'string' ? absoluteHatchPath(spec, key, written, parents) : undefined;
     if (element.type === 'MthdsField') {
       if (!path || !inputFieldAtPath(descriptor.inputs ?? [], path)) {
-        problems.push(`${key}: MthdsField delegates ${String(written)}, which no input has`);
+        problems.push(`${key}: MthdsField delegates ${shownAs(written)}, which no input has`);
       } else {
         delegated.push(path);
       }
     }
     if (element.type === 'MthdsResult') {
       if (!path || !descriptor.result || !resultFieldAtPath(descriptor.result, path)) {
-        problems.push(`${key}: MthdsResult delegates ${String(written)}, which no result has`);
+        problems.push(`${key}: MthdsResult delegates ${shownAs(written)}, which no result has`);
       }
     }
     // A repeat renders its element ONCE and that element's children once per

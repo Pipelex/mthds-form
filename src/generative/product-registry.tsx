@@ -1,12 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import {
-  type BaseComponentProps,
-  defineRegistry,
-  useBoundProp,
-  useFieldValidation,
-} from '@json-render/react';
+import { type BaseComponentProps, defineRegistry, useBoundProp } from '@json-render/react';
+import { useCheckedField } from './checked-fields';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
@@ -199,14 +195,12 @@ interface SummaryRowProps {
   placeholder?: string | null;
 }
 
-function present(value: unknown): value is string | number | boolean {
-  return value !== undefined && value !== null && value !== '';
-}
-
 function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
+  // Each half as it writes out, so one that is a structure, which writes out
+  // as nothing, leaves no separator dangling.
   const text = [props.value, props.detail]
-    .filter(present)
     .map(textOf)
+    .filter((half) => half !== '')
     .join(props.separator ?? ' ');
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-3 first:pt-0 last:border-b-0">
@@ -305,7 +299,7 @@ function useTextField(
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'blur';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );

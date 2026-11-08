@@ -589,6 +589,11 @@ describe('a spec malformed in a way the walk itself throws on', () => {
     ['props that are not an object', { root: 'a', elements: { a: { type: 'Text', props: 5 } } }],
     ['a null element', { root: 'a', elements: { a: null } }],
     ['no elements map at all', { root: 'a' }],
+    ['an element naming no type', { root: 'a', elements: { a: { type: 7, props: {} } } }],
+    [
+      'a relative repeat naming no member',
+      { root: 'a', elements: { a: { type: 'Stack', props: {}, repeat: { statePath: {} } } } },
+    ],
   ])('answers no rather than throwing: %s', (_name, malformed) => {
     const spec = malformed as unknown as Spec;
     expect(() => layoutProblems(descriptor, spec)).not.toThrow();
@@ -600,6 +605,39 @@ describe('a spec malformed in a way the walk itself throws on', () => {
     const spec = { root: 'a', elements: { a: null } } as unknown as Spec;
     expect(layoutProblems(descriptor, spec)).toEqual([
       expect.stringContaining('the layout is not a well-formed spec'),
+    ]);
+  });
+
+  it('writes out a hatch path that is no text without calling its own toString', () => {
+    const spec = {
+      root: 'a',
+      elements: { a: { type: 'MthdsField', props: { path: { toString: 1 } }, children: [] } },
+    } as unknown as Spec;
+    expect(layoutProblems(descriptor, spec)).toContain(
+      'a: MthdsField delegates {"toString":1}, which no input has',
+    );
+  });
+
+  it('refuses a result that is a list or carries no kind, rather than reading it as a field', () => {
+    const spec = {
+      root: 'a',
+      elements: { a: { type: 'MthdsResult', props: { path: '/result' }, children: [] } },
+    } as unknown as Spec;
+    for (const result of [[], {}]) {
+      expect(layoutProblems({ result } as never, spec)).toEqual([
+        'the descriptor\'s "result" is not a field',
+      ]);
+    }
+  });
+
+  it('holds a half of the descriptor written as null to be absent', () => {
+    const spec = {
+      root: 'a',
+      elements: { a: { type: 'MthdsField', props: { path: '/inputs/city' }, children: [] } },
+    } as unknown as Spec;
+    expect(layoutProblems({ ...descriptor, result: null } as never, spec)).toEqual([]);
+    expect(layoutProblems({ inputs: null, result: text('total', true) } as never, spec)).toEqual([
+      'a: MthdsField delegates /inputs/city, which no input has',
     ]);
   });
 });
@@ -993,6 +1031,9 @@ describe("a share's parts", () => {
       { kind: 'number', name: 'amount', required: true, integer: false },
     ],
   };
+  /** What every refusal of a part says a part is. */
+  const HOW =
+    ' each part is written as a structure with a "category" member and an "amount" member holding a number, or the whole list is read with { "$state" }';
   const bar = (labelKey: string, valueKey: string): Spec => ({
     root: 'bar',
     elements: {
@@ -1061,24 +1102,144 @@ describe("a share's parts", () => {
     ).toEqual([]);
   });
 
-  it('refuses a part written out as a null, a scalar, an expression or a structure missing a member', () => {
+  it('refuses a part written out as a null, a scalar, an expression that reads no structure or a structure missing a member', () => {
     expect(
       layoutProblems(
         { result: costs(LINE) },
         inline([
           null,
           'Lodging',
-          { $state: '/result/costs/0' },
+          { $template: '${/result/costs/0/category}' },
           { category: 'Food' },
           { category: 'Food', amount: 4 },
         ]),
       ),
     ).toEqual([
-      'bar: ProportionBar\'s part 1 is null, not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
-      'bar: ProportionBar\'s part 2 is "Lodging", not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
-      'bar: ProportionBar\'s part 3 is an expression, not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
-      'bar: ProportionBar\'s part 4 has no "amount" member; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
+      `bar: ProportionBar's part 1 is null, not a structure;${HOW}`,
+      `bar: ProportionBar's part 2 is "Lodging", not a structure;${HOW}`,
+      `bar: ProportionBar's part 3 is an expression that reads no structure;${HOW}`,
+      `bar: ProportionBar's part 4 has no "amount" member;${HOW}`,
     ]);
+  });
+
+  /**
+   * A part read whole, `{ "$state": "/result/costs/0" }`, draws exactly as a
+   * part written out does when the path holds a structure with both members,
+   * so it is held to that and not refused for being an expression.
+   */
+  it('takes a part read from a structure that has both members, its amount a number', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([{ $state: '/result/costs/0' }, { $state: '/result/costs/1' }]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a part read from a path that holds no such structure', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([{ $state: '/result/costs/0/category' }, { $state: '/result/costs' }]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1 reads /result/costs/0/category, which holds a text value;${HOW}`,
+      `bar: ProportionBar's part 2 reads /result/costs, which holds a list;${HOW}`,
+    ]);
+  });
+
+  /**
+   * The renderer reads a part's amount as a number, or a text that writes
+   * one out, and draws no share for anything else, silently; a written-out
+   * part is held to that as a part read from the payload is held to a number
+   * member.
+   */
+  it('takes an inline amount written as a text that writes a number out, as the renderer draws it', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: '40' },
+          { category: 'Lodging', amount: '12.5' },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses an inline amount that is not a number, or that reads a path holding no number', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: 'abc' },
+          { category: 'Food', amount: ' ' },
+          { category: 'Food', amount: { $state: '/result/costs/0/category' } },
+          { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
+          { category: 'Food', amount: { $state: '/result/costs/0/amount' } },
+          { category: 'Food', amount: { $state: '/ui/scratch' } },
+        ]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1's "amount" is "abc", not a number;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" is " ", not a number;${HOW}`,
+      `bar: ProportionBar's part 3's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
+      `bar: ProportionBar's part 4's "amount" is an expression that reads no number, not a number;${HOW}`,
+    ]);
+  });
+
+  /**
+   * json-render resolves `$index` to a number and a `$cond` to either branch,
+   * each resolved again, so each is read as what it resolves to.
+   */
+  it('reads a part or an amount through an index or either branch of a condition', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $index: true } },
+          {
+            $cond: { $state: '/ui/open' },
+            $then: { $state: '/result/costs/0' },
+            $else: { category: 'None', amount: 0 },
+          },
+          {
+            category: 'Food',
+            amount: { $cond: true, $then: 4, $else: { $state: '/result/costs/1/amount' } },
+          },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a conditional part or amount when either branch draws no share', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { $cond: { $state: '/ui/open' }, $then: { $state: '/result/costs/0' }, $else: 'none' },
+          {
+            category: 'Food',
+            amount: { $cond: true, $then: 4, $else: { $state: '/result/costs/0/category' } },
+          },
+        ]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1 is "none", not a structure;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
+    ]);
+  });
+
+  /** A binding resolves to the value at its path, as a read does. */
+  it('reads a part or an amount bound with $bindState as the path it binds', () => {
+    const spec = inline([
+      { $bindState: '/inputs/costs/0' },
+      { category: 'Food', amount: { $bindState: '/inputs/costs/0/category' } },
+    ]);
+    const list: RunField = { kind: 'list', name: 'costs', required: false, item: LINE };
+    expect(layoutProblems({ inputs: [list] }, spec)).toContain(
+      `bar: ProportionBar's part 2's "amount" reads /inputs/costs/0/category, which holds a text value, not a number;${HOW}`,
+    );
+    expect(layoutProblems({ inputs: [list] }, spec).join('\n')).not.toContain('part 1');
   });
 });
 

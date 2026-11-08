@@ -5,11 +5,11 @@ import {
   type BaseComponentProps,
   type Components,
   useBoundProp,
-  useFieldValidation,
   useRepeatScope,
   useStateStore,
   useStateValue,
 } from '@json-render/react';
+import { useCheckedField } from './checked-fields';
 import {
   Accessibility,
   AlertCircle,
@@ -149,13 +149,16 @@ export function DescriptorProvider({
   return <DescriptorContext.Provider value={scope}>{children}</DescriptorContext.Provider>;
 }
 
-function Unresolved({ path, side }: { path: string; side: 'input' | 'result' }) {
+function Unresolved({ path, side }: { path: unknown; side: 'input' | 'result' }) {
   return (
     <p
       role="alert"
       className="rounded-md border border-destructive/50 px-2.5 py-1.5 text-[12px] text-destructive"
     >
-      {side === 'input' ? 'No input' : 'No result'} at <span className="font-mono">{path}</span>
+      {side === 'input' ? 'No input' : 'No result'} at{' '}
+      <span className="font-mono">
+        {typeof path === 'string' ? path : (JSON.stringify(path) ?? String(path))}
+      </span>
     </p>
   );
 }
@@ -219,8 +222,12 @@ export function pathFromDomId(prefix: string | undefined, id: string): string | 
  * item's field name joined onto the current item's base path. A relative path
  * outside any repeat resolves to nothing, and the hatch says so.
  */
-function useAbsolutePath(path: string): string | undefined {
+function useAbsolutePath(path: unknown): string | undefined {
   const repeat = useRepeatScope();
+  // The checks hold a hatch's `path` to a literal text; a layout rendered
+  // past them may hand anything here, which resolves to nothing - never read
+  // as some other path, as a number written out would be inside a repeat.
+  if (typeof path !== 'string') return undefined;
   if (path.startsWith('/')) return path;
   // Raw, not `joinPath`: the same reason `absoluteHatchPath` gives - a relative
   // hatch path may name several segments, so its `/` are separators already.
@@ -310,7 +317,7 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'change';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
@@ -468,12 +475,12 @@ interface MetricProps {
 
 function Metric({ props }: BaseComponentProps<MetricProps>) {
   const value = props.value;
+  // Anything but a number as it writes out, so a structure, which writes out
+  // as nothing, shows the dash an absent value shows.
   const text =
     typeof value === 'number'
       ? numberFormat(props.format ?? 'plain').format(value)
-      : value === null || value === undefined || value === ''
-        ? '—'
-        : textOf(value);
+      : textOf(value) || '—';
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -526,33 +533,52 @@ interface TabsProps {
 /**
  * Tabs whose panels follow the active tab - the reason shadcn's is not in the
  * catalog. The nth child is the nth tab's panel; the active tab is local
- * state, so a spec never touches /state for it. Radix unmounts an inactive
- * panel, and the inputs in it keep their values in the store.
+ * state, so a spec never touches /state for it. An inactive panel stays
+ * mounted and hidden, so the checks of the fields in it still hold the run:
+ * unmounted, as Radix does by default, they left the page's record, and a
+ * run pressed from another tab started past a field that refused it.
  */
 function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const tabs = props.tabs ?? [];
   const panels = React.Children.toArray(children);
-  const [value, setValue] = React.useState(tabs[0]?.value ?? '');
+  // Each tab is told apart by its position, which is unique where a layout's
+  // values need not be: two tabs written with one value would otherwise be
+  // one tab to Radix, opening both panels, and one key to React. The open
+  // tab is remembered by its value, and which of the tabs sharing it, so it
+  // stays open when a patched layout inserts or removes a tab before it; one
+  // the layout no longer has gives way to the first.
+  const [chosen, setChosen] = React.useState<{ value: string; occurrence: number } | null>(null);
+  const open = chosen ? openIndex(tabs, chosen) : 0;
+  const value = String(open);
+  const choose = (next: string) => {
+    const index = Number(next);
+    const tab = tabs[index];
+    if (!tab) return;
+    const occurrence = tabs.slice(0, index).filter((t) => t.value === tab.value).length;
+    setChosen({ value: tab.value, occurrence });
+  };
   return (
-    <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
+    <TabsPrimitive.Root value={value} onValueChange={choose} className="w-full">
       {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
           however short its label, and the list around it with it, wrapping
           onto a second row rather than pushing the page sideways. */}
       <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto max-sm:flex-wrap">
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <TabsPrimitive.Trigger
-            key={tab.value}
-            value={tab.value}
+            key={index}
+            value={String(index)}
             className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm max-sm:min-h-11 max-sm:min-w-11"
           >
             {tab.label}
           </TabsPrimitive.Trigger>
         ))}
       </TabsPrimitive.List>
-      {tabs.map((tab, index) => (
+      {tabs.map((_tab, index) => (
         <TabsPrimitive.Content
-          key={tab.value}
-          value={tab.value}
+          key={index}
+          value={String(index)}
+          forceMount
+          hidden={index !== open}
           className="mt-4 focus-visible:outline-hidden"
         >
           {panels[index] ?? null}
@@ -560,6 +586,20 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
       ))}
     </TabsPrimitive.Root>
   );
+}
+
+/** The position of the `occurrence`th tab carrying `value`, or the first tab's when none does. */
+function openIndex(
+  tabs: readonly { value: string }[],
+  { value, occurrence }: { value: string; occurrence: number },
+): number {
+  let seen = 0;
+  for (const [index, tab] of tabs.entries()) {
+    if (tab.value !== value) continue;
+    if (seen === occurrence) return index;
+    seen += 1;
+  }
+  return 0;
 }
 
 // As tall as the layer's own `Button`, which is the 44 pixels a finger needs.
@@ -581,14 +621,18 @@ interface StepsProps {
  * A journey: a numbered indicator, one panel at a time, and its own Back and
  * Next. The nth child is the nth step's panel; the spec's one Button sits
  * inside the last one, which is why Next disappears there. The current step
- * is local state. A hidden panel is unmounted, and its inputs keep their
- * values in the store - a step hides from the eye, never from the run.
+ * is local state. A hidden panel stays mounted, so its inputs keep their
+ * values in the store and their checks hold the run - a step hides from the
+ * eye, never from the run.
  */
 function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const steps = props.steps ?? [];
   const panels = React.Children.toArray(children);
-  const [index, setIndex] = React.useState(0);
+  const [chosen, setIndex] = React.useState(0);
   const last = steps.length - 1;
+  // A layout patched or swapped mid-way may have fewer steps than the one
+  // reached: the last there is shows rather than none.
+  const index = Math.max(0, Math.min(chosen, last));
   return (
     <div className="flex flex-col gap-5">
       <ol className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -617,7 +661,11 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
           </li>
         ))}
       </ol>
-      <div>{panels[index] ?? null}</div>
+      {steps.map((_step, position) => (
+        <div key={position} hidden={position !== index}>
+          {panels[position] ?? null}
+        </div>
+      ))}
       {index > 0 || index < last ? (
         <div className="flex items-center justify-between gap-3">
           {index > 0 ? (
@@ -767,9 +815,10 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
         }}
         className="flex-wrap justify-start gap-1.5"
       >
-        {(props.options ?? []).map((option) => (
+        {(props.options ?? []).map((option, index) => (
           <ToggleGroupItem
-            key={option}
+            // A layout may name one option twice, so the option alone is no key.
+            key={`${index}-${option}`}
             value={option}
             variant="outline"
             size="sm"
@@ -902,4 +951,7 @@ const components: Components<typeof baseCatalog> = {
 export const generativeRenderers = withDeclaredProps(
   baseCatalog.data.components as Record<string, { props?: unknown }>,
   components,
+  // A hatch resolves its `path` as written, relative inside a repeat, so a
+  // refused one reaches it as refused rather than written out as text.
+  { MthdsField: ['path'], MthdsResult: ['path'] },
 );

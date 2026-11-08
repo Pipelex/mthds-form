@@ -2,7 +2,7 @@ import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
 /**
- * Five PUBLIC entry points, mirroring the package's layers:
+ * The PUBLIC entry points, mirroring the package's layers:
  *   `.`                     -> dist/core/index.js                 (headless, no React)
  *   `./react`               -> dist/react/index.js                (the control set)
  *   `./generative`          -> dist/generative/index.js           (the layer over a produced layout)
@@ -67,7 +67,7 @@ export default defineConfig({
   onSuccess: async () => {
     // esbuild drops directive prologues when it bundles, so the `'use client'`
     // that every control file carries in source does NOT survive into the
-    // bundle. Re-assert it on the two entries that render: a consumer bundler
+    // bundle. Re-assert it on the entries that render: a consumer bundler
     // treats each as a client boundary, which pulls the shared chunks it
     // imports into the client graph with it. The core, brand and
     // generative/headless entries deliberately do NOT get one - each must stay

@@ -1447,17 +1447,21 @@ function keepRejected(key, id, jsonl, suffix = 'rejected') {
 
 /**
  * Everything the checks find wrong with a layout written for `frame` over
- * `descriptor`: the frame catalog's verdict, then the fit (`layoutCheckProblems`).
- * A text that does not even compile is one problem, in the parser's words.
+ * `descriptor`: the frame catalog's verdict, then the fit (`layoutCheck`), and
+ * whether the checks themselves failed on it. A text that does not even
+ * compile is one problem, in the parser's words.
  */
 function checkProblems(g, jsonl, check) {
   let spec;
   try {
     spec = g.specFromJsonl(jsonl);
   } catch (error) {
-    return { problems: [`the text does not compile to a spec: ${error.message}`] };
+    return {
+      problems: [`the text does not compile to a spec: ${error.message}`],
+      checksFailed: false,
+    };
   }
-  return { spec, problems: g.layoutCheckProblems(spec, check) };
+  return { spec, ...g.layoutCheck(spec, check) };
 }
 
 /**
@@ -1635,9 +1639,11 @@ async function generateSpecs(only) {
     }
 
     let jsonl = designed;
-    let { spec, problems } = checkProblems(g, jsonl, check);
+    let { spec, problems, checksFailed } = checkProblems(g, jsonl, check);
     let repairs = 0;
-    while (problems.length > 0 && repairs < g.REPAIR_ATTEMPTS) {
+    // A failure of the checks themselves is no slip of the layout's, and no
+    // repair pass can fix it, so none is paid for.
+    while (problems.length > 0 && !checksFailed && repairs < g.REPAIR_ATTEMPTS) {
       repairs += 1;
       process.stdout.write(
         `  ${key} (${id}): ${problems.length} problem${problems.length === 1 ? '' : 's'}, repair ${repairs}…\n` +
@@ -1655,7 +1661,7 @@ async function generateSpecs(only) {
       tally(repairCost);
       cost = cost === undefined || repairCost === undefined ? undefined : cost + repairCost;
       jsonl = repaired.jsonl;
-      ({ spec, problems } = checkProblems(g, jsonl, check));
+      ({ spec, problems, checksFailed } = checkProblems(g, jsonl, check));
     }
     const price = cost === undefined ? '' : ` - $${cost.toFixed(4)}`;
     if (problems.length > 0) {

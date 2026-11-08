@@ -9,7 +9,7 @@ import { z } from 'zod';
  * centred column whose host draws the band above it and the action row's
  * mechanics, and the result after one, under the host's bar restating the
  * request. The two moments carry their own components, found by measuring the
- * designer against hand-drawn screens of three methods: the composer's frame
+ * designer against hand-drawn screens of several methods: the composer's frame
  * (`Composer`, with the page's h1, the panel and the host's action row) and a
  * group of inputs inside it, and a result's header, a proportion bar, colour
  * swatches, a picture, a fact, a labelled detail, a date in words and a list
