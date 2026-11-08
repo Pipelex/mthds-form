@@ -3,6 +3,8 @@ import type { RunField, RunFieldKind } from '../core';
 import { hasOwnProp } from '../core/own-property';
 import { catalog } from './catalog';
 import { isExpression } from './expressions';
+import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
+import { unwrapped } from './zod-definition';
 import {
   INPUTS_ROOT,
   RESULT_ROOT,
@@ -256,16 +258,24 @@ function staleRepeats(
   return problems;
 }
 
-/** A member name as a refusal writes it, with its article: `a "category"`, `an "amount"`. */
-function memberWords(name: string): string {
-  return `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${JSON.stringify(name)}`;
+/** A word with its indefinite article: `a "category"`, `an "amount"`, `an image value`. */
+function withArticle(word: string): string {
+  return `${/^["']?[aeiou]/i.test(word) ? 'an' : 'a'} ${word}`;
 }
 
-/** What a path of `kind` holds, in the words of a refusal: "a structure", "a file", "a text value". */
+/** A member name as a refusal writes it, with its article: `a "category"`, `an "amount"`. */
+function memberWords(name: string): string {
+  return withArticle(JSON.stringify(name));
+}
+
+/**
+ * What a path of `kind` holds, in the words of a refusal: what `NOT_A_VALUE`
+ * calls the kinds a value cannot be - "a structure", "a file", "a list" - and
+ * "a text value", "a number value" for the rest.
+ */
 function kindWords(kind: RunFieldKind): string {
-  if (kind === 'object') return 'a structure';
-  if (kind === 'document' || kind === 'image') return 'a file';
-  return `${/^[aeiou]/i.test(kind) ? 'an' : 'a'} ${kind} value`;
+  const wrong = hasOwnProp(NOT_A_VALUE, kind) ? NOT_A_VALUE[kind] : undefined;
+  return wrong ? wrong.what : withArticle(`${kind} value`);
 }
 
 /**
@@ -328,19 +338,6 @@ function listProps(): Map<string, Map<string, ListItems>> {
 
 /** The zod schemas whose values a list-taking prop can render as they are. */
 const VALUE_SCHEMAS = new Set(['string', 'number', 'boolean', 'enum', 'literal']);
-
-/** A zod definition, under the `.nullable()` / `.optional()` / `.default()` most props carry. */
-function unwrapped(schema: unknown): { type?: string; element?: unknown } | undefined {
-  let current: unknown = schema;
-  for (let depth = 0; depth < 8; depth += 1) {
-    const def = (current as { def?: { type?: string; innerType?: unknown; element?: unknown } })
-      .def;
-    if (!def) return undefined;
-    if (def.innerType === undefined) return def;
-    current = def.innerType;
-  }
-  return undefined;
-}
 
 /** What a prop declared as an array takes as its items, or nothing for a prop that is not one. */
 function listItemsOf(schema: unknown): ListItems | undefined {
@@ -446,32 +443,89 @@ function nonScalarReads(
         );
       }
     };
+    // The path a `$state` or an `$item` reads, resolved; nothing for any
+    // other value, an expression of another form included.
+    const readPath = (value: unknown): string | undefined => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+      const record = value as Record<string, unknown>;
+      if (typeof record.$state === 'string') return record.$state;
+      if (typeof record.$item === 'string') return itemPath(record.$item);
+      return undefined;
+    };
     // Parts written out inline. The catalog takes a share's items as a list
-    // of anything, and the renderer reads each by member name, so every
-    // entry must be a structure naming both members; a member may itself be
-    // an expression, which `walk` holds to a value. What comes back is the
-    // entries left to walk: a refused one is named once, here.
+    // of anything, and the renderer reads each by member name and its value
+    // member as a number, so every entry must be a structure naming both
+    // members whose value member is a number - written as one, or read with
+    // `$state` or `$item` from a path that holds one - or a read of a
+    // structure that has both members, its value member a number. A part
+    // that is neither draws no share, silently. The label member may be any
+    // expression, which `walk` holds to a value. A path under no root the
+    // descriptor owns is the layout's own scratch state and left alone, and
+    // one the descriptor does not have is the staleness check's to name.
+    // What comes back is the entries left to walk: a refused one is named
+    // once, here, and a read part has nothing in it to walk.
     const inlineShares = (entries: readonly unknown[]): readonly unknown[] => {
       if (element.type !== 'ProportionBar') return entries;
       const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
       if (typeof labelKey !== 'string' || typeof valueKey !== 'string') return entries;
-      const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member, or the whole list is read with { "$state" }`;
-      return entries.filter((entry, index) => {
+      const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member holding a number, or the whole list is read with { "$state" }`;
+      return entries.flatMap((entry, index): unknown[] => {
         const part = `${key}: ProportionBar's part ${index + 1}`;
         if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
           const shown = Array.isArray(entry) ? 'a list' : String(JSON.stringify(entry ?? null));
           problems.push(`${part} is ${shown}, not a structure; ${how}`);
-          return false;
+          return [];
         }
         if (isExpression(entry)) {
-          problems.push(`${part} is an expression, not a structure; ${how}`);
-          return false;
+          const path = readPath(entry);
+          if (path === undefined) {
+            problems.push(`${part} is an expression that reads no structure; ${how}`);
+            return [];
+          }
+          const field = isUnder(root, path) ? fieldAt(path) : undefined;
+          if (!field || field.kind === 'unknown') return [];
+          if (field.kind !== 'object') {
+            problems.push(`${part} reads ${path}, which holds ${kindWords(field.kind)}; ${how}`);
+            return [];
+          }
+          for (const name of [labelKey, valueKey]) {
+            const member = field.fields.find((m) => m.name === name);
+            if (!member) {
+              problems.push(
+                `${part} reads ${path}, which has no ${JSON.stringify(name)} member; ${how}`,
+              );
+            } else if (name === valueKey && member.kind !== 'number' && member.kind !== 'unknown') {
+              problems.push(
+                `${part} reads ${path}, whose ${JSON.stringify(name)} member holds ${kindWords(member.kind)}, not a number; ${how}`,
+              );
+            }
+          }
+          return [];
         }
         const missing = [labelKey, valueKey].find((name) => !hasOwnProp(entry, name));
         if (missing !== undefined) {
           problems.push(`${part} has no ${JSON.stringify(missing)} member; ${how}`);
+          return [entry];
         }
-        return true;
+        // A refused amount is named here, and the rest of the part is walked.
+        const { [valueKey]: amount, ...rest } = entry as Record<string, unknown>;
+        if (typeof amount === 'number') return [entry];
+        const path = readPath(amount);
+        if (path === undefined) {
+          const shown = isExpression(amount)
+            ? 'an expression that reads no number'
+            : String(JSON.stringify(amount));
+          problems.push(`${part}'s ${JSON.stringify(valueKey)} is ${shown}, not a number; ${how}`);
+          return [rest];
+        }
+        const field = isUnder(root, path) ? fieldAt(path) : undefined;
+        if (field && field.kind !== 'number' && field.kind !== 'unknown') {
+          problems.push(
+            `${part}'s ${JSON.stringify(valueKey)} reads ${path}, which holds ${kindWords(field.kind)}, not a number; ${how}`,
+          );
+          return [rest];
+        }
+        return [entry];
       });
     };
     const walk = (prop: string, value: unknown): void => {
@@ -618,10 +672,21 @@ function uncoveredUnder(field: RunField, path: string, offered: Offered): string
  * throw was not.
  */
 export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string[] {
+  // A descriptor is the host's, derived from the method; one of the wrong
+  // shape is answered as such, never as the checks' own failure.
+  const { inputs, result } = (descriptor ?? {}) as { inputs?: unknown; result?: unknown };
+  if (inputs !== undefined && !Array.isArray(inputs)) {
+    return ['the descriptor\'s "inputs" is not a list of fields'];
+  }
+  if (result !== undefined && (typeof result !== 'object' || result === null)) {
+    return ['the descriptor\'s "result" is not a field'];
+  }
+  const malformed = specMalformation(spec);
+  if (malformed !== undefined) return [malformedLine(malformed)];
   try {
     return collectLayoutProblems(descriptor, spec);
   } catch (error) {
-    return [`the layout is not a well-formed spec: ${String(error)}`];
+    return [checksFailedLine(error)];
   }
 }
 

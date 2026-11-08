@@ -55,8 +55,10 @@ export {
 } from '../designer-catalog';
 export { PROMPT_HASH, promptHashSubject } from '../prompt-hash';
 // What a producer needs beside them: the seed's line, the checks a produced
-// layout is held to in words, and the repair pass's bound.
+// layout is held to in words, the repair pass's bound, and whether an answer
+// holds the checks' own failure, which no repair pass can fix.
 export { REPAIR_ATTEMPTS, layoutCheckProblems, seedLine, type LayoutCheck } from '../designer-run';
+export { checksFailed } from '../spec-shape';
 
 // The brief a model is handed: the descriptor projected into the data the
 // designer method lays out itself, and nothing else.

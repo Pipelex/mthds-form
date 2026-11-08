@@ -1,8 +1,11 @@
 import type { Spec } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import type { RunField } from '../../core';
-import { componentNamesFor } from '../catalog';
+import { catalog, componentNamesFor, frameCatalog } from '../catalog';
+import { COMPOSER_COMPONENTS, RESULT_COMPONENTS } from '../frame-definitions';
 import { REPAIR_ATTEMPTS, layoutCheckProblems, seedLine } from '../designer-run';
+import type { LayoutDescriptor } from '../layout-fits';
+import { checksFailed } from '../spec-shape';
 
 /**
  * The checks a producer and a host hold a layout to, by frame: the frame's own
@@ -174,5 +177,59 @@ describe('what a producer hands the method', () => {
   it('gives a refused layout a bounded number of repair passes', () => {
     expect(REPAIR_ATTEMPTS).toBeGreaterThan(0);
     expect(REPAIR_ATTEMPTS).toBeLessThan(4);
+  });
+});
+
+/**
+ * A producer stops when the checks fail on their own account: the layout is
+ * refused all the same, but no repair pass can fix a defect in the checks.
+ */
+describe('an answer that holds the checks failing', () => {
+  it('is told apart from a layout that is not a spec', () => {
+    const malformed = layoutCheckProblems({ root: 'page' } as unknown as Spec, {
+      frame: 'composer',
+      descriptor: { inputs },
+    });
+    expect(malformed).toEqual(['the layout is not a well-formed spec: it has no "elements" map']);
+    expect(checksFailed(malformed)).toBe(false);
+    expect(checksFailed(['the checks failed on this layout (Error: boom): …'])).toBe(true);
+  });
+
+  it('answers a descriptor of the wrong shape as such', () => {
+    const problems = layoutCheckProblems(composer, {
+      frame: 'composer',
+      descriptor: { inputs: 5 } as unknown as LayoutDescriptor,
+    });
+    expect(problems).toContain('the descriptor\'s "inputs" is not a list of fields');
+    expect(checksFailed(problems)).toBe(false);
+  });
+});
+
+/**
+ * The composer's and the result page's vocabularies are allow-lists, so a
+ * component added to the catalog joins neither until someone names it there.
+ * What they name must still be components the catalog defines.
+ */
+describe("a frame's vocabulary", () => {
+  it.each(['composer', 'result'] as const)(
+    'names only components the catalog defines: %s',
+    (frame) => {
+      const defined = Object.keys(catalog.data.components as Record<string, unknown>);
+      const names = componentNamesFor(frame);
+      expect(names.filter((name) => !defined.includes(name))).toEqual([]);
+      expect(new Set(names).size).toBe(names.length);
+    },
+  );
+
+  it("holds each frame's own components and none of the other's", () => {
+    expect(componentNamesFor('composer')).toEqual(expect.arrayContaining([...COMPOSER_COMPONENTS]));
+    expect(componentNamesFor('result')).toEqual(expect.arrayContaining([...RESULT_COMPONENTS]));
+    expect(
+      componentNamesFor('result').filter((name) => COMPOSER_COMPONENTS.includes(name as never)),
+    ).toEqual([]);
+  });
+
+  it('is built once per frame', () => {
+    expect(frameCatalog('result')).toBe(frameCatalog('result'));
   });
 });

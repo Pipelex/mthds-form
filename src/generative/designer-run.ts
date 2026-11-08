@@ -2,6 +2,7 @@ import type { Spec } from '@json-render/core';
 import { frameCatalog } from './catalog';
 import { FRAMES, type Frame } from './frame-definitions';
 import { layoutProblems, type LayoutDescriptor } from './layout-fits';
+import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
 import { formatProblems, validateAgainstCatalog } from './validate';
 
 /**
@@ -49,8 +50,11 @@ export interface LayoutCheck {
  * frame a host stored and read back, and a throw is the one answer a host
  * cannot act on: it arrives instead of the problem that would have sent the
  * page to its fallback. So a frame this package does not draw, a missing
- * descriptor, and anything that is not a spec at all are each a problem line,
- * and any throw left in a walk below is caught here and answered as one.
+ * descriptor, and anything not shaped like a spec are each a problem line, and
+ * a throw left in a walk below on a layout of the right shape is the checks'
+ * own failure, answered by a line `checksFailed` recognises: the layout is
+ * still refused, and a producer stops there rather than paying the repair
+ * pass for a defect no layout can fix.
  */
 export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutCheck): string[] {
   if (!(FRAMES as readonly unknown[]).includes(frame)) {
@@ -61,6 +65,8 @@ export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutChe
   if (typeof descriptor !== 'object' || descriptor === null) {
     return ['the layout has no descriptor to be checked against'];
   }
+  const malformed = specMalformation(spec);
+  if (malformed !== undefined) return [malformedLine(malformed)];
   try {
     const verdict = validateAgainstCatalog(spec, frameCatalog(frame));
     const invalid = verdict.ok ? [] : formatProblems(verdict.problems).split('\n');
@@ -75,7 +81,7 @@ export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutChe
         : [];
     return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
   } catch (error) {
-    return [`the layout is not a well-formed spec: ${String(error)}`];
+    return [checksFailedLine(error)];
   }
 }
 

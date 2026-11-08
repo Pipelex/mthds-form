@@ -993,6 +993,9 @@ describe("a share's parts", () => {
       { kind: 'number', name: 'amount', required: true, integer: false },
     ],
   };
+  /** What every refusal of a part says a part is. */
+  const HOW =
+    ' each part is written as a structure with a "category" member and an "amount" member holding a number, or the whole list is read with { "$state" }';
   const bar = (labelKey: string, valueKey: string): Spec => ({
     root: 'bar',
     elements: {
@@ -1061,23 +1064,75 @@ describe("a share's parts", () => {
     ).toEqual([]);
   });
 
-  it('refuses a part written out as a null, a scalar, an expression or a structure missing a member', () => {
+  it('refuses a part written out as a null, a scalar, an expression that reads no structure or a structure missing a member', () => {
     expect(
       layoutProblems(
         { result: costs(LINE) },
         inline([
           null,
           'Lodging',
-          { $state: '/result/costs/0' },
+          { $template: '${/result/costs/0/category}' },
           { category: 'Food' },
           { category: 'Food', amount: 4 },
         ]),
       ),
     ).toEqual([
-      'bar: ProportionBar\'s part 1 is null, not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
-      'bar: ProportionBar\'s part 2 is "Lodging", not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
-      'bar: ProportionBar\'s part 3 is an expression, not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
-      'bar: ProportionBar\'s part 4 has no "amount" member; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
+      `bar: ProportionBar's part 1 is null, not a structure;${HOW}`,
+      `bar: ProportionBar's part 2 is "Lodging", not a structure;${HOW}`,
+      `bar: ProportionBar's part 3 is an expression that reads no structure;${HOW}`,
+      `bar: ProportionBar's part 4 has no "amount" member;${HOW}`,
+    ]);
+  });
+
+  /**
+   * A part read whole, `{ "$state": "/result/costs/0" }`, draws exactly as a
+   * part written out does when the path holds a structure with both members,
+   * so it is held to that and not refused for being an expression.
+   */
+  it('takes a part read from a structure that has both members, its amount a number', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([{ $state: '/result/costs/0' }, { $state: '/result/costs/1' }]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a part read from a path that holds no such structure', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([{ $state: '/result/costs/0/category' }, { $state: '/result/costs' }]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1 reads /result/costs/0/category, which holds a text value;${HOW}`,
+      `bar: ProportionBar's part 2 reads /result/costs, which holds a list;${HOW}`,
+    ]);
+  });
+
+  /**
+   * The renderer reads a part's amount as a number and draws no share for
+   * anything else, silently; a written-out part is held to that as a part
+   * read from the payload is held to a number member.
+   */
+  it('refuses an inline amount that is not a number, or that reads a path holding no number', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: 'abc' },
+          { category: 'Food', amount: '40' },
+          { category: 'Food', amount: { $state: '/result/costs/0/category' } },
+          { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
+          { category: 'Food', amount: { $state: '/result/costs/0/amount' } },
+          { category: 'Food', amount: { $state: '/ui/scratch' } },
+        ]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1's "amount" is "abc", not a number;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" is "40", not a number;${HOW}`,
+      `bar: ProportionBar's part 3's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
+      `bar: ProportionBar's part 4's "amount" is an expression that reads no number, not a number;${HOW}`,
     ]);
   });
 });

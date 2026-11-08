@@ -4,6 +4,8 @@ import type { z } from 'zod';
 import { frameCatalog } from './catalog';
 import { isExpression } from './expressions';
 import { INPUTS_ROOT, RESULT_ROOT } from './paths';
+import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
+import { unwrapped } from './zod-definition';
 import { hasOwnProp } from '../core/own-property';
 
 /**
@@ -120,22 +122,43 @@ function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {
  * the names, no expression can make it one.
  */
 function isClosedVocabulary(schema: z.ZodType): boolean {
-  let current: unknown = schema;
-  for (let depth = 0; depth < 8; depth += 1) {
-    const def = (current as { def?: { type?: string; innerType?: unknown } }).def;
-    if (!def) return false;
-    if (def.type === 'enum' || def.type === 'literal') return true;
-    if (def.innerType === undefined) return false;
-    current = def.innerType;
+  const type = unwrapped(schema)?.type;
+  return type === 'enum' || type === 'literal';
+}
+
+/**
+ * Where inside a prop's value an expression stands for one of a fixed set of
+ * names, as the issue path of the member it stands for: a `DataTable`
+ * column's `format` written as `{ "$state": ... }` is refused as a top-level
+ * closed prop is, rather than passed because it sits one level down. The
+ * value is walked beside its schema, through lists and structures; the whole
+ * prop is the caller's to judge.
+ */
+function closedExpressionPaths(
+  schema: z.ZodType | undefined,
+  value: unknown,
+  path: readonly PropertyKey[] = [],
+): PropertyKey[][] {
+  if (schema === undefined || typeof value !== 'object' || value === null) return [];
+  if (path.length > 0 && isExpression(value)) return isClosedVocabulary(schema) ? [[...path]] : [];
+  const def = unwrapped(schema);
+  if (Array.isArray(value)) {
+    return def?.type === 'array'
+      ? value.flatMap((entry, index) => closedExpressionPaths(def.element, entry, [...path, index]))
+      : [];
   }
-  return false;
+  if (def?.type !== 'object' || !def.shape) return [];
+  const shape = def.shape;
+  return Object.entries(value as Record<string, unknown>).flatMap(([name, member]) =>
+    hasOwnProp(shape, name) ? closedExpressionPaths(shape[name], member, [...path, name]) : [],
+  );
 }
 
 /** The catalog's definition of one component, or nothing for a type it does not have. */
 function definitionOf(
   catalog: ValidationCatalog,
   type: string,
-): { props?: unknown; events?: unknown } | undefined {
+): { props?: unknown; events?: unknown; slots?: unknown } | undefined {
   const components = (catalog.data as { components: Record<string, { props?: unknown }> })
     .components;
   // `hasOwnProp`, because the type is model-written and a prototype key would
@@ -249,13 +272,14 @@ export function validateAgainstCatalog(
   // must not hold.
   catalog: ValidationCatalog = frameCatalog('page'),
 ): SpecVerdict {
+  const malformed = specMalformation(spec);
+  if (malformed !== undefined) {
+    return { ok: false, problems: [{ message: malformedLine(malformed) }] };
+  }
   try {
     return checkAgainstCatalog(spec, catalog);
   } catch (error) {
-    return {
-      ok: false,
-      problems: [{ message: `the layout is not a well-formed spec: ${String(error)}` }],
-    };
+    return { ok: false, problems: [{ message: checksFailedLine(error) }] };
   }
 }
 
@@ -330,6 +354,31 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
     }
   }
 
+  // 2b. Every named slot is one its component declares. An element's
+  //     children in a slot its renderer does not have render nothing at all,
+  //     and json-render says so only in a development warning, which it
+  //     looks up by the registry object `defineRegistry` returned - and the
+  //     page renders through a registry of its own, every renderer wrapped in
+  //     a reporting boundary, so that warning never fires. `default` is
+  //     never a slot's name: a component's default content is its `children`.
+  for (const [key, element] of Object.entries(spec.elements)) {
+    const slots = element.slots;
+    if (typeof slots !== 'object' || slots === null) continue;
+    const definition = definitionOf(catalog, element.type);
+    if (!definition) continue;
+    const declared = Array.isArray(definition.slots) ? definition.slots : [];
+    for (const name of Object.keys(slots)) {
+      if (name !== 'default' && declared.includes(name)) continue;
+      problems.push({
+        elementKey: key,
+        message:
+          name === 'default'
+            ? `"${key}" puts children in a slot named "default"; a component's own content goes in "children".`
+            : `"${key}" puts children in slot "${name}", which ${element.type} does not have; its content goes in "children".`,
+      });
+    }
+  }
+
   // 3. Every prop exists on its component, and every literal parses.
   for (const [key, element] of Object.entries(spec.elements)) {
     const schema = propsSchemaOf(catalog, element.type);
@@ -358,6 +407,12 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
           });
         }
         continue;
+      }
+      for (const at of closedExpressionPaths(propSchema, value)) {
+        problems.push({
+          elementKey: key,
+          message: `${element.type}.${name}.${at.map(String).join('.')} is one of a fixed set of names, so it must be written as a literal, never as an expression.`,
+        });
       }
       const parsed = propSchema.safeParse(value);
       // json-render resolves an expression wherever it sits in a prop, inside

@@ -1075,6 +1075,7 @@ async function loadGenerative() {
     run,
     fits,
     styles,
+    shape,
   ] = await Promise.all([
     import('../src/__stories__/heroes.ts'),
     import('../src/generative/brief.ts'),
@@ -1089,8 +1090,10 @@ async function loadGenerative() {
     import('../src/generative/designer-run.ts'),
     import('../src/generative/layout-fits.ts'),
     import('../src/brand/styles.ts'),
+    import('../src/generative/spec-shape.ts'),
   ]);
   return {
+    ...shape,
     ...run,
     ...fits,
     ...styles,
@@ -1637,7 +1640,9 @@ async function generateSpecs(only) {
     let jsonl = designed;
     let { spec, problems } = checkProblems(g, jsonl, check);
     let repairs = 0;
-    while (problems.length > 0 && repairs < g.REPAIR_ATTEMPTS) {
+    // A failure of the checks themselves is no slip of the layout's, and no
+    // repair pass can fix it, so none is paid for.
+    while (problems.length > 0 && !g.checksFailed(problems) && repairs < g.REPAIR_ATTEMPTS) {
       repairs += 1;
       process.stdout.write(
         `  ${key} (${id}): ${problems.length} problem${problems.length === 1 ? '' : 's'}, repair ${repairs}…\n` +
