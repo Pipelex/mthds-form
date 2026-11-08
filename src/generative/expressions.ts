@@ -15,38 +15,39 @@
  * prop's schema rather than waving it through as a binding nothing resolves.
  */
 export function isExpression(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return expressionForm(value) !== undefined;
+}
+
+/** The form json-render resolves an expression as, named by its key. */
+export type ExpressionForm =
+  '$state' | '$item' | '$index' | '$bindState' | '$bindItem' | '$cond' | '$computed' | '$template';
+
+/**
+ * The form json-render resolves `value` as, or nothing for a literal: its
+ * forms tried in json-render's own order, so an object carrying two keys is
+ * the first. The one place that order is written; every reader of an
+ * expression asks this.
+ */
+export function expressionForm(value: unknown): ExpressionForm | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
-  return (
-    typeof record.$state === 'string' ||
-    typeof record.$item === 'string' ||
-    record.$index === true ||
-    typeof record.$bindState === 'string' ||
-    typeof record.$bindItem === 'string' ||
-    ('$cond' in record && '$then' in record && '$else' in record) ||
-    typeof record.$computed === 'string' ||
-    typeof record.$template === 'string'
-  );
+  if (typeof record.$state === 'string') return '$state';
+  if (typeof record.$item === 'string') return '$item';
+  if (record.$index === true) return '$index';
+  if (typeof record.$bindState === 'string') return '$bindState';
+  if (typeof record.$bindItem === 'string') return '$bindItem';
+  if ('$cond' in record && '$then' in record && '$else' in record) return '$cond';
+  if (typeof record.$computed === 'string') return '$computed';
+  if (typeof record.$template === 'string') return '$template';
+  return undefined;
 }
 
 /**
  * The two values a `$cond` resolves to - each resolved again in its turn -
- * when json-render reads `value` as one, or nothing. It tries `$state`,
- * `$item`, `$index`, `$bindState` and `$bindItem` first, so an object that is
- * also one of those is that, never a condition.
+ * when json-render reads `value` as one, or nothing.
  */
 export function condBranches(value: unknown): readonly [unknown, unknown] | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  if (expressionForm(value) !== '$cond') return undefined;
   const record = value as Record<string, unknown>;
-  if (
-    typeof record.$state === 'string' ||
-    typeof record.$item === 'string' ||
-    record.$index === true ||
-    typeof record.$bindState === 'string' ||
-    typeof record.$bindItem === 'string'
-  ) {
-    return undefined;
-  }
-  if (!('$cond' in record && '$then' in record && '$else' in record)) return undefined;
   return [record.$then, record.$else];
 }

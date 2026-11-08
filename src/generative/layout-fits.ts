@@ -2,7 +2,8 @@ import type { Spec } from '@json-render/core';
 import type { RunField, RunFieldKind } from '../core';
 import { hasOwnProp } from '../core/own-property';
 import { catalog } from './catalog';
-import { condBranches, isExpression } from './expressions';
+import { condBranches, expressionForm, isExpression } from './expressions';
+import { shareAmount } from './share-amount';
 import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
 import { unwrapped } from './zod-definition';
 import {
@@ -449,28 +450,18 @@ function nonScalarReads(
         );
       }
     };
-    // The path an expression reads, resolved, tried in json-render's order:
-    // `$state`, `$item`, then `$bindState` and `$bindItem`, which resolve to
-    // the value at their path as the first two do. Nothing for any other
-    // value, an `$index` included, which reads no path.
+    // The path an expression reads, resolved: `$state` and `$bindState` name
+    // it, `$item` and `$bindItem` name it relative to the repeat's item, and
+    // all four resolve to the value there. Nothing for any other value.
     const readPath = (value: unknown): string | undefined => {
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
-      const record = value as Record<string, unknown>;
-      if (typeof record.$state === 'string') return record.$state;
-      if (typeof record.$item === 'string') return itemPath(record.$item);
-      if (record.$index === true) return undefined;
-      if (typeof record.$bindState === 'string') return record.$bindState;
-      if (typeof record.$bindItem === 'string') return itemPath(record.$bindItem);
+      const form = expressionForm(value);
+      const record = value as Record<string, string>;
+      if (form === '$state' || form === '$bindState') return record[form];
+      if (form === '$item' || form === '$bindItem') return itemPath(record[form]!);
       return undefined;
     };
     // Whether json-render resolves `value` to the repeat's index, a number.
-    const readsIndex = (value: unknown): boolean =>
-      readPath(value) === undefined &&
-      typeof value === 'object' &&
-      value !== null &&
-      (value as Record<string, unknown>).$index === true &&
-      typeof (value as Record<string, unknown>).$state !== 'string' &&
-      typeof (value as Record<string, unknown>).$item !== 'string';
+    const readsIndex = (value: unknown): boolean => expressionForm(value) === '$index';
     // Every value `value` can resolve to, a `$cond` being either of its
     // branches, each resolved again; the value itself for anything else.
     const outcomes = (value: unknown, depth = 0): unknown[] => {
@@ -497,7 +488,9 @@ function nonScalarReads(
       const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member holding a number, or the whole list is read with { "$state" }`;
       // Whether an amount draws no share, naming why when it does not.
       const amountRefused = (part: string, amount: unknown): boolean => {
-        if (typeof amount === 'number' || readsIndex(amount)) return false;
+        // What the renderer draws a share from: a number, or a text that
+        // writes one out (`shareAmount`).
+        if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return false;
         const path = readPath(amount);
         if (path === undefined) {
           const shown = isExpression(amount)
@@ -731,7 +724,12 @@ export function descriptorMalformation(descriptor: unknown): string | undefined 
   if (inputs != null && !Array.isArray(inputs)) {
     return 'the descriptor\'s "inputs" is not a list of fields';
   }
-  if (result != null && typeof result !== 'object') {
+  if (
+    result != null &&
+    (typeof result !== 'object' ||
+      Array.isArray(result) ||
+      typeof (result as { kind?: unknown }).kind !== 'string')
+  ) {
     return 'the descriptor\'s "result" is not a field';
   }
   return undefined;

@@ -618,6 +618,18 @@ describe('a spec malformed in a way the walk itself throws on', () => {
     );
   });
 
+  it('refuses a result that is a list or carries no kind, rather than reading it as a field', () => {
+    const spec = {
+      root: 'a',
+      elements: { a: { type: 'MthdsResult', props: { path: '/result' }, children: [] } },
+    } as unknown as Spec;
+    for (const result of [[], {}]) {
+      expect(layoutProblems({ result } as never, spec)).toEqual([
+        'the descriptor\'s "result" is not a field',
+      ]);
+    }
+  });
+
   it('holds a half of the descriptor written as null to be absent', () => {
     const spec = {
       root: 'a',
@@ -1137,17 +1149,30 @@ describe("a share's parts", () => {
   });
 
   /**
-   * The renderer reads a part's amount as a number and draws no share for
-   * anything else, silently; a written-out part is held to that as a part
-   * read from the payload is held to a number member.
+   * The renderer reads a part's amount as a number, or a text that writes
+   * one out, and draws no share for anything else, silently; a written-out
+   * part is held to that as a part read from the payload is held to a number
+   * member.
    */
+  it('takes an inline amount written as a text that writes a number out, as the renderer draws it', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: '40' },
+          { category: 'Lodging', amount: '12.5' },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
   it('refuses an inline amount that is not a number, or that reads a path holding no number', () => {
     expect(
       layoutProblems(
         { result: costs(LINE) },
         inline([
           { category: 'Food', amount: 'abc' },
-          { category: 'Food', amount: '40' },
+          { category: 'Food', amount: ' ' },
           { category: 'Food', amount: { $state: '/result/costs/0/category' } },
           { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
           { category: 'Food', amount: { $state: '/result/costs/0/amount' } },
@@ -1156,7 +1181,7 @@ describe("a share's parts", () => {
       ),
     ).toEqual([
       `bar: ProportionBar's part 1's "amount" is "abc", not a number;${HOW}`,
-      `bar: ProportionBar's part 2's "amount" is "40", not a number;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" is " ", not a number;${HOW}`,
       `bar: ProportionBar's part 3's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
       `bar: ProportionBar's part 4's "amount" is an expression that reads no number, not a number;${HOW}`,
     ]);

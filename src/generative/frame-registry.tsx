@@ -14,6 +14,7 @@ import {
 import { cn } from '../react/utils';
 import { textOf, withDeclaredProps } from './declared-props';
 import { frameComponents } from './frame-definitions';
+import { shareAmount } from './share-amount';
 import { useFrameHost } from './frame-host';
 import { useDescriptorScope } from './registry';
 
@@ -264,19 +265,10 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     (row): row is Record<string, unknown> =>
       typeof row === 'object' && row !== null && !Array.isArray(row),
   );
-  // An amount is a number, or a text that writes one out, as a payload's
-  // decimal may arrive. Nothing else is one: a structure (on which `Number`
-  // throws when it carries its own `toString` member), a list, a boolean.
-  const amountOf = (raw: unknown) =>
-    typeof raw === 'number'
-      ? raw
-      : typeof raw === 'string' && raw.trim() !== ''
-        ? Number(raw)
-        : Number.NaN;
   const parts = rows
     .map((row) => ({
       label: textOf(row[props.labelKey]),
-      value: amountOf(row[props.valueKey]),
+      value: shareAmount(row[props.valueKey]),
     }))
     .filter((p) => Number.isFinite(p.value) && p.value > 0);
   const sum = parts.reduce((s, p) => s + p.value, 0);
