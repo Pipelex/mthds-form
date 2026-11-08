@@ -220,6 +220,39 @@ describe('a share whose parts are not all structures', () => {
 });
 
 describe('a picture whose path is not a literal', () => {
+  it('shows nothing inside a repeat over images, rather than the item itself, when the path resolves to nothing', () => {
+    // Inside a repeat, `""` is the item itself, so a path held to the empty
+    // text drew every item's image where the layout meant none.
+    const spec: Spec = {
+      root: 'shots',
+      elements: {
+        shots: {
+          type: 'Stack',
+          props: { direction: 'vertical' },
+          repeat: { statePath: '/result/shots' },
+          children: ['shot'],
+        },
+        shot: {
+          type: 'Picture',
+          props: { path: { $item: 'missing' }, alt: null, aspect: null },
+          children: [],
+        },
+      },
+    };
+    const { container } = render(
+      <GenerativePage
+        spec={spec}
+        store={createStateStore({
+          result: { shots: [{ url: 'https://cdn.test/a.png', caption: 'A' }] },
+        })}
+        scope={{}}
+        brand={BRAND}
+      />,
+    );
+    expect(renderErrors()).toEqual([]);
+    expect(container.querySelector('img')).toBeNull();
+  });
+
   it('shows nothing, and does not throw, when a layout rendered past the checks binds it to nothing', () => {
     const { container } = resultPage(
       'Picture',

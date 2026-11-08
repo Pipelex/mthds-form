@@ -367,14 +367,16 @@ function Picture({
   props,
 }: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>) {
   // The checks hold `path` to a literal; a layout rendered past them may still
-  // hand an expression's value here, which shows no picture.
-  const path = useAbsolute(typeof props.path === 'string' ? props.path : '');
+  // hand an expression's value here, which shows no picture. It is not read as
+  // the empty path, which inside a repeat is the item itself.
+  const written = typeof props.path === 'string' ? props.path : undefined;
+  const path = useAbsolute(written ?? '');
   const value = useStateValue<unknown>(path);
   const resolve = useResolveUrl();
   // In the result view's order, each through the kernel's gate: the host's
   // resolver on the stored reference, then the file's own public URL, then the
   // reference itself, so a picture shows wherever the result view shows it.
-  const content = readImageContent(value);
+  const content = written === undefined ? undefined : readImageContent(value);
   const src = content
     ? (viewableUrl(resolve?.(content.url)) ??
       viewableUrl(content.publicUrl) ??
@@ -498,19 +500,25 @@ function TextList({ props }: BaseComponentProps<TextListProps>) {
  * Each renderer is handed its props held to the frame's definitions
  * (`declared-props.ts`), as the base catalog's are.
  */
-export const frameRenderers = withDeclaredProps(frameComponents, {
-  TextList: (ctx: BaseComponentProps<TextListProps>) => <TextList {...ctx} />,
-  DateText: (ctx: BaseComponentProps<DateTextProps>) => <DateText {...ctx} />,
-  Composer: (ctx: BaseComponentProps<ComposerProps>) => <Composer {...ctx} />,
-  FieldGroup: (ctx: BaseComponentProps<{ title?: string | null }>) => <FieldGroup {...ctx} />,
-  ResultHeader: (ctx: BaseComponentProps<ResultHeaderProps>) => <ResultHeader {...ctx} />,
-  ProportionBar: (ctx: BaseComponentProps<ProportionBarProps>) => <ProportionBar {...ctx} />,
-  Swatches: (ctx: BaseComponentProps<{ colors: string[] }>) => <Swatches {...ctx} />,
-  Picture: (
-    ctx: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>,
-  ) => <Picture {...ctx} />,
-  Fact: (ctx: BaseComponentProps<{ label: string; value?: unknown; detail?: string | null }>) => (
-    <Fact {...ctx} />
-  ),
-  Detail: (ctx: BaseComponentProps<{ label: string; value?: unknown }>) => <Detail {...ctx} />,
-});
+export const frameRenderers = withDeclaredProps(
+  frameComponents,
+  {
+    TextList: (ctx: BaseComponentProps<TextListProps>) => <TextList {...ctx} />,
+    DateText: (ctx: BaseComponentProps<DateTextProps>) => <DateText {...ctx} />,
+    Composer: (ctx: BaseComponentProps<ComposerProps>) => <Composer {...ctx} />,
+    FieldGroup: (ctx: BaseComponentProps<{ title?: string | null }>) => <FieldGroup {...ctx} />,
+    ResultHeader: (ctx: BaseComponentProps<ResultHeaderProps>) => <ResultHeader {...ctx} />,
+    ProportionBar: (ctx: BaseComponentProps<ProportionBarProps>) => <ProportionBar {...ctx} />,
+    Swatches: (ctx: BaseComponentProps<{ colors: string[] }>) => <Swatches {...ctx} />,
+    Picture: (
+      ctx: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>,
+    ) => <Picture {...ctx} />,
+    Fact: (ctx: BaseComponentProps<{ label: string; value?: unknown; detail?: string | null }>) => (
+      <Fact {...ctx} />
+    ),
+    Detail: (ctx: BaseComponentProps<{ label: string; value?: unknown }>) => <Detail {...ctx} />,
+  },
+  // A refused `path` reaches the renderer as refused: its nearest value, the
+  // empty text, is the item itself inside a repeat.
+  { Picture: ['path'] },
+);

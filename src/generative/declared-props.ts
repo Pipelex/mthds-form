@@ -78,14 +78,17 @@ function conformValue(schema: z.ZodType, value: unknown): unknown {
  * every value already conforms, which is every render of a layout whose
  * expressions resolved to what they should, so a renderer sees no new props
  * object for nothing. A prop the shape does not declare is passed through: the
- * catalog check refuses one, and this is not the place to restate it.
+ * catalog check refuses one, and this is not the place to restate it, and
+ * neither is a prop named in `asWritten`, whose renderer reads it as it came.
  */
 export function conformProps<P extends Record<string, unknown>>(
   shape: Readonly<Record<string, z.ZodType>>,
   props: P,
+  asWritten: readonly string[] = [],
 ): P {
   let conformed: Record<string, unknown> | undefined;
   for (const [name, schema] of Object.entries(shape)) {
+    if (asWritten.includes(name)) continue;
     const value = props[name];
     const held = conformValue(schema, value);
     if (held === value) continue;
@@ -101,11 +104,15 @@ type Definitions = Readonly<Record<string, { props?: unknown }>>;
 /**
  * Renderers that are handed their props conformed to the definitions they
  * render, each wrapped once. A renderer the definitions do not name is
- * returned as it is.
+ * returned as it is. `asWritten` names, per component, the props whose
+ * nearest value would mean something else: a `Picture`'s empty `path` is the
+ * item itself inside a repeat, so a refused path must reach its renderer as
+ * refused, not as the empty text.
  */
 export function withDeclaredProps<R extends Record<string, (ctx: never) => unknown>>(
   definitions: Definitions,
   renderers: R,
+  asWritten: Readonly<Record<string, readonly string[]>> = {},
 ): R {
   const wrapped: Record<string, unknown> = {};
   for (const [name, render] of Object.entries(renderers)) {
@@ -113,7 +120,10 @@ export function withDeclaredProps<R extends Record<string, (ctx: never) => unkno
     const shape = schema?.shape;
     wrapped[name] = shape
       ? (ctx: { props: Record<string, unknown> }) =>
-          (render as (ctx: unknown) => unknown)({ ...ctx, props: conformProps(shape, ctx.props) })
+          (render as (ctx: unknown) => unknown)({
+            ...ctx,
+            props: conformProps(shape, ctx.props, asWritten[name]),
+          })
       : render;
   }
   return wrapped as R;
