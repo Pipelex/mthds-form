@@ -495,15 +495,18 @@ for (const entry of RENDERING_ENTRIES) {
   }
 }
 
-// The designer method ships as data beside the entries, reachable through the
-// `./layout-design.mthds` export. A missing file is a broken export a consumer
-// only discovers at run time.
-if (existsSync(`${DIST}/layout-design.mthds`)) {
-  console.log('ok  layout-design.mthds ships beside the entries');
-} else {
-  failures.push(
-    'dist/layout-design.mthds is missing - the `./layout-design.mthds` export resolves to nothing. See tsup.config.ts onSuccess.',
-  );
+// The designer method and its second entry ship as data beside the entries,
+// reachable through the `./layout-design.mthds` and `./layout-sample.mthds`
+// exports. A missing file is a broken export a consumer only discovers at run
+// time.
+for (const method of ['layout-design.mthds', 'layout-sample.mthds']) {
+  if (existsSync(`${DIST}/${method}`)) {
+    console.log(`ok  ${method} ships beside the entries`);
+  } else {
+    failures.push(
+      `dist/${method} is missing - the \`./${method}\` export resolves to nothing. See tsup.config.ts onSuccess.`,
+    );
+  }
 }
 
 /**

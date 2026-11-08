@@ -43,6 +43,8 @@ import { getPipelexClient } from './client';
 const PIPE_CODE = 'generative.design_layout';
 /** The method's second entry: a refused page and what the checks said, in; the page emitted again, out. */
 const REPAIR_PIPE_CODE = 'generative.repair_layout';
+/** The entry that designs a result page with no run to read: it writes a sample of the result first. */
+const FROM_WRITTEN_SAMPLE_PIPE_CODE = 'layout_sample.design_from_written_sample';
 
 /** `methods/`: the bundle's directory, and the sidecar's `bundle_dir`. */
 const BUNDLE_DIR = fileURLToPath(new URL('../../methods/', import.meta.url));
@@ -88,6 +90,8 @@ export interface DesignLayoutRun {
 /** The stuffs the method's first two stages write, by the names the sequence gives them. */
 const BRIEF_STUFF = 'brief_text';
 const PLAN_STUFF = 'plan';
+/** The stuff the written-sample entry's first step writes: the invented result, as JSON text. */
+const WRITTEN_SAMPLE_STUFF = 'written_sample';
 
 /**
  * One intermediate out of the run's working memory, or a loud failure: the
@@ -131,14 +135,12 @@ function briefTextOf(results: RunResults): string {
  * Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`.
  * A bundle is one closure: a file that imports a sibling needs that sibling
  * submitted with it, so the whole directory goes, and the drift gate lists
- * it with this same call.
- *
- * `methods/` holds one method today. A second one added beside it would join
- * this request - and would red `make codegen-check`, which lists the same
- * directory and reports a file the types were not generated from. That red is
- * the signal to give each method its own directory and move the sidecar's
- * `bundle_dir` with it through /pipelex-integrate, never a filter here: a
- * filter would quietly drop the sibling a real closure needs.
+ * it with this same call. `methods/` holds the designer and its written-sample
+ * entry, which reads the designer's concepts and pipes, so every design sends
+ * both and any entry may be started from them. A file that is NOT part of that
+ * closure does not belong in this directory: adding one reds `make
+ * codegen-check` and is the signal to give it a directory of its own, never a
+ * filter here, which would quietly drop a sibling a real closure needs.
  */
 async function readBundle(): Promise<string[]> {
   const names = (await readdir(BUNDLE_DIR, { recursive: true }))
@@ -218,6 +220,42 @@ export async function designLayout(
     jsonl: parseText(results.main_stuff).text,
     brief: briefTextOf(results),
     plan: planOf(results),
+    results,
+  };
+}
+
+export interface DesignFromWrittenSampleRun extends DesignLayoutRun {
+  /** The sample the entry invented, as the model wrote it; check it with `writtenSampleOf`. */
+  writtenSample: string;
+}
+
+/**
+ * One design of a result page with no run to read: the method's written-sample
+ * entry invents a state of the result first and then designs from it, in the
+ * same run and over the same inputs as `designLayout`. The brief it is handed
+ * carries no `sample_state`.
+ */
+export async function designFromWrittenSample(
+  inputs: DesignLayoutInputs,
+  options: DesignLayoutOptions = {},
+): Promise<DesignFromWrittenSampleRun> {
+  const results = await getPipelexClient().startAndWaitForResult(
+    {
+      pipe_code: FROM_WRITTEN_SAMPLE_PIPE_CODE,
+      mthds_contents: withOverrides(await readBundle(), options),
+      inputs: {
+        catalog: { concept: DESIGNER_CATALOG_CONCEPT, content: serializeCatalog(inputs.catalog) },
+        brief: { concept: DESIGNER_BRIEF_CONCEPT, content: serializeBrief(inputs.brief) },
+        ...(inputs.seed === undefined ? {} : { seed: inputs.seed }),
+      },
+    },
+    { onPoll: options.onPoll },
+  );
+  return {
+    jsonl: parseText(results.main_stuff).text,
+    brief: briefTextOf(results),
+    plan: planOf(results),
+    writtenSample: parseText(stuffOf(results, WRITTEN_SAMPLE_STUFF)).text,
     results,
   };
 }

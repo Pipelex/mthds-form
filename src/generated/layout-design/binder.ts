@@ -1,6 +1,6 @@
 // >>> pipelex-codegen-stamp >>>
-// crate_fingerprint: 555048485df75898bc9d8e66f18f67d7c42a810c756d680666c5e39d95cc186a
-// engine_version: 0.95.1
+// crate_fingerprint: 56029b66bfdb618b838f5d97a1f548990b8014f23369993ec9d9d668f6c9a68a
+// engine_version: 0.97.0
 // projection: types / ts-zod
 // options: {}
 // content_hash: 3d9cce17b328896decba8cdbcf09f13e9ab0144ee16341ddaaec04c7cb7a748b

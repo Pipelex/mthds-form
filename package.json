@@ -42,7 +42,8 @@
     },
     "./styles.css": "./dist/styles.css",
     "./theme.css": "./dist/theme.css",
-    "./layout-design.mthds": "./dist/layout-design.mthds"
+    "./layout-design.mthds": "./dist/layout-design.mthds",
+    "./layout-sample.mthds": "./dist/layout-sample.mthds"
   },
   "files": [
     "dist"

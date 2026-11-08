@@ -225,11 +225,11 @@ export function Stack({
 /** Enumerated rather than interpolated: Tailwind compiles the class names it can see. */
 const COLUMNS: Record<number, string> = {
   1: 'grid-cols-1',
-  2: 'sm:grid-cols-2',
-  3: 'sm:grid-cols-2 lg:grid-cols-3',
-  4: 'sm:grid-cols-2 lg:grid-cols-4',
-  5: 'sm:grid-cols-2 lg:grid-cols-5',
-  6: 'sm:grid-cols-2 lg:grid-cols-6',
+  2: '@lg:grid-cols-2',
+  3: '@lg:grid-cols-2 @5xl:grid-cols-3',
+  4: '@lg:grid-cols-2 @5xl:grid-cols-4',
+  5: '@lg:grid-cols-2 @5xl:grid-cols-5',
+  6: '@lg:grid-cols-2 @5xl:grid-cols-6',
 };
 
 export function Grid({
@@ -557,10 +557,11 @@ const NATIVE_CHECK = cn('size-4 shrink-0', checkedAccentClass, focusOutlineClass
 /**
  * The label a native radio or check box sits in, which is where a finger
  * lands: a tap anywhere on a label activates the control it wraps. The box
- * keeps its 16 pixels, and below `sm` its row grows to 44 pixels tall across
- * the column, so the target is the whole row rather than the box.
+ * keeps its 16 pixels, and on a page narrower than 512 pixels its row grows to
+ * 44 pixels tall across the column, so the target is the whole row rather than
+ * the box.
  */
-const NATIVE_CHECK_ROW = 'flex items-center gap-2 text-sm max-sm:min-h-11';
+const NATIVE_CHECK_ROW = 'flex items-center gap-2 text-sm @max-lg:min-h-11';
 
 export function Radio({
   props,
@@ -580,7 +581,7 @@ export function Radio({
     >
       <legend className={LABEL}>{props.label}</legend>
       {/* Rows of 44 pixels need no gap between them on a phone. */}
-      <div className="space-y-2 max-sm:space-y-0">
+      <div className="space-y-2 @max-lg:space-y-0">
         {(props.options ?? []).map((option, index, options) => (
           <label key={`${index}-${option}`} className={NATIVE_CHECK_ROW}>
             <input
@@ -658,8 +659,8 @@ export function Switch({
   const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props, id);
   return (
     <div className="space-y-2">
-      {/* Room for the switch's 44px hit area below `sm`, inside its own row. */}
-      <div className="flex items-center gap-3 max-sm:py-2.5">
+      {/* Room for the switch's 44px hit area on a narrow page, inside its own row. */}
+      <div className="flex items-center gap-3 @max-lg:py-2.5">
         <SwitchPrimitive
           id={id}
           name={props.name}
