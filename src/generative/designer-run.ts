@@ -48,5 +48,25 @@ export interface LayoutCheck {
 export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutCheck): string[] {
   const verdict = validateAgainstCatalog(spec, frameCatalog(frame));
   const invalid = verdict.ok ? [] : formatProblems(verdict.problems).split('\n');
-  return [...invalid, ...layoutProblems(descriptor, spec)];
+  // A page that takes inputs is there to start a run, and nothing else in it
+  // can: a layout with no control bound to `run` renders a dead page, which
+  // the host must refuse rather than show.
+  const runless =
+    frame !== 'result' && descriptor.inputs && !bindsRun(spec)
+      ? ["the layout has no control that runs the method: bind `run` under a control's `on`"]
+      : [];
+  return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
+}
+
+/** Whether any element binds the `run` action, through its `onSuccess` and `onError` chains too. */
+function bindsRun(spec: Spec): boolean {
+  const runs = (binding: unknown): boolean => {
+    if (Array.isArray(binding)) return binding.some(runs);
+    if (typeof binding !== 'object' || binding === null) return false;
+    const record = binding as Record<string, unknown>;
+    return record.action === 'run' || runs(record.onSuccess) || runs(record.onError);
+  };
+  return Object.values(spec.elements ?? {}).some((element) =>
+    Object.values((element as { on?: Record<string, unknown> }).on ?? {}).some(runs),
+  );
 }

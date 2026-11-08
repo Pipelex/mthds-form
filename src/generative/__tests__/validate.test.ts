@@ -488,6 +488,44 @@ describe('an expression where a name belongs', () => {
 });
 
 /**
+ * An expression standing for a whole object inside a prop. The literal check
+ * reads `{ $state: ... }` as the object itself and raises its issues at the
+ * object's members, under the expression rather than at it, so a filter that
+ * looked only at the issue's own path refused a binding json-render resolves.
+ */
+describe('an expression standing for an object inside a prop', () => {
+  it('is accepted, as json-render resolves it', () => {
+    const verdict = validateAgainstCatalog({
+      root: 't',
+      elements: {
+        t: {
+          type: 'Tabs',
+          props: { tabs: [{ $state: '/state/first' }, { label: 'Later', value: 'later' }] },
+          children: ['a', 'b'],
+        },
+        a: { type: 'Text', props: { text: 'One' }, children: [] },
+        b: { type: 'Text', props: { text: 'Two' }, children: [] },
+      },
+    } as unknown as Spec);
+    expect(verdict.problems.filter((p) => p.message.startsWith('Tabs.tabs'))).toEqual([]);
+  });
+
+  it('still refuses a literal object missing a member', () => {
+    const verdict = validateAgainstCatalog({
+      root: 't',
+      elements: {
+        t: {
+          type: 'Tabs',
+          props: { tabs: [{ label: 'Now' }, { label: 'Later', value: 'later' }] },
+          children: [],
+        },
+      },
+    } as unknown as Spec);
+    expect(formatProblems(verdict.problems)).toContain('Tabs.tabs');
+  });
+});
+
+/**
  * The gate's own promise, which docs/generative-ui.md states in as many words:
  * it answers with problems, not exceptions. A host calls it to decide whether
  * rendering is safe, so a throw is the one answer it cannot use - it arrives

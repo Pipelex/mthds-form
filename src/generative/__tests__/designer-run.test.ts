@@ -51,6 +51,34 @@ describe('a layout written for a frame', () => {
     });
     expect(problems.some((line) => line.includes('/inputs/tone'))).toBe(true);
   });
+
+  it('is refused when no control runs the method, since the page would be dead', () => {
+    const page = composer.elements.page!;
+    const runless: Spec = {
+      ...composer,
+      elements: {
+        ...composer.elements,
+        page: { ...page, on: { press: [{ action: 'validateForm' }] } },
+      },
+    };
+    const problems = layoutCheckProblems(runless, { frame: 'composer', descriptor: { inputs } });
+    expect(problems.join('\n')).toMatch(/no control that runs the method/);
+  });
+
+  it("finds the run in a binding's chain, where a layout may start it after a check", () => {
+    const page = composer.elements.page!;
+    const chained: Spec = {
+      ...composer,
+      elements: {
+        ...composer.elements,
+        page: {
+          ...page,
+          on: { press: { action: 'validateForm', onSuccess: { action: 'run' } } },
+        },
+      },
+    };
+    expect(layoutCheckProblems(chained, { frame: 'composer', descriptor: { inputs } })).toEqual([]);
+  });
 });
 
 describe('what a producer hands the method', () => {

@@ -375,7 +375,10 @@ function Picture({
   return (
     <img
       src={src}
-      alt={props.alt ?? ''}
+      alt={props.alt ?? content?.caption ?? ''}
+      // A result's URL is the result's to choose, so the host page's address
+      // is never sent to it, as with every other picture the package draws.
+      referrerPolicy="no-referrer"
       className={cn(
         'block w-full rounded-[var(--radius,0.5rem)] border border-border bg-muted object-cover',
         aspect,

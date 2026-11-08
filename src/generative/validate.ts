@@ -364,11 +364,15 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
       }
       const parsed = propSchema.safeParse(value);
       // json-render resolves an expression wherever it sits in a prop, inside
-      // an array or an object included, so an issue raised AT a nested
-      // expression is the literal check misreading it.
+      // an array or an object included, so an issue raised at a nested
+      // expression, or under one (an expression standing for an object draws
+      // issues at the object's members), is the literal check misreading it.
       const issues = parsed.success
         ? []
-        : parsed.error.issues.filter((issue) => !isExpression(valueAt(value, issue.path)));
+        : parsed.error.issues.filter(
+            (issue) =>
+              !issue.path.some((_, n) => isExpression(valueAt(value, issue.path.slice(0, n + 1)))),
+          );
       if (issues.length > 0) {
         problems.push({
           elementKey: key,

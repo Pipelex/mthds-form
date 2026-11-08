@@ -134,6 +134,21 @@ describe("a result page's components read result text as data", () => {
     );
     expect(container.querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/cover.png');
   });
+
+  it("sends no referrer to a picture's host, and names it by its caption when the layout does not", () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('Picture', { path: '/result/cover', alt: null, aspect: null })}
+        store={createStateStore({
+          result: { cover: { url: 'https://cdn.test/cover.png', caption: 'The harbour at dawn' } },
+        })}
+        scope={{}}
+      />,
+    );
+    const img = container.querySelector('img');
+    expect(img?.getAttribute('referrerpolicy')).toBe('no-referrer');
+    expect(img?.getAttribute('alt')).toBe('The harbour at dawn');
+  });
 });
 
 describe('a run starts once per press while it is going', () => {
@@ -157,6 +172,32 @@ describe('a run starts once per press while it is going', () => {
       return new Promise<void>((resolve) => {
         finish = resolve;
       });
+    };
+    render(<GenerativePage spec={PAGE} store={createStateStore({})} scope={{}} onRun={onRun} />);
+    const button = screen.getByRole('button', { name: /Plan my trip/ });
+    await act(async () => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    expect(calls).toHaveLength(1);
+    await act(async () => finish());
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('holds the guard for any thenable the host returns, not only a native promise', async () => {
+    let finish: () => void = () => {};
+    const calls: unknown[] = [];
+    const onRun = (state: unknown) => {
+      calls.push(state);
+      const settled = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      // A promise from another realm fails `instanceof Promise`; a bare
+      // thenable stands for it here.
+      return { then: settled.then.bind(settled) } as unknown as Promise<void>;
     };
     render(<GenerativePage spec={PAGE} store={createStateStore({})} scope={{}} onRun={onRun} />);
     const button = screen.getByRole('button', { name: /Plan my trip/ });

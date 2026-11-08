@@ -7,6 +7,7 @@ import { BrandProvider } from './brand-context';
 import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
+import { isThenable } from '../react/utils';
 
 /** What a page renders through: this entry's registry unless a host brings its own. */
 export type PageRegistry = React.ComponentProps<typeof Renderer>['registry'];
@@ -99,8 +100,11 @@ export function GenerativePage({
         running.current = false;
         throw error;
       }
-      if (pending instanceof Promise) {
-        return pending.finally(() => {
+      if (isThenable(pending)) {
+        // Any thenable holds the guard, a promise from another realm
+        // included, and json-render still receives what the host returned,
+        // its rejection included.
+        return Promise.resolve(pending).finally(() => {
           running.current = false;
         });
       }
