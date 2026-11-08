@@ -104,15 +104,28 @@ function said(error: unknown): string {
 
 /**
  * A value as the text of its content, for telling a new value from the same
- * one handed again as a new object. What a boundary renders from is JSON a
- * model wrote and the store holds, so it has one; anything that does not
- * stringify is compared as itself.
+ * one handed again as a new object. What a boundary renders from is mostly
+ * JSON a model wrote and the store holds, but a host's store may hold what
+ * JSON cannot write - a big integer, a structure that contains itself - so
+ * those are written out too, and anything still unwritable is one text: an
+ * input read afresh is a new object every time, and compared as itself it
+ * would read as changed at every render, retrying and reporting each time.
  */
-function contentOf(value: unknown): unknown {
+function contentOf(value: unknown): string {
+  const open = new WeakSet<object>();
   try {
-    return JSON.stringify(value);
+    return (
+      JSON.stringify(value, function (this: unknown, _key, entry: unknown) {
+        if (typeof entry === 'bigint') return `${entry}n`;
+        if (typeof entry === 'object' && entry !== null) {
+          if (open.has(entry)) return '[cycle]';
+          open.add(entry);
+        }
+        return entry;
+      }) ?? 'undefined'
+    );
   } catch {
-    return value;
+    return 'an input that cannot be written out';
   }
 }
 
@@ -179,8 +192,11 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
     }
   }
 
-  override componentDidUpdate(previous: BoundaryProps): void {
-    if (!this.state.failed) return;
+  override componentDidUpdate(previous: BoundaryProps, previousState: BoundaryState): void {
+    // React runs this before `componentDidCatch` in the commit that caught
+    // the throw, with the input that threw: only a boundary that had already
+    // failed before this update can be looking at a corrected input.
+    if (!this.state.failed || !previousState.failed) return;
     const streamEnded = previous.loading === true && !this.props.loading;
     if (streamEnded || this.inputChanged(previous)) {
       this.failedOn = undefined;

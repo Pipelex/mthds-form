@@ -130,4 +130,75 @@ describe('a run pressed while a field fails its own checks', () => {
     await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
   });
+
+  it('is refused by the checks of a radio group, as by those of a text field', async () => {
+    // The radio group, the checkbox and the switch render through another
+    // helper than the text fields, which the run gate once did not see.
+    const radio: Spec = {
+      ...CHECKED,
+      elements: {
+        ...CHECKED.elements,
+        city: {
+          type: 'Radio',
+          props: {
+            label: 'Mode',
+            name: 'mode',
+            options: ['train', 'car'],
+            value: { $bindState: '/inputs/mode' },
+            checks: [{ type: 'required', message: 'Pick a mode' }],
+            validateOn: null,
+          },
+          children: [],
+        },
+      },
+    };
+    const onRun = vi.fn();
+    render(
+      <GenerativePage
+        spec={radio}
+        store={createStateStore({ inputs: { mode: '' } })}
+        scope={{}}
+        onRun={onRun}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    expect(await screen.findByText('Pick a mode')).toBeTruthy();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('holds two fields bound to one path to both their checks, and shows the failure', async () => {
+    // Each registered its own checks over the other's at every render, a loop
+    // React stopped, and the result written last hid the other's failure.
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const twice: Spec = {
+      ...CHECKED,
+      elements: {
+        ...CHECKED.elements,
+        page: { ...CHECKED.elements.page!, children: ['city', 'again', 'cta'] },
+        again: {
+          ...CHECKED.elements.city!,
+          props: {
+            ...CHECKED.elements.city!.props,
+            label: 'City again',
+            name: 'again',
+            checks: [{ type: 'maxLength', args: { max: 10 }, message: 'Ten letters at most' }],
+          },
+        },
+      },
+    };
+    const onRun = vi.fn();
+    render(
+      <GenerativePage
+        spec={twice}
+        store={createStateStore({ inputs: { city: '' } })}
+        scope={{}}
+        onRun={onRun}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    expect(onRun).not.toHaveBeenCalled();
+    expect((await screen.findAllByText('Name a city')).length).toBeGreaterThan(0);
+    expect(errors.mock.calls.flat().join(' ')).not.toMatch(/Maximum update depth/);
+    errors.mockRestore();
+  });
 });

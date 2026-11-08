@@ -438,6 +438,41 @@ describe('an element that threw, once what it renders from is corrected', () => 
     expect(screen.getByRole('heading', { name: 'For anyone' })).toBeTruthy();
   });
 
+  it('reports once an element that starts failing after it drew', () => {
+    // React runs the update hook before the catch in the commit that throws,
+    // and the boundary took the input that threw for a corrected one.
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: STACK, children: ['title'] },
+        title: {
+          type: 'Heading',
+          props: { text: { $template: 'For ${/result/name}' }, level: 'h1' },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({ result: { name: 'Lyon' } });
+    const onElementError = vi.fn();
+    render(<GenerativePage spec={spec} store={store} scope={{}} onElementError={onElementError} />);
+    expect(screen.getByRole('heading', { name: 'For Lyon' })).toBeTruthy();
+    act(() => store.set('/result/name', { toString: 1 }));
+    expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not try again at every render when what it renders from is no JSON', () => {
+    // A host's store may hold a big integer, which JSON cannot write; read
+    // afresh as a new object at each render, it once compared as changed.
+    const store = createStateStore({ result: { lines: { count: BigInt(10) } } });
+    const onElementError = vi.fn();
+    render(
+      <GenerativePage spec={LINES} store={store} scope={{}} onElementError={onElementError} />,
+    );
+    act(() => store.set('/ui/elsewhere', 1));
+    act(() => store.set('/ui/elsewhere', 2));
+    expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
   it('neither tries again nor reports again while what it renders from is unchanged', () => {
     const store = createStateStore({ result: { lines: 'not a list' } });
     const onElementError = vi.fn();

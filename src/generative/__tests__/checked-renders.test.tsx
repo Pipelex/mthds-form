@@ -1,6 +1,7 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { z } from 'zod';
 import type { BrandManifest } from '../../brand/manifest';
@@ -377,5 +378,56 @@ describe('tabs that share a value', () => {
     expect(screen.getByText('First panel')).toBeTruthy();
     expect(screen.queryByText('Second panel')).toBeNull();
     expect(logged.flat().join(' ')).not.toMatch(/same key/);
+  });
+
+  it('open the first panel when a new layout has fewer tabs than the one open', async () => {
+    const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+    const text = (t: string) => ({ type: 'Text', props: { text: t, variant: null }, children: [] });
+    const three: Spec = {
+      root: 'tabs',
+      elements: {
+        tabs: {
+          type: 'Tabs',
+          props: {
+            tabs: [
+              { label: 'One', value: 'one' },
+              { label: 'Two', value: 'two' },
+              { label: 'Three', value: 'three' },
+            ],
+          },
+          children: ['one', 'two', 'three'],
+        },
+        one: { type: 'Stack', props: STACK, children: ['first'] },
+        two: { type: 'Stack', props: STACK, children: ['second'] },
+        three: { type: 'Stack', props: STACK, children: ['third'] },
+        first: text('First panel'),
+        second: text('Second panel'),
+        third: text('Third panel'),
+      },
+    };
+    const store = createStateStore({});
+    const { rerender } = render(
+      <GenerativePage spec={three} store={store} scope={{}} brand={BRAND} />,
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Three' }));
+    expect(screen.getByText('Third panel')).toBeTruthy();
+    const two: Spec = {
+      ...three,
+      elements: {
+        ...three.elements,
+        tabs: {
+          ...three.elements.tabs!,
+          props: {
+            tabs: [
+              { label: 'One', value: 'one' },
+              { label: 'Two', value: 'two' },
+            ],
+          },
+          children: ['one', 'two'],
+        },
+      },
+    };
+    rerender(<GenerativePage spec={two} store={store} scope={{}} brand={BRAND} />);
+    expect(screen.getByText('First panel')).toBeTruthy();
   });
 });

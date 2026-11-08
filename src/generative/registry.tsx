@@ -542,7 +542,10 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   // Each tab is told apart by its position, which is unique where a layout's
   // values need not be: two tabs written with one value would otherwise be
   // one tab to Radix, opening both panels, and one key to React.
-  const [value, setValue] = React.useState('0');
+  const [chosen, setValue] = React.useState('0');
+  // A layout patched or swapped while a tab is open may have fewer tabs than
+  // the position chosen: the first opens rather than none.
+  const value = Number(chosen) < tabs.length ? chosen : '0';
   return (
     <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
       {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
@@ -597,8 +600,11 @@ interface StepsProps {
 function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const steps = props.steps ?? [];
   const panels = React.Children.toArray(children);
-  const [index, setIndex] = React.useState(0);
+  const [chosen, setIndex] = React.useState(0);
   const last = steps.length - 1;
+  // A layout patched or swapped mid-way may have fewer steps than the one
+  // reached: the last there is shows rather than none.
+  const index = Math.max(0, Math.min(chosen, last));
   return (
     <div className="flex flex-col gap-5">
       <ol className="flex flex-wrap items-center gap-x-5 gap-y-2">

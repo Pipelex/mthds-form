@@ -9,7 +9,7 @@ import {
   type ValidationContextValue,
 } from '@json-render/react';
 import { BrandProvider } from './brand-context';
-import { CheckedFieldsContext, checksPass, type CheckedFields } from './checked-fields';
+import { CheckedFields, CheckedFieldsContext } from './checked-fields';
 import {
   ReportingContext,
   RootBoundary,
@@ -138,10 +138,11 @@ export function GenerativePage({
   const rootType = spec?.elements?.[spec.root]?.type ?? 'root';
   const reporting = onElementError !== undefined;
   // The page's checks, read at the press that runs it (below): json-render's
-  // validation, which runs a field's checks and shows its message, and the
-  // page's own record of which checked fields are mounted now.
+  // validation, which runs a field's checks and shows its message, told by
+  // the page's own record of the checked fields mounted now which checks
+  // each path carries.
   const validation = React.useRef<ValidationContextValue | null>(null);
-  const [checkedFields] = React.useState<CheckedFields>(() => new Set());
+  const [checkedFields] = React.useState(() => new CheckedFields());
 
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
@@ -167,12 +168,13 @@ export function GenerativePage({
         // runs and records - and json-render runs the next binding whatever it
         // recorded, so `[validateForm, run]` ran a form its own checks had just
         // refused, and only the host's run gate stood between it and a billed
-        // run. A run is started only when the checks of every field mounted
-        // now pass - not those of every field ever registered, which
-        // json-render keeps for a field hidden or dropped since - and running
-        // them shows each failing field its message, as `validateForm` does.
+        // run. A run is started only when every field's checks pass, and
+        // running them shows each failing field its message, as
+        // `validateForm` does. The checks are those of the fields mounted now,
+        // which the page's record keeps json-render told of, so a field
+        // hidden or dropped since does not hold the run.
         const checks = validation.current;
-        if (checks && !checksPass(checkedFields, checks)) return undefined;
+        if (checks && !checks.validateAll()) return undefined;
         running.current = true;
         let pending: unknown;
         try {
@@ -199,7 +201,7 @@ export function GenerativePage({
       <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
         <ReportingContext.Provider value={reporting}>
           <CheckedFieldsContext.Provider value={checkedFields}>
-            <ValidationBridge into={validation} />
+            <ValidationBridge into={validation} fields={checkedFields} />
             <RootBoundary
               type={rootType}
               report={report}
@@ -220,13 +222,22 @@ export function GenerativePage({
 /**
  * Hands the page's validation - the checks its fields registered with
  * json-render, which `validateForm` runs - to the run handler, which is
- * created above the provider that holds it. Refreshed in an insertion effect,
- * before any press can reach the handler.
+ * created above the provider that holds it, and to the page's record of its
+ * checked fields, which registers them. Refreshed in an insertion effect,
+ * before any field's effect enters its checks and before any press can reach
+ * the handler.
  */
-function ValidationBridge({ into }: { into: React.RefObject<ValidationContextValue | null> }) {
+function ValidationBridge({
+  into,
+  fields,
+}: {
+  into: React.RefObject<ValidationContextValue | null>;
+  fields: CheckedFields;
+}) {
   const validation = useOptionalValidation();
   React.useInsertionEffect(() => {
     into.current = validation;
+    fields.attach(validation);
   });
   return null;
 }

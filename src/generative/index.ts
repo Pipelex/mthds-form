@@ -39,6 +39,7 @@ export {
   type DescriptorScope,
 } from './registry';
 export { generativeRegistry } from './product-registry';
+export { useCheckedField } from './checked-fields';
 export { ResultSlotProvider, useResultSlot, type ResultSlot } from './result-slot';
 export { BrandProvider, useBrand } from './brand-context';
 // The brand's bar - what the catalog's `AppBar` draws - for a host to draw as
