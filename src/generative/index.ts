@@ -28,6 +28,8 @@ export {
   type GenerativePageProps,
   type PageRegistry,
 } from './page';
+// What a page tells its host of an element that failed to render.
+export type { ElementErrorHandler, ElementErrorInfo } from './element-errors';
 export {
   DescriptorProvider,
   domIdFor,
@@ -39,6 +41,9 @@ export {
 export { generativeRegistry } from './product-registry';
 export { ResultSlotProvider, useResultSlot, type ResultSlot } from './result-slot';
 export { BrandProvider, useBrand } from './brand-context';
+// The brand's bar - what the catalog's `AppBar` draws - for a host to draw as
+// its own chrome, over a plain form or above a layout that has none.
+export { BrandBar, type BrandBarProps } from './brand-bar';
 // What a host's compose-then-result frame tells a layout's frame components:
 // how long a run takes, and the result's actions.
 export { FrameHostProvider, useFrameHost, type FrameHost } from './frame-host';

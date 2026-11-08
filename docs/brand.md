@@ -116,7 +116,7 @@ A host does three things:
 
 1. Load the brand's compiled stylesheet, once.
 2. Put the brand's scope class on the element that wraps the page, and `.dark` on an ancestor for the dark mode.
-3. Hand the manifest to the page: `GenerativePage` takes it as `brand`, or a host wraps its tree in `BrandProvider`. That puts the logo pair and the name in scope for the app bar and loads the web font.
+3. Hand the manifest to the page: `GenerativePage` takes it as `brand`, or a host wraps its tree in `BrandProvider`. That puts the logo pair and the name in scope for the app bar and loads the web font. A host that draws the brand's bar as its own chrome, over the plain form or above a layout with no app bar, renders `BrandBar` from `./generative` inside the same `BrandProvider`.
 
 ```tsx
 import '../brands/acme.css';

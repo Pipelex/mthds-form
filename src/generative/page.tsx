@@ -4,6 +4,7 @@ import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
 import { BrandProvider } from './brand-context';
+import { reportingRegistry, type ElementErrorHandler } from './element-errors';
 import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
@@ -37,6 +38,15 @@ export interface GenerativePageProps {
    * brand components may omit it.
    */
   brand?: BrandManifest;
+  /**
+   * Called once for each element that throws while rendering, with the error
+   * and the element's component type. json-render drops such an element from
+   * the page and catches its throw in a boundary of its own, so a boundary
+   * around the page never fires; this is how a host hears of it, and falls
+   * back to its plain view if it wants the whole page to. The element renders
+   * nothing in its place either way. Without it, json-render logs the error.
+   */
+  onElementError?: ElementErrorHandler;
 }
 
 /**
@@ -55,6 +65,7 @@ export function GenerativePage({
   loading,
   registry = generativeRegistry,
   brand,
+  onElementError,
 }: GenerativePageProps) {
   // The scope reaches every control through context, so a fresh object on each
   // render re-renders every field on the page - and a host naturally writes it
@@ -82,6 +93,22 @@ export function GenerativePage({
   React.useEffect(() => {
     latest.current = { onRun, store };
   });
+  // The registry is wrapped in reporting boundaries only when the host asks to
+  // hear of a render error, so a page without the callback renders exactly as
+  // json-render does. Wrapped once per registry, so no element remounts on a
+  // new callback; the callback itself is read through a ref at the error. The
+  // ref is refreshed in an insertion effect, which runs before the layout
+  // phase a boundary reports in, so an element that fails in the same commit
+  // as a new callback reports to that one.
+  const report = React.useRef(onElementError);
+  React.useInsertionEffect(() => {
+    report.current = onElementError;
+  });
+  const reporting = onElementError !== undefined;
+  const pageRegistry = React.useMemo(
+    () => (reporting ? reportingRegistry(registry, report) : registry),
+    [registry, reporting],
+  );
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
   // never) left a second press inside that wait free to start a second
@@ -125,8 +152,8 @@ export function GenerativePage({
   });
   const page = (
     <DescriptorProvider scope={stableScope}>
-      <JSONUIProvider registry={registry} store={store} handlers={handlers}>
-        <Renderer spec={spec} registry={registry} loading={loading} />
+      <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
+        <Renderer spec={spec} registry={pageRegistry} loading={loading} />
       </JSONUIProvider>
     </DescriptorProvider>
   );
