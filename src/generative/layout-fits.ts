@@ -714,25 +714,90 @@ export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
  * nothing. A descriptor is the host's, derived from the method; one of the
  * wrong shape is answered as such, never as the checks' own failure. An
  * absent half - `null` written for it included, which is how JSON carries one
- * - is a descriptor with nothing on that side.
+ * - is a descriptor with nothing on that side. Every field is held to the
+ * shape the walks read, at every depth: a structure naming its `kind` and its
+ * `name` as texts, a structure's members a list of fields and a list's item a
+ * field, with no field inside itself and none nested deeper than
+ * `MAX_FIELD_DEPTH`. Reading one never throws: a descriptor whose own reading
+ * throws is answered as one that cannot be read.
  */
 export function descriptorMalformation(descriptor: unknown): string | undefined {
   if (typeof descriptor !== 'object' || descriptor === null) {
     return 'the layout has no descriptor to be checked against';
   }
-  const { inputs, result } = descriptor as { inputs?: unknown; result?: unknown };
-  if (inputs != null && !Array.isArray(inputs)) {
-    return 'the descriptor\'s "inputs" is not a list of fields';
+  try {
+    const { inputs, result } = descriptor as { inputs?: unknown; result?: unknown };
+    if (inputs != null && !Array.isArray(inputs)) {
+      return 'the descriptor\'s "inputs" is not a list of fields';
+    }
+    for (const [index, input] of (inputs ?? []).entries()) {
+      const problem = fieldMalformation(input, `input ${index + 1}`, new Set());
+      if (problem !== undefined) return `the descriptor's ${problem}`;
+    }
+    if (result != null) {
+      if (!isField(result)) return 'the descriptor\'s "result" is not a field';
+      const problem = fieldMalformation(result, '"result"', new Set());
+      if (problem !== undefined) return `the descriptor's ${problem}`;
+    }
+    return undefined;
+  } catch (error) {
+    return `the descriptor cannot be read (${String(error)})`;
   }
-  if (
-    result != null &&
-    (typeof result !== 'object' ||
-      Array.isArray(result) ||
-      typeof (result as { kind?: unknown }).kind !== 'string')
-  ) {
-    return 'the descriptor\'s "result" is not a field';
+}
+
+/** How many fields deep a descriptor is read before it is refused as too deep. */
+const MAX_FIELD_DEPTH = 64;
+
+/** Whether `value` names its `kind` and its `name` as texts, as a field does. */
+function isField(value: unknown): value is { kind: string; name: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { kind?: unknown }).kind === 'string' &&
+    typeof (value as { name?: unknown }).name === 'string'
+  );
+}
+
+/**
+ * What makes `value`, which the descriptor holds as `subject`, no field the
+ * walks can read, or nothing. `ancestors` holds the fields it sits inside,
+ * so a field held twice - two members sharing one definition - is read at
+ * each place, and only one inside itself is refused.
+ */
+function fieldMalformation(
+  value: unknown,
+  subject: string,
+  ancestors: Set<object>,
+): string | undefined {
+  if (!isField(value)) return `${subject} is not a field`;
+  const named = `${subject} (${JSON.stringify(value.name)})`;
+  if (ancestors.has(value)) return `${named} contains itself`;
+  if (ancestors.size >= MAX_FIELD_DEPTH) {
+    return `${named} is nested more than ${MAX_FIELD_DEPTH} fields deep`;
   }
-  return undefined;
+  ancestors.add(value);
+  try {
+    if (value.kind === 'object') {
+      const { fields } = value as { fields?: unknown };
+      if (!Array.isArray(fields)) return `${named} has no list of member "fields"`;
+      for (const [index, member] of fields.entries()) {
+        const problem = fieldMalformation(member, `${named} member ${index + 1}`, ancestors);
+        if (problem !== undefined) return problem;
+      }
+    }
+    if (value.kind === 'list') {
+      const problem = fieldMalformation(
+        (value as { item?: unknown }).item,
+        `${named} item`,
+        ancestors,
+      );
+      if (problem !== undefined) return problem;
+    }
+    return undefined;
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 /**

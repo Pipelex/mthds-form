@@ -32,16 +32,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * What makes `spec` no spec the checks can walk, in words, or nothing when it
- * has the shape they assume: an `elements` map of structures, each naming
- * its component `type` as a text, with structured `props`, a list of
- * `children`, slots of lists and a `repeat` naming its `statePath`. Whether
- * the root exists, whether a child is an element, whether a type is known,
- * whether `on` and `watch` are the maps the runtime reads: those are problems
- * the checks themselves report, in their own words, not reasons they cannot
- * run.
+ * has the shape they assume: a `root` named by a text, an `elements` map of
+ * structures, each naming its component `type` as a text, with structured
+ * `props`, a list of `children` and slots of lists that name elements by
+ * their keys, and a `repeat` naming its `statePath`. A key is a text because
+ * every walk looks an element up by it, and a structure carrying its own
+ * `toString` member throws as it is turned into one, which the checks would
+ * answer as their own failure and a producer would skip the repair pass for.
+ * Whether the root is there at all, whether a key names an element, whether a
+ * type is known, whether `on` and `watch` are the maps the runtime reads:
+ * those are problems the checks themselves report, in their own words, not
+ * reasons they cannot run.
  */
 export function specMalformation(spec: unknown): string | undefined {
   if (!isRecord(spec)) return `it is ${shown(spec)}, not a structure`;
+  if (spec.root !== undefined && typeof spec.root !== 'string') {
+    return `its "root" is ${shown(spec.root)}, not an element's key`;
+  }
   if (!isRecord(spec.elements)) return 'it has no "elements" map';
   for (const [key, element] of Object.entries(spec.elements)) {
     const at = JSON.stringify(key);
@@ -52,13 +59,31 @@ export function specMalformation(spec: unknown): string | undefined {
       return `the element ${at} has "props" that are not a structure`;
     if (children != null && !Array.isArray(children))
       return `the element ${at} has "children" that are not a list`;
+    const child = Array.isArray(children) ? firstNotAKey(children) : undefined;
+    if (child)
+      return `the element ${at} has a child that is ${shown(child.entry)}, not an element's key`;
     if (slots != null && (!isRecord(slots) || !Object.values(slots).every(Array.isArray))) {
       return `the element ${at} has "slots" that are not lists`;
+    }
+    const slotted = isRecord(slots)
+      ? firstNotAKey(Object.values(slots).flatMap((entries) => entries as unknown[]))
+      : undefined;
+    if (slotted) {
+      return `the element ${at} has a slot entry that is ${shown(slotted.entry)}, not an element's key`;
     }
     if (repeat !== undefined && !repeatsOver(repeat)) {
       return `the element ${at} has a "repeat" that names no "statePath"`;
     }
   }
+  return undefined;
+}
+
+/**
+ * The first entry of `children` or of a slot that is not an element's key,
+ * boxed, so an entry written as `undefined` is found as well.
+ */
+function firstNotAKey(entries: readonly unknown[]): { entry: unknown } | undefined {
+  for (const entry of entries) if (typeof entry !== 'string') return { entry };
   return undefined;
 }
 

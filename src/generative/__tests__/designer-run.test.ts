@@ -1,10 +1,22 @@
 import type { Spec } from '@json-render/core';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RunField } from '../../core';
+import { specMalformation } from '../spec-shape';
 import { catalog, componentNamesFor, frameCatalog } from '../catalog';
 import { COMPOSER_COMPONENTS, RESULT_COMPONENTS } from '../frame-definitions';
 import { REPAIR_ATTEMPTS, layoutCheck, layoutCheckProblems, seedLine } from '../designer-run';
 import type { LayoutDescriptor } from '../layout-fits';
+
+// The shape check, observed: a pass-through spy, so each call is counted and
+// answers as the check itself does.
+vi.mock('../spec-shape', async (actual) => {
+  const shape = await actual<typeof import('../spec-shape')>();
+  return { ...shape, specMalformation: vi.fn(shape.specMalformation) };
+});
+
+beforeEach(() => {
+  vi.mocked(specMalformation).mockClear();
+});
 
 /**
  * The checks a producer and a host hold a layout to, by frame: the frame's own
@@ -207,9 +219,10 @@ describe('an answer that holds the checks failing', () => {
   });
 
   it('says so when a check throws on a layout of the right shape', () => {
-    // A field whose name cannot be read stands in for a defect in a walk.
-    const field = { kind: 'text', required: true } as RunField;
-    Object.defineProperty(field, 'name', {
+    // A field whose requiredness cannot be read stands in for a defect in a
+    // walk: the shape check reads a field's kind and name, never that.
+    const field = { kind: 'text', name: 'topic' } as RunField;
+    Object.defineProperty(field, 'required', {
       get() {
         throw new Error('boom');
       },
@@ -256,9 +269,89 @@ describe('an answer that holds the checks failing', () => {
   });
 
   it('runs the shape check once, and answers the same lines as before', () => {
+    const verdict = layoutCheck(composer, { frame: 'composer', descriptor: { inputs } });
+    expect(specMalformation).toHaveBeenCalledTimes(1);
     expect(layoutCheckProblems(composer, { frame: 'composer', descriptor: { inputs } })).toEqual(
-      layoutCheck(composer, { frame: 'composer', descriptor: { inputs } }).problems,
+      verdict.problems,
     );
+  });
+
+  it.each([
+    [
+      'a child that is a structure',
+      { children: [{ toString: 1 }] },
+      'the element "page" has a child that is {"toString":1}, not an element\'s key',
+    ],
+    [
+      'a child that is a number',
+      { children: [5] },
+      'the element "page" has a child that is 5, not an element\'s key',
+    ],
+    [
+      'a slot entry that is a structure',
+      { slots: { header: [{ toString: 1 }] } },
+      'the element "page" has a slot entry that is {"toString":1}, not an element\'s key',
+    ],
+  ])('refuses %s as a malformed layout, which a repair can fix', (_name, element, line) => {
+    const spec = {
+      ...composer,
+      elements: { ...composer.elements, page: { ...composer.elements.page!, ...element } },
+    } as unknown as Spec;
+    expect(layoutCheck(spec, { frame: 'composer', descriptor: { inputs } })).toEqual({
+      problems: [`the layout is not a well-formed spec: ${line}`],
+      checksFailed: false,
+    });
+  });
+
+  it('refuses a root that is no text as a malformed layout', () => {
+    const spec = { ...composer, root: { toString: 1 } } as unknown as Spec;
+    expect(layoutCheck(spec, { frame: 'composer', descriptor: { inputs } })).toEqual({
+      problems: [
+        'the layout is not a well-formed spec: its "root" is {"toString":1}, not an element\'s key',
+      ],
+      checksFailed: false,
+    });
+  });
+
+  it.each([
+    [[null], "the descriptor's input 1 is not a field"],
+    [[5], "the descriptor's input 1 is not a field"],
+    [[{ kind: 'text' }], "the descriptor's input 1 is not a field"],
+    [
+      [{ kind: 'object', name: 'trip', required: true }],
+      'the descriptor\'s input 1 ("trip") has no list of member "fields"',
+    ],
+    [
+      [{ kind: 'object', name: 'trip', required: true, fields: [null] }],
+      'the descriptor\'s input 1 ("trip") member 1 is not a field',
+    ],
+    [
+      [{ kind: 'list', name: 'stops', required: true }],
+      'the descriptor\'s input 1 ("stops") item is not a field',
+    ],
+  ])('refuses the inputs %j as a malformed descriptor', (fields, line) => {
+    const descriptor = { inputs: fields } as unknown as LayoutDescriptor;
+    expect(layoutCheck(composer, { frame: 'composer', descriptor })).toEqual({
+      problems: [line],
+      checksFailed: false,
+    });
+  });
+
+  it('refuses a field inside itself, and reads a field held twice at each place', () => {
+    const place = { kind: 'text', name: 'city', required: true };
+    const trip = { kind: 'object', name: 'topic', required: true, fields: [place, place] };
+    expect(
+      layoutCheck(composer, { frame: 'composer', descriptor: { inputs: [trip] } as never })
+        .problems,
+    ).toEqual([]);
+    const loop: Record<string, unknown> = { kind: 'object', name: 'topic', required: true };
+    loop.fields = [loop];
+    expect(
+      layoutCheck(composer, { frame: 'composer', descriptor: { inputs: [loop] } as never }),
+    ).toEqual({
+      problems: ['the descriptor\'s input 1 ("topic") member 1 ("topic") contains itself'],
+      checksFailed: false,
+    });
   });
 });
 
