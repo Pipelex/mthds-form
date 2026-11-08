@@ -432,8 +432,10 @@ interface DateTextProps {
 }
 
 function DateText({ props }: BaseComponentProps<DateTextProps>) {
-  // Read as a `DataTable`'s date column reads one (`formatDay`): its leading
-  // day, at noon UTC, so no time zone moves it.
+  // A day written as text, its leading day read through the layer's one
+  // formatter (`formatDay`) at noon UTC, so no time zone moves it. The prop is
+  // a text, so a native date's structure never reaches here: a `native.Date`
+  // is delegated to the result view, which reads its structure.
   const day = formatDay(props.value, props.style ?? 'long');
   if (day === undefined) return null;
   const tone =

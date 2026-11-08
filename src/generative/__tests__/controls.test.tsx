@@ -532,7 +532,9 @@ describe('a stack asked to centre', () => {
     );
     const column = container.querySelector('h1')!.parentElement!;
     const classes = column.className.split(/\s+/);
-    expect(classes).toEqual(expect.arrayContaining(['w-fit', 'max-w-full', 'items-stretch']));
+    expect(classes).toEqual(
+      expect.arrayContaining(['w-fit', 'max-w-full', 'items-stretch', 'grow']),
+    );
     expect(classes).not.toContain('items-center');
     // Centred by the box around it, as `items-center` centred a child, never
     // by auto margins, which inside a horizontal stack would take the row's

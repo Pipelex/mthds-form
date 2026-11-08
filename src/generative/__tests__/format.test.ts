@@ -17,6 +17,11 @@ describe('the layout formatter', () => {
     expect(formatAmount(2400, 'EUR')).toBe('€2,400');
     expect(formatAmount(2400.5, 'EUR')).toBe('€2,400.50');
     expect(formatAmount(1200, 'JPY')).toBe('JP¥1,200');
+    // Whole at the currency's own precision, not by `Number.isInteger`: a
+    // payload's 2399.999 is written as the 2,400 beside it, and a sum of
+    // 0.1 and 0.2 keeps its cents.
+    expect(formatAmount(2399.999, 'EUR')).toBe('€2,400');
+    expect(formatAmount(0.1 + 0.2, 'EUR')).toBe('€0.30');
   });
 
   it('writes every currency in the one locale, whichever component asks', () => {
@@ -71,5 +76,8 @@ describe('the layout formatter', () => {
     expect(formatDay(20250309)).toBeUndefined();
     expect(formatDay(null)).toBeUndefined();
     expect(formatDay('2025-13-45')).toBeUndefined();
+    // A day the month does not have, which `Date` would roll into the next.
+    expect(formatDay('2025-02-31')).toBeUndefined();
+    expect(formatDay('2025-04-31', 'short')).toBeUndefined();
   });
 });

@@ -1311,6 +1311,20 @@ describe("a share's parts", () => {
         `bar: ProportionBar's total reads /result/costs, which holds a list, not a number;${WHAT}`,
       ]);
     });
+
+    it('refuses the repeat index, which outside a repeat resolves to nothing and draws the sum', () => {
+      // An index is never a total, and outside a repeat json-render resolves
+      // it to `undefined`, which the renderer takes for no total at all.
+      expect(layoutProblems({ result: PLAN }, totalled({ $index: true }))).toEqual([
+        `bar: ProportionBar's total is the repeat's index, not an amount;${WHAT}`,
+      ]);
+      expect(
+        layoutProblems(
+          { result: PLAN },
+          totalled(null, { $cond: true, $then: 2400, $else: { $index: true } }),
+        ),
+      ).toEqual([`bar: ProportionBar's of is the repeat's index, not an amount;${WHAT}`]);
+    });
   });
 });
 

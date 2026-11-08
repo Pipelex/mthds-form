@@ -493,13 +493,18 @@ function nonScalarReads(
     // anything else rather than the parts' sum, so a total a model wrote as
     // a `$template` around a currency would be a bar with no figure; it is
     // refused here instead, in each branch of a `$cond`, and the page falls
-    // back. Writing none (`null`) is the parts' sum, and no ceiling.
+    // back. Writing none (`null`) is the parts' sum, and no ceiling. The
+    // repeat's index, which a part's amount may read, is never a total, and
+    // outside a repeat it resolves to nothing, which the renderer would take
+    // for no total and draw the parts' sum in its place.
     if (element.type === 'ProportionBar') {
       const props = (element.props ?? {}) as Record<string, unknown>;
       for (const prop of ['total', 'of'] as const) {
         const refusals = outcomes(props[prop])
           .filter((outcome) => outcome !== null && outcome !== undefined)
-          .map(amountRefusal)
+          .map((outcome) =>
+            readsIndex(outcome) ? "is the repeat's index, not an amount" : amountRefusal(outcome),
+          )
           .filter((refusal): refusal is string => refusal !== undefined);
         for (const refusal of new Set(refusals)) {
           problems.push(

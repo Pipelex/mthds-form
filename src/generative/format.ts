@@ -107,7 +107,14 @@ function currencyFormat(code: string): Money | null {
 export function formatAmount(value: number, unit?: string | null): string {
   if (unit && /^[A-Z]{3}$/.test(unit)) {
     const money = currencyFormat(unit);
-    if (money) return (Number.isInteger(value) ? money.whole : money.fractional).format(value);
+    if (money) {
+      // Whole at the currency's own precision, as it will be written, so a
+      // payload's 2399.999 reads "€2,400" beside the 2,400 it is, not
+      // "€2,400.00".
+      const places = money.fractional.resolvedOptions().maximumFractionDigits ?? 2;
+      const whole = Number.isInteger(Math.round(value * 10 ** places) / 10 ** places);
+      return (whole ? money.whole : money.fractional).format(value);
+    }
   }
   const written = formatNumber(value);
   return unit ? `${written} ${unit}` : written;
@@ -130,14 +137,19 @@ const days = new Map<DayStyle, Intl.DateTimeFormat>();
  * date (`readDateContent`): the day as text, or a native date's own
  * structure (`{ date, time }`, in the serializer's envelope or not). Only its
  * leading `YYYY-MM-DD` is read, anchored at noon UTC, so a time beside it
- * ("2025-03-09 00:30") never moves it across midnight in the reader's zone.
+ * ("2025-03-09 00:30") never moves it across midnight in the reader's zone,
+ * and a day its month does not have names none.
  */
 export function formatDay(value: unknown, style: DayStyle = 'long'): string | undefined {
   const written = readDateContent(value)?.date;
   const day = written === undefined ? null : /^\d{4}-\d{2}-\d{2}/.exec(written);
   if (!day) return undefined;
   const date = new Date(`${day[0]}T12:00:00Z`);
-  if (Number.isNaN(date.getTime())) return undefined;
+  // `Date` rolls a day the month does not have into the next ("2025-02-31"
+  // into 3 March), so the day it lands on must be the one written.
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== day[0]) {
+    return undefined;
+  }
   let format = days.get(style);
   if (!format) {
     format = new Intl.DateTimeFormat(LAYOUT_LOCALE, DAY_OPTIONS[style]);

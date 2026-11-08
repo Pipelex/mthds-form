@@ -188,7 +188,10 @@ export function Stack({
   // The column is centred by an outer box that centres it as `items-center`
   // centred each child, never by auto margins: inside a horizontal stack an
   // auto margin takes the row's free space ahead of its `gap` and `justify`,
-  // so two centred columns side by side spread apart instead of packing.
+  // so two centred columns side by side spread apart instead of packing. The
+  // column grows to the outer box's height, so a parent that stretches the
+  // box (a grid cell, a row asked to stretch) still gives its `justify` and a
+  // child that grows the room they had.
   const column = !horizontal && props.align === 'center';
   const stack = (
     <div
@@ -197,7 +200,7 @@ export function Stack({
         horizontal ? 'flex-row' : 'flex-col',
         pick(GAP, props.gap, 'md'),
         column
-          ? 'w-fit max-w-full items-stretch'
+          ? 'w-fit max-w-full grow items-stretch'
           : pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
         props.justify ? pick(JUSTIFY, props.justify, 'start') : undefined,
       )}
