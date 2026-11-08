@@ -23,6 +23,7 @@ import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
 import { catalog } from './catalog';
+import { textOf, withDeclaredProps } from './declared-props';
 import { frameRenderers } from './frame-registry';
 import { generativeRenderers, useDescriptorScope } from './registry';
 import { useResultSlot } from './result-slot';
@@ -274,7 +275,7 @@ function present(value: unknown): value is string | number | boolean {
 function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
   const text = [props.value, props.detail]
     .filter(present)
-    .map(String)
+    .map(textOf)
     .join(props.separator ?? ' ');
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-3 first:pt-0 last:border-b-0">
@@ -479,16 +480,20 @@ type RegistryOptions = Parameters<typeof defineRegistry<typeof catalog>>[1];
 export const { registry: generativeRegistry } = defineRegistry(catalog, {
   components: {
     ...generativeRenderers,
-    Input: (ctx) => <BrandInput {...ctx} />,
-    Textarea: (ctx) => <BrandTextarea {...ctx} />,
-    AppBar: (ctx) => <AppBar {...ctx} />,
-    Hero: (ctx) => <Hero {...ctx} />,
-    Workspace: (ctx) => <Workspace {...ctx} />,
-    Section: (ctx) => <Section {...ctx} />,
-    Rail: (ctx) => <Rail {...ctx} />,
-    SummaryRow: (ctx) => <SummaryRow {...ctx} />,
-    Cta: (ctx) => <Cta {...ctx} />,
-    Footer: (ctx) => <Footer {...ctx} />,
+    // Held to their definitions as the base and frame renderers are
+    // (`declared-props.ts`).
+    ...withDeclaredProps(catalog.data.components as Record<string, { props?: unknown }>, {
+      Input: (ctx: Parameters<typeof BrandInput>[0]) => <BrandInput {...ctx} />,
+      Textarea: (ctx: Parameters<typeof BrandTextarea>[0]) => <BrandTextarea {...ctx} />,
+      AppBar: (ctx: Parameters<typeof AppBar>[0]) => <AppBar {...ctx} />,
+      Hero: (ctx: Parameters<typeof Hero>[0]) => <Hero {...ctx} />,
+      Workspace: (ctx: Parameters<typeof Workspace>[0]) => <Workspace {...ctx} />,
+      Section: (ctx: Parameters<typeof Section>[0]) => <Section {...ctx} />,
+      Rail: (ctx: Parameters<typeof Rail>[0]) => <Rail {...ctx} />,
+      SummaryRow: (ctx: Parameters<typeof SummaryRow>[0]) => <SummaryRow {...ctx} />,
+      Cta: (ctx: Parameters<typeof Cta>[0]) => <Cta {...ctx} />,
+      Footer: (ctx: Parameters<typeof Footer>[0]) => <Footer {...ctx} />,
+    }),
     ...frameRenderers,
   },
 } as RegistryOptions);

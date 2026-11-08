@@ -88,8 +88,14 @@ const EXPRESSION_KEYS = [
   '$template',
 ];
 
-/** The two escape hatches: their `path` is resolved by the layer, so it is never an expression. */
-const HATCHES = new Set(['MthdsField', 'MthdsResult']);
+/**
+ * The components whose `path` the layer resolves as written - the two escape
+ * hatches, and the `Picture`, which shows a file the kind check will not read
+ * into a prop - so it is never an expression. The fit check resolves each
+ * through the repeat above it; an expression there resolved at render time to
+ * whatever it held, past this check.
+ */
+const LITERAL_PATHS = new Set(['MthdsField', 'MthdsResult', 'Picture']);
 
 function isExpression(value: unknown): boolean {
   return (
@@ -349,7 +355,7 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         continue;
       }
       if (isExpression(value)) {
-        if (HATCHES.has(element.type) && name === 'path') {
+        if (LITERAL_PATHS.has(element.type) && name === 'path') {
           problems.push({
             elementKey: key,
             message: `${element.type}.path must be a literal string - absolute, or the item's field name inside a repeat - never an expression.`,

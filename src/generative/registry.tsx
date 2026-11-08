@@ -95,6 +95,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '../react/ui/toggle-group';
 import { cn } from '../react/utils';
 import { baseCatalog, type ICON_NAMES, type METRIC_FORMATS } from './components';
+import { textOf, withDeclaredProps } from './declared-props';
 import * as shadcn from './ui/shadcn';
 import { inputFieldAtPath, RESULT_ROOT, resultFieldAtPath, segmentsUnder } from './paths';
 
@@ -472,7 +473,7 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
       ? numberFormat(props.format ?? 'plain').format(value)
       : value === null || value === undefined || value === ''
         ? '—'
-        : String(value);
+        : textOf(value);
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -892,4 +893,13 @@ const components: Components<typeof baseCatalog> = {
 };
 
 /** The renderers, for the registry over the catalog that extends this vocabulary. */
-export const generativeRenderers = components;
+/**
+ * Each renderer is handed its props held to the base catalog's definitions
+ * (`declared-props.ts`), so an expression that resolved to the wrong type -
+ * scratch state holding a structure where a title belongs - draws nothing
+ * rather than throwing past both checks.
+ */
+export const generativeRenderers = withDeclaredProps(
+  baseCatalog.data.components as Record<string, { props?: unknown }>,
+  components,
+);

@@ -92,6 +92,46 @@ describe('a layout written for a frame', () => {
   });
 });
 
+/**
+ * The checks never throw. A host calls them on whatever a model wrote, or on
+ * a layout it stored and read back, and a throw there is a page that neither
+ * renders nor falls back: the answer to anything that is not a layout is a
+ * problem line, which the fallback acts on.
+ */
+describe('a layout that is not one at all', () => {
+  it.each([null, undefined, 42, 'page', [], {}, { root: 'page' }, { root: 'page', elements: 7 }])(
+    'is answered with problems, never an exception: %j',
+    (spec) => {
+      const check = () =>
+        layoutCheckProblems(spec as unknown as Spec, { frame: 'composer', descriptor: { inputs } });
+      expect(check).not.toThrow();
+      expect(check().length).toBeGreaterThan(0);
+    },
+  );
+
+  it('is refused for a frame it does not name, rather than checked against no vocabulary', () => {
+    // A frame read back from storage can be anything; an unknown one used to
+    // exclude nothing, so a composer layout naming an `AppBar` passed.
+    const problems = layoutCheckProblems(composer, {
+      frame: 'sidebar' as unknown as 'composer',
+      descriptor: { inputs },
+    });
+    expect(problems).toEqual([
+      'the layout names the frame "sidebar", which is none of page, composer, result',
+    ]);
+  });
+
+  it('is refused, not thrown on, when there is no descriptor to check it against', () => {
+    const check = () =>
+      layoutCheckProblems(composer, {
+        frame: 'composer',
+        descriptor: null as unknown as { inputs: RunField[] },
+      });
+    expect(check).not.toThrow();
+    expect(check()).toEqual(['the layout has no descriptor to be checked against']);
+  });
+});
+
 describe('what a producer hands the method', () => {
   it('sends the seed as the one labelled line the planner reads', () => {
     expect(seedLine('abc')).toBe(

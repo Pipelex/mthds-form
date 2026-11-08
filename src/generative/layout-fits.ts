@@ -214,7 +214,7 @@ function staleReads(
 }
 
 /**
- * The repeats whose list the descriptor no longer has.
+ * The repeats whose list the descriptor no longer has, or never had as a list.
  *
  * A repeat over a list the method has renamed renders nothing at all, and
  * nothing else notices: on a result page there is no coverage to miss it, and
@@ -224,12 +224,18 @@ function staleReads(
  * of repeats above it - and, as with every read, only under the root the
  * descriptor owns: a repeat over the layout's own scratch state is its
  * business.
+ *
+ * A repeat over a path that holds something other than a list is refused as
+ * well. json-render maps over what the path holds, so a text there throws in
+ * the render of the element above and drops the whole subtree, and a structure
+ * renders nothing. A path the descriptor cannot speak for (`unknown`) is left
+ * alone.
  */
 function staleRepeats(
   spec: Spec,
   parents: Map<string, string>,
   root: string,
-  resolves: (path: string) => boolean,
+  fieldAt: (path: string) => RunField | undefined,
   side: 'input' | 'result',
 ): string[] {
   const problems: string[] = [];
@@ -237,11 +243,33 @@ function staleRepeats(
     if (!element.repeat) continue;
     const listPath = repeatListPathOf(spec, key, parents);
     if (listPath === undefined || !isUnder(root, listPath)) continue;
-    if (!resolves(listPath)) {
+    const field = fieldAt(listPath);
+    if (!field) {
       problems.push(`${key}: repeats over ${listPath}, which no ${side} has`);
+    } else if (field.kind !== 'list' && field.kind !== 'unknown') {
+      problems.push(
+        `${key}: repeats over ${listPath}, which holds ${kindWords(field.kind)}, not a list`,
+      );
     }
   }
   return problems;
+}
+
+/** A member name as a refusal writes it, with its article: `a "category"`, `an "amount"`. */
+function memberWords(name: string): string {
+  return `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${JSON.stringify(name)}`;
+}
+
+/** Whether a value is a json-render expression - `{ "$state": ... }` and its kin - rather than a literal. */
+function isExpressionObject(value: object): boolean {
+  return Object.keys(value).some((name) => name.startsWith('$'));
+}
+
+/** What a path of `kind` holds, in the words of a refusal: "a structure", "a file", "a text value". */
+function kindWords(kind: RunFieldKind): string {
+  if (kind === 'object') return 'a structure';
+  if (kind === 'document' || kind === 'image') return 'a file';
+  return `a ${kind} value`;
 }
 
 /**
@@ -422,6 +450,34 @@ function nonScalarReads(
         );
       }
     };
+    // Parts written out inline. The catalog takes a share's items as a list
+    // of anything, and the renderer reads each by member name, so every
+    // entry must be a structure naming both members; a member may itself be
+    // an expression, which `walk` holds to a value. What comes back is the
+    // entries left to walk: a refused one is named once, here.
+    const inlineShares = (entries: readonly unknown[]): readonly unknown[] => {
+      if (element.type !== 'ProportionBar') return entries;
+      const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
+      if (typeof labelKey !== 'string' || typeof valueKey !== 'string') return entries;
+      const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member, or the whole list is read with { "$state" }`;
+      return entries.filter((entry, index) => {
+        const part = `${key}: ProportionBar's part ${index + 1}`;
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+          const shown = Array.isArray(entry) ? 'a list' : String(JSON.stringify(entry ?? null));
+          problems.push(`${part} is ${shown}, not a structure; ${how}`);
+          return false;
+        }
+        if (isExpressionObject(entry)) {
+          problems.push(`${part} is an expression, not a structure; ${how}`);
+          return false;
+        }
+        const missing = [labelKey, valueKey].find((name) => !hasOwnProp(entry, name));
+        if (missing !== undefined) {
+          problems.push(`${part} has no ${JSON.stringify(missing)} member; ${how}`);
+        }
+        return true;
+      });
+    };
     const walk = (prop: string, value: unknown): void => {
       if (Array.isArray(value)) {
         value.forEach((entry) => walk(prop, entry));
@@ -444,16 +500,27 @@ function nonScalarReads(
     for (const [prop, value] of Object.entries(element.props ?? {})) {
       const items = listy?.get(prop);
       if (items === undefined || Array.isArray(value)) {
-        walk(prop, value);
+        walk(prop, prop === 'items' && Array.isArray(value) ? inlineShares(value) : value);
         continue;
       }
       if (typeof value !== 'object' || value === null) continue;
       const record = value as Record<string, unknown>;
+      // A template writes a text, which is never the list the prop takes.
+      if (typeof record.$template === 'string') {
+        problems.push(
+          `${key}: ${prop} takes a list, and a $template writes a text; a prop that takes a list reads a list path`,
+        );
+        continue;
+      }
+      // A binding reads the path it names as well as writing it, so it is
+      // held to the path's kind exactly as a read is.
+      const absolute = typeof record.$state === 'string' ? record.$state : record.$bindState;
+      const relative = typeof record.$item === 'string' ? record.$item : record.$bindItem;
       const listPath =
-        typeof record.$state === 'string'
-          ? record.$state
-          : typeof record.$item === 'string'
-            ? itemPath(record.$item)
+        typeof absolute === 'string'
+          ? absolute
+          : typeof relative === 'string'
+            ? itemPath(relative)
             : undefined;
       if (listPath !== undefined) {
         checkList(prop, listPath, items);
@@ -621,7 +688,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     const fieldAt = (path: string): RunField | undefined =>
       result ? resultFieldAtPath(result, path) : undefined;
     const resolves = (path: string): boolean => fieldAt(path) !== undefined;
-    problems.push(...staleRepeats(spec, parents, RESULT_ROOT, resolves, 'result'));
+    problems.push(...staleRepeats(spec, parents, RESULT_ROOT, fieldAt, 'result'));
     for (const path of staleReads(read, RESULT_ROOT, resolves)) {
       problems.push(`${path} is read, and no result has it`);
     }
@@ -632,7 +699,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
   const inputs = descriptor.inputs;
   const fieldAt = (path: string): RunField | undefined => inputFieldAtPath(inputs, path);
   const resolves = (path: string): boolean => fieldAt(path) !== undefined;
-  problems.push(...staleRepeats(spec, parents, INPUTS_ROOT, resolves, 'input'));
+  problems.push(...staleRepeats(spec, parents, INPUTS_ROOT, fieldAt, 'input'));
   for (const path of staleReads(read, INPUTS_ROOT, resolves)) {
     problems.push(`${path} is read, and no input has it`);
   }

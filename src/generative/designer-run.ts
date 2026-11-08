@@ -1,6 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { frameCatalog } from './catalog';
-import type { Frame } from './frame-definitions';
+import { FRAMES, type Frame } from './frame-definitions';
 import { layoutProblems, type LayoutDescriptor } from './layout-fits';
 import { formatProblems, validateAgainstCatalog } from './validate';
 
@@ -44,18 +44,37 @@ export interface LayoutCheck {
  * may render. A producer feeds the lines, joined, to `repair_layout` as its
  * `problems`; a host deciding whether a stored layout renders needs only
  * whether the list is empty.
+ *
+ * It never throws. Its subject is whatever a model wrote, or a layout and a
+ * frame a host stored and read back, and a throw is the one answer a host
+ * cannot act on: it arrives instead of the problem that would have sent the
+ * page to its fallback. So a frame this package does not draw, a missing
+ * descriptor, and anything that is not a spec at all are each a problem line,
+ * and any throw left in a walk below is caught here and answered as one.
  */
 export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutCheck): string[] {
-  const verdict = validateAgainstCatalog(spec, frameCatalog(frame));
-  const invalid = verdict.ok ? [] : formatProblems(verdict.problems).split('\n');
-  // A page that takes inputs is there to start a run, and nothing else in it
-  // can: a layout with no control bound to `run` renders a dead page, which
-  // the host must refuse rather than show.
-  const runless =
-    frame !== 'result' && descriptor.inputs && !bindsRun(spec)
-      ? ["the layout has no control that runs the method: bind `run` under a control's `on`"]
-      : [];
-  return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
+  if (!(FRAMES as readonly unknown[]).includes(frame)) {
+    return [
+      `the layout names the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
+    ];
+  }
+  if (typeof descriptor !== 'object' || descriptor === null) {
+    return ['the layout has no descriptor to be checked against'];
+  }
+  try {
+    const verdict = validateAgainstCatalog(spec, frameCatalog(frame));
+    const invalid = verdict.ok ? [] : formatProblems(verdict.problems).split('\n');
+    // A page that takes inputs is there to start a run, and nothing else in it
+    // can: a layout with no control bound to `run` renders a dead page, which
+    // the host must refuse rather than show.
+    const runless =
+      frame !== 'result' && descriptor.inputs && !bindsRun(spec)
+        ? ["the layout has no control that runs the method: bind `run` under a control's `on`"]
+        : [];
+    return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
+  } catch (error) {
+    return [`the layout is not a well-formed spec: ${String(error)}`];
+  }
 }
 
 /**
@@ -72,6 +91,7 @@ function bindsRun(spec: Spec): boolean {
     typeof binding === 'object' &&
     binding !== null &&
     (binding as Record<string, unknown>).action === 'run';
+  if (typeof spec !== 'object' || spec === null) return false;
   const elements: unknown = spec.elements;
   if (typeof elements !== 'object' || elements === null) return false;
   return Object.values(elements).some((element) => {

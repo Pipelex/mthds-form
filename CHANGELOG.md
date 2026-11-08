@@ -6,6 +6,15 @@
 
 - **`@pipelex/mthds-form/generative/headless`, the generative layer's half that renders nothing**: the designer catalog and the frames, the brief, the concept names, `PROMPT_HASH` and `promptHashSubject`, `seedLine`, the JSONL compiler, `validateAgainstCatalog`, `layoutFits`, `layoutProblems`, `layoutCheckProblems`, `REPAIR_ATTEMPTS`, the state paths, `payloadToState` and the provenance record, in an entry with no React and no `'use client'` directive, so a host running React Server Components produces and checks a layout on its server. `./generative` re-exports all of it, so nothing a client host imports moves. See [docs/generative-ui.md](docs/generative-ui.md).
 
+### Changed
+
+- **The checks refuse more of what renders nothing or throws (Breaking)**: `validateAgainstCatalog` refuses a `Picture` whose `path` is an expression, which must be written literally as a hatch's is, and `layoutFits` refuses a repeat over a path holding something other than a list, a `$template` in a prop that takes a list, a binding in such a prop whose path is not a list, and a `ProportionBar` part written out inline that is not a structure naming both its label and its value member. A stored layout that relied on any of them now falls back to the plain form. See [docs/generative-ui.md](docs/generative-ui.md).
+
+### Fixed
+
+- **A layout the checks accept renders without throwing**: every renderer `./generative` registers is handed its props held to the catalog's declaration of them, so a prop bound to a layout's scratch state that holds the wrong kind of value draws as nothing rather than dropping the element, a `ProportionBar` draws the parts that are structures, and a `Picture` whose path resolves to nothing draws nothing.
+- **`layoutCheckProblems` never throws**: a spec that is not one, `null` included, a frame this package does not draw and a missing descriptor are each answered with a problem line, and an unknown frame no longer passes every component it is handed.
+
 ## [v0.31.0] - 2026-11-08
 
 ### Highlights

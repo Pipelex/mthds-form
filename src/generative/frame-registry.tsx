@@ -12,6 +12,8 @@ import {
   panelSurfaceClass,
 } from '../react/style-tokens';
 import { cn } from '../react/utils';
+import { textOf, withDeclaredProps } from './declared-props';
+import { frameComponents } from './frame-definitions';
 import { useFrameHost } from './frame-host';
 import { useDescriptorScope } from './registry';
 
@@ -255,10 +257,16 @@ function amount(value: number, unit: string | null | undefined): string {
 }
 
 function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
-  const rows = (Array.isArray(props.items) ? props.items : []) as Array<Record<string, unknown>>;
+  // A part is a structure with a label member and a number member; an entry
+  // that is not one - a null, a word, an expression that resolved to nothing -
+  // is no part of the share, and is skipped rather than read into.
+  const rows = (Array.isArray(props.items) ? props.items : []).filter(
+    (row): row is Record<string, unknown> =>
+      typeof row === 'object' && row !== null && !Array.isArray(row),
+  );
   const parts = rows
     .map((row) => ({
-      label: String(row[props.labelKey] ?? ''),
+      label: textOf(row[props.labelKey]),
       value: Number(row[props.valueKey] ?? 0),
     }))
     .filter((p) => Number.isFinite(p.value) && p.value > 0);
@@ -358,7 +366,9 @@ const ASPECT: Record<string, string> = {
 function Picture({
   props,
 }: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>) {
-  const path = useAbsolute(props.path);
+  // The checks hold `path` to a literal; a layout rendered past them may still
+  // hand an expression's value here, which shows no picture.
+  const path = useAbsolute(typeof props.path === 'string' ? props.path : '');
   const value = useStateValue<unknown>(path);
   const resolve = useResolveUrl();
   // In the result view's order, each through the kernel's gate: the host's
@@ -398,7 +408,7 @@ function Fact({
     <div className="flex flex-col gap-1 rounded-[var(--radius,0.5rem)] border border-border bg-background px-4 py-3">
       <span className="text-[13px] text-muted-foreground">{props.label}</span>
       <span className="text-[16px] font-medium text-foreground tabular-nums">
-        {present(props.value) ? String(props.value) : '—'}
+        {present(props.value) ? textOf(props.value) : '—'}
       </span>
       {props.detail ? (
         <span className="text-[13px] text-muted-foreground">{props.detail}</span>
@@ -414,7 +424,7 @@ function Detail({ props }: BaseComponentProps<{ label: string; value?: unknown }
     // row: there it read as an underline on every detail but the last.
     <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-3 border-b border-border py-2.5 text-[14px] last:border-b-0 [.flex-row>&]:border-b-0 [.flex-row>&]:grid-cols-[auto_minmax(0,1fr)]">
       <span className="text-muted-foreground">{props.label}</span>
-      <span className="text-foreground">{String(props.value)}</span>
+      <span className="text-foreground">{textOf(props.value)}</span>
     </div>
   );
 }
@@ -484,7 +494,11 @@ function TextList({ props }: BaseComponentProps<TextListProps>) {
   );
 }
 
-export const frameRenderers = {
+/**
+ * Each renderer is handed its props held to the frame's definitions
+ * (`declared-props.ts`), as the base catalog's are.
+ */
+export const frameRenderers = withDeclaredProps(frameComponents, {
   TextList: (ctx: BaseComponentProps<TextListProps>) => <TextList {...ctx} />,
   DateText: (ctx: BaseComponentProps<DateTextProps>) => <DateText {...ctx} />,
   Composer: (ctx: BaseComponentProps<ComposerProps>) => <Composer {...ctx} />,
@@ -499,4 +513,4 @@ export const frameRenderers = {
     <Fact {...ctx} />
   ),
   Detail: (ctx: BaseComponentProps<{ label: string; value?: unknown }>) => <Detail {...ctx} />,
-};
+});

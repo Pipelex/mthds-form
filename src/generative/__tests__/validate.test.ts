@@ -2,6 +2,7 @@ import type { Spec } from '@json-render/core';
 import { defineCatalog } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { frameCatalog } from '../catalog';
 import { generativeSchema } from '../schema';
 import { formatProblems, validateAgainstCatalog, type ValidationCatalog } from '../validate';
 
@@ -484,6 +485,38 @@ describe('an expression where a name belongs', () => {
       },
     });
     expect(bound.ok, formatProblems(bound.problems)).toBe(true);
+  });
+});
+
+/**
+ * A `Picture` names the image it shows literally, as a hatch names its field:
+ * the fit check resolves `path` as written, through the repeat above it, and
+ * an image is a file the kind check will not read into a prop. Written as an
+ * expression, it passed this check alone and resolved at render time to
+ * whatever the expression held - a url where a path belongs, or nothing.
+ */
+describe('the path a Picture shows', () => {
+  const picture = (path: unknown): Spec =>
+    ({
+      root: 'p',
+      elements: { p: { type: 'Picture', props: { path, alt: null, aspect: null }, children: [] } },
+    }) as unknown as Spec;
+
+  it('is refused as an expression, in the words a hatch is refused in', () => {
+    const verdict = validateAgainstCatalog(
+      picture({ $state: '/result/cover' }),
+      frameCatalog('result'),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      "Picture.path must be a literal string - absolute, or the item's field name inside a repeat - never an expression.",
+    );
+  });
+
+  it('is accepted written literally', () => {
+    // The page-level rules (one h1) are about a whole page, not this element.
+    const verdict = validateAgainstCatalog(picture('/result/cover'), frameCatalog('result'));
+    expect(verdict.problems.filter((p) => p.message.startsWith('Picture'))).toEqual([]);
   });
 });
 
