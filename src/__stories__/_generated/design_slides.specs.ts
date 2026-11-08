@@ -281,213 +281,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'slide_designer.generate_design_proposals_from_rough_brief',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'JJfBQGcag9fQPq0vnNIgdWY5aS1ElvX4',
-    frame: 'composer',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief:
-      'data/briefs/slide_designer.generate_design_proposals_from_rough_brief.composer.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"composer"}\n{"op":"add","path":"/elements/composer","value":{"type":"Composer","props":{"headline":"Explore slide design themes","lede":"Turn your presentation brief into themes with visual mockups and an HTML report.","runLabel":"Generate design proposals","columns":"2","notes":["HTML for the content","The content’s CSS class"]},"children":["presentation","design-direction"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/presentation","value":{"type":"FieldGroup","props":{"title":"Presentation"},"children":["topic","goal","audience"]}}\n{"op":"add","path":"/elements/topic","value":{"type":"Input","props":{"label":"Topic","name":"topic","value":{"$bindState":"/inputs/brief/topic"},"checks":[{"type":"required","message":"Enter the presentation topic."}],"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/goal","value":{"type":"Select","props":{"label":"Goal","name":"goal","options":["pitch investors","sell to clients","internal training","keynote"],"value":{"$bindState":"/inputs/brief/goal"}},"children":[]}}\n{"op":"add","path":"/elements/audience","value":{"type":"Segmented","props":{"label":"Audience","name":"audience","options":["executives","technical team","general public"],"value":{"$bindState":"/inputs/brief/audience"}},"children":[]}}\n{"op":"add","path":"/elements/design-direction","value":{"type":"FieldGroup","props":{"title":"Design direction"},"children":["tone","brand-field","references-field"]}}\n{"op":"add","path":"/elements/tone","value":{"type":"Segmented","props":{"label":"Tone","name":"tone","options":["formal","playful","innovative","trustworthy","artsy"],"value":{"$bindState":"/inputs/brief/tone"}},"children":[]}}\n{"op":"add","path":"/elements/brand-field","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["brand-guidelines","brand-hint"]}}\n{"op":"add","path":"/elements/brand-guidelines","value":{"type":"Input","props":{"label":"Brand guidelines","name":"brand_guidelines","value":{"$bindState":"/inputs/brief/brand_guidelines"}},"children":[]}}\n{"op":"add","path":"/elements/brand-hint","value":{"type":"Text","props":{"text":"Colors, fonts and logo usage.","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/references-field","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["references","references-hint"]}}\n{"op":"add","path":"/elements/references","value":{"type":"Input","props":{"label":"References","name":"existing_references","value":{"$bindState":"/inputs/brief/existing_references"}},"children":[]}}\n{"op":"add","path":"/elements/references-hint","value":{"type":"Text","props":{"text":"Templates or past decks to reference or avoid.","variant":"muted"},"children":[]}}',
-    spec: {
-      root: 'composer',
-      elements: {
-        composer: {
-          type: 'Composer',
-          props: {
-            headline: 'Explore slide design themes',
-            lede: 'Turn your presentation brief into themes with visual mockups and an HTML report.',
-            runLabel: 'Generate design proposals',
-            columns: '2',
-            notes: ['HTML for the content', 'The content’s CSS class'],
-          },
-          children: ['presentation', 'design-direction'],
-          on: {
-            press: [
-              {
-                action: 'validateForm',
-              },
-              {
-                action: 'run',
-              },
-            ],
-          },
-        },
-        presentation: {
-          type: 'FieldGroup',
-          props: {
-            title: 'Presentation',
-          },
-          children: ['topic', 'goal', 'audience'],
-        },
-        topic: {
-          type: 'Input',
-          props: {
-            label: 'Topic',
-            name: 'topic',
-            value: {
-              $bindState: '/inputs/brief/topic',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Enter the presentation topic.',
-              },
-            ],
-            validateOn: 'blur',
-          },
-          children: [],
-        },
-        goal: {
-          type: 'Select',
-          props: {
-            label: 'Goal',
-            name: 'goal',
-            options: ['pitch investors', 'sell to clients', 'internal training', 'keynote'],
-            value: {
-              $bindState: '/inputs/brief/goal',
-            },
-          },
-          children: [],
-        },
-        audience: {
-          type: 'Segmented',
-          props: {
-            label: 'Audience',
-            name: 'audience',
-            options: ['executives', 'technical team', 'general public'],
-            value: {
-              $bindState: '/inputs/brief/audience',
-            },
-          },
-          children: [],
-        },
-        'design-direction': {
-          type: 'FieldGroup',
-          props: {
-            title: 'Design direction',
-          },
-          children: ['tone', 'brand-field', 'references-field'],
-        },
-        tone: {
-          type: 'Segmented',
-          props: {
-            label: 'Tone',
-            name: 'tone',
-            options: ['formal', 'playful', 'innovative', 'trustworthy', 'artsy'],
-            value: {
-              $bindState: '/inputs/brief/tone',
-            },
-          },
-          children: [],
-        },
-        'brand-field': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['brand-guidelines', 'brand-hint'],
-        },
-        'brand-guidelines': {
-          type: 'Input',
-          props: {
-            label: 'Brand guidelines',
-            name: 'brand_guidelines',
-            value: {
-              $bindState: '/inputs/brief/brand_guidelines',
-            },
-          },
-          children: [],
-        },
-        'brand-hint': {
-          type: 'Text',
-          props: {
-            text: 'Colors, fonts and logo usage.',
-            variant: 'muted',
-          },
-          children: [],
-        },
-        'references-field': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['references', 'references-hint'],
-        },
-        references: {
-          type: 'Input',
-          props: {
-            label: 'References',
-            name: 'existing_references',
-            value: {
-              $bindState: '/inputs/brief/existing_references',
-            },
-          },
-          children: [],
-        },
-        'references-hint': {
-          type: 'Text',
-          props: {
-            text: 'Templates or past decks to reference or avoid.',
-            variant: 'muted',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        "Help someone commissioning a slide deck turn a rough presentation brief into design themes, with the presentation's purpose and visual direction considered side by side.",
-      title: 'Explore slide design themes',
-      composition:
-        "Use one centred Composer with the headline and the muted line “Turn your presentation brief into themes with visual mockups and an HTML report.” Its single raised panel has two generously spaced columns: Presentation on the left and Design direction on the right, stacking in that order on narrow screens. Each column is one FieldGroup with three controls; topic comes first, and nothing is collapsed. Keep the headline light and the copy short, with no additional cards, decoration or input summaries. The Composer's sticky host action row is the only run location; bind on.press to validateForm then run. Beneath the panel, use Composer notes “HTML for the content” and “The content’s CSS class”, with no other output explanation.",
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Introduce the outcome and contain the entire request, its single action row and the short output notes.',
-          container: 'Composer',
-          elements: [
-            'Composer: title “Explore slide design themes”; description “Turn your presentation brief into themes with visual mockups and an HTML report.”; columns “2”; holds the Presentation and Design direction FieldGroups.',
-            'Composer: runLabel “Generate design proposals”; on.press validates the form with validateForm, then invokes run; retain the host-provided timing in the sticky action row.',
-            'Composer: notes “HTML for the content” and “The content’s CSS class”.',
-          ],
-        },
-        {
-          title: 'Presentation',
-          purpose:
-            'Establish what the deck is about, what it should achieve and who will see it, in the first column.',
-          container: 'FieldGroup',
-          elements: [
-            'Input: value binds with $bindState to /inputs/brief/topic; label “Topic”; required check, validateOn blur.',
-            'Select: value binds with $bindState to /inputs/brief/goal; label “Goal”; options exactly “pitch investors”, “sell to clients”, “internal training”, “keynote”; optional. Use a dropdown because these labels do not fit comfortably on one line within this column.',
-            'Segmented: value binds with $bindState to /inputs/brief/audience; label “Audience”; options exactly “executives”, “technical team”, “general public”; optional.',
-          ],
-        },
-        {
-          title: 'Design direction',
-          purpose:
-            "Set the desired feel and the client's visual constraints beside the presentation essentials.",
-          container: 'FieldGroup',
-          elements: [
-            'Segmented: value binds with $bindState to /inputs/brief/tone; label “Tone”; options exactly “formal”, “playful”, “innovative”, “trustworthy”, “artsy”; optional.',
-            'Input: value binds with $bindState to /inputs/brief/brand_guidelines; label “Brand guidelines”; hint “Colors, fonts and logo usage.”; optional.',
-            'Input: value binds with $bindState to /inputs/brief/existing_references; label “References”; hint “Templates or past decks to reference or avoid.”; optional.',
-          ],
-        },
-      ],
-      call_to_action: 'Generate design proposals',
-      defaults: null,
-      delegated: null,
-    },
-  },
-  {
-    pipeRef: 'slide_designer.generate_design_proposals_from_rough_brief',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: '4sl2aYBaUufTgOa1w2o3wXpeTw6iK10y',
     frame: 'composer',
     style: 'editorial',
@@ -1102,6 +895,210 @@ export const SPECS: SpecFixture[] = [
             'Segmented — $bindState /inputs/brief/tone; label="Tone"; options exactly: "formal", "playful", "innovative", "trustworthy", "artsy"; optional.',
             'Input — $bindState /inputs/brief/brand_guidelines; label="Brand guidelines"; hint="Colors, fonts and logo usage."; optional.',
             'Input — $bindState /inputs/brief/existing_references; label="References"; hint="Templates or past decks to reference or avoid."; optional.',
+          ],
+        },
+      ],
+      call_to_action: 'Generate design proposals',
+      defaults: null,
+      delegated: null,
+    },
+  },
+  {
+    pipeRef: 'slide_designer.generate_design_proposals_from_rough_brief',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: '15eMhqtd4GksMNiUoPHaGRTSBxQIOQS8',
+    frame: 'composer',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief:
+      'data/briefs/slide_designer.generate_design_proposals_from_rough_brief.composer.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"deck-composer"}\n{"op":"add","path":"/elements/deck-composer","value":{"type":"Composer","props":{"headline":"Explore directions for your slide deck","lede":"Turn your brief into design themes, visual mockups and an HTML report.","columns":"2","runLabel":"Generate design proposals"},"children":["presentation-group","design-direction-group"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/presentation-group","value":{"type":"FieldGroup","props":{"title":"The presentation"},"children":["topic-input","goal-select","audience-segmented"]}}\n{"op":"add","path":"/elements/topic-input","value":{"type":"Input","props":{"label":"Topic","name":"topic","value":{"$bindState":"/inputs/brief/topic"},"checks":[{"type":"required","message":"Enter a topic."}],"validateOn":"blur"},"children":[]}}\n{"op":"add","path":"/elements/goal-select","value":{"type":"Select","props":{"label":"Goal","name":"goal","options":["pitch investors","sell to clients","internal training","keynote"],"value":{"$bindState":"/inputs/brief/goal"}},"children":[]}}\n{"op":"add","path":"/elements/audience-segmented","value":{"type":"Segmented","props":{"label":"Audience","name":"audience","options":["executives","technical team","general public"],"value":{"$bindState":"/inputs/brief/audience"}},"children":[]}}\n{"op":"add","path":"/elements/design-direction-group","value":{"type":"FieldGroup","props":{"title":"Design direction"},"children":["tone-segmented","brand-guidelines-field","references-field"]}}\n{"op":"add","path":"/elements/tone-segmented","value":{"type":"Segmented","props":{"label":"Tone","name":"tone","options":["formal","playful","innovative","trustworthy","artsy"],"value":{"$bindState":"/inputs/brief/tone"}},"children":[]}}\n{"op":"add","path":"/elements/brand-guidelines-field","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["brand-guidelines-input","brand-guidelines-hint"]}}\n{"op":"add","path":"/elements/brand-guidelines-input","value":{"type":"Input","props":{"label":"Brand guidelines","name":"brand_guidelines","value":{"$bindState":"/inputs/brief/brand_guidelines"}},"children":[]}}\n{"op":"add","path":"/elements/brand-guidelines-hint","value":{"type":"Text","props":{"text":"Colors, fonts and logo use.","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/references-field","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["references-input","references-hint"]}}\n{"op":"add","path":"/elements/references-input","value":{"type":"Input","props":{"label":"References","name":"existing_references","value":{"$bindState":"/inputs/brief/existing_references"}},"children":[]}}\n{"op":"add","path":"/elements/references-hint","value":{"type":"Text","props":{"text":"Decks or templates to reference or avoid.","variant":"muted"},"children":[]}}',
+    spec: {
+      root: 'deck-composer',
+      elements: {
+        'deck-composer': {
+          type: 'Composer',
+          props: {
+            headline: 'Explore directions for your slide deck',
+            lede: 'Turn your brief into design themes, visual mockups and an HTML report.',
+            columns: '2',
+            runLabel: 'Generate design proposals',
+          },
+          children: ['presentation-group', 'design-direction-group'],
+          on: {
+            press: [
+              {
+                action: 'validateForm',
+              },
+              {
+                action: 'run',
+              },
+            ],
+          },
+        },
+        'presentation-group': {
+          type: 'FieldGroup',
+          props: {
+            title: 'The presentation',
+          },
+          children: ['topic-input', 'goal-select', 'audience-segmented'],
+        },
+        'topic-input': {
+          type: 'Input',
+          props: {
+            label: 'Topic',
+            name: 'topic',
+            value: {
+              $bindState: '/inputs/brief/topic',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Enter a topic.',
+              },
+            ],
+            validateOn: 'blur',
+          },
+          children: [],
+        },
+        'goal-select': {
+          type: 'Select',
+          props: {
+            label: 'Goal',
+            name: 'goal',
+            options: ['pitch investors', 'sell to clients', 'internal training', 'keynote'],
+            value: {
+              $bindState: '/inputs/brief/goal',
+            },
+          },
+          children: [],
+        },
+        'audience-segmented': {
+          type: 'Segmented',
+          props: {
+            label: 'Audience',
+            name: 'audience',
+            options: ['executives', 'technical team', 'general public'],
+            value: {
+              $bindState: '/inputs/brief/audience',
+            },
+          },
+          children: [],
+        },
+        'design-direction-group': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Design direction',
+          },
+          children: ['tone-segmented', 'brand-guidelines-field', 'references-field'],
+        },
+        'tone-segmented': {
+          type: 'Segmented',
+          props: {
+            label: 'Tone',
+            name: 'tone',
+            options: ['formal', 'playful', 'innovative', 'trustworthy', 'artsy'],
+            value: {
+              $bindState: '/inputs/brief/tone',
+            },
+          },
+          children: [],
+        },
+        'brand-guidelines-field': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['brand-guidelines-input', 'brand-guidelines-hint'],
+        },
+        'brand-guidelines-input': {
+          type: 'Input',
+          props: {
+            label: 'Brand guidelines',
+            name: 'brand_guidelines',
+            value: {
+              $bindState: '/inputs/brief/brand_guidelines',
+            },
+          },
+          children: [],
+        },
+        'brand-guidelines-hint': {
+          type: 'Text',
+          props: {
+            text: 'Colors, fonts and logo use.',
+            variant: 'muted',
+          },
+          children: [],
+        },
+        'references-field': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['references-input', 'references-hint'],
+        },
+        'references-input': {
+          type: 'Input',
+          props: {
+            label: 'References',
+            name: 'existing_references',
+            value: {
+              $bindState: '/inputs/brief/existing_references',
+            },
+          },
+          children: [],
+        },
+        'references-hint': {
+          type: 'Text',
+          props: {
+            text: 'Decks or templates to reference or avoid.',
+            variant: 'muted',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help someone commissioning a slide deck turn a rough brief into several design directions they can compare.',
+      title: 'Explore directions for your slide deck',
+      composition:
+        "Use one centred Composer with the headline and the line “Turn your brief into design themes, visual mockups and an HTML report.” above its single raised panel. Set columns to 2: the left FieldGroup collects the presentation's purpose, and the right FieldGroup collects its visual direction; stack them in that order on narrow screens. Keep both groups visible, with generous space between them and no decorative elements or additional surfaces. The Composer's persistent host action row is the only place to run the method; omit notes and additional helper copy beyond the two guidance lines specified below.",
+      regions: [
+        {
+          title: null,
+          purpose:
+            "Carry the page's headline, introductory line, input panel and sole run action without duplicating the host's app identity.",
+          container: 'Composer',
+          elements: [
+            'Composer: headline “Explore directions for your slide deck”; description “Turn your brief into design themes, visual mockups and an HTML report.”; columns “2”; holds FieldGroup “The presentation” then FieldGroup “Design direction”; runLabel “Generate design proposals”; on.press: validateForm then run; no notes.',
+          ],
+        },
+        {
+          title: 'The presentation',
+          purpose:
+            'Put the required topic first, followed by the intended outcome and audience in the left column.',
+          container: 'FieldGroup',
+          elements: [
+            'Input — $bindState /inputs/brief/topic; label “Topic”; required check, validateOn blur.',
+            'Select — $bindState /inputs/brief/goal; label “Goal”; options exactly ["pitch investors", "sell to clients", "internal training", "keynote"]; use a dropdown because these choices are too long for one line in the half-width column.',
+            'Segmented — $bindState /inputs/brief/audience; label “Audience”; options exactly ["executives", "technical team", "general public"].',
+          ],
+        },
+        {
+          title: 'Design direction',
+          purpose:
+            'Keep the desired tone visible near the topic, with brand constraints and references directly beneath it in the right column.',
+          container: 'FieldGroup',
+          elements: [
+            'Segmented — $bindState /inputs/brief/tone; label “Tone”; options exactly ["formal", "playful", "innovative", "trustworthy", "artsy"].',
+            'Input — $bindState /inputs/brief/brand_guidelines; label “Brand guidelines”; hint “Colors, fonts and logo use.”',
+            'Input — $bindState /inputs/brief/existing_references; label “References”; hint “Decks or templates to reference or avoid.”',
           ],
         },
       ],

@@ -138,88 +138,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'invoice_extraction.process_invoice',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'XU1UAYi9qLoC7i2HL9i3K96yOh3Y5ZFo',
-    frame: 'composer',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/invoice_extraction.process_invoice.composer.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"invoice-composer"}\n{"op":"add","path":"/elements/invoice-composer","value":{"type":"Composer","props":{"headline":"Get your invoice details","lede":"Extract structured information from an invoice.","runLabel":"Extract invoice details","columns":"1","notes":["Invoice references, dates and vendor details","Totals, taxes and currency","Itemised purchases and expense category","Extracted document text"]},"children":["document-group"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/document-group","value":{"type":"FieldGroup","props":{},"children":["invoice-document"]}}\n{"op":"add","path":"/elements/invoice-document","value":{"type":"MthdsField","props":{"path":"/inputs/document","label":"Invoice document"},"children":[]}}\n',
-    spec: {
-      root: 'invoice-composer',
-      elements: {
-        'invoice-composer': {
-          type: 'Composer',
-          props: {
-            headline: 'Get your invoice details',
-            lede: 'Extract structured information from an invoice.',
-            runLabel: 'Extract invoice details',
-            columns: '1',
-            notes: [
-              'Invoice references, dates and vendor details',
-              'Totals, taxes and currency',
-              'Itemised purchases and expense category',
-              'Extracted document text',
-            ],
-          },
-          children: ['document-group'],
-          on: {
-            press: [
-              {
-                action: 'validateForm',
-              },
-              {
-                action: 'run',
-              },
-            ],
-          },
-        },
-        'document-group': {
-          type: 'FieldGroup',
-          props: {},
-          children: ['invoice-document'],
-        },
-        'invoice-document': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/document',
-            label: 'Invoice document',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help someone holding an invoice extract its details into structured information with one document and one action.',
-      title: 'Get your invoice details',
-      composition:
-        "Use one centred Composer with a short, light headline and generous space before its single-column raised panel. The panel contains one untitled FieldGroup for the document, with no redundant section heading or extra instructions. Keep the Composer's sole action row visible at the panel foot; beneath the panel, show four short outcome notes in two columns. Do not add anything outside the composer or reproduce the host's app name, timing or run requirements.",
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Present the extraction task, collect the invoice document and run the method, followed by a concise account of what comes back.',
-          container: 'Composer',
-          elements: [
-            'Composer: headline "Get your invoice details" as the only h1; muted line "Extract structured information from an invoice."; columns "1"; contains the FieldGroup and its own action row.',
-            'FieldGroup: untitled; contains only the document control.',
-            'MthdsField: /inputs/document; label "Invoice document"; retain the delegated file control and its validation.',
-            'Composer action row: runLabel "Extract invoice details"; on.press calls validateForm then run; host supplies timing and run readiness.',
-            'Composer notes, in order: "Invoice references, dates and vendor details"; "Totals, taxes and currency"; "Itemised purchases and expense category"; "Extracted document text".',
-          ],
-        },
-      ],
-      call_to_action: 'Extract invoice details',
-      defaults: [],
-      delegated: ['/inputs/document — required file; the brief delegates it to MthdsField.'],
-    },
-  },
-  {
-    pipeRef: 'invoice_extraction.process_invoice',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: 'ooaTmANXCtErnD6GKiM4Bzx0NsxasJZ8',
     frame: 'composer',
     style: 'soft',
@@ -451,393 +369,6 @@ export const SPECS: SpecFixture[] = [
       defaults: [],
       delegated: [
         '/inputs/document — required file input explicitly delegated to MthdsField by the brief.',
-      ],
-    },
-  },
-  {
-    pipeRef: 'invoice_extraction.process_invoice',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
-    seed: 'NBPALrq458r8QFLUhY511mEZ8vh2ZRkn',
-    frame: 'result',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/invoice_extraction.process_invoice.result.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["review-header","invoices"]}}\n{"op":"add","path":"/elements/review-header","value":{"type":"ResultHeader","props":{"title":"Review the extracted invoices"},"children":[]}}\n{"op":"add","path":"/elements/invoices","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"repeat":{"statePath":"/result","key":"invoice_id"},"children":["invoice-separator","invoice-record"]}}\n{"op":"add","path":"/elements/invoice-separator","value":{"type":"Separator","props":{"orientation":"horizontal"},"children":[]}}\n{"op":"add","path":"/elements/invoice-record","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["invoice-vendor","invoice-meta","invoice-description","invoice-amounts","invoice-purchases","invoice-evidence"]}}\n{"op":"add","path":"/elements/invoice-vendor","value":{"type":"Heading","props":{"text":{"$cond":{"$item":"vendor"},"$then":{"$item":"vendor"},"$else":"Invoice"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/invoice-meta","value":{"type":"Stack","props":{"direction":"horizontal","gap":"lg","align":"center"},"children":["invoice-date","invoice-time","invoice-number"]}}\n{"op":"add","path":"/elements/invoice-date","value":{"type":"DateText","props":{"value":{"$item":"issue_date"},"style":"long","tone":"muted"},"children":[]}}\n{"op":"add","path":"/elements/invoice-time","value":{"type":"Detail","props":{"label":"Time","value":{"$item":"time"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-number","value":{"type":"Detail","props":{"label":"Invoice number","value":{"$item":"invoice_number"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-description","value":{"type":"Text","props":{"text":{"$item":"description"},"variant":"body"},"visible":{"$item":"description"},"children":[]}}\n{"op":"add","path":"/elements/invoice-amounts","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["invoice-currency","amount-band"]}}\n{"op":"add","path":"/elements/invoice-currency","value":{"type":"Text","props":{"text":{"$item":"currency"},"variant":"muted"},"visible":{"$item":"currency"},"children":[]}}\n{"op":"add","path":"/elements/amount-band","value":{"type":"Grid","props":{"columns":3,"gap":"lg"},"children":["total-charged","before-tax","tax"]}}\n{"op":"add","path":"/elements/total-charged","value":{"type":"Fact","props":{"label":"Total charged","value":{"$template":"${amount_incl_tax}"}},"children":[]}}\n{"op":"add","path":"/elements/before-tax","value":{"type":"Fact","props":{"label":"Before tax","value":{"$template":"${amount_excl_tax}"}},"children":[]}}\n{"op":"add","path":"/elements/tax","value":{"type":"Fact","props":{"label":"Tax","value":{"$template":"${vat_amount}"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-purchases","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["purchases-label","purchase-lines"]}}\n{"op":"add","path":"/elements/purchases-label","value":{"type":"Text","props":{"text":"Purchases","variant":"caption"},"children":[]}}\n{"op":"add","path":"/elements/purchase-lines","value":{"type":"MthdsResult","props":{"path":"line_items","hideLabel":true},"children":[]}}\n{"op":"add","path":"/elements/invoice-evidence","value":{"type":"Collapsible","props":{"title":"Details & source","defaultOpen":false},"children":["evidence-content"]}}\n{"op":"add","path":"/elements/evidence-content","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["seller-address","seller-siret","seller-vat-registration","buyer-name","buyer-address","document-type","classification-reason","vat-rates","source-text"]}}\n{"op":"add","path":"/elements/seller-address","value":{"type":"Detail","props":{"label":"Seller address","value":{"$item":"vendor_address"}},"children":[]}}\n{"op":"add","path":"/elements/seller-siret","value":{"type":"Detail","props":{"label":"SIRET","value":{"$item":"vendor_siret"}},"children":[]}}\n{"op":"add","path":"/elements/seller-vat-registration","value":{"type":"Detail","props":{"label":"VAT registration","value":{"$item":"vendor_vat_number"}},"children":[]}}\n{"op":"add","path":"/elements/buyer-name","value":{"type":"Detail","props":{"label":"Buyer","value":{"$item":"company_name"}},"children":[]}}\n{"op":"add","path":"/elements/buyer-address","value":{"type":"Detail","props":{"label":"Buyer address","value":{"$item":"company_address"}},"children":[]}}\n{"op":"add","path":"/elements/document-type","value":{"type":"Detail","props":{"label":"Document type","value":{"$item":"category/category"}},"children":[]}}\n{"op":"add","path":"/elements/classification-reason","value":{"type":"Detail","props":{"label":"Classification reason","value":{"$item":"category/explanation"}},"children":[]}}\n{"op":"add","path":"/elements/vat-rates","value":{"type":"MthdsResult","props":{"path":"vat_rates"},"children":[]}}\n{"op":"add","path":"/elements/source-text","value":{"type":"MthdsResult","props":{"path":"text"},"children":[]}}',
-    spec: {
-      root: 'page',
-      elements: {
-        page: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-          },
-          children: ['review-header', 'invoices'],
-        },
-        'review-header': {
-          type: 'ResultHeader',
-          props: {
-            title: 'Review the extracted invoices',
-          },
-          children: [],
-        },
-        invoices: {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-          },
-          repeat: {
-            statePath: '/result',
-            key: 'invoice_id',
-          },
-          children: ['invoice-separator', 'invoice-record'],
-        },
-        'invoice-separator': {
-          type: 'Separator',
-          props: {
-            orientation: 'horizontal',
-          },
-          children: [],
-        },
-        'invoice-record': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: [
-            'invoice-vendor',
-            'invoice-meta',
-            'invoice-description',
-            'invoice-amounts',
-            'invoice-purchases',
-            'invoice-evidence',
-          ],
-        },
-        'invoice-vendor': {
-          type: 'Heading',
-          props: {
-            text: {
-              $cond: {
-                $item: 'vendor',
-              },
-              $then: {
-                $item: 'vendor',
-              },
-              $else: 'Invoice',
-            },
-            level: 'h2',
-          },
-          children: [],
-        },
-        'invoice-meta': {
-          type: 'Stack',
-          props: {
-            direction: 'horizontal',
-            gap: 'lg',
-            align: 'center',
-          },
-          children: ['invoice-date', 'invoice-time', 'invoice-number'],
-        },
-        'invoice-date': {
-          type: 'DateText',
-          props: {
-            value: {
-              $item: 'issue_date',
-            },
-            style: 'long',
-            tone: 'muted',
-          },
-          children: [],
-        },
-        'invoice-time': {
-          type: 'Detail',
-          props: {
-            label: 'Time',
-            value: {
-              $item: 'time',
-            },
-          },
-          children: [],
-        },
-        'invoice-number': {
-          type: 'Detail',
-          props: {
-            label: 'Invoice number',
-            value: {
-              $item: 'invoice_number',
-            },
-          },
-          children: [],
-        },
-        'invoice-description': {
-          type: 'Text',
-          props: {
-            text: {
-              $item: 'description',
-            },
-            variant: 'body',
-          },
-          visible: {
-            $item: 'description',
-          },
-          children: [],
-        },
-        'invoice-amounts': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['invoice-currency', 'amount-band'],
-        },
-        'invoice-currency': {
-          type: 'Text',
-          props: {
-            text: {
-              $item: 'currency',
-            },
-            variant: 'muted',
-          },
-          visible: {
-            $item: 'currency',
-          },
-          children: [],
-        },
-        'amount-band': {
-          type: 'Grid',
-          props: {
-            columns: 3,
-            gap: 'lg',
-          },
-          children: ['total-charged', 'before-tax', 'tax'],
-        },
-        'total-charged': {
-          type: 'Fact',
-          props: {
-            label: 'Total charged',
-            value: {
-              $template: '${amount_incl_tax}',
-            },
-          },
-          children: [],
-        },
-        'before-tax': {
-          type: 'Fact',
-          props: {
-            label: 'Before tax',
-            value: {
-              $template: '${amount_excl_tax}',
-            },
-          },
-          children: [],
-        },
-        tax: {
-          type: 'Fact',
-          props: {
-            label: 'Tax',
-            value: {
-              $template: '${vat_amount}',
-            },
-          },
-          children: [],
-        },
-        'invoice-purchases': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['purchases-label', 'purchase-lines'],
-        },
-        'purchases-label': {
-          type: 'Text',
-          props: {
-            text: 'Purchases',
-            variant: 'caption',
-          },
-          children: [],
-        },
-        'purchase-lines': {
-          type: 'MthdsResult',
-          props: {
-            path: 'line_items',
-            hideLabel: true,
-          },
-          children: [],
-        },
-        'invoice-evidence': {
-          type: 'Collapsible',
-          props: {
-            title: 'Details & source',
-            defaultOpen: false,
-          },
-          children: ['evidence-content'],
-        },
-        'evidence-content': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'md',
-          },
-          children: [
-            'seller-address',
-            'seller-siret',
-            'seller-vat-registration',
-            'buyer-name',
-            'buyer-address',
-            'document-type',
-            'classification-reason',
-            'vat-rates',
-            'source-text',
-          ],
-        },
-        'seller-address': {
-          type: 'Detail',
-          props: {
-            label: 'Seller address',
-            value: {
-              $item: 'vendor_address',
-            },
-          },
-          children: [],
-        },
-        'seller-siret': {
-          type: 'Detail',
-          props: {
-            label: 'SIRET',
-            value: {
-              $item: 'vendor_siret',
-            },
-          },
-          children: [],
-        },
-        'seller-vat-registration': {
-          type: 'Detail',
-          props: {
-            label: 'VAT registration',
-            value: {
-              $item: 'vendor_vat_number',
-            },
-          },
-          children: [],
-        },
-        'buyer-name': {
-          type: 'Detail',
-          props: {
-            label: 'Buyer',
-            value: {
-              $item: 'company_name',
-            },
-          },
-          children: [],
-        },
-        'buyer-address': {
-          type: 'Detail',
-          props: {
-            label: 'Buyer address',
-            value: {
-              $item: 'company_address',
-            },
-          },
-          children: [],
-        },
-        'document-type': {
-          type: 'Detail',
-          props: {
-            label: 'Document type',
-            value: {
-              $item: 'category/category',
-            },
-          },
-          children: [],
-        },
-        'classification-reason': {
-          type: 'Detail',
-          props: {
-            label: 'Classification reason',
-            value: {
-              $item: 'category/explanation',
-            },
-          },
-          children: [],
-        },
-        'vat-rates': {
-          type: 'MthdsResult',
-          props: {
-            path: 'vat_rates',
-          },
-          children: [],
-        },
-        'source-text': {
-          type: 'MthdsResult',
-          props: {
-            path: 'text',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help someone checking an extracted invoice verify the charged total and purchases first, then inspect the supporting details without wading through the source text.',
-      title: 'Review the extracted invoices',
-      composition:
-        "Open with a quiet ResultHeader and the host's result actions, then repeat a full-width, unboxed invoice block for each item in /result, preserving its order. Each block starts with the vendor, date and invoice number, followed by a generous three-column band of amounts with the charged total first and most prominent; a single currency label applies to that band. Put the purchases immediately below, and fold registration details, classification reasoning and source text into one closed Collapsible per invoice. Separate invoice blocks with hairlines, stack the amount band on narrow screens, and use no side rail, decorative icons, additional actions or state patches.",
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Name the review task once and provide the placement for the host-owned result actions.',
-          container: 'Stack',
-          elements: [
-            'ResultHeader — title "Review the extracted invoices" as the page\'s only h1; no eyebrow or subtitle; host-owned result actions at the right.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            'Present each extracted invoice as a readable record, keeping the charge and purchases visible while secondary evidence remains available on demand.',
-          container: 'Stack',
-          elements: [
-            'Stack — repeat over /result read with $state; one invoice block per item in source order; all relative paths below refer to that item.',
-            'Heading — vendor read with $item, h2; use "Invoice" only when vendor is empty.',
-            'Stack — horizontal, wrapping; holds DateText, transaction time and invoice number.',
-            'DateText — issue_date read with $item; format long; muted tone.',
-            'Detail — time read with $item; label "Time"; hide when empty.',
-            'Detail — invoice_number read with $item; label "Invoice number"; hide when empty.',
-            'Text — description read with $item; hide when empty.',
-            'Text — currency read with $item; muted, directly above the amount band; hide when empty and do not infer a currency.',
-            'Grid — three columns, stacking on narrow screens; holds the total, net amount and tax, in that order; the currency directly above applies to all three.',
-            'Fact — amount_incl_tax read through a $template referencing the item\'s amount_incl_tax; label "Total charged"; first and visually largest amount; no invented unit.',
-            'Fact — amount_excl_tax read through a $template referencing the item\'s amount_excl_tax; label "Before tax"; no invented unit.',
-            'Fact — vat_amount read through a $template referencing the item\'s vat_amount; label "Tax"; no invented unit.',
-            'Stack — purchases block with Text "Purchases" as a short group label and MthdsResult beneath it.',
-            'MthdsResult — path line_items relative to the repeated invoice; hideLabel true; delegate the priced-line structure whole.',
-            'Collapsible — trigger "Details & source"; initially closed; contains the following details and delegated evidence in order.',
-            'Detail — vendor_address read with $item; label "Seller address".',
-            'Detail — vendor_siret read with $item; label "SIRET".',
-            'Detail — vendor_vat_number read with $item; label "VAT registration".',
-            'Detail — company_name read with $item; label "Buyer".',
-            'Detail — company_address read with $item; label "Buyer address".',
-            'Detail — category/category read with $item; label "Document type"; display the recorded choice "bill" or "receipt" without an editing control.',
-            'Detail — category/explanation read with $item; label "Classification reason".',
-            'MthdsResult — path vat_rates relative to the repeated invoice; label "VAT rates"; delegate the numeric list whole.',
-            'MthdsResult — path text relative to the repeated invoice; label "Source text"; delegate the extracted source text whole.',
-            'Separator — between repeated invoice blocks only; omit after the last block.',
-          ],
-        },
-      ],
-      call_to_action: null,
-      defaults: null,
-      delegated: [
-        'line_items — relative to each item in /result; delegate the nested priced-line list to MthdsResult.',
-        'vat_rates — relative to each item in /result; delegate the numeric rate list to MthdsResult.',
-        'text — relative to each item in /result; delegate the raw extracted source text to MthdsResult.',
       ],
     },
   },
@@ -2190,6 +1721,518 @@ export const SPECS: SpecFixture[] = [
       delegated: [
         'line_items — within each /result item, delegate the complete priced-line list to MthdsResult for its read-only structured rendering.',
         'vat_rates — within each /result item, delegate the numeric rate list to MthdsResult.',
+      ],
+    },
+  },
+  {
+    pipeRef: 'invoice_extraction.process_invoice',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'kVxDkIjPxgaChj6osiVBIr5lAUqp73IM',
+    frame: 'composer',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/invoice_extraction.process_invoice.composer.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"invoice-composer"}\n{"op":"add","path":"/elements/invoice-composer","value":{"type":"Composer","props":{"headline":"Extract invoice details","lede":"The key information in your invoice, brought together.","runLabel":"Extract invoice details","columns":"1","notes":["Invoice references, dates, vendor and buyer details.","Totals, taxes, currency, line items and extracted text."]},"children":["invoice-fields"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/invoice-fields","value":{"type":"FieldGroup","props":{},"children":["invoice-document"]}}\n{"op":"add","path":"/elements/invoice-document","value":{"type":"MthdsField","props":{"path":"/inputs/document","label":"Invoice document","hint":""},"children":[]}}',
+    spec: {
+      root: 'invoice-composer',
+      elements: {
+        'invoice-composer': {
+          type: 'Composer',
+          props: {
+            headline: 'Extract invoice details',
+            lede: 'The key information in your invoice, brought together.',
+            runLabel: 'Extract invoice details',
+            columns: '1',
+            notes: [
+              'Invoice references, dates, vendor and buyer details.',
+              'Totals, taxes, currency, line items and extracted text.',
+            ],
+          },
+          children: ['invoice-fields'],
+          on: {
+            press: [
+              {
+                action: 'validateForm',
+              },
+              {
+                action: 'run',
+              },
+            ],
+          },
+        },
+        'invoice-fields': {
+          type: 'FieldGroup',
+          props: {},
+          children: ['invoice-document'],
+        },
+        'invoice-document': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/document',
+            label: 'Invoice document',
+            hint: '',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help someone with an invoice document extract its purchase details without configuring a complicated request.',
+      title: 'Extract invoice details',
+      composition:
+        "Use one centred, single-column Composer within the host's frame. Its short h1 and muted line lead directly into one raised panel with generous spacing and a single untitled FieldGroup; do not add section headings, decoration or a second column for one input. Keep the Composer's host action row at the panel's foot and visible while scrolling. Place two brief output notes beneath the panel, using the Composer's own two-column notes layout; add no other surrounding regions.",
+      regions: [
+        {
+          title: null,
+          purpose:
+            'Collect the invoice document, run extraction and give a compact indication of what comes back.',
+          container: 'Composer',
+          elements: [
+            'Composer: headline "Extract invoice details"; muted line "The key information in your invoice, brought together."; columns "1"; holds the FieldGroup, host action row and notes.',
+            'FieldGroup: untitled; holds the invoice document control.',
+            'MthdsField: /inputs/document; label "Invoice document"; hint empty; retain the delegated control\'s required-file handling.',
+            'Composer: runLabel "Extract invoice details"; on.press invokes validateForm then run; host supplies duration and run-readiness information.',
+            'Composer: notes "Invoice references, dates, vendor and buyer details." and "Totals, taxes, currency, line items and extracted text."',
+          ],
+        },
+      ],
+      call_to_action: 'Extract invoice details',
+      defaults: [],
+      delegated: ['/inputs/document — required file; the brief delegates it to MthdsField.'],
+    },
+  },
+  {
+    pipeRef: 'invoice_extraction.process_invoice',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'x5i2vrqr58kXEaT1ZYpWnaFoOBlzxDje',
+    frame: 'result',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/invoice_extraction.process_invoice.result.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["header","invoices"]}}\n{"op":"add","path":"/elements/header","value":{"type":"ResultHeader","props":{"title":"Review the invoices"},"children":[]}}\n{"op":"add","path":"/elements/invoices","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"repeat":{"statePath":"/result","key":"invoice_id"},"children":["invoice-identity","invoice-purchases","billing-details","invoice-separator"]}}\n{"op":"add","path":"/elements/invoice-identity","value":{"type":"Grid","props":{"columns":2,"gap":"xl"},"children":["identity","invoice-total"]}}\n{"op":"add","path":"/elements/identity","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["vendor","issue-date","transaction-time","invoice-number","purchase-summary"]}}\n{"op":"add","path":"/elements/vendor","value":{"type":"Heading","props":{"text":{"$item":"vendor"},"level":"h2"},"visible":{"$item":"vendor"},"children":[]}}\n{"op":"add","path":"/elements/issue-date","value":{"type":"DateText","props":{"value":{"$item":"issue_date"},"style":"long","tone":"muted"},"visible":{"$item":"issue_date"},"children":[]}}\n{"op":"add","path":"/elements/transaction-time","value":{"type":"Detail","props":{"label":"Time","value":{"$item":"time"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-number","value":{"type":"Detail","props":{"label":"Invoice number","value":{"$item":"invoice_number"}},"children":[]}}\n{"op":"add","path":"/elements/purchase-summary","value":{"type":"Text","props":{"text":{"$item":"description"},"variant":"body"},"visible":{"$item":"description"},"children":[]}}\n{"op":"add","path":"/elements/invoice-total","value":{"type":"Fact","props":{"label":"Total including tax","value":{"$cond":{"$item":"currency"},"$then":{"$template":"${amount_incl_tax} ${currency}"},"$else":{"$template":"${amount_incl_tax}"}}},"children":[]}}\n{"op":"add","path":"/elements/invoice-purchases","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["purchased-lines","net-and-tax"]}}\n{"op":"add","path":"/elements/purchased-lines","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["purchased-lines-label","purchased-lines-result"]}}\n{"op":"add","path":"/elements/purchased-lines-label","value":{"type":"Text","props":{"text":"Purchased lines","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/purchased-lines-result","value":{"type":"MthdsResult","props":{"path":"line_items","hideLabel":true},"children":[]}}\n{"op":"add","path":"/elements/net-and-tax","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["net-amount","tax-amount"]}}\n{"op":"add","path":"/elements/net-amount","value":{"type":"Detail","props":{"label":"Before tax","value":{"$cond":{"$item":"currency"},"$then":{"$template":"${amount_excl_tax} ${currency}"},"$else":{"$template":"${amount_excl_tax}"}}},"visible":[{"$item":"amount_excl_tax","neq":null},{"$item":"amount_excl_tax","neq":""}],"children":[]}}\n{"op":"add","path":"/elements/tax-amount","value":{"type":"Detail","props":{"label":"Tax","value":{"$cond":{"$item":"currency"},"$then":{"$template":"${vat_amount} ${currency}"},"$else":{"$template":"${vat_amount}"}}},"visible":[{"$item":"vat_amount","neq":null},{"$item":"vat_amount","neq":""}],"children":[]}}\n{"op":"add","path":"/elements/billing-details","value":{"type":"Collapsible","props":{"title":"Billing details","defaultOpen":false},"children":["billing-details-content"]}}\n{"op":"add","path":"/elements/billing-details-content","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["document-type","seller-address","seller-siret","seller-vat-number","billed-to","billing-address","vat-rates"]}}\n{"op":"add","path":"/elements/document-type","value":{"type":"Detail","props":{"label":"Document type","value":{"$item":"category/category"}},"children":[]}}\n{"op":"add","path":"/elements/seller-address","value":{"type":"Detail","props":{"label":"Seller address","value":{"$item":"vendor_address"}},"children":[]}}\n{"op":"add","path":"/elements/seller-siret","value":{"type":"Detail","props":{"label":"Seller SIRET","value":{"$item":"vendor_siret"}},"children":[]}}\n{"op":"add","path":"/elements/seller-vat-number","value":{"type":"Detail","props":{"label":"Seller VAT number","value":{"$item":"vendor_vat_number"}},"children":[]}}\n{"op":"add","path":"/elements/billed-to","value":{"type":"Detail","props":{"label":"Billed to","value":{"$item":"company_name"}},"children":[]}}\n{"op":"add","path":"/elements/billing-address","value":{"type":"Detail","props":{"label":"Billing address","value":{"$item":"company_address"}},"children":[]}}\n{"op":"add","path":"/elements/vat-rates","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"visible":{"$item":"vat_rates"},"children":["vat-rates-label","vat-rates-result"]}}\n{"op":"add","path":"/elements/vat-rates-label","value":{"type":"Text","props":{"text":"VAT rates","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/vat-rates-result","value":{"type":"MthdsResult","props":{"path":"vat_rates","hideLabel":true},"children":[]}}\n{"op":"add","path":"/elements/invoice-separator","value":{"type":"Separator","props":{"orientation":"horizontal"},"children":[]}}',
+    spec: {
+      root: 'page',
+      elements: {
+        page: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          children: ['header', 'invoices'],
+        },
+        header: {
+          type: 'ResultHeader',
+          props: {
+            title: 'Review the invoices',
+          },
+          children: [],
+        },
+        invoices: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          repeat: {
+            statePath: '/result',
+            key: 'invoice_id',
+          },
+          children: [
+            'invoice-identity',
+            'invoice-purchases',
+            'billing-details',
+            'invoice-separator',
+          ],
+        },
+        'invoice-identity': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'xl',
+          },
+          children: ['identity', 'invoice-total'],
+        },
+        identity: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'md',
+          },
+          children: [
+            'vendor',
+            'issue-date',
+            'transaction-time',
+            'invoice-number',
+            'purchase-summary',
+          ],
+        },
+        vendor: {
+          type: 'Heading',
+          props: {
+            text: {
+              $item: 'vendor',
+            },
+            level: 'h2',
+          },
+          visible: {
+            $item: 'vendor',
+          },
+          children: [],
+        },
+        'issue-date': {
+          type: 'DateText',
+          props: {
+            value: {
+              $item: 'issue_date',
+            },
+            style: 'long',
+            tone: 'muted',
+          },
+          visible: {
+            $item: 'issue_date',
+          },
+          children: [],
+        },
+        'transaction-time': {
+          type: 'Detail',
+          props: {
+            label: 'Time',
+            value: {
+              $item: 'time',
+            },
+          },
+          children: [],
+        },
+        'invoice-number': {
+          type: 'Detail',
+          props: {
+            label: 'Invoice number',
+            value: {
+              $item: 'invoice_number',
+            },
+          },
+          children: [],
+        },
+        'purchase-summary': {
+          type: 'Text',
+          props: {
+            text: {
+              $item: 'description',
+            },
+            variant: 'body',
+          },
+          visible: {
+            $item: 'description',
+          },
+          children: [],
+        },
+        'invoice-total': {
+          type: 'Fact',
+          props: {
+            label: 'Total including tax',
+            value: {
+              $cond: {
+                $item: 'currency',
+              },
+              $then: {
+                $template: '${amount_incl_tax} ${currency}',
+              },
+              $else: {
+                $template: '${amount_incl_tax}',
+              },
+            },
+          },
+          children: [],
+        },
+        'invoice-purchases': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['purchased-lines', 'net-and-tax'],
+        },
+        'purchased-lines': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: ['purchased-lines-label', 'purchased-lines-result'],
+        },
+        'purchased-lines-label': {
+          type: 'Text',
+          props: {
+            text: 'Purchased lines',
+            variant: 'muted',
+          },
+          children: [],
+        },
+        'purchased-lines-result': {
+          type: 'MthdsResult',
+          props: {
+            path: 'line_items',
+            hideLabel: true,
+          },
+          children: [],
+        },
+        'net-and-tax': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'lg',
+          },
+          children: ['net-amount', 'tax-amount'],
+        },
+        'net-amount': {
+          type: 'Detail',
+          props: {
+            label: 'Before tax',
+            value: {
+              $cond: {
+                $item: 'currency',
+              },
+              $then: {
+                $template: '${amount_excl_tax} ${currency}',
+              },
+              $else: {
+                $template: '${amount_excl_tax}',
+              },
+            },
+          },
+          visible: [
+            {
+              $item: 'amount_excl_tax',
+              neq: null,
+            },
+            {
+              $item: 'amount_excl_tax',
+              neq: '',
+            },
+          ],
+          children: [],
+        },
+        'tax-amount': {
+          type: 'Detail',
+          props: {
+            label: 'Tax',
+            value: {
+              $cond: {
+                $item: 'currency',
+              },
+              $then: {
+                $template: '${vat_amount} ${currency}',
+              },
+              $else: {
+                $template: '${vat_amount}',
+              },
+            },
+          },
+          visible: [
+            {
+              $item: 'vat_amount',
+              neq: null,
+            },
+            {
+              $item: 'vat_amount',
+              neq: '',
+            },
+          ],
+          children: [],
+        },
+        'billing-details': {
+          type: 'Collapsible',
+          props: {
+            title: 'Billing details',
+            defaultOpen: false,
+          },
+          children: ['billing-details-content'],
+        },
+        'billing-details-content': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          children: [
+            'document-type',
+            'seller-address',
+            'seller-siret',
+            'seller-vat-number',
+            'billed-to',
+            'billing-address',
+            'vat-rates',
+          ],
+        },
+        'document-type': {
+          type: 'Detail',
+          props: {
+            label: 'Document type',
+            value: {
+              $item: 'category/category',
+            },
+          },
+          children: [],
+        },
+        'seller-address': {
+          type: 'Detail',
+          props: {
+            label: 'Seller address',
+            value: {
+              $item: 'vendor_address',
+            },
+          },
+          children: [],
+        },
+        'seller-siret': {
+          type: 'Detail',
+          props: {
+            label: 'Seller SIRET',
+            value: {
+              $item: 'vendor_siret',
+            },
+          },
+          children: [],
+        },
+        'seller-vat-number': {
+          type: 'Detail',
+          props: {
+            label: 'Seller VAT number',
+            value: {
+              $item: 'vendor_vat_number',
+            },
+          },
+          children: [],
+        },
+        'billed-to': {
+          type: 'Detail',
+          props: {
+            label: 'Billed to',
+            value: {
+              $item: 'company_name',
+            },
+          },
+          children: [],
+        },
+        'billing-address': {
+          type: 'Detail',
+          props: {
+            label: 'Billing address',
+            value: {
+              $item: 'company_address',
+            },
+          },
+          children: [],
+        },
+        'vat-rates': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'sm',
+          },
+          visible: {
+            $item: 'vat_rates',
+          },
+          children: ['vat-rates-label', 'vat-rates-result'],
+        },
+        'vat-rates-label': {
+          type: 'Text',
+          props: {
+            text: 'VAT rates',
+            variant: 'muted',
+          },
+          children: [],
+        },
+        'vat-rates-result': {
+          type: 'MthdsResult',
+          props: {
+            path: 'vat_rates',
+            hideLabel: true,
+          },
+          children: [],
+        },
+        'invoice-separator': {
+          type: 'Separator',
+          props: {
+            orientation: 'horizontal',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help the person checking extracted invoices see what was charged, inspect the purchased lines, and find the billing details without reading the extraction payload.',
+      title: 'Review the invoices',
+      composition:
+        'Open with a quiet ResultHeader and the host’s result actions, then repeat one spacious, full-width invoice record for each item in /result, preserving list order. Each record begins with a two-column Grid: vendor, date, invoice number and purchase summary on the left; one total tile on the right. The purchased lines follow across the full width, then a compact net-and-tax pair; less-used billing details sit in a closed Collapsible at the end of that record. Stack the grid columns on narrow screens. Use no outer cards, decorative icons, side panels or additional actions; the only headings are the page h1 and each vendor’s h2. Bind repeated content to the listed relative members of the current /result item, using $item in scalar reads and templates and literal relative paths for MthdsResult. Omit invoice_id, category/explanation and text: internal identification, classification rationale and raw extraction text are not needed in this review.',
+      regions: [
+        {
+          title: null,
+          purpose: 'Name the review and provide the host’s single home for result actions.',
+          container: 'Stack',
+          elements: [
+            'ResultHeader — title: “Review the invoices”; no eyebrow or supporting paragraph; host download/share actions at the right.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            'Make each document’s identity and final charge immediately legible before its purchased lines.',
+          container: 'Stack',
+          elements: [
+            'Stack — repeat over /result in original order; each item contains this region and the two following regions, with generous space and a Separator between invoice records.',
+            'Grid — two columns containing an identity Stack and a total Fact; one column on narrow screens.',
+            'Heading — vendor, read with $item; h2; omit when empty.',
+            'DateText — issue_date, read with $item; format long, muted tone; omit when empty.',
+            'Detail — time, read with $item; label “Time”.',
+            'Detail — invoice_number, read with $item; label “Invoice number”.',
+            'Text — description, read with $item; omit when empty.',
+            'Fact — label “Total including tax”; value is a $template reading amount_incl_tax and currency from the current item, with the amount followed by the currency code; preserve decimal precision to two places and omit the currency suffix when empty. Do not show currency separately.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            'Show the priced purchase lines, followed by the extracted net and tax amounts without implying that the extraction has been reconciled.',
+          container: 'Stack',
+          elements: [
+            'MthdsResult — line_items, relative to the current invoice; label visible as “Purchased lines”; delegate the complete priced-line list.',
+            'Grid — two columns holding the net and tax Detail components; one column on narrow screens.',
+            'Detail — label “Before tax”; value is a $template reading amount_excl_tax and currency from the current item, amount to two decimal places followed by the currency code; hide when amount_excl_tax is empty and omit an empty currency suffix.',
+            'Detail — label “Tax”; value is a $template reading vat_amount and currency from the current item, amount to two decimal places followed by the currency code; hide when vat_amount is empty and omit an empty currency suffix.',
+          ],
+        },
+        {
+          title: 'Billing details',
+          purpose:
+            'Keep addresses, registration details and document type accessible without letting sparse metadata dominate the invoice.',
+          container: 'Collapsible',
+          elements: [
+            'Collapsible — trigger “Billing details”; closed initially; contains one Stack of Detail components and the delegated VAT-rate list.',
+            'Detail — category/category, read with $item; label “Document type”; display the extracted choice as supplied: "bill" | "receipt".',
+            'Detail — vendor_address, read with $item; label “Seller address”.',
+            'Detail — vendor_siret, read with $item; label “Seller SIRET”.',
+            'Detail — vendor_vat_number, read with $item; label “Seller VAT number”.',
+            'Detail — company_name, read with $item; label “Billed to”.',
+            'Detail — company_address, read with $item; label “Billing address”.',
+            'MthdsResult — vat_rates, relative to the current invoice; label visible as “VAT rates”; delegate the whole numeric list and omit when empty.',
+          ],
+        },
+      ],
+      call_to_action: null,
+      defaults: null,
+      delegated: [
+        'line_items — delegate the complete priced-line list within each /result item to MthdsResult at the relative path line_items.',
+        'vat_rates — delegate the numeric rate list within each /result item to MthdsResult at the relative path vat_rates.',
       ],
     },
   },

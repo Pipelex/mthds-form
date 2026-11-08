@@ -684,300 +684,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'structured.invoice_with_source',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: '7CooldYrt14XxGoWcmhPTX4FkEwOUDT6',
-    frame: 'composer',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/structured.invoice_with_source.composer.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"invoice-composer"}\n{"op":"add","path":"/elements/invoice-composer","value":{"type":"Composer","props":{"headline":"Describe an invoice","lede":"Pair the invoice details with the original document.","runLabel":"Describe invoice","columns":"1"},"children":["invoice-workspace"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/invoice-workspace","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["source-document","invoice-address-grid","line-items-group"]}}\n{"op":"add","path":"/elements/source-document","value":{"type":"MthdsField","props":{"path":"/inputs/source","label":"Source document"},"children":[]}}\n{"op":"add","path":"/elements/invoice-address-grid","value":{"type":"Grid","props":{"columns":2,"gap":"xl"},"children":["invoice-details-group","billing-address-group"]}}\n{"op":"add","path":"/elements/invoice-details-group","value":{"type":"FieldGroup","props":{"title":"Invoice"},"children":["invoice-reference","invoice-issued-on","invoice-total","invoice-status","invoice-paid","invoice-settled-at"]}}\n{"op":"add","path":"/elements/invoice-reference","value":{"type":"Input","props":{"label":"Reference","name":"/inputs/invoice/reference","value":{"$bindState":"/inputs/invoice/reference"},"checks":[{"type":"required","message":"Enter the invoice reference."}]},"children":[]}}\n{"op":"add","path":"/elements/invoice-issued-on","value":{"type":"MthdsField","props":{"path":"/inputs/invoice/issued_on","label":"Issued on"},"children":[]}}\n{"op":"add","path":"/elements/invoice-total","value":{"type":"NumberInput","props":{"label":"Total due","name":"/inputs/invoice/total","value":{"$bindState":"/inputs/invoice/total"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-status","value":{"type":"Segmented","props":{"label":"Status","name":"/inputs/invoice/status","options":["draft","sent","paid","void"],"value":{"$bindState":"/inputs/invoice/status"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-paid","value":{"type":"Checkbox","props":{"label":"Payment settled","name":"/inputs/invoice/paid","checked":{"$bindState":"/inputs/invoice/paid"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-settled-at","value":{"type":"MthdsField","props":{"path":"/inputs/invoice/settled_at","label":"Payment cleared at (optional)"},"children":[]}}\n{"op":"add","path":"/elements/billing-address-group","value":{"type":"FieldGroup","props":{"title":"Billed to"},"children":["billing-street","billing-city","billing-country"]}}\n{"op":"add","path":"/elements/billing-street","value":{"type":"Input","props":{"label":"Street and number","name":"/inputs/invoice/billed_to/street","value":{"$bindState":"/inputs/invoice/billed_to/street"},"checks":[{"type":"required","message":"Enter the street and number."}]},"children":[]}}\n{"op":"add","path":"/elements/billing-city","value":{"type":"Input","props":{"label":"City","name":"/inputs/invoice/billed_to/city","value":{"$bindState":"/inputs/invoice/billed_to/city"},"checks":[{"type":"required","message":"Enter the city."}]},"children":[]}}\n{"op":"add","path":"/elements/billing-country","value":{"type":"Segmented","props":{"label":"Country (optional)","name":"/inputs/invoice/billed_to/country","options":["France","Germany","Spain","United Kingdom"],"value":{"$bindState":"/inputs/invoice/billed_to/country"}},"children":[]}}\n{"op":"add","path":"/elements/line-items-group","value":{"type":"FieldGroup","props":{"title":"Line items"},"children":["billable-lines","invoice-notes"]}}\n{"op":"add","path":"/elements/billable-lines","value":{"type":"MthdsField","props":{"path":"/inputs/invoice/lines","label":"Billable lines"},"children":[]}}\n{"op":"add","path":"/elements/invoice-notes","value":{"type":"Textarea","props":{"label":"Notes (optional)","name":"/inputs/invoice/notes","rows":3,"value":{"$bindState":"/inputs/invoice/notes"}},"children":[]}}',
-    spec: {
-      root: 'invoice-composer',
-      elements: {
-        'invoice-composer': {
-          type: 'Composer',
-          props: {
-            headline: 'Describe an invoice',
-            lede: 'Pair the invoice details with the original document.',
-            runLabel: 'Describe invoice',
-            columns: '1',
-          },
-          children: ['invoice-workspace'],
-          on: {
-            press: [
-              {
-                action: 'validateForm',
-              },
-              {
-                action: 'run',
-              },
-            ],
-          },
-        },
-        'invoice-workspace': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-            align: 'stretch',
-          },
-          children: ['source-document', 'invoice-address-grid', 'line-items-group'],
-        },
-        'source-document': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/source',
-            label: 'Source document',
-          },
-          children: [],
-        },
-        'invoice-address-grid': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'xl',
-          },
-          children: ['invoice-details-group', 'billing-address-group'],
-        },
-        'invoice-details-group': {
-          type: 'FieldGroup',
-          props: {
-            title: 'Invoice',
-          },
-          children: [
-            'invoice-reference',
-            'invoice-issued-on',
-            'invoice-total',
-            'invoice-status',
-            'invoice-paid',
-            'invoice-settled-at',
-          ],
-        },
-        'invoice-reference': {
-          type: 'Input',
-          props: {
-            label: 'Reference',
-            name: '/inputs/invoice/reference',
-            value: {
-              $bindState: '/inputs/invoice/reference',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Enter the invoice reference.',
-              },
-            ],
-          },
-          children: [],
-        },
-        'invoice-issued-on': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/invoice/issued_on',
-            label: 'Issued on',
-          },
-          children: [],
-        },
-        'invoice-total': {
-          type: 'NumberInput',
-          props: {
-            label: 'Total due',
-            name: '/inputs/invoice/total',
-            value: {
-              $bindState: '/inputs/invoice/total',
-            },
-          },
-          children: [],
-        },
-        'invoice-status': {
-          type: 'Segmented',
-          props: {
-            label: 'Status',
-            name: '/inputs/invoice/status',
-            options: ['draft', 'sent', 'paid', 'void'],
-            value: {
-              $bindState: '/inputs/invoice/status',
-            },
-          },
-          children: [],
-        },
-        'invoice-paid': {
-          type: 'Checkbox',
-          props: {
-            label: 'Payment settled',
-            name: '/inputs/invoice/paid',
-            checked: {
-              $bindState: '/inputs/invoice/paid',
-            },
-          },
-          children: [],
-        },
-        'invoice-settled-at': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/invoice/settled_at',
-            label: 'Payment cleared at (optional)',
-          },
-          children: [],
-        },
-        'billing-address-group': {
-          type: 'FieldGroup',
-          props: {
-            title: 'Billed to',
-          },
-          children: ['billing-street', 'billing-city', 'billing-country'],
-        },
-        'billing-street': {
-          type: 'Input',
-          props: {
-            label: 'Street and number',
-            name: '/inputs/invoice/billed_to/street',
-            value: {
-              $bindState: '/inputs/invoice/billed_to/street',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Enter the street and number.',
-              },
-            ],
-          },
-          children: [],
-        },
-        'billing-city': {
-          type: 'Input',
-          props: {
-            label: 'City',
-            name: '/inputs/invoice/billed_to/city',
-            value: {
-              $bindState: '/inputs/invoice/billed_to/city',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Enter the city.',
-              },
-            ],
-          },
-          children: [],
-        },
-        'billing-country': {
-          type: 'Segmented',
-          props: {
-            label: 'Country (optional)',
-            name: '/inputs/invoice/billed_to/country',
-            options: ['France', 'Germany', 'Spain', 'United Kingdom'],
-            value: {
-              $bindState: '/inputs/invoice/billed_to/country',
-            },
-          },
-          children: [],
-        },
-        'line-items-group': {
-          type: 'FieldGroup',
-          props: {
-            title: 'Line items',
-          },
-          children: ['billable-lines', 'invoice-notes'],
-        },
-        'billable-lines': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/invoice/lines',
-            label: 'Billable lines',
-          },
-          children: [],
-        },
-        'invoice-notes': {
-          type: 'Textarea',
-          props: {
-            label: 'Notes (optional)',
-            name: '/inputs/invoice/notes',
-            rows: 3,
-            value: {
-              $bindState: '/inputs/invoice/notes',
-            },
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help someone handling a commercial invoice describe its details alongside the original document in one calm workspace.',
-      title: 'Describe an invoice',
-      composition:
-        'Use one centred Composer with a short h1 and the line “Pair the invoice details with the original document.” Its single raised panel opens with the source document, followed by a two-column Grid: invoice details on the left and the billing address on the right, aligned at the top and stacked in that order on narrow screens. A full-width line-items group finishes the panel with notes beneath the delegated editor. Keep generous space between groups, no additional boxes, no collapsed inputs, and no decorative elements. The Composer’s sticky host action row is the only place to run the method; add no notes or additional surrounding content.',
-      regions: [
-        {
-          title: null,
-          purpose: 'Carry the page headline, the single input panel and the host-owned action row.',
-          container: 'Composer',
-          elements: [
-            'Composer: title “Describe an invoice”; subtitle “Pair the invoice details with the original document.”; columns “1”; no notes; runLabel “Describe invoice”; on.press: validateForm then run.',
-            'Stack: holds the source control, the two-column Grid of Invoice and Billed to, and the full-width Line items FieldGroup, in that order.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            'Put the required original document first, directly under the headline that promises to pair it with the details.',
-          container: 'Stack',
-          elements: [
-            'MthdsField: /inputs/source; label “Source document”; required; retain the delegated document control.',
-          ],
-        },
-        {
-          title: 'Invoice',
-          purpose:
-            'Collect the invoice’s identity, amount and payment details together in the left column.',
-          container: 'FieldGroup',
-          elements: [
-            'Input: /inputs/invoice/reference; label “Reference”; required.',
-            'MthdsField: /inputs/invoice/issued_on; label “Issued on”; required.',
-            'NumberInput: /inputs/invoice/total; label “Total due”; required; no unit, minimum, maximum or step.',
-            'Segmented: /inputs/invoice/status; label “Status”; options exactly "draft", "sent", "paid", "void"; required.',
-            'Checkbox: /inputs/invoice/paid; label “Payment settled”; optional; does not hide or reveal any input.',
-            'MthdsField: /inputs/invoice/settled_at; label “Payment cleared at (optional)”; always visible.',
-          ],
-        },
-        {
-          title: 'Billed to',
-          purpose:
-            'Keep the recipient’s address together in the right column, separate from invoice and payment details.',
-          container: 'FieldGroup',
-          elements: [
-            'Input: /inputs/invoice/billed_to/street; label “Street and number”; required.',
-            'Input: /inputs/invoice/billed_to/city; label “City”; required.',
-            'Segmented: /inputs/invoice/billed_to/country; label “Country (optional)”; options exactly "France", "Germany", "Spain", "United Kingdom"; fit across the right column.',
-          ],
-        },
-        {
-          title: 'Line items',
-          purpose:
-            'Give the billable-line editor the full panel width and leave optional context immediately beneath it before the run action.',
-          container: 'FieldGroup',
-          elements: [
-            'MthdsField: /inputs/invoice/lines; label “Billable lines”; required; delegate the entire list and its item editing.',
-            'Textarea: /inputs/invoice/notes; label “Notes (optional)”.',
-          ],
-        },
-      ],
-      call_to_action: 'Describe invoice',
-      defaults: [],
-      delegated: [
-        '/inputs/invoice/issued_on — brief delegates the date control to MthdsField.',
-        '/inputs/invoice/settled_at — brief delegates the date-with-time control to MthdsField.',
-        '/inputs/invoice/lines — brief delegates the whole line-item list to MthdsField.',
-        '/inputs/source — brief delegates the document attachment to MthdsField.',
-      ],
-    },
-  },
-  {
-    pipeRef: 'structured.invoice_with_source',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: 'C3QpGOlnZKRjxlLujNKlqQHNq6q1A15t',
     frame: 'composer',
     style: 'editorial',
@@ -1523,6 +1229,294 @@ export const SPECS: SpecFixture[] = [
         '/inputs/invoice/settled_at — MthdsField; date with time explicitly delegated by the brief.',
         '/inputs/invoice/lines — MthdsField; structured line-item list explicitly delegated by the brief.',
         '/inputs/source — MthdsField; document file explicitly delegated by the brief.',
+      ],
+    },
+  },
+  {
+    pipeRef: 'structured.invoice_with_source',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'BxmLlSwh5mH8FfGsDgxKzOX4OO6AfT2B',
+    frame: 'composer',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/structured.invoice_with_source.composer.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"invoice-composer"}\n{"op":"add","path":"/elements/invoice-composer","value":{"type":"Composer","props":{"headline":"Describe an invoice","lede":"Turn invoice details and their source into text.","columns":"1","runLabel":"Describe my invoice"},"children":["invoice-workspace"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/invoice-workspace","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["details-grid","items-payment-group"]}}\n{"op":"add","path":"/elements/details-grid","value":{"type":"Grid","props":{"columns":2,"gap":"xl"},"children":["invoice-group","source-billing-group"]}}\n{"op":"add","path":"/elements/invoice-group","value":{"type":"FieldGroup","props":{"title":"Invoice"},"children":["invoice-reference","invoice-issued-on","invoice-total","invoice-status"]}}\n{"op":"add","path":"/elements/invoice-reference","value":{"type":"Input","props":{"label":"Invoice reference","name":"invoice-reference","value":{"$bindState":"/inputs/invoice/reference"},"checks":[{"type":"required","message":"Enter an invoice reference."}]},"children":[]}}\n{"op":"add","path":"/elements/invoice-issued-on","value":{"type":"MthdsField","props":{"path":"/inputs/invoice/issued_on","label":"Issued on"},"children":[]}}\n{"op":"add","path":"/elements/invoice-total","value":{"type":"NumberInput","props":{"label":"Total due","name":"invoice-total","value":{"$bindState":"/inputs/invoice/total"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-status","value":{"type":"Segmented","props":{"label":"Status","name":"invoice-status","options":["draft","sent","paid","void"],"value":{"$bindState":"/inputs/invoice/status"}},"children":[]}}\n{"op":"add","path":"/elements/source-billing-group","value":{"type":"FieldGroup","props":{"title":"Source & billing"},"children":["source-document","billing-street","billing-city","billing-country"]}}\n{"op":"add","path":"/elements/source-document","value":{"type":"MthdsField","props":{"path":"/inputs/source","label":"Source document"},"children":[]}}\n{"op":"add","path":"/elements/billing-street","value":{"type":"Input","props":{"label":"Billing street and number","name":"billing-street","value":{"$bindState":"/inputs/invoice/billed_to/street"},"checks":[{"type":"required","message":"Enter the billing street and number."}]},"children":[]}}\n{"op":"add","path":"/elements/billing-city","value":{"type":"Input","props":{"label":"City","name":"billing-city","value":{"$bindState":"/inputs/invoice/billed_to/city"},"checks":[{"type":"required","message":"Enter the city."}]},"children":[]}}\n{"op":"add","path":"/elements/billing-country","value":{"type":"Segmented","props":{"label":"Country","name":"billing-country","options":["France","Germany","Spain","United Kingdom"],"value":{"$bindState":"/inputs/invoice/billed_to/country"}},"children":[]}}\n{"op":"add","path":"/elements/items-payment-group","value":{"type":"FieldGroup","props":{"title":"Items & payment"},"children":["invoice-lines","payment-grid","invoice-notes"]}}\n{"op":"add","path":"/elements/invoice-lines","value":{"type":"MthdsField","props":{"path":"/inputs/invoice/lines","label":"Line items"},"children":[]}}\n{"op":"add","path":"/elements/payment-grid","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["payment-settled","payment-cleared-at"]}}\n{"op":"add","path":"/elements/payment-settled","value":{"type":"Checkbox","props":{"label":"Payment settled","name":"payment-settled","checked":{"$bindState":"/inputs/invoice/paid"}},"children":[]}}\n{"op":"add","path":"/elements/payment-cleared-at","value":{"type":"MthdsField","props":{"path":"/inputs/invoice/settled_at","label":"Payment cleared at"},"children":[]}}\n{"op":"add","path":"/elements/invoice-notes","value":{"type":"Input","props":{"label":"Notes","name":"invoice-notes","value":{"$bindState":"/inputs/invoice/notes"}},"children":[]}}',
+    spec: {
+      root: 'invoice-composer',
+      elements: {
+        'invoice-composer': {
+          type: 'Composer',
+          props: {
+            headline: 'Describe an invoice',
+            lede: 'Turn invoice details and their source into text.',
+            columns: '1',
+            runLabel: 'Describe my invoice',
+          },
+          children: ['invoice-workspace'],
+          on: {
+            press: [
+              {
+                action: 'validateForm',
+              },
+              {
+                action: 'run',
+              },
+            ],
+          },
+        },
+        'invoice-workspace': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+          },
+          children: ['details-grid', 'items-payment-group'],
+        },
+        'details-grid': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'xl',
+          },
+          children: ['invoice-group', 'source-billing-group'],
+        },
+        'invoice-group': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Invoice',
+          },
+          children: ['invoice-reference', 'invoice-issued-on', 'invoice-total', 'invoice-status'],
+        },
+        'invoice-reference': {
+          type: 'Input',
+          props: {
+            label: 'Invoice reference',
+            name: 'invoice-reference',
+            value: {
+              $bindState: '/inputs/invoice/reference',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Enter an invoice reference.',
+              },
+            ],
+          },
+          children: [],
+        },
+        'invoice-issued-on': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/invoice/issued_on',
+            label: 'Issued on',
+          },
+          children: [],
+        },
+        'invoice-total': {
+          type: 'NumberInput',
+          props: {
+            label: 'Total due',
+            name: 'invoice-total',
+            value: {
+              $bindState: '/inputs/invoice/total',
+            },
+          },
+          children: [],
+        },
+        'invoice-status': {
+          type: 'Segmented',
+          props: {
+            label: 'Status',
+            name: 'invoice-status',
+            options: ['draft', 'sent', 'paid', 'void'],
+            value: {
+              $bindState: '/inputs/invoice/status',
+            },
+          },
+          children: [],
+        },
+        'source-billing-group': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Source & billing',
+          },
+          children: ['source-document', 'billing-street', 'billing-city', 'billing-country'],
+        },
+        'source-document': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/source',
+            label: 'Source document',
+          },
+          children: [],
+        },
+        'billing-street': {
+          type: 'Input',
+          props: {
+            label: 'Billing street and number',
+            name: 'billing-street',
+            value: {
+              $bindState: '/inputs/invoice/billed_to/street',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Enter the billing street and number.',
+              },
+            ],
+          },
+          children: [],
+        },
+        'billing-city': {
+          type: 'Input',
+          props: {
+            label: 'City',
+            name: 'billing-city',
+            value: {
+              $bindState: '/inputs/invoice/billed_to/city',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Enter the city.',
+              },
+            ],
+          },
+          children: [],
+        },
+        'billing-country': {
+          type: 'Segmented',
+          props: {
+            label: 'Country',
+            name: 'billing-country',
+            options: ['France', 'Germany', 'Spain', 'United Kingdom'],
+            value: {
+              $bindState: '/inputs/invoice/billed_to/country',
+            },
+          },
+          children: [],
+        },
+        'items-payment-group': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Items & payment',
+          },
+          children: ['invoice-lines', 'payment-grid', 'invoice-notes'],
+        },
+        'invoice-lines': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/invoice/lines',
+            label: 'Line items',
+          },
+          children: [],
+        },
+        'payment-grid': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'lg',
+          },
+          children: ['payment-settled', 'payment-cleared-at'],
+        },
+        'payment-settled': {
+          type: 'Checkbox',
+          props: {
+            label: 'Payment settled',
+            name: 'payment-settled',
+            checked: {
+              $bindState: '/inputs/invoice/paid',
+            },
+          },
+          children: [],
+        },
+        'payment-cleared-at': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/invoice/settled_at',
+            label: 'Payment cleared at',
+          },
+          children: [],
+        },
+        'invoice-notes': {
+          type: 'Input',
+          props: {
+            label: 'Notes',
+            name: 'invoice-notes',
+            value: {
+              $bindState: '/inputs/invoice/notes',
+            },
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help someone handling an invoice turn its details and source document into a text description in one calm workspace.',
+      title: 'Describe an invoice',
+      composition:
+        'Use one centred Composer with the h1 “Describe an invoice” and the muted line “Turn invoice details and their source into text.” Set Composer columns to 1; inside its single raised panel, place a two-column Grid containing “Invoice” on the left and “Source & billing” on the right, stacking left before right on narrow screens. Follow the Grid with the full-width “Items & payment” group, giving the delegated line editor room to breathe. Keep all inputs visible, with generous spacing between the three groups and no added cards, decoration, summary, or notes. The Composer’s sticky host action row contains the only run control, labelled “Describe my invoice”, with on.press invoking validateForm then run.',
+      regions: [
+        {
+          title: null,
+          purpose:
+            'Carry the page headline, the input workspace, and the single host-managed action row without adding surrounding chrome.',
+          container: 'Composer',
+          elements: [
+            'Composer — title “Describe an invoice”; muted line “Turn invoice details and their source into text.”; columns 1; runLabel “Describe my invoice”; on.press: validateForm then run; no notes.',
+            'Grid — two columns containing the “Invoice” and “Source & billing” FieldGroups in that order; one column on narrow screens.',
+            'FieldGroup — “Items & payment”, below the Grid at full panel width.',
+          ],
+        },
+        {
+          title: 'Invoice',
+          purpose:
+            'Collect the invoice’s identifying details and amount first, in the left column of the opening Grid.',
+          container: 'FieldGroup',
+          elements: [
+            'Input — $bindState /inputs/invoice/reference; label “Invoice reference”; required.',
+            'MthdsField — path /inputs/invoice/issued_on; label “Issued on”.',
+            'NumberInput — $bindState /inputs/invoice/total; label “Total due”; required; no unit or numeric bounds.',
+            'Segmented — $bindState /inputs/invoice/status; label “Status”; options exactly ["draft", "sent", "paid", "void"]; required.',
+          ],
+        },
+        {
+          title: 'Source & billing',
+          purpose:
+            'Keep the source document near the top beside the invoice details, then collect the billing address beneath it.',
+          container: 'FieldGroup',
+          elements: [
+            'MthdsField — path /inputs/source; label “Source document”.',
+            'Input — $bindState /inputs/invoice/billed_to/street; label “Billing street and number”; required.',
+            'Input — $bindState /inputs/invoice/billed_to/city; label “City”; required.',
+            'Segmented — $bindState /inputs/invoice/billed_to/country; label “Country”; options exactly ["France", "Germany", "Spain", "United Kingdom"]; optional.',
+          ],
+        },
+        {
+          title: 'Items & payment',
+          purpose:
+            'Give billable lines the full panel width, followed by settlement details and an optional note.',
+          container: 'FieldGroup',
+          elements: [
+            'MthdsField — path /inputs/invoice/lines; label “Line items”.',
+            'Grid — two columns holding the paid Checkbox on the left and the settlement MthdsField on the right; stack in that order on narrow screens.',
+            'Checkbox — $bindState /inputs/invoice/paid on checked; label “Payment settled”; optional.',
+            'MthdsField — path /inputs/invoice/settled_at; label “Payment cleared at”.',
+            'Input — $bindState /inputs/invoice/notes; label “Notes”; optional; full width beneath the payment Grid.',
+          ],
+        },
+      ],
+      call_to_action: 'Describe my invoice',
+      defaults: null,
+      delegated: [
+        '/inputs/invoice/issued_on — required date; delegated by the brief.',
+        '/inputs/invoice/settled_at — optional date with time; delegated by the brief.',
+        '/inputs/invoice/lines — required list of structured line items; delegated by the brief.',
+        '/inputs/source — required source document; delegated by the brief.',
       ],
     },
   },

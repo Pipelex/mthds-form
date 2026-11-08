@@ -248,239 +248,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'results.deep_result',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'TYkTQCLEsgABL3k2BLAu1smkWw8GF2ng',
-    frame: 'result',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/results.deep_result.result.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"company-directory"}\n{"op":"add","path":"/elements/company-directory","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["header-region","company-context","divisions-region"]}}\n{"op":"add","path":"/elements/header-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["result-header"]}}\n{"op":"add","path":"/elements/result-header","value":{"type":"ResultHeader","props":{"title":{"$template":"Meet the people at ${/result/name}"}},"children":[]}}\n{"op":"add","path":"/elements/company-context","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["company-facts","company-summary"]}}\n{"op":"add","path":"/elements/company-facts","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["founding-group","public-listing"]}}\n{"op":"add","path":"/elements/founding-group","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["founded-label","founded-date"]}}\n{"op":"add","path":"/elements/founded-label","value":{"type":"Text","props":{"text":"Founded","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/founded-date","value":{"type":"DateText","props":{"value":{"$state":"/result/founded_on"},"style":"long","tone":"muted"},"children":[]}}\n{"op":"add","path":"/elements/public-listing","value":{"type":"Fact","props":{"label":"Publicly traded","value":{"$cond":{"$state":"/result/is_public"},"$then":"Yes","$else":"No"}},"children":[]}}\n{"op":"add","path":"/elements/company-summary","value":{"type":"MthdsResult","props":{"path":"/result/summary","hideLabel":true},"children":[]}}\n{"op":"add","path":"/elements/divisions-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["division-list"]}}\n{"op":"add","path":"/elements/division-list","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"repeat":{"statePath":"/result/divisions"},"children":["division-section"]}}\n{"op":"add","path":"/elements/division-section","value":{"type":"Section","props":{"title":{"$item":"name"}},"children":["division-content"]}}\n{"op":"add","path":"/elements/division-content","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["division-facts","division-teams"]}}\n{"op":"add","path":"/elements/division-facts","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["division-budget","division-region"]}}\n{"op":"add","path":"/elements/division-budget","value":{"type":"Metric","props":{"label":"Annual budget","value":{"$item":"budget"},"format":"decimal","unit":"M"},"children":[]}}\n{"op":"add","path":"/elements/division-region","value":{"type":"Fact","props":{"label":"Operating region","value":{"$item":"region"}},"children":[]}}\n{"op":"add","path":"/elements/division-teams","value":{"type":"MthdsResult","props":{"path":"teams","hideLabel":true},"children":[]}}',
-    spec: {
-      root: 'company-directory',
-      elements: {
-        'company-directory': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-            align: 'stretch',
-          },
-          children: ['header-region', 'company-context', 'divisions-region'],
-        },
-        'header-region': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['result-header'],
-        },
-        'result-header': {
-          type: 'ResultHeader',
-          props: {
-            title: {
-              $template: 'Meet the people at ${/result/name}',
-            },
-          },
-          children: [],
-        },
-        'company-context': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['company-facts', 'company-summary'],
-        },
-        'company-facts': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'lg',
-          },
-          children: ['founding-group', 'public-listing'],
-        },
-        'founding-group': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['founded-label', 'founded-date'],
-        },
-        'founded-label': {
-          type: 'Text',
-          props: {
-            text: 'Founded',
-            variant: 'muted',
-          },
-          children: [],
-        },
-        'founded-date': {
-          type: 'DateText',
-          props: {
-            value: {
-              $state: '/result/founded_on',
-            },
-            style: 'long',
-            tone: 'muted',
-          },
-          children: [],
-        },
-        'public-listing': {
-          type: 'Fact',
-          props: {
-            label: 'Publicly traded',
-            value: {
-              $cond: {
-                $state: '/result/is_public',
-              },
-              $then: 'Yes',
-              $else: 'No',
-            },
-          },
-          children: [],
-        },
-        'company-summary': {
-          type: 'MthdsResult',
-          props: {
-            path: '/result/summary',
-            hideLabel: true,
-          },
-          children: [],
-        },
-        'divisions-region': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-          },
-          children: ['division-list'],
-        },
-        'division-list': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-          },
-          repeat: {
-            statePath: '/result/divisions',
-          },
-          children: ['division-section'],
-        },
-        'division-section': {
-          type: 'Section',
-          props: {
-            title: {
-              $item: 'name',
-            },
-          },
-          children: ['division-content'],
-        },
-        'division-content': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['division-facts', 'division-teams'],
-        },
-        'division-facts': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'lg',
-          },
-          children: ['division-budget', 'division-region'],
-        },
-        'division-budget': {
-          type: 'Metric',
-          props: {
-            label: 'Annual budget',
-            value: {
-              $item: 'budget',
-            },
-            format: 'decimal',
-            unit: 'M',
-          },
-          children: [],
-        },
-        'division-region': {
-          type: 'Fact',
-          props: {
-            label: 'Operating region',
-            value: {
-              $item: 'region',
-            },
-          },
-          children: [],
-        },
-        'division-teams': {
-          type: 'MthdsResult',
-          props: {
-            path: 'teams',
-            hideLabel: true,
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help someone exploring a company understand what it does and follow its divisions down to the teams and people doing the work.',
-      title: 'Meet the people at {company name}',
-      composition:
-        "Use a spacious, full-width directory with a single reading path and no surrounding app chrome. The ResultHeader carries the company-led h1 and the host's result actions; a compact pair of founding and listing facts comes next, followed by the company summary. Below, repeat a flat Section for each division in source order: its name is the h2, its annual budget and operating region sit together immediately beneath it, and its complete team hierarchy follows through the kernel renderer. Keep all divisions visible, use generous space and hairline separation between them, and introduce no tabs, side panels, invented totals or duplicate values. On narrow screens, the two-column fact groups become single columns.",
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Name the company directory immediately and leave the result actions in the host-owned header slot.',
-          container: 'Stack',
-          elements: [
-            'ResultHeader — title template "Meet the people at {company name}", with company name read using $state from /result/name; this is the only h1; no eyebrow or subtitle; retain the host\'s result-action slot.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            "Give the company's essential context before the organizational detail, without adding a separate overview heading.",
-          container: 'Stack',
-          elements: [
-            'Grid — two columns, stacking to one on narrow screens; holds the founding date group and the public-listing fact.',
-            'Stack — holds Text "Founded" and DateText reading $state /result/founded_on, format long, tone muted.',
-            'Fact — label "Publicly traded"; value reads $state /result/is_public, displayed as Yes or No.',
-            'MthdsResult — path /result/summary; hideLabel true; render the markdown beneath the facts.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            "Make divisions easy to scan while preserving each team's mission and the complete nested roster underneath its division.",
-          container: 'Stack',
-          elements: [
-            'Stack — repeat over the list read with $state /result/divisions, in source order; each repeated child is one Section.',
-            "Section — one per division; h2 title reads the item's relative path name with $item; no stage number or subtitle; holds the division facts and its teams.",
-            'Grid — two columns, stacking to one on narrow screens; holds Metric for budget and Fact for region.',
-            'Metric — label "Annual budget"; value reads the division item\'s relative path budget with $item; format decimal; unit "M"; do not add a currency.',
-            'Fact — label "Operating region"; value reads the division item\'s relative path region with $item.',
-            'MthdsResult — path teams, relative to the current division item; hideLabel true; render the entire teams subtree, including team names, markdown missions, headcounts, members and their details; do not separately render any descendants.',
-          ],
-        },
-      ],
-      call_to_action: null,
-      defaults: null,
-      delegated: [
-        '/result/summary — required delegation for markdown prose; render without its own label.',
-        'teams — the whole subtree relative to each item of /result/divisions; delegate the nested team and member hierarchy to preserve markdown missions and avoid flattening people into a table.',
-      ],
-    },
-  },
-  {
-    pipeRef: 'results.deep_result',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: 'xWe2EZl0LcLIQjmrGdctzpmcPAifPFpN',
     frame: 'result',
     style: 'soft',
@@ -1150,6 +917,218 @@ export const SPECS: SpecFixture[] = [
       delegated: [
         '/result/summary — required delegation for markdown prose.',
         'teams, relative to each item of /result/divisions — delegate the complete team tree to preserve markdown missions and its nested member structures without duplicating any of its values.',
+      ],
+    },
+  },
+  {
+    pipeRef: 'results.deep_result',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'OsqNB0HGCYGq8xjaADUkh1FZsaD1qfky',
+    frame: 'result',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/results.deep_result.result.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"company-directory"}\n{"op":"add","path":"/elements/company-directory","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["identity","company-overview","divisions-region"]}}\n{"op":"add","path":"/elements/identity","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["company-header"]}}\n{"op":"add","path":"/elements/company-header","value":{"type":"ResultHeader","props":{"eyebrow":"Company directory","title":{"$state":"/result/name"}},"children":[]}}\n{"op":"add","path":"/elements/company-overview","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["company-facts","company-summary"]}}\n{"op":"add","path":"/elements/company-facts","value":{"type":"Grid","props":{"columns":2,"gap":"md"},"children":["founded-fact","public-trading-fact"]}}\n{"op":"add","path":"/elements/founded-fact","value":{"type":"Fact","props":{"label":"Founded","value":{"$state":"/result/founded_on"}},"children":[]}}\n{"op":"add","path":"/elements/public-trading-fact","value":{"type":"Fact","props":{"label":"Publicly traded","value":{"$cond":{"$state":"/result/is_public","eq":true},"$then":"Yes","$else":"No"}},"children":[]}}\n{"op":"add","path":"/elements/company-summary","value":{"type":"MthdsResult","props":{"path":"/result/summary","hideLabel":true},"children":[]}}\n{"op":"add","path":"/elements/divisions-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["division-list"]}}\n{"op":"add","path":"/elements/division-list","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"repeat":{"statePath":"/result/divisions"},"children":["division-section"]}}\n{"op":"add","path":"/elements/division-section","value":{"type":"Section","props":{"title":{"$item":"name"}},"children":["division-metadata","division-teams"]}}\n{"op":"add","path":"/elements/division-metadata","value":{"type":"Stack","props":{"direction":"horizontal","gap":"lg","align":"start"},"children":["division-region","division-budget"]}}\n{"op":"add","path":"/elements/division-region","value":{"type":"Detail","props":{"label":"Region","value":{"$item":"region"}},"children":[]}}\n{"op":"add","path":"/elements/division-budget","value":{"type":"Metric","props":{"label":"Annual budget","value":{"$item":"budget"},"format":"decimal","unit":"M"},"children":[]}}\n{"op":"add","path":"/elements/division-teams","value":{"type":"MthdsResult","props":{"path":"teams","hideLabel":true},"children":[]}}',
+    spec: {
+      root: 'company-directory',
+      elements: {
+        'company-directory': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+            align: 'stretch',
+          },
+          children: ['identity', 'company-overview', 'divisions-region'],
+        },
+        identity: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'md',
+          },
+          children: ['company-header'],
+        },
+        'company-header': {
+          type: 'ResultHeader',
+          props: {
+            eyebrow: 'Company directory',
+            title: {
+              $state: '/result/name',
+            },
+          },
+          children: [],
+        },
+        'company-overview': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['company-facts', 'company-summary'],
+        },
+        'company-facts': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'md',
+          },
+          children: ['founded-fact', 'public-trading-fact'],
+        },
+        'founded-fact': {
+          type: 'Fact',
+          props: {
+            label: 'Founded',
+            value: {
+              $state: '/result/founded_on',
+            },
+          },
+          children: [],
+        },
+        'public-trading-fact': {
+          type: 'Fact',
+          props: {
+            label: 'Publicly traded',
+            value: {
+              $cond: {
+                $state: '/result/is_public',
+                eq: true,
+              },
+              $then: 'Yes',
+              $else: 'No',
+            },
+          },
+          children: [],
+        },
+        'company-summary': {
+          type: 'MthdsResult',
+          props: {
+            path: '/result/summary',
+            hideLabel: true,
+          },
+          children: [],
+        },
+        'divisions-region': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+            align: 'stretch',
+          },
+          children: ['division-list'],
+        },
+        'division-list': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+            align: 'stretch',
+          },
+          repeat: {
+            statePath: '/result/divisions',
+          },
+          children: ['division-section'],
+        },
+        'division-section': {
+          type: 'Section',
+          props: {
+            title: {
+              $item: 'name',
+            },
+          },
+          children: ['division-metadata', 'division-teams'],
+        },
+        'division-metadata': {
+          type: 'Stack',
+          props: {
+            direction: 'horizontal',
+            gap: 'lg',
+            align: 'start',
+          },
+          children: ['division-region', 'division-budget'],
+        },
+        'division-region': {
+          type: 'Detail',
+          props: {
+            label: 'Region',
+            value: {
+              $item: 'region',
+            },
+          },
+          children: [],
+        },
+        'division-budget': {
+          type: 'Metric',
+          props: {
+            label: 'Annual budget',
+            value: {
+              $item: 'budget',
+            },
+            format: 'decimal',
+            unit: 'M',
+          },
+          children: [],
+        },
+        'division-teams': {
+          type: 'MthdsResult',
+          props: {
+            path: 'teams',
+            hideLabel: true,
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help someone exploring a company understand what it does, how its divisions are organized, and who works in each team.',
+      title: 'Explore the company',
+      composition:
+        "Use a full-width, open directory with generous space and no enclosing cards. The ResultHeader names the company, followed by a compact two-fact band and its summary. Below, show divisions in their source order as flat Sections: each division's name is its h2, its region and annual budget sit in a compact horizontal row, and its teams and people follow beneath in the kernel's read-only rendering. Keep all divisions visible rather than hiding them in tabs or collapsibles; separate the Sections with their built-in hairlines. On narrow screens, the fact band and division metadata stack. Build nothing outside the result, and add no run control.",
+      regions: [
+        {
+          title: null,
+          purpose:
+            "Identify the company and place the host's result actions beside the page's only h1.",
+          container: 'Stack',
+          elements: [
+            'ResultHeader: eyebrow "Company directory"; h1 title reads /result/name with $state; no subtitle; reserve its action slot for the host.',
+          ],
+        },
+        {
+          title: null,
+          purpose: "Give the company's basic facts before explaining what it does.",
+          container: 'Stack',
+          elements: [
+            'Grid: two columns, stacking to one on narrow screens; holds the founding date and public-trading status.',
+            'Fact: label "Founded"; value reads /result/founded_on with $state, formatted as a date in words.',
+            'Fact: label "Publicly traded"; value reads /result/is_public with $state, displayed as "Yes" for true and "No" for false.',
+            'MthdsResult: path /result/summary; hideLabel true; render the markdown summary below the fact band.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            "Let readers move through the company's divisions and reach each team's mission and member details without flattening the hierarchy.",
+          container: 'Stack',
+          elements: [
+            'Stack: repeat over /result/divisions with $state, in source order; each item contains one Section.',
+            "Section: repeated division container; h2 title reads the item's name with $item; contains a metadata Stack and MthdsResult.",
+            'Stack: horizontal division metadata, stacking on narrow screens; contains Detail and Metric.',
+            'Detail: label "Region"; value reads the division item\'s region with $item; display the stored choice as written: "emea" | "americas" | "apac".',
+            'Metric: label "Annual budget"; value reads the division item\'s budget with $item; format decimal; unit "M", meaning millions, with no invented currency.',
+            'MthdsResult: within each division repeat, path "teams"; hideLabel true; delegate the entire teams subtree, including team names, markdown missions, headcounts, and members with their roles, joining dates, remote status, and focus areas.',
+          ],
+        },
+      ],
+      call_to_action: null,
+      defaults: null,
+      delegated: [
+        '/result/summary — required delegation for the markdown company summary.',
+        '/result/divisions → each item\'s teams, using MthdsResult path "teams" — delegate the nested team-and-member structure whole so markdown missions and the people hierarchy render together.',
       ],
     },
   },
@@ -1862,14 +1841,14 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'results.nested_result',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'JyebXn0HXVDjezYn4Hj04bMjmikrgezb',
+    seed: 'XPlLR14PuknpQXVEL13mxC989jn0wKQy',
     frame: 'result',
     style: 'quiet',
     promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
+    date: '2026-11-08',
     brief: 'data/briefs/results.nested_result.result.quiet.md',
     jsonl:
-      '{"op":"add","path":"/root","value":"invoice-page"}\n{"op":"add","path":"/elements/invoice-page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["invoice-header-group","invoice-summary","billable-lines-group"]}}\n{"op":"add","path":"/elements/invoice-header-group","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["invoice-header"]}}\n{"op":"add","path":"/elements/invoice-header","value":{"type":"ResultHeader","props":{"title":{"$template":"Review invoice ${/result/reference}"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-summary","value":{"type":"Grid","props":{"columns":3,"gap":"xl"},"children":["invoice-total","issued-date-group","paid-status"]}}\n{"op":"add","path":"/elements/invoice-total","value":{"type":"Metric","props":{"label":"Invoice total","value":{"$state":"/result/total"},"format":"decimal"},"children":[]}}\n{"op":"add","path":"/elements/issued-date-group","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["issued-label","issued-date"]}}\n{"op":"add","path":"/elements/issued-label","value":{"type":"Text","props":{"text":"Issued","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/issued-date","value":{"type":"DateText","props":{"value":{"$state":"/result/issued_on"},"style":"short","tone":"muted"},"children":[]}}\n{"op":"add","path":"/elements/paid-status","value":{"type":"Fact","props":{"label":"Paid","value":{"$state":"/result/paid"}},"children":[]}}\n{"op":"add","path":"/elements/billable-lines-group","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["billable-lines-heading","lines-table"]}}\n{"op":"add","path":"/elements/billable-lines-heading","value":{"type":"Heading","props":{"text":"Billable lines","level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/lines-table","value":{"type":"DataTable","props":{"rows":{"$state":"/result/lines"},"columns":[{"path":"label","label":"Item","format":"text"},{"path":"quantity","label":"Quantity","format":"number"},{"path":"unit_price","label":"Unit price","format":"number"}]},"children":[]}}',
+      '{"op":"add","path":"/root","value":"invoice-page"}\n{"op":"add","path":"/elements/invoice-page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["header-group","invoice-facts","billable-lines"]}}\n{"op":"add","path":"/elements/header-group","value":{"type":"Stack","props":{"direction":"vertical","gap":"none"},"children":["invoice-header"]}}\n{"op":"add","path":"/elements/invoice-header","value":{"type":"ResultHeader","props":{"title":{"$template":"Invoice ${/result/reference}"}},"children":[]}}\n{"op":"add","path":"/elements/invoice-facts","value":{"type":"Grid","props":{"columns":3,"gap":"lg"},"children":["total-metric","issued-date","paid-fact"]}}\n{"op":"add","path":"/elements/total-metric","value":{"type":"Metric","props":{"label":"Invoice total","value":{"$state":"/result/total"},"format":"decimal"},"children":[]}}\n{"op":"add","path":"/elements/issued-date","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["issued-label","issued-value"]}}\n{"op":"add","path":"/elements/issued-label","value":{"type":"Text","props":{"text":"Issued","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/issued-value","value":{"type":"DateText","props":{"value":{"$state":"/result/issued_on"},"style":"long","tone":"muted"},"children":[]}}\n{"op":"add","path":"/elements/paid-fact","value":{"type":"Fact","props":{"label":"Paid","value":{"$cond":{"$state":"/result/paid"},"$then":"Yes","$else":"No"}},"children":[]}}\n{"op":"add","path":"/elements/billable-lines","value":{"type":"Stack","props":{"direction":"vertical","gap":"md","align":"stretch"},"children":["lines-heading","lines-table"]}}\n{"op":"add","path":"/elements/lines-heading","value":{"type":"Heading","props":{"text":"Billable lines","level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/lines-table","value":{"type":"DataTable","props":{"rows":{"$state":"/result/lines"},"columns":[{"path":"label","label":"Item","format":"text"},{"path":"quantity","label":"Quantity","format":"number"},{"path":"unit_price","label":"Unit price","format":"number"}]},"children":[]}}',
     spec: {
       root: 'invoice-page',
       elements: {
@@ -1880,13 +1859,13 @@ export const SPECS: SpecFixture[] = [
             gap: 'xl',
             align: 'stretch',
           },
-          children: ['invoice-header-group', 'invoice-summary', 'billable-lines-group'],
+          children: ['header-group', 'invoice-facts', 'billable-lines'],
         },
-        'invoice-header-group': {
+        'header-group': {
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'lg',
+            gap: 'none',
           },
           children: ['invoice-header'],
         },
@@ -1894,20 +1873,20 @@ export const SPECS: SpecFixture[] = [
           type: 'ResultHeader',
           props: {
             title: {
-              $template: 'Review invoice ${/result/reference}',
+              $template: 'Invoice ${/result/reference}',
             },
           },
           children: [],
         },
-        'invoice-summary': {
+        'invoice-facts': {
           type: 'Grid',
           props: {
             columns: 3,
-            gap: 'xl',
+            gap: 'lg',
           },
-          children: ['invoice-total', 'issued-date-group', 'paid-status'],
+          children: ['total-metric', 'issued-date', 'paid-fact'],
         },
-        'invoice-total': {
+        'total-metric': {
           type: 'Metric',
           props: {
             label: 'Invoice total',
@@ -1918,13 +1897,13 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'issued-date-group': {
+        'issued-date': {
           type: 'Stack',
           props: {
             direction: 'vertical',
             gap: 'sm',
           },
-          children: ['issued-label', 'issued-date'],
+          children: ['issued-label', 'issued-value'],
         },
         'issued-label': {
           type: 'Text',
@@ -1934,37 +1913,41 @@ export const SPECS: SpecFixture[] = [
           },
           children: [],
         },
-        'issued-date': {
+        'issued-value': {
           type: 'DateText',
           props: {
             value: {
               $state: '/result/issued_on',
             },
-            style: 'short',
+            style: 'long',
             tone: 'muted',
           },
           children: [],
         },
-        'paid-status': {
+        'paid-fact': {
           type: 'Fact',
           props: {
             label: 'Paid',
             value: {
-              $state: '/result/paid',
+              $cond: {
+                $state: '/result/paid',
+              },
+              $then: 'Yes',
+              $else: 'No',
             },
           },
           children: [],
         },
-        'billable-lines-group': {
+        'billable-lines': {
           type: 'Stack',
           props: {
             direction: 'vertical',
-            gap: 'lg',
+            gap: 'md',
             align: 'stretch',
           },
-          children: ['billable-lines-heading', 'lines-table'],
+          children: ['lines-heading', 'lines-table'],
         },
-        'billable-lines-heading': {
+        'lines-heading': {
           type: 'Heading',
           props: {
             text: 'Billable lines',
@@ -2002,40 +1985,39 @@ export const SPECS: SpecFixture[] = [
     },
     plan: {
       purpose:
-        'Help the person checking an extracted invoice verify its total, settlement status and billable lines at a glance.',
-      title: 'Review the invoice',
+        'Help the person reviewing an extracted invoice check its total, settlement status and billable lines at a glance.',
+      title: 'Invoice',
       composition:
-        'Use a full-width, open vertical composition with generous space between three groups. The ResultHeader carries the invoice reference in the single h1 and reserves its action area for the host. Below it, a three-column Grid puts the total first and largest, followed by the issue date and payment status; stack these in that order on narrow screens. Finish with a full-width line-item table under a small h2, without cards, decorative icons, tabs or a repeated total.',
+        'Use a full-width, flat vertical Stack with generous space between three groups: the result header, a compact band of invoice facts, and the billable-lines table. The header’s sole h1 reads “Invoice” followed by the reference and reserves its action area for the host. Below it, a three-column Grid places the total first and largest, followed by the issue date and paid status; these stack in that order on narrow screens. Finish with a full-width table under a single h2, without cards, decorative icons, extra summaries or calculated amounts.',
       regions: [
         {
           title: null,
-          purpose: "Identify the invoice being reviewed and accommodate the host's result actions.",
+          purpose:
+            'Identify the invoice immediately and provide the host’s result-action placement.',
           container: 'Stack',
           elements: [
-            'ResultHeader: title uses $template "Review invoice {/result/reference}", reading /result/reference; no eyebrow or subtitle; host-owned actions occupy its action area.',
+            'ResultHeader — title uses a $template reading /result/reference: “Invoice {reference}”; no eyebrow or subtitle; the only h1; host-owned actions at the right.',
           ],
         },
         {
           title: null,
           purpose:
-            'Put the amount first, with the date and settlement status alongside it for a quick check.',
+            'Put the invoice total first, with the date and settlement status alongside it for a quick check.',
           container: 'Grid',
           elements: [
-            'Grid: three columns holding Metric, Stack and Fact; one column on narrow screens.',
-            'Metric: value reads /result/total with $state; label "Invoice total"; format decimal; no unit because the result carries no currency.',
-            'Stack: holds Text "Issued" followed by DateText.',
-            'DateText: value reads /result/issued_on with $state; format short; tone muted.',
-            'Fact: value reads /result/paid with $state; label "Paid"; show the boolean as Yes or No; no detail.',
+            'Metric — value reads $state /result/total; label “Invoice total”; format decimal; no unit or currency suffix.',
+            'Stack — holds Text “Issued” and DateText reading $state /result/issued_on; format long; muted tone.',
+            'Fact — value reads $state /result/paid; label “Paid”; render the boolean as “Yes” or “No”; no detail.',
           ],
         },
         {
           title: 'Billable lines',
           purpose:
-            'Show what was sold and the quantities and unit prices that make up the invoice.',
+            'Show exactly what was sold and its quantity and unit price, without inventing line totals or currency.',
           container: 'Stack',
           elements: [
-            'Heading: h2 "Billable lines".',
-            'DataTable: rows read /result/lines with $state; columns in order: label, header "Item", format text; quantity, header "Quantity", format number; unit_price, header "Unit price", format number. No calculated line totals, currency symbols or summary row.',
+            'Heading — h2 “Billable lines”.',
+            'DataTable — rows read $state /result/lines; columns in order: label, header “Item”, format text; quantity, header “Quantity”, format number; unit_price, header “Unit price”, format number; no currency suffix, calculated columns or total row.',
           ],
         },
       ],

@@ -24,11 +24,11 @@ A brand's directory is named by `brandProducerId(provenance)`, which is `produce
 
 `BRAND_CONTRACT` is the list of tokens a brand sets: which DTCG token sets which custom property, and what that property paints, in the words a producer is told.
 
-| Tokens | Set | Held to |
-| --- | --- | --- |
-| `color.background` … `color.ring` | the colour properties, `--background` … `--ring` | `theme.css`'s `:root` and `.dark` blocks |
-| `radius.base` | `--radius` | `theme.css`'s `:root` block |
-| `font.sans`, `font.mono` | `--font-sans`, `--font-mono` | Tailwind's own theme variables, which `theme.css` leaves alone |
+| Tokens                            | Set                                              | Held to                                                        |
+| --------------------------------- | ------------------------------------------------ | -------------------------------------------------------------- |
+| `color.background` … `color.ring` | the colour properties, `--background` … `--ring` | `theme.css`'s `:root` and `.dark` blocks                       |
+| `radius.base`                     | `--radius`                                       | `theme.css`'s `:root` block                                    |
+| `font.sans`, `font.mono`          | `--font-sans`, `--font-mono`                     | Tailwind's own theme variables, which `theme.css` leaves alone |
 
 The colour and radius rows are not a second list kept beside the theme. `src/brand/__tests__/contract.test.ts` holds them to `theme.css` over the source, and `make assert-bundle` holds them over the built entry, so a token added to the theme is a token a producer must set.
 
@@ -72,7 +72,10 @@ Whether a brand was produced against the current brief, and from the facts its p
 Some things a site does not show, and no reading can supply them: the accent of a site with no button, a different accent for its dark canvas, a logo for a canvas the site draws none for. A person states them beside the URL, as `StatedFacts`:
 
 ```json
-{ "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" }, "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" } }
+{
+  "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" },
+  "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" }
+}
 ```
 
 A stated fact outranks every reading, and whatever runs a producer tells it so, outside this package (see [Where a brand comes from](#where-a-brand-comes-from)). The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
@@ -114,7 +117,7 @@ import '../brands/acme.css';
 
 <div className={scope}>
   <GenerativePage spec={spec} store={store} scope={descriptorScope} brand={manifest} />
-</div>
+</div>;
 ```
 
 The tokens and the manifest are separate on purpose: the tokens are the palette, and the manifest is what the page says it is.
@@ -132,25 +135,25 @@ const dark = deriveBrandRoles(resolveDarkSeeds(colors, darkColors), '#0d0d0d');
 
 ### The seeds
 
-| Seed | What it paints | When it is not set |
-| --- | --- | --- |
-| `action` | The button colour: the run button, every main button, the selected state of a pill | No role: the host's own button colour stays |
-| `accent` | Secondary highlights: links, the active tab, the upload area on hover, progress | The button colour, so a red button never sits beside links in another hue; no role when that is unset too |
-| `header` | The band across the top of the page, behind the logo | No role: the host draws its own band, or none |
+| Seed     | What it paints                                                                     | When it is not set                                                                                        |
+| -------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `action` | The button colour: the run button, every main button, the selected state of a pill | No role: the host's own button colour stays                                                               |
+| `accent` | Secondary highlights: links, the active tab, the upload area on hover, progress    | The button colour, so a red button never sits beside links in another hue; no role when that is unset too |
+| `header` | The band across the top of the page, behind the logo                               | No role: the host draws its own band, or none                                                             |
 
 A seed is `#rrggbb` in any case, or `null` or `undefined` for unset, so a host passes a team's stored colours as they arrive. Anything else, the page colour included, throws an error naming it: a host validates what a person typed before it reaches here.
 
 ### The roles
 
-| Role | What it is | What is guaranteed | Present when |
-| --- | --- | --- | --- |
-| `action` | The button colour, as a fill | The seed itself | `action` is set |
-| `onAction` | Text and icons on the button colour | `#000000` or `#ffffff`, whichever contrasts more | `action` is set |
-| `accent` | The accent, as a fill: an active tab's underline, a progress bar | The seed itself | `accent` or `action` is set |
-| `accentFill` | A pale accent fill behind accent text: a pill, a badge | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page | `accent` or `action` is set |
-| `accentInk` | The accent as text | At least 4.5:1 on the page, on `accentFill` and on every other surface the host names (§ "The accent on a style's surfaces") | `accent` or `action` is set |
-| `header` | The header band, as a fill | The seed itself | `header` is set |
-| `onHeader` | Text on the band: the back link, a wordmark | `#000000` or `#ffffff`, whichever contrasts more | `header` is set |
+| Role         | What it is                                                       | What is guaranteed                                                                                                           | Present when                |
+| ------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `action`     | The button colour, as a fill                                     | The seed itself                                                                                                              | `action` is set             |
+| `onAction`   | Text and icons on the button colour                              | `#000000` or `#ffffff`, whichever contrasts more                                                                             | `action` is set             |
+| `accent`     | The accent, as a fill: an active tab's underline, a progress bar | The seed itself                                                                                                              | `accent` or `action` is set |
+| `accentFill` | A pale accent fill behind accent text: a pill, a badge           | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page                      | `accent` or `action` is set |
+| `accentInk`  | The accent as text                                               | At least 4.5:1 on the page, on `accentFill` and on every other surface the host names (§ "The accent on a style's surfaces") | `accent` or `action` is set |
+| `header`     | The header band, as a fill                                       | The seed itself                                                                                                              | `header` is set             |
+| `onHeader`   | Text on the band: the back link, a wordmark                      | `#000000` or `#ffffff`, whichever contrasts more                                                                             | `header` is set             |
 
 Every role is `#rrggbb` in lower case, and an absent role is not a key of the result at all, so with no seed the result is `{}`. The roles come in three groups (the button colour's pair, the accent's three, the band's pair), each present whole or absent whole, and the type says so: checking one role of a group, `roles.action !== undefined`, narrows the rest of it. The function returns roles, never custom property names, because each host maps them onto its own tokens.
 
@@ -191,12 +194,12 @@ A team brands its pages with more than colours: it picks a **style** from a clos
 
 ### The styles
 
-| Style | Its direction, as a designer reads it | Headings | Body face | Control radius | Panel | Call to action | Rhythm |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `quiet` | Calm and precise: light titles, hairline panels, generous air, nothing decorated. | the host's | the host's | the host's | the host's | the host's | the host's |
-| `soft` | Friendly and rounded: generous corners, panels that float on a soft shadow with no outline, warm medium-weight titles. | the body face, 500, −0.015em | DM Sans | 12px | the card, no visible edge, a two-layer shadow; on a dark page the card lifted 7% toward the foreground under a deeper shadow, with a faint highlight along its top edge; fields on the card (light) or the page (dark) | a short shadow in the button colour at 50% on a light page, none on a dark one | 1.08 |
-| `editorial` | Considered and literary: serif display titles, fine hairlines, wide margins and a reading rhythm. | Newsreader, 500, −0.01em | Source Sans 3 | 2px | the card on a 1px hairline, no shadow; fields on the card, so each reads as its hairline | none | 1.25 |
-| `bold` | Confident and graphic: heavy, tightly set titles, solid panels with firm edges, a compact rhythm. | the body face, 700, −0.03em | Space Grotesk | 6px | the muted fill on a 2px edge of the foreground at 62% (30% on a dark page), no shadow; fields on the card (light) or the page (dark) | none | 0.85 |
+| Style       | Its direction, as a designer reads it                                                                                  | Headings                     | Body face     | Control radius | Panel                                                                                                                                                                                                                  | Call to action                                                                 | Rhythm     |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------- |
+| `quiet`     | The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated.                  | the host's                   | the host's    | the host's     | the host's                                                                                                                                                                                                             | the host's                                                                     | the host's |
+| `soft`      | Friendly and rounded: generous corners, panels that float on a soft shadow with no outline, warm medium-weight titles. | the body face, 500, −0.015em | DM Sans       | 12px           | the card, no visible edge, a two-layer shadow; on a dark page the card lifted 7% toward the foreground under a deeper shadow, with a faint highlight along its top edge; fields on the card (light) or the page (dark) | a short shadow in the button colour at 50% on a light page, none on a dark one | 1.08       |
+| `editorial` | Considered and literary: serif display titles, fine hairlines, wide margins and a reading rhythm.                      | Newsreader, 500, −0.01em     | Source Sans 3 | 2px            | the card on a 1px hairline, no shadow; fields on the card, so each reads as its hairline                                                                                                                               | none                                                                           | 1.25       |
+| `bold`      | Confident and graphic: heavy, tightly set titles, solid panels with firm edges, a compact rhythm.                      | the body face, 700, −0.03em  | Space Grotesk | 6px            | the muted fill on a 2px edge of the foreground at 62% (30% on a dark page), no shadow; fields on the card (light) or the page (dark)                                                                                   | none                                                                           | 0.85       |
 
 **`quiet` sets nothing.** It is the host's own look, named, so that "no style" and "the default style" are one state: a team that has set no style is on `quiet`, and a page wearing it renders exactly as one wearing none. That holds only because the host states its own treatment of what a style changes, its titles, its panels and its call to action, through the same tokens a style sets; a style overrides them, and `quiet` leaves them.
 

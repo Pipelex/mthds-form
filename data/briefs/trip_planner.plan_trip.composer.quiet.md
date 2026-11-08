@@ -29,7 +29,7 @@ A person runs a tool more readily when they know what comes back: the page may s
 
 ## Style
 
-The team's apps wear the Quiet style: Calm and precise: light titles, hairline panels, generous air, nothing decorated.
+The team's apps wear the Quiet style: The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated.
 
 The components already draw its faces, weights, radii and panels, so the page sets none of them. What the page decides is its composition, and the composition should read as this style too: how much air there is between the groups, how large and how long the headline is, how many groups the inputs fall into and whether they are titled, how much the page says around them. A calm style asks for few groups and generous air, a literary one for a headline that reads like a title and a measured rhythm, a graphic one for a dense, firm page with short labels.
 
@@ -267,7 +267,7 @@ The `brief` input the designer method receives, verbatim, as `inputBrief` or `re
   ],
   "style": {
     "name": "Quiet",
-    "direction": "Calm and precise: light titles, hairline panels, generous air, nothing decorated."
+    "direction": "The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated."
   }
 }
 ```

@@ -136,80 +136,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'summarize_people.summarize_people',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'S2En4xep2WZ8D8LJKiUSSUeMeSxDtgge',
-    frame: 'composer',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/summarize_people.summarize_people.composer.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"people-composer"}\n{"op":"add","path":"/elements/people-composer","value":{"type":"Composer","props":{"headline":"Summarize each person","lede":"Work from your list of person records.","runLabel":"Summarize people","columns":"1","notes":["Full names and countries of origin.","A one-sentence portrait of each person."]},"children":["people-field"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people"},"children":[]}}',
-    spec: {
-      root: 'people-composer',
-      elements: {
-        'people-composer': {
-          type: 'Composer',
-          props: {
-            headline: 'Summarize each person',
-            lede: 'Work from your list of person records.',
-            runLabel: 'Summarize people',
-            columns: '1',
-            notes: [
-              'Full names and countries of origin.',
-              'A one-sentence portrait of each person.',
-            ],
-          },
-          children: ['people-field'],
-          on: {
-            press: [
-              {
-                action: 'validateForm',
-              },
-              {
-                action: 'run',
-              },
-            ],
-          },
-        },
-        'people-field': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/people',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help someone working with a list of person records get a concise summary of each person in one run.',
-      title: 'Summarize each person',
-      composition:
-        "Use one centred Composer with a short, light headline and the muted line “Work from your list of person records.” Keep its raised input panel in one column: the single delegated list control occupies the full width, with generous breathing room and no redundant group heading. Keep the host's action row visible at the panel's foot, with the sole run control. Below the panel, use two short Composer notes for the returned details; add no decoration, surrounding navigation or additional surfaces.",
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Present the job, collect the person records, and run the summaries from one calm workspace.',
-          container: 'Composer',
-          elements: [
-            'Composer: headline “Summarize each person”; muted line “Work from your list of person records.”; columns “1”; contains MthdsField and the host action row; runLabel “Summarize people”; on.press validates with validateForm, then invokes run.',
-            "MthdsField: path /inputs/people; two-way binding; label “People”; retain the descriptor's description; delegate the entire required list without rendering its members separately.",
-            'Composer notes: “Full names and countries of origin.” and “A one-sentence portrait of each person.”',
-          ],
-        },
-      ],
-      call_to_action: 'Summarize people',
-      defaults: [],
-      delegated: [
-        '/inputs/people — the brief delegates the entire list of person structures to MthdsField.',
-      ],
-    },
-  },
-  {
-    pipeRef: 'summarize_people.summarize_people',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: 'FmLqr4GTLMsmeTujkBVUsUiHERhxGm7n',
     frame: 'composer',
     style: 'soft',
@@ -439,6 +365,85 @@ export const SPECS: SpecFixture[] = [
       defaults: [],
       delegated: [
         '/inputs/people — the brief requires MthdsField for the whole list of person records.',
+      ],
+    },
+  },
+  {
+    pipeRef: 'summarize_people.summarize_people',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'nsmTtlvSbqgvBMHGgDJAlt0R3C7M43Vm',
+    frame: 'composer',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/summarize_people.summarize_people.composer.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"people-composer"}\n{"op":"add","path":"/elements/people-composer","value":{"type":"Composer","props":{"headline":"Summarize each person","lede":"Work from a list of person records.","runLabel":"Summarize people","columns":"1","notes":["Full names and countries of origin alongside each summary."]},"children":["people-group"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/people-group","value":{"type":"FieldGroup","props":{},"children":["people-field"]}}\n{"op":"add","path":"/elements/people-field","value":{"type":"MthdsField","props":{"path":"/inputs/people","label":"People"},"children":[]}}',
+    spec: {
+      root: 'people-composer',
+      elements: {
+        'people-composer': {
+          type: 'Composer',
+          props: {
+            headline: 'Summarize each person',
+            lede: 'Work from a list of person records.',
+            runLabel: 'Summarize people',
+            columns: '1',
+            notes: ['Full names and countries of origin alongside each summary.'],
+          },
+          children: ['people-group'],
+          on: {
+            press: [
+              {
+                action: 'validateForm',
+              },
+              {
+                action: 'run',
+              },
+            ],
+          },
+        },
+        'people-group': {
+          type: 'FieldGroup',
+          props: {},
+          children: ['people-field'],
+        },
+        'people-field': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/people',
+            label: 'People',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help someone with a list of person records get a one-sentence persona summary for each person.',
+      title: 'Summarize each person',
+      composition:
+        'Use one centred, generously spaced column with a single Composer, columns="1". Its h1 is “Summarize each person” and its muted line is “Work from a list of person records.” The raised panel contains one untitled FieldGroup with the delegated people control; no additional headings, cards or decoration. Keep the Composer’s action row visible at the panel’s foot, with host-provided timing and the sole run control. Set runLabel="Summarize people" and bind on.press to validateForm then run, with no additional gate. Below the panel, use one Composer note: “Full names and countries of origin alongside each summary.” Build nothing outside the composer or around the host’s frame.',
+      regions: [
+        {
+          title: null,
+          purpose:
+            'Present the job, collect the complete list of people, and run the summaries from one quiet workspace.',
+          container: 'Composer',
+          elements: [
+            'Composer headline: “Summarize each person”; muted line: “Work from a list of person records.”',
+            'FieldGroup, untitled, containing only MthdsField for /inputs/people.',
+            'MthdsField at /inputs/people, two-way bound; label="People"; retain the descriptor’s description and required validation.',
+            'Composer action row: host-provided timing and runLabel="Summarize people"; on.press: validateForm then run.',
+            'Composer notes: “Full names and countries of origin alongside each summary.”',
+          ],
+        },
+      ],
+      call_to_action: 'Summarize people',
+      defaults: [],
+      delegated: [
+        '/inputs/people — required list of person records; explicitly delegated to MthdsField.',
       ],
     },
   },

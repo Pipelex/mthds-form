@@ -1100,369 +1100,6 @@ export const SPECS: SpecFixture[] = [
     pipeRef: 'trip_planner.plan_trip',
     producer: 'pipelex-method',
     model: 'gpt-6.1-sol',
-    seed: 'Q4eaSXO3R9XtI5uJU51rhTOFfRL4Byy7',
-    frame: 'composer',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/trip_planner.plan_trip.composer.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"trip-composer"}\n{"op":"add","path":"/elements/trip-composer","value":{"type":"Composer","props":{"headline":"Plan your trip, day by day","lede":"A day-by-day itinerary built around your budget.","columns":"1","runLabel":"Plan my trip","notes":["An itinerary for each day","Estimated costs by category and in total","Practical notes for getting around"]},"children":["trip-groups"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/trip-groups","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"children":["essentials","travelling-party","your-days"]}}\n{"op":"add","path":"/elements/essentials","value":{"type":"FieldGroup","props":{"title":"The essentials"},"children":["essentials-grid","trip-name"]}}\n{"op":"add","path":"/elements/essentials-grid","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["city","country","arrival","departure","budget","currency"]}}\n{"op":"add","path":"/elements/city","value":{"type":"Input","props":{"label":"City","name":"city","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Enter a city."}]},"children":[]}}\n{"op":"add","path":"/elements/country","value":{"type":"Select","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"},"checks":[{"type":"required","message":"Choose a country."}]},"children":[]}}\n{"op":"add","path":"/elements/arrival","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on","label":"Arrival"},"children":[]}}\n{"op":"add","path":"/elements/departure","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on","label":"Departure"},"children":[]}}\n{"op":"add","path":"/elements/budget","value":{"type":"NumberInput","props":{"label":"Total trip budget","name":"budget","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/currency","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/trip-name","value":{"type":"Input","props":{"label":"Trip name","name":"title","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Give your trip a name."}]},"children":[]}}\n{"op":"add","path":"/elements/travelling-party","value":{"type":"FieldGroup","props":{"title":"Who’s going"},"children":["travellers","party-needs-grid"]}}\n{"op":"add","path":"/elements/travellers","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers","label":"Travellers"},"children":[]}}\n{"op":"add","path":"/elements/party-needs-grid","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["with-children","accessibility-field"]}}\n{"op":"add","path":"/elements/with-children","value":{"type":"Checkbox","props":{"label":"Children are travelling","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility-field","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm"},"children":["accessibility","accessibility-hint"]}}\n{"op":"add","path":"/elements/accessibility","value":{"type":"Input","props":{"label":"Accessibility needs","name":"accessibility","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility-hint","value":{"type":"Text","props":{"text":"Mobility or accessibility needs the plan should respect.","variant":"muted"},"children":[]}}\n{"op":"add","path":"/elements/your-days","value":{"type":"FieldGroup","props":{"title":"Your days"},"children":["pace","trip-focus","more-direction"]}}\n{"op":"add","path":"/elements/pace","value":{"type":"Segmented","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/trip-focus","value":{"type":"Segmented","props":{"label":"Trip focus","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/more-direction","value":{"type":"Collapsible","props":{"title":"A little more direction","defaultOpen":false},"children":["direction-fields"]}}\n{"op":"add","path":"/elements/direction-fields","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["must-see","notes","inspiration"]}}\n{"op":"add","path":"/elements/must-see","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see","label":"Places not to miss"},"children":[]}}\n{"op":"add","path":"/elements/notes","value":{"type":"Textarea","props":{"label":"Anything else","name":"notes","rows":4,"value":{"$bindState":"/inputs/request/notes"}},"children":[]}}\n{"op":"add","path":"/elements/inspiration","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration","label":"Inspiration image"},"children":[]}}',
-    spec: {
-      root: 'trip-composer',
-      elements: {
-        'trip-composer': {
-          type: 'Composer',
-          props: {
-            headline: 'Plan your trip, day by day',
-            lede: 'A day-by-day itinerary built around your budget.',
-            columns: '1',
-            runLabel: 'Plan my trip',
-            notes: [
-              'An itinerary for each day',
-              'Estimated costs by category and in total',
-              'Practical notes for getting around',
-            ],
-          },
-          children: ['trip-groups'],
-          on: {
-            press: [
-              {
-                action: 'validateForm',
-              },
-              {
-                action: 'run',
-              },
-            ],
-          },
-        },
-        'trip-groups': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-          },
-          children: ['essentials', 'travelling-party', 'your-days'],
-        },
-        essentials: {
-          type: 'FieldGroup',
-          props: {
-            title: 'The essentials',
-          },
-          children: ['essentials-grid', 'trip-name'],
-        },
-        'essentials-grid': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'lg',
-          },
-          children: ['city', 'country', 'arrival', 'departure', 'budget', 'currency'],
-        },
-        city: {
-          type: 'Input',
-          props: {
-            label: 'City',
-            name: 'city',
-            value: {
-              $bindState: '/inputs/request/stay/city',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Enter a city.',
-              },
-            ],
-          },
-          children: [],
-        },
-        country: {
-          type: 'Select',
-          props: {
-            label: 'Country',
-            name: 'country',
-            options: ['France', 'Italy', 'Japan', 'Portugal', 'Spain', 'United States'],
-            value: {
-              $bindState: '/inputs/request/stay/country',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Choose a country.',
-              },
-            ],
-          },
-          children: [],
-        },
-        arrival: {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/request/stay/arriving_on',
-            label: 'Arrival',
-          },
-          children: [],
-        },
-        departure: {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/request/stay/leaving_on',
-            label: 'Departure',
-          },
-          children: [],
-        },
-        budget: {
-          type: 'NumberInput',
-          props: {
-            label: 'Total trip budget',
-            name: 'budget',
-            value: {
-              $bindState: '/inputs/request/budget',
-            },
-          },
-          children: [],
-        },
-        currency: {
-          type: 'Segmented',
-          props: {
-            label: 'Currency',
-            name: 'currency',
-            options: ['EUR', 'USD', 'GBP', 'JPY'],
-            value: {
-              $bindState: '/inputs/request/currency',
-            },
-          },
-          children: [],
-        },
-        'trip-name': {
-          type: 'Input',
-          props: {
-            label: 'Trip name',
-            name: 'title',
-            value: {
-              $bindState: '/inputs/request/title',
-            },
-            checks: [
-              {
-                type: 'required',
-                message: 'Give your trip a name.',
-              },
-            ],
-          },
-          children: [],
-        },
-        'travelling-party': {
-          type: 'FieldGroup',
-          props: {
-            title: 'Who’s going',
-          },
-          children: ['travellers', 'party-needs-grid'],
-        },
-        travellers: {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/request/travellers',
-            label: 'Travellers',
-          },
-          children: [],
-        },
-        'party-needs-grid': {
-          type: 'Grid',
-          props: {
-            columns: 2,
-            gap: 'lg',
-          },
-          children: ['with-children', 'accessibility-field'],
-        },
-        'with-children': {
-          type: 'Checkbox',
-          props: {
-            label: 'Children are travelling',
-            name: 'with_children',
-            checked: {
-              $bindState: '/inputs/request/with_children',
-            },
-          },
-          children: [],
-        },
-        'accessibility-field': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-          },
-          children: ['accessibility', 'accessibility-hint'],
-        },
-        accessibility: {
-          type: 'Input',
-          props: {
-            label: 'Accessibility needs',
-            name: 'accessibility',
-            value: {
-              $bindState: '/inputs/request/accessibility',
-            },
-          },
-          children: [],
-        },
-        'accessibility-hint': {
-          type: 'Text',
-          props: {
-            text: 'Mobility or accessibility needs the plan should respect.',
-            variant: 'muted',
-          },
-          children: [],
-        },
-        'your-days': {
-          type: 'FieldGroup',
-          props: {
-            title: 'Your days',
-          },
-          children: ['pace', 'trip-focus', 'more-direction'],
-        },
-        pace: {
-          type: 'Segmented',
-          props: {
-            label: 'Pace',
-            name: 'pace',
-            options: ['slow', 'balanced', 'packed'],
-            value: {
-              $bindState: '/inputs/request/pace',
-            },
-          },
-          children: [],
-        },
-        'trip-focus': {
-          type: 'Segmented',
-          props: {
-            label: 'Trip focus',
-            name: 'style',
-            options: ['culture', 'food', 'nature', 'nightlife', 'family'],
-            value: {
-              $bindState: '/inputs/request/style',
-            },
-          },
-          children: [],
-        },
-        'more-direction': {
-          type: 'Collapsible',
-          props: {
-            title: 'A little more direction',
-            defaultOpen: false,
-          },
-          children: ['direction-fields'],
-        },
-        'direction-fields': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['must-see', 'notes', 'inspiration'],
-        },
-        'must-see': {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/request/stay/must_see',
-            label: 'Places not to miss',
-          },
-          children: [],
-        },
-        notes: {
-          type: 'Textarea',
-          props: {
-            label: 'Anything else',
-            name: 'notes',
-            rows: 4,
-            value: {
-              $bindState: '/inputs/request/notes',
-            },
-          },
-          children: [],
-        },
-        inspiration: {
-          type: 'MthdsField',
-          props: {
-            path: '/inputs/inspiration',
-            label: 'Inspiration image',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        'Help a traveller turn their destination, dates and total budget into a day-by-day trip that suits the people going.',
-      title: 'Plan your trip, day by day',
-      composition:
-        'Use one centred Composer with a short h1, the line “A day-by-day itinerary built around your budget.”, and one raised panel; add nothing outside the host’s frame. Set Composer columns to 1 and stack three untitled-surface FieldGroups with generous space between them: The essentials, Who’s going, and Your days. Within the groups, pair related controls in two-column Grids that stack on narrow screens; keep the traveller editor and the five-option trip-style control full width. Put destination, dates and budget before the trip name so the headline’s promise is visible in the first rows. Fold only the optional places, notes and image into “A little more direction” at the end. The Composer’s persistent action row is the sole run location, with on.press executing validateForm then run. Use no cards, icons, extra headings or decorative copy; let the components provide light and dark styling.',
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Carry the page’s single headline, the input panel and the sole run action, then state once what the itinerary includes.',
-          container: 'Composer',
-          elements: [
-            'Composer: title “Plan your trip, day by day”; subtitle “A day-by-day itinerary built around your budget.”; columns=1; holds The essentials, Who’s going, and Your days FieldGroups in that order.',
-            'Composer: runLabel “Plan my trip”; on.press: validateForm then run; retain the host-provided timing and persistent action row without additional status text.',
-            'Composer: notes “An itinerary for each day”, “Estimated costs by category and in total”, “Practical notes for getting around”; display beneath the panel in the Composer’s two-column notes layout.',
-          ],
-        },
-        {
-          title: 'The essentials',
-          purpose: 'Collect where, when and how much first, then give the trip its name.',
-          container: 'FieldGroup',
-          elements: [
-            'Grid: two columns, containing City and Country in the first row, Arrival and Departure in the second, Total trip budget and Currency in the third; stack in the same order on narrow screens.',
-            'Input: $bindState /inputs/request/stay/city; label “City”; required.',
-            'Select: $bindState /inputs/request/stay/country; label “Country”; options exactly "France", "Italy", "Japan", "Portugal", "Spain", "United States"; required. Use a dropdown because the six country names do not fit comfortably in one row.',
-            'MthdsField: path /inputs/request/stay/arriving_on; label “Arrival”; delegated date control.',
-            'MthdsField: path /inputs/request/stay/leaving_on; label “Departure”; delegated date control.',
-            'NumberInput: $bindState /inputs/request/budget; label “Total trip budget”; required; no unit, min, max or step.',
-            'Segmented: $bindState /inputs/request/currency; label “Currency”; options exactly "EUR", "USD", "GBP", "JPY"; required.',
-            'Input: $bindState /inputs/request/title; label “Trip name”; required; full width below the Grid.',
-          ],
-        },
-        {
-          title: 'Who’s going',
-          purpose:
-            'Keep the traveller list together with needs that affect whether the itinerary works for everyone.',
-          container: 'FieldGroup',
-          elements: [
-            'MthdsField: path /inputs/request/travellers; label “Travellers”; delegated list of traveller structures; full width.',
-            'Grid: two columns holding Children are travelling and Accessibility needs; stack in that order on narrow screens.',
-            'Checkbox: $bindState /inputs/request/with_children; label “Children are travelling”; optional.',
-            'Input: $bindState /inputs/request/accessibility; label “Accessibility needs”; hint “Mobility or accessibility needs the plan should respect.”; optional.',
-          ],
-        },
-        {
-          title: 'Your days',
-          purpose:
-            'Choose the rhythm and focus of the itinerary, with optional inspiration available without crowding the main decisions.',
-          container: 'FieldGroup',
-          elements: [
-            'Segmented: $bindState /inputs/request/pace; label “Pace”; options exactly "slow", "balanced", "packed"; required; full width.',
-            'Segmented: $bindState /inputs/request/style; label “Trip focus”; options exactly "culture", "food", "nature", "nightlife", "family"; required; full width.',
-            'Collapsible: trigger “A little more direction”; initially closed using component-local state; holds a Stack with Places not to miss, Anything else, and Inspiration image in that order.',
-            'MthdsField: path /inputs/request/stay/must_see; label “Places not to miss”; delegated optional list of text, inside the Collapsible.',
-            'Textarea: $bindState /inputs/request/notes; label “Anything else”; optional markdown prose, inside the Collapsible.',
-            'MthdsField: path /inputs/inspiration; label “Inspiration image”; delegated optional image file, inside the Collapsible.',
-          ],
-        },
-      ],
-      call_to_action: 'Plan my trip',
-      defaults: [],
-      delegated: [
-        '/inputs/request/stay/arriving_on — date; explicitly delegated to MthdsField.',
-        '/inputs/request/stay/leaving_on — date; explicitly delegated to MthdsField.',
-        '/inputs/request/stay/must_see — list of text; explicitly delegated to MthdsField.',
-        '/inputs/request/travellers — list of traveller structures; explicitly delegated to MthdsField.',
-        '/inputs/inspiration — image file; explicitly delegated to MthdsField.',
-      ],
-    },
-  },
-  {
-    pipeRef: 'trip_planner.plan_trip',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
     seed: 'L2drbcRMq51Iio3P9XQ0qAKqWA5HEbCN',
     frame: 'composer',
     style: 'editorial',
@@ -1799,276 +1436,6 @@ export const SPECS: SpecFixture[] = [
         '/inputs/request/travellers — required traveller list; delegated by the brief.',
         '/inputs/inspiration — optional image file; delegated by the brief.',
       ],
-    },
-  },
-  {
-    pipeRef: 'trip_planner.plan_trip',
-    producer: 'pipelex-method',
-    model: 'gpt-6.1-sol',
-    seed: 'TdevbiOcR9Z8fmzEML6RpBRIX5QYucry',
-    frame: 'result',
-    style: 'quiet',
-    promptHash: '30cf9bc059f6',
-    date: '2026-11-07',
-    brief: 'data/briefs/trip_planner.plan_trip.result.quiet.md',
-    jsonl:
-      '{"op":"add","path":"/root","value":"trip-page"}\n{"op":"add","path":"/elements/trip-page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["trip-introduction","estimated-costs","daily-itinerary","preparation-notes"]}}\n{"op":"add","path":"/elements/trip-introduction","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["trip-header"]}}\n{"op":"add","path":"/elements/trip-header","value":{"type":"ResultHeader","props":{"title":{"$state":"/result/title"},"subtitle":{"$state":"/result/overview"}},"children":[]}}\n{"op":"add","path":"/elements/estimated-costs","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg","align":"stretch"},"children":["trip-cost-bar"]}}\n{"op":"add","path":"/elements/trip-cost-bar","value":{"type":"ProportionBar","props":{"label":"Estimated trip cost","total":{"$state":"/result/estimated_total"},"items":{"$state":"/result/costs"},"labelKey":"category","valueKey":"amount","unit":{"$state":"/result/currency"}},"children":[]}}\n{"op":"add","path":"/elements/daily-itinerary","value":{"type":"Section","props":{"title":"Day by day"},"children":["day-rows"]}}\n{"op":"add","path":"/elements/day-rows","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl"},"repeat":{"statePath":"/result/days","key":"day"},"children":["day-split","day-separator"]}}\n{"op":"add","path":"/elements/day-split","value":{"type":"Split","props":{"ratio":"1:2","gap":"xl"},"children":["day-heading","day-activities"]}}\n{"op":"add","path":"/elements/day-heading","value":{"type":"Stack","props":{"direction":"vertical","gap":"sm","align":"start"},"children":["day-date","day-title"]}}\n{"op":"add","path":"/elements/day-date","value":{"type":"DateText","props":{"value":{"$item":"day"},"style":"long","tone":"muted"},"children":[]}}\n{"op":"add","path":"/elements/day-title","value":{"type":"Heading","props":{"text":{"$item":"title"},"level":"h3"},"children":[]}}\n{"op":"add","path":"/elements/day-activities","value":{"type":"Stack","props":{"direction":"vertical","gap":"md"},"children":["morning-activity","lunch-activity","afternoon-activity","evening-activity"]}}\n{"op":"add","path":"/elements/morning-activity","value":{"type":"Detail","props":{"label":"Morning","value":{"$item":"morning"}},"children":[]}}\n{"op":"add","path":"/elements/lunch-activity","value":{"type":"Detail","props":{"label":"Lunch","value":{"$item":"midday"}},"children":[]}}\n{"op":"add","path":"/elements/afternoon-activity","value":{"type":"Detail","props":{"label":"Afternoon","value":{"$item":"afternoon"}},"children":[]}}\n{"op":"add","path":"/elements/evening-activity","value":{"type":"Detail","props":{"label":"Evening","value":{"$item":"evening"}},"children":[]}}\n{"op":"add","path":"/elements/day-separator","value":{"type":"Separator","props":{"orientation":"horizontal"},"children":[]}}\n{"op":"add","path":"/elements/preparation-notes","value":{"type":"Section","props":{"title":"Before you go"},"children":["practical-notes-list"]}}\n{"op":"add","path":"/elements/practical-notes-list","value":{"type":"TextList","props":{"items":{"$state":"/result/practical_notes"},"marker":"bullet"},"children":[]}}',
-    spec: {
-      root: 'trip-page',
-      elements: {
-        'trip-page': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-            align: 'stretch',
-          },
-          children: [
-            'trip-introduction',
-            'estimated-costs',
-            'daily-itinerary',
-            'preparation-notes',
-          ],
-        },
-        'trip-introduction': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-          },
-          children: ['trip-header'],
-        },
-        'trip-header': {
-          type: 'ResultHeader',
-          props: {
-            title: {
-              $state: '/result/title',
-            },
-            subtitle: {
-              $state: '/result/overview',
-            },
-          },
-          children: [],
-        },
-        'estimated-costs': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'lg',
-            align: 'stretch',
-          },
-          children: ['trip-cost-bar'],
-        },
-        'trip-cost-bar': {
-          type: 'ProportionBar',
-          props: {
-            label: 'Estimated trip cost',
-            total: {
-              $state: '/result/estimated_total',
-            },
-            items: {
-              $state: '/result/costs',
-            },
-            labelKey: 'category',
-            valueKey: 'amount',
-            unit: {
-              $state: '/result/currency',
-            },
-          },
-          children: [],
-        },
-        'daily-itinerary': {
-          type: 'Section',
-          props: {
-            title: 'Day by day',
-          },
-          children: ['day-rows'],
-        },
-        'day-rows': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'xl',
-          },
-          repeat: {
-            statePath: '/result/days',
-            key: 'day',
-          },
-          children: ['day-split', 'day-separator'],
-        },
-        'day-split': {
-          type: 'Split',
-          props: {
-            ratio: '1:2',
-            gap: 'xl',
-          },
-          children: ['day-heading', 'day-activities'],
-        },
-        'day-heading': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'sm',
-            align: 'start',
-          },
-          children: ['day-date', 'day-title'],
-        },
-        'day-date': {
-          type: 'DateText',
-          props: {
-            value: {
-              $item: 'day',
-            },
-            style: 'long',
-            tone: 'muted',
-          },
-          children: [],
-        },
-        'day-title': {
-          type: 'Heading',
-          props: {
-            text: {
-              $item: 'title',
-            },
-            level: 'h3',
-          },
-          children: [],
-        },
-        'day-activities': {
-          type: 'Stack',
-          props: {
-            direction: 'vertical',
-            gap: 'md',
-          },
-          children: [
-            'morning-activity',
-            'lunch-activity',
-            'afternoon-activity',
-            'evening-activity',
-          ],
-        },
-        'morning-activity': {
-          type: 'Detail',
-          props: {
-            label: 'Morning',
-            value: {
-              $item: 'morning',
-            },
-          },
-          children: [],
-        },
-        'lunch-activity': {
-          type: 'Detail',
-          props: {
-            label: 'Lunch',
-            value: {
-              $item: 'midday',
-            },
-          },
-          children: [],
-        },
-        'afternoon-activity': {
-          type: 'Detail',
-          props: {
-            label: 'Afternoon',
-            value: {
-              $item: 'afternoon',
-            },
-          },
-          children: [],
-        },
-        'evening-activity': {
-          type: 'Detail',
-          props: {
-            label: 'Evening',
-            value: {
-              $item: 'evening',
-            },
-          },
-          children: [],
-        },
-        'day-separator': {
-          type: 'Separator',
-          props: {
-            orientation: 'horizontal',
-          },
-          children: [],
-        },
-        'preparation-notes': {
-          type: 'Section',
-          props: {
-            title: 'Before you go',
-          },
-          children: ['practical-notes-list'],
-        },
-        'practical-notes-list': {
-          type: 'TextList',
-          props: {
-            items: {
-              $state: '/result/practical_notes',
-            },
-            marker: 'bullet',
-          },
-          children: [],
-        },
-      },
-    },
-    plan: {
-      purpose:
-        "Help a traveler move from a trip idea to a usable daily plan, seeing the estimated spend first and then reading each day's activities in order.",
-      title: 'Your trip, day by day',
-      composition:
-        'Use a full-width, quiet reading layout with generous space between three groups: estimated costs, the daily itinerary, and practical notes. Open with a ResultHeader whose sole h1 reads /result/title and whose muted line reads /result/overview; leave its action area to the host. Place one full-width ProportionBar immediately below it, making the estimated total the first prominent figure without repeating it elsewhere. Follow with open, hairline-separated day rows: each row uses a 1:2 Split with the date and day title on the left and the chronological activity details on the right, stacking in that order on narrow screens. Keep every day visible, omit empty activity lines, and finish with a short, unboxed notes list; add no navigation, request summary, persistent side panel, or run control.',
-      regions: [
-        {
-          title: null,
-          purpose:
-            'Name the generated trip and introduce its character without restating the request.',
-          container: 'Stack',
-          elements: [
-            'ResultHeader: title reads { "$state": "/result/title" }; subtitle reads { "$state": "/result/overview" }; no eyebrow; the title is the page\'s only h1; reserve the component\'s action area for the host.',
-          ],
-        },
-        {
-          title: null,
-          purpose:
-            'Show the estimated trip cost and where the money goes before the traveler starts reading the schedule.',
-          container: 'Stack',
-          elements: [
-            'ProportionBar: label "Estimated trip cost"; total reads { "$state": "/result/estimated_total" }; items reads { "$state": "/result/costs" }; labelKey "category"; valueKey "amount"; unit reads { "$state": "/result/currency" }; no ceiling. Show each category\'s amount only in the component\'s legend.',
-          ],
-        },
-        {
-          title: 'Day by day',
-          purpose:
-            "Make the itinerary readable as consecutive days, with each day's activities in chronological order and room for longer descriptions.",
-          container: 'Section',
-          elements: [
-            'Section: h2 "Day by day"; holds a Stack repeating over { "$state": "/result/days" } in source order; no section number or helper line.',
-            'Stack: each repeated day holds a Split with ratio "1:2", followed by a Separator between days only.',
-            'Split: exactly two Stack children; the first holds DateText and Heading, and the second holds four Detail components.',
-            'DateText: value reads { "$item": "day" }; format "long"; tone "muted"; appears above the day title.',
-            'Heading: h3 reads { "$item": "title" }.',
-            'Detail: label "Morning"; value reads { "$item": "morning" }; hides when empty.',
-            'Detail: label "Lunch"; value reads { "$item": "midday" }; hides when empty.',
-            'Detail: label "Afternoon"; value reads { "$item": "afternoon" }; hides when empty.',
-            'Detail: label "Evening"; value reads { "$item": "evening" }; hides when empty.',
-          ],
-        },
-        {
-          title: 'Before you go',
-          purpose:
-            'Collect booking, transport, and comfort advice after the schedule, where it supports preparation without interrupting the daily plan.',
-          container: 'Section',
-          elements: [
-            'Section: h2 "Before you go"; holds TextList; no section number or helper line.',
-            'TextList: items reads { "$state": "/result/practical_notes" }; dot markers; preserve source order.',
-          ],
-        },
-      ],
-      call_to_action: null,
-      defaults: null,
-      delegated: null,
     },
   },
   {
@@ -2802,6 +2169,560 @@ export const SPECS: SpecFixture[] = [
           elements: [
             'Section — h2 title "Before you go"; contains TextList.',
             'TextList — items read /result/practical_notes with $state; dot markers; preserve list order.',
+          ],
+        },
+      ],
+      call_to_action: null,
+      defaults: null,
+      delegated: null,
+    },
+  },
+  {
+    pipeRef: 'trip_planner.plan_trip',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'JCnSZV5hY5pn5gHuRpTayf2qQAgcRwC5',
+    frame: 'composer',
+    style: 'quiet',
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/trip_planner.plan_trip.composer.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"trip-composer"}\n{"op":"add","path":"/elements/trip-composer","value":{"type":"Composer","props":{"headline":"Plan your trip, day by day","lede":"Build an itinerary around your budget and the way you like to travel.","runLabel":"Plan my trip","columns":"2","notes":["A day-by-day itinerary","Estimated costs and practical travel notes"]},"children":["where-and-when","budget-and-rhythm","who-is-going","make-it-yours"],"on":{"press":[{"action":"validateForm"},{"action":"run"}]}}}\n{"op":"add","path":"/elements/where-and-when","value":{"type":"FieldGroup","props":{"title":"Where and when"},"children":["city","country","travel-dates","trip-name"]}}\n{"op":"add","path":"/elements/city","value":{"type":"Input","props":{"label":"City","name":"city","value":{"$bindState":"/inputs/request/stay/city"},"checks":[{"type":"required","message":"Enter a city."}]},"children":[]}}\n{"op":"add","path":"/elements/country","value":{"type":"Select","props":{"label":"Country","name":"country","options":["France","Italy","Japan","Portugal","Spain","United States"],"value":{"$bindState":"/inputs/request/stay/country"},"checks":[{"type":"required","message":"Choose a country."}]},"children":[]}}\n{"op":"add","path":"/elements/travel-dates","value":{"type":"Grid","props":{"columns":2,"gap":"lg"},"children":["arrival-date","departure-date"]}}\n{"op":"add","path":"/elements/arrival-date","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/arriving_on"},"children":[]}}\n{"op":"add","path":"/elements/departure-date","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/leaving_on"},"children":[]}}\n{"op":"add","path":"/elements/trip-name","value":{"type":"Input","props":{"label":"Trip name","name":"title","value":{"$bindState":"/inputs/request/title"},"checks":[{"type":"required","message":"Give your trip a name."}]},"children":[]}}\n{"op":"add","path":"/elements/budget-and-rhythm","value":{"type":"FieldGroup","props":{"title":"Budget and rhythm"},"children":["trip-budget","currency","pace","focus"]}}\n{"op":"add","path":"/elements/trip-budget","value":{"type":"NumberInput","props":{"label":"Total trip budget","name":"budget","value":{"$bindState":"/inputs/request/budget"}},"children":[]}}\n{"op":"add","path":"/elements/currency","value":{"type":"Segmented","props":{"label":"Currency","name":"currency","options":["EUR","USD","GBP","JPY"],"value":{"$bindState":"/inputs/request/currency"}},"children":[]}}\n{"op":"add","path":"/elements/pace","value":{"type":"Segmented","props":{"label":"Pace","name":"pace","options":["slow","balanced","packed"],"value":{"$bindState":"/inputs/request/pace"}},"children":[]}}\n{"op":"add","path":"/elements/focus","value":{"type":"Segmented","props":{"label":"Focus","name":"style","options":["culture","food","nature","nightlife","family"],"value":{"$bindState":"/inputs/request/style"}},"children":[]}}\n{"op":"add","path":"/elements/who-is-going","value":{"type":"FieldGroup","props":{"title":"Who’s going"},"children":["travellers","with-children","accessibility"]}}\n{"op":"add","path":"/elements/travellers","value":{"type":"MthdsField","props":{"path":"/inputs/request/travellers"},"children":[]}}\n{"op":"add","path":"/elements/with-children","value":{"type":"Checkbox","props":{"label":"Children are travelling","name":"with_children","checked":{"$bindState":"/inputs/request/with_children"}},"children":[]}}\n{"op":"add","path":"/elements/accessibility","value":{"type":"Input","props":{"label":"Mobility or accessibility needs","name":"accessibility","value":{"$bindState":"/inputs/request/accessibility"}},"children":[]}}\n{"op":"add","path":"/elements/make-it-yours","value":{"type":"FieldGroup","props":{"title":"Make it yours"},"children":["must-see-places","additional-notes","inspiration-image"]}}\n{"op":"add","path":"/elements/must-see-places","value":{"type":"MthdsField","props":{"path":"/inputs/request/stay/must_see"},"children":[]}}\n{"op":"add","path":"/elements/additional-notes","value":{"type":"Textarea","props":{"label":"Anything else to know?","name":"notes","rows":4,"value":{"$bindState":"/inputs/request/notes"}},"children":[]}}\n{"op":"add","path":"/elements/inspiration-image","value":{"type":"MthdsField","props":{"path":"/inputs/inspiration"},"children":[]}}',
+    spec: {
+      root: 'trip-composer',
+      elements: {
+        'trip-composer': {
+          type: 'Composer',
+          props: {
+            headline: 'Plan your trip, day by day',
+            lede: 'Build an itinerary around your budget and the way you like to travel.',
+            runLabel: 'Plan my trip',
+            columns: '2',
+            notes: ['A day-by-day itinerary', 'Estimated costs and practical travel notes'],
+          },
+          children: ['where-and-when', 'budget-and-rhythm', 'who-is-going', 'make-it-yours'],
+          on: {
+            press: [
+              {
+                action: 'validateForm',
+              },
+              {
+                action: 'run',
+              },
+            ],
+          },
+        },
+        'where-and-when': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Where and when',
+          },
+          children: ['city', 'country', 'travel-dates', 'trip-name'],
+        },
+        city: {
+          type: 'Input',
+          props: {
+            label: 'City',
+            name: 'city',
+            value: {
+              $bindState: '/inputs/request/stay/city',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Enter a city.',
+              },
+            ],
+          },
+          children: [],
+        },
+        country: {
+          type: 'Select',
+          props: {
+            label: 'Country',
+            name: 'country',
+            options: ['France', 'Italy', 'Japan', 'Portugal', 'Spain', 'United States'],
+            value: {
+              $bindState: '/inputs/request/stay/country',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Choose a country.',
+              },
+            ],
+          },
+          children: [],
+        },
+        'travel-dates': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'lg',
+          },
+          children: ['arrival-date', 'departure-date'],
+        },
+        'arrival-date': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/request/stay/arriving_on',
+          },
+          children: [],
+        },
+        'departure-date': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/request/stay/leaving_on',
+          },
+          children: [],
+        },
+        'trip-name': {
+          type: 'Input',
+          props: {
+            label: 'Trip name',
+            name: 'title',
+            value: {
+              $bindState: '/inputs/request/title',
+            },
+            checks: [
+              {
+                type: 'required',
+                message: 'Give your trip a name.',
+              },
+            ],
+          },
+          children: [],
+        },
+        'budget-and-rhythm': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Budget and rhythm',
+          },
+          children: ['trip-budget', 'currency', 'pace', 'focus'],
+        },
+        'trip-budget': {
+          type: 'NumberInput',
+          props: {
+            label: 'Total trip budget',
+            name: 'budget',
+            value: {
+              $bindState: '/inputs/request/budget',
+            },
+          },
+          children: [],
+        },
+        currency: {
+          type: 'Segmented',
+          props: {
+            label: 'Currency',
+            name: 'currency',
+            options: ['EUR', 'USD', 'GBP', 'JPY'],
+            value: {
+              $bindState: '/inputs/request/currency',
+            },
+          },
+          children: [],
+        },
+        pace: {
+          type: 'Segmented',
+          props: {
+            label: 'Pace',
+            name: 'pace',
+            options: ['slow', 'balanced', 'packed'],
+            value: {
+              $bindState: '/inputs/request/pace',
+            },
+          },
+          children: [],
+        },
+        focus: {
+          type: 'Segmented',
+          props: {
+            label: 'Focus',
+            name: 'style',
+            options: ['culture', 'food', 'nature', 'nightlife', 'family'],
+            value: {
+              $bindState: '/inputs/request/style',
+            },
+          },
+          children: [],
+        },
+        'who-is-going': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Who’s going',
+          },
+          children: ['travellers', 'with-children', 'accessibility'],
+        },
+        travellers: {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/request/travellers',
+          },
+          children: [],
+        },
+        'with-children': {
+          type: 'Checkbox',
+          props: {
+            label: 'Children are travelling',
+            name: 'with_children',
+            checked: {
+              $bindState: '/inputs/request/with_children',
+            },
+          },
+          children: [],
+        },
+        accessibility: {
+          type: 'Input',
+          props: {
+            label: 'Mobility or accessibility needs',
+            name: 'accessibility',
+            value: {
+              $bindState: '/inputs/request/accessibility',
+            },
+          },
+          children: [],
+        },
+        'make-it-yours': {
+          type: 'FieldGroup',
+          props: {
+            title: 'Make it yours',
+          },
+          children: ['must-see-places', 'additional-notes', 'inspiration-image'],
+        },
+        'must-see-places': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/request/stay/must_see',
+          },
+          children: [],
+        },
+        'additional-notes': {
+          type: 'Textarea',
+          props: {
+            label: 'Anything else to know?',
+            name: 'notes',
+            rows: 4,
+            value: {
+              $bindState: '/inputs/request/notes',
+            },
+          },
+          children: [],
+        },
+        'inspiration-image': {
+          type: 'MthdsField',
+          props: {
+            path: '/inputs/inspiration',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help someone planning a getaway turn their destination, budget and travelling needs into a day-by-day trip they can afford.',
+      title: 'Plan your trip, day by day',
+      composition:
+        'Use one centred Composer with the headline and the line “Build an itinerary around your budget and the way you like to travel.” above its single raised panel. Set columns to 2: the first row pairs “Where and when” on the left with “Budget and rhythm” on the right, making destination and budget visible first; the second row pairs “Who’s going” with “Make it yours”. Each column holds a FieldGroup with generously spaced controls, no inner cards or decoration; on narrow screens stack the groups in that reading order. Keep all inputs visible rather than using tabs or disclosure. The Composer’s sticky foot contains the host’s timing and the sole run control; beneath the panel, use two short Composer notes: “A day-by-day itinerary” and “Estimated costs and practical travel notes”.',
+      regions: [
+        {
+          title: null,
+          purpose:
+            'Carry the page’s only headline, the input panel and the host’s single run action without adding any surrounding chrome.',
+          container: 'Composer',
+          elements: [
+            'Composer: title “Plan your trip, day by day”; description “Build an itinerary around your budget and the way you like to travel.”; columns 2; holds the four FieldGroup regions in the listed order.',
+            'Composer: runLabel “Plan my trip”; on.press validates with validateForm, then calls run; host action row stays visible while the panel scrolls.',
+            'Composer: notes “A day-by-day itinerary” and “Estimated costs and practical travel notes”.',
+          ],
+        },
+        {
+          title: 'Where and when',
+          purpose: 'Start with the destination and travel dates, then give the trip a name.',
+          container: 'FieldGroup',
+          elements: [
+            'Input — /inputs/request/stay/city — label “City”; required.',
+            'Select — /inputs/request/stay/country — label “Country”; options exactly “France”, “Italy”, “Japan”, “Portugal”, “Spain”, “United States”; required.',
+            'Grid: two columns holding the arrival and departure MthdsField controls; stack on narrow screens.',
+            'MthdsField — /inputs/request/stay/arriving_on — label “Arrive”; required delegated date.',
+            'MthdsField — /inputs/request/stay/leaving_on — label “Leave”; required delegated date.',
+            'Input — /inputs/request/title — label “Trip name”; required.',
+          ],
+        },
+        {
+          title: 'Budget and rhythm',
+          purpose:
+            'Put the spending limit beside the destination, followed by the choices that shape each day.',
+          container: 'FieldGroup',
+          elements: [
+            'NumberInput — /inputs/request/budget — label “Total trip budget”; required; no fixed unit or numeric bounds.',
+            'Segmented — /inputs/request/currency — label “Currency”; options exactly “EUR”, “USD”, “GBP”, “JPY”; required.',
+            'Segmented — /inputs/request/pace — label “Pace”; options exactly “slow”, “balanced”, “packed”; required.',
+            'Segmented — /inputs/request/style — label “Focus”; options exactly “culture”, “food”, “nature”, “nightlife”, “family”; required; keep the options on one row within the group.',
+          ],
+        },
+        {
+          title: 'Who’s going',
+          purpose:
+            'Collect the travellers and the needs that the itinerary must respect, without hiding them as advanced settings.',
+          container: 'FieldGroup',
+          elements: [
+            'MthdsField — /inputs/request/travellers — label “Travellers”; required delegated list of traveller structures.',
+            'Checkbox — /inputs/request/with_children — label “Children are travelling”; optional; does not reveal or hide other controls.',
+            'Input — /inputs/request/accessibility — label “Mobility or accessibility needs”; optional.',
+          ],
+        },
+        {
+          title: 'Make it yours',
+          purpose:
+            'Leave room for must-see places, personal context and an optional visual reference after the essentials.',
+          container: 'FieldGroup',
+          elements: [
+            'MthdsField — /inputs/request/stay/must_see — label “Must-see places”; optional delegated list of text.',
+            'Textarea — /inputs/request/notes — label “Anything else to know?”; optional markdown prose.',
+            'MthdsField — /inputs/inspiration — label “Inspiration image”; optional delegated image file.',
+          ],
+        },
+      ],
+      call_to_action: 'Plan my trip',
+      defaults: [],
+      delegated: [
+        '/inputs/request/stay/arriving_on — required date; brief mandates MthdsField.',
+        '/inputs/request/stay/leaving_on — required date; brief mandates MthdsField.',
+        '/inputs/request/stay/must_see — optional text list; brief mandates MthdsField.',
+        '/inputs/request/travellers — required list of traveller structures; brief mandates MthdsField.',
+        '/inputs/inspiration — optional image file; brief mandates MthdsField.',
+      ],
+    },
+  },
+  {
+    pipeRef: 'trip_planner.plan_trip',
+    producer: 'pipelex-method',
+    model: 'gpt-6.1-sol',
+    seed: 'UBn2EtjxXmDzD4gGJx38di72FNRszPu1',
+    frame: 'result',
+    style: 'quiet',
+    repairs: 1,
+    promptHash: '30cf9bc059f6',
+    date: '2026-11-08',
+    brief: 'data/briefs/trip_planner.plan_trip.result.quiet.md',
+    jsonl:
+      '{"op":"add","path":"/root","value":"page"}\n{"op":"add","path":"/elements/page","value":{"type":"Stack","props":{"direction":"vertical","gap":"xl","align":"stretch"},"children":["header-region","cost-region","days-grid","practical-notes"]}}\n{"op":"add","path":"/elements/header-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["trip-header"]}}\n{"op":"add","path":"/elements/trip-header","value":{"type":"ResultHeader","props":{"title":{"$state":"/result/title"},"subtitle":{"$state":"/result/overview"}},"children":[]}}\n{"op":"add","path":"/elements/cost-region","value":{"type":"Stack","props":{"direction":"vertical","gap":"lg"},"children":["estimated-cost"]}}\n{"op":"add","path":"/elements/estimated-cost","value":{"type":"ProportionBar","props":{"label":"Estimated trip cost","total":{"$state":"/result/estimated_total"},"items":{"$state":"/result/costs"},"labelKey":"category","valueKey":"amount","unit":{"$state":"/result/currency"}},"children":[]}}\n{"op":"add","path":"/elements/days-grid","value":{"type":"Grid","props":{"columns":2,"gap":"xl"},"repeat":{"statePath":"/result/days","key":"day"},"children":["day-plan"]}}\n{"op":"add","path":"/elements/day-plan","value":{"type":"Stack","props":{"direction":"vertical","gap":"md","align":"stretch"},"children":["day-date","day-title","morning-detail","lunch-detail","afternoon-detail","evening-detail"]}}\n{"op":"add","path":"/elements/day-date","value":{"type":"DateText","props":{"value":{"$item":"day"},"style":"long","tone":"muted"},"children":[]}}\n{"op":"add","path":"/elements/day-title","value":{"type":"Heading","props":{"text":{"$item":"title"},"level":"h2"},"children":[]}}\n{"op":"add","path":"/elements/morning-detail","value":{"type":"Detail","props":{"label":"Morning","value":{"$item":"morning"}},"children":[]}}\n{"op":"add","path":"/elements/lunch-detail","value":{"type":"Detail","props":{"label":"Lunch","value":{"$item":"midday"}},"children":[]}}\n{"op":"add","path":"/elements/afternoon-detail","value":{"type":"Detail","props":{"label":"Afternoon","value":{"$item":"afternoon"}},"children":[]}}\n{"op":"add","path":"/elements/evening-detail","value":{"type":"Detail","props":{"label":"Evening","value":{"$item":"evening"}},"children":[]}}\n{"op":"add","path":"/elements/practical-notes","value":{"type":"Section","props":{"title":"Good to know"},"children":["notes-list"]}}\n{"op":"add","path":"/elements/notes-list","value":{"type":"TextList","props":{"items":{"$state":"/result/practical_notes"},"marker":"bullet"},"children":[]}}',
+    spec: {
+      root: 'page',
+      elements: {
+        page: {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'xl',
+            align: 'stretch',
+          },
+          children: ['header-region', 'cost-region', 'days-grid', 'practical-notes'],
+        },
+        'header-region': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['trip-header'],
+        },
+        'trip-header': {
+          type: 'ResultHeader',
+          props: {
+            title: {
+              $state: '/result/title',
+            },
+            subtitle: {
+              $state: '/result/overview',
+            },
+          },
+          children: [],
+        },
+        'cost-region': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'lg',
+          },
+          children: ['estimated-cost'],
+        },
+        'estimated-cost': {
+          type: 'ProportionBar',
+          props: {
+            label: 'Estimated trip cost',
+            total: {
+              $state: '/result/estimated_total',
+            },
+            items: {
+              $state: '/result/costs',
+            },
+            labelKey: 'category',
+            valueKey: 'amount',
+            unit: {
+              $state: '/result/currency',
+            },
+          },
+          children: [],
+        },
+        'days-grid': {
+          type: 'Grid',
+          props: {
+            columns: 2,
+            gap: 'xl',
+          },
+          repeat: {
+            statePath: '/result/days',
+            key: 'day',
+          },
+          children: ['day-plan'],
+        },
+        'day-plan': {
+          type: 'Stack',
+          props: {
+            direction: 'vertical',
+            gap: 'md',
+            align: 'stretch',
+          },
+          children: [
+            'day-date',
+            'day-title',
+            'morning-detail',
+            'lunch-detail',
+            'afternoon-detail',
+            'evening-detail',
+          ],
+        },
+        'day-date': {
+          type: 'DateText',
+          props: {
+            value: {
+              $item: 'day',
+            },
+            style: 'long',
+            tone: 'muted',
+          },
+          children: [],
+        },
+        'day-title': {
+          type: 'Heading',
+          props: {
+            text: {
+              $item: 'title',
+            },
+            level: 'h2',
+          },
+          children: [],
+        },
+        'morning-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Morning',
+            value: {
+              $item: 'morning',
+            },
+          },
+          children: [],
+        },
+        'lunch-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Lunch',
+            value: {
+              $item: 'midday',
+            },
+          },
+          children: [],
+        },
+        'afternoon-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Afternoon',
+            value: {
+              $item: 'afternoon',
+            },
+          },
+          children: [],
+        },
+        'evening-detail': {
+          type: 'Detail',
+          props: {
+            label: 'Evening',
+            value: {
+              $item: 'evening',
+            },
+          },
+          children: [],
+        },
+        'practical-notes': {
+          type: 'Section',
+          props: {
+            title: 'Good to know',
+          },
+          children: ['notes-list'],
+        },
+        'notes-list': {
+          type: 'TextList',
+          props: {
+            items: {
+              $state: '/result/practical_notes',
+            },
+            marker: 'bullet',
+          },
+          children: [],
+        },
+      },
+    },
+    plan: {
+      purpose:
+        'Help a traveler turn their finished trip plan into an easy-to-follow daily itinerary, with the estimated cost visible before they start reading.',
+      title: 'Your trip, day by day',
+      composition:
+        "Use the full width as a calm, open itinerary, beginning with a ResultHeader whose h1 reads /result/title and whose supporting line reads /result/overview. Place one full-width cost breakdown immediately beneath it, showing the estimated total only there. Follow with an airy two-column grid of days in chronological, row-major order, collapsing to one column on narrow screens; each day opens with its date and title, followed by the day's activities. Keep every day open, separate the day blocks with generous space rather than cards, and finish with a full-width practical-notes section. Use only h1 and h2 headings, no decorative icons, and no additional host controls or request summary.",
+      regions: [
+        {
+          title: null,
+          purpose:
+            "Name the actual trip and introduce the plan, leaving the host's result actions in the header's action area.",
+          container: 'Stack',
+          elements: [
+            "ResultHeader: title reads /result/title with $state; supporting line reads /result/overview with $state; no eyebrow; the title is the page's only h1; retain the host-owned action area.",
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            'Make the estimated trip cost and its allocation visible before the daily plan, without suggesting a budget comparison that the result does not provide.',
+          container: 'Stack',
+          elements: [
+            'ProportionBar: label "Estimated trip cost"; total reads /result/estimated_total with $state; items read /result/costs with $state; labelKey "category"; valueKey "amount"; unit reads /result/currency with $state; category values are "stay", "food", "tickets", "transport", "buffer". Show the total and category amounts with the supplied currency, with no ceiling and no duplicate total elsewhere.',
+          ],
+        },
+        {
+          title: null,
+          purpose:
+            "Let the traveler read each day's activities in order, with neighboring days available for a quick comparison.",
+          container: 'Grid',
+          elements: [
+            'Grid: two equal columns on wide screens and one on narrow screens; repeat a Stack over /result/days in list order, placing items row by row. Each Stack contains DateText, Heading, and four Detail elements in the order below.',
+            'DateText inside each repeated Stack: value reads item-relative day with $item; format "long"; tone "muted".',
+            'Heading inside each repeated Stack: h2 reads item-relative title with $item.',
+            'Detail inside each repeated Stack: label "Morning"; value reads item-relative morning with $item; hide when empty.',
+            'Detail inside each repeated Stack: label "Lunch"; value reads item-relative midday with $item; hide when empty.',
+            'Detail inside each repeated Stack: label "Afternoon"; value reads item-relative afternoon with $item; hide when empty.',
+            'Detail inside each repeated Stack: label "Evening"; value reads item-relative evening with $item; hide when empty.',
+          ],
+        },
+        {
+          title: 'Good to know',
+          purpose:
+            'Close with the practical advice the traveler will need when booking and getting around.',
+          container: 'Section',
+          elements: [
+            'Section: h2 title "Good to know"; contains TextList; no number or helper line.',
+            'TextList: items read /result/practical_notes with $state; dot markers; preserve list order.',
           ],
         },
       ],

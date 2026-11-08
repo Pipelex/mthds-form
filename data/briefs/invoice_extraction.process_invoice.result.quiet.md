@@ -14,7 +14,7 @@ Show each value once: a figure a component already states, such as the total ins
 
 ## Style
 
-The team's apps wear the Quiet style: Calm and precise: light titles, hairline panels, generous air, nothing decorated.
+The team's apps wear the Quiet style: The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated.
 
 The components already draw its faces, weights, radii and panels, so the page sets none of them. What the page decides is its composition, and the composition should read as this style too: how much air there is between the groups, how large and how long the headline is, how many groups the inputs fall into and whether they are titled, how much the page says around them. A calm style asks for few groups and generous air, a literary one for a headline that reads like a title and a measured rhythm, a graphic one for a dense, firm page with short labels.
 
@@ -364,7 +364,7 @@ The `brief` input the designer method receives, verbatim, as `inputBrief` or `re
   ],
   "style": {
     "name": "Quiet",
-    "direction": "Calm and precise: light titles, hairline panels, generous air, nothing decorated."
+    "direction": "The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated."
   },
   "sample_state": "[\n  {\n    \"invoice_id\": \"914946\",\n    \"invoice_number\": \"JFK5BFDH6707\",\n    \"issue_date\": \"2025-03-09\",\n    \"time\": \"16:28\",\n    \"amount_incl_tax\": 9.96,\n    \"amount_excl_tax\": 8.88,\n    \"vat_amount\": 0.81,\n    \"currency\": \"USD\",\n    \"vat_rates\": null,\n    \"vendor\": \"JFK 5B Food Hall\",\n    \"vendor_address\": null,\n    \"vendor_siret\": null,\n    \"vendor_vat_number\": null,\n    \"company_name\": null,\n    \"company_address\": null,\n    \"description\": \"Takeout snack and soft drink with an employee benefits surcharge.\",\n    \"line_items\": [\n      {\n        \"label\": \"Chip Potato Kettle Salt & Vinegar\",\n        \"quantity\": 1,\n        \"unit_price\": null,\n        \"amount\": 3.99\n      },\n      {\n        \"label\": \"DIET PEPSI\",\n        \"quantity\": 1,\n        \"unit_price\": null,\n        \"amount\": 4.89\n      },\n      {\n        \"label\": \"EE Ben Surch\",\n        \"quantity\": null,\n        \"unit_price\": null,\n        \"amount\": 0.27\n      }\n    ],\n    \"category\": {\n      \"category\": \"receipt\",\n      \"explanation\": \"Paid takeout purchase receipt showing card payment and a zero balance.\"\n    },\n    \"text\": \"Welcome to JFK 5B Food Hall\\nORDER # JFK5BFDH6707\\nLocation: JFK5BFDH\\nDevice: JFK5BSCKSK3\\nOrigin ID: Kiosk\\nORDER ID: 914946\\nPOS Order Id: 5171\\nDATE: 03/09/2025\\nTIME: 04:28 PM\\nTAKE OUT\\n1 Chip Potato Kettle Salt & Vinegar $3.99\\n1 DIET PEPSI $4.89\\nSUB-TOTAL $8.88\\nSALES TAX $0.81\\nEE Ben Surch $0.27\\nTOTAL - PLUS TAX $9.96\\nCustomer Name: VALUED CUSTOMER\\nPaid - Card#: ************1818\\nAMEX\\n$9.96\\nBalance $0.00\\nPAY AT SELF CHECKOUT OR CASHIER !!!!\"\n  }\n]"
 }
