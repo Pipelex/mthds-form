@@ -65,7 +65,7 @@ describe('a layout written for a frame', () => {
     expect(problems.join('\n')).toMatch(/no control that runs the method/);
   });
 
-  it("finds the run in a binding's chain, where a layout may start it after a check", () => {
+  it("does not count a run reached only through a binding's chain, which json-render never fires", () => {
     const page = composer.elements.page!;
     const chained: Spec = {
       ...composer,
@@ -77,7 +77,18 @@ describe('a layout written for a frame', () => {
         },
       },
     };
-    expect(layoutCheckProblems(chained, { frame: 'composer', descriptor: { inputs } })).toEqual([]);
+    const problems = layoutCheckProblems(chained, { frame: 'composer', descriptor: { inputs } });
+    expect(problems.join('\n')).toMatch(/no control that runs the method/);
+  });
+
+  it('answers a malformed element with problems rather than an exception', () => {
+    const broken = { root: 'page', elements: { page: null } } as unknown as Spec;
+    expect(() =>
+      layoutCheckProblems(broken, { frame: 'composer', descriptor: { inputs } }),
+    ).not.toThrow();
+    expect(
+      layoutCheckProblems(broken, { frame: 'composer', descriptor: { inputs } }).length,
+    ).toBeGreaterThan(0);
   });
 });
 

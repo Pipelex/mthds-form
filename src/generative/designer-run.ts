@@ -58,15 +58,28 @@ export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutChe
   return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
 }
 
-/** Whether any element binds the `run` action, through its `onSuccess` and `onError` chains too. */
+/**
+ * Whether any element binds the `run` action directly under `on`, as the
+ * binding itself or as one entry of a list of them, which json-render runs in
+ * order. A `run` reached only through an `onSuccess` or `onError` chain is not
+ * counted: json-render applies those chains to a handler's actions alone, and
+ * never after `validateForm` or a state action, so such a run never fires.
+ * The walk is total over whatever a model wrote, since a malformed element is
+ * the catalog check's to report, never a reason for this one to throw.
+ */
 function bindsRun(spec: Spec): boolean {
-  const runs = (binding: unknown): boolean => {
-    if (Array.isArray(binding)) return binding.some(runs);
-    if (typeof binding !== 'object' || binding === null) return false;
-    const record = binding as Record<string, unknown>;
-    return record.action === 'run' || runs(record.onSuccess) || runs(record.onError);
-  };
-  return Object.values(spec.elements ?? {}).some((element) =>
-    Object.values((element as { on?: Record<string, unknown> }).on ?? {}).some(runs),
-  );
+  const isRun = (binding: unknown): boolean =>
+    typeof binding === 'object' &&
+    binding !== null &&
+    (binding as Record<string, unknown>).action === 'run';
+  const elements: unknown = spec.elements;
+  if (typeof elements !== 'object' || elements === null) return false;
+  return Object.values(elements).some((element) => {
+    if (typeof element !== 'object' || element === null) return false;
+    const on: unknown = (element as Record<string, unknown>).on;
+    if (typeof on !== 'object' || on === null) return false;
+    return Object.values(on).some((binding) =>
+      Array.isArray(binding) ? binding.some(isRun) : isRun(binding),
+    );
+  });
 }

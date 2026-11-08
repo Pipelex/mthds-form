@@ -1203,13 +1203,15 @@ async function heroBrief(hero, g, variant = { frame: 'page' }) {
   const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
   const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
   if (!contract)
-    die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
+    throw new Error(
+      `${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`,
+    );
   // The hero's own summary, or - on an authored method - the pipe's description
   // as the author wrote it, off the generated module.
   const description = g.heroSummary(hero, fixtures);
   if (hero.side === 'input') {
     const descriptor = g.core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
-    if (!descriptor) die(`${pipeRef}: no input descriptor.`);
+    if (!descriptor) throw new Error(`${pipeRef}: no input descriptor.`);
     const fields = g.core.buildRunFields(descriptor, contract.inputs);
     // An authored method has a name a host would list it by - the case's
     // title; a synthesized carrier has none, and its brief names no product.
@@ -1226,10 +1228,11 @@ async function heroBrief(hero, g, variant = { frame: 'page' }) {
     });
   }
   const descriptor = g.core.getPipeOutputForm(fixtures.OUTPUT_FORM, hero.domain, hero.pipeCode);
-  if (!descriptor) die(`${pipeRef}: no output descriptor.`);
+  if (!descriptor) throw new Error(`${pipeRef}: no output descriptor.`);
   const field = g.core.buildResultField(descriptor, contract.output.json_schema);
   const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
-  if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
+  if (!(pipeRef in PAYLOADS))
+    throw new Error(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
   return g.resultBrief(
     { pipeRef, description },
     field,
@@ -1394,7 +1397,7 @@ async function generateBriefs() {
     for (const variant of variantsOf(hero, g)) {
       const key = g.briefKey(hero, variant);
       if (key in briefs) die(`${key}: two heroes share a brief; give one of them its own frames.`);
-      briefs[key] = await heroBrief(hero, g, variant);
+      briefs[key] = await heroBrief(hero, g, variant).catch((error) => die(error.message));
       frameOf[key] = variant.frame;
     }
   }
