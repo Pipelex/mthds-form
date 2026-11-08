@@ -43,6 +43,8 @@ import {
   useResolveRendition,
   useResolveShareUrl,
   useResolveUrl,
+  PanelEnvOverride,
+  useResultFramed,
   useSaveFiles,
   useTableColumns,
   useTableLayout,
@@ -1833,6 +1835,26 @@ interface StackClasses {
 }
 
 /**
+ * The box a table of records is drawn in. On a bare page it is its own
+ * rounded hairline box, which is what says where the table ends. Inside a
+ * host's panel (`framed`, `StuffViewer`'s or `ResultEnvProvider`'s), the panel
+ * already says it, and a second box inside it read as a box in a box under
+ * every app style: the table then draws no edge, keeping its header band and
+ * its row rules, and rounds its band's corners a step under a control's, so a
+ * style's radius reaches it and a panel's larger corner still encloses it.
+ * A table inside an open row is inside the outer table, not the host's panel,
+ * so it keeps its own box (the row opens under `framed: false`), which is what
+ * sets it apart from the rows around it. The name is on the DOM as
+ * `data-table-box` (`box` or `framed`), for a host's stylesheet and for tests,
+ * which cannot read an edge from its classes.
+ */
+function useTableBox(): { name: 'box' | 'framed'; className: string } {
+  return useResultFramed()
+    ? { name: 'framed', className: 'rounded-md' }
+    : { name: 'box', className: 'rounded-lg border border-border' };
+}
+
+/**
  * The same layout three times: behind the container query, behind the phone's
  * viewport (`max-sm:`, where the chevron is always 44px, so its margin and
  * corner need no second condition), and without either. Spelled out in full
@@ -2111,6 +2133,7 @@ function ObjectTable({
   const presentation = useFieldPresentation();
   const budget = useTableColumns();
   const layout = useTableLayout();
+  const box = useTableBox();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const [viewportWidth, setViewportWidth] = useState<number>();
@@ -2220,8 +2243,10 @@ function ObjectTable({
       role="group"
       aria-label={label}
       {...(fits && !overflows ? {} : { tabIndex: 0 })}
+      data-table-box={box.name}
       className={cn(
-        'overflow-x-auto rounded-lg border border-border',
+        'overflow-x-auto',
+        box.className,
         focusOutlineInsetClass,
         EXPAND_COLUMN_WIDTH,
         fits && '@container',
@@ -2358,8 +2383,16 @@ function ObjectTable({
                           : {})}
                       >
                         {/* Inside the row's own `ResultAt`, so a file in the
-                            record is placed at this entry's index. */}
-                        <ResultField field={element} value={item} hideLabel />
+                            record is placed at this entry's index; and out of
+                            the host's panel, as far as a table in it knows,
+                            since the outer table is what frames it. */}
+                        <PanelEnvOverride
+                          downloads={undefined}
+                          tableLayout={undefined}
+                          framed={false}
+                        >
+                          <ResultField field={element} value={item} hideLabel />
+                        </PanelEnvOverride>
                       </div>
                     </td>
                   ) : (
@@ -2768,6 +2801,7 @@ function RecordsTable({
 }) {
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
+  const box = useTableBox();
   const columns: string[] = [];
   for (const item of items) {
     for (const key of Object.keys(item)) if (!columns.includes(key)) columns.push(key);
@@ -2780,7 +2814,8 @@ function RecordsTable({
       role="group"
       aria-label={label}
       tabIndex={0}
-      className={cn('overflow-x-auto rounded-lg border border-border', focusOutlineClass)}
+      data-table-box={box.name}
+      className={cn('overflow-x-auto', box.className, focusOutlineClass)}
     >
       <table className="min-w-full border-collapse text-[12.5px] text-foreground">
         <thead>
@@ -2809,7 +2844,15 @@ function RecordsTable({
                     {typeof cell === 'boolean' ? (
                       <Bool value={cell} />
                     ) : typeof cell === 'object' && cell !== null ? (
-                      <NativeValue value={cell} label={columnLabel(column)} />
+                      // Out of the host's panel, as far as a table in the
+                      // cell knows, since this table is what frames it.
+                      <PanelEnvOverride
+                        downloads={undefined}
+                        tableLayout={undefined}
+                        framed={false}
+                      >
+                        <NativeValue value={cell} label={columnLabel(column)} />
+                      </PanelEnvOverride>
                     ) : (
                       <Scalar value={cell} />
                     )}

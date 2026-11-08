@@ -442,3 +442,75 @@ describe('tableLayout="stack"', () => {
     expect(box().getAttribute('tabindex')).toBe('0');
   });
 });
+
+/**
+ * A host that frames the result in a panel of its own says so with `framed`,
+ * and a table then draws no outline of its own inside that panel: the panel
+ * is the box, and a hairline box with its own radius inside it read as a box
+ * in a box under every app style.
+ */
+describe('a table in a result the host frames', () => {
+  const fields = columns(3);
+  const viewer = (props: { framed?: boolean } = {}) => (
+    <StuffViewer field={list(record(fields))} value={rowsOf(fields)} {...props} />
+  );
+
+  it('draws its hairline box when nothing says the host frames it', () => {
+    render(viewer());
+    expect(box().dataset.tableBox).toBe('box');
+    expect(box().className).toContain('border');
+  });
+
+  it('drops its outline and keeps a corner for its header band when the panel says so', () => {
+    render(viewer({ framed: true }));
+    expect(box().dataset.tableBox).toBe('framed');
+    expect(box().className.split(/\s+/)).not.toContain('border');
+    expect(box().className).toContain('rounded-md');
+  });
+
+  it('takes the setting from the provider, the panel’s own winning', () => {
+    const { unmount } = render(<ResultEnvProvider framed>{viewer()}</ResultEnvProvider>);
+    expect(box().dataset.tableBox).toBe('framed');
+    unmount();
+    render(<ResultEnvProvider framed>{viewer({ framed: false })}</ResultEnvProvider>);
+    expect(box().dataset.tableBox).toBe('box');
+  });
+
+  it('leaves a table inside an open row its own box, the outer table being what frames it', async () => {
+    const lines = { ...list(record([text('item'), number('qty')])), name: 'lines' };
+    const orders = list(record([text('reference'), lines]));
+    const { container } = render(
+      <StuffViewer
+        field={orders}
+        value={[{ reference: 'O-1', lines: [{ item: 'pen', qty: 2 }] }]}
+        framed
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.toggleRowDetails(1) }),
+    );
+    const boxes = [...container.querySelectorAll<HTMLElement>('[data-table-box]')];
+    expect(boxes.map((b) => b.dataset.tableBox)).toEqual(['framed', 'box']);
+  });
+
+  it('leaves a records table inside a records table’s cell its own box', () => {
+    // A composite, whose members the descriptor states no structure for,
+    // holding records whose cell holds records again: the inner table sits
+    // inside the outer one.
+    const unknown: RunField = {
+      kind: 'unknown',
+      name: 'output',
+      conceptRef: 'native.Composite',
+      required: true,
+    };
+    const { container } = render(
+      <StuffViewer
+        field={unknown}
+        value={{ orders: [{ reference: 'O-1', lines: [{ item: 'pen', qty: 2 }] }] }}
+        framed
+      />,
+    );
+    const boxes = [...container.querySelectorAll<HTMLElement>('[data-table-box]')];
+    expect(boxes.map((b) => b.dataset.tableBox)).toEqual(['framed', 'box']);
+  });
+});

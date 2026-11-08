@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { type BaseComponentProps, useRepeatScope, useStateValue } from '@json-render/react';
+import { type BaseComponentProps, useStateValue } from '@json-render/react';
 import { ArrowRight, Clock } from 'lucide-react';
 import { readImageContent, viewableUrl } from '../core/native-content';
 import { waitingFields } from '../core/readiness';
@@ -19,9 +19,10 @@ import { textOf, withDeclaredProps } from './declared-props';
 import { frameComponents } from './frame-definitions';
 import { shareAmount } from './share-amount';
 import { useFrameHost } from './frame-host';
+import { formatAmount, formatDay } from './format';
 import { INPUTS_ROOT, inputFieldAtPath, joinPath } from './paths';
 import { type PlacedInput, usePlacedInputs } from './placed-inputs';
-import { useDescriptorScope } from './registry';
+import { useAbsolutePath, useDescriptorScope } from './registry';
 
 /**
  * The renderers of the two frames' vocabularies (`frame-definitions.ts`): the
@@ -42,20 +43,6 @@ import { useDescriptorScope } from './registry';
  */
 
 const RADIUS = 'rounded-[calc(var(--radius,0.5rem)*1.5)]';
-
-function useAbsolute(path: string): string {
-  const repeat = useRepeatScope();
-  if (path.startsWith('/')) return path;
-  if (!repeat) return path;
-  return path === '' ? repeat.basePath : `${repeat.basePath}/${path}`;
-}
-
-/** A date path's value as a date at noon UTC, so no time zone moves its day; `undefined` for anything else. */
-function asDate(value: unknown): Date | undefined {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value)) return undefined;
-  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
-  return Number.isNaN(date.getTime()) ? undefined : date;
-}
 
 // ─── Composer ────────────────────────────────────────────────────────────────
 
@@ -310,8 +297,9 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
 
 interface ProportionBarProps {
   label: string;
-  total?: number | null;
-  of?: number | null;
+  /** Read as written (`asWritten` below): a number, a numeric text, or what the layout check let by. */
+  total?: unknown;
+  of?: unknown;
   unit?: string | null;
   items?: unknown[] | null;
   labelKey: string;
@@ -332,20 +320,21 @@ function segmentColor(index: number, count: number): string {
   return `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${segmentMix(index, count)}%, var(--muted, hsl(240 4.8% 95.9%)))`;
 }
 
-function amount(value: number, unit: string | null | undefined): string {
-  if (unit && /^[A-Z]{3}$/.test(unit)) {
-    try {
-      return new Intl.NumberFormat('en-GB', {
-        style: 'currency',
-        currency: unit,
-        maximumFractionDigits: 0,
-      }).format(value);
-    } catch {
-      /* not a currency code */
-    }
-  }
-  const n = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(value);
-  return unit ? `${n} ${unit}` : n;
+/**
+ * A total or a ceiling as the layout wrote it: `null` when it wrote none, the
+ * number a number or a text writes out (a payload's decimal may arrive as
+ * text, and the prop's schema would otherwise drop a `$state` read of it to
+ * nothing), and `undefined` for anything else, which is shown as no figure.
+ * `null` is none whoever wrote it: the layout, or a run that left the path a
+ * `$state` read names empty, which the renderer cannot tell apart, since it
+ * sees the value resolved. Only an unreadable total is never read as the
+ * parts' sum: a total of 2,400 shown as the 100 its parts add up to was a
+ * wrong figure in large type.
+ */
+function statedAmount(raw: unknown): number | null | undefined {
+  if (raw === null || raw === undefined) return null;
+  const amount = shareAmount(raw);
+  return Number.isFinite(amount) ? amount : undefined;
 }
 
 function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
@@ -363,8 +352,10 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     }))
     .filter((p) => Number.isFinite(p.value) && p.value > 0);
   const sum = parts.reduce((s, p) => s + p.value, 0);
-  const total = typeof props.total === 'number' ? props.total : sum;
-  const scale = Math.max(sum, total, typeof props.of === 'number' ? props.of : 0) || 1;
+  const stated = statedAmount(props.total);
+  const total = stated === null ? sum : stated;
+  const ceiling = statedAmount(props.of) ?? undefined;
+  const scale = Math.max(sum, total ?? 0, ceiling ?? 0) || 1;
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   return (
     <div
@@ -378,12 +369,14 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <span className="text-[15px] text-muted-foreground">{props.label}</span>
-        <strong className="text-2xl font-semibold tabular-nums text-foreground">
-          {amount(total, props.unit)}
-        </strong>
-        {typeof props.of === 'number' ? (
+        {total !== undefined ? (
+          <strong className="text-2xl font-semibold tabular-nums text-foreground">
+            {formatAmount(total, props.unit)}
+          </strong>
+        ) : null}
+        {ceiling !== undefined ? (
           <span className="text-[15px] text-muted-foreground">
-            of {amount(props.of, props.unit)}
+            of {formatAmount(ceiling, props.unit)}
           </span>
         ) : null}
       </div>
@@ -411,7 +404,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
               }}
               aria-hidden="true"
             />
-            {cap(p.label)} {amount(p.value, props.unit)}
+            {cap(p.label)} {formatAmount(p.value, props.unit)}
           </li>
         ))}
       </ul>
@@ -459,16 +452,16 @@ function Picture({
   props,
 }: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>) {
   // The checks hold `path` to a literal; a layout rendered past them may still
-  // hand an expression's value here, which shows no picture. It is not read as
-  // the empty path, which inside a repeat is the item itself.
-  const written = typeof props.path === 'string' ? props.path : undefined;
-  const path = useAbsolute(written ?? '');
-  const value = useStateValue<unknown>(path);
+  // hand an expression's value here, which shows no picture, as does a
+  // relative path outside any repeat. Neither is read as the empty path,
+  // which inside a repeat is the item itself (`useAbsolutePath`).
+  const path = useAbsolutePath(props.path, true);
+  const value = useStateValue<unknown>(path ?? '');
   const resolve = useResolveUrl();
   // In the result view's order, each through the kernel's gate: the host's
   // resolver on the stored reference, then the file's own public URL, then the
   // reference itself, so a picture shows wherever the result view shows it.
-  const content = written === undefined ? undefined : readImageContent(value);
+  const content = path === undefined ? undefined : readImageContent(value);
   const src = content
     ? (viewableUrl(resolve?.(content.url)) ??
       viewableUrl(content.publicUrl) ??
@@ -523,12 +516,6 @@ function Detail({ props }: BaseComponentProps<{ label: string; value?: unknown }
   );
 }
 
-const DATE_STYLES: Record<string, Intl.DateTimeFormatOptions> = {
-  long: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' },
-  short: { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' },
-  weekday: { weekday: 'short', day: 'numeric', month: 'long', timeZone: 'UTC' },
-};
-
 interface DateTextProps {
   value?: string | null;
   style?: 'long' | 'short' | 'weekday' | null;
@@ -536,19 +523,19 @@ interface DateTextProps {
 }
 
 function DateText({ props }: BaseComponentProps<DateTextProps>) {
-  const date = asDate(props.value);
-  if (!date) return null;
+  // A day written as text, its leading day read through the layer's one
+  // formatter (`formatDay`) at noon UTC, so no time zone moves it. The prop is
+  // a text, so a native date's structure never reaches here: a `native.Date`
+  // is delegated to the result view, which reads its structure.
+  const day = formatDay(props.value, props.style ?? 'long');
+  if (day === undefined) return null;
   const tone =
     props.tone === 'accent'
       ? cn('text-[13px] font-semibold', linkTextClass)
       : props.tone === 'muted'
         ? 'text-sm text-muted-foreground'
         : 'text-[15px] text-foreground';
-  return (
-    <span className={cn('block', tone)}>
-      {date.toLocaleDateString('en-GB', DATE_STYLES[props.style ?? 'long'])}
-    </span>
-  );
+  return <span className={cn('block', tone)}>{day}</span>;
 }
 
 interface TextListProps {
@@ -611,6 +598,9 @@ export const frameRenderers = withDeclaredProps(
     Detail: (ctx: BaseComponentProps<{ label: string; value?: unknown }>) => <Detail {...ctx} />,
   },
   // A refused `path` reaches the renderer as refused: its nearest value, the
-  // empty text, is the item itself inside a repeat.
-  { Picture: ['path'] },
+  // empty text, is the item itself inside a repeat. A share's total and its
+  // ceiling are read as written too: a decimal a payload carries as text is
+  // a number the bar can draw, where its nearest value, nothing, would put
+  // the parts' sum in its place.
+  { Picture: ['path'], ProportionBar: ['total', 'of'] },
 );

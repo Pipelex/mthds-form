@@ -314,6 +314,15 @@ interface ResultEnv {
    * PDF in the browser. See {@link RenderPdf}.
    */
   renderPdf?: RenderPdf;
+  /**
+   * Whether the host draws the result inside a panel of its own. Its tables
+   * then draw no box of their own, keeping their header band and their row
+   * rules: a table's rounded hairline inside the host's panel read as a box
+   * in a box, under every app style. Unset, every table keeps its box, as on
+   * a bare page, where the box is what says where the table ends. Only the
+   * host knows whether a panel surrounds the result.
+   */
+  framed?: boolean;
 }
 
 const ResultEnvContext = createContext<ResultEnv>({});
@@ -329,6 +338,7 @@ export function ResultEnvProvider({
   saveFiles,
   downloads,
   renderPdf,
+  framed,
   children,
 }: ResultEnv & { children: ReactNode }) {
   const env = useMemo(
@@ -343,6 +353,7 @@ export function ResultEnvProvider({
       saveFiles,
       downloads,
       renderPdf,
+      framed,
     }),
     [
       resolveUrl,
@@ -355,6 +366,7 @@ export function ResultEnvProvider({
       saveFiles,
       downloads,
       renderPdf,
+      framed,
     ],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
@@ -362,17 +374,20 @@ export function ResultEnvProvider({
 
 /**
  * The provider's settings with one panel's own laid over them, for everything
- * beneath: its download display key by key, and its table layout. Internal: it
- * is how `StuffViewer`'s `downloads` and `tableLayout` props reach the file
- * buttons and the tables drawn deep inside its tree.
+ * beneath: its download display key by key, its table layout and whether a
+ * host's panel frames it. Internal: it is how `StuffViewer`'s `downloads`,
+ * `tableLayout` and `framed` props reach the file buttons and the tables
+ * drawn deep inside its tree.
  */
 export function PanelEnvOverride({
   downloads,
   tableLayout,
+  framed,
   children,
 }: {
   downloads: DownloadDisplay | undefined;
   tableLayout: TableLayout | undefined;
+  framed: boolean | undefined;
   children: ReactNode;
 }) {
   const env = use(ResultEnvContext);
@@ -383,10 +398,11 @@ export function PanelEnvOverride({
   const merged = useMemo(() => {
     const ownDownloads =
       result !== undefined || files !== undefined || pdf !== undefined || askFileName !== undefined;
-    if (!ownDownloads && tableLayout === undefined) return env;
+    if (!ownDownloads && tableLayout === undefined && framed === undefined) return env;
     return {
       ...env,
       ...(tableLayout === undefined ? {} : { tableLayout }),
+      ...(framed === undefined ? {} : { framed }),
       ...(ownDownloads
         ? {
             downloads: {
@@ -398,7 +414,7 @@ export function PanelEnvOverride({
           }
         : {}),
     };
-  }, [env, result, files, pdf, askFileName, tableLayout]);
+  }, [env, result, files, pdf, askFileName, tableLayout, framed]);
   return <ResultEnvContext value={merged}>{children}</ResultEnvContext>;
 }
 
@@ -545,4 +561,9 @@ export function useTableColumns(): number {
 /** The table layout, defaulted to the scroller every host had before it was a choice. */
 export function useTableLayout(): TableLayout {
   return use(ResultEnvContext).tableLayout ?? 'scroll';
+}
+
+/** Whether a host's panel frames the result, so its tables draw no box of their own. */
+export function useResultFramed(): boolean {
+  return use(ResultEnvContext).framed ?? false;
 }

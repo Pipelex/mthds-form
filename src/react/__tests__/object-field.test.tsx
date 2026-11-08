@@ -264,7 +264,10 @@ describe('a structure in error', () => {
   it("turns a card's outline red, with the caption under it", () => {
     const { container } = renderShop({ framed: false, error: 'Required' });
     const card = container.querySelector('[data-structure-group="box"]')!;
-    expect(card.className).toMatch(/\bborder-destructive\/50\b/);
+    // The outline is the error colour solid, which the brand contract holds
+    // to 3:1; the half-strength outline it replaced measured under 3:1 even
+    // in the stock palette.
+    expect(card.className.split(/\s+/)).toContain('border-destructive');
     const caption = screen.getByRole('alert');
     expect(card.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector('[data-error-edge]')).toBeNull();

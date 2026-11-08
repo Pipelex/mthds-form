@@ -235,14 +235,16 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
         // On a dark page a shadow barely shows, so the panel is lifted by its
         // fill instead, the card a little toward the foreground, with a faint
         // highlight along its top edge where light would catch it, and its
-        // fields sink back to the page's own background.
+        // fields are lifted a step further, so each reads as a control on
+        // the panel. At the page's own background they read as wells cut
+        // into it.
         dark: {
           fill: role('card', { toward: { role: 'foreground', share: 0.07 } }),
           edge: null,
           edgeWidth: 1,
           shadow:
             'inset 0 1px 0 rgb(255 255 255 / 0.07), 0 2px 4px rgb(0 0 0 / 0.55), 0 24px 56px -12px rgb(0 0 0 / 0.95)',
-          field: role('background'),
+          field: role('card', { toward: { role: 'foreground', share: 0.12 } }),
         },
       },
       // A short shadow in the button colour on a light page, kept within the
@@ -299,8 +301,10 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
       radius: 6,
       // One firm edge around a solid panel, softer on a dark page. The panel
       // is the muted fill, which the host's fields all but match, so fields
-      // set into it take the card on a light page and the page's background
-      // on a dark one.
+      // set into it take the card on a light page, and on a dark one the
+      // muted fill lifted a little toward the foreground: a step above the
+      // panel, as the card is on a light page, where the page's background
+      // read as a well cut into it.
       panel: {
         light: {
           fill: role('muted'),
@@ -314,7 +318,7 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
           edge: role('foreground', { alpha: 0.3 }),
           edgeWidth: 2,
           shadow: null,
-          field: role('background'),
+          field: role('muted', { toward: { role: 'foreground', share: 0.06 } }),
         },
       },
       actionShadow: { light: 'none', dark: 'none' },

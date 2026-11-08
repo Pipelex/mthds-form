@@ -469,6 +469,54 @@ function nonScalarReads(
       const branches = depth < MAX_COND_DEPTH ? condBranches(value) : undefined;
       return branches ? branches.flatMap((branch) => outcomes(branch, depth + 1)) : [value];
     };
+    // Why an amount draws nothing, or nothing when it draws: what the
+    // renderer draws from is a number, or a text that writes one out
+    // (`shareAmount`), so a literal must be one and a read must name a path
+    // that holds one. A `$template` writes a text that may carry anything
+    // around the number, so it reads none.
+    const amountPathRefusal = (path: string): string | undefined => {
+      const field = isUnder(root, path) ? fieldAt(path) : undefined;
+      if (field && field.kind !== 'number' && field.kind !== 'unknown') {
+        return `reads ${path}, which holds ${kindWords(field.kind)}, not a number`;
+      }
+      return undefined;
+    };
+    const amountRefusal = (amount: unknown): string | undefined => {
+      if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return undefined;
+      const path = readPath(amount);
+      if (path === undefined) {
+        const shown = isExpression(amount)
+          ? 'an expression that reads no number'
+          : String(JSON.stringify(amount ?? null));
+        return `is ${shown}, not a number`;
+      }
+      return amountPathRefusal(path);
+    };
+    // A share's total and its ceiling, held to what the renderer draws as
+    // either: a number, or a read of one. The renderer shows no figure for
+    // anything else rather than the parts' sum, so a total a model wrote as
+    // a `$template` around a currency would be a bar with no figure; it is
+    // refused here instead, in each branch of a `$cond`, and the page falls
+    // back. Writing none (`null`) is the parts' sum, and no ceiling. The
+    // repeat's index, which a part's amount may read, is never a total, and
+    // outside a repeat it resolves to nothing, which the renderer would take
+    // for no total and draw the parts' sum in its place.
+    if (element.type === 'ProportionBar') {
+      const props = (element.props ?? {}) as Record<string, unknown>;
+      for (const prop of ['total', 'of'] as const) {
+        const refusals = outcomes(props[prop])
+          .filter((outcome) => outcome !== null && outcome !== undefined)
+          .map((outcome) =>
+            readsIndex(outcome) ? "is the repeat's index, not an amount" : amountRefusal(outcome),
+          )
+          .filter((refusal): refusal is string => refusal !== undefined);
+        for (const refusal of new Set(refusals)) {
+          problems.push(
+            `${key}: ProportionBar's ${prop} ${refusal}; a total or a ceiling is a number, or reads a path that holds one with { "$state" }`,
+          );
+        }
+      }
+    }
     // Parts written out inline. The catalog takes a share's items as a list
     // of anything, and the renderer reads each by member name and its value
     // member as a number, so every entry must be a structure naming both
@@ -505,44 +553,29 @@ function nonScalarReads(
         }
         return interpolatedPaths(text, itemPath).length > 0 ? 'more' : { text };
       };
+      // An inline amount may also be a template that writes one out; a page
+      // hands json-render no functions, so a `$computed` resolves to nothing
+      // there, which draws no share. Everything else is any amount's refusal.
+      const inlineAmountRefusal = (amount: unknown): string | undefined => {
+        if (expressionForm(amount) === '$computed') {
+          return 'is a $computed, which a page has no function to resolve, not a number';
+        }
+        const written = templateAmount(amount);
+        if (written === undefined) return amountRefusal(amount);
+        if (written === 'more') {
+          return 'is a template that writes text beside its value, not a number';
+        }
+        if ('path' in written) return amountPathRefusal(written.path);
+        return Number.isFinite(shareAmount(written.text))
+          ? undefined
+          : `is a template that writes ${JSON.stringify(written.text)} out, not a number`;
+      };
       // Whether an amount draws no share, naming why when it does not.
       const amountRefused = (part: string, amount: unknown): boolean => {
-        // What the renderer draws a share from: a number, or a text that
-        // writes one out (`shareAmount`).
-        if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return false;
-        const written = templateAmount(amount);
-        if (written !== undefined && written !== 'more' && 'text' in written) {
-          if (Number.isFinite(shareAmount(written.text))) return false;
-        }
-        const path =
-          readPath(amount) ??
-          (written !== undefined && written !== 'more' && 'path' in written
-            ? written.path
-            : undefined);
-        if (path === undefined) {
-          // A page hands json-render no functions, so a `$computed` resolves
-          // to nothing there, which draws no share.
-          const shown =
-            written === 'more'
-              ? 'a template that writes text beside its value'
-              : written !== undefined && 'text' in written
-                ? `a template that writes ${JSON.stringify(written.text)} out`
-                : expressionForm(amount) === '$computed'
-                  ? 'a $computed, which a page has no function to resolve'
-                  : isExpression(amount)
-                    ? 'an expression that reads no number'
-                    : String(JSON.stringify(amount ?? null));
-          problems.push(`${part}'s ${JSON.stringify(valueKey)} is ${shown}, not a number; ${how}`);
-          return true;
-        }
-        const field = isUnder(root, path) ? fieldAt(path) : undefined;
-        if (field && field.kind !== 'number' && field.kind !== 'unknown') {
-          problems.push(
-            `${part}'s ${JSON.stringify(valueKey)} reads ${path}, which holds ${kindWords(field.kind)}, not a number; ${how}`,
-          );
-          return true;
-        }
-        return false;
+        const refusal = inlineAmountRefusal(amount);
+        if (refusal === undefined) return false;
+        problems.push(`${part}'s ${JSON.stringify(valueKey)} ${refusal}; ${how}`);
+        return true;
       };
       // One value a part can resolve to, held to the rule above.
       const sharePart = (part: string, entry: unknown): unknown[] => {
@@ -614,6 +647,9 @@ function nonScalarReads(
       }
     };
     for (const [prop, value] of Object.entries(element.props ?? {})) {
+      // A share's total and ceiling were held to a number above, which says
+      // more than that they are no value.
+      if (element.type === 'ProportionBar' && (prop === 'total' || prop === 'of')) continue;
       const items = listy?.get(prop);
       if (items === undefined || Array.isArray(value)) {
         walk(prop, prop === 'items' && Array.isArray(value) ? inlineShares(value) : value);
