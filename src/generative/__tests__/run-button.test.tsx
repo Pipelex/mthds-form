@@ -4,7 +4,10 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ValidationConfig } from '@json-render/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { RunField } from '../../core';
+import { FieldPresentationProvider } from '../../react';
 import { useCheckedField } from '../checked-fields';
+import { FrameHostProvider } from '../frame-host';
 import { GenerativePage } from '../page';
 import { generativeRegistry } from '../product-registry';
 
@@ -66,6 +69,90 @@ describe('the run button of a produced page', () => {
       expect(screen.getByRole('button', { name: /Plan my trip/ })).toBeDisabled();
     });
   }
+});
+
+/**
+ * The designer method tells a model writing a composer that the host's action
+ * row says which inputs the run waits for, so the page writes nothing about
+ * it; the action row drew only the time a run takes and the button, and so
+ * nobody said it.
+ */
+describe('what a composer’s run waits for', () => {
+  const COMPOSER: Spec = {
+    root: 'composer',
+    elements: {
+      composer: {
+        type: 'Composer',
+        props: {
+          headline: 'Plan a trip',
+          lede: null,
+          runLabel: 'Plan my trip',
+          columns: null,
+          notes: null,
+        },
+        children: [],
+      },
+    },
+  };
+  const field = (name: string, extra: Partial<RunField> = {}): RunField =>
+    ({ kind: 'text', name, required: true, ...extra }) as RunField;
+
+  it('names the inputs still empty beside the run button, which it describes', () => {
+    const inputs = [
+      field('destination', { title: 'Destination' }),
+      field('travel_dates'),
+      field('notes', { required: false }),
+    ];
+    const store = createStateStore({ inputs: {} });
+    render(
+      <FieldPresentationProvider presentation="app">
+        <GenerativePage spec={COMPOSER} store={store} scope={{ inputs }} />
+      </FieldPresentationProvider>,
+    );
+    const button = screen.getByRole('button', { name: /Plan my trip/ });
+    expect(button).toHaveAccessibleDescription('Fill in Destination and Travel dates to run');
+    act(() => store.set('/inputs/destination', 'Lisbon'));
+    expect(button).toHaveAccessibleDescription('Fill in Travel dates to run');
+    act(() => store.set('/inputs/travel_dates', 'May'));
+    expect(button).not.toHaveAccessibleDescription();
+    expect(screen.queryByText(/to run$/)).toBeNull();
+  });
+
+  it('counts an optional input once it is started, and the inputs past the first few', () => {
+    const inputs = [
+      field('a'),
+      field('b'),
+      field('c'),
+      field('d'),
+      field('e'),
+      {
+        kind: 'object',
+        name: 'extra',
+        required: false,
+        fields: [field('x'), field('y')],
+      } as RunField,
+    ];
+    const store = createStateStore({ inputs: { a: 'filled' } });
+    render(<GenerativePage spec={COMPOSER} store={store} scope={{ inputs }} />);
+    const button = screen.getByRole('button', { name: /Plan my trip/ });
+    expect(button).toHaveAccessibleDescription('Fill in b, c, d and 1 more to run');
+    act(() => store.set('/inputs/extra', { x: 'started' }));
+    expect(button).toHaveAccessibleDescription('Fill in b, c, d and 2 more to run');
+  });
+
+  it('keeps the time a run takes beside what it waits for', () => {
+    render(
+      <FrameHostProvider host={{ eta: 'About a minute' }}>
+        <GenerativePage
+          spec={COMPOSER}
+          store={createStateStore({ inputs: {} })}
+          scope={{ inputs: [field('city', { title: 'City' })] }}
+        />
+      </FrameHostProvider>,
+    );
+    expect(screen.getByText('Fill in City to run')).toBeTruthy();
+    expect(screen.getByText('About a minute')).toBeTruthy();
+  });
 });
 
 /**

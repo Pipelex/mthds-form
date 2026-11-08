@@ -178,6 +178,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     `${count} ${plural(count, 'entrée facultative', 'entrées facultatives')}`,
   requiredField: 'Obligatoire',
   incompleteField: 'Incomplet\u00a0: remplissez ses champs obligatoires',
+  runWaitsFor: (names, more) => `Remplissez ${someNames(names, more)} pour lancer`,
   uploadFailed: 'Ce fichier n’a pas pu être envoyé. Réessayez.',
   chooseFromSource: 'Choisir parmi les fichiers de l’équipe',
   chooseFromSourceAria: (label) =>

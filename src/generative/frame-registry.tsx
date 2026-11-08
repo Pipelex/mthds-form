@@ -1,9 +1,12 @@
 'use client';
 
+import * as React from 'react';
 import { type BaseComponentProps, useRepeatScope, useStateValue } from '@json-render/react';
 import { ArrowRight, Clock } from 'lucide-react';
 import { readImageContent, viewableUrl } from '../core/native-content';
-import { useResolveUrl } from '../react';
+import { missingFields } from '../core/readiness';
+import { useFieldStrings, useResolveUrl } from '../react';
+import { fieldLabel, useFieldPresentation } from '../react/field-presentation';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
@@ -62,11 +65,39 @@ interface ComposerProps {
   notes?: string[] | null;
 }
 
+/** How many of the inputs a run waits for the action row names before it counts the rest. */
+const NAMED_WAITING = 3;
+
+/**
+ * What the run waits for, in the action row's words: the inputs the kernel's
+ * readiness counts as missing (`missingFields`), named as their fields label
+ * them, or nothing once none is. The designer method tells a model writing a
+ * composer that the host's action row says this, so the page itself does not.
+ */
+function useRunWaitsFor(): string | undefined {
+  const { inputs } = useDescriptorScope();
+  const values = useStateValue<Record<string, unknown>>('/inputs');
+  const presentation = useFieldPresentation();
+  const strings = useFieldStrings();
+  const waiting = missingFields(inputs ?? [], isRecord(values) ? values : undefined);
+  if (waiting.length === 0) return undefined;
+  const names = waiting
+    .slice(0, NAMED_WAITING)
+    .map((field) => fieldLabel(field.title, field.name, presentation));
+  return strings.runWaitsFor(names, waiting.length - names.length);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) {
   const host = useFrameHost();
   // The host's `env.disabled` holds the run while one is going, as it holds
   // the plain form's submit: a second press would be a second billed run.
   const busy = useDescriptorScope().env?.disabled ?? false;
+  const waitsFor = useRunWaitsFor();
+  const waitsForId = React.useId();
   const two = props.columns === '2';
   return (
     <div
@@ -112,16 +143,21 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           {children}
         </div>
         <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
-          {host.eta ? (
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground max-sm:justify-center">
-              <Clock className="size-4" aria-hidden="true" /> {host.eta}
-            </span>
-          ) : (
-            <span />
-          )}
+          {/* What the run waits for, which describes the button, and how long
+              a run takes. The run is not held by it: a press runs the page's
+              checks and the host's gate, which say what is wrong where. */}
+          <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground max-sm:items-center max-sm:text-center">
+            {waitsFor ? <p id={waitsForId}>{waitsFor}</p> : null}
+            {host.eta ? (
+              <span className="inline-flex items-center gap-2">
+                <Clock className="size-4" aria-hidden="true" /> {host.eta}
+              </span>
+            ) : null}
+          </div>
           <button
             type="button"
             disabled={busy}
+            aria-describedby={waitsFor ? waitsForId : undefined}
             onClick={() => emit('press')}
             className={cn(
               'inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius,0.5rem)] bg-primary px-[22px] text-[15px] font-semibold text-primary-foreground transition-all hover:bg-primary/90',

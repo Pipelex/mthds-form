@@ -230,11 +230,38 @@ export function mustBeFilled(field: RunField): boolean {
  * things stand between me and Run", which is the number a host is displaying.
  */
 export function computeReadiness(fields: RunField[], values: Record<string, unknown>): Readiness {
-  const gating = fields.filter((f) => mustBeFilled(f) || isFilled(ownProp(values, f.name)));
-  const missing = gating
-    .filter((f) => !fieldFilled(f, ownProp(values, f.name)))
-    .map((f) => f.title ?? f.name);
+  const gating = gatingFields(fields, values);
+  const missing = missingAmong(gating, values).map((f) => f.title ?? f.name);
   return { total: gating.length, ready: gating.length - missing.length, missing };
+}
+
+/**
+ * The top-level fields that stand between the current values and a run, as
+ * fields rather than names, in the descriptor's order: the inputs
+ * `computeReadiness` counts as missing. A surface that names them in its own
+ * words - a humanised label, a run button's description - reads them here, so
+ * it names exactly what the count says.
+ */
+export function missingFields(
+  fields: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): RunField[] {
+  return missingAmong(gatingFields(fields, values), values);
+}
+
+/** The fields that gate: every one the method demands, and an optional one once it is touched. */
+function gatingFields(
+  fields: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): RunField[] {
+  return fields.filter((f) => mustBeFilled(f) || isFilled(ownProp(values, f.name)));
+}
+
+function missingAmong(
+  gating: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): RunField[] {
+  return gating.filter((f) => !fieldFilled(f, ownProp(values, f.name)));
 }
 
 /**

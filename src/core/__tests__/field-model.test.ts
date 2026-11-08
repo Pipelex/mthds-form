@@ -7,6 +7,7 @@ import {
   type ObjectRunField,
 } from '..';
 import { describe, expect, it } from 'vitest';
+import { missingFields } from '../readiness';
 import type { InputFormTopLevelField } from 'mthds/protocol';
 import type { InputForm, PipeInputContract } from '..';
 import {
@@ -309,6 +310,22 @@ describe('required / readiness over optional and plural inputs', () => {
       ready: 1,
       missing: ['supplier_quote'],
     });
+  });
+
+  it('hands over the missing inputs as the fields themselves, in the same order', () => {
+    // A composer names them in its own words (`fieldLabel`), so it needs the
+    // field, not the name `computeReadiness` has already chosen.
+    const f = fields();
+    for (const values of [
+      {},
+      { comments: 'offrir la gravure' },
+      { supplier_quote: { url: 'q.pdf' } },
+    ]) {
+      expect(missingFields(f, values).map((field) => field.title ?? field.name)).toEqual(
+        computeReadiness(f, values).missing,
+      );
+    }
+    expect(missingFields(f, undefined).map((field) => field.name)).toEqual(['supplier_quote']);
   });
 });
 
