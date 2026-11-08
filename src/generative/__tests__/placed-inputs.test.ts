@@ -50,6 +50,22 @@ describe('the inputs a layout places', () => {
     expect(placedInputs(spec).get('/inputs/city')).toEqual({ order: 0, label: 'Town' });
   });
 
+  it('places a list a repeat lays out where the repeat stands', () => {
+    const spec = {
+      root: 'page',
+      elements: {
+        page: element('Stack', {}, ['stops', 'city']),
+        stops: { ...element('Stack', {}, ['stop']), repeat: { statePath: '/inputs/stops' } },
+        stop: element('Input', { label: 'Stop', value: { $bindItem: 'name' } }),
+        city: element('Input', { label: 'City', value: { $bindState: '/inputs/city' } }),
+      },
+    } as unknown as Spec;
+    expect(Object.fromEntries(placedInputs(spec))).toEqual({
+      '/inputs/stops': { order: 0 },
+      '/inputs/city': { order: 1, label: 'City' },
+    });
+  });
+
   it('reads nothing from a layout it cannot walk', () => {
     expect(placedInputs(null).size).toBe(0);
     expect(placedInputs({ root: 'x', elements: null } as unknown as Spec).size).toBe(0);

@@ -15,8 +15,9 @@ export interface PlacedInput {
 
 /**
  * The inputs a layout places, by path, in the order the page reads: each path
- * an element binds (`{ "$bindState": "/inputs/..." }`) or an `MthdsField`
- * delegates, with the `label` that element gives it. A layout orders and
+ * an element binds (`{ "$bindState": "/inputs/..." }`), an `MthdsField`
+ * delegates or a repeat lays out as its list, with the `label` that element
+ * gives it. A layout orders and
  * words its controls itself - "Trip name", near the end, where the descriptor
  * says "Title", first - so a line that names inputs for the person names them
  * as the page does, in the order the page shows them, and falls back on the
@@ -41,7 +42,8 @@ export function placedInputs(spec: Spec | null | undefined): ReadonlyMap<string,
     seen.add(key);
     const element = ownProp(elements, key);
     if (!isRecord(element)) continue;
-    if (isRecord(element.props)) place(placed, element.type, element.props);
+    const props = isRecord(element.props) ? element.props : {};
+    place(placed, [...repeatedList(element.repeat), ...inputPathsOf(element.type, props)], props);
     // A stack: the first child is read next, and its descendants before its sibling.
     pending.push(...[...keysOf(element.children), ...slotKeys(element.slots)].reverse());
   }
@@ -50,11 +52,11 @@ export function placedInputs(spec: Spec | null | undefined): ReadonlyMap<string,
 
 function place(
   placed: Map<string, PlacedInput>,
-  type: unknown,
+  paths: readonly string[],
   props: Record<string, unknown>,
 ): void {
   const label = typeof props.label === 'string' ? props.label.trim() : '';
-  for (const path of inputPathsOf(type, props)) {
+  for (const path of paths) {
     const known = placed.get(path);
     if (!known) placed.set(path, { order: placed.size, ...(label ? { label } : {}) });
     else if (known.label === undefined && label) known.label = label;
@@ -68,10 +70,19 @@ function inputPathsOf(type: unknown, props: Record<string, unknown>): string[] {
   for (const value of Object.values(props)) {
     if (isRecord(value) && typeof value.$bindState === 'string') paths.push(value.$bindState);
   }
-  return paths.flatMap((path) => {
-    const segments = segmentsUnder(INPUTS_ROOT, path);
-    return segments && segments.length > 0 ? [joinPath(INPUTS_ROOT, ...segments)] : [];
-  });
+  return paths.flatMap(inputPath);
+}
+
+/** The list a repeat lays out, when it names an input's list by its own path. */
+function repeatedList(repeat: unknown): string[] {
+  return isRecord(repeat) && typeof repeat.statePath === 'string'
+    ? inputPath(repeat.statePath)
+    : [];
+}
+
+function inputPath(path: string): string[] {
+  const segments = segmentsUnder(INPUTS_ROOT, path);
+  return segments && segments.length > 0 ? [joinPath(INPUTS_ROOT, ...segments)] : [];
 }
 
 function keysOf(value: unknown): string[] {
