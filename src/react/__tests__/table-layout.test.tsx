@@ -492,4 +492,25 @@ describe('a table in a result the host frames', () => {
     const boxes = [...container.querySelectorAll<HTMLElement>('[data-table-box]')];
     expect(boxes.map((b) => b.dataset.tableBox)).toEqual(['framed', 'box']);
   });
+
+  it('leaves a records table inside a records table’s cell its own box', () => {
+    // A composite, whose members the descriptor states no structure for,
+    // holding records whose cell holds records again: the inner table sits
+    // inside the outer one.
+    const unknown: RunField = {
+      kind: 'unknown',
+      name: 'output',
+      conceptRef: 'native.Composite',
+      required: true,
+    };
+    const { container } = render(
+      <StuffViewer
+        field={unknown}
+        value={{ orders: [{ reference: 'O-1', lines: [{ item: 'pen', qty: 2 }] }] }}
+        framed
+      />,
+    );
+    const boxes = [...container.querySelectorAll<HTMLElement>('[data-table-box]')];
+    expect(boxes.map((b) => b.dataset.tableBox)).toEqual(['framed', 'box']);
+  });
 });

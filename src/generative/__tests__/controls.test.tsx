@@ -530,11 +530,17 @@ describe('a stack asked to centre', () => {
     const { container } = render(
       <GenerativePage spec={centred('vertical')} store={createStateStore({})} scope={{}} />,
     );
-    const classes = stackOf(container);
-    expect(classes).toEqual(
-      expect.arrayContaining(['mx-auto', 'w-fit', 'max-w-full', 'items-stretch']),
-    );
+    const column = container.querySelector('h1')!.parentElement!;
+    const classes = column.className.split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(['w-fit', 'max-w-full', 'items-stretch']));
     expect(classes).not.toContain('items-center');
+    // Centred by the box around it, as `items-center` centred a child, never
+    // by auto margins, which inside a horizontal stack would take the row's
+    // free space and spread two centred columns apart.
+    expect(classes).not.toContain('mx-auto');
+    expect(column.parentElement!.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(['flex', 'flex-col', 'items-center']),
+    );
   });
 
   it('centres each child on the cross axis when horizontal', () => {

@@ -1903,6 +1903,11 @@ async function reemitModules() {
     return;
   }
   const g = specsModules.length > 0 ? await loadGenerative() : undefined;
+  // Every module's captures are resolved before any module is written, so a
+  // capture that names no hero (one removed from heroes.ts while its capture
+  // is still committed, which the generative suite reports as well) stops the
+  // re-emit with nothing rewritten, never partway through.
+  const resolved = [];
   for (const caseName of specsModules) {
     // Each capture's brief under the key the sweep stored it by, `briefKey`
     // over the hero it was written for and its variant, so the two cannot
@@ -1921,8 +1926,9 @@ async function reemitModules() {
           : { frame: 'page' };
       return { ...fixture, brief: briefRelPath(g.briefKey(hero, variant)) };
     });
-    writeSpecsModule(caseName, specs);
+    resolved.push([caseName, specs]);
   }
+  for (const [caseName, specs] of resolved) writeSpecsModule(caseName, specs);
   // A payloads module is its fixtures under a header, so it re-emits the same
   // way - which is what lets the header change without a paid sweep. The
   // payloads themselves are copied through untouched: a re-emit never runs.

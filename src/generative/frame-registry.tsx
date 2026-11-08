@@ -234,8 +234,11 @@ function segmentColor(index: number, count: number): string {
  * number a number or a text writes out (a payload's decimal may arrive as
  * text, and the prop's schema would otherwise drop a `$state` read of it to
  * nothing), and `undefined` for anything else, which is shown as no figure.
- * An unreadable total is never read as the parts' sum: a total of 2,400 shown
- * as the 100 its parts add up to was a wrong figure in large type.
+ * `null` is none whoever wrote it: the layout, or a run that left the path a
+ * `$state` read names empty, which the renderer cannot tell apart, since it
+ * sees the value resolved. Only an unreadable total is never read as the
+ * parts' sum: a total of 2,400 shown as the 100 its parts add up to was a
+ * wrong figure in large type.
  */
 function statedAmount(raw: unknown): number | null | undefined {
   if (raw === null || raw === undefined) return null;

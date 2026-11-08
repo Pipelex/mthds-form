@@ -224,7 +224,14 @@ describe("a result page's components write numbers and days one way", () => {
           caption: null,
         })}
         store={createStateStore({
-          result: { rows: [{ year: 2024, units: '1234567.5', raw: 1234567 }] },
+          result: {
+            rows: [
+              { year: 2024, units: '1234567.5', raw: 1234567 },
+              // Written out in full, never in exponent notation; and a code
+              // that `Number` would read as hexadecimal stays the text it is.
+              { year: 1e21, units: '0x1A', raw: 1 },
+            ],
+          },
         })}
         scope={{}}
       />,
@@ -233,6 +240,9 @@ describe("a result page's components write numbers and days one way", () => {
       '2024',
       '1,234,567.5',
       '1,234,567',
+      '1000000000000000000000',
+      '0x1A',
+      '1',
     ]);
   });
 

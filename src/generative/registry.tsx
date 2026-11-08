@@ -390,14 +390,14 @@ function formatCell(value: unknown): string {
 /**
  * A cell in a column the layout stated a format for. `date` writes the day
  * the value names (`formatDay`), never a stringified structure. `text` writes
- * a number as it is, ungrouped, since a column the layout calls text holds a
+ * a number in full and ungrouped, never in exponent notation, since a column the layout calls text holds a
  * year, a reference or a code, and "2,024" is damage there. `number` groups a
  * number, and a text that writes one out too, as a payload's decimal may
  * arrive. With no format, a number is grouped and the rest written as it is.
  */
 function formatColumnCell(value: unknown, format: string | null | undefined): string {
   if (format === 'date') return formatDay(value, 'short') ?? formatCell(value);
-  if (format === 'text' && typeof value === 'number') return String(value);
+  if (format === 'text' && typeof value === 'number') return formatNumber(value, 'plain');
   if (format === 'number') {
     const amount = shareAmount(value);
     if (Number.isFinite(amount)) return formatNumber(amount);

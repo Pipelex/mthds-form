@@ -2844,7 +2844,15 @@ function RecordsTable({
                     {typeof cell === 'boolean' ? (
                       <Bool value={cell} />
                     ) : typeof cell === 'object' && cell !== null ? (
-                      <NativeValue value={cell} label={columnLabel(column)} />
+                      // Out of the host's panel, as far as a table in the
+                      // cell knows, since this table is what frames it.
+                      <PanelEnvOverride
+                        downloads={undefined}
+                        tableLayout={undefined}
+                        framed={false}
+                      >
+                        <NativeValue value={cell} label={columnLabel(column)} />
+                      </PanelEnvOverride>
                     ) : (
                       <Scalar value={cell} />
                     )}

@@ -184,15 +184,20 @@ export function Stack({
   // one that sizes itself (a `Button`) starts at the column's edge with the
   // rest rather than in its middle. A horizontal stack centres its children
   // on the cross axis, one by one.
+  //
+  // The column is centred by an outer box that centres it as `items-center`
+  // centred each child, never by auto margins: inside a horizontal stack an
+  // auto margin takes the row's free space ahead of its `gap` and `justify`,
+  // so two centred columns side by side spread apart instead of packing.
   const column = !horizontal && props.align === 'center';
-  return (
+  const stack = (
     <div
       className={cn(
         'flex',
         horizontal ? 'flex-row' : 'flex-col',
         pick(GAP, props.gap, 'md'),
         column
-          ? 'mx-auto w-fit max-w-full items-stretch'
+          ? 'w-fit max-w-full items-stretch'
           : pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
         props.justify ? pick(JUSTIFY, props.justify, 'start') : undefined,
       )}
@@ -200,6 +205,7 @@ export function Stack({
       {children}
     </div>
   );
+  return column ? <div className="flex flex-col items-center">{stack}</div> : stack;
 }
 
 /** Enumerated rather than interpolated: Tailwind compiles the class names it can see. */

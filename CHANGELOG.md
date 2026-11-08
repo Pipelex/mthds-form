@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`framed` on `StuffViewer` and `ResultEnvProvider`**: a host that draws the result inside a panel of its own says so, and a table of records then draws no outline of its own inside it, keeping its header band, its row rules and a `rounded-md` corner for its band; a table inside an open row keeps its box. The box is on the DOM as `data-table-box` (`box` or `framed`). A host that sets nothing renders as before.
+- **`framed` on `StuffViewer` and `ResultEnvProvider`**: a host that draws the result inside a panel of its own says so, and a table of records then draws no outline of its own inside it, keeping its header band, its row rules and a `rounded-md` corner for its band; a table inside an open row, or inside a cell of a table of records, keeps its box. The box is on the DOM as `data-table-box` (`box` or `framed`). A host that sets nothing renders as before.
 - **`data-error-outline`**: the wrapper that outlines a field in error, in `app`, carries the attribute, so a host's stylesheet and a test can find the mark.
 - **`STYLE=` and `FRAME=` narrow the paid fixture sweep**: `make fixtures-specs` with `STYLE=soft` designs that style's framed moments and no unstyled page (a page is designed under `FRAME=page` whatever the style), an unknown style or frame stops the sweep before it spends anything, and `ONLY=` matches a pipe code or a case.
 
@@ -15,7 +15,7 @@
 - **`soft` and `bold` lift their dark field fill (Breaking)**: `deriveStyleRoles` returns a dark `field` a step lighter than its panel, `card` 12% toward `foreground` for `soft` and `muted` 6% toward `foreground` for `bold`, where both returned `background`, which sat darker than the lifted panel and read as a well cut into it.
 - **A vertical `Stack` asked to centre centres one column (Breaking)**: its children share a column as wide as the widest of them, never wider than its box, and fill it, so their edges agree; each child used to be centred at its own width, and a heading narrower than the form under it started at a different left edge. A horizontal `Stack` still centres each child on the cross axis.
 - **A produced page writes numbers, money and days one way (Breaking)**: `DataTable`, `Metric`, `ProportionBar` and `DateText` format through one formatter in en-GB, so USD reads "US$5" everywhere and a `Metric`'s `compact` style reads "1.3m"; money keeps its currency's own cents ("€3.99", never "€4") and a whole amount is written whole; a `DataTable` column whose format is `text` writes a number ungrouped ("2024").
-- **A `ProportionBar`'s `total` and `of` are read as written (Breaking)**: a number, or a text that writes one out, is drawn, and anything else shows no figure rather than the sum of the parts in its place; `layoutFits` refuses a `$template` there, and a read of a path that holds no number, in each branch of a `$cond`.
+- **A `ProportionBar`'s `total` and `of` are read as written (Breaking)**: a number, or a text that writes one out in decimal, is drawn; none, whether the layout wrote `null` or the path it reads holds `null` when the run comes back, draws the parts' sum, as before; and anything else, such as a structure or a word, shows no figure rather than the sum of the parts in its place; `layoutFits` refuses a `$template` there, and a read of a path that holds no number, in each branch of a `$cond`. A part's amount and a `DataTable` `number` column's text are read the same way, so a code such as "0x1A", which `Number` reads as 26, is no number: the part draws no share and the cell keeps its text.
 
 ### Fixed
 
