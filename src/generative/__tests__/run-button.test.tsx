@@ -213,6 +213,51 @@ describe('what a composer’s run waits for', () => {
     );
   });
 
+  it('ranks a member where the page places its structure, and a structure where it places a member', () => {
+    const placedWhole: Spec = {
+      root: 'composer',
+      elements: {
+        composer: { ...COMPOSER.elements.composer!, children: ['a', 'request', 'b', 'c'] },
+        a: {
+          type: 'MthdsField',
+          props: { path: '/inputs/a', label: null, hint: null },
+          children: [],
+        },
+        request: {
+          type: 'MthdsField',
+          props: { path: '/inputs/request', label: null, hint: null },
+          children: [],
+        },
+        b: {
+          type: 'MthdsField',
+          props: { path: '/inputs/b', label: null, hint: null },
+          children: [],
+        },
+        c: {
+          type: 'MthdsField',
+          props: { path: '/inputs/c', label: null, hint: null },
+          children: [],
+        },
+      },
+    };
+    const inputs = [
+      field('b'),
+      field('c'),
+      field('a'),
+      { kind: 'object', name: 'request', required: true, fields: [field('title')] } as RunField,
+    ];
+    render(
+      <GenerativePage
+        spec={placedWhole}
+        store={createStateStore({ inputs: {} })}
+        scope={{ inputs }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Plan my trip/ })).toHaveAccessibleDescription(
+      'Fill in a, title, b and 1 more to run',
+    );
+  });
+
   it('keeps the time a run takes beside what it waits for', () => {
     render(
       <FrameHostProvider host={{ eta: 'About a minute' }}>

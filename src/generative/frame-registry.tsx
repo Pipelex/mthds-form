@@ -88,9 +88,12 @@ function useRunWaitsFor(): string | undefined {
   const presentation = useFieldPresentation();
   const strings = useFieldStrings();
   const waiting = waitingFields(inputs ?? [], isRecord(values) ? values : undefined)
-    .map(({ field, path }) => ({ field, on: placed.get(joinPath(INPUTS_ROOT, ...path)) }))
+    .map(({ field, path }) => {
+      const at = joinPath(INPUTS_ROOT, ...path);
+      return { field, on: placed.get(at), rank: rankOf(placed, at) };
+    })
     // A stable sort: what the page does not place keeps the descriptor's order, after the rest.
-    .sort((a, b) => rankOf(a.on) - rankOf(b.on));
+    .sort((a, b) => a.rank - b.rank);
   if (waiting.length === 0) return undefined;
   const names = waiting
     .slice(0, NAMED_WAITING)
@@ -98,8 +101,28 @@ function useRunWaitsFor(): string | undefined {
   return strings.runWaitsFor(names, waiting.length - names.length);
 }
 
-function rankOf(placed: PlacedInput | undefined): number {
-  return placed?.order ?? Number.MAX_SAFE_INTEGER;
+/**
+ * Where the page shows a field: where it places the field itself, else where
+ * it places the nearest structure around it whole (an `MthdsField` over the
+ * structure draws its members), else where it places the first of the
+ * field's own members, and after everything the page places otherwise.
+ */
+function rankOf(placed: ReadonlyMap<string, PlacedInput>, path: string): number {
+  const own = placed.get(path);
+  if (own) return own.order;
+  for (
+    let at = path.lastIndexOf('/');
+    at > INPUTS_ROOT.length;
+    at = path.lastIndexOf('/', at - 1)
+  ) {
+    const around = placed.get(path.slice(0, at));
+    if (around) return around.order;
+  }
+  let first = Number.MAX_SAFE_INTEGER;
+  for (const [inside, { order }] of placed) {
+    if (inside.startsWith(`${path}/`)) first = Math.min(first, order);
+  }
+  return first;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
