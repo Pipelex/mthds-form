@@ -387,7 +387,8 @@ function PlainComposer({ app }: { app: HostApp }) {
           {app.lede ? <p className="af-lead">{app.lede}</p> : null}
         </div>
         <div className="af-panel af-comp">
-          <MethodForm form={form} presentation="app" />
+          {/* The panel is the host's here too, so the form draws no card inside it. */}
+          <MethodForm form={form} presentation="app" framed />
           <div className="af-act">
             <span className="af-eta">
               <Icon d={CLOCK} /> {app.eta}

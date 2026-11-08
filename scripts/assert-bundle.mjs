@@ -11,8 +11,11 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DIST = resolve('dist');
+/** The repository, wherever the script is run from. */
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const DIST = resolve(ROOT, 'dist');
 
 /**
  * The entries that RENDER, as opposed to the headless core. Two things follow
@@ -68,7 +71,7 @@ function specifiersOf(code) {
 function graphOf(entry) {
   const files = new Set();
   const externals = new Set();
-  const queue = [resolve(entry)];
+  const queue = [resolve(ROOT, entry)];
 
   while (queue.length > 0) {
     const file = queue.pop();
@@ -168,7 +171,7 @@ function staticGraphOf(entry) {
   const files = new Set();
   const statics = new Set();
   const dynamics = new Set();
-  const queue = [resolve(entry)];
+  const queue = [resolve(ROOT, entry)];
   while (queue.length > 0) {
     const file = queue.pop();
     if (files.has(file)) continue;
@@ -468,8 +471,12 @@ for (const entry of RENDERING_ENTRIES) {
     "const problems = m.layoutCheckProblems(spec, { frame: 'composer', descriptor: { inputs: [] } });",
     "console.log(JSON.stringify({ components: catalog.components.length, hash: m.PROMPT_HASH, problems }));",
   ].join('\n');
+  // Run from the repository, whose `package.json` the specifier resolves
+  // through, and bounded: a probe that hangs is a failure, never a wait.
   const result = spawnSync(process.execPath, ['--conditions=react-server', '--input-type=module', '-e', probe], {
+    cwd: ROOT,
     encoding: 'utf8',
+    timeout: 60_000,
   });
   let answer;
   try {
@@ -483,7 +490,7 @@ for (const entry of RENDERING_ENTRIES) {
     );
   } else {
     failures.push(
-      `./generative/headless did not import and run under node --conditions=react-server: exit ${result.status}, ${(result.stderr || result.stdout).trim().split('\n').slice(0, 3).join(' / ')}`,
+      `./generative/headless did not import and run under node --conditions=react-server: ${result.error ? result.error.message : `exit ${result.status}`}, ${(result.stderr || result.stdout || '').trim().split('\n').slice(0, 3).join(' / ')}`,
     );
   }
 }
@@ -517,7 +524,7 @@ if (existsSync(`${DIST}/layout-design.mthds`)) {
  * present, which is a moving target and a brittle test. The `@source` lines are
  * the actual contract, and they are exact.
  */
-const tailwindEntry = readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8');
+const tailwindEntry = readFileSync(resolve(ROOT, 'src/styles/tailwind-entry.css'), 'utf8');
 const scanned = [...tailwindEntry.matchAll(/@source\s+['"]\.\.\/([^'"]+)['"]/g)].map(
   (match) => match[1],
 );
@@ -545,9 +552,9 @@ const excludedTrees = [
   ...withoutComments(tailwindEntry).matchAll(/@source\s+not\s+['"]\.\.\/([^'"]+?)\/?['"]/g),
 ].map((match) => `src/${match[1]}/`);
 const testOnlyFiles = scanned.flatMap((tree) =>
-  readdirSync(resolve(`src/${tree}`), { recursive: true, withFileTypes: true })
+  readdirSync(resolve(ROOT, `src/${tree}`), { recursive: true, withFileTypes: true })
     .filter((file) => file.isFile())
-    .map((file) => relative(resolve('.'), `${file.parentPath ?? file.path}/${file.name}`))
+    .map((file) => relative(ROOT, `${file.parentPath ?? file.path}/${file.name}`))
     .filter(
       (path) => path.includes('/__tests__/') || /\.(test|spec|stories)\.[cm]?[jt]sx?$/.test(path),
     ),
@@ -942,7 +949,7 @@ function fallbackRule({ stand, tint, literal, shape }, { built }) {
     : `a \`color-mix()\` tint of \`var(${stand}, …)\``;
 }
 
-const themeCss = withoutComments(readFileSync(resolve('src/styles/theme.css'), 'utf8'));
+const themeCss = withoutComments(readFileSync(resolve(ROOT, 'src/styles/theme.css'), 'utf8'));
 const lightBody = soleBlock(themeCss, /(?:^|[}\s;])(?::root)\s*\{/g, ':root', 'src/styles/theme.css');
 const darkBody = soleBlock(themeCss, /(?:^|[}\s;])(?:\.dark)\s*\{/g, '.dark', 'src/styles/theme.css');
 const lightPalette = lightBody === null ? new Map() : declarationsOf(lightBody);
@@ -953,7 +960,7 @@ if (lightBody !== null && lightPalette.size === 0) {
   );
 }
 
-const entryCss = withoutComments(readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8'));
+const entryCss = withoutComments(readFileSync(resolve(ROOT, 'src/styles/tailwind-entry.css'), 'utf8'));
 const themeBody = soleBlock(entryCss, /@theme\s+inline\s*\{/g, '@theme inline', 'src/styles/tailwind-entry.css');
 const arms = themeBody === null ? [] : readsOf(themeBody, 'src/styles/tailwind-entry.css `@theme inline`');
 const mapped = new Set(arms.map((arm) => arm.name));
@@ -1038,7 +1045,7 @@ const arbitraryProblems = [];
 let arbitraryReads = 0;
 const optionalReads = new Map([...OPTIONAL_TOKENS.keys()].map((name) => [name, 0]));
 for (const dir of ARBITRARY_SOURCES) {
-  for (const file of readdirSync(resolve(dir), { recursive: true, withFileTypes: true })) {
+  for (const file of readdirSync(resolve(ROOT, dir), { recursive: true, withFileTypes: true })) {
     if (!file.isFile() || !/\.(tsx?|css)$/.test(file.name)) continue;
     const path = `${file.parentPath ?? file.path}/${file.name}`;
     const relative = path.slice(path.indexOf('src/'));
@@ -1083,7 +1090,7 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
 //     host reads names each one.
 {
   const optionalProblems = [];
-  const themingText = readFileSync(resolve('docs/theming.md'), 'utf8');
+  const themingText = readFileSync(resolve(ROOT, 'docs/theming.md'), 'utf8');
   for (const [name, { stand, literal }] of OPTIONAL_TOKENS) {
     // The chain of stand-ins must end at a token theme.css defines, and never
     // loop back on itself. A literal fallback has no chain.
@@ -1270,7 +1277,7 @@ if (existsSync(`${DIST}/theme.css`)) {
 // is the one restatement nothing used to check - which is exactly how the
 // secondary pair went missing from it. The `@theme inline` block is the
 // authority; this asserts the doc says the same words.
-const themingDoc = readFileSync(resolve('docs/theming.md'), 'utf8');
+const themingDoc = readFileSync(resolve(ROOT, 'docs/theming.md'), 'utf8');
 const tableRows = /\n\| --- \| --- \|\n([\s\S]*?)\n\n/.exec(themingDoc);
 const documented = new Set(
   tableRows === null ? [] : [...tableRows[1].matchAll(/`(--[\w-]+)`/g)].map((m) => m[1]),

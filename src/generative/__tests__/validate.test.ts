@@ -930,3 +930,123 @@ describe('a component a page has one of', () => {
     );
   });
 });
+
+/**
+ * An object is an expression to json-render only when its key holds what the
+ * runtime resolves - a text under `$state`, `true` under `$index`, a `$cond`
+ * beside both branches - so `{ "$state": 7 }` renders as the literal object
+ * it is, and the literal check holds it to the prop's schema.
+ */
+describe('an object that carries an expression key without being an expression', () => {
+  const heading = (text: unknown): Spec => ({
+    root: 'h',
+    elements: { h: { type: 'Heading', props: { text, level: 'h1' }, children: [] } },
+  });
+
+  it.each([{ $state: 7 }, { $index: 1 }, { $cond: { $state: '/ui/on' } }, { $template: 3 }])(
+    'is read as the literal it renders as: %j',
+    (value) => {
+      const verdict = validateAgainstCatalog(heading(value));
+      expect(verdict.ok).toBe(false);
+      expect(formatProblems(verdict.problems)).toContain('Heading.text');
+    },
+  );
+
+  it('is still an expression when its key holds what the runtime resolves', () => {
+    expect(validateAgainstCatalog(heading({ $state: '/ui/title' })).ok).toBe(true);
+  });
+});
+
+/**
+ * A prop whose values are a fixed set takes a literal alone, and so does one
+ * nested inside a prop: a `DataTable` column's `format` written as an
+ * expression is refused as a top-level closed prop is.
+ */
+describe('a closed vocabulary nested inside a prop', () => {
+  it('is refused when it is written as an expression', () => {
+    const spec: Spec = {
+      root: 't',
+      elements: {
+        t: {
+          type: 'DataTable',
+          props: {
+            rows: { $state: '/result/rows' },
+            columns: [{ key: 'when', label: 'When', format: { $state: '/ui/format' } }],
+            caption: null,
+          },
+          children: [],
+        },
+      },
+    };
+    const verdict = validateAgainstCatalog(spec);
+    expect(formatProblems(verdict.problems)).toContain(
+      'DataTable.columns.0.format is one of a fixed set of names',
+    );
+  });
+});
+
+/**
+ * Children in a slot the component does not declare render nothing, and the
+ * development warning json-render would print is looked up by a registry the
+ * page does not render through, so the check says it instead.
+ */
+describe('a named slot', () => {
+  const slotted = (name: string): Spec => ({
+    root: 's',
+    elements: {
+      s: {
+        type: 'Stack',
+        props: { direction: 'vertical', gap: null, align: null, justify: null },
+        children: [],
+        slots: { [name]: ['t'] },
+      },
+      t: { type: 'Text', props: { text: 'Hello', variant: null }, children: [] },
+    },
+  });
+
+  it('is refused when its component does not declare it', () => {
+    expect(formatProblems(validateAgainstCatalog(slotted('aside')).problems)).toContain(
+      'slot "aside", which Stack does not have',
+    );
+  });
+
+  it('is refused when it is named "default", which is what children are for', () => {
+    expect(formatProblems(validateAgainstCatalog(slotted('default')).problems)).toContain(
+      'a slot named "default"',
+    );
+  });
+});
+
+/**
+ * The checks answer a spec of the wrong shape as such, and a throw inside
+ * them on a spec of the right shape as their own failure - never the other
+ * way round, which sent a defect in the checks to the repair pass as a slip
+ * of the layout's.
+ */
+describe('a failure of the checks themselves', () => {
+  const spec: Spec = {
+    root: 't',
+    elements: { t: { type: 'Text', props: { text: 'Hello', variant: null }, children: [] } },
+  };
+
+  it('is answered as the checks failing, not as a malformed layout', () => {
+    const broken = {
+      ...frameCatalog('page'),
+      get componentNames(): readonly string[] {
+        throw new Error('boom');
+      },
+    } as ValidationCatalog;
+    const [problem] = validateAgainstCatalog(spec, broken).problems;
+    expect(problem?.message).toMatch(/^the checks failed on this layout \(Error: boom\)/);
+  });
+
+  it('names the shape a malformed layout lacks', () => {
+    const [problem] = validateAgainstCatalog({
+      root: 't',
+      elements: { t: { type: 'Text', children: 5 } },
+    } as unknown as Spec).problems;
+    expect(problem?.message).toBe(
+      'the layout is not a well-formed spec: the element "t" has "children" that are not a list',
+    );
+  });
+});

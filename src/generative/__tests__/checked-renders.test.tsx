@@ -1,9 +1,11 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { z } from 'zod';
 import type { BrandManifest } from '../../brand/manifest';
+import type { RunField } from '../../core';
 import { catalog } from '../catalog';
 import { layoutProblems } from '../layout-fits';
 import { GenerativePage } from '../page';
@@ -279,5 +281,184 @@ describe('a picture whose path is not a literal', () => {
     );
     expect(renderErrors()).toEqual([]);
     expect(container.querySelector('img')).toBeNull();
+  });
+});
+
+/**
+ * A value a renderer writes out that is a structure, out of the layout's own
+ * scratch state, used to read `[object Object]`; it shows what an absent
+ * value shows.
+ */
+describe('a structure where a value is shown', () => {
+  it.each([
+    ['Fact', { label: 'Where', value: { $state: '/ui/place' }, detail: null }, '—'],
+    ['Metric', { label: 'Total', value: { $state: '/ui/place' }, unit: null, format: null }, '—'],
+  ])('is no text in a %s', (type, props, shown) => {
+    const spec: Spec = { root: 'only', elements: { only: { type, props, children: [] } } };
+    const { container } = render(
+      <GenerativePage
+        spec={spec}
+        store={createStateStore({ ui: { place: { city: 'Lyon' } } })}
+        scope={{}}
+        brand={BRAND}
+      />,
+    );
+    expect(container.textContent).not.toContain('[object Object]');
+    expect(container.textContent).toContain(shown);
+  });
+});
+
+/**
+ * A hatch's `path` is relative inside a repeat, so one a layout rendered past
+ * the checks read as a number from scratch state must not be written out as
+ * text: `0` would bind the field to the item's first entry.
+ */
+describe("a hatch's path that is not a text", () => {
+  it('resolves to nothing rather than to the entry its number names', () => {
+    const spec: Spec = {
+      root: 'rows',
+      elements: {
+        rows: {
+          type: 'Stack',
+          props: { direction: 'vertical', gap: null, align: null, justify: null, className: null },
+          repeat: { statePath: '/inputs/matrix' },
+          children: ['cell'],
+        },
+        cell: {
+          type: 'MthdsField',
+          props: { path: { $state: '/ui/index' }, label: null, hint: null },
+          children: [],
+        },
+      },
+    };
+    const cell: RunField = { kind: 'text', name: 'cell', required: true };
+    const matrix: RunField = {
+      kind: 'list',
+      name: 'matrix',
+      required: true,
+      item: { kind: 'list', name: 'row', required: true, item: cell },
+    };
+    render(
+      <GenerativePage
+        spec={spec}
+        store={createStateStore({ inputs: { matrix: [['a']] }, ui: { index: 0 } })}
+        scope={{ inputs: [matrix] }}
+        brand={BRAND}
+      />,
+    );
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('No input at 0');
+  });
+});
+
+/** Two tabs a layout wrote with one value are still two tabs. */
+describe('tabs that share a value', () => {
+  it('open one panel at a time, under keys React can tell apart', async () => {
+    const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+    const spec: Spec = {
+      root: 'tabs',
+      elements: {
+        tabs: {
+          type: 'Tabs',
+          props: {
+            tabs: [
+              { label: 'One', value: 'same' },
+              { label: 'Two', value: 'same' },
+            ],
+          },
+          children: ['one', 'two'],
+        },
+        one: { type: 'Stack', props: STACK, children: ['first'] },
+        two: { type: 'Stack', props: STACK, children: ['second'] },
+        first: { type: 'Text', props: { text: 'First panel', variant: null }, children: [] },
+        second: { type: 'Text', props: { text: 'Second panel', variant: null }, children: [] },
+      },
+    };
+    render(<GenerativePage spec={spec} store={createStateStore({})} scope={{}} brand={BRAND} />);
+    expect(screen.getByText('First panel').closest('[hidden]')).toBeNull();
+    expect(screen.getByText('Second panel').closest('[hidden]')).not.toBeNull();
+    expect(logged.flat().join(' ')).not.toMatch(/same key/);
+  });
+
+  it('open the first panel when a new layout has fewer tabs than the one open', async () => {
+    const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+    const text = (t: string) => ({ type: 'Text', props: { text: t, variant: null }, children: [] });
+    const three: Spec = {
+      root: 'tabs',
+      elements: {
+        tabs: {
+          type: 'Tabs',
+          props: {
+            tabs: [
+              { label: 'One', value: 'one' },
+              { label: 'Two', value: 'two' },
+              { label: 'Three', value: 'three' },
+            ],
+          },
+          children: ['one', 'two', 'three'],
+        },
+        one: { type: 'Stack', props: STACK, children: ['first'] },
+        two: { type: 'Stack', props: STACK, children: ['second'] },
+        three: { type: 'Stack', props: STACK, children: ['third'] },
+        first: text('First panel'),
+        second: text('Second panel'),
+        third: text('Third panel'),
+      },
+    };
+    const store = createStateStore({});
+    const { rerender } = render(
+      <GenerativePage spec={three} store={store} scope={{}} brand={BRAND} />,
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Three' }));
+    expect(screen.getByText('Third panel')).toBeTruthy();
+    const two: Spec = {
+      ...three,
+      elements: {
+        ...three.elements,
+        tabs: {
+          ...three.elements.tabs!,
+          props: {
+            tabs: [
+              { label: 'One', value: 'one' },
+              { label: 'Two', value: 'two' },
+            ],
+          },
+          children: ['one', 'two'],
+        },
+      },
+    };
+    rerender(<GenerativePage spec={two} store={store} scope={{}} brand={BRAND} />);
+    expect(screen.getByText('First panel').closest('[hidden]')).toBeNull();
+  });
+
+  it('keep the open tab open when a new layout inserts one before it', async () => {
+    const STACK = { direction: 'vertical', gap: null, align: null, justify: null, className: null };
+    const text = (t: string) => ({ type: 'Text', props: { text: t, variant: null }, children: [] });
+    const tabsOf = (values: string[]): Spec => ({
+      root: 'tabs',
+      elements: {
+        tabs: {
+          type: 'Tabs',
+          props: { tabs: values.map((value) => ({ label: value, value })) },
+          children: values.map((value) => `p-${value}`),
+        },
+        ...Object.fromEntries(
+          values.flatMap((value) => [
+            [`p-${value}`, { type: 'Stack', props: STACK, children: [`t-${value}`] }],
+            [`t-${value}`, text(`Panel ${value}`)],
+          ]),
+        ),
+      },
+    });
+    const store = createStateStore({});
+    const { rerender } = render(
+      <GenerativePage spec={tabsOf(['A', 'B', 'C'])} store={store} scope={{}} brand={BRAND} />,
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'B' }));
+    rerender(
+      <GenerativePage spec={tabsOf(['X', 'A', 'B', 'C'])} store={store} scope={{}} brand={BRAND} />,
+    );
+    expect(screen.getByText('Panel B').closest('[hidden]')).toBeNull();
+    expect(screen.getByText('Panel A').closest('[hidden]')).not.toBeNull();
   });
 });

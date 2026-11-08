@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { type BaseComponentProps, useBoundProp, useFieldValidation } from '@json-render/react';
+import { type BaseComponentProps, useBoundProp } from '@json-render/react';
+import { useCheckedField } from '../checked-fields';
 import { hasOwnProp } from '../../core/own-property';
 import { enumLabeler, useFieldPresentation } from '../../react/field-presentation';
 import { fieldControlClass } from '../../react/field-styles';
@@ -37,7 +38,7 @@ interface BoundFieldProps {
 /**
  * The one piece of binding every input repeats: the value the control shows,
  * the setter that writes it back, and the checks the spec attached to it.
- * `useFieldValidation` is given a binding only when there is both a path and a
+ * `useCheckedField` is given a binding only when there is both a path and a
  * check, so an unbound control never registers a validator the run would wait
  * on.
  */
@@ -52,7 +53,7 @@ function useBoundField<T>(
   const isBound = Boolean(binding);
   const hasValidation = Boolean(binding && checks?.length);
   const when = validateOn ?? 'change';
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     binding ?? '',
     hasValidation ? { checks: checks ?? [], validateOn: when } : undefined,
   );
