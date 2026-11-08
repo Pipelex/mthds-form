@@ -72,18 +72,23 @@ function structureGrouping(depth: number, labelled: boolean, framed: boolean): S
 /**
  * What a section in error draws where a card would turn its outline red: a
  * bar in the error colour down the section's whole height, from its heading
- * to its last field, set in the host's panel's padding, 12 pixels outside
- * the form's own edge. It stands out of the flow, so it moves no field when
- * the error comes or goes, and it is one edge rather than four, so no card
- * comes back inside the host's panel. A framed form always has that padding,
- * since the host's panel is what `framed` states. Three pixels in the solid
- * error colour, where the card's outline was one at half strength, because
- * a single edge has less length to be seen by; the stock palette's red
- * reaches the 3:1 a mark needs on the panel in both themes. `m-0` undoes the
- * spacing the stack it heads gives its children, which would shorten it.
+ * to its last field, just outside the form's start edge. It stands out of
+ * the flow, so it moves no field when the error comes or goes, and it is one
+ * edge rather than four, so no card comes back inside the host's panel.
+ *
+ * It stands 4 pixels off the form, as a field's own error outline stands 4
+ * pixels off the field (`FieldShell`), so it asks for 7 pixels of room
+ * beside the form, little more than the 5 that outline already takes; a
+ * host's panel pads its form by more than that, and a host that clips
+ * closer loses the bar as it loses the outline, while the section's message
+ * at its heading stays. Three pixels in the solid error colour, where the
+ * card's outline was one at half strength, because a single edge has less
+ * length to be seen by; the brand contract holds that colour to the 3:1 a
+ * mark needs on the page and on a card. `m-0` undoes the spacing the stack
+ * it heads gives its children, which would shorten it.
  */
 const SECTION_ERROR_EDGE =
-  'pointer-events-none absolute inset-y-0 -left-3 m-0 w-[3px] rounded-full bg-destructive';
+  'pointer-events-none absolute inset-y-0 -start-[7px] m-0 w-[3px] rounded-full bg-destructive';
 
 /**
  * A structure's name, set as a heading over its fields' labels in `app`: the

@@ -153,6 +153,13 @@ export interface ContrastPair {
  * the text bar there waits on the stock palette reaching it. The field fill
  * may be translucent, as a style's often is, so it is laid over the canvas
  * first.
+ *
+ * The error colour is held to the same 3:1 on the canvas and on a card, the
+ * surfaces the kernel marks an error on: a framed section's error bar, the
+ * outline of a field or a card in error. Its captions are text, which AA
+ * would hold to 4.5:1, but the stock palette's red measures 3.76:1 on white,
+ * so that bar waits on the stock palette too. A card may be translucent, so
+ * it is laid over the canvas first.
  */
 export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   { foreground: 'foreground', background: 'background', minimum: MIN_CONTRAST },
@@ -160,6 +167,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   {
     foreground: 'muted-foreground',
     background: 'input',
+    over: 'background',
+    minimum: MIN_CONTROL_CONTRAST,
+  },
+  { foreground: 'destructive', background: 'background', minimum: MIN_CONTROL_CONTRAST },
+  {
+    foreground: 'destructive',
+    background: 'card',
     over: 'background',
     minimum: MIN_CONTROL_CONTRAST,
   },

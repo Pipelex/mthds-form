@@ -193,8 +193,9 @@ export const FramedByTheHost: Story = {
  * The framed form after Run was pressed with the shop empty and the refund
  * account started but not finished. Without the frame each structure's card
  * would turn red; a section has no card, so each one in error draws a red
- * edge down its whole height, in the host's panel's padding beside the
- * form, and its message at its heading rather than under its last field.
+ * edge down its whole height, 4 pixels off the form's start edge as a
+ * field's own error outline stands off its field, and its message at its
+ * heading rather than under its last field.
  * Neither moves a field: the edge stands out of the flow and the message
  * takes the heading's row. The play measures all of it, in both themes.
  */
@@ -232,8 +233,10 @@ export const FramedAfterAnAttempt: Story = {
         // Down the section's whole height, its heading and its last field included.
         await expect(rect.top).toBeLessThanOrEqual(heading.getBoundingClientRect().top);
         await expect(rect.bottom).toBeGreaterThanOrEqual(fields.at(-1)!.bottom);
-        // Beside the form, in the panel's padding, and no hairline.
+        // Beside the form, asking no more room of the panel than a field's
+        // error outline does, and no hairline.
         await expect(rect.right).toBeLessThan(column.left);
+        await expect(column.left - rect.left).toBeLessThanOrEqual(7);
         await expect(rect.left).toBeGreaterThan(box.left);
         await expect(rect.width).toBeGreaterThanOrEqual(2);
         // The error colour, at the 3:1 a mark needs against the panel.

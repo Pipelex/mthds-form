@@ -230,6 +230,46 @@ describe('the token validator', () => {
     );
   });
 
+  it('holds the error colour to 3:1 on the page and on a card, in both modes', () => {
+    // A red that has faded into the page: the error bar, a field's error
+    // outline and a card's are each a mark nobody can see on it.
+    const tokens = base();
+    const page = resolveColor(tokens, 'background', 'light')!;
+    const night = resolveColor(tokens, 'background', 'dark')!;
+    tokens.color.destructive.$value = { ...page, alpha: 1 };
+    tokens.color.destructive.$extensions!.mode.dark = { ...night, alpha: 1 };
+    const problems = problemsOf(tokens).join('\n');
+    for (const mode of ['light', 'dark']) {
+      expect(problems).toMatch(
+        new RegExp(
+          `color\\.destructive on color\\.background \\(${mode}\\): contrast 1\\.00, expected 3 \\(WCAG AA for a control\\)`,
+        ),
+      );
+      expect(problems).toMatch(
+        new RegExp(`color\\.destructive on color\\.card over color\\.background \\(${mode}\\)`),
+      );
+    }
+  });
+
+  it('measures the error colour on a card as the card renders over the page', () => {
+    // A card the error colour itself, at half strength: over a white page it
+    // is a pale red the red reads on at under 3:1, which an opaque reading of
+    // the card, the red itself, would put at 1:1.
+    const tokens = base();
+    const red = {
+      colorSpace: 'srgb' as const,
+      components: [0.86, 0.15, 0.15] as [number, number, number],
+    };
+    tokens.color.background.$value = { colorSpace: 'srgb', components: [1, 1, 1], alpha: 1 };
+    tokens.color.destructive.$value = { ...red, alpha: 1 };
+    tokens.color.card.$value = { ...red, alpha: 0.5 };
+    const card = problemsOf(tokens).filter((problem) =>
+      problem.startsWith('color.destructive on color.card over color.background (light)'),
+    );
+    expect(card).toHaveLength(1);
+    expect(card[0]).not.toMatch(/contrast 1\.00/);
+  });
+
   it('names a translucent canvas once, however many pairs stand on it', () => {
     const tokens = base();
     tokens.color.background.$value = { colorSpace: 'srgb', components: [1, 1, 1], alpha: 0.9 };
