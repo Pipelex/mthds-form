@@ -90,8 +90,9 @@ async function expectNoSidewaysScroll(canvasElement: HTMLElement) {
  * **A list of three documents with long names, on a phone.** Each card keeps
  * its name readable - its first eighteen characters or so, then an ellipsis -
  * by moving its Preview and remove buttons under the name once the row is too
- * narrow for both, rather than squeezing the name to a letter. Every button on
- * the card and in the list is 44 pixels square or more.
+ * narrow for both, rather than squeezing the name to a letter, and Preview is
+ * its icon alone, the word kept as its accessible name. Every button on the
+ * card and in the list is 44 pixels square or more.
  */
 export const DocumentListPhone: Story = {
   name: 'A list of documents with long names, phone',
@@ -120,6 +121,10 @@ export const DocumentListPhone: Story = {
     // on each, a remove button per row, and Add under both lists.
     await expect(controls).toHaveLength(2 * (3 * 3 + 3 + 2));
     for (const control of controls) await expectTouchTarget(control);
+    // Found above by its accessible name, and as wide as its icon's target.
+    for (const preview of buttons(canvasElement, S.preview)) {
+      await expect(Math.round(preview.getBoundingClientRect().width)).toBe(TOUCH_TARGET);
+    }
   },
 };
 

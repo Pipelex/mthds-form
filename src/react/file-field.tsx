@@ -1078,12 +1078,14 @@ function FileChip({
             type="button"
             onClick={onTogglePreview}
             className={cn(
-              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-11 max-sm:px-3',
+              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:size-11 max-sm:justify-center max-sm:px-0',
               focusOutlineClass,
             )}
           >
             {previewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {s.preview}
+            {/* On a phone the word crowded the file's name for a row it did not
+                need: the button is its icon, and the word is still its name. */}
+            <span className="max-sm:sr-only">{s.preview}</span>
           </button>
         )}
         <ClearButton disabled={disabled} onClick={onClear} />
