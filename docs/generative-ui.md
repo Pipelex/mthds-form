@@ -4,6 +4,8 @@
 
 The reason it is a separate entry rather than a feature of `./react` is the [dependency budget](dependency-budget.md): a layout is compiled and validated, which costs json-render and zod, and a host rendering an ordinary form should not carry either.
 
+The layer is two entries. **`@pipelex/mthds-form/generative/headless`** is everything that renders nothing: the catalog and the frames, the designer method's catalog data and brief, the prompt pin, the seed's line, the JSONL compiler, the two checks and `layoutCheckProblems`, the state paths, `payloadToState` and the provenance record. It carries no React and no `'use client'` directive, so it imports alike from a server component, a server action, a route handler, a worker, a script and a browser. **`@pipelex/mthds-form/generative`** renders: it re-exports all of the headless entry beside the page, the registry and the providers, behind a `'use client'` directive. A client host imports from `./generative` alone; a host's server imports `./generative/headless`, because every export of a client module reaches a React Server Components server as a client reference that throws when it is called. Every function this document names that renders nothing is exported by both.
+
 ## Three artifacts, and what each is allowed to say
 
 | Artifact           | Who makes it                             | What it states                                                               |
@@ -40,7 +42,7 @@ import {
   formatProblems,
   layoutFits,
   validateAgainstCatalog,
-} from '@pipelex/mthds-form/generative';
+} from '@pipelex/mthds-form/generative'; // or '@pipelex/mthds-form/generative/headless' on a server
 ```
 
 **`validateAgainstCatalog(spec)`** asks whether the layout is written in the vocabulary of a whole page (a frame's layout passes `frameCatalog(frame)` as the second argument; the exported `catalog` defines every frame's components too, so it is what the registry renders, not what a page may hold): every element type known, every prop declared and correctly typed (an expression may stand anywhere inside a prop, a whole entry of a list included, because json-render resolves it wherever it sits, so the typing reads past it rather than refusing the object it stands for, while a prop whose values are a fixed set takes a literal alone), one panel per tab or step, exactly two children in a `Split` or a `Workspace` (their renderers lay out two and would drop a third in silence), no empty option in a choice (no dropdown row or pill can offer nothing, and the run gate would refuse whatever a renderer wrote in its place), no heading level skipped and exactly one h1 — counting what the components render, since the a11y gate reads the DOM and not the element types: a `Hero`'s headline is the h1, a `Section`'s or a `Rail`'s title an h2, a titled `Card`'s an h3 — at most one of a component that renders as one of the page's landmarks (an `AppBar` is its banner, a `Footer` its contentinfo), every element reachable from the root, no element its own descendant, and the element tree no deeper than this entry renders. What a component renders beyond its schema is not read off its name: the catalog carries it as `renders`, a table of `ComponentRendering` per component — the heading its title is, the landmark it renders as, the fixed number of children it lays out, the prop whose entries are its panels — declared as `COMPONENT_RENDERINGS` beside this entry's definitions and read off whichever catalog the validator is handed. A host validating a vocabulary of its own declares what its renderers do, or nothing, in which case it is held to its schemas and its `Heading` elements alone, and asked for an h1 only when its vocabulary can render one. It answers with problems, not exceptions — `formatProblems` renders them for a log — and that holds for a spec malformed in ways json-render's own walk throws on, because a host calling this to decide whether rendering is safe has no use for an exception.
@@ -177,7 +179,7 @@ A render error is the last condition, and json-render's per-element boundary cat
 
 ## Producing a layout
 
-The producer is outside this package, but the package ships what a producer needs.
+The producer is outside this package, but the package ships what a producer needs, and all of it is in **`./generative/headless`**: a producer starts the designer method where its API key is, on its server, and checks the answer there before it stores it, so nothing it imports may sit behind the rendering entry's client directive. The catalog data, the brief, the concept names, the seed's line, the prompt pin and its recipe, the compiler, the checks and the repair bound are each imported from it, in a server action or a route handler as much as in a script; `./generative` exports the same values for a host that produces in the browser.
 
 The **designer method** is the prompt. It ships as data at `@pipelex/mthds-form/layout-design.mthds`: a `.mthds` bundle whose main pipe, `design_layout`, takes three inputs — `catalog`, `brief` and an optional `seed`, the first two as data — and runs three stages. `render_brief` lays the brief out: a Jinja2 template over the brief's data, with no model behind it, whose Markdown is the text both model stages then read — so every sentence a model reads about the page, the headings, how a path line is worded, what "delegated" says, is in that file too. `plan_page` reads that text and the catalog and writes a `PagePlan`, a structure the bundle declares: what the page is for, its title and composition, its regions with the elements and paths each holds, what runs the method, the defaults and what is delegated. It alone sees the seed, because the plan is where two runs of the same brief diverge. Neither model stage prescribes a composition: the shape of the page is the planner's decision, written into the plan, and the prose names none of the product chrome — what a component is for travels in its catalog description, as data, the control that runs the method is named by the brief, as data, and a test holds the method to naming none — so two layouts of one brief may differ in their bones and not only in their copy. `emit_page` is handed the plan, the catalog with every props signature and the laid-out brief, and emits the JSONL patches. Every paragraph either model reads — the brief's own prose, the design direction and the planning rules on one side, the output format, the state contract and the numbered rules on the other — is authored in that file. It ships as a file rather than as a string baked into a module because it is still being iterated on — a newer method is then a package upgrade rather than a code change — and because nothing in the entry may read it, which is what keeps the entry importable from a browser. Improving the prompt is editing that file; nothing in TypeScript renders a prompt string, and nothing in TypeScript writes a sentence of the brief. Three things to know before editing it: a literal dollar sign is written `$$`, because `$name` is the language's inline substitution, so every json-render expression key in the prose (`$$state`, `$$bindState`, `$$item`, ...) is spelled that way, in the brief's template too; the component and action sections, like the plan the builder reads, are Jinja2 loops in the two prompts, which keep every newline they are written with, so a heading that follows a loop sits directly under its `{% endfor %}` to render one blank line rather than two; and the brief's template is a `markdown` template, whose category trims a line holding only a `{% %}` tag, so a line that ends with such a tag closes it with `+%}` to keep its newline, and every `{% set %}` sits at the top of the template — the runtime reads a name set inside a loop or a condition as an input the pipe never declared.
 
@@ -195,7 +197,8 @@ import {
   DESIGNER_CATALOG_CONCEPT,
   designerCatalog,
   inputBrief,
-} from '@pipelex/mthds-form/generative';
+  seedLine,
+} from '@pipelex/mthds-form/generative/headless';
 
 const method = createRequire(import.meta.url).resolve('@pipelex/mthds-form/layout-design.mthds');
 const request = {
@@ -217,6 +220,24 @@ const request = {
 ```
 
 The **seed** is optional and travels as the one labelled line `seedLine(seed)` writes, the line the planner's seed procedure was written against: two runs of one brief with different seeds diverge in their composition, and a host that wants a page it can reproduce stores the seed beside the layout.
+
+When the run answers, the producer compiles the JSONL and checks it against the frame it asked for, on the same server, before it stores anything:
+
+```ts
+import {
+  PROMPT_HASH,
+  REPAIR_ATTEMPTS,
+  layoutCheckProblems,
+  specFromJsonl,
+} from '@pipelex/mthds-form/generative/headless';
+
+const problems = layoutCheckProblems(specFromJsonl(jsonl), {
+  frame: 'composer',
+  descriptor: { inputs: fields },
+});
+if (problems.length === 0) store({ jsonl, frame: 'composer', promptHash: PROMPT_HASH, seed });
+// otherwise repair, at most REPAIR_ATTEMPTS times, as below
+```
 
 **The repair pass.** A layout the checks refuse is not lost. The method's second entry, `generative.repair_layout`, takes the same `catalog` and `brief`, the refused JSONL as `page`, and the problems as `problems` — `layoutCheckProblems(spec, check).join('\n')` — and emits the whole page again with those problems fixed and nothing else changed. The loop is the producer's, because the checks are this package's TypeScript and the method cannot run them: check, repair, check again, at most `REPAIR_ATTEMPTS` times, and keep the plain form when the last pass is still refused. The refusals the designer makes are slips of one prop or one child key, which one pass told what it broke fixes; each pass is one model call on the model the method pins, about what the builder stage of a design costs, and its usage comes back with the run like a design's. A layout that needed passes records how many as `repairs`.
 

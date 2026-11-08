@@ -8,6 +8,7 @@
  *
  * Run against a fresh `dist/` (see `make assert-bundle`).
  */
+import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 
@@ -22,13 +23,18 @@ const RENDERING_ENTRIES = ['react', 'generative'];
 
 /**
  * The entries that must import with no DOM and no React: the headless kernel,
- * and the brand entry, which a build script, a test and a server's fetcher
- * import alike. Neither may carry a `'use client'` prologue.
+ * the brand entry, which a build script, a test and a server's fetcher import
+ * alike, and the generative layer's half that renders nothing, which a host's
+ * server imports to produce and check a layout. None may carry a
+ * `'use client'` prologue.
  */
-const ISOMORPHIC_ENTRIES = ['core', 'brand'];
+const ISOMORPHIC_ENTRIES = ['core', 'brand', 'generative/headless'];
 
 /** Every entry, for the bans that hold everywhere. */
-const ENTRIES = ['core', 'react', 'generative', 'brand'];
+const ENTRIES = ['core', 'react', 'generative', 'generative/headless', 'brand'];
+
+/** How an entry is spelled in the package's `exports` map, for a failure's words. */
+const specifierOf = (entry) => (entry === 'core' ? '.' : `./${entry}`);
 
 /**
  * Import and re-export specifiers of a bundled module.
@@ -90,7 +96,7 @@ const BANNED = [
   ...ISOMORPHIC_ENTRIES.map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^react($|\/)|^react-dom($|\/)/,
-    why: `The \`${entry === 'core' ? '.' : `./${entry}`}\` entry is isomorphic and must stay importable from a server component and a node script.`,
+    why: `The \`${specifierOf(entry)}\` entry is isomorphic and must stay importable from a server component and a node script.`,
   })),
   ...['react', 'generative', 'brand'].map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
@@ -229,6 +235,33 @@ for (const { entry, match, why } of BANNED) {
   } else {
     console.log(
       `ok  ${relative(DIST, entry)} (${files.size} modules) reaches nothing matching ${match.source}`,
+    );
+  }
+}
+
+/**
+ * The generative layer's server entry has an allow-list too: json-render's
+ * core, which compiles a layout's JSONL and checks its structure, and zod,
+ * which its catalog is written in - and nothing else. No React, no renderer,
+ * no icon set, no radix, no class helper, no validator: what a server imports
+ * to produce and check a layout is exactly what its budget line says, and a
+ * shared chunk that carried any of the rendering half's dependencies back
+ * into it fails here whatever the dependency is.
+ */
+{
+  const SERVER_ALLOWED = /^@json-render\/core$|^zod($|\/)/;
+  const { files, externals } = graphOf(`${DIST}/generative/headless/index.js`);
+  const outside = [...externals].filter((specifier) => !SERVER_ALLOWED.test(specifier));
+  const missing = ['@json-render/core', 'zod'].filter((name) => !externals.has(name));
+  if (outside.length > 0 || missing.length > 0) {
+    failures.push(
+      outside.length > 0
+        ? `generative/headless/index.js reaches ${outside.join(', ')} - the server entry depends on @json-render/core and zod and nothing else. See docs/dependency-budget.md.`
+        : `generative/headless/index.js does not reach ${missing.join(', ')}, so the allow-list compared less than the entry's budget names - the catalog is zod and the compiler is json-render's.`,
+    );
+  } else {
+    console.log(
+      `ok  generative/headless/index.js (${files.size} modules) reaches @json-render/core and zod and nothing else`,
     );
   }
 }
@@ -397,6 +430,61 @@ for (const entry of ISOMORPHIC_ENTRIES) {
     );
   } else {
     console.log(`ok  ${entry}/index.js carries no 'use client' directive`);
+  }
+}
+
+// A client boundary cannot carry `export *`: a bundler that turns a
+// `'use client'` module's exports into client references has to know their
+// names, and Next.js refuses the star form outright. `./generative` re-exports
+// the server entry with `export * from './headless'` in source, which esbuild
+// flattens into named exports because the module is inside the bundle - so
+// this checks the flattening happened, rather than trusting it.
+for (const entry of RENDERING_ENTRIES) {
+  const starred = statementsOf(readFileSync(`${DIST}/${entry}/index.js`, 'utf8')).filter(
+    (statement) => /^export\s*\*/.test(statement),
+  );
+  if (starred.length > 0) {
+    failures.push(
+      `${entry}/index.js carries ${starred.length} \`export *\` statement(s) behind its 'use client' directive - a client boundary must name its exports. first: ${starred[0].slice(0, 80)}`,
+    );
+  } else {
+    console.log(`ok  ${entry}/index.js names every export behind its 'use client' directive`);
+  }
+}
+
+// The server entry, imported as a server imports it: through the package's
+// own `exports` map, by its public specifier, under the `react-server`
+// condition a React Server Components server resolves with - where `react` is
+// the server build, which has no hooks and no context, so a module that so
+// much as touched the rendering half would fail to load. The graph check above
+// reads specifiers; this runs the entry, which is what catches a wrong path in
+// `package.json` or a chunk that throws on load. The client entry fails this
+// same import, and that failure is the reason the server entry exists.
+{
+  const probe = [
+    "const m = await import('@pipelex/mthds-form/generative/headless');",
+    "const catalog = m.designerCatalog({ frame: 'composer' });",
+    "const spec = m.specFromJsonl(m.specToJsonl({ root: 'p', elements: { p: { type: 'Composer', props: { headline: 'h', lede: null, runLabel: 'Run', columns: null, notes: null }, on: { press: [{ action: 'run' }] }, children: [] } } }));",
+    "const problems = m.layoutCheckProblems(spec, { frame: 'composer', descriptor: { inputs: [] } });",
+    "console.log(JSON.stringify({ components: catalog.components.length, hash: m.PROMPT_HASH, problems }));",
+  ].join('\n');
+  const result = spawnSync(process.execPath, ['--conditions=react-server', '--input-type=module', '-e', probe], {
+    encoding: 'utf8',
+  });
+  let answer;
+  try {
+    answer = JSON.parse(result.stdout.trim().split('\n').pop() ?? '');
+  } catch {
+    answer = undefined;
+  }
+  if (result.status === 0 && answer && answer.components > 0 && /^[0-9a-f]{12}$/.test(answer.hash) && Array.isArray(answer.problems) && answer.problems.length === 0) {
+    console.log(
+      `ok  ./generative/headless imports and runs under the react-server condition (${answer.components} composer components, prompt ${answer.hash})`,
+    );
+  } else {
+    failures.push(
+      `./generative/headless did not import and run under node --conditions=react-server: exit ${result.status}, ${(result.stderr || result.stdout).trim().split('\n').slice(0, 3).join(' / ')}`,
+    );
   }
 }
 

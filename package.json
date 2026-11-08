@@ -32,6 +32,10 @@
       "import": "./dist/generative/index.js",
       "types": "./dist/generative/index.d.ts"
     },
+    "./generative/headless": {
+      "import": "./dist/generative/headless/index.js",
+      "types": "./dist/generative/headless/index.d.ts"
+    },
     "./brand": {
       "import": "./dist/brand/index.js",
       "types": "./dist/brand/index.d.ts"

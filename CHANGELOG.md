@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`@pipelex/mthds-form/generative/headless`, the generative layer's half that renders nothing**: the designer catalog and the frames, the brief, the concept names, `PROMPT_HASH` and `promptHashSubject`, `seedLine`, the JSONL compiler, `validateAgainstCatalog`, `layoutFits`, `layoutProblems`, `layoutCheckProblems`, `REPAIR_ATTEMPTS`, the state paths, `payloadToState` and the provenance record, in an entry with no React and no `'use client'` directive, so a host running React Server Components produces and checks a layout on its server. `./generative` re-exports all of it, so nothing a client host imports moves. See [docs/generative-ui.md](docs/generative-ui.md).
+
 ## [v0.31.0] - 2026-11-08
 
 ### Highlights
