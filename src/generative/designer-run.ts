@@ -84,7 +84,7 @@ export function layoutCheck(spec: Spec, { frame, descriptor }: LayoutCheck): Lay
     // The frame is the host's argument, not the layout's: no repair can mend it.
     return {
       problems: [
-        `the layout names the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
+        `the layout is checked against the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
       ],
       checksFailed: true,
     };

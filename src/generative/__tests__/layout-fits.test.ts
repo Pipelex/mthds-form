@@ -47,6 +47,16 @@ describe('a layout that has gone stale', () => {
     expect(layoutProblems(descriptor, pageBinding('/inputs/city', '/inputs/request/tone'))).toEqual(
       [],
     );
+    // A blank default fills nothing, so it does not cover the structure.
+    const blank: RunField = {
+      ...request,
+      fields: [{ ...text('tone', false), defaultValue: '' }],
+    } as RunField;
+    expect(
+      layoutProblems({ inputs: [text('city', true), blank] }, pageBinding('/inputs/city')).some(
+        (line) => line.includes('/inputs/request'),
+      ),
+    ).toBe(true);
     // A member with a default fills the structure from the start.
     const seeded: RunField = {
       ...request,

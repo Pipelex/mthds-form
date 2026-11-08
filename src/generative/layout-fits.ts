@@ -1,6 +1,7 @@
 import type { Spec } from '@json-render/core';
 import type { RunField, RunFieldKind } from '../core';
 import { hasOwnProp } from '../core/own-property';
+import { isFilled } from '../core/readiness';
 import { catalog } from './catalog';
 import { condBranches, expressionForm, isExpression } from './expressions';
 import { shareAmount } from './share-amount';
@@ -727,11 +728,10 @@ function uncoveredUnder(field: RunField, path: string, offered: Offered): string
     const under = (child: RunField) => uncoveredUnder(child, joinPath(path, child.name), offered);
     const required = field.fields.filter((child) => child.required);
     if (required.length > 0) return required.flatMap(under);
-    // A member with a default holds it from the start (`seedInputs`), so the
-    // structure is filled before the person touches it.
-    return field.fields.some(
-      (child) => child.defaultValue !== undefined || under(child).length === 0,
-    )
+    // A member whose default holds something has it from the start
+    // (`seedInputs`), so the structure is filled before the person touches
+    // it; a blank default fills nothing.
+    return field.fields.some((child) => isFilled(child.defaultValue) || under(child).length === 0)
       ? []
       : [path];
   }
