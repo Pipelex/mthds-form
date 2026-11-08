@@ -45,11 +45,13 @@ export interface LayoutVerdict {
   /** Every problem, one a line, in the words the repair pass reads; empty means the layout may render. */
   problems: string[];
   /**
-   * Whether a check threw on a layout of the right shape: a defect in the
-   * checks, stated among the problems in a line of its own. The layout is
-   * refused all the same - the host keeps the plain form - but a producer
-   * stops here instead of handing the lines to the repair pass, which can
-   * change the layout and not the checks.
+   * Whether no repair of the layout can help: a check threw on a layout of
+   * the right shape, a defect in the checks, or the descriptor the layout is
+   * checked against is misshapen, a defect in what the host handed over. Each
+   * is stated among the problems in a line of its own. The layout is refused
+   * all the same - the host keeps the plain form - but a producer stops here
+   * instead of handing the lines to the repair pass, which can change the
+   * layout and neither the checks nor the descriptor.
    */
   checksFailed: boolean;
 }
@@ -80,8 +82,9 @@ export function layoutCheck(spec: Spec, { frame, descriptor }: LayoutCheck): Lay
       `the layout names the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
     );
   }
+  // The descriptor is the host's, not the layout's: no repair can mend it.
   const misshapen = descriptorMalformation(descriptor);
-  if (misshapen !== undefined) return refused(misshapen);
+  if (misshapen !== undefined) return { problems: [misshapen], checksFailed: true };
   const malformed = specMalformation(spec);
   if (malformed !== undefined) return refused(malformedLine(malformed));
   try {

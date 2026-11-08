@@ -214,7 +214,7 @@ describe('an answer that holds the checks failing', () => {
     });
     expect(verdict).toEqual({
       problems: ['the descriptor\'s "inputs" is not a list of fields'],
-      checksFailed: false,
+      checksFailed: true,
     });
   });
 
@@ -333,7 +333,7 @@ describe('an answer that holds the checks failing', () => {
     const descriptor = { inputs: fields } as unknown as LayoutDescriptor;
     expect(layoutCheck(composer, { frame: 'composer', descriptor })).toEqual({
       problems: [line],
-      checksFailed: false,
+      checksFailed: true,
     });
   });
 
@@ -350,7 +350,7 @@ describe('an answer that holds the checks failing', () => {
       layoutCheck(composer, { frame: 'composer', descriptor: { inputs: [loop] } as never }),
     ).toEqual({
       problems: ['the descriptor\'s input 1 ("topic") member 1 ("topic") contains itself'],
-      checksFailed: false,
+      checksFailed: true,
     });
   });
 });
