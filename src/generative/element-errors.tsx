@@ -33,9 +33,18 @@ export interface ElementErrorInfo {
 /** The host's hook for an element's render error. */
 export type ElementErrorHandler = (error: unknown, info: ElementErrorInfo) => void;
 
+/**
+ * Whether the host passes a handler, read by every element's boundary as it
+ * renders. A boolean, so a host passing a new callback at every render
+ * re-renders no element; only starting or stopping does.
+ */
+export const ReportingContext = React.createContext(false);
+
 interface BoundaryProps {
   type: string;
   report: React.RefObject<ElementErrorHandler | undefined>;
+  /** Whether the host passes a handler, as of this render. */
+  reporting: boolean;
   /** A value whose change gives a failed boundary another try: the root's spec. */
   resetOn?: unknown;
   children: React.ReactNode;
@@ -44,8 +53,6 @@ interface BoundaryProps {
 interface BoundaryState {
   failed: boolean;
   error: unknown;
-  /** Whether the error goes on to the boundary above, decided once it is caught. */
-  rethrow: boolean;
   resetOn: unknown;
 }
 
@@ -53,7 +60,7 @@ interface BoundaryState {
 export class ElementBoundary extends React.Component<BoundaryProps, BoundaryState> {
   constructor(props: BoundaryProps) {
     super(props);
-    this.state = { failed: false, error: undefined, rethrow: false, resetOn: props.resetOn };
+    this.state = { failed: false, error: undefined, resetOn: props.resetOn };
   }
 
   static getDerivedStateFromError(error: unknown): Partial<BoundaryState> {
@@ -65,28 +72,28 @@ export class ElementBoundary extends React.Component<BoundaryProps, BoundaryStat
     state: BoundaryState,
   ): Partial<BoundaryState> | null {
     if (Object.is(props.resetOn, state.resetOn)) return null;
-    return { failed: false, error: undefined, rethrow: false, resetOn: props.resetOn };
+    return { failed: false, error: undefined, resetOn: props.resetOn };
   }
 
-  // Whether to report or to throw the error on is decided here, in the
-  // commit, where the page has already refreshed its callback: read during
-  // the render that failed, the callback is the previous render's, so one the
-  // host started passing in that render would never hear of the error.
   override componentDidCatch(error: unknown, info: React.ErrorInfo): void {
-    const report = this.props.report.current;
-    if (!report) {
-      // No host to tell: the error goes on to json-render's boundary, or the
-      // host's around the page, exactly as if this one were not here.
-      this.setState({ rethrow: true });
-      return;
-    }
+    if (!this.props.reporting) return;
     const componentStack = info.componentStack ?? undefined;
-    report(error, { type: this.props.type, ...(componentStack ? { componentStack } : {}) });
+    this.props.report.current?.(error, {
+      type: this.props.type,
+      ...(componentStack ? { componentStack } : {}),
+    });
   }
 
+  // Whether to report or to throw the error on is decided as the boundary
+  // renders its failure, from whether the host passes a handler in this very
+  // render: decided later, it cost a blank commit and a second record of the
+  // same error, and decided from the ref, it read the previous render's
+  // callback. No host to tell: the error goes on, in the same render, to
+  // json-render's boundary or the host's around the page, which record it
+  // once, as if this one were not here.
   override render(): React.ReactNode {
     if (!this.state.failed) return this.props.children;
-    if (this.state.rethrow) throw this.state.error;
+    if (!this.props.reporting) throw this.state.error;
     return null;
   }
 }
@@ -117,7 +124,7 @@ export function reportingRegistry<R extends Record<string, unknown>>(
     }
     const Component = Renderer as React.ComponentType<Record<string, unknown>>;
     const Reported = (props: Record<string, unknown>) => (
-      <ElementBoundary type={type} report={report}>
+      <ElementBoundary type={type} report={report} reporting={React.useContext(ReportingContext)}>
         <Component {...props} />
       </ElementBoundary>
     );

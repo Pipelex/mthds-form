@@ -6,6 +6,7 @@ import { JSONUIProvider, Renderer } from '@json-render/react';
 import { BrandProvider } from './brand-context';
 import {
   ElementBoundary,
+  ReportingContext,
   reportingRegistry,
   type ElementErrorHandler,
   type ReportedRenderers,
@@ -117,8 +118,13 @@ export function GenerativePage({
   );
   // json-render resolves an element's props before its renderer runs, so a
   // throw there is caught by the boundary of the element above - and the root
-  // has none. Its own boundary is given another try with every new spec.
+  // has none. Its own boundary is given another try with every new spec - a
+  // new layout, judged by its content: a host that parses its spec inline
+  // hands a new object at every render, and one whose report sets its state
+  // would otherwise retry, throw and report until React gave up.
   const rootType = spec?.elements?.[spec.root]?.type ?? 'root';
+  const specContent = React.useMemo(() => contentOf(spec), [spec]);
+  const reporting = onElementError !== undefined;
 
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
@@ -164,13 +170,33 @@ export function GenerativePage({
   const page = (
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
-        <ElementBoundary type={rootType} report={report} resetOn={spec}>
-          <Renderer spec={spec} registry={pageRegistry} loading={loading} />
-        </ElementBoundary>
+        <ReportingContext.Provider value={reporting}>
+          <ElementBoundary
+            type={rootType}
+            report={report}
+            reporting={reporting}
+            resetOn={specContent}
+          >
+            <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+          </ElementBoundary>
+        </ReportingContext.Provider>
       </JSONUIProvider>
     </DescriptorProvider>
   );
   return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;
+}
+
+/**
+ * A spec as the text of its content, for telling a new layout from the same
+ * one handed again as a new object. A spec is JSON a model wrote, so it always
+ * has one; anything that does not stringify is compared as itself.
+ */
+function contentOf(spec: Spec | null): unknown {
+  try {
+    return JSON.stringify(spec);
+  } catch {
+    return spec;
+  }
 }
 
 /** The store's current state, re-rendering on every change. For a receipt beside a page. */

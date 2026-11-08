@@ -218,6 +218,49 @@ describe('an element that throws while rendering', () => {
     ).toBe(true);
   });
 
+  it('reports a failing root once to a host that builds its spec in render and counts the reports', () => {
+    // A spec parsed inline is a new object at every render, and a report that
+    // sets the host's state renders it again: a root boundary that retried on
+    // every new spec object threw and reported until React gave up.
+    const stored = JSON.stringify({
+      root: 'title',
+      elements: {
+        title: {
+          type: 'Heading',
+          props: { text: { $template: 'For ${/result/name}' }, level: 'h1' },
+          children: [],
+        },
+      },
+    });
+    const store = createStateStore({ result: { name: { toString: 1 } } });
+    let reports = 0;
+    function Host() {
+      const [, setCount] = React.useState(0);
+      return (
+        <GenerativePage
+          spec={JSON.parse(stored) as Spec}
+          store={store}
+          scope={{}}
+          brand={BRAND}
+          onElementError={() => {
+            reports += 1;
+            setCount((count) => count + 1);
+          }}
+        />
+      );
+    }
+    expect(() => render(<Host />)).not.toThrow();
+    expect(reports).toBe(1);
+  });
+
+  it('records a failure once, at json-render, when the host passes no callback', () => {
+    const caught: unknown[] = [];
+    render(<GenerativePage spec={BARRED} store={createStateStore({})} scope={{}} />, {
+      onCaughtError: (error) => caught.push(error),
+    });
+    expect(caught).toHaveLength(1);
+  });
+
   it('reports nothing for a page that renders cleanly', () => {
     const onElementError = vi.fn();
     render(
