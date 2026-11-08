@@ -11,9 +11,10 @@ import { FRAMES } from './frame-definitions';
  * the catalog as data (`designerCatalog({ frame })`). Both are what a run was
  * actually given, so both are hashed - a reworded rule and a renamed prop each
  * move the pin, exactly as they did when the prompt was rendered here. A run
- * is given the catalog of one frame, and the hash covers every frame's in a
- * fixed order: one pin a host compares every stored layout with, whichever
- * frame it was written for, and which any frame's vocabulary moving moves. The frame a
+ * is given the catalog of one frame, and the hash covers the method's text
+ * first and then every frame's catalog, in a fixed order: one pin a host
+ * compares every stored layout with, whichever frame it was written for, and
+ * which a reworded rule or any frame's vocabulary moving moves. The frame a
  * layout was written for is its own provenance, beside the hash. The brief is
  * not hashed: it is the per-method half, recorded with each layout. The model
  * pin in the method file moves it too, since the file is hashed whole; a
