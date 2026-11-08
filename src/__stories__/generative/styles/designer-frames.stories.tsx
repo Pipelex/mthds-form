@@ -67,12 +67,17 @@ function StyledMoment({ app, moment, style, team, producer }: MomentArgs) {
  * Each page has one h1 - the host's title on the kernel's page, the
  * Composer's or the ResultHeader's on a layout - and every title wears the
  * style's weight; the action that runs the method, wherever the page puts it,
- * wears the style's action shadow.
+ * wears the style's action shadow. A table in the kernel's result, which the
+ * host frames in its panel, draws no box of its own inside that panel.
  */
 async function expectFramedPage(canvasElement: HTMLElement) {
   await styleFontsReady();
   const pages = [...canvasElement.querySelectorAll<HTMLElement>('.app-host')];
   await expect(pages.length, 'host pages').toBeGreaterThan(0);
+  for (const table of canvasElement.querySelectorAll<HTMLElement>('.af-result [data-table-box]')) {
+    await expect(table.dataset.tableBox, 'a table in a framed result').toBe('framed');
+    await expect(getComputedStyle(table).borderTopWidth, 'its own outline').toBe('0px');
+  }
   for (const page of pages) {
     await expect(page.querySelectorAll('h1').length, 'one h1').toBe(1);
     const weight = getComputedStyle(page).getPropertyValue('--heading-weight').trim();
