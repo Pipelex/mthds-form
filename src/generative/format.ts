@@ -5,8 +5,8 @@ import { readDateContent } from '../core/native-content';
  * one formatter per setting, made once and kept.
  *
  * The result components used to build their formatters three ways in two
- * locales, so a `DataTable` cell and a `Metric` wrote USD as "$5" (en-US)
- * while a `ProportionBar` wrote it "US$5" (en-GB), and a share of money was
+ * locales, so a `DataTable` cell and a `Metric` wrote their numbers in en-US
+ * while a `ProportionBar` wrote its amounts in en-GB, and a share of money was
  * rounded to whole units: parts of 3.99 and 1.49 read "€4" and "€1" beside a
  * total of "€5". Every component now asks here.
  *
@@ -108,11 +108,12 @@ export function formatAmount(value: number, unit?: string | null): string {
   if (unit && /^[A-Z]{3}$/.test(unit)) {
     const money = currencyFormat(unit);
     if (money) {
-      // Whole at the currency's own precision, as it will be written, so a
-      // payload's 2399.999 reads "€2,400" beside the 2,400 it is, not
-      // "€2,400.00".
-      const places = money.fractional.resolvedOptions().maximumFractionDigits ?? 2;
-      const whole = Number.isInteger(Math.round(value * 10 ** places) / 10 ** places);
+      // Whole as the currency's own formatter rounds it, so a payload's
+      // 2399.999 reads "€2,400" beside the 2,400 it is, not "€2,400.00", and
+      // 1.005 keeps the cent `Intl` rounds it to: binary arithmetic would
+      // round it the other way and call it whole.
+      const fraction = money.fractional.formatToParts(value).find((p) => p.type === 'fraction');
+      const whole = fraction === undefined || /^0+$/.test(fraction.value);
       return (whole ? money.whole : money.fractional).format(value);
     }
   }

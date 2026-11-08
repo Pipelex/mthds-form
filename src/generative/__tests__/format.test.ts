@@ -22,6 +22,9 @@ describe('the layout formatter', () => {
     // 0.1 and 0.2 keeps its cents.
     expect(formatAmount(2399.999, 'EUR')).toBe('€2,400');
     expect(formatAmount(0.1 + 0.2, 'EUR')).toBe('€0.30');
+    // Rounded as `Intl` rounds, which binary arithmetic would not.
+    expect(formatAmount(1.005, 'EUR')).toBe('€1.01');
+    expect(formatAmount(3.995, 'EUR')).toBe('€4');
   });
 
   it('writes every currency in the one locale, whichever component asks', () => {
