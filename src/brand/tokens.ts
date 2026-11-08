@@ -260,26 +260,35 @@ export function composite(color: SrgbColor, over: SrgbColor): SrgbColor {
 /**
  * Each contrast pair as it renders. The canvas must be opaque, since a
  * translucent one shows whatever the host paints beneath it and its contrast is
- * nobody's to promise; the ink is blended over it, so a translucent ink is
- * measured at the strength it actually has, and a transparent one fails. Both
- * are measured as the compiler writes them, which is what renders.
+ * nobody's to promise; a surface a pair lays `over` the canvas is blended onto
+ * it first, so a translucent field fill is measured as the fill a reader sees;
+ * and the ink is blended over that, so a translucent ink is measured at the
+ * strength it actually has, and a transparent one fails. All are measured as
+ * the compiler writes them, which is what renders.
  */
 function checkContrast(tokens: BrandTokens, mode: ColorMode, problems: string[]) {
   for (const pair of CONTRAST_PAIRS) {
+    const canvasName = pair.over ?? pair.background;
     const foreground = resolveColor(tokens, pair.foreground, mode);
     const background = resolveColor(tokens, pair.background, mode);
-    if (!foreground || !background) continue;
-    if (background.alpha < 1) {
-      problems.push(
-        `color.${pair.background} (${mode}): alpha ${background.alpha}, but text is measured against it, so it must be opaque (alpha 1)`,
-      );
+    const canvasColor = resolveColor(tokens, canvasName, mode);
+    if (!foreground || !background || !canvasColor) continue;
+    if (canvasColor.alpha < 1) {
+      // Several pairs stand on one canvas, and it is named once.
+      const problem = `color.${canvasName} (${mode}): alpha ${canvasColor.alpha}, but text is measured against it, so it must be opaque (alpha 1)`;
+      if (!problems.includes(problem)) problems.push(problem);
       continue;
     }
-    const canvas = asWritten(background);
-    const ratio = contrastRatio(composite(asWritten(foreground), canvas), canvas);
-    if (ratio < MIN_CONTRAST) {
+    const canvas = asWritten(canvasColor);
+    const surface = pair.over ? composite(asWritten(background), canvas) : canvas;
+    const ratio = contrastRatio(composite(asWritten(foreground), surface), surface);
+    if (ratio < pair.minimum) {
+      const on = pair.over
+        ? `color.${pair.background} over color.${pair.over}`
+        : `color.${pair.background}`;
+      const level = pair.minimum >= MIN_CONTRAST ? 'WCAG AA' : 'WCAG AA for a control';
       problems.push(
-        `color.${pair.foreground} on color.${pair.background} (${mode}): contrast ${ratio.toFixed(2)}, expected ${MIN_CONTRAST} (WCAG AA)`,
+        `color.${pair.foreground} on ${on} (${mode}): contrast ${ratio.toFixed(2)}, expected ${pair.minimum} (${level})`,
       );
     }
   }

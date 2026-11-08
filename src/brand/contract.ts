@@ -111,20 +111,59 @@ export const BRAND_CONTRACT: readonly ContractToken[] = [
   },
 ];
 
+/** The minimum contrast ratio text must reach: WCAG 2 AA for normal text. */
+export const MIN_CONTRAST = 4.5;
+
 /**
- * The pairs that must clear WCAG AA in both modes, as they render: the canvas
- * opaque, the ink blended over it by its alpha.
+ * The contrast a control's outline or mark needs against what surrounds it:
+ * WCAG 2's level for a user interface component (1.4.11). A button colour
+ * below it against the page is a button whose shape is hard to see.
  */
-export const CONTRAST_PAIRS: readonly {
+export const MIN_CONTROL_CONTRAST = 3;
+
+/**
+ * Two colours the contract holds to a contrast ratio in both modes, as they
+ * render: the canvas opaque, a translucent surface laid over it, and the ink
+ * blended over whatever is beneath it by its alpha.
+ */
+export interface ContrastPair {
   foreground: ColorTokenName;
   background: ColorTokenName;
-}[] = [
-  { foreground: 'foreground', background: 'background' },
-  { foreground: 'muted-foreground', background: 'background' },
-];
+  /**
+   * The canvas `background` is laid over before anything is measured on it,
+   * for a surface the contract lets be translucent. Absent, `background` is
+   * the canvas itself and must be opaque, since what shows through a
+   * translucent canvas is whatever the host paints beneath it.
+   */
+  over?: ColorTokenName;
+  /** The ratio the pair must reach: `MIN_CONTRAST` for text, `MIN_CONTROL_CONTRAST` for a mark. */
+  minimum: number;
+}
 
-/** The minimum contrast ratio those pairs must reach: WCAG 2 AA for normal text. */
-export const MIN_CONTRAST = 4.5;
+/**
+ * The pairs a brand must hold in both modes. The ink and the secondary text
+ * on the canvas are text, at WCAG AA.
+ *
+ * The secondary text on the field fill is held to a control's 3:1. The kernel
+ * sets marks there in it, an off switch's track and a number field's stepper
+ * icons, and those need 3:1 to be seen; it also sets text there in it, a
+ * boolean row's description, an unselected pill's label and a placeholder,
+ * which AA would hold to 4.5:1, but the stock palette's light mode measures
+ * 4.39:1 on its own field fill, the same grey it measures on `--muted`, so
+ * the text bar there waits on the stock palette reaching it. The field fill
+ * may be translucent, as a style's often is, so it is laid over the canvas
+ * first.
+ */
+export const CONTRAST_PAIRS: readonly ContrastPair[] = [
+  { foreground: 'foreground', background: 'background', minimum: MIN_CONTRAST },
+  { foreground: 'muted-foreground', background: 'background', minimum: MIN_CONTRAST },
+  {
+    foreground: 'muted-foreground',
+    background: 'input',
+    over: 'background',
+    minimum: MIN_CONTROL_CONTRAST,
+  },
+];
 
 const byId = new Map(BRAND_CONTRACT.map((token) => [token.id, token]));
 

@@ -23,9 +23,11 @@ export {
   COLOR_TOKEN_NAMES,
   CONTRAST_PAIRS,
   MIN_CONTRAST,
+  MIN_CONTROL_CONTRAST,
   contractVariable,
   isColorTokenName,
   type ColorTokenName,
+  type ContrastPair,
   type ContractToken,
   type ContractTokenType,
 } from './contract';
@@ -71,7 +73,6 @@ export { BRAND_VARIABLES, compileBrand } from './compile';
 
 // Up to three seed colours in, the colour roles a page paints with out.
 export {
-  MIN_CONTROL_CONTRAST,
   deriveBrandRoles,
   isAccentAdjusted,
   isActionFaint,

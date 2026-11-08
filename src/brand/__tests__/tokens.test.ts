@@ -193,6 +193,52 @@ describe('the token validator', () => {
     );
   });
 
+  it('holds the secondary text to 3:1 on the field fill, laid over the canvas', () => {
+    // The grey reads at 4.54:1 on the white page, so the canvas pairs hold.
+    // The field fill is that grey at half strength: over the page it renders
+    // as a light grey the grey reads on at 2.35:1, under what an off switch's
+    // track needs to be seen. Measured as an opaque colour, the fill would be
+    // the grey itself, at 1:1.
+    const tokens = base();
+    const grey = (alpha: number) => ({
+      colorSpace: 'srgb' as const,
+      components: [118 / 255, 118 / 255, 118 / 255] as [number, number, number],
+      alpha,
+    });
+    tokens.color.background.$value = { colorSpace: 'srgb', components: [1, 1, 1], alpha: 1 };
+    tokens.color['muted-foreground'].$value = grey(1);
+    tokens.color.input.$value = grey(0.5);
+    expect(problemsOf(tokens)).toEqual([
+      'color.muted-foreground on color.input over color.background (light): contrast 2.35, expected 3 (WCAG AA for a control)',
+    ]);
+  });
+
+  it('accepts a translucent field fill, which is measured as it renders', () => {
+    // The committed brand's field fill is ink at 6%: the page shows through
+    // it, so it is laid over the page rather than refused as a canvas is.
+    const tokens = base();
+    expect(resolveColor(tokens, 'input', 'light')!.alpha).toBeLessThan(1);
+    expect(problemsOf(tokens)).toEqual([]);
+  });
+
+  it('holds the field fill pair in the dark mode as well', () => {
+    const tokens = base();
+    const muted = resolveColor(tokens, 'muted-foreground', 'dark')!;
+    tokens.color.input.$extensions!.mode.dark = { ...muted, alpha: 1 };
+    expect(problemsOf(tokens).join('\n')).toMatch(
+      /color\.muted-foreground on color\.input over color\.background \(dark\): contrast 1\.00, expected 3/,
+    );
+  });
+
+  it('names a translucent canvas once, however many pairs stand on it', () => {
+    const tokens = base();
+    tokens.color.background.$value = { colorSpace: 'srgb', components: [1, 1, 1], alpha: 0.9 };
+    const opaque = problemsOf(tokens).filter((problem) =>
+      problem.startsWith('color.background (light): alpha'),
+    );
+    expect(opaque).toHaveLength(1);
+  });
+
   it('refuses a family name holding a control character, which would end its string', () => {
     const tokens = base();
     tokens.font.sans.$value = ['Inter\f} body { background: red } .z {'];

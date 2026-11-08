@@ -1,4 +1,4 @@
-import { MIN_CONTRAST } from './contract';
+import { MIN_CONTRAST, MIN_CONTROL_CONTRAST } from './contract';
 import { colorHex, contrastRatio, type SrgbColor } from './tokens';
 
 /**
@@ -45,13 +45,6 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  * It returns roles, never custom property names: each host maps the roles onto
  * its own tokens. See docs/brand.md § "Three seed colours".
  */
-
-/**
- * The contrast a control's outline needs against what surrounds it: WCAG 2's
- * level for a user interface component (1.4.11). A button colour below it
- * against the page is a button whose shape is hard to see.
- */
-export const MIN_CONTROL_CONTRAST = 3;
 
 /**
  * How strongly the accent is laid over the page to make the pale accent fill:
