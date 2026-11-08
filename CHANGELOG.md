@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [v0.32.0] - 2026-11-08
+
+### Highlights
+
+- **A host produces and checks a designed layout on its server.** `@pipelex/mthds-form/generative/headless` carries the designer catalog, the brief, the prompt pin, the JSONL compiler and the checks with no React and no `'use client'` directive, and a layout those checks accept no longer throws in a renderer.
+- **The checks refuse more, which is a breaking change for stored layouts**: a `Picture` path written as an expression, a repeat over something that is not a list, and a `run` bound anywhere but a press or a submit now send a host back to the plain form until the layout is designed again.
 
 ### Added
 
