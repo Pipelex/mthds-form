@@ -148,7 +148,7 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
       <div>
         <h1
           className={cn(
-            'text-[32px] leading-[1.1] text-balance text-foreground sm:text-[38px] sm:leading-[1.08]',
+            'text-[32px] leading-[1.1] text-balance text-foreground @lg:text-[38px] @lg:leading-[1.08]',
             headingClass(700, true),
           )}
         >
@@ -165,7 +165,7 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           shadow floats it. */}
       <div
         data-style-panel=""
-        className={cn(RADIUS, panelSurfaceClass, panelFlatShadowClass, 'p-7 max-sm:p-5')}
+        className={cn(RADIUS, panelSurfaceClass, panelFlatShadowClass, 'p-7 @max-lg:p-5')}
       >
         {/* Two columns flow the groups down one column and on into the next,
             balanced, rather than a grid's rows: a row as tall as its tallest
@@ -179,16 +179,16 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           className={cn(
             'grid gap-8',
             two &&
-              'md:block md:columns-2 md:gap-x-10 md:[&>*+*]:mt-8 md:[&>*>h2]:break-after-avoid md:[&>*>*:not(h2)]:break-inside-avoid',
+              '@lg:block @lg:columns-2 @lg:gap-x-10 @lg:[&>*+*]:mt-8 @lg:[&>*>h2]:break-after-avoid @lg:[&>*>*:not(h2)]:break-inside-avoid',
           )}
         >
           {children}
         </div>
-        <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
+        <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 @max-lg:-mx-5 @max-lg:-mb-5 @max-lg:flex-col-reverse @max-lg:items-stretch @max-lg:px-5 @max-lg:pb-5">
           {/* What the run waits for, which describes the button, and how long
               a run takes. The run is not held by it: a press runs the page's
               checks and the host's gate, which say what is wrong where. */}
-          <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground max-sm:items-center max-sm:text-center">
+          <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground @max-lg:items-center @max-lg:text-center">
             {waitsFor ? <p id={waitsForId}>{waitsFor}</p> : null}
             {host.eta ? (
               <span className="inline-flex items-center gap-2">
@@ -213,7 +213,7 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
         </div>
       </div>
       {props.notes && props.notes.length > 0 ? (
-        <ul className="grid gap-x-8 gap-y-2.5 px-1 sm:grid-cols-2">
+        <ul className="grid gap-x-8 gap-y-2.5 px-1 @lg:grid-cols-2">
           {props.notes.map((note, index) => (
             <li key={index} className="flex items-start gap-2.5 text-sm text-muted-foreground">
               <span aria-hidden="true" className={linkTextClass}>
@@ -252,14 +252,14 @@ interface ResultHeaderProps {
 function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
   const host = useFrameHost();
   return (
-    <div className="flex items-start justify-between gap-6 max-sm:flex-col">
+    <div className="flex items-start justify-between gap-6 @max-lg:flex-col">
       <div className="min-w-0">
         {props.eyebrow ? (
           <p className={cn('mb-1.5 text-[13px] font-semibold', linkTextClass)}>{props.eyebrow}</p>
         ) : null}
         <h1
           className={cn(
-            'text-[28px] leading-[1.12] text-balance text-foreground sm:text-[32px]',
+            'text-[28px] leading-[1.12] text-balance text-foreground @lg:text-[32px]',
             headingClass(700, true),
           )}
         >
@@ -277,7 +277,7 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
               type="button"
               onClick={() => host.onAction?.(label)}
               className={cn(
-                'inline-flex min-h-11 items-center rounded-[var(--radius,0.5rem)] px-4 text-sm font-semibold sm:min-h-9',
+                'inline-flex min-h-11 items-center rounded-[var(--radius,0.5rem)] px-4 text-sm font-semibold @lg:min-h-9',
                 focusOutlineClass,
                 i === 0
                   ? 'bg-primary text-primary-foreground'

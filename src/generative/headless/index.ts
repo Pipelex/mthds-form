@@ -115,6 +115,8 @@ export {
   segmentsUnder,
 } from '../paths';
 export { payloadToState } from '../state';
+// What a designer's written sample holds, checked against the descriptor.
+export { writtenSampleOf, type WrittenSample } from '../written-sample';
 
 // A layout with its provenance: who produced it, on which model, under which prompt.
 export {

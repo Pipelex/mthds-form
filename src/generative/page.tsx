@@ -222,15 +222,23 @@ export function GenerativePage({
             <ReportingContext.Provider value={reporting}>
               <CheckedFieldsContext.Provider value={checkedFields}>
                 <ValidationBridge into={validation} fields={checkedFields} />
-                <RootBoundary
-                  type={rootType}
-                  report={report}
-                  reporting={reporting}
-                  loading={loading === true}
-                  spec={spec}
-                >
-                  <Renderer spec={spec} registry={pageRegistry} loading={loading} />
-                </RootBoundary>
+                {/* The container every component's width variants read
+                    (`@lg:`, `@max-lg:`), so a page set in a pane narrower
+                    than the browser lays out for the pane. `w-full` because
+                    a query container sizes from its parent and never from
+                    its content, so as a flex item it would otherwise
+                    collapse. */}
+                <div className="@container w-full">
+                  <RootBoundary
+                    type={rootType}
+                    report={report}
+                    reporting={reporting}
+                    loading={loading === true}
+                    spec={spec}
+                  >
+                    <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+                  </RootBoundary>
+                </div>
               </CheckedFieldsContext.Provider>
             </ReportingContext.Provider>
           </JSONUIProvider>

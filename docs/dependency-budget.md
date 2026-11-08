@@ -103,7 +103,7 @@ Fixing the controls is not enough on its own, and the reason is worth keeping: a
 Two things make it work and would switch it off silently if changed:
 
 - **`sideEffects` in `package.json` must stay CSS-only.** It is what lets a bundler drop a re-exported module it decided is unused. Widening it to `true`, or dropping the field, re-ships everything.
-- **The per-module `dist/core/*.js` files are build artifacts, not API.** The `exports` map lists the JavaScript entries, plus the stylesheets `./styles.css` and `./theme.css` and the designer method `./layout-design.mthds`; no core deep path is reachable — which is what keeps this a packaging detail rather than a surface (see the third rule in `CLAUDE.md`).
+- **The per-module `dist/core/*.js` files are build artifacts, not API.** The `exports` map lists the JavaScript entries, plus the stylesheets `./styles.css` and `./theme.css` and the designer method's two files `./layout-design.mthds` and `./layout-sample.mthds`; no core deep path is reachable — which is what keeps this a packaging detail rather than a surface (see the third rule in `CLAUDE.md`).
 
 ### Guarding it
 

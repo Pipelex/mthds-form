@@ -86,5 +86,9 @@ export default defineConfig({
     // newer method is a package upgrade rather than a code change. Nothing in
     // the entry reads it - the entry must stay importable from a browser.
     copyFileSync("methods/layout-design.mthds", "dist/layout-design.mthds");
+    // Its second entry, which writes a sample of the result when a page is
+    // designed with no run to read, in a file of its own so that this one and
+    // its hash stay as they are. A host sends both files in the same run.
+    copyFileSync("methods/layout-sample.mthds", "dist/layout-sample.mthds");
   },
 });

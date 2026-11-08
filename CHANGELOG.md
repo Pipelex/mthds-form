@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A designer entry that writes its own sample**: the new `./layout-sample.mthds` ships beside `./layout-design.mthds`, and its pipe `layout_sample.design_from_written_sample` designs a result page with no run to read by inventing one state of the result first, leaving `PROMPT_HASH` where it was. A host sends both files and starts that pipe, and `resultBrief` takes an `undefined` state, which omits `sample_state`.
+- **`writtenSampleOf(field, text)`**: exported from `./generative/headless` and `./generative`, it parses a written sample (a code fence around it is tolerated) and answers `{ state, problems }`: known members only, kinds that match, delegated paths and every file absent. A sample with problems never blocks a layout.
+
 ### Changed
+
+- **A designed page fits the width it is given**: `GenerativePage`'s root is a query container and the composer's and the result page's components use container variants with one threshold of 512 pixels where they used the viewport's, so a page in a narrow pane on a wide screen lays out for the pane. A host places the page in a box sized from outside, since a query container takes its width from its parent.
 
 - **The controls' chrome reads as a product's in `app`**: the optional mark is the word "Optional" in the page's face rather than a tag in capitals; a list's count, its row numbers, a file field's formats and the line under an attached file's name are set in the page's face rather than in mono, as are a number and a date; an empty list shows its Add button alone, with no "No items yet" box, and with no "0 items" either unless the method states an exact count, which it announces from the start ("0 of 3 items"); the Add button is a hairline row like "Choose from your team's files" rather than a dashed slot; and the link input under a drop zone is a control of the field family. `studio` keeps its mono and its dashed slot. See [docs/architecture.md](docs/architecture.md).
 - **A description that restates its label is left out in `app`**: a field's description is shown only when it holds a word, a symbol such as `%` included, that neither its label nor its control already says, and whenever the rule cannot judge it, so "The day they arrive" under "Arriving on", or "An image" over an image drop zone, are gone, and a list row shows no description, the list saying once, under its own, what its item's description adds; a number's range and the JSON hint take the place of one left out. `studio` shows every description. See [docs/architecture.md](docs/architecture.md).

@@ -376,7 +376,12 @@ export function inputBrief(
   };
 }
 
-/** The brief for a RESULT page: what one run produced, laid out. */
+/**
+ * The brief for a RESULT page: what one run produced, laid out. With no run to
+ * read, `state` is left `undefined` and the brief carries no sample: it is then
+ * for the method's `layout_sample.design_from_written_sample` entry, which
+ * writes one itself.
+ */
 export function resultBrief(
   subject: BriefSubject,
   field: RunField,
@@ -407,6 +412,6 @@ export function resultBrief(
     description: subject.description,
     paths,
     ...(style ? { style: styleOf(style) } : {}),
-    sample_state: JSON.stringify(state, null, 2),
+    ...(state === undefined ? {} : { sample_state: JSON.stringify(state, null, 2) }),
   };
 }

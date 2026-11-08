@@ -5,10 +5,12 @@ import { expect, waitFor } from 'storybook/test';
  * finger is given: a story pinned to a phone's or a desktop's width, and a
  * measure of the area a tap on a control actually lands in.
  *
- * The controls grow below Tailwind's `sm` breakpoint, a VIEWPORT width, because
- * a hit area is about the finger and the screen rather than about the box a
- * control sits in. So these stories pin the viewport, where the result stories
- * about layout pin a panel's width instead.
+ * The kernel's controls grow below Tailwind's `sm` breakpoint, a VIEWPORT
+ * width, because a hit area is about the finger and the screen rather than
+ * about the box a control sits in, and a generative page's own do so on a page
+ * narrower than 512 pixels, which a phone's own width makes true on a phone. So
+ * these stories pin the viewport, where the result stories about layout pin a
+ * panel's width instead.
  */
 
 /** The smallest hit area, in CSS pixels, on each side. */

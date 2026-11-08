@@ -498,14 +498,14 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
 type SplitRatio = '1:1' | '1:2' | '2:1';
 
 const SPLIT_COLUMNS: Record<SplitRatio, string> = {
-  '1:1': 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
-  '1:2': 'sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]',
-  '2:1': 'sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]',
+  '1:1': '@lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
+  '1:2': '@lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]',
+  '2:1': '@lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]',
 };
 
 const SPLIT_GAP: Record<'md' | 'lg' | 'xl', string> = { md: 'gap-4', lg: 'gap-6', xl: 'gap-8' };
 
-/** Two columns from two children, stacking under the `sm` breakpoint. */
+/** Two columns from two children, stacking where the page is narrower than 512 pixels. */
 function Split({
   props,
   children,
@@ -557,15 +557,15 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   };
   return (
     <TabsPrimitive.Root value={value} onValueChange={choose} className="w-full">
-      {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
+      {/* On a page narrower than 512 pixels each tab grows to the 44 by 44 pixels a finger needs,
           however short its label, and the list around it with it, wrapping
           onto a second row rather than pushing the page sideways. */}
-      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto max-sm:flex-wrap">
+      <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground @max-lg:h-auto @max-lg:flex-wrap">
         {tabs.map((tab, index) => (
           <TabsPrimitive.Trigger
             key={index}
             value={String(index)}
-            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm max-sm:min-h-11 max-sm:min-w-11"
+            className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm @max-lg:min-h-11 @max-lg:min-w-11"
           >
             {tab.label}
           </TabsPrimitive.Trigger>
@@ -826,9 +826,9 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
             value={option}
             variant="outline"
             size="sm"
-            // Below `sm`, the 44 pixels a finger needs, as the kernel's own
-            // choice control grows there.
-            className="rounded-full px-3.5 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground max-sm:h-11 max-sm:min-w-11"
+            // On a page narrower than 512 pixels, the 44 pixels a finger needs,
+            // as the kernel's own choice control grows on a phone.
+            className="rounded-full px-3.5 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground @max-lg:h-11 @max-lg:min-w-11"
           >
             {labelOf(option)}
           </ToggleGroupItem>
