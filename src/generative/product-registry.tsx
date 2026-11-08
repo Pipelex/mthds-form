@@ -199,14 +199,12 @@ interface SummaryRowProps {
   placeholder?: string | null;
 }
 
-function present(value: unknown): value is string | number | boolean {
-  return value !== undefined && value !== null && value !== '';
-}
-
 function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
+  // Each half as it writes out, so one that is a structure, which writes out
+  // as nothing, leaves no separator dangling.
   const text = [props.value, props.detail]
-    .filter(present)
     .map(textOf)
+    .filter((half) => half !== '')
     .join(props.separator ?? ' ');
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-3 first:pt-0 last:border-b-0">

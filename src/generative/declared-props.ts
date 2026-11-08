@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { unwrapped, type ZodDefinition } from './zod-definition';
 
 /**
  * What a renderer is handed: its props as the catalog declares them, whatever
@@ -18,59 +19,118 @@ import type { z } from 'zod';
  * definition, once, here, rather than each renderer guarding each prop. A
  * value its schema accepts is passed as it is. One it refuses is replaced by
  * the nearest value of the declared type: a number or a boolean in a text prop
- * is written out, as an interpolation would write it; a list keeps the entries
- * its item schema accepts; anything else is absent - null where the prop is
- * nullable, and for a required text or list prop the empty text or list,
- * which a renderer draws as nothing. A prop declared `any` (a value a renderer
- * shows, a table's rows) is the renderer's own to read, through `textOf` where
- * it writes one out.
+ * is written out, as an interpolation would write it, and so is one among the
+ * entries of a list of texts; a list keeps the entries its item schema
+ * accepts, and is itself held to the list's bounds once they are dropped, so
+ * a `Tabs` left with one tab of the two it must have draws none rather than
+ * one; anything else is absent - null where the prop is nullable, and for a
+ * required text or list prop the empty text or list, which a renderer draws as
+ * nothing. A prop declared `any` (a value a renderer shows, a table's rows) is
+ * the renderer's own to read, through `textOf` where it writes one out.
+ *
+ * It runs on every render of every element, so it parses as little as it can.
+ * What a schema says of an absent value is worked out once per schema; a
+ * scalar against a plain text, number or boolean schema is judged by its type
+ * alone; and a structure or a list is judged once per schema and value, so the
+ * list a `$state` reads out of the store is parsed when the store changes and
+ * not at each render - and when it is refused, the entries it keeps come back
+ * as the same list each time, so a renderer whose effect is keyed on the prop
+ * does not run it at every render.
  */
 
-interface ZodDefinition {
-  type: string;
-  innerType?: z.ZodType;
-  element?: z.ZodType;
+/** What a schema says of an absent value, worked out once. */
+interface SchemaFacts {
+  def: ZodDefinition | undefined;
+  acceptsNull: boolean;
+  acceptsUndefined: boolean;
+  /** What the prop resolves to when it is absent or refused. */
+  absent: unknown;
 }
 
-function definitionOf(schema: z.ZodType): ZodDefinition | undefined {
-  return (schema as unknown as { _zod?: { def?: ZodDefinition } })._zod?.def;
+const factsBySchema = new WeakMap<z.ZodType, SchemaFacts>();
+
+function factsOf(schema: z.ZodType): SchemaFacts {
+  const known = factsBySchema.get(schema);
+  if (known) return known;
+  const def = unwrapped(schema);
+  const acceptsNull = schema.safeParse(null).success;
+  const acceptsUndefined = schema.safeParse(undefined).success;
+  const absent = acceptsNull
+    ? null
+    : acceptsUndefined
+      ? undefined
+      : def?.type === 'string'
+        ? ''
+        : def?.type === 'array'
+          ? []
+          : undefined;
+  const facts = { def, acceptsNull, acceptsUndefined, absent };
+  factsBySchema.set(schema, facts);
+  return facts;
 }
 
-/** The definition under the `.nullable()`, `.optional()` and `.default()` most props carry. */
-function unwrapped(schema: z.ZodType): ZodDefinition | undefined {
-  let def = definitionOf(schema);
-  for (let depth = 0; depth < 8 && def; depth += 1) {
-    if (def.type !== 'nullable' && def.type !== 'optional' && def.type !== 'default') return def;
-    def = def.innerType ? definitionOf(def.innerType) : undefined;
-  }
-  return def;
+/**
+ * Whether a scalar conforms by its type alone: a text, a boolean or a finite
+ * number against a schema of that kind with no refinement on it. Anything
+ * else - an enum, a bounded text - is parsed.
+ */
+function plainlyConforms(def: ZodDefinition | undefined, value: unknown): boolean {
+  if (!def || (def.checks !== undefined && def.checks.length > 0)) return false;
+  if (def.type === 'string') return typeof value === 'string';
+  if (def.type === 'boolean') return typeof value === 'boolean';
+  if (def.type === 'number') return typeof value === 'number' && Number.isFinite(value);
+  return false;
 }
 
-/** What a prop resolves to when it is absent or refused: null, nothing, or the empty value of its type. */
-function absentValueOf(schema: z.ZodType): unknown {
-  if (schema.safeParse(null).success) return null;
-  if (schema.safeParse(undefined).success) return undefined;
-  const type = unwrapped(schema)?.type;
-  if (type === 'string') return '';
-  if (type === 'array') return [];
-  return undefined;
+/** A scalar's nearest value of a text schema: a number or a boolean written out, or nothing. */
+function writtenOut(schema: z.ZodType, value: unknown): string | undefined {
+  if (typeof value !== 'number' && typeof value !== 'boolean') return undefined;
+  const text = String(value);
+  return schema.safeParse(text).success ? text : undefined;
 }
+
+/** A refused list's nearest value: the entries its item schema accepts, or writes out, held to its bounds. */
+function keptEntries(
+  schema: z.ZodType,
+  element: z.ZodType,
+  entries: readonly unknown[],
+  absent: unknown,
+): unknown {
+  const textItems = unwrapped(element)?.type === 'string';
+  const kept = entries.flatMap((entry) => {
+    if (element.safeParse(entry).success) return [entry];
+    const text = textItems ? writtenOut(element, entry) : undefined;
+    return text === undefined ? [] : [text];
+  });
+  return schema.safeParse(kept).success ? kept : absent;
+}
+
+/** What a structure or a list conformed to, by schema and value. */
+const conformedBySchema = new WeakMap<z.ZodType, WeakMap<object, unknown>>();
 
 /** One prop's resolved value, held to its schema. */
 function conformValue(schema: z.ZodType, value: unknown): unknown {
-  if (value === undefined || value === null) {
-    return schema.safeParse(value).success ? value : absentValueOf(schema);
+  const facts = factsOf(schema);
+  if (value === undefined) return facts.acceptsUndefined ? value : facts.absent;
+  if (value === null) return facts.acceptsNull ? value : facts.absent;
+  if (typeof value !== 'object') {
+    if (plainlyConforms(facts.def, value) || schema.safeParse(value).success) return value;
+    if (facts.def?.type === 'string') return writtenOut(schema, value) ?? facts.absent;
+    return facts.absent;
   }
-  if (schema.safeParse(value).success) return value;
-  const def = unwrapped(schema);
-  if (def?.type === 'string' && (typeof value === 'number' || typeof value === 'boolean')) {
-    return String(value);
+  let byValue = conformedBySchema.get(schema);
+  if (!byValue) {
+    byValue = new WeakMap();
+    conformedBySchema.set(schema, byValue);
   }
-  if (def?.type === 'array' && def.element && Array.isArray(value)) {
-    const element = def.element;
-    return value.filter((entry) => element.safeParse(entry).success);
-  }
-  return absentValueOf(schema);
+  if (byValue.has(value)) return byValue.get(value);
+  const held = schema.safeParse(value).success
+    ? value
+    : facts.def?.type === 'array' && facts.def.element && Array.isArray(value)
+      ? keptEntries(schema, facts.def.element, value, facts.absent)
+      : facts.absent;
+  byValue.set(value, held);
+  return held;
 }
 
 /**
@@ -105,9 +165,12 @@ type Definitions = Readonly<Record<string, { props?: unknown }>>;
  * Renderers that are handed their props conformed to the definitions they
  * render, each wrapped once. A renderer the definitions do not name is
  * returned as it is. `asWritten` names, per component, the props whose
- * nearest value would mean something else: a `Picture`'s empty `path` is the
- * item itself inside a repeat, so a refused path must reach its renderer as
- * refused, not as the empty text.
+ * nearest value would mean something else: a `path` the layer resolves as
+ * written - a hatch's, a `Picture`'s - is relative inside a repeat, so a
+ * refused one written out as text would bind a live field to some other
+ * corner of the state (a `0` read from scratch state is the item's first
+ * entry), and an empty one is the item itself; a refused path must reach its
+ * renderer as refused.
  */
 export function withDeclaredProps<R extends Record<string, (ctx: never) => unknown>>(
   definitions: Definitions,
@@ -131,21 +194,22 @@ export function withDeclaredProps<R extends Record<string, (ctx: never) => unkno
 
 /**
  * A value as the text a renderer writes out, for a prop declared `any`. A
- * scalar is written as it is; a structure is written the way `String` writes
- * one, except that one a model wrote with its own `toString` member - which
- * `String` throws on, since JSON can hold `{ "toString": 1 }` - is written as
- * its JSON instead.
+ * scalar is written as it is; a list is its entries written out and joined;
+ * a structure is no text at all, so the renderer shows what it shows for a
+ * value that is not there rather than `[object Object]`. The checks refuse a
+ * read of a structure the descriptor owns into such a prop; this is for one
+ * that reached it anyway, out of a layout's own scratch state, where a
+ * `setState` wrote whatever JSON it wrote - one carrying its own `toString`
+ * member included, which `String` throws on.
  */
 export function textOf(value: unknown): string {
   if (value === undefined || value === null) return '';
-  if (typeof value !== 'object') return String(value);
-  try {
-    return String(value);
-  } catch {
-    try {
-      return JSON.stringify(value) ?? '';
-    } catch {
-      return '';
-    }
+  if (Array.isArray(value)) {
+    return value
+      .map(textOf)
+      .filter((text) => text !== '')
+      .join(', ');
   }
+  if (typeof value === 'object') return '';
+  return String(value);
 }

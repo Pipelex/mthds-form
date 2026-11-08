@@ -149,13 +149,16 @@ export function DescriptorProvider({
   return <DescriptorContext.Provider value={scope}>{children}</DescriptorContext.Provider>;
 }
 
-function Unresolved({ path, side }: { path: string; side: 'input' | 'result' }) {
+function Unresolved({ path, side }: { path: unknown; side: 'input' | 'result' }) {
   return (
     <p
       role="alert"
       className="rounded-md border border-destructive/50 px-2.5 py-1.5 text-[12px] text-destructive"
     >
-      {side === 'input' ? 'No input' : 'No result'} at <span className="font-mono">{path}</span>
+      {side === 'input' ? 'No input' : 'No result'} at{' '}
+      <span className="font-mono">
+        {typeof path === 'string' ? path : (JSON.stringify(path) ?? String(path))}
+      </span>
     </p>
   );
 }
@@ -219,8 +222,12 @@ export function pathFromDomId(prefix: string | undefined, id: string): string | 
  * item's field name joined onto the current item's base path. A relative path
  * outside any repeat resolves to nothing, and the hatch says so.
  */
-function useAbsolutePath(path: string): string | undefined {
+function useAbsolutePath(path: unknown): string | undefined {
   const repeat = useRepeatScope();
+  // The checks hold a hatch's `path` to a literal text; a layout rendered
+  // past them may hand anything here, which resolves to nothing - never read
+  // as some other path, as a number written out would be inside a repeat.
+  if (typeof path !== 'string') return undefined;
   if (path.startsWith('/')) return path;
   // Raw, not `joinPath`: the same reason `absoluteHatchPath` gives - a relative
   // hatch path may name several segments, so its `/` are separators already.
@@ -468,12 +475,12 @@ interface MetricProps {
 
 function Metric({ props }: BaseComponentProps<MetricProps>) {
   const value = props.value;
+  // Anything but a number as it writes out, so a structure, which writes out
+  // as nothing, shows the dash an absent value shows.
   const text =
     typeof value === 'number'
       ? numberFormat(props.format ?? 'plain').format(value)
-      : value === null || value === undefined || value === ''
-        ? '—'
-        : textOf(value);
+      : textOf(value) || '—';
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -532,27 +539,30 @@ interface TabsProps {
 function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const tabs = props.tabs ?? [];
   const panels = React.Children.toArray(children);
-  const [value, setValue] = React.useState(tabs[0]?.value ?? '');
+  // Each tab is told apart by its position, which is unique where a layout's
+  // values need not be: two tabs written with one value would otherwise be
+  // one tab to Radix, opening both panels, and one key to React.
+  const [value, setValue] = React.useState('0');
   return (
     <TabsPrimitive.Root value={value} onValueChange={setValue} className="w-full">
       {/* Below `sm` each tab grows to the 44 by 44 pixels a finger needs,
           however short its label, and the list around it with it, wrapping
           onto a second row rather than pushing the page sideways. */}
       <TabsPrimitive.List className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground max-sm:h-auto max-sm:flex-wrap">
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <TabsPrimitive.Trigger
-            key={tab.value}
-            value={tab.value}
+            key={index}
+            value={String(index)}
             className="inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm max-sm:min-h-11 max-sm:min-w-11"
           >
             {tab.label}
           </TabsPrimitive.Trigger>
         ))}
       </TabsPrimitive.List>
-      {tabs.map((tab, index) => (
+      {tabs.map((_tab, index) => (
         <TabsPrimitive.Content
-          key={tab.value}
-          value={tab.value}
+          key={index}
+          value={String(index)}
           className="mt-4 focus-visible:outline-hidden"
         >
           {panels[index] ?? null}
@@ -767,9 +777,10 @@ function Segmented({ props, bindings, emit }: BaseComponentProps<SegmentedProps>
         }}
         className="flex-wrap justify-start gap-1.5"
       >
-        {(props.options ?? []).map((option) => (
+        {(props.options ?? []).map((option, index) => (
           <ToggleGroupItem
-            key={option}
+            // A layout may name one option twice, so the option alone is no key.
+            key={`${index}-${option}`}
             value={option}
             variant="outline"
             size="sm"
@@ -902,4 +913,7 @@ const components: Components<typeof baseCatalog> = {
 export const generativeRenderers = withDeclaredProps(
   baseCatalog.data.components as Record<string, { props?: unknown }>,
   components,
+  // A hatch resolves its `path` as written, relative inside a repeat, so a
+  // refused one reaches it as refused rather than written out as text.
+  { MthdsField: ['path'], MthdsResult: ['path'] },
 );

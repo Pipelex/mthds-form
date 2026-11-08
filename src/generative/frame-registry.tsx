@@ -264,10 +264,15 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     (row): row is Record<string, unknown> =>
       typeof row === 'object' && row !== null && !Array.isArray(row),
   );
-  // A structure is no amount, and `Number` throws on one carrying its own
-  // `toString` member, so only a written value is read as a number.
+  // An amount is a number, or a text that writes one out, as a payload's
+  // decimal may arrive. Nothing else is one: a structure (on which `Number`
+  // throws when it carries its own `toString` member), a list, a boolean.
   const amountOf = (raw: unknown) =>
-    typeof raw === 'object' && raw !== null ? Number.NaN : Number(raw ?? 0);
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw.trim() !== ''
+        ? Number(raw)
+        : Number.NaN;
   const parts = rows
     .map((row) => ({
       label: textOf(row[props.labelKey]),
@@ -403,18 +408,17 @@ function Picture({
   );
 }
 
-function present(value: unknown): boolean {
-  return value !== undefined && value !== null && value !== '';
-}
-
 function Fact({
   props,
 }: BaseComponentProps<{ label: string; value?: unknown; detail?: string | null }>) {
+  // What the value writes out, so a structure, which writes out as nothing,
+  // shows the dash an absent value shows.
+  const text = textOf(props.value);
   return (
     <div className="flex flex-col gap-1 rounded-[var(--radius,0.5rem)] border border-border bg-background px-4 py-3">
       <span className="text-[13px] text-muted-foreground">{props.label}</span>
       <span className="text-[16px] font-medium text-foreground tabular-nums">
-        {present(props.value) ? textOf(props.value) : '—'}
+        {text !== '' ? text : '—'}
       </span>
       {props.detail ? (
         <span className="text-[13px] text-muted-foreground">{props.detail}</span>
@@ -424,13 +428,14 @@ function Fact({
 }
 
 function Detail({ props }: BaseComponentProps<{ label: string; value?: unknown }>) {
-  if (!present(props.value)) return null;
+  const text = textOf(props.value);
+  if (text === '') return null;
   return (
     // A rule between the rows of a list of details, never under one set in a
     // row: there it read as an underline on every detail but the last.
     <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-3 border-b border-border py-2.5 text-[14px] last:border-b-0 [.flex-row>&]:border-b-0 [.flex-row>&]:grid-cols-[auto_minmax(0,1fr)]">
       <span className="text-muted-foreground">{props.label}</span>
-      <span className="text-foreground">{textOf(props.value)}</span>
+      <span className="text-foreground">{text}</span>
     </div>
   );
 }
