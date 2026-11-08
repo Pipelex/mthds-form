@@ -299,7 +299,7 @@ function useTextField(
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'blur';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useCheckedField(
+  const { errors, validate, focusRef } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
@@ -310,7 +310,7 @@ function useTextField(
   const onBlur = () => {
     if (hasValidation && validateOn === 'blur') validate();
   };
-  return { value, errors, onChange, onBlur };
+  return { value, errors, onChange, onBlur, focusRef };
 }
 
 function BrandInput({
@@ -333,7 +333,9 @@ function BrandInput({
         type={props.type ?? 'text'}
         value={field.value}
         placeholder={props.placeholder ?? ''}
+        ref={field.focusRef}
         aria-invalid={field.errors.length > 0 || undefined}
+        aria-describedby={field.errors[0] ? `${id}-error` : undefined}
         onChange={(event) => field.onChange(event.target.value)}
         onBlur={() => {
           field.onBlur();
@@ -346,7 +348,7 @@ function BrandInput({
         className={cn(fieldControlClass, 'h-11 px-3.5')}
       />
       {field.errors[0] ? (
-        <p role="alert" className="text-[11px] text-destructive">
+        <p id={`${id}-error`} role="alert" className="text-[11px] text-destructive">
           {field.errors[0]}
         </p>
       ) : null}
@@ -371,13 +373,15 @@ function BrandTextarea({
         rows={props.rows ?? 3}
         value={field.value}
         placeholder={props.placeholder ?? ''}
+        ref={field.focusRef}
         aria-invalid={field.errors.length > 0 || undefined}
+        aria-describedby={field.errors[0] ? `${id}-error` : undefined}
         onChange={(event) => field.onChange(event.target.value)}
         onBlur={field.onBlur}
         className={cn(fieldControlClass, 'px-3.5 py-2.5 leading-relaxed')}
       />
       {field.errors[0] ? (
-        <p role="alert" className="text-[11px] text-destructive">
+        <p id={`${id}-error`} role="alert" className="text-[11px] text-destructive">
           {field.errors[0]}
         </p>
       ) : null}

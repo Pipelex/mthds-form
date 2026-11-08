@@ -41,6 +41,8 @@ describe('FR_FIELD_STRINGS', () => {
       s.filesLeftOut(['d.pdf', 'e.pdf'], 0, 0),
       s.optionalFieldsCount(2),
       s.optionalInputsCount(2),
+      s.runWaitsFor(['Destination'], 0),
+      s.runWaitsFor(['Destination', 'Dates', 'Budget'], 2),
       s.chooseFromSourceAria('Devis'),
       s.filePickerTakes(['PDF', 'PNG']),
       s.filePickerUse(0, undefined),
@@ -122,6 +124,14 @@ describe('FR_FIELD_STRINGS for a batch of files', () => {
     );
     expect(normalize(s.filesLeftOut(['d.pdf', 'e.pdf'], 1, 0))).toBe(
       'La liste est pleine, ces fichiers n’ont donc pas été ajoutés : d.pdf, e.pdf et 1 autre.',
+    );
+  });
+
+  it('names the inputs a run waits for, with the rest counted', () => {
+    const s = FR_FIELD_STRINGS;
+    expect(s.runWaitsFor(['Destination'], 0)).toBe('Remplissez Destination pour lancer');
+    expect(s.runWaitsFor(['Destination', 'Dates', 'Budget'], 2)).toBe(
+      'Remplissez Destination, Dates, Budget et 2 autres pour lancer',
     );
   });
 });

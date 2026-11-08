@@ -59,6 +59,33 @@ describe("a result page's components read result text as data", () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });
 
+  it('draws a share for an amount a template writes out as a number, as the checks read it', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('ProportionBar', {
+          label: 'Costs',
+          total: null,
+          of: null,
+          unit: null,
+          items: [
+            { category: 'Food', amount: { $template: '${/result/food}' } },
+            { category: 'Stay', amount: 60 },
+          ],
+          labelKey: 'category',
+          valueKey: 'amount',
+        })}
+        store={createStateStore({ result: { food: 40 } })}
+        scope={{}}
+      />,
+    );
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    // The bar's segments are the spans given a width; the legend's dots are not.
+    const widths = [...container.querySelectorAll<HTMLElement>('span[style]')]
+      .map((segment) => segment.style.width)
+      .filter(Boolean);
+    expect(widths).toEqual(['40%', '60%']);
+  });
+
   it('lays out bullets as an unordered list and numbers as an ordered one', () => {
     const items = ['Pack light', 'Book early'];
     const { container, rerender } = render(

@@ -45,11 +45,14 @@ export interface LayoutVerdict {
   /** Every problem, one a line, in the words the repair pass reads; empty means the layout may render. */
   problems: string[];
   /**
-   * Whether a check threw on a layout of the right shape: a defect in the
-   * checks, stated among the problems in a line of its own. The layout is
-   * refused all the same - the host keeps the plain form - but a producer
-   * stops here instead of handing the lines to the repair pass, which can
-   * change the layout and not the checks.
+   * Whether no repair of the layout can help: a check threw on a layout of
+   * the right shape, a defect in the checks, or the frame or the descriptor
+   * the layout is checked against is not one, a defect in what the host
+   * handed over. Each
+   * is stated among the problems in a line of its own. The layout is refused
+   * all the same - the host keeps the plain form - but a producer stops here
+   * instead of handing the lines to the repair pass, which can change the
+   * layout and neither the checks nor the descriptor.
    */
   checksFailed: boolean;
 }
@@ -70,18 +73,25 @@ export interface LayoutVerdict {
  * page to its fallback. So a frame this package does not draw, a missing or
  * misshapen descriptor, and anything not shaped like a spec are each a
  * problem line, and a throw left in a walk below on a layout of the right
- * shape is the checks' own failure: a line saying so, and `checksFailed`.
+ * shape is the checks' own failure, a line saying so. The frame and the
+ * descriptor are the host's, and a throw is the checks', so each of those
+ * sets `checksFailed` too: no repair of the layout can mend it.
  * The shape is checked once, before either check walks the layout.
  */
 export function layoutCheck(spec: Spec, { frame, descriptor }: LayoutCheck): LayoutVerdict {
   const refused = (line: string): LayoutVerdict => ({ problems: [line], checksFailed: false });
   if (!(FRAMES as readonly unknown[]).includes(frame)) {
-    return refused(
-      `the layout names the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
-    );
+    // The frame is the host's argument, not the layout's: no repair can mend it.
+    return {
+      problems: [
+        `the layout is checked against the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
+      ],
+      checksFailed: true,
+    };
   }
+  // The descriptor is the host's, not the layout's: no repair can mend it.
   const misshapen = descriptorMalformation(descriptor);
-  if (misshapen !== undefined) return refused(misshapen);
+  if (misshapen !== undefined) return { problems: [misshapen], checksFailed: true };
   const malformed = specMalformation(spec);
   if (malformed !== undefined) return refused(malformedLine(malformed));
   try {

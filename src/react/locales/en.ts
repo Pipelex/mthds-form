@@ -130,6 +130,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   optionalInputsCount: (count) => (count === 1 ? '1 optional input' : `${count} optional inputs`),
   requiredField: 'Required',
   incompleteField: 'Incomplete: fill in its required fields',
+  runWaitsFor: (names, more) => `Fill in ${someNames(names, more)} to run`,
   uploadFailed: 'This file could not be uploaded. Try again.',
   chooseFromSource: "Choose from your team's files",
   chooseFromSourceAria: (label) =>

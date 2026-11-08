@@ -32,6 +32,97 @@ function pageBinding(...paths: string[]): Spec {
 }
 
 describe('a layout that has gone stale', () => {
+  it('is refused when it offers nothing of a required structure that requires no member', () => {
+    // The run needs the structure to hold something, so a page that offers
+    // none of its members is one nobody can complete.
+    const request: RunField = {
+      kind: 'object',
+      name: 'request',
+      required: true,
+      fields: [text('note', false), text('tone', false)],
+    };
+    const descriptor = { inputs: [text('city', true), request] };
+    const missing = layoutProblems(descriptor, pageBinding('/inputs/city'));
+    expect(missing.some((line) => line.includes('/inputs/request'))).toBe(true);
+    expect(layoutProblems(descriptor, pageBinding('/inputs/city', '/inputs/request/tone'))).toEqual(
+      [],
+    );
+    // A blank default fills nothing, so it does not cover the structure.
+    const blank: RunField = {
+      ...request,
+      fields: [{ ...text('tone', false), defaultValue: '' }],
+    } as RunField;
+    expect(
+      layoutProblems({ inputs: [text('city', true), blank] }, pageBinding('/inputs/city')).some(
+        (line) => line.includes('/inputs/request'),
+      ),
+    ).toBe(true);
+    // A member with a default fills the structure from the start.
+    const seeded: RunField = {
+      ...request,
+      fields: [text('note', false), { ...text('tone', false), defaultValue: 'formal' }],
+    } as RunField;
+    expect(
+      layoutProblems({ inputs: [text('city', true), seeded] }, pageBinding('/inputs/city')),
+    ).toEqual([]);
+  });
+
+  it('counts a default only where the seed reaches it', () => {
+    const tone = { ...text('tone', false), defaultValue: 'formal' } as RunField;
+    const city = text('city', true);
+    const refusal = (name: string) =>
+      `/inputs/${name} is required, and the layout offers nowhere to enter it`;
+
+    // `seedInputs` does not open an optional structure, so `tone`'s default
+    // never reaches `request`, and the run would refuse it.
+    const beneathOptional: RunField = {
+      kind: 'object',
+      name: 'request',
+      required: true,
+      fields: [{ kind: 'object', name: 'extras', required: false, fields: [tone] }],
+    };
+    expect(
+      layoutProblems({ inputs: [city, beneathOptional] }, pageBinding('/inputs/city')),
+    ).toEqual([refusal('request')]);
+
+    // A required structure beneath the optional one is no nearer the seed.
+    const requiredBeneathOptional: RunField = {
+      kind: 'object',
+      name: 'r',
+      required: true,
+      fields: [
+        {
+          kind: 'object',
+          name: 's',
+          required: false,
+          fields: [{ kind: 'object', name: 'c', required: true, fields: [tone] }],
+        },
+      ],
+    };
+    expect(
+      layoutProblems({ inputs: [city, requiredBeneathOptional] }, pageBinding('/inputs/city')),
+    ).toEqual([refusal('r')]);
+
+    // Offering the member is still enough: the person enters it there.
+    expect(
+      layoutProblems(
+        { inputs: [city, beneathOptional] },
+        pageBinding('/inputs/city', '/inputs/request/extras/tone'),
+      ),
+    ).toEqual([]);
+
+    // A chain of required structures is walked by the seed, at any depth.
+    const beneathRequired: RunField = {
+      kind: 'object',
+      name: 'request',
+      required: true,
+      fields: [{ kind: 'object', name: 'extras', required: true, fields: [tone] }],
+    };
+    expect(
+      layoutProblems({ inputs: [city, beneathRequired] }, pageBinding('/inputs/city')),
+    ).toEqual([]);
+  });
+
   it('is refused when it binds a path no input has', () => {
     const problems = layoutProblems({ inputs: [text('city', true)] }, pageBinding('/inputs/town'));
     expect(problems).toContain('/inputs/town is bound, and no input has it');
@@ -1174,7 +1265,7 @@ describe("a share's parts", () => {
           { category: 'Food', amount: 'abc' },
           { category: 'Food', amount: ' ' },
           { category: 'Food', amount: { $state: '/result/costs/0/category' } },
-          { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
+          { category: 'Food', amount: { $computed: 'total' } },
           { category: 'Food', amount: { $state: '/result/costs/0/amount' } },
           { category: 'Food', amount: { $state: '/ui/scratch' } },
         ]),
@@ -1183,7 +1274,44 @@ describe("a share's parts", () => {
       `bar: ProportionBar's part 1's "amount" is "abc", not a number;${HOW}`,
       `bar: ProportionBar's part 2's "amount" is " ", not a number;${HOW}`,
       `bar: ProportionBar's part 3's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
-      `bar: ProportionBar's part 4's "amount" is an expression that reads no number, not a number;${HOW}`,
+      `bar: ProportionBar's part 4's "amount" is a $computed, which a page has no function to resolve, not a number;${HOW}`,
+    ]);
+  });
+
+  /**
+   * A template writes a text out, which the renderer draws as a share when it
+   * writes a number: one that writes out a single path's value and nothing
+   * else does exactly that when the path holds a number, so it is read as
+   * that path; one with words beside its value cannot be known to.
+   */
+  it('reads a template amount that writes one value out as the path it reads', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
+          { category: 'Food', amount: { $template: ' ${/result/costs/1/amount} ' } },
+          { category: 'Food', amount: { $template: '${/ui/scratch}' } },
+          { category: 'Food', amount: { $template: '40' } },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a template amount that writes more than a number out, or reads no number', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $template: '${/result/costs/0/amount} EUR' } },
+          { category: 'Food', amount: { $template: '${/result/costs/0/category}' } },
+          { category: 'Food', amount: { $template: 'forty' } },
+        ]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1's "amount" is a template that writes text beside its value, not a number;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
+      `bar: ProportionBar's part 3's "amount" is a template that writes "forty" out, not a number;${HOW}`,
     ]);
   });
 
