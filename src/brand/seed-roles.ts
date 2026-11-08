@@ -1,4 +1,4 @@
-import { MIN_CONTRAST } from './contract';
+import { MIN_CONTRAST, MIN_CONTROL_CONTRAST } from './contract';
 import { colorHex, contrastRatio, type SrgbColor } from './tokens';
 
 /**
@@ -19,12 +19,18 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  *   colour, so every label clears WCAG AA. Only the two extremes carry that
  *   guarantee: a warm near-black or an off-white falls below 4.5:1 on some
  *   mid-tone, so no other colour is ever returned for text.
- * - **The accent as text is ink** (`accentInk`): the accent darkened on a
- *   light page or lightened on a dark one, keeping its hue and saturation,
- *   just until it reads at 4.5:1 on the page, on the pale accent fill and on
- *   every other surface the host names (a style's panel and its fields), the
- *   backgrounds a host draws accent text on. An accent that already reads is
- *   its own ink.
+ * - **The accent as text is ink** (`accentInk`): the accent with its hue
+ *   and saturation kept and its lightness moved just until it reads at 4.5:1
+ *   on the page, on the pale accent fill and on every other surface the host
+ *   names (a style's panel and its fields), the backgrounds a host draws
+ *   accent text on. The lightness moves toward the page's extreme, darker on
+ *   a light page and lighter on a dark one, and away from it only when a
+ *   surface on the far side of the page's lightness leaves no shade that way
+ *   reading on every background at once. A random search over accents and
+ *   surfaces on a white and on a black page found no case of it; on a
+ *   mid-tone page it happens: `#1e40af` on the grey `#767676`, which counts
+ *   as light, inks as `#000001` alone and as `#fefeff` beside a black panel.
+ *   An accent that already reads is its own ink.
  * - **The pale accent fill** (`accentFill`) is the accent laid over the page
  *   at a low strength: a pale tint on a light page, a deep one on a dark page.
  *
@@ -45,13 +51,6 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  * It returns roles, never custom property names: each host maps the roles onto
  * its own tokens. See docs/brand.md § "Three seed colours".
  */
-
-/**
- * The contrast a control's outline needs against what surrounds it: WCAG 2's
- * level for a user interface component (1.4.11). A button colour below it
- * against the page is a button whose shape is hard to see.
- */
-export const MIN_CONTROL_CONTRAST = 3;
 
 /**
  * How strongly the accent is laid over the page to make the pale accent fill:
