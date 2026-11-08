@@ -893,10 +893,9 @@ function MethodFormFields({
   // run: what a structure's members are marked by as well.
   const refusalOf = (field: RunField) =>
     attempted ? gateRefusal(field, ownProp(values, field.name), mustBeFilled(field)) : undefined;
-  const errorFor = (field: RunField): string | undefined => {
+  const errorFor = (field: RunField, refusal: ReturnType<typeof refusalOf>): string | undefined => {
     const hostError = errors ? ownProp(errors, field.name) : undefined;
     if (hostError) return hostError;
-    const refusal = refusalOf(field);
     if (refusal === 'required') return s.requiredField;
     return refusal === 'incomplete' ? s.incompleteField : undefined;
   };
@@ -914,25 +913,28 @@ function MethodFormFields({
           disabled={disabled}
         />
       )}
-      {visible.map((field) => (
-        // Remounted on each reset, so no control keeps what it held for the
-        // values the reset replaced (a file still arriving, a failed drop). A
-        // structure the gate refuses marks the members it refuses, whatever
-        // a host's message says of the structure.
-        <RefusedStructureContext
-          key={`${field.name}:${resets}`}
-          value={refusalOf(field) ? field.name : null}
-        >
-          <FieldRenderer
-            field={field}
-            id={field.name}
-            value={ownProp(values, field.name)}
-            error={errorFor(field)}
-            env={env}
-            onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
-          />
-        </RefusedStructureContext>
-      ))}
+      {visible.map((field) => {
+        const refusal = refusalOf(field);
+        return (
+          // Remounted on each reset, so no control keeps what it held for the
+          // values the reset replaced (a file still arriving, a failed drop). A
+          // structure the gate refuses marks the members it refuses, whatever
+          // a host's message says of the structure.
+          <RefusedStructureContext
+            key={`${field.name}:${resets}`}
+            value={refusal ? field.name : null}
+          >
+            <FieldRenderer
+              field={field}
+              id={field.name}
+              value={ownProp(values, field.name)}
+              error={errorFor(field, refusal)}
+              env={env}
+              onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
+            />
+          </RefusedStructureContext>
+        );
+      })}
       {(folded.length > 0 || structureOpen) && (
         <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />
       )}
