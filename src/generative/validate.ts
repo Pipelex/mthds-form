@@ -97,6 +97,16 @@ const EXPRESSION_KEYS = [
  */
 const LITERAL_PATHS = new Set(['MthdsField', 'MthdsResult', 'Picture']);
 
+/** The action a generative page hands to the host's `onRun`: the one that starts a billed run. */
+const RUN_ACTION = 'run';
+
+/**
+ * The events a run may start from: a press of a button, and Enter in a field,
+ * which is how a plain form submits. Every other event a control emits fires
+ * as the person edits or moves through the page.
+ */
+const DELIBERATE_EVENTS: readonly string[] = ['press', 'submit'];
+
 function isExpression(value: unknown): boolean {
   return (
     typeof value === 'object' &&
@@ -587,6 +597,28 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   //    run through the same executor. Every one of those is a door into
   //    `/inputs` that the walk over `on` never saw, so a binding is checked
   //    wherever it sits, and a chain is followed as far as it goes.
+  //
+  //    And a run is billed, so it starts from a deliberate gesture and from
+  //    nothing else (`DELIBERATE_EVENTS`). Bound under `change`, `focus` or
+  //    `blur` it started a run at every edit, and under a `watch` at every
+  //    change of the state, with no gesture at all. A run in a chain is never
+  //    deliberate either: json-render applies a chain after a handler alone, so
+  //    one after `validateForm` or a state action never fires, and one after a
+  //    run starts a second billed run as the first settles.
+  /** Where a binding sits, which decides whether a run may start from it. */
+  type Trigger = { kind: 'event'; event: string } | { kind: 'watch' } | { kind: 'chain' };
+  const deliberately = `a run is billed, so it starts only from a deliberate gesture: bind it under ${DELIBERATE_EVENTS.map((event) => `"${event}"`).join(' or ')}.`;
+  const misplacedRun = (trigger: Trigger): string | undefined => {
+    if (trigger.kind === 'event') {
+      return DELIBERATE_EVENTS.includes(trigger.event)
+        ? undefined
+        : `runs the method on "${trigger.event}", which fires as the person edits or moves through the page; ${deliberately}`;
+    }
+    if (trigger.kind === 'watch') {
+      return `runs the method when the state changes, with no gesture at all; ${deliberately}`;
+    }
+    return `chains a run after another action, which either never fires or starts a second billed run as the first settles; bind run directly under ${DELIBERATE_EVENTS.map((event) => `"${event}"`).join(' or ')}.`;
+  };
   const declared = [
     ...(catalog.actionNames ?? []),
     ...(catalog.schema?.builtInActions ?? []).map((action) => action.name),
@@ -616,10 +648,11 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   /**
    * One binding, wherever it sits - under `on.<event>`, under `watch.<path>`,
    * or as the `onSuccess` or `onError` of another - held to the name check,
-   * the write ban, and then to its own callbacks. `site` is the spelling a
-   * problem names the binding by.
+   * the write ban, where a run may start, and then to its own callbacks.
+   * `site` is the spelling a problem names the binding by, and `trigger` what
+   * fires it.
    */
-  const checkBinding = (key: string, site: string, entry: unknown): void => {
+  const checkBinding = (key: string, site: string, entry: unknown, trigger: Trigger): void => {
     const action = (entry as { action?: unknown } | null)?.action;
     if (typeof action !== 'string') {
       problems.push({ elementKey: key, message: `${site} has an entry with no "action" name.` });
@@ -631,6 +664,10 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         message: `${site} names the unknown action "${action}" (known: ${[...knownActions].join(', ')}); nothing would handle it.`,
       });
       return;
+    }
+    if (action === RUN_ACTION) {
+      const misplaced = misplacedRun(trigger);
+      if (misplaced) problems.push({ elementKey: key, message: `${site} ${misplaced}` });
     }
     // `hasOwnProp`: the action is model-written, and `constructor` would
     // find a function where a list of destinations belongs.
@@ -702,7 +739,7 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
           }
         }
       }
-      if (record.action !== undefined) checkBinding(key, hookSite, record);
+      if (record.action !== undefined) checkBinding(key, hookSite, record, { kind: 'chain' });
     }
   };
 
@@ -726,7 +763,9 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
                   : `on.${event}: ${element.type} emits no events, so nothing bound there would ever fire.`,
             });
           }
-          for (const entry of bindingsOf(binding)) checkBinding(key, `on.${event}`, entry);
+          for (const entry of bindingsOf(binding)) {
+            checkBinding(key, `on.${event}`, entry, { kind: 'event', event });
+          }
         }
       }
     }
@@ -743,7 +782,9 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         });
       } else {
         for (const [path, binding] of Object.entries(watch as Record<string, unknown>)) {
-          for (const entry of bindingsOf(binding)) checkBinding(key, `watch.${path}`, entry);
+          for (const entry of bindingsOf(binding)) {
+            checkBinding(key, `watch.${path}`, entry, { kind: 'watch' });
+          }
         }
       }
     }

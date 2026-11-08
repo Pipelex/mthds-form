@@ -65,11 +65,13 @@ export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutChe
     const verdict = validateAgainstCatalog(spec, frameCatalog(frame));
     const invalid = verdict.ok ? [] : formatProblems(verdict.problems).split('\n');
     // A page that takes inputs is there to start a run, and nothing else in it
-    // can: a layout with no control bound to `run` renders a dead page, which
+    // can: a layout with no button bound to `run` renders a dead page, which
     // the host must refuse rather than show.
     const runless =
-      frame !== 'result' && descriptor.inputs && !bindsRun(spec)
-        ? ["the layout has no control that runs the method: bind `run` under a control's `on`"]
+      frame !== 'result' && descriptor.inputs && !pressRuns(spec)
+        ? [
+            "the layout has no control that runs the method: bind `run` under a control's `on.press`",
+          ]
         : [];
     return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
   } catch (error) {
@@ -78,15 +80,18 @@ export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutChe
 }
 
 /**
- * Whether any element binds the `run` action directly under `on`, as the
- * binding itself or as one entry of a list of them, which json-render runs in
- * order. A `run` reached only through an `onSuccess` or `onError` chain is not
- * counted: json-render applies those chains to a handler's actions alone, and
- * never after `validateForm` or a state action, so such a run never fires.
- * The walk is total over whatever a model wrote, since a malformed element is
- * the catalog check's to report, never a reason for this one to throw.
+ * Whether any element binds the `run` action directly under `on.press`, as
+ * the binding itself or as one entry of a list of them, which json-render runs
+ * in order: a page needs a button that runs it. A run under a field's
+ * `submit` is a deliberate gesture the catalog check accepts, but Enter in a
+ * field is no control a person can see, so it does not count here; nor does a
+ * run reached through an `onSuccess` or `onError` chain, which the catalog
+ * check refuses. In the composer frame the one control that emits `press` is
+ * the `Composer`'s run button, so this asks for that button to run. The walk
+ * is total over whatever a model wrote, since a malformed element is the
+ * catalog check's to report, never a reason for this one to throw.
  */
-function bindsRun(spec: Spec): boolean {
+function pressRuns(spec: Spec): boolean {
   const isRun = (binding: unknown): boolean =>
     typeof binding === 'object' &&
     binding !== null &&
@@ -98,8 +103,7 @@ function bindsRun(spec: Spec): boolean {
     if (typeof element !== 'object' || element === null) return false;
     const on: unknown = (element as Record<string, unknown>).on;
     if (typeof on !== 'object' || on === null) return false;
-    return Object.values(on).some((binding) =>
-      Array.isArray(binding) ? binding.some(isRun) : isRun(binding),
-    );
+    const press: unknown = (on as Record<string, unknown>).press;
+    return Array.isArray(press) ? press.some(isRun) : isRun(press);
   });
 }

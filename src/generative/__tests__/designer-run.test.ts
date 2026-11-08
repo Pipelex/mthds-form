@@ -81,6 +81,38 @@ describe('a layout written for a frame', () => {
     expect(problems.join('\n')).toMatch(/no control that runs the method/);
   });
 
+  it('is refused when the only run is bound to a field rather than pressed, since the run button would be dead', () => {
+    const page = composer.elements.page!;
+    const fieldOnly: Spec = {
+      root: 'page',
+      elements: {
+        ...composer.elements,
+        page: { ...page, on: { press: [{ action: 'validateForm' }] }, children: ['topic', 'city'] },
+        city: {
+          type: 'Input',
+          props: {
+            label: 'City',
+            name: 'city',
+            type: null,
+            placeholder: null,
+            value: { $bindState: '/inputs/city' },
+            checks: null,
+            validateOn: null,
+          },
+          children: [],
+          on: { submit: [{ action: 'validateForm' }, { action: 'run' }] },
+        },
+      },
+    };
+    const problems = layoutCheckProblems(fieldOnly, {
+      frame: 'composer',
+      descriptor: { inputs: [...inputs, { kind: 'text', name: 'city', required: false }] },
+    });
+    expect(problems).toEqual([
+      "the layout has no control that runs the method: bind `run` under a control's `on.press`",
+    ]);
+  });
+
   it('answers a malformed element with problems rather than an exception', () => {
     const broken = { root: 'page', elements: { page: null } } as unknown as Spec;
     expect(() =>

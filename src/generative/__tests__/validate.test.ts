@@ -447,6 +447,93 @@ describe('the event a layout binds', () => {
 });
 
 /**
+ * A run is billed, so it starts from a deliberate gesture and from nothing
+ * else: a press of a button, or Enter in a field, which is how a plain form
+ * submits. A `Select` whose `on.change` ran the method started a billed run at
+ * every edit, and a `watch` at every change of the state, with no gesture at
+ * all. And a run in a chain is never deliberate: json-render applies a chain
+ * after a handler alone, so one after `validateForm` never fires, and one
+ * after a run starts a second run as the first settles.
+ */
+describe('where a layout may start a run', () => {
+  const SELECT = {
+    label: 'Pace',
+    name: 'pace',
+    options: ['slow', 'fast'],
+    placeholder: null,
+    value: { $bindState: '/inputs/pace' },
+    checks: null,
+    validateOn: null,
+  };
+  const INPUT = {
+    label: 'City',
+    name: 'city',
+    type: null,
+    placeholder: null,
+    value: { $bindState: '/inputs/city' },
+    checks: null,
+    validateOn: null,
+  };
+  const page = (type: string, props: Record<string, unknown>, extra: Record<string, unknown>) =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'el'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
+        el: { type, props, children: [], ...extra },
+      },
+    }) as unknown as Spec;
+  const messages = (spec: Spec) =>
+    validateAgainstCatalog(spec).problems.map((problem) => problem.message);
+
+  it('is refused under an event that fires as the person edits or moves', () => {
+    expect(messages(page('Select', SELECT, { on: { change: [{ action: 'run' }] } }))).toContain(
+      'on.change runs the method on "change", which fires as the person edits or moves through the page; a run is billed, so it starts only from a deliberate gesture: bind it under "press" or "submit".',
+    );
+    expect(messages(page('Input', INPUT, { on: { blur: { action: 'run' } } }))).toContain(
+      'on.blur runs the method on "blur", which fires as the person edits or moves through the page; a run is billed, so it starts only from a deliberate gesture: bind it under "press" or "submit".',
+    );
+  });
+
+  it('is refused under a watch, which fires with no gesture at all', () => {
+    expect(
+      messages(page('Select', SELECT, { watch: { '/inputs/pace': { action: 'run' } } })),
+    ).toContain(
+      'watch./inputs/pace runs the method when the state changes, with no gesture at all; a run is billed, so it starts only from a deliberate gesture: bind it under "press" or "submit".',
+    );
+  });
+
+  it('is refused in a chain, after a run or after anything else', () => {
+    const cta = { label: 'Plan my trip' };
+    expect(
+      messages(page('Cta', cta, { on: { press: { action: 'run', onError: { action: 'run' } } } })),
+    ).toContain(
+      'on.press.onError chains a run after another action, which either never fires or starts a second billed run as the first settles; bind run directly under "press" or "submit".',
+    );
+    expect(
+      messages(
+        page('Cta', cta, {
+          on: { press: { action: 'validateForm', onSuccess: { action: 'run' } } },
+        }),
+      ),
+    ).toContain(
+      'on.press.onSuccess chains a run after another action, which either never fires or starts a second billed run as the first settles; bind run directly under "press" or "submit".',
+    );
+  });
+
+  it('is accepted under a press, and under a submit, which is Enter in a field', () => {
+    const press = validateAgainstCatalog(
+      page('Cta', { label: 'Plan my trip' }, { on: { press: [{ action: 'run' }] } }),
+    );
+    expect(press.ok, formatProblems(press.problems)).toBe(true);
+    const submit = validateAgainstCatalog(
+      page('Input', INPUT, { on: { submit: [{ action: 'validateForm' }, { action: 'run' }] } }),
+    );
+    expect(submit.ok, formatProblems(submit.problems)).toBe(true);
+  });
+});
+
+/**
  * An expression on a prop whose values are a fixed set.
  *
  * `{ "$template": "script" }` carries no interpolation, so json-render resolves

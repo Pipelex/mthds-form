@@ -9,10 +9,12 @@
 ### Changed
 
 - **The checks refuse more of what renders nothing or throws (Breaking)**: `validateAgainstCatalog` refuses a `Picture` whose `path` is an expression, which must be written literally as a hatch's is, and `layoutFits` refuses a repeat over a path holding something other than a list, a `$template` in a prop that takes a list, a binding in such a prop whose path is not a list, and a `ProportionBar` part written out inline that is not a structure naming both its label and its value member. A stored layout that relied on any of them now falls back to the plain form. See [docs/generative-ui.md](docs/generative-ui.md).
+- **A run starts from a deliberate gesture alone (Breaking)**: `validateAgainstCatalog` accepts the `run` action only directly under a `press` or a `submit` (Enter in a field), and refuses it under `change`, `focus` or `blur`, under a `watch` and anywhere in an `onSuccess` or `onError` chain; `layoutCheckProblems` asks for `run` under some element's `on.press`, which in the composer frame is the `Composer`'s run button. A stored layout that ran the method on an edit now falls back to the plain form.
 
 ### Fixed
 
 - **A layout the checks accept renders without throwing**: every renderer `./generative` registers is handed its props held to the catalog's declaration of them, so a prop bound to a layout's scratch state that holds the wrong kind of value draws as nothing rather than dropping the element, a `ProportionBar` draws the parts that are structures, and a `Picture` whose path resolves to nothing draws nothing.
+- **One run per press, chain or no chain**: `GenerativePage` holds its run guard one task past the settled run, so a run chained under its own `onError` no longer starts a second billed run when the first one fails.
 - **`layoutCheckProblems` never throws**: a spec that is not one, `null` included, a frame this package does not draw and a missing descriptor are each answered with a problem line, and an unknown frame no longer passes every component it is handed.
 
 ## [v0.31.0] - 2026-11-08

@@ -85,33 +85,44 @@ export function GenerativePage({
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
   // never) left a second press inside that wait free to start a second
-  // billed run. The guard is held until what `onRun` returns settles, and
-  // released at once for an `onRun` that returns nothing, where the host's
-  // own state covers the run.
+  // billed run. The guard is held until what `onRun` returns settles - at
+  // once for an `onRun` that returns nothing, where the host's own state
+  // covers the run - and then one task longer: json-render applies the
+  // binding's `onSuccess` or `onError` chain after the handler, in the same
+  // task, so a guard released as `onRun` settled let a run chained under the
+  // run that just failed start a second billed run. The catalog check refuses
+  // such a chain; this holds a layout rendered past it to one run per press.
   const running = React.useRef(false);
-  const [handlers] = React.useState(() => ({
-    run: () => {
-      if (running.current) return undefined;
-      running.current = true;
-      let pending: unknown;
-      try {
-        pending = latest.current.onRun?.(latest.current.store.getSnapshot());
-      } catch (error) {
+  const [handlers] = React.useState(() => {
+    const release = () => {
+      setTimeout(() => {
         running.current = false;
-        throw error;
-      }
-      if (isThenable(pending)) {
-        // Any thenable holds the guard, a promise from another realm
-        // included, and json-render still receives what the host returned,
-        // its rejection included.
-        return Promise.resolve(pending).finally(() => {
-          running.current = false;
-        });
-      }
-      running.current = false;
-      return undefined;
-    },
-  }));
+      }, 0);
+    };
+    return {
+      run: () => {
+        if (running.current) return undefined;
+        running.current = true;
+        let pending: unknown;
+        try {
+          pending = latest.current.onRun?.(latest.current.store.getSnapshot());
+        } catch (error) {
+          release();
+          throw error;
+        }
+        if (isThenable(pending)) {
+          // Any thenable holds the guard, a promise from another realm
+          // included, and json-render still receives what the host returned,
+          // its rejection included.
+          const settled = Promise.resolve(pending);
+          settled.then(release, release);
+          return settled;
+        }
+        release();
+        return undefined;
+      },
+    };
+  });
   const page = (
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={registry} store={store} handlers={handlers}>
