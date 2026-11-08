@@ -170,11 +170,12 @@ describe('teamTokens', () => {
       '#eef1f5',
       '#ffffff',
     ]);
-    // soft's dark panel, lifted toward the foreground, and its fields on the page.
+    // soft's dark panel, lifted toward the foreground, and its fields a step
+    // above it, never down at the page.
     expect(styleSurfaces(deriveStyleRoles('soft'), 'dark')).toEqual([
       '#0b0d12',
       '#1e2129',
-      '#12151c',
+      '#272b32',
     ]);
     for (const key of TEAM_KEYS) {
       for (const theme of THEMES) {
