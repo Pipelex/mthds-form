@@ -47,6 +47,27 @@ describe('the parsing a render costs', () => {
     expect(parses.map((spy) => spy.mock.calls.length)).toEqual([0, 0]);
   });
 
+  it('still parses a scalar whose schema refines it, on a wrapper or as a format', () => {
+    // Judged by its type alone, a text passed a `.refine` on the nullable
+    // around it, an email format and an integer format.
+    const shape = {
+      refined: z
+        .string()
+        .nullable()
+        .refine((value) => value !== 'forbidden'),
+      email: z.email(),
+      count: z.int(),
+    };
+    expect(
+      conformProps(shape, { refined: 'forbidden', email: 'not an address', count: 1.5 }),
+    ).toEqual({ refined: null, email: '', count: undefined });
+    expect(conformProps(shape, { refined: 'fine', email: 'a@example.com', count: 2 })).toEqual({
+      refined: 'fine',
+      email: 'a@example.com',
+      count: 2,
+    });
+  });
+
   it('parses a structure once per schema and value', () => {
     const rows = z.array(z.object({ name: z.string() }));
     const value = [{ name: 'a' }];

@@ -276,10 +276,25 @@ export function validateAgainstCatalog(
   if (malformed !== undefined) {
     return { ok: false, problems: [{ message: malformedLine(malformed) }] };
   }
+  return catalogCheck(spec, catalog).verdict;
+}
+
+/**
+ * The catalog's verdict on a spec already known to have the shape the checks
+ * walk, and whether the checks themselves failed on it - said beside the
+ * verdict, so no reader has to recognise the failure by its words.
+ */
+export function catalogCheck(
+  spec: Spec,
+  catalog: ValidationCatalog,
+): { verdict: SpecVerdict; checksFailed: boolean } {
   try {
-    return checkAgainstCatalog(spec, catalog);
+    return { verdict: checkAgainstCatalog(spec, catalog), checksFailed: false };
   } catch (error) {
-    return { ok: false, problems: [{ message: checksFailedLine(error) }] };
+    return {
+      verdict: { ok: false, problems: [{ message: checksFailedLine(error) }] },
+      checksFailed: true,
+    };
   }
 }
 

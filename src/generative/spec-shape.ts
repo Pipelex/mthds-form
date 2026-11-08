@@ -9,12 +9,10 @@
  * which a producer then handed to the method's repair pass, paying for passes
  * no layout could satisfy. So the shape the walks assume is checked first,
  * here, and stated as what it is; a throw on a spec that has it is the checks'
- * own failure, answered by a line of its own that `checksFailed` recognises,
- * on which a producer stops rather than repairs.
+ * own failure, answered by a line of its own, and flagged as such by
+ * `layoutCheck` - never by the line's words, which a layout can write into an
+ * element key - so a producer stops rather than repairs.
  */
-
-/** The opening of the line the checks answer with when they fail on a well-shaped layout. */
-const CHECKS_FAILED = 'the checks failed on this layout';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -22,12 +20,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * What makes `spec` no spec the checks can walk, in words, or nothing when it
- * has the shape they assume: an `elements` map of structures, each with
- * structured `props`, a list of `children`, slots of lists and a `repeat`
- * naming its `statePath`. Whether the root exists, whether a child is an
- * element, whether a type is known, whether `on` and `watch` are the maps the
- * runtime reads: those are problems the checks themselves report, in their
- * own words, not reasons they cannot run.
+ * has the shape they assume: an `elements` map of structures, each naming
+ * its component `type` as a text, with structured `props`, a list of
+ * `children`, slots of lists and a `repeat` naming its `statePath`. Whether
+ * the root exists, whether a child is an element, whether a type is known,
+ * whether `on` and `watch` are the maps the runtime reads: those are problems
+ * the checks themselves report, in their own words, not reasons they cannot
+ * run.
  */
 export function specMalformation(spec: unknown): string | undefined {
   if (!isRecord(spec))
@@ -36,7 +35,8 @@ export function specMalformation(spec: unknown): string | undefined {
   for (const [key, element] of Object.entries(spec.elements)) {
     const at = JSON.stringify(key);
     if (!isRecord(element)) return `the element ${at} is not a structure`;
-    const { props, children, slots, repeat } = element;
+    const { type, props, children, slots, repeat } = element;
+    if (typeof type !== 'string') return `the element ${at} names no component "type"`;
     if (props != null && !isRecord(props))
       return `the element ${at} has "props" that are not a structure`;
     if (children != null && !Array.isArray(children))
@@ -44,14 +44,24 @@ export function specMalformation(spec: unknown): string | undefined {
     if (slots != null && (!isRecord(slots) || !Object.values(slots).every(Array.isArray))) {
       return `the element ${at} has "slots" that are not lists`;
     }
-    if (
-      repeat !== undefined &&
-      (!isRecord(repeat) || (typeof repeat.statePath !== 'string' && !isRecord(repeat.statePath)))
-    ) {
+    if (repeat !== undefined && !repeatsOver(repeat)) {
       return `the element ${at} has a "repeat" that names no "statePath"`;
     }
   }
   return undefined;
+}
+
+/**
+ * Whether a `repeat` names the list it lays out as json-render reads one: a
+ * path, or `{ "$item": … }`, a path relative to the item of the repeat
+ * around it, which json-render joins as a text.
+ */
+function repeatsOver(repeat: unknown): boolean {
+  if (!isRecord(repeat)) return false;
+  const { statePath } = repeat;
+  return (
+    typeof statePath === 'string' || (isRecord(statePath) && typeof statePath.$item === 'string')
+  );
 }
 
 /** The line a malformed spec is answered with. */
@@ -67,15 +77,5 @@ export function checksFailedLine(error: unknown): string {
   } catch {
     said = 'an error that cannot be written out';
   }
-  return `${CHECKS_FAILED} (${said}): a defect in the checks, which no repair of the layout can fix`;
-}
-
-/**
- * Whether the checks' answer holds their own failure rather than the layout's
- * problems. The layout is still refused - the host keeps the plain form - but
- * a producer stops here instead of handing the line to the method's repair
- * pass, which can change the layout and not the checks.
- */
-export function checksFailed(problems: readonly string[]): boolean {
-  return problems.some((line) => line.startsWith(CHECKS_FAILED));
+  return `the checks failed on this layout (${said}): a defect in the checks, which no repair of the layout can fix`;
 }

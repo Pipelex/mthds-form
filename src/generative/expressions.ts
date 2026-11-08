@@ -28,3 +28,25 @@ export function isExpression(value: unknown): boolean {
     typeof record.$template === 'string'
   );
 }
+
+/**
+ * The two values a `$cond` resolves to - each resolved again in its turn -
+ * when json-render reads `value` as one, or nothing. It tries `$state`,
+ * `$item`, `$index`, `$bindState` and `$bindItem` first, so an object that is
+ * also one of those is that, never a condition.
+ */
+export function condBranches(value: unknown): readonly [unknown, unknown] | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.$state === 'string' ||
+    typeof record.$item === 'string' ||
+    record.$index === true ||
+    typeof record.$bindState === 'string' ||
+    typeof record.$bindItem === 'string'
+  ) {
+    return undefined;
+  }
+  if (!('$cond' in record && '$then' in record && '$else' in record)) return undefined;
+  return [record.$then, record.$else];
+}

@@ -1,9 +1,9 @@
 import type { Spec } from '@json-render/core';
 import { frameCatalog } from './catalog';
 import { FRAMES, type Frame } from './frame-definitions';
-import { layoutProblems, type LayoutDescriptor } from './layout-fits';
+import { descriptorMalformation, fitCheck, type LayoutDescriptor } from './layout-fits';
 import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
-import { formatProblems, validateAgainstCatalog } from './validate';
+import { catalogCheck, formatProblems } from './validate';
 
 /**
  * What a producer of layouts needs beside the method, the catalog and the
@@ -38,38 +38,57 @@ export interface LayoutCheck {
 }
 
 /**
+ * The checks' answer on a layout: every problem they found, one a line, and
+ * whether they themselves failed on it.
+ */
+export interface LayoutVerdict {
+  /** Every problem, one a line, in the words the repair pass reads; empty means the layout may render. */
+  problems: string[];
+  /**
+   * Whether a check threw on a layout of the right shape: a defect in the
+   * checks, stated among the problems in a line of its own. The layout is
+   * refused all the same - the host keeps the plain form - but a producer
+   * stops here instead of handing the lines to the repair pass, which can
+   * change the layout and not the checks.
+   */
+  checksFailed: boolean;
+}
+
+/**
  * Everything the host's two checks find wrong with a layout written for
- * `frame`, one problem a line, in the words the repair pass reads: first the
+ * `frame`, and whether the checks themselves failed on it: first the
  * catalog's verdict against the frame's own vocabulary (`frameCatalog`), then
- * whether it fits the descriptor (`layoutProblems`). Empty means the layout
- * may render. A producer feeds the lines, joined, to `repair_layout` as its
- * `problems`; a host deciding whether a stored layout renders needs only
- * whether the list is empty.
+ * whether it fits the descriptor (`layoutProblems`). Empty problems mean the
+ * layout may render. A producer feeds the lines, joined, to `repair_layout`
+ * as its `problems`, unless `checksFailed` says no repair can help; a host
+ * deciding whether a stored layout renders needs only whether the list is
+ * empty, which `layoutCheckProblems` answers alone.
  *
  * It never throws. Its subject is whatever a model wrote, or a layout and a
  * frame a host stored and read back, and a throw is the one answer a host
  * cannot act on: it arrives instead of the problem that would have sent the
- * page to its fallback. So a frame this package does not draw, a missing
- * descriptor, and anything not shaped like a spec are each a problem line, and
- * a throw left in a walk below on a layout of the right shape is the checks'
- * own failure, answered by a line `checksFailed` recognises: the layout is
- * still refused, and a producer stops there rather than paying the repair
- * pass for a defect no layout can fix.
+ * page to its fallback. So a frame this package does not draw, a missing or
+ * misshapen descriptor, and anything not shaped like a spec are each a
+ * problem line, and a throw left in a walk below on a layout of the right
+ * shape is the checks' own failure: a line saying so, and `checksFailed`.
+ * The shape is checked once, before either check walks the layout.
  */
-export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutCheck): string[] {
+export function layoutCheck(spec: Spec, { frame, descriptor }: LayoutCheck): LayoutVerdict {
+  const refused = (line: string): LayoutVerdict => ({ problems: [line], checksFailed: false });
   if (!(FRAMES as readonly unknown[]).includes(frame)) {
-    return [
+    return refused(
       `the layout names the frame ${JSON.stringify(frame)}, which is none of ${FRAMES.join(', ')}`,
-    ];
+    );
   }
-  if (typeof descriptor !== 'object' || descriptor === null) {
-    return ['the layout has no descriptor to be checked against'];
-  }
+  const misshapen = descriptorMalformation(descriptor);
+  if (misshapen !== undefined) return refused(misshapen);
   const malformed = specMalformation(spec);
-  if (malformed !== undefined) return [malformedLine(malformed)];
+  if (malformed !== undefined) return refused(malformedLine(malformed));
   try {
-    const verdict = validateAgainstCatalog(spec, frameCatalog(frame));
-    const invalid = verdict.ok ? [] : formatProblems(verdict.problems).split('\n');
+    const catalogs = catalogCheck(spec, frameCatalog(frame));
+    const invalid = catalogs.verdict.ok
+      ? []
+      : formatProblems(catalogs.verdict.problems).split('\n');
     // A page that takes inputs is there to start a run, and nothing else in it
     // can: a layout with no button bound to `run` renders a dead page, which
     // the host must refuse rather than show.
@@ -79,10 +98,23 @@ export function layoutCheckProblems(spec: Spec, { frame, descriptor }: LayoutChe
             "the layout has no control that runs the method: bind `run` under a control's `on.press`",
           ]
         : [];
-    return [...invalid, ...runless, ...layoutProblems(descriptor, spec)];
+    const fit = fitCheck(descriptor, spec);
+    return {
+      problems: [...invalid, ...runless, ...fit.problems],
+      checksFailed: catalogs.checksFailed || fit.checksFailed,
+    };
   } catch (error) {
-    return [checksFailedLine(error)];
+    return { problems: [checksFailedLine(error)], checksFailed: true };
   }
+}
+
+/**
+ * Everything the host's two checks find wrong with a layout written for
+ * `frame`, one problem a line: `layoutCheck`'s problems alone, for a host
+ * that needs only whether a stored layout renders. Never throws.
+ */
+export function layoutCheckProblems(spec: Spec, check: LayoutCheck): string[] {
+  return layoutCheck(spec, check).problems;
 }
 
 /**

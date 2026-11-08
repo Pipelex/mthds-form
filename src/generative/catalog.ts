@@ -193,7 +193,7 @@ export const COMPONENT_NAMES: readonly string[] = [
  * back.
  */
 const FRAME_VOCABULARIES: Record<Exclude<Frame, 'page'>, readonly string[]> = {
-  composer: [
+  composer: Object.freeze([
     'Card',
     'Stack',
     'Grid',
@@ -220,8 +220,8 @@ const FRAME_VOCABULARIES: Record<Exclude<Frame, 'page'>, readonly string[]> = {
     'Section',
     ...COMPOSER_COMPONENTS,
     'TextList',
-  ],
-  result: [
+  ]),
+  result: Object.freeze([
     'Card',
     'Stack',
     'Grid',
@@ -242,21 +242,30 @@ const FRAME_VOCABULARIES: Record<Exclude<Frame, 'page'>, readonly string[]> = {
     'Section',
     'SummaryRow',
     ...RESULT_COMPONENTS,
-  ],
+  ]),
 };
 
-/** The component names a layout written for `frame` may use, in the order the designer method lists them. */
+/** A whole page's vocabulary: every component but the frames' own. */
+const PAGE_VOCABULARY: readonly string[] = Object.freeze(
+  COMPONENT_NAMES.filter((name) => !(FRAME_COMPONENTS as readonly string[]).includes(name)),
+);
+
+/**
+ * The component names a layout written for `frame` may use, in the order the
+ * designer method lists them. Frozen, like the catalog `frameCatalog` builds
+ * over them: both are shared by every check, so a caller that edited one
+ * would change what every later check accepts.
+ */
 export function componentNamesFor(frame: Frame): readonly string[] {
-  if (frame !== 'page') return FRAME_VOCABULARIES[frame];
-  const frames = new Set<string>(FRAME_COMPONENTS);
-  return COMPONENT_NAMES.filter((name) => !frames.has(name));
+  return frame === 'page' ? PAGE_VOCABULARY : FRAME_VOCABULARIES[frame];
 }
 
 const frameCatalogs = new Map<Frame, ValidationCatalog>();
 
 /**
  * The catalog a layout written for `frame` is validated against: the same
- * definitions and renderings as `catalog`, held to the frame's vocabulary. A
+ * definitions and renderings as `catalog`, held to the frame's vocabulary.
+ * Built once per frame and shared, so it is frozen with its vocabulary. A
  * composer that names an `AppBar` is refused here as an unknown component,
  * though the entry's registry could render one, because the host's frame
  * already draws what it stands for.
@@ -265,13 +274,13 @@ export function frameCatalog(frame: Frame): ValidationCatalog {
   // Built once per frame: every check of a layout asks for one.
   const built = frameCatalogs.get(frame);
   if (built) return built;
-  const made: ValidationCatalog = {
+  const made: ValidationCatalog = Object.freeze({
     componentNames: componentNamesFor(frame),
     actionNames: catalog.actionNames,
     data: catalog.data,
     schema: catalog.schema,
     renders: COMPONENT_RENDERINGS,
-  };
+  });
   frameCatalogs.set(frame, made);
   return made;
 }

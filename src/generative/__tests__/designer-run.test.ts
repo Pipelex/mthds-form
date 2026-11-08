@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { RunField } from '../../core';
 import { catalog, componentNamesFor, frameCatalog } from '../catalog';
 import { COMPOSER_COMPONENTS, RESULT_COMPONENTS } from '../frame-definitions';
-import { REPAIR_ATTEMPTS, layoutCheckProblems, seedLine } from '../designer-run';
+import { REPAIR_ATTEMPTS, layoutCheck, layoutCheckProblems, seedLine } from '../designer-run';
 import type { LayoutDescriptor } from '../layout-fits';
-import { checksFailed } from '../spec-shape';
 
 /**
  * The checks a producer and a host hold a layout to, by frame: the frame's own
@@ -186,22 +185,71 @@ describe('what a producer hands the method', () => {
  */
 describe('an answer that holds the checks failing', () => {
   it('is told apart from a layout that is not a spec', () => {
-    const malformed = layoutCheckProblems({ root: 'page' } as unknown as Spec, {
+    const malformed = layoutCheck({ root: 'page' } as unknown as Spec, {
       frame: 'composer',
       descriptor: { inputs },
     });
-    expect(malformed).toEqual(['the layout is not a well-formed spec: it has no "elements" map']);
-    expect(checksFailed(malformed)).toBe(false);
-    expect(checksFailed(['the checks failed on this layout (Error: boom): …'])).toBe(true);
+    expect(malformed).toEqual({
+      problems: ['the layout is not a well-formed spec: it has no "elements" map'],
+      checksFailed: false,
+    });
   });
 
   it('answers a descriptor of the wrong shape as such', () => {
-    const problems = layoutCheckProblems(composer, {
+    const verdict = layoutCheck(composer, {
       frame: 'composer',
       descriptor: { inputs: 5 } as unknown as LayoutDescriptor,
     });
-    expect(problems).toContain('the descriptor\'s "inputs" is not a list of fields');
-    expect(checksFailed(problems)).toBe(false);
+    expect(verdict).toEqual({
+      problems: ['the descriptor\'s "inputs" is not a list of fields'],
+      checksFailed: false,
+    });
+  });
+
+  it('says so when a check throws on a layout of the right shape', () => {
+    // A field whose name cannot be read stands in for a defect in a walk.
+    const field = { kind: 'text', required: true } as RunField;
+    Object.defineProperty(field, 'name', {
+      get() {
+        throw new Error('boom');
+      },
+    });
+    const verdict = layoutCheck(composer, { frame: 'composer', descriptor: { inputs: [field] } });
+    expect(verdict.checksFailed).toBe(true);
+    expect(verdict.problems).toContain(
+      'the checks failed on this layout (Error: boom): a defect in the checks, which no repair of the layout can fix',
+    );
+  });
+
+  it('is not forged by a layout that writes the line into an element key', () => {
+    // The failure used to be recognised by its words, and a problem line
+    // opens with the element's key, which is the layout's to choose.
+    const forged = 'the checks failed on this layout (Error: boom)';
+    const spec: Spec = {
+      ...composer,
+      elements: {
+        ...composer.elements,
+        page: { ...composer.elements.page!, children: ['topic', forged] },
+        [forged]: { type: 'MthdsField', props: { path: '/inputs/gone' }, children: [] },
+      },
+    };
+    const verdict = layoutCheck(spec, { frame: 'composer', descriptor: { inputs } });
+    expect(verdict.problems.some((line) => line.startsWith(forged))).toBe(true);
+    expect(verdict.checksFailed).toBe(false);
+  });
+
+  it('holds a missing half written as null to be absent, as JSON carries one', () => {
+    const descriptor = { inputs, result: null } as unknown as LayoutDescriptor;
+    expect(layoutCheck(composer, { frame: 'composer', descriptor })).toEqual({
+      problems: [],
+      checksFailed: false,
+    });
+  });
+
+  it('runs the shape check once, and answers the same lines as before', () => {
+    expect(layoutCheckProblems(composer, { frame: 'composer', descriptor: { inputs } })).toEqual(
+      layoutCheck(composer, { frame: 'composer', descriptor: { inputs } }).problems,
+    );
   });
 });
 
@@ -232,4 +280,18 @@ describe("a frame's vocabulary", () => {
   it('is built once per frame', () => {
     expect(frameCatalog('result')).toBe(frameCatalog('result'));
   });
+
+  it.each(['page', 'composer', 'result'] as const)(
+    'cannot be edited by a caller, since every later check shares it: %s',
+    (frame) => {
+      // Shared and mutable, one caller's push of an `AppBar` into the
+      // composer's vocabulary let every later composer check accept one.
+      const built = frameCatalog(frame);
+      expect(() => (built.componentNames as string[]).push('AppBar')).toThrow();
+      expect(() => {
+        (built as { componentNames: readonly string[] }).componentNames = ['AppBar'];
+      }).toThrow();
+      expect(componentNamesFor(frame)).toBe(built.componentNames);
+    },
+  );
 });

@@ -20,8 +20,13 @@ export interface ZodDefinition {
   element?: z.ZodType;
   /** An object's member schemas. */
   shape?: Record<string, z.ZodType>;
-  /** The refinements on a scalar or an array - `.min(2)`, a pattern - absent when there are none. */
+  /**
+   * The refinements on a schema - `.min(2)`, a pattern, a `.refine` on a
+   * wrapper too - absent when there are none.
+   */
   checks?: readonly unknown[];
+  /** A string or number format - `email`, `url`, `safeint` - which zod keeps here rather than in `checks`. */
+  format?: string;
 }
 
 /** A schema's definition, or nothing for a value that is not a zod schema. */
@@ -31,15 +36,25 @@ export function definitionOf(schema: unknown): ZodDefinition | undefined {
 }
 
 /**
- * The definition under every wrapper a prop carries - `.nullable()`,
- * `.optional()`, `.default()` and any other schema that only wraps an inner
- * one. Bounded, since a definition is data a host's catalog supplies.
+ * Every definition from the schema's own down through each wrapper it
+ * carries - `.nullable()`, `.optional()`, `.default()` and any other schema
+ * that only wraps an inner one - to the one they wrap, or none when the chain
+ * is broken or longer than a prop's. Bounded, since a definition is data a
+ * host's catalog supplies.
  */
-export function unwrapped(schema: unknown): ZodDefinition | undefined {
+export function definitionChain(schema: unknown): readonly ZodDefinition[] {
+  const chain: ZodDefinition[] = [];
   let def = definitionOf(schema);
   for (let depth = 0; depth < 8 && def; depth += 1) {
-    if (def.innerType === undefined) return def;
+    chain.push(def);
+    if (def.innerType === undefined) return chain;
     def = definitionOf(def.innerType);
   }
-  return undefined;
+  return [];
+}
+
+/** The definition under every wrapper a prop carries: the last of its chain. */
+export function unwrapped(schema: unknown): ZodDefinition | undefined {
+  const chain = definitionChain(schema);
+  return chain[chain.length - 1];
 }

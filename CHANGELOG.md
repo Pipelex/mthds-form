@@ -4,12 +4,14 @@
 
 ### Added
 
-- **`checksFailed(problems)`**: says whether an answer from the checks holds their own failure rather than the layout's problems; a throw inside the checks on a layout of the right shape is now the line `the checks failed on this layout (…)`, never "not a well-formed spec", so a producer stops instead of paying the repair pass for a defect no layout can fix.
+- **`layoutCheck(spec, { frame, descriptor })`**: the checks' answer as `{ problems, checksFailed }`, the problems `layoutCheckProblems` returns beside a flag saying whether a check itself threw on a layout of the right shape. That throw is now the line `the checks failed on this layout (…)`, never "not a well-formed spec", and a producer reads the flag, not the line, to stop instead of paying the repair pass for a defect no layout can fix: a layout can write the line into an element key, but not the flag.
 
 ### Changed
 
-- **The checks refuse more (Breaking)**: an object carrying an expression key that json-render would not resolve (`{ "$state": 7 }`, `{ "$index": 1 }`, a `$cond` without both branches) is held to the prop's schema as the literal it renders as; a fixed-set prop nested inside another, such as a `DataTable` column's `format`, takes a literal alone; a named slot the component does not declare, or one named `default`, is refused; and an inline `ProportionBar` part's amount must be a number or read a number path, so an amount written as a text (`"40"` included) or reading a text path sends a stored layout back to the plain form.
-- **A `ProportionBar` part read whole is accepted**: `items: [{ "$state": "/result/split/0" }, …]` passes when each path holds a structure with both members, its value member a number, since it draws exactly as a part written out does.
+- **The checks refuse more (Breaking)**: an object carrying an expression key that json-render would not resolve (`{ "$state": 7 }`, `{ "$index": 1 }`, a `$cond` without both branches) is held to the prop's schema as the literal it renders as; a fixed-set prop nested inside another, such as a `DataTable` column's `format`, takes a literal alone; a named slot the component does not declare, or one named `default`, is refused; an inline `ProportionBar` part's amount must be a number or read a number path, so an amount written as a text (`"40"` included) or reading a text path sends a stored layout back to the plain form, and a part or an amount under a `$cond` is held to that in each branch; and an element whose `type` is not a text, or a relative `repeat` naming no `$item`, is a malformed layout.
+- **A `ProportionBar` part read whole is accepted**: `items: [{ "$state": "/result/split/0" }, …]` passes when each path holds a structure with both members, its value member a number, since it draws exactly as a part written out does; a part or an amount read with `$bindState` or `$bindItem` is read as the path it binds, and an amount of `{ "$index": true }` is a number.
+- **A descriptor half written as `null` is absent**: `{ inputs: null }` or `{ result: null }`, which is how JSON carries a missing half, is checked as a descriptor with nothing on that side rather than refused as misshapen.
+- **A frame's vocabulary and catalog are frozen**: `componentNamesFor(frame)` and `frameCatalog(frame)` are shared by every check, so a caller can no longer edit what every later check accepts.
 - **A failed element tries again**: an element that threw draws again once its resolved props, the list it repeats over, or a child's resolved props change (and the root once the layout or its own resolved props do), without the host remounting the page; an equal value handed as a new object does not retry it, and while `loading` a failure is held and only what still fails when the stream ends reaches `onElementError`. Without a handler, an element's error is logged as json-render logs it rather than handed to json-render's boundary, which never retried.
 - **A run waits for the fields' own checks**: the page's `run` handler does not call `onRun` while a mounted field's `checks` fail, and the press shows each failing field its message, so `[validateForm, run]` no longer starts a run of a form its own checks refused. A field hidden or dropped since it registered its checks does not hold the run.
 - **A structure shown as a value writes out as nothing**: a `Fact`, `Detail`, `Metric` or `SummaryRow` handed a structure out of scratch state shows what it shows for an absent value instead of `[object Object]`, and a list writes out as its entries joined.
@@ -19,6 +21,8 @@
 
 - **A hatch's path that is not a text**: an `MthdsField` or `MthdsResult` whose `path` resolved to a number no longer binds to the entry that number names inside a repeat; it resolves to nothing.
 - **Tabs and pills a layout names twice**: two tabs sharing a value are two tabs, and a `Segmented` option named twice no longer gives React two children with one key.
+- **A refined scalar prop is parsed**: a text prop with a `.refine` on the wrapper around it, an email or an integer format was judged by its type alone and passed to the renderer unchecked.
+- **A hatch path that is no text no longer fails the fit check**: one whose own `toString` throws is written out as its JSON in the problem line, rather than answered as the checks failing.
 
 ## [v0.32.0] - 2026-11-08
 

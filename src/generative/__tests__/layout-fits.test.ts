@@ -589,6 +589,11 @@ describe('a spec malformed in a way the walk itself throws on', () => {
     ['props that are not an object', { root: 'a', elements: { a: { type: 'Text', props: 5 } } }],
     ['a null element', { root: 'a', elements: { a: null } }],
     ['no elements map at all', { root: 'a' }],
+    ['an element naming no type', { root: 'a', elements: { a: { type: 7, props: {} } } }],
+    [
+      'a relative repeat naming no member',
+      { root: 'a', elements: { a: { type: 'Stack', props: {}, repeat: { statePath: {} } } } },
+    ],
   ])('answers no rather than throwing: %s', (_name, malformed) => {
     const spec = malformed as unknown as Spec;
     expect(() => layoutProblems(descriptor, spec)).not.toThrow();
@@ -600,6 +605,27 @@ describe('a spec malformed in a way the walk itself throws on', () => {
     const spec = { root: 'a', elements: { a: null } } as unknown as Spec;
     expect(layoutProblems(descriptor, spec)).toEqual([
       expect.stringContaining('the layout is not a well-formed spec'),
+    ]);
+  });
+
+  it('writes out a hatch path that is no text without calling its own toString', () => {
+    const spec = {
+      root: 'a',
+      elements: { a: { type: 'MthdsField', props: { path: { toString: 1 } }, children: [] } },
+    } as unknown as Spec;
+    expect(layoutProblems(descriptor, spec)).toContain(
+      'a: MthdsField delegates {"toString":1}, which no input has',
+    );
+  });
+
+  it('holds a half of the descriptor written as null to be absent', () => {
+    const spec = {
+      root: 'a',
+      elements: { a: { type: 'MthdsField', props: { path: '/inputs/city' }, children: [] } },
+    } as unknown as Spec;
+    expect(layoutProblems({ ...descriptor, result: null } as never, spec)).toEqual([]);
+    expect(layoutProblems({ inputs: null, result: text('total', true) } as never, spec)).toEqual([
+      'a: MthdsField delegates /inputs/city, which no input has',
     ]);
   });
 });
@@ -1134,6 +1160,61 @@ describe("a share's parts", () => {
       `bar: ProportionBar's part 3's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
       `bar: ProportionBar's part 4's "amount" is an expression that reads no number, not a number;${HOW}`,
     ]);
+  });
+
+  /**
+   * json-render resolves `$index` to a number and a `$cond` to either branch,
+   * each resolved again, so each is read as what it resolves to.
+   */
+  it('reads a part or an amount through an index or either branch of a condition', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $index: true } },
+          {
+            $cond: { $state: '/ui/open' },
+            $then: { $state: '/result/costs/0' },
+            $else: { category: 'None', amount: 0 },
+          },
+          {
+            category: 'Food',
+            amount: { $cond: true, $then: 4, $else: { $state: '/result/costs/1/amount' } },
+          },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a conditional part or amount when either branch draws no share', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { $cond: { $state: '/ui/open' }, $then: { $state: '/result/costs/0' }, $else: 'none' },
+          {
+            category: 'Food',
+            amount: { $cond: true, $then: 4, $else: { $state: '/result/costs/0/category' } },
+          },
+        ]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1 is "none", not a structure;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
+    ]);
+  });
+
+  /** A binding resolves to the value at its path, as a read does. */
+  it('reads a part or an amount bound with $bindState as the path it binds', () => {
+    const spec = inline([
+      { $bindState: '/inputs/costs/0' },
+      { category: 'Food', amount: { $bindState: '/inputs/costs/0/category' } },
+    ]);
+    const list: RunField = { kind: 'list', name: 'costs', required: false, item: LINE };
+    expect(layoutProblems({ inputs: [list] }, spec)).toContain(
+      `bar: ProportionBar's part 2's "amount" reads /inputs/costs/0/category, which holds a text value, not a number;${HOW}`,
+    );
+    expect(layoutProblems({ inputs: [list] }, spec).join('\n')).not.toContain('part 1');
   });
 });
 

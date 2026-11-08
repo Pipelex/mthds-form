@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { unwrapped, type ZodDefinition } from './zod-definition';
+import { definitionChain, unwrapped, type ZodDefinition } from './zod-definition';
 
 /**
  * What a renderer is handed: its props as the catalog declares them, whatever
@@ -41,6 +41,8 @@ import { unwrapped, type ZodDefinition } from './zod-definition';
 /** What a schema says of an absent value, worked out once. */
 interface SchemaFacts {
   def: ZodDefinition | undefined;
+  /** The scalar type a value conforms to by its type alone, when the schema refines nothing. */
+  plain: 'string' | 'boolean' | 'number' | undefined;
   acceptsNull: boolean;
   acceptsUndefined: boolean;
   /** What the prop resolves to when it is absent or refused. */
@@ -52,7 +54,8 @@ const factsBySchema = new WeakMap<z.ZodType, SchemaFacts>();
 function factsOf(schema: z.ZodType): SchemaFacts {
   const known = factsBySchema.get(schema);
   if (known) return known;
-  const def = unwrapped(schema);
+  const chain = definitionChain(schema);
+  const def = chain[chain.length - 1];
   const acceptsNull = schema.safeParse(null).success;
   const acceptsUndefined = schema.safeParse(undefined).success;
   const absent = acceptsNull
@@ -64,22 +67,43 @@ function factsOf(schema: z.ZodType): SchemaFacts {
         : def?.type === 'array'
           ? []
           : undefined;
-  const facts = { def, acceptsNull, acceptsUndefined, absent };
+  const facts = { def, plain: plainType(chain), acceptsNull, acceptsUndefined, absent };
   factsBySchema.set(schema, facts);
   return facts;
 }
 
+/** The wrappers that hand a present value to the schema they wrap and its result back unchanged. */
+const PASSING_WRAPPERS: ReadonlySet<string> = new Set([
+  'optional',
+  'nullable',
+  'default',
+  'prefault',
+  'readonly',
+  'catch',
+  'nonoptional',
+]);
+
 /**
- * Whether a scalar conforms by its type alone: a text, a boolean or a finite
- * number against a schema of that kind with no refinement on it. Anything
- * else - an enum, a bounded text - is parsed.
+ * The scalar type a value conforms to by its type alone: a text, a boolean
+ * or a number schema with no refinement and no format on it, under wrappers
+ * that pass a present value through and refine nothing either. Anything else
+ * - an enum, a bounded text, an email, an integer, a `.refine` on the
+ * nullable around a text - is parsed.
  */
-function plainlyConforms(def: ZodDefinition | undefined, value: unknown): boolean {
-  if (!def || (def.checks !== undefined && def.checks.length > 0)) return false;
-  if (def.type === 'string') return typeof value === 'string';
-  if (def.type === 'boolean') return typeof value === 'boolean';
-  if (def.type === 'number') return typeof value === 'number' && Number.isFinite(value);
-  return false;
+function plainType(chain: readonly ZodDefinition[]): SchemaFacts['plain'] {
+  const def = chain[chain.length - 1];
+  if (!def || def.format !== undefined) return undefined;
+  if (chain.some((link) => link.checks !== undefined && link.checks.length > 0)) return undefined;
+  if (!chain.slice(0, -1).every((link) => PASSING_WRAPPERS.has(link.type))) return undefined;
+  return def.type === 'string' || def.type === 'boolean' || def.type === 'number'
+    ? def.type
+    : undefined;
+}
+
+/** Whether a scalar conforms by its type alone, against a schema `plainType` read as plain. */
+function plainlyConforms(plain: SchemaFacts['plain'], value: unknown): boolean {
+  if (plain === 'number') return typeof value === 'number' && Number.isFinite(value);
+  return plain !== undefined && typeof value === plain;
 }
 
 /** A scalar's nearest value of a text schema: a number or a boolean written out, or nothing. */
@@ -114,7 +138,7 @@ function conformValue(schema: z.ZodType, value: unknown): unknown {
   if (value === undefined) return facts.acceptsUndefined ? value : facts.absent;
   if (value === null) return facts.acceptsNull ? value : facts.absent;
   if (typeof value !== 'object') {
-    if (plainlyConforms(facts.def, value) || schema.safeParse(value).success) return value;
+    if (plainlyConforms(facts.plain, value) || schema.safeParse(value).success) return value;
     if (facts.def?.type === 'string') return writtenOut(schema, value) ?? facts.absent;
     return facts.absent;
   }
