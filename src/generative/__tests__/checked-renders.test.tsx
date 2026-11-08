@@ -202,6 +202,23 @@ describe('a share whose parts are not all structures', () => {
     expect(container.textContent).toContain('Food');
   });
 
+  it('draws the parts whose amount is a number, when another amount is a structure carrying its own toString', () => {
+    // `Number` throws on such a structure, which dropped the whole bar.
+    const { container } = resultPage(
+      'ProportionBar',
+      { ...SHARE, items: { $state: '/result/costs' } },
+      {
+        costs: [
+          { category: 'Food', amount: 40 },
+          { category: 'Lodging', amount: { toString: 1 } },
+        ],
+      },
+    );
+    expect(renderErrors()).toEqual([]);
+    expect(container.querySelectorAll('li')).toHaveLength(1);
+    expect(container.textContent).toContain('Food');
+  });
+
   it('draws the parts that are, when an inline entry is an expression that resolved to nothing', () => {
     const { container } = resultPage(
       'ProportionBar',

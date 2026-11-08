@@ -334,6 +334,16 @@ describe('the brand bar a host draws itself', () => {
     expect(page.container.innerHTML).toBe(ownHtml);
   });
 
+  it('draws a link the layout names twice twice, under keys React can tell apart', () => {
+    const { container } = render(
+      <BrandProvider manifest={BRAND}>
+        <BrandBar app="Trip planner" links={['Docs', 'Docs']} />
+      </BrandProvider>,
+    );
+    expect(container.querySelectorAll('nav a')).toHaveLength(2);
+    expect(logged.flat().join(' ')).not.toMatch(/same key/);
+  });
+
   it('names the cure when no brand is in scope', () => {
     expect(() => render(<BrandBar app="Trip planner" />)).toThrow(/no brand in scope/);
   });

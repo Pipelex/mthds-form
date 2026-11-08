@@ -61,9 +61,10 @@ export function BrandBar({ app, links, tag }: BrandBarProps) {
         <div className="ml-auto flex min-w-0 items-center gap-6">
           {links && links.length > 0 ? (
             <nav aria-label="Site" className="hidden items-center gap-6 sm:flex">
-              {links.map((link) => (
+              {links.map((link, index) => (
                 <a
-                  key={link}
+                  // A layout may name one link twice, so the label alone is no key.
+                  key={`${index}-${link}`}
                   href="#"
                   onClick={(event) => event.preventDefault()}
                   className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden"

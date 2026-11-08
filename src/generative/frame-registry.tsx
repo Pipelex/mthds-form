@@ -264,10 +264,14 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     (row): row is Record<string, unknown> =>
       typeof row === 'object' && row !== null && !Array.isArray(row),
   );
+  // A structure is no amount, and `Number` throws on one carrying its own
+  // `toString` member, so only a written value is read as a number.
+  const amountOf = (raw: unknown) =>
+    typeof raw === 'object' && raw !== null ? Number.NaN : Number(raw ?? 0);
   const parts = rows
     .map((row) => ({
       label: textOf(row[props.labelKey]),
-      value: Number(row[props.valueKey] ?? 0),
+      value: amountOf(row[props.valueKey]),
     }))
     .filter((p) => Number.isFinite(p.value) && p.value > 0);
   const sum = parts.reduce((s, p) => s + p.value, 0);

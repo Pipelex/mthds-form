@@ -15,7 +15,7 @@
 
 ### Fixed
 
-- **A layout the checks accept renders without throwing**: every renderer `./generative` registers is handed its props held to the catalog's declaration of them, so a prop bound to a layout's scratch state that holds the wrong kind of value draws as nothing rather than dropping the element, a `ProportionBar` draws the parts that are structures, and a `Picture` whose path resolves to nothing draws nothing.
+- **No renderer throws on a layout the checks accept**: every renderer `./generative` registers is handed its props held to the catalog's declaration of them, so a prop bound to a layout's scratch state that holds the wrong kind of value draws as nothing rather than dropping the element, a `ProportionBar` draws the parts that are structures with a written amount, and a `Picture` whose path resolves to nothing draws nothing.
 - **One run per press, chain or no chain**: `GenerativePage` holds its run guard one task past the settled run, so a run chained under its own `onError` no longer starts a second billed run when the first one fails.
 - **`layoutCheckProblems` never throws**: a spec that is not one, `null` included, a frame this package does not draw and a missing descriptor are each answered with a problem line, and an unknown frame no longer passes every component it is handed.
 
