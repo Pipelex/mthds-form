@@ -107,6 +107,49 @@ const BRAND_PATTERNS = [
   },
 ];
 
+/**
+ * What the generative layer's half that renders nothing may not reach.
+ *
+ * `./generative/headless` exports the producer and the checks to a host's server,
+ * where a module that touches React cannot load (docs/dependency-budget.md),
+ * so every module it reaches is held off React and the rendering half's
+ * dependencies. Those modules are the `.ts` files directly under
+ * `src/generative/` - the renderers are `.tsx`, the split vitest's two
+ * generative projects already read - and the entry's own index. A value
+ * import of the control set or of one of the layer's renderers would drag
+ * React in through a relative path no package pattern sees, so both are named
+ * too; a type import is erased and stays allowed. `scripts/assert-bundle.mjs`
+ * holds the entry to an allow-list of `@json-render/core` and `zod` on the
+ * built graph, which is the backstop for a renderer added after this list.
+ */
+const HEADLESS_GENERATIVE_PATTERNS = [
+  {
+    group: [
+      'react',
+      'react-dom',
+      'react/*',
+      'react-dom/*',
+      '@json-render/react',
+      'lucide-react',
+      '@radix-ui/*',
+      'react-dropzone',
+      'class-variance-authority',
+      'clsx',
+      'tailwind-merge',
+      'marked',
+    ],
+    message:
+      'This module is in the half of the generative layer that renders nothing, which `./generative/headless` exports to a host\'s server: React and the rendering half\'s dependencies belong in a `.tsx` module. See docs/dependency-budget.md.',
+  },
+  {
+    regex:
+      '^(?:\\.\\./)+react(?:/.*)?$|^\\.\\.?/(?:\\.\\./)*(?:generative/)?(?:brand-bar|brand-context|element-errors|frame-host|frame-registry|index|page|product-registry|registry|result-slot|ui(?:/.*)?)$',
+    allowTypeImports: true,
+    message:
+      'A value import of the control set or of a renderer drags React into `./generative/headless`, which a host\'s server imports. See docs/dependency-budget.md.',
+  },
+];
+
 const TERRAZZO_PATTERN = {
   group: ['@terrazzo/*'],
   message:
@@ -216,6 +259,18 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'error',
         { patterns: [...BUDGET_PATTERNS, CORE_BARREL_PATTERN] },
+      ],
+    },
+  },
+  {
+    // The half of the generative layer that renders nothing, which the server
+    // entry reaches. Listed after the block above so its patterns win here.
+    files: ['src/generative/*.ts', 'src/generative/headless/**/*.ts'],
+    ignores: ['src/generative/index.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...BUDGET_PATTERNS, CORE_BARREL_PATTERN, ...HEADLESS_GENERATIVE_PATTERNS] },
       ],
     },
   },

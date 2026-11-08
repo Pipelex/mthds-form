@@ -7,12 +7,7 @@ import {
   useBoundProp,
   useFieldValidation,
 } from '@json-render/react';
-import {
-  focusOutlineClass,
-  linkTextClass,
-  selectedBorderClass,
-  selectedFillClass,
-} from '../react/role-tokens';
+import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
   headingClass,
@@ -21,8 +16,9 @@ import {
 } from '../react/style-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
-import { useBrand } from './brand-context';
+import { BrandBar, CONTAINER } from './brand-bar';
 import { catalog } from './catalog';
+import { textOf, withDeclaredProps } from './declared-props';
 import { frameRenderers } from './frame-registry';
 import { generativeRenderers, useDescriptorScope } from './registry';
 import { useResultSlot } from './result-slot';
@@ -53,8 +49,6 @@ import { useControlId } from './ui/shadcn';
  * and that is all.
  */
 
-const CONTAINER = 'mx-auto w-full max-w-6xl px-6 sm:px-8';
-
 /** The kernel's app-presentation label, so a brand field and a kernel field read alike. */
 const LABEL = 'block text-[13.5px] leading-none font-medium text-foreground';
 
@@ -67,69 +61,7 @@ interface AppBarProps {
 }
 
 function AppBar({ props }: BaseComponentProps<AppBarProps>) {
-  const brand = useBrand();
-  return (
-    <header className="border-b border-border">
-      <div className={cn(CONTAINER, 'flex h-16 items-center gap-5')}>
-        {/* `no-referrer` on both, as on every image this package paints: the
-            scheme is already checked where the manifest is parsed, and a brand
-            asset has no more business learning where it was drawn than a
-            payload's picture does.
-
-            This pair is the one place a `dark:` variant and the token fallbacks
-            disagree. A fallback is frozen per utility and cannot vary by scope,
-            so a host that defines no tokens renders LIGHT inside `.dark` - but
-            the variant still flips, so that host gets the dark-ground asset on
-            a light surface. Documented in `docs/theming.md` rather than worked
-            around: the swap is right for every host that defines tokens, which
-            is every host that sets `.dark` deliberately. */}
-        <img
-          src={brand.logo.onLight}
-          alt={brand.name}
-          referrerPolicy="no-referrer"
-          className="h-7 w-auto dark:hidden"
-        />
-        <img
-          src={brand.logo.onDark}
-          alt={brand.name}
-          referrerPolicy="no-referrer"
-          className="hidden h-7 w-auto dark:block"
-        />
-        <span aria-hidden="true" className="h-5 w-px bg-border" />
-        <span className="text-sm font-medium text-foreground/80">{props.app}</span>
-        {/* `min-w-0` down to the pill: a pipe's code is one long word, and
-            at phone width an unshrinkable pill pushed the row past the viewport. */}
-        <div className="ml-auto flex min-w-0 items-center gap-6">
-          {props.links && props.links.length > 0 ? (
-            <nav aria-label="Site" className="hidden items-center gap-6 sm:flex">
-              {props.links.map((link) => (
-                <a
-                  key={link}
-                  href="#"
-                  onClick={(event) => event.preventDefault()}
-                  className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden"
-                >
-                  {link}
-                </a>
-              ))}
-            </nav>
-          ) : null}
-          {props.tag ? (
-            <span
-              className={cn(
-                'min-w-0 truncate rounded-lg border px-2.5 py-1 font-mono text-[11px]',
-                selectedBorderClass,
-                selectedFillClass,
-                linkTextClass,
-              )}
-            >
-              {props.tag}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </header>
-  );
+  return <BrandBar app={props.app} links={props.links} tag={props.tag} />;
 }
 
 interface HeroProps {
@@ -274,7 +206,7 @@ function present(value: unknown): value is string | number | boolean {
 function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
   const text = [props.value, props.detail]
     .filter(present)
-    .map(String)
+    .map(textOf)
     .join(props.separator ?? ' ');
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-3 first:pt-0 last:border-b-0">
@@ -479,16 +411,20 @@ type RegistryOptions = Parameters<typeof defineRegistry<typeof catalog>>[1];
 export const { registry: generativeRegistry } = defineRegistry(catalog, {
   components: {
     ...generativeRenderers,
-    Input: (ctx) => <BrandInput {...ctx} />,
-    Textarea: (ctx) => <BrandTextarea {...ctx} />,
-    AppBar: (ctx) => <AppBar {...ctx} />,
-    Hero: (ctx) => <Hero {...ctx} />,
-    Workspace: (ctx) => <Workspace {...ctx} />,
-    Section: (ctx) => <Section {...ctx} />,
-    Rail: (ctx) => <Rail {...ctx} />,
-    SummaryRow: (ctx) => <SummaryRow {...ctx} />,
-    Cta: (ctx) => <Cta {...ctx} />,
-    Footer: (ctx) => <Footer {...ctx} />,
+    // Held to their definitions as the base and frame renderers are
+    // (`declared-props.ts`).
+    ...withDeclaredProps(catalog.data.components as Record<string, { props?: unknown }>, {
+      Input: (ctx: Parameters<typeof BrandInput>[0]) => <BrandInput {...ctx} />,
+      Textarea: (ctx: Parameters<typeof BrandTextarea>[0]) => <BrandTextarea {...ctx} />,
+      AppBar: (ctx: Parameters<typeof AppBar>[0]) => <AppBar {...ctx} />,
+      Hero: (ctx: Parameters<typeof Hero>[0]) => <Hero {...ctx} />,
+      Workspace: (ctx: Parameters<typeof Workspace>[0]) => <Workspace {...ctx} />,
+      Section: (ctx: Parameters<typeof Section>[0]) => <Section {...ctx} />,
+      Rail: (ctx: Parameters<typeof Rail>[0]) => <Rail {...ctx} />,
+      SummaryRow: (ctx: Parameters<typeof SummaryRow>[0]) => <SummaryRow {...ctx} />,
+      Cta: (ctx: Parameters<typeof Cta>[0]) => <Cta {...ctx} />,
+      Footer: (ctx: Parameters<typeof Footer>[0]) => <Footer {...ctx} />,
+    }),
     ...frameRenderers,
   },
 } as RegistryOptions);

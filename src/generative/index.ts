@@ -11,75 +11,15 @@
  * The public API is this file. Deep paths are not exported and not stable.
  */
 
-// The catalog a layout is written against, and the same catalog as the data
-// the designer method takes. The prompt itself is the method, shipped as
-// `@pipelex/mthds-form/layout-design.mthds`; nothing here renders it.
-export {
-  COMPONENT_NAMES,
-  COMPONENT_RENDERINGS,
-  PRODUCT_COMPONENTS,
-  catalog,
-  componentNamesFor,
-  frameCatalog,
-  type GenerativeSpec,
-  type ProductComponentName,
-} from './catalog';
-// The frames a layout is written for: a whole product page, or the composer
-// and the result page of a host's compose-then-result app, each with the
-// components it adds.
-export {
-  COMPOSER_COMPONENTS,
-  FRAMES,
-  FRAME_COMPONENTS,
-  RESULT_COMPONENTS,
-  type Frame,
-} from './frame-definitions';
-export { CUSTOM_COMPONENTS, ICON_NAMES, METRIC_FORMATS, PICKED_SHADCN } from './components';
-export {
-  DESIGNER_CATALOG_CONCEPT,
-  designerCatalog,
-  type DesignerAction,
-  type DesignerCatalog,
-  type DesignerCatalogOptions,
-  type DesignerComponent,
-} from './designer-catalog';
-export { PROMPT_HASH, promptHashSubject } from './prompt-hash';
-// What a producer needs beside them: the seed's line, the checks a produced
-// layout is held to in words, and the repair pass's bound.
-export { REPAIR_ATTEMPTS, layoutCheckProblems, seedLine, type LayoutCheck } from './designer-run';
-
-// The brief a model is handed: the descriptor projected into the data the
-// designer method lays out itself, and nothing else.
-export {
-  DESIGNER_BRIEF_CONCEPT,
-  inputBrief,
-  isDelegatedInput,
-  isDelegatedResult,
-  resultBrief,
-  type BriefSubject,
-  type DesignerBrief,
-  type DesignerPathEntry,
-  type DesignerStyle,
-  type InputBriefOptions,
-  type ResultBriefOptions,
-} from './brief';
-
-// The two checks a host runs before it renders a stored layout.
-export {
-  formatProblems,
-  validateAgainstCatalog,
-  type ComponentRendering,
-  type SpecProblem,
-  type SpecVerdict,
-  type ValidationCatalog,
-} from './validate';
-export { layoutFits, layoutProblems, type LayoutDescriptor } from './layout-fits';
-
-// The wire format a produced layout arrives in: json-render's JSON patch lines,
-// one per line, root first and parents before children, so a renderer can paint
-// a partial tree at every line. A stored layout is the JSONL exactly as the
-// model emitted it, and a host compiles it before it validates it.
-export { jsonlLines, specFromJsonl, specToJsonl } from './stream';
+// Everything that renders nothing - the catalog and the frames, the brief, the
+// prompt pin, the seed's line, the two checks, the JSONL compiler, the state
+// paths and the payload loader, the provenance - lives in the server entry,
+// `./generative/headless`, which a host's server imports without this module's
+// `'use client'`. Re-exported whole, so a client host imports from one place
+// and nothing it imported moved. `export *` from a module inside the bundle is
+// flattened into named exports at build, which is what a bundler needs at a
+// client boundary; `make assert-bundle` checks it stayed that way.
+export * from './headless';
 
 // The page, and what it resolves paths against.
 export {
@@ -88,6 +28,8 @@ export {
   type GenerativePageProps,
   type PageRegistry,
 } from './page';
+// What a page tells its host of an element that failed to render.
+export type { ElementErrorHandler, ElementErrorInfo } from './element-errors';
 export {
   DescriptorProvider,
   domIdFor,
@@ -99,6 +41,9 @@ export {
 export { generativeRegistry } from './product-registry';
 export { ResultSlotProvider, useResultSlot, type ResultSlot } from './result-slot';
 export { BrandProvider, useBrand } from './brand-context';
+// The brand's bar - what the catalog's `AppBar` draws - for a host to draw as
+// its own chrome, over a plain form or above a layout that has none.
+export { BrandBar, type BrandBarProps } from './brand-bar';
 // What a host's compose-then-result frame tells a layout's frame components:
 // how long a run takes, and the result's actions.
 export { FrameHostProvider, useFrameHost, type FrameHost } from './frame-host';
@@ -108,32 +53,10 @@ export { brandManifestSchema, type BrandManifest } from '../brand/manifest';
 
 // The store a page reads and writes, created by the host with this entry's own
 // json-render, so the page recognises it: a second copy of the runtime resolved
-// by the host would hand the page a store it does not know.
-export { createStateStore, type Spec, type StateModel, type StateStore } from '@json-render/core';
+// by the host would hand the page a store it does not know. (`Spec` comes with
+// the server entry above.)
+export { createStateStore, type StateModel, type StateStore } from '@json-render/core';
 
-// The two state trees a layout binds to.
-export {
-  INPUTS_ROOT,
-  RESULT_ROOT,
-  absoluteHatchPath,
-  fieldAtSegments,
-  inputFieldAtPath,
-  joinPath,
-  repeatBasePathOf,
-  resultFieldAtPath,
-  segmentsUnder,
-} from './paths';
-export { payloadToState } from './state';
 // The seed is the kernel's (`src/core/seed.ts`), re-exported here so a host on
 // this entry seeds its store without a second import.
 export { seedInputs } from '../core/seed';
-
-// A layout with its provenance: who produced it, on which model, under which prompt.
-export {
-  findFixture,
-  fixtureId,
-  fixtureLabel,
-  type CriticLoop,
-  type Producer,
-  type SpecFixture,
-} from './fixture';

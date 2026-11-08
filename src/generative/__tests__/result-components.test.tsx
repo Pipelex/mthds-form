@@ -1,7 +1,7 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GenerativePage } from '../page';
 
 const one = (type: string, props: Record<string, unknown>): Spec => ({
@@ -180,11 +180,46 @@ describe('a run starts once per press while it is going', () => {
       fireEvent.click(button);
     });
     expect(calls).toHaveLength(1);
-    await act(async () => finish());
+    // The guard outlasts the settled run by one task, the task json-render
+    // runs the binding's chain in; a person's next press comes after it. The
+    // release is scheduled only once the settled promise's callbacks have run,
+    // after a timer set here at once, so the press waits a task beyond that.
+    await act(async () => {
+      finish();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     await act(async () => {
       fireEvent.click(button);
     });
     expect(calls).toHaveLength(2);
+  });
+
+  // A run chained under the binding that ran is refused by the catalog
+  // check, and the page holds to one run per press for a layout rendered
+  // past it all the same: the guard used to be released as `onRun` settled,
+  // before json-render reached the chain, so a rejected run started again.
+  it.each([
+    ['onError, after a run the host rejects', 'onError', () => Promise.reject(new Error('quota'))],
+    ['onSuccess, after a run that returns nothing', 'onSuccess', () => undefined],
+    ['onSuccess, after a run the host resolves', 'onSuccess', () => Promise.resolve()],
+  ])('starts no second run from a chain under %s', async (_name, hook, outcome) => {
+    const onRun = vi.fn(outcome);
+    const chained: Spec = {
+      root: 'cta',
+      elements: {
+        cta: {
+          ...PAGE.elements.cta!,
+          on: { press: { action: 'run', [hook]: { action: 'run' } } },
+        },
+      },
+    };
+    render(<GenerativePage spec={chained} store={createStateStore({})} scope={{}} onRun={onRun} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(onRun).toHaveBeenCalledTimes(1);
   });
 
   it('holds the guard for any thenable the host returns, not only a native promise', async () => {
@@ -206,7 +241,15 @@ describe('a run starts once per press while it is going', () => {
       fireEvent.click(button);
     });
     expect(calls).toHaveLength(1);
-    await act(async () => finish());
+    // The guard outlasts the settled run by one task, the task json-render
+    // runs the binding's chain in; a person's next press comes after it. The
+    // release is scheduled only once the settled promise's callbacks have run,
+    // after a timer set here at once, so the press waits a task beyond that.
+    await act(async () => {
+      finish();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     await act(async () => {
       fireEvent.click(button);
     });

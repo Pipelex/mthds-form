@@ -4,6 +4,13 @@ import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
 import { BrandProvider } from './brand-context';
+import {
+  ElementBoundary,
+  ReportingContext,
+  reportingRegistry,
+  type ElementErrorHandler,
+  type ReportedRenderers,
+} from './element-errors';
 import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
@@ -37,6 +44,15 @@ export interface GenerativePageProps {
    * brand components may omit it.
    */
   brand?: BrandManifest;
+  /**
+   * Called once for each element that throws while rendering, with the error
+   * and the element's component type. json-render drops such an element from
+   * the page and catches its throw in a boundary of its own, so a boundary
+   * around the page never fires; this is how a host hears of it, and falls
+   * back to its plain view if it wants the whole page to. The element renders
+   * nothing in its place either way. Without it, json-render logs the error.
+   */
+  onElementError?: ElementErrorHandler;
 }
 
 /**
@@ -55,6 +71,7 @@ export function GenerativePage({
   loading,
   registry = generativeRegistry,
   brand,
+  onElementError,
 }: GenerativePageProps) {
   // The scope reaches every control through context, so a fresh object on each
   // render re-renders every field on the page - and a host naturally writes it
@@ -82,44 +99,104 @@ export function GenerativePage({
   React.useEffect(() => {
     latest.current = { onRun, store };
   });
+  // Every renderer is wrapped in a reporting boundary, once per type and
+  // renderer, so no element remounts on a new callback, on a host that starts
+  // or stops passing one, or on a registry object rebuilt with the same
+  // renderers; without a callback the boundary throws the error on, and the
+  // page renders exactly as json-render does. The callback is read through a
+  // ref at the error, refreshed in an insertion effect, which runs before the
+  // layout phase a boundary reports in, so an element that fails in the same
+  // commit as a new callback reports to that one.
+  const report = React.useRef(onElementError);
+  React.useInsertionEffect(() => {
+    report.current = onElementError;
+  });
+  const [made] = React.useState<ReportedRenderers>(() => new Map());
+  const pageRegistry = React.useMemo(
+    () => reportingRegistry(registry, report, made),
+    [registry, made],
+  );
+  // json-render resolves an element's props before its renderer runs, so a
+  // throw there is caught by the boundary of the element above - and the root
+  // has none. Its own boundary is given another try with every new spec - a
+  // new layout, judged by its content: a host that parses its spec inline
+  // hands a new object at every render, and one whose report sets its state
+  // would otherwise retry, throw and report until React gave up.
+  const rootType = spec?.elements?.[spec.root]?.type ?? 'root';
+  const specContent = React.useMemo(() => contentOf(spec), [spec]);
+  const reporting = onElementError !== undefined;
+
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
   // never) left a second press inside that wait free to start a second
-  // billed run. The guard is held until what `onRun` returns settles, and
-  // released at once for an `onRun` that returns nothing, where the host's
-  // own state covers the run.
+  // billed run. The guard is held until what `onRun` returns settles - at
+  // once for an `onRun` that returns nothing, where the host's own state
+  // covers the run - and then one task longer: json-render applies the
+  // binding's `onSuccess` or `onError` chain after the handler, in the same
+  // task, so a guard released as `onRun` settled let a run chained under the
+  // run that just failed start a second billed run. The catalog check refuses
+  // such a chain; this holds a layout rendered past it to one run per press.
   const running = React.useRef(false);
-  const [handlers] = React.useState(() => ({
-    run: () => {
-      if (running.current) return undefined;
-      running.current = true;
-      let pending: unknown;
-      try {
-        pending = latest.current.onRun?.(latest.current.store.getSnapshot());
-      } catch (error) {
+  const [handlers] = React.useState(() => {
+    const release = () => {
+      setTimeout(() => {
         running.current = false;
-        throw error;
-      }
-      if (isThenable(pending)) {
-        // Any thenable holds the guard, a promise from another realm
-        // included, and json-render still receives what the host returned,
-        // its rejection included.
-        return Promise.resolve(pending).finally(() => {
-          running.current = false;
-        });
-      }
-      running.current = false;
-      return undefined;
-    },
-  }));
+      }, 0);
+    };
+    return {
+      run: () => {
+        if (running.current) return undefined;
+        running.current = true;
+        let pending: unknown;
+        try {
+          pending = latest.current.onRun?.(latest.current.store.getSnapshot());
+        } catch (error) {
+          release();
+          throw error;
+        }
+        if (isThenable(pending)) {
+          // Any thenable holds the guard, a promise from another realm
+          // included, and json-render still receives what the host returned,
+          // its rejection included.
+          const settled = Promise.resolve(pending);
+          settled.then(release, release);
+          return settled;
+        }
+        release();
+        return undefined;
+      },
+    };
+  });
   const page = (
     <DescriptorProvider scope={stableScope}>
-      <JSONUIProvider registry={registry} store={store} handlers={handlers}>
-        <Renderer spec={spec} registry={registry} loading={loading} />
+      <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
+        <ReportingContext.Provider value={reporting}>
+          <ElementBoundary
+            type={rootType}
+            report={report}
+            reporting={reporting}
+            resetOn={specContent}
+          >
+            <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+          </ElementBoundary>
+        </ReportingContext.Provider>
       </JSONUIProvider>
     </DescriptorProvider>
   );
   return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;
+}
+
+/**
+ * A spec as the text of its content, for telling a new layout from the same
+ * one handed again as a new object. A spec is JSON a model wrote, so it always
+ * has one; anything that does not stringify is compared as itself.
+ */
+function contentOf(spec: Spec | null): unknown {
+  try {
+    return JSON.stringify(spec);
+  } catch {
+    return spec;
+  }
 }
 
 /** The store's current state, re-rendering on every change. For a receipt beside a page. */

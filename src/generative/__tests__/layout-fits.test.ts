@@ -1027,4 +1027,152 @@ describe("a share's parts", () => {
       expect.stringContaining('ProportionBar reads /result/costs, a list of text values'),
     ]);
   });
+
+  /**
+   * Parts written out inline. The catalog takes `items` as a list of anything,
+   * so a null, a word or an expression standing for a whole part passed both
+   * checks, and the renderer, which reads each part by member name, threw on
+   * the null and drew nothing for the rest.
+   */
+  const inline = (items: unknown[]): Spec => {
+    const spec = bar('category', 'amount');
+    spec.elements.bar!.props = { ...spec.elements.bar!.props, items };
+    return spec;
+  };
+
+  it('accepts parts written out as structures naming both members, whatever their members read', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $state: '/result/costs/0/amount' } },
+          { category: 'Lodging', amount: 120 },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('reads a part as an expression only by the keys json-render resolves, as the catalog check does', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([{ $label: 'x', category: 'Food', amount: 4 }]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a part written out as a null, a scalar, an expression or a structure missing a member', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          null,
+          'Lodging',
+          { $state: '/result/costs/0' },
+          { category: 'Food' },
+          { category: 'Food', amount: 4 },
+        ]),
+      ),
+    ).toEqual([
+      'bar: ProportionBar\'s part 1 is null, not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
+      'bar: ProportionBar\'s part 2 is "Lodging", not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
+      'bar: ProportionBar\'s part 3 is an expression, not a structure; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
+      'bar: ProportionBar\'s part 4 has no "amount" member; each part is written as a structure with a "category" member and an "amount" member, or the whole list is read with { "$state" }',
+    ]);
+  });
+});
+
+/**
+ * A repeat over a path the descriptor owns, which holds something other than a
+ * list. json-render maps over what the path holds, so a text there throws in
+ * the parent's render and the whole subtree is dropped, past both checks; a
+ * structure renders nothing.
+ */
+describe('a repeat over a path that holds no list', () => {
+  const result: RunField = {
+    kind: 'object',
+    name: 'invoice',
+    required: true,
+    fields: [
+      text('title', true),
+      { kind: 'object', name: 'customer', required: true, fields: [text('name', true)] },
+      {
+        kind: 'list',
+        name: 'lines',
+        required: true,
+        item: { kind: 'object', name: 'line', required: true, fields: [text('label', true)] },
+      },
+    ],
+  };
+  const repeating = (statePath: string): Spec => ({
+    root: 'page',
+    elements: {
+      page: { type: 'Stack', props: {}, children: ['rows'] },
+      rows: { type: 'Stack', props: {}, children: [], repeat: { statePath } },
+    },
+  });
+
+  it('is refused on a result page, saying what the path holds', () => {
+    expect(layoutProblems({ result }, repeating('/result/title'))).toEqual([
+      'rows: repeats over /result/title, which holds a text value, not a list',
+    ]);
+    expect(layoutProblems({ result }, repeating('/result/customer'))).toEqual([
+      'rows: repeats over /result/customer, which holds a structure, not a list',
+    ]);
+  });
+
+  it('is refused on an input page', () => {
+    expect(layoutProblems({ inputs: [text('topic', false)] }, repeating('/inputs/topic'))).toEqual([
+      'rows: repeats over /inputs/topic, which holds a text value, not a list',
+    ]);
+  });
+
+  it('names a choice with the article its kind takes', () => {
+    const tone: RunField = {
+      kind: 'enum',
+      name: 'tone',
+      required: false,
+      options: ['dry', 'warm'],
+    } as RunField;
+    expect(layoutProblems({ inputs: [tone] }, repeating('/inputs/tone'))).toEqual([
+      'rows: repeats over /inputs/tone, which holds an enum value, not a list',
+    ]);
+  });
+
+  it('is accepted over the list itself', () => {
+    expect(layoutProblems({ result }, repeating('/result/lines'))).toEqual([]);
+  });
+});
+
+/**
+ * A prop that takes a list, written as an expression that can never be one: a
+ * `$template` writes a text, and a binding names a path whose kind is the
+ * descriptor's to say. Either rendered an empty list, past both checks.
+ */
+describe('a list-taking prop written as an expression that is not a list read', () => {
+  const steps = (value: unknown): Spec =>
+    ({
+      root: 's',
+      elements: {
+        s: {
+          type: 'Steps',
+          props: { steps: value, nextLabel: null, backLabel: null },
+          children: [],
+        },
+      },
+    }) as unknown as Spec;
+
+  it('is refused as a template, which writes a text', () => {
+    expect(layoutProblems({ inputs: [] }, steps({ $template: '${/ui/a}, ${/ui/b}' }))).toEqual([
+      's: steps takes a list, and a $template writes a text; a prop that takes a list reads a list path',
+    ]);
+  });
+
+  it('holds a binding to the kind of the path it names, as it holds a read', () => {
+    expect(
+      layoutProblems({ inputs: [text('topic', true)] }, steps({ $bindState: '/inputs/topic' })),
+    ).toContain(
+      's: steps takes a list, and /inputs/topic is a value; a prop that takes a list reads a list path',
+    );
+  });
 });
