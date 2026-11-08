@@ -757,8 +757,9 @@ export interface MethodFormProps {
  * gating input still empty after `form.attempt()` is marked `requiredField`,
  * and an optional input started but not complete `incompleteField`; a host's
  * `errors` entry replaces either. A structure the gate refuses marks each
- * field inside it that the gate refuses the same way, at every depth, and a
- * host's entry for the structure marks none of them. The top-level "+ N optional inputs"
+ * field inside it that the gate refuses the same way, at every depth; a
+ * host's entry for the structure adds no mark to them and removes none of the
+ * gate's. The top-level "+ N optional inputs"
  * disclosure folds and opens exactly as the one inside a structure does,
  * optional structures included.
  */

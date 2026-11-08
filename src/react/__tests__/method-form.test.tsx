@@ -346,10 +346,14 @@ describe('the required marks', () => {
     expect(screen.getByLabelText('name')).toHaveAttribute('aria-invalid', 'false');
   });
 
-  it("marks none of a structure's fields for a host's message about the structure", () => {
+  it("adds no mark to a structure's fields for a host's message, and keeps the gate's beside it", async () => {
+    const user = userEvent.setup();
     render(<Harness {...SHOP} formProps={{ errors: { shop: 'The server refused this shop.' } }} />);
     expect(screen.getByText('The server refused this shop.')).toBeInTheDocument();
     expect(screen.getByLabelText('name')).toHaveAttribute('aria-invalid', 'false');
+    await user.click(screen.getByRole('button', { name: 'Run' }));
+    expect(screen.getByText('The server refused this shop.')).toBeInTheDocument();
+    expect(screen.getByLabelText('name')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('marks a started optional input that is not complete', async () => {
