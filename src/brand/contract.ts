@@ -130,8 +130,9 @@ export interface ContrastPair {
   foreground: ColorTokenName;
   background: ColorTokenName;
   /**
-   * The canvas `background` is laid over before anything is measured on it,
-   * for a surface the contract lets be translucent. Absent, `background` is
+   * The canvas beneath the pair's surface. When it is set, `background` names
+   * a surface the contract lets be translucent, and that surface is laid over
+   * this canvas before anything is measured on it. Absent, `background` is
    * the canvas itself and must be opaque, since what shows through a
    * translucent canvas is whatever the host paints beneath it.
    */
@@ -145,23 +146,23 @@ export interface ContrastPair {
  * on the canvas are text, at WCAG AA.
  *
  * The secondary text on the field fill is held to a control's 3:1. The kernel
- * sets marks there in it, an off switch's track and a number field's stepper
- * icons, and those need 3:1 to be seen; it also sets text there in it, a
- * boolean row's description, an unselected pill's label and a placeholder,
- * which AA would hold to 4.5:1, but the stock palette's light mode measures
- * 4.39:1 on its own field fill, the same grey it measures on `--muted`, so
- * the text bar there waits on the stock palette reaching it. The field fill
- * may be translucent, as a style's often is, so it is laid over the canvas
- * first.
+ * draws marks in that colour on the fill, an off switch's track and a number
+ * field's stepper icons, and those need 3:1 to be seen. It also sets text in
+ * that colour on the fill, a boolean row's description, an unselected pill's
+ * label and a placeholder, which AA would hold to 4.5:1, but the stock
+ * palette's light mode measures 4.39:1 on its own field fill, the same grey
+ * it measures on `--muted`, so the text bar there waits on the stock palette
+ * reaching it. The field fill may be translucent, as a style's often is, so
+ * it is laid over the canvas first.
  *
  * The error colour is held to the same 3:1, as a solid colour, on the canvas
- * and on a card laid over it, which is what a host's panel usually is: a
- * framed section's error bar is drawn in it solid there. The outlines of a
- * card and of a field in error are drawn at half and seven tenths of it, so
- * they read fainter than this pair measures, and the pair does not hold
- * them. Its captions are text, which AA would hold to 4.5:1, but the stock
- * palette's red measures 3.76:1 on white, so that bar waits on the stock
- * palette too.
+ * and on a card laid over it, which is what a host's panel usually is,
+ * because a framed section's error bar is drawn in that colour, solid, on
+ * either. The outlines of a card and of a field in error are drawn at half
+ * and seven tenths of it, so they read fainter than this pair measures, and
+ * the pair does not hold them. The error captions are text, which AA would
+ * hold to 4.5:1, but the stock palette's red measures 3.76:1 on white, so
+ * that bar waits on the stock palette too.
  */
 export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   { foreground: 'foreground', background: 'background', minimum: MIN_CONTRAST },
