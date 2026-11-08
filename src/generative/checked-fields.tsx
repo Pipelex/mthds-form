@@ -92,9 +92,15 @@ export class CheckedFields {
   // One entry per mounted field, so two fields handed one config object are
   // two entries, and one leaving does not take the other's checks with it.
   private readonly byPath = new Map<string, Set<CheckedEntry>>();
-  // Every path the record has told json-render of, which json-render keeps
-  // until told otherwise: its verdict on these is the record's to give.
+  // Every path the record speaks for: those it carries now, and those it has
+  // just emptied, whose old checks json-render may still read until it has
+  // drawn once with the emptied ones. The verdict on these is the record's.
   private readonly told = new Set<string>();
+  // The emptied paths, each with the validation json-render handed over when
+  // the record emptied it. A later one has drawn with the emptied checks, so
+  // the path goes back to json-render: a host's control that registers its
+  // checks there directly is then judged by them.
+  private readonly emptied = new Map<string, ValidationContextValue>();
   private validation: ValidationContextValue | null = null;
 
   /** Hands the record json-render's validation, and tells it what is already mounted. */
@@ -102,6 +108,11 @@ export class CheckedFields {
     if (validation === this.validation) return;
     const first = this.validation === null;
     this.validation = validation;
+    for (const [path, at] of this.emptied) {
+      if (at === validation) continue;
+      this.emptied.delete(path);
+      this.told.delete(path);
+    }
     if (first) for (const path of this.byPath.keys()) this.publish(path);
   }
 
@@ -162,9 +173,10 @@ export class CheckedFields {
    * `validateAll` reads what it was told as of its provider's last render,
    * which a press can beat by one task, so a field hidden or mounted the
    * task before would be judged by checks it no longer carries, or not yet
-   * by those it does. A path the record never carried is a host's control
-   * that registered its checks with json-render directly
-   * (`useFieldValidation`), and json-render's verdict on it stands.
+   * by those it does. A path the record does not carry, and has not just
+   * emptied, is a host's control that registered its checks with json-render
+   * directly (`useFieldValidation`), and json-render's verdict on it stands,
+   * a path the record once carried included.
    */
   check(validation: ValidationContextValue): boolean {
     const before = validation.fieldStates;
@@ -199,8 +211,11 @@ export class CheckedFields {
 
   private publish(path: string): void {
     if (!this.validation) return;
+    const config = this.configFor(path);
     this.told.add(path);
-    this.validation.registerField(path, this.configFor(path) ?? { checks: [] });
+    if (config) this.emptied.delete(path);
+    else this.emptied.set(path, this.validation);
+    this.validation.registerField(path, config ?? { checks: [] });
   }
 }
 

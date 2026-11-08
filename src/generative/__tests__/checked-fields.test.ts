@@ -101,4 +101,18 @@ describe("the run's verdict on each path", () => {
     fields.attach(direct);
     expect(fields.check(direct)).toBe(false);
   });
+
+  it("is refused by a host's direct control mounted where a checked field used to be", () => {
+    // The record empties the path when its last field leaves; once json-render
+    // has drawn with that, the path is json-render's again, so a host's control
+    // registered there directly is judged by its own checks.
+    const fields = new CheckedFields();
+    fields.attach(lagging({}));
+    const leave = fields.enter('/inputs/notes', required);
+    leave();
+    const drawn = lagging({ '/inputs/notes': false });
+    fields.attach(drawn);
+    expect(fields.check(drawn)).toBe(false);
+    expect(drawn.clear).not.toHaveBeenCalled();
+  });
 });
