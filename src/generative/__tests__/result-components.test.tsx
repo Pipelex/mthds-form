@@ -151,6 +151,160 @@ describe("a result page's components read result text as data", () => {
   });
 });
 
+/**
+ * Every number, amount and day a result component writes comes from one
+ * formatter (`../format`), in one locale, with a currency's own cents.
+ */
+describe("a result page's components write numbers and days one way", () => {
+  const share = (total: unknown, of: unknown = null): Spec =>
+    one('ProportionBar', {
+      label: 'Costs',
+      total,
+      of,
+      unit: 'EUR',
+      items: { $state: '/result/costs' },
+      labelKey: 'category',
+      valueKey: 'amount',
+    });
+  const costs = {
+    costs: [
+      { category: 'Coffee', amount: 3.99 },
+      { category: 'Croissant', amount: 1.49 },
+    ],
+  };
+  const figure = (container: HTMLElement) => container.querySelector('strong')?.textContent;
+
+  it('keeps the cents of a share of money, so its parts add up to its total', () => {
+    const { container } = render(
+      <GenerativePage spec={share(null)} store={createStateStore({ result: costs })} scope={{}} />,
+    );
+    expect(figure(container)).toBe('€5.48');
+    expect([...container.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Coffee €3.99',
+      'Croissant €1.49',
+    ]);
+  });
+
+  it('reads a total the payload carries as text as the number it writes out', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={share({ $state: '/result/total' }, { $state: '/result/budget' })}
+        store={createStateStore({ result: { ...costs, total: '2400', budget: '3000.5' } })}
+        scope={{}}
+      />,
+    );
+    expect(figure(container)).toBe('€2,400');
+    expect(container.textContent).toContain('of €3,000.50');
+  });
+
+  it('shows no figure for a total it cannot read, never the sum of its parts in its place', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={share({ $state: '/result/total' })}
+        store={createStateStore({ result: { ...costs, total: 'about two thousand' } })}
+        scope={{}}
+      />,
+    );
+    expect(container.querySelector('strong')).toBeNull();
+    expect(container.textContent).not.toContain('€5.48');
+    // The parts still draw.
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+  });
+
+  it('writes a text column as written, a number column grouped, and no format as a cell', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('DataTable', {
+          rows: { $state: '/result/rows' },
+          columns: [
+            { path: 'year', label: 'Year', format: 'text' },
+            { path: 'units', label: 'Units', format: 'number' },
+            { path: 'raw', label: 'Raw', format: null },
+          ],
+          caption: null,
+        })}
+        store={createStateStore({
+          result: { rows: [{ year: 2024, units: '1234567.5', raw: 1234567 }] },
+        })}
+        scope={{}}
+      />,
+    );
+    expect([...container.querySelectorAll('td')].map((td) => td.textContent)).toEqual([
+      '2024',
+      '1,234,567.5',
+      '1,234,567',
+    ]);
+  });
+
+  it('writes a metric in the style it names, in the one locale', () => {
+    const metric = (format: string | null) =>
+      one('Metric', { label: 'Visitors', value: { $state: '/result/n' }, unit: null, format });
+    const store = () => createStateStore({ result: { n: 1250000 } });
+    const { container, rerender } = render(
+      <GenerativePage spec={metric('compact')} store={store()} scope={{}} />,
+    );
+    expect(container.textContent).toContain('1.3m');
+    rerender(<GenerativePage spec={metric('decimal')} store={store()} scope={{}} />);
+    expect(container.textContent).toContain('1,250,000.00');
+    rerender(<GenerativePage spec={metric(null)} store={store()} scope={{}} />);
+    expect(container.textContent).toContain('1250000');
+  });
+
+  it('writes a date text as the day it names, as a date column does', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('DateText', { value: { $state: '/result/day' }, style: 'short', tone: null })}
+        store={createStateStore({ result: { day: '2025-03-09 00:30' } })}
+        scope={{}}
+      />,
+    );
+    expect(container.textContent).toBe('9 Mar 2025');
+  });
+
+  it('shows no picture for a relative path outside any repeat, as a hatch resolves none', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('Picture', { path: 'cover', alt: null, aspect: null })}
+        store={createStateStore({ cover: { url: 'https://cdn.test/cover.png' } })}
+        scope={{}}
+      />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('shows each image of a repeat when a picture names the item itself', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={{
+          root: 'shots',
+          elements: {
+            shots: {
+              type: 'Stack',
+              props: { direction: 'vertical' },
+              repeat: { statePath: '/result/shots' },
+              children: ['shot'],
+            },
+            shot: { type: 'Picture', props: { path: '', alt: null, aspect: null }, children: [] },
+          },
+        }}
+        store={createStateStore({
+          result: {
+            shots: [
+              { url: 'https://cdn.test/a.png', caption: 'A' },
+              { url: 'https://cdn.test/b.png', caption: 'B' },
+            ],
+          },
+        })}
+        scope={{}}
+      />,
+    );
+    expect([...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual([
+      'https://cdn.test/a.png',
+      'https://cdn.test/b.png',
+    ]);
+  });
+});
+
 describe('a run starts once per press while it is going', () => {
   const PAGE: Spec = {
     root: 'cta',

@@ -79,7 +79,6 @@ import {
 } from 'lucide-react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
-import { readDateContent } from '../core/native-content';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
 import { focusOutlineClass, linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
@@ -96,6 +95,8 @@ import { ToggleGroup, ToggleGroupItem } from '../react/ui/toggle-group';
 import { cn } from '../react/utils';
 import { baseCatalog, type ICON_NAMES, type METRIC_FORMATS } from './components';
 import { textOf, withDeclaredProps } from './declared-props';
+import { formatDay, formatNumber } from './format';
+import { shareAmount } from './share-amount';
 import * as shadcn from './ui/shadcn';
 import { inputFieldAtPath, RESULT_ROOT, resultFieldAtPath, segmentsUnder } from './paths';
 
@@ -218,20 +219,23 @@ export function pathFromDomId(prefix: string | undefined, id: string): string | 
 }
 
 /**
- * The path a hatch resolves: absolute as written, or, inside a repeat, the
- * item's field name joined onto the current item's base path. A relative path
- * outside any repeat resolves to nothing, and the hatch says so.
+ * The path a hatch or a `Picture` resolves: absolute as written, or, inside a
+ * repeat, the item's field name joined onto the current item's base path, and
+ * the empty path the item itself. A relative path outside any repeat resolves
+ * to nothing, and the element says so. The one resolver every renderer that
+ * names a path literally reads through, so two cannot read one path two ways.
  */
-function useAbsolutePath(path: unknown): string | undefined {
+export function useAbsolutePath(path: unknown): string | undefined {
   const repeat = useRepeatScope();
-  // The checks hold a hatch's `path` to a literal text; a layout rendered
-  // past them may hand anything here, which resolves to nothing - never read
-  // as some other path, as a number written out would be inside a repeat.
+  // The checks hold such a `path` to a literal text; a layout rendered past
+  // them may hand anything here, which resolves to nothing - never read as
+  // some other path, as a number written out would be inside a repeat.
   if (typeof path !== 'string') return undefined;
   if (path.startsWith('/')) return path;
+  if (!repeat) return undefined;
   // Raw, not `joinPath`: the same reason `absoluteHatchPath` gives - a relative
   // hatch path may name several segments, so its `/` are separators already.
-  return repeat ? `${repeat.basePath}/${path}` : undefined;
+  return path === '' ? repeat.basePath : `${repeat.basePath}/${path}`;
 }
 
 // ─── The escape hatches ──────────────────────────────────────────────────────
@@ -370,35 +374,29 @@ function valueAt(row: unknown, relativePath: string): unknown {
 }
 
 /** A cell shows a number as it is: grouped, with the places it has, never padded. */
-const CELL_NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'number') return CELL_NUMBER.format(value);
+  if (typeof value === 'number') return formatNumber(value);
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(formatCell).join(', ');
   return JSON.stringify(value);
 }
 
-/** A cell in a column the layout stated a format for. */
+/**
+ * A cell in a column the layout stated a format for. `date` writes the day
+ * the value names (`formatDay`), never a stringified structure. `text` writes
+ * a number as it is, ungrouped, since a column the layout calls text holds a
+ * year, a reference or a code, and "2,024" is damage there. `number` groups a
+ * number, and a text that writes one out too, as a payload's decimal may
+ * arrive. With no format, a number is grouped and the rest written as it is.
+ */
 function formatColumnCell(value: unknown, format: string | null | undefined): string {
-  // The calendar day is the one written: a time beside it ("2025-03-09
-  // 00:30") must not move it across midnight in the reader's zone, so only the
-  // leading day is read, anchored at noon UTC, as `DateText` reads one.
-  // The value is the day as text, or a native date's own structure
-  // ({ date, time }); either way its day is read, never stringified.
-  const written = format === 'date' ? readDateContent(value)?.date : undefined;
-  const day = written === undefined ? null : /^\d{4}-\d{2}-\d{2}/.exec(written);
-  if (day) {
-    const date = new Date(`${day[0]}T12:00:00Z`);
-    if (!Number.isNaN(date.getTime()))
-      return date.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-      });
+  if (format === 'date') return formatDay(value, 'short') ?? formatCell(value);
+  if (format === 'text' && typeof value === 'number') return String(value);
+  if (format === 'number') {
+    const amount = shareAmount(value);
+    if (Number.isFinite(amount)) return formatNumber(amount);
   }
   return formatCell(value);
 }
@@ -451,21 +449,6 @@ function DataTable({ props }: BaseComponentProps<DataTableProps>) {
 
 type MetricFormat = (typeof METRIC_FORMATS)[number];
 
-function numberFormat(format: MetricFormat): Intl.NumberFormat {
-  switch (format) {
-    case 'integer':
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-    case 'decimal':
-      return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    case 'compact':
-      return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
-    case 'plain':
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 20, useGrouping: false });
-    default:
-      return format satisfies never;
-  }
-}
-
 interface MetricProps {
   label: string;
   value: unknown;
@@ -478,9 +461,7 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
   // Anything but a number as it writes out, so a structure, which writes out
   // as nothing, shows the dash an absent value shows.
   const text =
-    typeof value === 'number'
-      ? numberFormat(props.format ?? 'plain').format(value)
-      : textOf(value) || '—';
+    typeof value === 'number' ? formatNumber(value, props.format ?? 'plain') : textOf(value) || '—';
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">

@@ -13,6 +13,12 @@
 - **Error marks are the error colour, solid (Breaking)**: a field's error outline in `app` is a 1px outline in `--destructive`, 4px off the field, where it was a ring at 70% over a band painted in `--background`, and a structure's card or rule in error is `border-destructive` where it was at 50%. Both now reach the 3:1 the brand contract holds `--destructive` to; at their old strength they did not, even in the stock palette.
 - **`soft` and `bold` lift their dark field fill (Breaking)**: `deriveStyleRoles` returns a dark `field` a step lighter than its panel, `card` 12% toward `foreground` for `soft` and `muted` 6% toward `foreground` for `bold`, where both returned `background`, which sat darker than the lifted panel and read as a well cut into it.
 - **A vertical `Stack` asked to centre centres one column (Breaking)**: its children share a column as wide as the widest of them, never wider than its box, and fill it, so their edges agree; each child used to be centred at its own width, and a heading narrower than the form under it started at a different left edge. A horizontal `Stack` still centres each child on the cross axis.
+- **A produced page writes numbers, money and days one way (Breaking)**: `DataTable`, `Metric`, `ProportionBar` and `DateText` format through one formatter in en-GB, so USD reads "US$5" everywhere and a `Metric`'s `compact` style reads "1.3m"; money keeps its currency's own cents ("€3.99", never "€4") and a whole amount is written whole; a `DataTable` column whose format is `text` writes a number ungrouped ("2024").
+- **A `ProportionBar`'s `total` and `of` are read as written (Breaking)**: a number, or a text that writes one out, is drawn, and anything else shows no figure rather than the sum of the parts in its place; `layoutFits` refuses a `$template` there, and a read of a path that holds no number, in each branch of a `$cond`.
+
+### Fixed
+
+- **A `Picture` path relative to no repeat**: a `Picture` whose relative `path` stands outside any repeat shows nothing, as a hatch resolves nothing there, where it read the path from the root of the page's state; it now resolves its path through the same resolver as a hatch.
 
 ## [v0.33.0] - 2026-11-08
 

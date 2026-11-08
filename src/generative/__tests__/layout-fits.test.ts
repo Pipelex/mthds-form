@@ -1241,6 +1241,77 @@ describe("a share's parts", () => {
     );
     expect(layoutProblems({ inputs: [list] }, spec).join('\n')).not.toContain('part 1');
   });
+
+  /**
+   * The renderer draws a total and a ceiling from a number, or a text that
+   * writes one out, and shows no figure for anything else; a total it used
+   * to replace with the parts' sum, so a `$template` total of 2,400 read 100.
+   */
+  describe('its total and its ceiling', () => {
+    const PLAN: RunField = {
+      kind: 'object',
+      name: 'plan',
+      required: true,
+      fields: [
+        { kind: 'list', name: 'costs', required: true, item: LINE },
+        { kind: 'number', name: 'total', required: true, integer: false },
+        text('currency', true),
+      ],
+    };
+    const totalled = (total: unknown, of: unknown = null): Spec => {
+      const spec = bar('category', 'amount');
+      spec.elements.bar!.props = { ...spec.elements.bar!.props, total, of };
+      return spec;
+    };
+    const WHAT =
+      ' a total or a ceiling is a number, or reads a path that holds one with { "$state" }';
+
+    it('accepts none, a number, and a read of a number, in each branch of a condition', () => {
+      for (const total of [
+        null,
+        2400,
+        { $state: '/result/total' },
+        { $cond: { $state: '/ui/open' }, $then: { $state: '/result/total' }, $else: null },
+      ]) {
+        expect(layoutProblems({ result: PLAN }, totalled(total, total))).toEqual([]);
+      }
+    });
+
+    it('refuses a template, a read of a text, and a word, each by name', () => {
+      expect(
+        layoutProblems(
+          { result: PLAN },
+          totalled(
+            { $template: '${/result/currency} ${/result/total}' },
+            {
+              $state: '/result/currency',
+            },
+          ),
+        ),
+      ).toEqual([
+        `bar: ProportionBar's total is an expression that reads no number, not a number;${WHAT}`,
+        `bar: ProportionBar's of reads /result/currency, which holds a text value, not a number;${WHAT}`,
+      ]);
+      expect(layoutProblems({ result: PLAN }, totalled('about 2,400'))).toEqual([
+        `bar: ProportionBar's total is "about 2,400", not a number;${WHAT}`,
+      ]);
+    });
+
+    it('refuses a condition when either branch reads no number', () => {
+      expect(
+        layoutProblems(
+          { result: PLAN },
+          totalled({
+            $cond: true,
+            $then: { $state: '/result/total' },
+            $else: { $state: '/result/costs' },
+          }),
+        ),
+      ).toEqual([
+        `bar: ProportionBar's total reads /result/costs, which holds a list, not a number;${WHAT}`,
+      ]);
+    });
+  });
 });
 
 /**

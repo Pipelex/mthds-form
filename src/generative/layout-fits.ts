@@ -468,6 +468,46 @@ function nonScalarReads(
       const branches = depth < MAX_COND_DEPTH ? condBranches(value) : undefined;
       return branches ? branches.flatMap((branch) => outcomes(branch, depth + 1)) : [value];
     };
+    // Why an amount draws nothing, or nothing when it draws: what the
+    // renderer draws from is a number, or a text that writes one out
+    // (`shareAmount`), so a literal must be one and a read must name a path
+    // that holds one. A `$template` writes a text that may carry anything
+    // around the number, so it reads none.
+    const amountRefusal = (amount: unknown): string | undefined => {
+      if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return undefined;
+      const path = readPath(amount);
+      if (path === undefined) {
+        const shown = isExpression(amount)
+          ? 'an expression that reads no number'
+          : String(JSON.stringify(amount ?? null));
+        return `is ${shown}, not a number`;
+      }
+      const field = isUnder(root, path) ? fieldAt(path) : undefined;
+      if (field && field.kind !== 'number' && field.kind !== 'unknown') {
+        return `reads ${path}, which holds ${kindWords(field.kind)}, not a number`;
+      }
+      return undefined;
+    };
+    // A share's total and its ceiling, held to what the renderer draws as
+    // either: a number, or a read of one. The renderer shows no figure for
+    // anything else rather than the parts' sum, so a total a model wrote as
+    // a `$template` around a currency would be a bar with no figure; it is
+    // refused here instead, in each branch of a `$cond`, and the page falls
+    // back. Writing none (`null`) is the parts' sum, and no ceiling.
+    if (element.type === 'ProportionBar') {
+      const props = (element.props ?? {}) as Record<string, unknown>;
+      for (const prop of ['total', 'of'] as const) {
+        const refusals = outcomes(props[prop])
+          .filter((outcome) => outcome !== null && outcome !== undefined)
+          .map(amountRefusal)
+          .filter((refusal): refusal is string => refusal !== undefined);
+        for (const refusal of new Set(refusals)) {
+          problems.push(
+            `${key}: ProportionBar's ${prop} ${refusal}; a total or a ceiling is a number, or reads a path that holds one with { "$state" }`,
+          );
+        }
+      }
+    }
     // Parts written out inline. The catalog takes a share's items as a list
     // of anything, and the renderer reads each by member name and its value
     // member as a number, so every entry must be a structure naming both
@@ -488,25 +528,10 @@ function nonScalarReads(
       const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member holding a number, or the whole list is read with { "$state" }`;
       // Whether an amount draws no share, naming why when it does not.
       const amountRefused = (part: string, amount: unknown): boolean => {
-        // What the renderer draws a share from: a number, or a text that
-        // writes one out (`shareAmount`).
-        if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return false;
-        const path = readPath(amount);
-        if (path === undefined) {
-          const shown = isExpression(amount)
-            ? 'an expression that reads no number'
-            : String(JSON.stringify(amount ?? null));
-          problems.push(`${part}'s ${JSON.stringify(valueKey)} is ${shown}, not a number; ${how}`);
-          return true;
-        }
-        const field = isUnder(root, path) ? fieldAt(path) : undefined;
-        if (field && field.kind !== 'number' && field.kind !== 'unknown') {
-          problems.push(
-            `${part}'s ${JSON.stringify(valueKey)} reads ${path}, which holds ${kindWords(field.kind)}, not a number; ${how}`,
-          );
-          return true;
-        }
-        return false;
+        const refusal = amountRefusal(amount);
+        if (refusal === undefined) return false;
+        problems.push(`${part}'s ${JSON.stringify(valueKey)} ${refusal}; ${how}`);
+        return true;
       };
       // One value a part can resolve to, held to the rule above.
       const sharePart = (part: string, entry: unknown): unknown[] => {
@@ -578,6 +603,9 @@ function nonScalarReads(
       }
     };
     for (const [prop, value] of Object.entries(element.props ?? {})) {
+      // A share's total and ceiling were held to a number above, which says
+      // more than that they are no value.
+      if (element.type === 'ProportionBar' && (prop === 'total' || prop === 'of')) continue;
       const items = listy?.get(prop);
       if (items === undefined || Array.isArray(value)) {
         walk(prop, prop === 'items' && Array.isArray(value) ? inlineShares(value) : value);
