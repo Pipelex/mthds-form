@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createStateStore } from '@json-render/core';
 import type { RunField } from '../../../core';
 import {
   buildResultField,
@@ -13,7 +14,14 @@ import {
   StuffViewer,
   useMethodForm,
 } from '../../../react';
-import { GenerativePage, type SpecFixture } from '../../../generative';
+import {
+  FrameHostProvider,
+  GenerativePage,
+  layoutCheckProblems,
+  pathFromDomId,
+  payloadToState,
+  type SpecFixture,
+} from '../../../generative';
 import type { BrandManifest } from '../../../brand';
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../../_generated/trips';
 import {
@@ -24,6 +32,7 @@ import { PAYLOADS as COMPOSITE_PAYLOADS } from '../../_generated/composites.payl
 import { STOCK } from '../brands';
 import { useLayoutStore } from '../layout-page';
 import { standInUpload } from '../../stand-in-upload';
+import type { HostApp } from './apps';
 import { TEAMS, teamTokens, type TeamKey } from './teams';
 
 /**
@@ -352,6 +361,205 @@ export function DesignedPage({
     <AppFrame>
       <Band appName={appName} team={team} />
       <main className="af-stage">{page}</main>
+    </AppFrame>
+  );
+}
+
+// ─── A moment of an app: the plain form, or a layout written for it ────────
+
+/**
+ * The composer as a host with no designer draws it: the app's name and the
+ * method's own description over the kernel's plain form, filled with what the
+ * real run was given, in a raised panel whose foot is the host's action row.
+ */
+function PlainComposer({ app }: { app: HostApp }) {
+  const form = useMethodForm({
+    descriptor: app.composer.descriptor,
+    contract: app.composer.contract,
+    initialValues: app.composer.values,
+    uploadFile: upload,
+  });
+  return (
+    <main className="af-page">
+      <div className="af-col">
+        <div>
+          <h1 className="af-display">{app.appName}</h1>
+          {app.lede ? <p className="af-lead">{app.lede}</p> : null}
+        </div>
+        <div className="af-panel af-comp">
+          <MethodForm form={form} presentation="app" />
+          <div className="af-act">
+            <span className="af-eta">
+              <Icon d={CLOCK} /> {app.eta}
+            </span>
+            <button type="button" className="af-btn">
+              Run <Icon d={ARROW} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * A layout written for the composer frame, rendered as a host renders one:
+ * over the same inputs, filled the same way, in the `app` presentation, with
+ * the host's one fact the layout cannot know - how long a run takes - handed
+ * to the Composer that places the action row.
+ */
+function DesignedComposer({ app, fixture }: { app: HostApp; fixture: SpecFixture }) {
+  const idPrefix = `dc-${app.key}`;
+  const store = React.useMemo(
+    () => createStateStore({ inputs: structuredClone(app.composer.values) }),
+    [app],
+  );
+  const env = React.useMemo(
+    () => ({
+      onDropFile: (id: string, file: File) => {
+        const path = pathFromDomId(idPrefix, id);
+        if (path) store.set(path, standInUpload(file));
+      },
+    }),
+    [idPrefix, store],
+  );
+  return (
+    <main className="af-page">
+      <FrameHostProvider host={{ eta: app.eta }}>
+        <FieldPresentationProvider presentation="app">
+          <GenerativePage
+            spec={fixture.spec}
+            store={store}
+            scope={{ inputs: app.composer.fields, idPrefix, env }}
+          />
+        </FieldPresentationProvider>
+      </FrameHostProvider>
+    </main>
+  );
+}
+
+/** The host's request bar over a result page: what was asked, and the way back to change it. */
+function RequestBar({ app }: { app: HostApp }) {
+  return (
+    <div className="af-req">
+      <div className="af-req-i">
+        <span className="af-req-l">{app.request}</span>
+        <button type="button" className="af-btn link">
+          <Icon d={PENCIL} size={14} /> Edit
+        </button>
+        <button type="button" className="af-btn ghost">
+          Run again
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The result page as a host with no designer draws it: its own header over the kernel's result view. */
+function PlainResult({ app }: { app: HostApp }) {
+  return (
+    <main className="af-stage">
+      <div className="af-res-head">
+        <div>
+          <p className="af-eyebrow">Your result</p>
+          <h1 className="af-res-title">{app.appName}</h1>
+        </div>
+        <div className="af-actions">
+          {app.actions.map((label) => (
+            <button key={label} type="button" className="af-btn ghost">
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="af-panel af-result">
+        <ResultEnvProvider resolveUrl={app.result.resolveUrl}>
+          <FieldPresentationProvider presentation="app">
+            <StuffViewer field={app.result.field} value={app.result.payload} />
+          </FieldPresentationProvider>
+        </ResultEnvProvider>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * A layout written for the result frame over the same run, its actions the
+ * host's, placed where the layout's ResultHeader says.
+ */
+function DesignedResult({ app, fixture }: { app: HostApp; fixture: SpecFixture }) {
+  const store = React.useMemo(
+    () =>
+      createStateStore({
+        result: payloadToState(app.result.field, app.result.payload) as Record<string, unknown>,
+      }),
+    [app],
+  );
+  return (
+    <main className="af-stage">
+      {/* A story's actions go nowhere, but a host's do: the frame draws an
+          action only with a handler to press. */}
+      <FrameHostProvider host={{ actions: app.actions, onAction: () => {} }}>
+        <ResultEnvProvider resolveUrl={app.result.resolveUrl}>
+          <FieldPresentationProvider presentation="app">
+            <GenerativePage
+              spec={fixture.spec}
+              store={store}
+              scope={{ result: app.result.field, idPrefix: `dr-${app.key}` }}
+            />
+          </FieldPresentationProvider>
+        </ResultEnvProvider>
+      </FrameHostProvider>
+    </main>
+  );
+}
+
+/**
+ * The layout a host would render for a moment, or a loud failure: the checks
+ * a host runs before it renders a stored layout (`layoutCheckProblems`), so a
+ * story never shows a layout a host would have refused for the plain form.
+ */
+export function checkedLayout(app: HostApp, fixture: SpecFixture): SpecFixture {
+  const frame = fixture.frame ?? 'page';
+  const problems = layoutCheckProblems(fixture.spec, {
+    frame,
+    descriptor: frame === 'result' ? { result: app.result.field } : { inputs: app.composer.fields },
+  });
+  if (problems.length > 0) throw new Error(`${fixture.pipeRef}: ${problems.join('; ')}`);
+  return fixture;
+}
+
+/**
+ * One moment of an app in the host's frame: the band, then the composer or
+ * the request bar over the result page, each either the kernel's plain view
+ * (`layout` null) or a layout the designer wrote for that moment.
+ */
+export function AppMoment({
+  app,
+  moment,
+  layout,
+  team,
+}: {
+  app: HostApp;
+  moment: Moment;
+  layout: SpecFixture | null;
+  team: TeamKey | null;
+}) {
+  return (
+    <AppFrame>
+      <Band appName={app.appName} team={team} />
+      {moment === 'compose' ? (
+        layout ? (
+          <DesignedComposer app={app} fixture={layout} />
+        ) : (
+          <PlainComposer app={app} />
+        )
+      ) : (
+        <>
+          <RequestBar app={app} />
+          {layout ? <DesignedResult app={app} fixture={layout} /> : <PlainResult app={app} />}
+        </>
+      )}
     </AppFrame>
   );
 }

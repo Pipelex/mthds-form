@@ -1,5 +1,5 @@
 {
-  "origin": "https://github.com/Pipelex/pipelex-cookbook/blob/4265d86a5551b788ccf1c7be5b00393e12c82aef/examples/b_basics/document_extract/extract_invoice/bundle.mthds",
+  "origin": "https://github.com/Pipelex/methods/blob/08367d9a0ca7206d866094ae97c7b4257716cc28/methods/invoice_extraction/invoice_extraction.mthds",
   "license": "MIT",
   "title": "Invoice extraction",
   "heroes": [

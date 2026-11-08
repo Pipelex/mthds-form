@@ -41,6 +41,26 @@ describe('assembling a brand', () => {
     ]);
   });
 
+  it('accepts a logo at a root-relative path on the host, and refuses one that leaves it', () => {
+    const source = corpusSource('pipelex', 'pipelex-method--claude-4.8-opus');
+    const withLogo = (onDark: string) => {
+      const manifest = structuredClone(source.manifest) as { logo: { onDark: string } };
+      manifest.logo.onDark = onDark;
+      return problemsOf({ ...source, manifest });
+    };
+    expect(withLogo('/brand/logo-on-dark.svg')).toEqual([]);
+    for (const elsewhere of [
+      '//elsewhere.example/logo.svg',
+      '/\\elsewhere.example/logo.svg',
+      'brand/logo.svg',
+      '/brand/ logo.svg',
+    ]) {
+      expect(withLogo(elsewhere), elsewhere).toEqual([
+        expect.stringMatching(/^brand\.json: logo\.onDark: /),
+      ]);
+    }
+  });
+
   it('names the file of every problem, and reports the files together', () => {
     const source = corpusSource('pipelex', 'pipelex-method--claude-4.8-opus');
     const problems = problemsOf({ ...source, manifest: {}, tokens: {}, provenance: {} });

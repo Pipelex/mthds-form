@@ -208,7 +208,8 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
   // body and its headings.
   quiet: {
     name: 'Quiet',
-    direction: 'Calm and precise: light titles, hairline panels, generous air, nothing decorated.',
+    direction:
+      'The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated.',
     bodyFace: null,
     headingFace: 'body',
     roles: {},

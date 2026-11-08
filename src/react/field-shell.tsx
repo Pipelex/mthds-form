@@ -66,7 +66,14 @@ export function FieldShell({
         )}
         {!isApp && <ConceptPill conceptRef={conceptRef} category={category} />}
         {!required && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          // In `app` the mark is in the body face, as the label beside it is:
+          // a monospace tag was a third face on a host's page.
+          <span
+            className={cn(
+              'ml-auto text-[10px] uppercase tracking-wider text-muted-foreground',
+              !isApp && 'font-mono',
+            )}
+          >
             {s.optionalBadge}
           </span>
         )}

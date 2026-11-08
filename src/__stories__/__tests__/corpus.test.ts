@@ -1,12 +1,18 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { OUTPUT_FORM as INVOICE_OUTPUT_FORM } from '../_generated/extract_invoice';
+import { PAYLOADS as INVOICE_PAYLOADS } from '../_generated/extract_invoice.payloads';
 import { OUTPUT_FORM as LIST_OUTPUT_FORM } from '../_generated/lists';
 import { PAYLOADS as LIST_PAYLOADS } from '../_generated/lists.payloads';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
 import { OUTPUT_FORM as SEARCH_OUTPUT_FORM } from '../_generated/search';
 import { PAYLOADS as SEARCH_PAYLOADS } from '../_generated/search.payloads';
+import { OUTPUT_FORM as SLIDES_OUTPUT_FORM } from '../_generated/slide_directions';
+import { PAYLOADS as SLIDES_PAYLOADS } from '../_generated/slide_directions.payloads';
+import { OUTPUT_FORM as TRIP_OUTPUT_FORM } from '../_generated/plan_trip';
+import { PAYLOADS as TRIP_PAYLOADS } from '../_generated/plan_trip.payloads';
 import { HEROES, pipeRefOf } from '../heroes';
 
 /**
@@ -181,9 +187,10 @@ describe('the authored methods', () => {
       const domain = /^\s*domain\s*=\s*"([^"]+)"/m.exec(bundle)?.[1];
       return spec.heroes.map((code) => `${name}:${domain}.${code}`);
     });
-    expect(listed.map((hero) => `${hero.caseName}:${pipeRefOf(hero)}`).sort()).toEqual(
-      named.sort(),
-    );
+    // A pipe may be a hero on both sides - its input page and its result page -
+    // and is named once in its case.
+    const heroes = [...new Set(listed.map((hero) => `${hero.caseName}:${pipeRefOf(hero)}`))];
+    expect(heroes.sort()).toEqual(named.sort());
     // No summary of ours: the author's description is the brief's opening line.
     for (const hero of listed) expect(hero.summary, pipeRefOf(hero)).toBeUndefined();
   });
@@ -244,9 +251,13 @@ describe('the run payloads', () => {
    * pipe_refs the descriptor half also knows: a payload keyed by a pipe that no
    * longer exists renders nothing, in a story that still passes.
    */
-  it('pairs every payload module with an authored case', () => {
+  it('pairs every payload module with a case', () => {
+    // An authored method's payload is read in from a run of one of its heroes
+    // (`--read-run`), since this pass never runs one; a structures case's is
+    // bought by the payload pass.
+    const cases = [...authoredCases(), ...methodCases()];
     for (const name of payloadCases()) {
-      expect(authoredCases(), `${name}.payloads.ts has no case`).toContain(name);
+      expect(cases, `${name}.payloads.ts has no case`).toContain(name);
     }
   });
 
@@ -259,6 +270,9 @@ describe('the run payloads', () => {
       [OUTPUT_FORM, PAYLOADS],
       [LIST_OUTPUT_FORM, LIST_PAYLOADS],
       [SEARCH_OUTPUT_FORM, SEARCH_PAYLOADS],
+      [INVOICE_OUTPUT_FORM, INVOICE_PAYLOADS],
+      [TRIP_OUTPUT_FORM, TRIP_PAYLOADS],
+      [SLIDES_OUTPUT_FORM, SLIDES_PAYLOADS],
     ];
     for (const [outputForm, payloads] of cases) {
       for (const pipeRef of Object.keys(payloads)) {

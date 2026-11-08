@@ -112,6 +112,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     onChange(items.filter((_, i) => i !== index));
   };
   const addItem = () => onChange([...items, emptyValue(field.item)]);
+  const structuredRows = field.item.kind === 'object';
 
   // A file arriving anywhere in this list - a row that IS a dropzone, or one
   // that contains one - pins the row numbering until it lands. Removing a row
@@ -303,7 +304,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
           {fieldLabel(field.title, field.name, presentation)}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="list" />}
-        <span className="font-mono text-[10.5px] text-muted-foreground">
+        <span className={cn('text-[10.5px] text-muted-foreground', !isApp && 'font-mono')}>
           {/* "of N" is a claim about an EXACT count, so it needs both bounds and
               needs them equal. Read off `itemCount` alone - the LOWER bound - a
               model saying "at least two" was announced as a list of exactly two
@@ -315,7 +316,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             : s.itemsCount(items.length)}
         </span>
         {shownAsOptional(field) && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span
+            className={cn(
+              'ml-auto text-[10px] uppercase tracking-wider text-muted-foreground',
+              !isApp && 'font-mono',
+            )}
+          >
             {s.optionalBadge}
           </span>
         )}
@@ -338,12 +344,26 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             <div
               key={rowKeys[index] ?? index}
               data-list-row
-              className="flex items-start gap-2 rounded-md border border-border bg-card/40 p-3"
+              className={cn(
+                'rounded-md border border-border bg-card/40 p-3',
+                // A row holding a structure puts its number and its remove
+                // button on a line of their own, so its fields take the row's
+                // whole width: beside the button every input in the row ended
+                // a button short of the edge, a third of a phone's row.
+                structuredRows
+                  ? 'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1'
+                  : 'flex items-start gap-2',
+              )}
             >
-              <span className="mt-1 w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
+              <span
+                className={cn(
+                  'shrink-0 font-mono text-[11px] text-muted-foreground',
+                  structuredRows ? 'col-start-1 row-start-1' : 'mt-1 w-5 text-center',
+                )}
+              >
                 {index + 1}
               </span>
-              <div className="min-w-0 flex-1">
+              <div className={structuredRows ? 'col-span-3 row-start-2 min-w-0' : 'min-w-0 flex-1'}>
                 <FieldRenderer
                   // `required: true`: a row is in the array because the person
                   // added it, so it is never optional - an object row is never an
@@ -366,7 +386,8 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
                 disabled={env?.disabled || busy}
                 aria-label={s.removeItemAria(index + 1)}
                 className={cn(
-                  'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:mt-0 max-sm:size-11',
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50 max-sm:size-11',
+                  structuredRows ? 'col-start-3 row-start-1' : 'mt-0.5 max-sm:mt-0',
                   focusOutlineClass,
                 )}
               >

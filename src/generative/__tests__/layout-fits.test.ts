@@ -833,3 +833,198 @@ describe('a path the layout binds', () => {
     ]);
   });
 });
+
+describe('a Picture on a result page', () => {
+  const result: RunField = {
+    kind: 'object',
+    name: 'deck',
+    required: true,
+    fields: [
+      text('title', true),
+      {
+        kind: 'list',
+        name: 'slides',
+        required: true,
+        item: {
+          kind: 'object',
+          name: 'slide',
+          required: true,
+          fields: [
+            { kind: 'image', name: 'mockup', required: true, formats: [] },
+            text('name', true),
+          ],
+        },
+      },
+    ],
+  };
+  const picture = (path: string, repeated: boolean): Spec => ({
+    root: 'page',
+    elements: {
+      page: {
+        type: 'Stack',
+        props: {},
+        children: ['pic'],
+        ...(repeated ? { repeat: { statePath: '/result/slides', key: 'name' } } : {}),
+      },
+      pic: { type: 'Picture', props: { path, alt: 'x' }, children: [] },
+    },
+  });
+
+  it('is accepted when it shows an image the result has, inside a repeat or by its absolute path', () => {
+    expect(layoutProblems({ result }, picture('mockup', true))).toEqual([]);
+    expect(layoutProblems({ result }, picture('/result/slides/0/mockup', false))).toEqual([]);
+  });
+
+  it('is refused when its path names nothing the result has', () => {
+    expect(layoutProblems({ result }, picture('poster', true))).toContain(
+      'pic: Picture shows "poster", which no result has',
+    );
+  });
+
+  it('is refused when its path holds something other than an image', () => {
+    expect(layoutProblems({ result }, picture('name', true))).toContain(
+      'pic: Picture shows /result/slides/0/name, which holds a text, not an image',
+    );
+  });
+});
+
+describe('a repeat inside a Grid', () => {
+  const RESULT: RunField = {
+    kind: 'object',
+    name: 'plan',
+    required: true,
+    fields: [
+      {
+        kind: 'list',
+        name: 'days',
+        required: true,
+        item: { kind: 'object', name: 'day', required: true, fields: [text('title', true)] },
+      },
+    ],
+  };
+  const grid = (repeatOn: 'grid' | 'child'): Spec => ({
+    root: 'days',
+    elements: {
+      days: {
+        type: 'Grid',
+        props: { columns: 2, gap: null },
+        ...(repeatOn === 'grid' ? { repeat: { statePath: '/result/days' } } : {}),
+        children: ['day'],
+      },
+      day: {
+        type: 'Heading',
+        props: { text: { $item: 'title' }, level: 'h3' },
+        ...(repeatOn === 'child' ? { repeat: { statePath: '/result/days' } } : {}),
+        children: [],
+      },
+    },
+  });
+
+  it('refuses a Grid whose only child carries the repeat, which puts every item in one cell', () => {
+    expect(layoutProblems({ result: RESULT }, grid('child'))).toEqual([
+      expect.stringContaining("days: Grid's only child day carries the repeat"),
+    ]);
+  });
+
+  it('accepts the repeat on the Grid itself', () => {
+    expect(layoutProblems({ result: RESULT }, grid('grid'))).toEqual([]);
+  });
+
+  it('accepts a Grid with a repeat of its own whose only child repeats over each item, a list in every cell', () => {
+    const nested: RunField = {
+      kind: 'object',
+      name: 'plan',
+      required: true,
+      fields: [
+        {
+          kind: 'list',
+          name: 'days',
+          required: true,
+          item: {
+            kind: 'object',
+            name: 'day',
+            required: true,
+            fields: [
+              {
+                kind: 'list',
+                name: 'activities',
+                required: true,
+                item: text('activity', true),
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const spec: Spec = {
+      root: 'days',
+      elements: {
+        days: {
+          type: 'Grid',
+          props: { columns: 2, gap: null },
+          repeat: { statePath: '/result/days' },
+          children: ['activities'],
+        },
+        activities: {
+          type: 'Stack',
+          props: { direction: 'vertical', gap: null, align: null, justify: null },
+          repeat: { statePath: 'activities' },
+          children: [],
+        },
+      },
+    };
+    expect(layoutProblems({ result: nested }, spec)).toEqual([]);
+  });
+});
+
+describe("a share's parts", () => {
+  const costs = (item: RunField): RunField => ({
+    kind: 'object',
+    name: 'plan',
+    required: true,
+    fields: [{ kind: 'list', name: 'costs', required: true, item }],
+  });
+  const LINE: RunField = {
+    kind: 'object',
+    name: 'line',
+    required: true,
+    fields: [
+      text('category', true),
+      { kind: 'number', name: 'amount', required: true, integer: false },
+    ],
+  };
+  const bar = (labelKey: string, valueKey: string): Spec => ({
+    root: 'bar',
+    elements: {
+      bar: {
+        type: 'ProportionBar',
+        props: {
+          label: 'Costs',
+          total: null,
+          of: null,
+          unit: null,
+          items: { $state: '/result/costs' },
+          labelKey,
+          valueKey,
+        },
+        children: [],
+      },
+    },
+  });
+
+  it('accepts a list of structures whose label member exists and whose value member is a number', () => {
+    expect(layoutProblems({ result: costs(LINE) }, bar('category', 'amount'))).toEqual([]);
+  });
+
+  it('refuses a misspelt key, a value that is not a number, and a list of scalars', () => {
+    expect(layoutProblems({ result: costs(LINE) }, bar('category', 'amonut'))).toEqual([
+      expect.stringContaining('valueKey "amonut" is no member of /result/costs'),
+    ]);
+    expect(layoutProblems({ result: costs(LINE) }, bar('amount', 'category'))).toEqual([
+      expect.stringContaining('valueKey "category" holds a text, not a number'),
+    ]);
+    expect(layoutProblems({ result: costs(text('cost', true)) }, bar('a', 'b'))).toEqual([
+      expect.stringContaining('ProportionBar reads /result/costs, a list of text values'),
+    ]);
+  });
+});

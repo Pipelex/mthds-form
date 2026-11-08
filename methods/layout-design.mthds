@@ -29,6 +29,14 @@ main_pipe   = "design_layout"
 # - `emit_page` builds exactly that page: it is handed the plan, the catalog
 #   with every props signature, and the brief, and emits the JSONL patches.
 #
+# A second entry, `repair_layout`, takes a page the host's own checks refused
+# - the JSONL as emitted and the problems in words - lays the brief out the same
+# way and has `emit_repair` emit the whole page again with those problems
+# fixed. The checks are the package's TypeScript (`validateAgainstCatalog`
+# and `layoutProblems`), so the loop is the caller's: run `design_layout`,
+# check, and on a refusal run `repair_layout` with what the checks said, a
+# bounded number of times.
+#
 # The split is the point. A single completion asked for a whole page decides
 # the page and writes every patch in the same breath, and nothing in between
 # can be read; the plan can. The seed reaches the planner only, because the
@@ -75,7 +83,9 @@ main_pipe   = "design_layout"
 # text, and fails loudly on any issue, so a repair is a change HERE, never to
 # the fixture.
 #
-# Both model stages pin the same model. The specs pass takes MODEL=<id> to
+# Every model stage pins the same model: gpt-6.1-sol since the designer-reach
+# spike, where a blind critic scored it level with claude-5.5-opus at about a
+# third of the cost per page, with every layout valid. The specs pass takes MODEL=<id> to
 # override every pin at once for a comparative run (and TEMPERATURE=<n> for a
 # model that fixes its own), and records which model produced each fixture.
 #
@@ -120,7 +130,17 @@ description  = { type = "text", description = "One sentence on what the page is 
 name         = { type = "text", description = "On an input page, the method's name as the host lists it - the one product name the page may carry. Absent when the host lists none." }
 paths        = { type = "list", item_type = "concept", item_concept_ref = "PathEntry", description = "Every path in the state the page binds or reads, in reading order and flattened: a structure's members follow it one level deeper, and a list's item members follow the list, spelled relative to one item.", required = true }
 run_control  = { type = "text", description = "On an input page, the catalog component that runs the method, by name; the page has exactly one of it." }
+returns      = { type = "list", item_type = "text", description = "On a composer, what one run gives back, one line per member of the result, read from the result's own titles and descriptions. Absent elsewhere." }
+frame        = { choices = ["page", "composer", "result"], description = "Where the page sits: `page`, a whole product page of its own; `composer`, the inputs of a host's compose-then-result app, before a run; `result`, the result page of that app, after one. Absent reads as `page`." }
+style        = { type = "concept", concept_ref = "Style", description = "The app style the team chose, which the page will wear: its name and its direction. Absent when the team chose none." }
 sample_state = { type = "text", description = "On a result page, the state of one real run as the host loads it, as JSON - what `/result` held after one actual run, so magnitudes and lengths can be judged. Never copied into a page." }
+
+[concept.Style]
+description = "An app style: a named look the components draw - faces, weights, radii, panels and rhythm - and the one sentence that says what it is, which the composition follows."
+
+[concept.Style.structure]
+name      = { type = "text", description = "The style's name, as a team picks it: `Quiet`, `Soft`, `Editorial`, `Bold`.", required = true }
+direction = { type = "text", description = "The style's direction in one sentence, as a designer reads it.", required = true }
 
 [concept.PathEntry]
 description = "One path of the state, as the brief describes it: where it is, what it holds, what it is called, what constrains it, and whether the page lays it out or hands it back to the kernel's own control."
@@ -203,6 +223,42 @@ The result of a method, described below.
 The method is called «{{ brief.name }}», as the host lists it. That is the app's name wherever the layout asks for one; invent no other. Links, if the layout carries any, name this page's own sections. The page states nothing the method does not: no promise about storage, privacy, speed, or what happens after the run.
 
 {% endif %}
+{% if brief.frame == "composer" %}
+## Frame
+
+This page is the composer of an app that is composed, then shows its result. The host draws what surrounds it: a band across the top with the team's logo and the app's name, which is not a heading, and below the page nothing. There is no side panel, no app bar, no footer and no summary of the inputs to build: the page is one centred column.
+
+The column opens on a headline that says what the person gets from the app, in their words (the page's h1), and one line under it. Then the inputs, in one raised panel whose foot is the host's action row: how long a run takes, which the host knows, and the one control that runs the method, worded with the job. Inside the panel, group the inputs the way a person thinks about the request, under a few short titles, and set them in two columns when there are enough to fill two. Nothing restates an input, and nothing is said twice.
+
+The action row stays on screen, so the first screen holds the headline and the first rows of the panel: put first the inputs a person decides first, and any the headline promises. Every word the page writes is fixed when the page is written, while the inputs change as a person fills them: never write a line about the state of an input or of the run, such as "Waiting on the topic" or "Add a document to start" - the controls show their own state.
+{% if brief.returns %}
+
+What one run gives back, read from the result's own description:
+{% for line in brief.returns %}
+- {{ line }}
+{% endfor %}
+
+A person runs a tool more readily when they know what comes back: the page may say it once, in their words, as the Composer's notes - a few short lines, never the list above copied out.
+{% endif %}
+
+{% elif brief.frame == "result" %}
+## Frame
+
+This page is the result page of an app that is composed, then shows its result: what the person sees after one run. The host draws what surrounds it: the band with the team's logo and the app's name, then a bar restating the request with a way back to edit it and to run again. The host also owns the actions on the result, such as downloading or sharing it, and places them where the page's header puts them. There is no side panel, no app bar and no footer to build, and nothing restates the request.
+
+The page is the result across the full width. It opens on its header, which names the result in a person's words, read from the result itself where it can be (the page's h1). Then the figure or the fact a person looks for first, then the body of the result in the shape it naturally has: a plan day by day, options side by side to compare, a record's details. Lay out what a person reads; leave out what only a machine would.
+
+Show each value once: a figure a component already states, such as the total inside a ProportionBar, is not repeated beside it. When the result carries the request back - the same facts the person entered, such as the topic or the tone they chose - leave that part out: the host's bar already restates the request. Write a value as a person reads it: a date in words, an amount beside its currency when the result has one.
+
+{% endif %}
+{% if brief.style %}
+## Style
+
+The team's apps wear the {{ brief.style.name }} style: {{ brief.style.direction }}
+
+The components already draw its faces, weights, radii and panels, so the page sets none of them. What the page decides is its composition, and the composition should read as this style too: how much air there is between the groups, how large and how long the headline is, how many groups the inputs fall into and whether they are titled, how much the page says around them. A calm style asks for few groups and generous air, a literary one for a headline that reads like a title and a measured rhythm, a graphic one for a dense, firm page with short labels.
+
+{% endif %}
 ## State
 
 {% if brief.side == "input" %}
@@ -252,7 +308,11 @@ None. Emit no `/state` patches.
 ## Run
 
 {% if gating %}
+{% if brief.frame == "composer" %}
+The run waits for `{{ gating | map(attribute="name") | join("`, `") }}`. The host's action row says so by itself, so the page writes nothing about it.
+{% else %}
 The run waits for `{{ gating | map(attribute="name") | join("`, `") }}`; say so near the {{ brief.run_control }}, briefly.
+{% endif %}
 {% else %}
 Nothing gates the run.
 {% endif %}
@@ -274,7 +334,7 @@ type = "PipeLLM"
 description = "Read the brief and plan the page: what it is for, how it is composed, what each region holds and with which components, what runs the method, and what is delegated."
 inputs = { catalog = "Catalog", brief_text = "Text", seed = "Text?" }
 output = "PagePlan"
-model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 8192 }
+model = { model = "gpt-6.1-sol", temperature = 0.5, max_tokens = 8192 }
 system_prompt = """
 You are a product designer with taste. You plan ONE page for a method - its inputs, or its result - to be built from a fixed catalog of components and bound to state the host provides. The page must read as a small, purpose-built web app, never as a form. Its shape is yours to decide: nothing here prescribes one. You write the plan and a second designer builds the page from it, so every decision you leave open is one they will make without you.
 """
@@ -293,6 +353,8 @@ DESIGN DIRECTION:
 - Restraint reads premium. No label that restates the obvious, no card inside a card, no paragraph that explains the form, no more than two levels of heading. Every element must earn its place; when in doubt, remove it.
 - Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The control that runs names the job ("Plan my trip"), never "Submit".
 - Every value binds to a path the brief lists, and the page reads clearly in both a light and a dark theme.
+- When the brief has a Frame section, the host has already drawn the rest of the screen: plan only the page that section describes, inside that frame - never a side panel, never a bar or a footer the host draws, never a second place the method is run from or a second copy of the request.
+- When the brief has a Style section, the team's apps wear that style, and the composition follows its direction: how much air the page takes, how large the headline reads, how dense the inputs sit and how they are grouped are yours to set in its spirit. The look itself - faces, radii, panels, colour - is the components', never the page's.
 
 AVAILABLE COMPONENTS ({{ catalog.components | length }}):
 
@@ -337,12 +399,13 @@ type        = "PipeLLM"
 description = "Build the page the plan describes: emit the JSONL patches of a spec over the catalog, bound to the host's state at the paths the brief lists."
 inputs      = { plan = "PagePlan", catalog = "Catalog", brief_text = "Text" }
 output      = "Text"
-# The object form, because the default output cap (4096 tokens on this model)
-# is not enough for a page over a deeply nested result: the Company hero's
-# first run spent exactly 4096 tokens and came back empty. The object form
+# The object form, because the default output cap (4096 tokens on
+# claude-5-sonnet, where this was learned) is not enough for a page over a
+# deeply nested result: the Company hero's first run spent exactly 4096
+# tokens and came back empty. The object form
 # requires a temperature; this is the runtime's own default, so the setting
 # the earlier captures ran under is unchanged.
-model = { model = "claude-5-sonnet", temperature = 0.5, max_tokens = 16384 }
+model = { model = "gpt-6.1-sol", temperature = 0.5, max_tokens = 16384 }
 system_prompt = """
 You are a product designer with taste, building ONE page for a method - its inputs, or its result - as a JSON spec over a fixed catalog of components, bound to state the host provides. A designer has planned the page; you build exactly that page, and it must read as a small, purpose-built web app, never as a form.
 """
@@ -402,6 +465,7 @@ EXECUTION:
 - Restraint reads premium. No label that restates the obvious, no card inside a card, no paragraph that explains the form, no more than two levels of heading. Every element must earn its place; when in doubt, remove it.
 - Write copy a person would say: short labels, one helper sentence where a label is not enough and none where it is. The control that runs names the job ("Plan my trip"), never "Submit".
 - Every value binds to a path the brief lists, and the page reads clearly in both a light and a dark theme.
+- When the brief has a Style section, build the plan's composition in its spirit: where the plan is silent - a gap, a column count, whether a group is titled - decide as that style would.
 
 AVAILABLE COMPONENTS ({{ catalog.components | length }}):
 
@@ -449,4 +513,67 @@ Below is the brief for the page you are building. It is the ONLY source of paths
 ---
 
 Build this page as the plan describes. Bind every value; inline nothing the state carries. Output only the JSONL patch lines - no prose before or after, no code fence.
+"""
+
+[pipe.repair_layout]
+type = "PipeSequence"
+description = "Repair a page the host's checks refused: lay the brief out, then emit the whole page again with every problem the checks named fixed."
+inputs = { catalog = "Catalog", brief = "Brief", page = "Text", problems = "Text" }
+output = "Text"
+steps = [
+  { pipe = "render_brief", result = "brief_text" },
+  { pipe = "emit_repair", result = "repaired" },
+]
+
+[pipe.emit_repair]
+type        = "PipeLLM"
+description = "Emit a refused page again, whole, as JSONL patches over the catalog, with every problem the host's checks named fixed and nothing else changed."
+inputs      = { page = "Text", problems = "Text", catalog = "Catalog", brief_text = "Text" }
+output      = "Text"
+model = { model = "gpt-6.1-sol", temperature = 0.5, max_tokens = 16384 }
+system_prompt = """
+You are a product designer with taste, repairing ONE page that was built as a JSON spec over a fixed catalog of components, bound to state the host provides. The host checked the page before rendering it and refused it; you fix what it refused and keep everything else exactly as it was designed.
+"""
+prompt = """
+OUTPUT FORMAT (JSONL, RFC 6902 JSON Patch):
+Output ONLY JSONL: one JSON object per line, no prose, no markdown, no code fences. Emit the WHOLE page again, every line of it, as the page below is written: first /root, then each element under /elements/<key>, parents before children, then the /state patches it had, if any.
+
+WHAT THE HOST'S CHECKS FOUND:
+Each line names an element by its key and the rule it breaks.
+
+@problems
+
+THE PAGE AS IT WAS EMITTED:
+
+@page
+
+HOW TO REPAIR IT:
+1. Fix every problem listed, at the element it names, in the smallest way that satisfies the rule: a prop the component does not declare is removed or replaced by one it declares; a missing required prop is added; a second h1 becomes the next level down; a heading that skips a level takes the level it should have; a Tabs or Steps with one panel becomes that panel alone; a path the brief does not list is replaced by the one the brief lists for that value, or the element is removed.
+2. Change nothing the problems do not name: every other element keeps its key, its type, its props, its copy and its place in the tree, and the page keeps its composition.
+3. A fix must not break another rule: one h1, heading levels that increase by one, only the components and props below, every child emitted as its own element, every path one the brief lists, one control that runs the method on an input page.
+
+AVAILABLE COMPONENTS ({{ catalog.components | length }}):
+
+{% for component in catalog.components -%}
+- {{ component.name }}: {{ component.props }}
+  {%- if component.description %} - {{ component.description }}{% endif %}
+  {%- if component.accepts_children and component.slots %} [accepts children; slots: {{ component.slots | join(", ") }}]
+  {%- elif component.accepts_children %} [accepts children]
+  {%- elif component.slots %} [slots: {{ component.slots | join(", ") }}]{% endif %}
+  {%- if component.events %} [events: {{ component.events | join(", ") }}]{% endif %}
+{% endfor %}
+AVAILABLE ACTIONS:
+
+{% for action in catalog.actions -%}
+- {{ action.name }}: {{ action.description }}{% if action.built_in %} [built-in]{% endif %}
+{% endfor %}
+---
+
+Below is the brief the page was built for. It is the ONLY source of paths: every value the page shows or binds must be at a path the brief lists, spelled exactly as written.
+
+@brief_text
+
+---
+
+Emit the repaired page, whole. Output only the JSONL patch lines - no prose before or after, no code fence.
 """

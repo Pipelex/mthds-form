@@ -1,5 +1,7 @@
 import type { Spec } from '@json-render/core';
+import type { AppStyleId } from '../brand/styles';
 import type { PagePlan } from '../generated/layout-design/types';
+import type { Frame } from './frame-definitions';
 
 /**
  * A spec with its provenance - the shape every fixture takes, whoever produced
@@ -41,6 +43,15 @@ export interface SpecFixture {
   seed?: string;
   /** The critic loop the producer ran, when one did. */
   critic?: CriticLoop;
+  /** The frame it was written for, when not a whole product page: `composer` or `result`. */
+  frame?: Exclude<Frame, 'page'>;
+  /** The style the brief carried, when it carried one. */
+  style?: AppStyleId;
+  /**
+   * How many times the method's repair pass re-emitted it before it passed
+   * the checks, when it needed any: the page as stored is the last pass's.
+   */
+  repairs?: number;
   /** The first twelve hex digits of the SHA-256 of the catalog prompt at the time. */
   promptHash: string;
   /** The day it was produced, `YYYY-MM-DD`. */
@@ -61,14 +72,20 @@ export interface SpecFixture {
   plan?: PagePlan;
 }
 
+type Provenance = Pick<SpecFixture, 'producer' | 'model' | 'seed' | 'critic' | 'frame' | 'style'>;
+
 /**
- * The id a story and a screenshot are keyed by: producer, model and the two
- * procedures that change what a run is. `pipelex-method--gpt-5.5--seeded`.
+ * The id a story and a screenshot are keyed by: producer, model, the frame and
+ * the style it was written for, and the two procedures that change what a run
+ * is. `pipelex-method--gpt-5.5--seeded`,
+ * `pipelex-method--gpt-6.1-sol--composer--soft--seeded`.
  */
-export function fixtureId(fixture: Pick<SpecFixture, 'producer' | 'model' | 'seed' | 'critic'>) {
+export function fixtureId(fixture: Provenance) {
   return [
     fixture.producer,
     fixture.model,
+    fixture.frame ?? null,
+    fixture.style ?? null,
     fixture.seed ? 'seeded' : null,
     fixture.critic ? 'critic' : null,
   ]
@@ -86,11 +103,12 @@ const PRODUCER_LABEL: Record<Producer, string> = {
  * The honest title: what made the page. `Pipelex method · gpt-5.5 · with a
  * seed`, never a role ("authored", "generated").
  */
-export function fixtureLabel(
-  fixture: Pick<SpecFixture, 'producer' | 'model' | 'seed' | 'critic'>,
-): string {
+export function fixtureLabel(fixture: Provenance & Pick<SpecFixture, 'repairs'>): string {
   const parts = [PRODUCER_LABEL[fixture.producer], fixture.model];
+  if (fixture.frame) parts.push(`${fixture.frame} frame`);
+  if (fixture.style) parts.push(`${fixture.style} style`);
   if (fixture.seed) parts.push('with a seed');
+  if (fixture.repairs) parts.push(`repaired × ${fixture.repairs}`);
   if (fixture.critic) {
     parts.push(
       `${fixture.critic.model} critic × ${fixture.critic.rounds} round${fixture.critic.rounds === 1 ? '' : 's'}`,

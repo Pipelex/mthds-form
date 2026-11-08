@@ -1,7 +1,7 @@
 /**
  * Generated from data/methods/extract_invoice/bundle.mthds - DO NOT EDIT.
  *
- * Invoice extraction, an authored method. Copied verbatim from https://github.com/Pipelex/pipelex-cookbook/blob/4265d86a5551b788ccf1c7be5b00393e12c82aef/examples/b_basics/document_extract/extract_invoice/bundle.mthds (MIT).
+ * Invoice extraction, an authored method. Copied verbatim from https://github.com/Pipelex/methods/blob/08367d9a0ca7206d866094ae97c7b4257716cc28/methods/invoice_extraction/invoice_extraction.mthds (MIT).
  *
  * Regenerate with `make fixtures`. The pipes below are the author's own,
  * projected from the bundle exactly as committed: nothing is synthesized.
@@ -14,6 +14,7 @@ export const PIPE_REFS = [
   'invoice_extraction.analyze_invoice',
   'invoice_extraction.extract_invoice',
   'invoice_extraction.extract_invoice_data',
+  'invoice_extraction.extract_invoice_pages',
   'invoice_extraction.process_invoice',
 ] as const;
 
@@ -528,6 +529,63 @@ export const CONTRACTS: PipeIOContracts = {
             title: 'invoice_extraction__InvoiceDetails',
             type: 'object',
           },
+          invoice_extraction__InvoiceLineItem: {
+            description:
+              'One priced line of an invoice or a receipt, as printed: a product, a service, a fee or a discount',
+            properties: {
+              amount: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "Total of the line, in the invoice's currency, as printed; negative for a discount or a refund",
+                title: 'Amount',
+              },
+              label: {
+                description:
+                  'What the line is for, as printed: the product, service, fee or discount',
+                title: 'Label',
+                type: 'string',
+              },
+              quantity: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  'How many units, or how much, as printed; may be fractional for a weighed or measured item. Empty when the line prints no quantity',
+                title: 'Quantity',
+              },
+              unit_price: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "Price of one unit, in the invoice's currency, when the line prints it",
+                title: 'Unit Price',
+              },
+            },
+            required: ['label'],
+            title: 'invoice_extraction__InvoiceLineItem',
+            type: 'object',
+          },
         },
         description:
           'Invoice information extracted from text, supporting both formal bills and receipts',
@@ -542,7 +600,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Net amount excluding taxes',
+            description: "Net amount excluding taxes, in the invoice's currency",
             title: 'Amount Excl Tax',
           },
           amount_incl_tax: {
@@ -555,7 +613,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Total amount including taxes',
+            description: "Total amount including taxes, in the invoice's currency",
             title: 'Amount Incl Tax',
           },
           category: {
@@ -596,6 +654,20 @@ export const CONTRACTS: PipeIOContracts = {
             description: 'Name of the purchasing company',
             title: 'Company Name',
           },
+          currency: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description:
+              "ISO 4217 code of the currency the invoice's totals and lines are expressed in, three uppercase letters such as EUR, USD or GBP; never the currency of a converted amount or of a card payment in another currency. Empty when the document does not determine it",
+            title: 'Currency',
+          },
           description: {
             anyOf: [
               {
@@ -606,7 +678,8 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Description of goods or services purchased',
+            description:
+              'One-line summary of what was purchased; the purchase line by line is in line_items',
             title: 'Description',
           },
           invoice_id: {
@@ -649,6 +722,23 @@ export const CONTRACTS: PipeIOContracts = {
             description: 'Date when the invoice was issued',
             title: 'Issue Date',
           },
+          line_items: {
+            anyOf: [
+              {
+                items: {
+                  $ref: '#/$defs/invoice_extraction__InvoiceLineItem',
+                },
+                type: 'array',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description:
+              'The priced lines of the invoice, in the order printed, fees and discounts included; never the subtotal, tax, total or payment lines',
+            title: 'Line Items',
+          },
           text: {
             anyOf: [
               {
@@ -685,7 +775,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Total VAT/tax amount',
+            description: "Total VAT or tax amount, in the invoice's currency",
             title: 'Vat Amount',
           },
           vat_rates: {
@@ -701,7 +791,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'List of VAT rates applied',
+            description: 'VAT rates applied, as percentages: 20 for 20 %',
             title: 'Vat Rates',
           },
           vendor: {
@@ -1058,6 +1148,63 @@ export const CONTRACTS: PipeIOContracts = {
             title: 'invoice_extraction__InvoiceDetails',
             type: 'object',
           },
+          invoice_extraction__InvoiceLineItem: {
+            description:
+              'One priced line of an invoice or a receipt, as printed: a product, a service, a fee or a discount',
+            properties: {
+              amount: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "Total of the line, in the invoice's currency, as printed; negative for a discount or a refund",
+                title: 'Amount',
+              },
+              label: {
+                description:
+                  'What the line is for, as printed: the product, service, fee or discount',
+                title: 'Label',
+                type: 'string',
+              },
+              quantity: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  'How many units, or how much, as printed; may be fractional for a weighed or measured item. Empty when the line prints no quantity',
+                title: 'Quantity',
+              },
+              unit_price: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "Price of one unit, in the invoice's currency, when the line prints it",
+                title: 'Unit Price',
+              },
+            },
+            required: ['label'],
+            title: 'invoice_extraction__InvoiceLineItem',
+            type: 'object',
+          },
         },
         description:
           'Invoice information extracted from text, supporting both formal bills and receipts',
@@ -1072,7 +1219,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Net amount excluding taxes',
+            description: "Net amount excluding taxes, in the invoice's currency",
             title: 'Amount Excl Tax',
           },
           amount_incl_tax: {
@@ -1085,7 +1232,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Total amount including taxes',
+            description: "Total amount including taxes, in the invoice's currency",
             title: 'Amount Incl Tax',
           },
           category: {
@@ -1126,6 +1273,20 @@ export const CONTRACTS: PipeIOContracts = {
             description: 'Name of the purchasing company',
             title: 'Company Name',
           },
+          currency: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description:
+              "ISO 4217 code of the currency the invoice's totals and lines are expressed in, three uppercase letters such as EUR, USD or GBP; never the currency of a converted amount or of a card payment in another currency. Empty when the document does not determine it",
+            title: 'Currency',
+          },
           description: {
             anyOf: [
               {
@@ -1136,7 +1297,8 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Description of goods or services purchased',
+            description:
+              'One-line summary of what was purchased; the purchase line by line is in line_items',
             title: 'Description',
           },
           invoice_id: {
@@ -1179,6 +1341,23 @@ export const CONTRACTS: PipeIOContracts = {
             description: 'Date when the invoice was issued',
             title: 'Issue Date',
           },
+          line_items: {
+            anyOf: [
+              {
+                items: {
+                  $ref: '#/$defs/invoice_extraction__InvoiceLineItem',
+                },
+                type: 'array',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description:
+              'The priced lines of the invoice, in the order printed, fees and discounts included; never the subtotal, tax, total or payment lines',
+            title: 'Line Items',
+          },
           text: {
             anyOf: [
               {
@@ -1215,7 +1394,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'Total VAT/tax amount',
+            description: "Total VAT or tax amount, in the invoice's currency",
             title: 'Vat Amount',
           },
           vat_rates: {
@@ -1231,7 +1410,7 @@ export const CONTRACTS: PipeIOContracts = {
               },
             ],
             default: null,
-            description: 'List of VAT rates applied',
+            description: 'VAT rates applied, as percentages: 20 for 20 %',
             title: 'Vat Rates',
           },
           vendor: {
@@ -1291,6 +1470,320 @@ export const CONTRACTS: PipeIOContracts = {
         type: 'object',
       },
       multiplicity: 'single',
+      optional: false,
+    },
+  },
+  'invoice_extraction.extract_invoice_pages': {
+    inputs: {
+      document: {
+        concept_ref: 'native.Document',
+        item_count: null,
+        json_schema: {
+          description: 'A document',
+          properties: {
+            filename: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The original filename of the document',
+              title: 'Filename',
+            },
+            mime_type: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The MIME type of the document',
+              title: 'Mime Type',
+            },
+            public_url: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The public HTTPS URL of the document',
+              title: 'Public Url',
+            },
+            snippet: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'A text snippet or excerpt from the document',
+              title: 'Snippet',
+            },
+            title: {
+              anyOf: [
+                {
+                  type: 'string',
+                },
+                {
+                  type: 'null',
+                },
+              ],
+              default: null,
+              description: 'The title of the document or source',
+              title: 'Title',
+            },
+            url: {
+              description: 'The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+              title: 'Url',
+              type: 'string',
+            },
+          },
+          required: ['url'],
+          title: 'native.Document',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'native.Page',
+      item_count: null,
+      json_schema: {
+        $defs: {
+          ImageContent: {
+            description: 'An image',
+            properties: {
+              caption: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The caption of the image',
+                title: 'Caption',
+              },
+              filename: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The original filename of the image',
+                title: 'Filename',
+              },
+              height: {
+                anyOf: [
+                  {
+                    exclusiveMinimum: 0,
+                    type: 'integer',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The height of the image, in pixels',
+                title: 'Height',
+              },
+              mime_type: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The MIME type of the image',
+                title: 'Mime Type',
+              },
+              public_url: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The public URL of the image',
+                title: 'Public Url',
+              },
+              source_negative_prompt: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The source negative prompt of the image',
+                title: 'Source Negative Prompt',
+              },
+              source_prompt: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The source prompt of the image',
+                title: 'Source Prompt',
+              },
+              url: {
+                description: 'The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+                title: 'Url',
+                type: 'string',
+              },
+              width: {
+                anyOf: [
+                  {
+                    exclusiveMinimum: 0,
+                    type: 'integer',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The width of the image, in pixels',
+                title: 'Width',
+              },
+            },
+            required: ['url'],
+            title: 'ImageContent',
+            type: 'object',
+          },
+          PageContent: {
+            description:
+              'The content of a page of a document, comprising text and linked images and an optional page view image',
+            properties: {
+              page_view: {
+                anyOf: [
+                  {
+                    $ref: '#/$defs/ImageContent',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The screenshot of the page',
+              },
+              text_and_images: {
+                $ref: '#/$defs/TextAndImagesContent',
+                description: 'The text and images content extracted from the page',
+              },
+            },
+            required: ['text_and_images'],
+            title: 'PageContent',
+            type: 'object',
+          },
+          TextAndImagesContent: {
+            properties: {
+              images: {
+                anyOf: [
+                  {
+                    items: {
+                      $ref: '#/$defs/ImageContent',
+                    },
+                    type: 'array',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'A list of images that were extracted from the text',
+                title: 'Images',
+              },
+              raw_html: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The raw HTML of the fetched page, if requested',
+                title: 'Raw Html',
+              },
+              text: {
+                anyOf: [
+                  {
+                    $ref: '#/$defs/TextContent',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'A text content',
+              },
+            },
+            title: 'TextAndImagesContent',
+            type: 'object',
+          },
+          TextContent: {
+            description: 'A text',
+            properties: {
+              text: {
+                description: 'The text',
+                title: 'Text',
+                type: 'string',
+              },
+            },
+            required: ['text'],
+            title: 'TextContent',
+            type: 'object',
+          },
+        },
+        properties: {
+          items: {
+            items: {
+              $ref: '#/$defs/PageContent',
+            },
+            title: 'Items',
+            type: 'array',
+          },
+        },
+        required: ['items'],
+        title: 'ListContent[PageContent]',
+        type: 'object',
+      },
+      multiplicity: 'variable',
       optional: false,
     },
   },
@@ -1400,7 +1893,7 @@ export const CONTRACTS: PipeIOContracts = {
                   },
                 ],
                 default: null,
-                description: 'Net amount excluding taxes',
+                description: "Net amount excluding taxes, in the invoice's currency",
                 title: 'Amount Excl Tax',
               },
               amount_incl_tax: {
@@ -1413,7 +1906,7 @@ export const CONTRACTS: PipeIOContracts = {
                   },
                 ],
                 default: null,
-                description: 'Total amount including taxes',
+                description: "Total amount including taxes, in the invoice's currency",
                 title: 'Amount Incl Tax',
               },
               category: {
@@ -1454,6 +1947,20 @@ export const CONTRACTS: PipeIOContracts = {
                 description: 'Name of the purchasing company',
                 title: 'Company Name',
               },
+              currency: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "ISO 4217 code of the currency the invoice's totals and lines are expressed in, three uppercase letters such as EUR, USD or GBP; never the currency of a converted amount or of a card payment in another currency. Empty when the document does not determine it",
+                title: 'Currency',
+              },
               description: {
                 anyOf: [
                   {
@@ -1464,7 +1971,8 @@ export const CONTRACTS: PipeIOContracts = {
                   },
                 ],
                 default: null,
-                description: 'Description of goods or services purchased',
+                description:
+                  'One-line summary of what was purchased; the purchase line by line is in line_items',
                 title: 'Description',
               },
               invoice_id: {
@@ -1507,6 +2015,23 @@ export const CONTRACTS: PipeIOContracts = {
                 description: 'Date when the invoice was issued',
                 title: 'Issue Date',
               },
+              line_items: {
+                anyOf: [
+                  {
+                    items: {
+                      $ref: '#/$defs/invoice_extraction__InvoiceLineItem',
+                    },
+                    type: 'array',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  'The priced lines of the invoice, in the order printed, fees and discounts included; never the subtotal, tax, total or payment lines',
+                title: 'Line Items',
+              },
               text: {
                 anyOf: [
                   {
@@ -1543,7 +2068,7 @@ export const CONTRACTS: PipeIOContracts = {
                   },
                 ],
                 default: null,
-                description: 'Total VAT/tax amount',
+                description: "Total VAT or tax amount, in the invoice's currency",
                 title: 'Vat Amount',
               },
               vat_rates: {
@@ -1559,7 +2084,7 @@ export const CONTRACTS: PipeIOContracts = {
                   },
                 ],
                 default: null,
-                description: 'List of VAT rates applied',
+                description: 'VAT rates applied, as percentages: 20 for 20 %',
                 title: 'Vat Rates',
               },
               vendor: {
@@ -1650,6 +2175,63 @@ export const CONTRACTS: PipeIOContracts = {
               },
             },
             title: 'invoice_extraction__InvoiceDetails',
+            type: 'object',
+          },
+          invoice_extraction__InvoiceLineItem: {
+            description:
+              'One priced line of an invoice or a receipt, as printed: a product, a service, a fee or a discount',
+            properties: {
+              amount: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "Total of the line, in the invoice's currency, as printed; negative for a discount or a refund",
+                title: 'Amount',
+              },
+              label: {
+                description:
+                  'What the line is for, as printed: the product, service, fee or discount',
+                title: 'Label',
+                type: 'string',
+              },
+              quantity: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  'How many units, or how much, as printed; may be fractional for a weighed or measured item. Empty when the line prints no quantity',
+                title: 'Quantity',
+              },
+              unit_price: {
+                anyOf: [
+                  {
+                    type: 'number',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description:
+                  "Price of one unit, in the invoice's currency, when the line prints it",
+                title: 'Unit Price',
+              },
+            },
+            required: ['label'],
+            title: 'invoice_extraction__InvoiceLineItem',
             type: 'object',
           },
         },
@@ -1792,6 +2374,30 @@ export const INPUT_FORM: InputForm = {
   'invoice_extraction.extract_invoice_data': {
     fields: [
       {
+        concept_ref: 'invoice_extraction.InvoiceDetails',
+        description: 'Classification of the invoice type (formal bill vs simple receipt)',
+        fields: [
+          {
+            choices: ['bill', 'receipt'],
+            description: 'The category of the invoice',
+            kind: 'enum',
+            name: 'category',
+            required: false,
+          },
+          {
+            description: 'Explanation of the classification',
+            kind: 'text',
+            name: 'explanation',
+            required: false,
+          },
+        ],
+        gating: true,
+        kind: 'object',
+        name: 'invoice_details',
+        presence: 'plain',
+        required: true,
+      },
+      {
         concept_ref: 'native.Page',
         description:
           'The content of a page of a document, comprising text and linked images and an optional page view image',
@@ -1845,27 +2451,16 @@ export const INPUT_FORM: InputForm = {
         presence: 'plain',
         required: true,
       },
+    ],
+  },
+  'invoice_extraction.extract_invoice_pages': {
+    fields: [
       {
-        concept_ref: 'invoice_extraction.InvoiceDetails',
-        description: 'Classification of the invoice type (formal bill vs simple receipt)',
-        fields: [
-          {
-            choices: ['bill', 'receipt'],
-            description: 'The category of the invoice',
-            kind: 'enum',
-            name: 'category',
-            required: false,
-          },
-          {
-            description: 'Explanation of the classification',
-            kind: 'text',
-            name: 'explanation',
-            required: false,
-          },
-        ],
+        concept_ref: 'native.Document',
+        description: 'A document',
         gating: true,
-        kind: 'object',
-        name: 'invoice_details',
+        kind: 'document',
+        name: 'document',
         presence: 'plain',
         required: true,
       },
@@ -1949,28 +2544,35 @@ export const OUTPUT_FORM: OutputForm = {
           required: false,
         },
         {
-          description: 'Total amount including taxes',
+          description: "Total amount including taxes, in the invoice's currency",
           integer: false,
           kind: 'number',
           name: 'amount_incl_tax',
           required: false,
         },
         {
-          description: 'Net amount excluding taxes',
+          description: "Net amount excluding taxes, in the invoice's currency",
           integer: false,
           kind: 'number',
           name: 'amount_excl_tax',
           required: false,
         },
         {
-          description: 'Total VAT/tax amount',
+          description: "Total VAT or tax amount, in the invoice's currency",
           integer: false,
           kind: 'number',
           name: 'vat_amount',
           required: false,
         },
         {
-          description: 'List of VAT rates applied',
+          description:
+            "ISO 4217 code of the currency the invoice's totals and lines are expressed in, three uppercase letters such as EUR, USD or GBP; never the currency of a converted amount or of a card payment in another currency. Empty when the document does not determine it",
+          kind: 'text',
+          name: 'currency',
+          required: false,
+        },
+        {
+          description: 'VAT rates applied, as percentages: 20 for 20 %',
           item: {
             integer: false,
             kind: 'number',
@@ -2017,9 +2619,58 @@ export const OUTPUT_FORM: OutputForm = {
           required: false,
         },
         {
-          description: 'Description of goods or services purchased',
+          description:
+            'One-line summary of what was purchased; the purchase line by line is in line_items',
           kind: 'text',
           name: 'description',
+          required: false,
+        },
+        {
+          concept_ref: 'invoice_extraction.InvoiceLineItem',
+          description:
+            'The priced lines of the invoice, in the order printed, fees and discounts included; never the subtotal, tax, total or payment lines',
+          item: {
+            concept_ref: 'invoice_extraction.InvoiceLineItem',
+            description:
+              'One priced line of an invoice or a receipt, as printed: a product, a service, a fee or a discount',
+            fields: [
+              {
+                description:
+                  'What the line is for, as printed: the product, service, fee or discount',
+                kind: 'text',
+                name: 'label',
+                required: true,
+              },
+              {
+                description:
+                  'How many units, or how much, as printed; may be fractional for a weighed or measured item. Empty when the line prints no quantity',
+                integer: false,
+                kind: 'number',
+                name: 'quantity',
+                required: false,
+              },
+              {
+                description:
+                  "Price of one unit, in the invoice's currency, when the line prints it",
+                integer: false,
+                kind: 'number',
+                name: 'unit_price',
+                required: false,
+              },
+              {
+                description:
+                  "Total of the line, in the invoice's currency, as printed; negative for a discount or a refund",
+                integer: false,
+                kind: 'number',
+                name: 'amount',
+                required: false,
+              },
+            ],
+            kind: 'object',
+            required: true,
+          },
+          kind: 'list',
+          name: 'line_items',
           required: false,
         },
         {
@@ -2088,28 +2739,35 @@ export const OUTPUT_FORM: OutputForm = {
           required: false,
         },
         {
-          description: 'Total amount including taxes',
+          description: "Total amount including taxes, in the invoice's currency",
           integer: false,
           kind: 'number',
           name: 'amount_incl_tax',
           required: false,
         },
         {
-          description: 'Net amount excluding taxes',
+          description: "Net amount excluding taxes, in the invoice's currency",
           integer: false,
           kind: 'number',
           name: 'amount_excl_tax',
           required: false,
         },
         {
-          description: 'Total VAT/tax amount',
+          description: "Total VAT or tax amount, in the invoice's currency",
           integer: false,
           kind: 'number',
           name: 'vat_amount',
           required: false,
         },
         {
-          description: 'List of VAT rates applied',
+          description:
+            "ISO 4217 code of the currency the invoice's totals and lines are expressed in, three uppercase letters such as EUR, USD or GBP; never the currency of a converted amount or of a card payment in another currency. Empty when the document does not determine it",
+          kind: 'text',
+          name: 'currency',
+          required: false,
+        },
+        {
+          description: 'VAT rates applied, as percentages: 20 for 20 %',
           item: {
             integer: false,
             kind: 'number',
@@ -2156,9 +2814,58 @@ export const OUTPUT_FORM: OutputForm = {
           required: false,
         },
         {
-          description: 'Description of goods or services purchased',
+          description:
+            'One-line summary of what was purchased; the purchase line by line is in line_items',
           kind: 'text',
           name: 'description',
+          required: false,
+        },
+        {
+          concept_ref: 'invoice_extraction.InvoiceLineItem',
+          description:
+            'The priced lines of the invoice, in the order printed, fees and discounts included; never the subtotal, tax, total or payment lines',
+          item: {
+            concept_ref: 'invoice_extraction.InvoiceLineItem',
+            description:
+              'One priced line of an invoice or a receipt, as printed: a product, a service, a fee or a discount',
+            fields: [
+              {
+                description:
+                  'What the line is for, as printed: the product, service, fee or discount',
+                kind: 'text',
+                name: 'label',
+                required: true,
+              },
+              {
+                description:
+                  'How many units, or how much, as printed; may be fractional for a weighed or measured item. Empty when the line prints no quantity',
+                integer: false,
+                kind: 'number',
+                name: 'quantity',
+                required: false,
+              },
+              {
+                description:
+                  "Price of one unit, in the invoice's currency, when the line prints it",
+                integer: false,
+                kind: 'number',
+                name: 'unit_price',
+                required: false,
+              },
+              {
+                description:
+                  "Total of the line, in the invoice's currency, as printed; negative for a discount or a refund",
+                integer: false,
+                kind: 'number',
+                name: 'amount',
+                required: false,
+              },
+            ],
+            kind: 'object',
+            required: true,
+          },
+          kind: 'list',
+          name: 'line_items',
           required: false,
         },
         {
@@ -2191,6 +2898,67 @@ export const OUTPUT_FORM: OutputForm = {
         },
       ],
       kind: 'object',
+      name: 'output',
+      required: true,
+    },
+  },
+  'invoice_extraction.extract_invoice_pages': {
+    field: {
+      concept_ref: 'native.Page',
+      description:
+        'The content of a page of a document, comprising text and linked images and an optional page view image',
+      item: {
+        concept_ref: 'native.Page',
+        description:
+          'The content of a page of a document, comprising text and linked images and an optional page view image',
+        fields: [
+          {
+            concept_ref: 'native.TextAndImages',
+            description: 'The text and images content extracted from the page',
+            fields: [
+              {
+                concept_ref: 'native.Text',
+                description: 'A text content',
+                kind: 'prose',
+                name: 'text',
+                required: false,
+              },
+              {
+                concept_ref: 'native.Image',
+                description: 'A list of images that were extracted from the text',
+                item: {
+                  concept_ref: 'native.Image',
+                  description: 'An image',
+                  kind: 'image',
+                  required: true,
+                },
+                kind: 'list',
+                name: 'images',
+                required: false,
+              },
+              {
+                description: 'The raw HTML of the fetched page, if requested',
+                kind: 'text',
+                name: 'raw_html',
+                required: false,
+              },
+            ],
+            kind: 'object',
+            name: 'text_and_images',
+            required: true,
+          },
+          {
+            concept_ref: 'native.Image',
+            description: 'The screenshot of the page',
+            kind: 'image',
+            name: 'page_view',
+            required: false,
+          },
+        ],
+        kind: 'object',
+        required: true,
+      },
+      kind: 'list',
       name: 'output',
       required: true,
     },
@@ -2231,28 +2999,35 @@ export const OUTPUT_FORM: OutputForm = {
             required: false,
           },
           {
-            description: 'Total amount including taxes',
+            description: "Total amount including taxes, in the invoice's currency",
             integer: false,
             kind: 'number',
             name: 'amount_incl_tax',
             required: false,
           },
           {
-            description: 'Net amount excluding taxes',
+            description: "Net amount excluding taxes, in the invoice's currency",
             integer: false,
             kind: 'number',
             name: 'amount_excl_tax',
             required: false,
           },
           {
-            description: 'Total VAT/tax amount',
+            description: "Total VAT or tax amount, in the invoice's currency",
             integer: false,
             kind: 'number',
             name: 'vat_amount',
             required: false,
           },
           {
-            description: 'List of VAT rates applied',
+            description:
+              "ISO 4217 code of the currency the invoice's totals and lines are expressed in, three uppercase letters such as EUR, USD or GBP; never the currency of a converted amount or of a card payment in another currency. Empty when the document does not determine it",
+            kind: 'text',
+            name: 'currency',
+            required: false,
+          },
+          {
+            description: 'VAT rates applied, as percentages: 20 for 20 %',
             item: {
               integer: false,
               kind: 'number',
@@ -2299,9 +3074,58 @@ export const OUTPUT_FORM: OutputForm = {
             required: false,
           },
           {
-            description: 'Description of goods or services purchased',
+            description:
+              'One-line summary of what was purchased; the purchase line by line is in line_items',
             kind: 'text',
             name: 'description',
+            required: false,
+          },
+          {
+            concept_ref: 'invoice_extraction.InvoiceLineItem',
+            description:
+              'The priced lines of the invoice, in the order printed, fees and discounts included; never the subtotal, tax, total or payment lines',
+            item: {
+              concept_ref: 'invoice_extraction.InvoiceLineItem',
+              description:
+                'One priced line of an invoice or a receipt, as printed: a product, a service, a fee or a discount',
+              fields: [
+                {
+                  description:
+                    'What the line is for, as printed: the product, service, fee or discount',
+                  kind: 'text',
+                  name: 'label',
+                  required: true,
+                },
+                {
+                  description:
+                    'How many units, or how much, as printed; may be fractional for a weighed or measured item. Empty when the line prints no quantity',
+                  integer: false,
+                  kind: 'number',
+                  name: 'quantity',
+                  required: false,
+                },
+                {
+                  description:
+                    "Price of one unit, in the invoice's currency, when the line prints it",
+                  integer: false,
+                  kind: 'number',
+                  name: 'unit_price',
+                  required: false,
+                },
+                {
+                  description:
+                    "Total of the line, in the invoice's currency, as printed; negative for a discount or a refund",
+                  integer: false,
+                  kind: 'number',
+                  name: 'amount',
+                  required: false,
+                },
+              ],
+              kind: 'object',
+              required: true,
+            },
+            kind: 'list',
+            name: 'line_items',
             required: false,
           },
           {
@@ -2351,11 +3175,13 @@ export const OUTPUT_FORM: OutputForm = {
  */
 export const PIPE_DESCRIPTIONS: Record<string, string> = {
   'invoice_extraction.analyze_invoice': 'Analyze the invoice',
-  'invoice_extraction.extract_invoice':
-    'Extract invoice information from an invoice text transcript',
+  'invoice_extraction.extract_invoice': 'Extract invoice information from an invoice page',
   'invoice_extraction.extract_invoice_data':
-    'Extract invoice information from an invoice text transcript',
+    'Extract invoice information from an invoice text transcript and page view',
+  'invoice_extraction.extract_invoice_pages':
+    'Extract page contents (text and images) from the invoice document, with full page views',
   'invoice_extraction.process_invoice': 'Process relevant information from an invoice',
 };
 
-export const DOMAIN_DESCRIPTION: string | null = null;
+export const DOMAIN_DESCRIPTION: string | null =
+  'Extracting structured invoice data from documents, supporting both formal bills and simple receipts';

@@ -1,0 +1,108 @@
+# Written in this repository, not taken from the cookbook: a trip planner whose
+# input is the trips case's TripRequest, so its composer brief matches the trip
+# hero's, and whose output is a structured Itinerary, so a result page has a
+# real payload to be designed over. Origin: https://github.com/Pipelex/mthds-form/blob/dev/data/methods/plan_trip/bundle.mthds
+
+domain      = "trip_planner"
+description = "Plans a trip day by day from who is going, where and when, the budget and the spirit of it."
+main_pipe   = "plan_trip"
+
+[concept.Traveller]
+description = "One person on the trip"
+
+[concept.Traveller.structure]
+name    = { type = "text", description = "Their name", required = true, hints = { intent = "label" } }
+age     = { type = "integer", description = "Their age", required = false, hints = { intent = "quantity" } }
+dietary = { type = "text", description = "Dietary needs, if any", required = false }
+
+[concept.Stay]
+description = "Where and when the trip takes place"
+
+[concept.Stay.structure]
+city        = { type = "text", description = "The city", required = true, hints = { intent = "label" } }
+country     = { type = "text", description = "The country", required = true, choices = [
+  "France",
+  "Italy",
+  "Japan",
+  "Portugal",
+  "Spain",
+  "United States",
+] }
+arriving_on = { type = "date", description = "The day they arrive", required = true }
+leaving_on  = { type = "date", description = "The day they leave", required = true }
+must_see    = { type = "list", item_type = "text", description = "Places they must not miss", required = false }
+
+[concept.TripRequest]
+description = "Everything the planner needs to draft an itinerary"
+
+[concept.TripRequest.structure]
+title         = { type = "text", description = "A name for the trip", required = true, hints = { intent = "label" } }
+stay          = { type = "concept", concept_ref = "Stay", description = "Where and when", required = true }
+travellers    = { type = "list", item_type = "concept", item_concept_ref = "Traveller", description = "Who is going", required = true }
+budget        = { type = "number", description = "The total budget for the whole trip", required = true, hints = { intent = "quantity" } }
+currency      = { type = "text", description = "The currency the budget is in", required = true, choices = [
+  "EUR",
+  "USD",
+  "GBP",
+  "JPY",
+] }
+pace          = { type = "text", description = "How full the days should be", required = true, choices = [
+  "slow",
+  "balanced",
+  "packed",
+] }
+style         = { type = "text", description = "What the trip is mostly about", required = true, choices = [
+  "culture",
+  "food",
+  "nature",
+  "nightlife",
+  "family",
+] }
+with_children = { type = "boolean", description = "Whether children are travelling", required = false }
+accessibility = { type = "text", description = "Mobility or accessibility needs the plan must respect", required = false }
+notes         = { type = "text", description = "Anything else the planner should know", required = false, hints = { intent = "prose" } }
+
+[concept.DayPlan]
+description = "One day of the trip"
+
+[concept.DayPlan.structure]
+day       = { type = "date", description = "The day", required = true }
+title     = { type = "text", description = "What the day is about, in a few words", required = true }
+morning   = { type = "text", description = "What to do in the morning" }
+midday    = { type = "text", description = "Where and what to eat at midday" }
+afternoon = { type = "text", description = "What to do in the afternoon" }
+evening   = { type = "text", description = "What to do in the evening" }
+
+[concept.CostLine]
+description = "One line of the estimated cost"
+
+[concept.CostLine.structure]
+category = { type = "text", description = "What the money goes on", required = true, choices = ["stay", "food", "tickets", "transport", "buffer"] }
+amount   = { type = "number", description = "The estimated amount, in the trip's currency", required = true }
+
+[concept.Itinerary]
+description = "A day-by-day plan for a trip, with its estimated cost"
+
+[concept.Itinerary.structure]
+title           = { type = "text", description = "The trip's name", required = true }
+overview        = { type = "text", description = "The plan in two or three sentences", required = true }
+days            = { type = "list", item_type = "concept", item_concept_ref = "DayPlan", description = "The plan for each day, in order", required = true }
+costs           = { type = "list", item_type = "concept", item_concept_ref = "CostLine", description = "The estimated cost, by category", required = true }
+estimated_total = { type = "number", description = "The estimated total cost of the trip", required = true }
+currency        = { type = "text", description = "The currency of every amount", required = true }
+practical_notes = { type = "list", item_type = "text", description = "Notes for getting around and staying comfortable" }
+
+[pipe.plan_trip]
+type        = "PipeLLM"
+description = "Plan the trip day by day, within the budget"
+inputs      = { request = "TripRequest", inspiration = "Image?" }
+output      = "Itinerary"
+prompt      = """
+Plan this trip day by day, from the arrival day to the departure day included. Respect the budget, the pace, the style, the travellers' ages and dietary needs, and any accessibility needs. Estimate the cost by category so that the categories add up to the estimated total, which stays within the budget. Write concrete places and times, briefly.
+
+@request
+
+{% if inspiration %}A photo for the mood of the trip:
+$inspiration
+{% endif %}
+"""
