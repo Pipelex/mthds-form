@@ -4,7 +4,7 @@ The input form for MTHDS methods, as a library: a headless kernel that maps the 
 
 It exists because "the form" is one problem that keeps being solved separately. A method declares its inputs; something has to decide what widget each input deserves, whether the Run button may light up, what shape the values take on the wire, and what a validation failure says to a person. That logic belongs in one place with tests around it, not copied into each surface that happens to need a form.
 
-## Five entry points
+## Entry points
 
 ```ts
 import { buildRunFields, computeReadiness } from '@pipelex/mthds-form'; // headless

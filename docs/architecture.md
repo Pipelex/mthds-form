@@ -133,7 +133,7 @@ What the run makes of the value is the rule of the section above, unchanged. An 
 
 ## Public API and internal code
 
-`src/core/index.ts`, `src/react/index.ts`, `src/generative/index.ts`, `src/generative/headless/index.ts` and `src/brand/index.ts` are the five entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
+`src/core/index.ts`, `src/react/index.ts`, `src/generative/index.ts`, `src/generative/headless/index.ts` and `src/brand/index.ts` are the entry points, and they are the whole public surface. Deep paths are not exported and are not stable. This is deliberate: it is what lets the derivation and the vendored primitives change without a breaking release.
 
 `src/generated/layout-design/` is neither an entry nor public. It is the projection of `methods/layout-design.mthds` into zod schemas and types, written by `/pipelex-integrate` and never edited by hand; the generative entries reach it type-only, so nothing of it ships, and the fixture harness's typed call site under `scripts/pipelex/` is its value consumer. See [generative-ui.md](generative-ui.md) § "The typed contract".
 

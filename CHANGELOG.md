@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`checksFailed(problems)`**: says whether an answer from the checks holds their own failure rather than the layout's problems; a throw inside the checks on a layout of the right shape is now the line `the checks failed on this layout (…)`, never "not a well-formed spec", so a producer stops instead of paying the repair pass for a defect no layout can fix.
+
+### Changed
+
+- **The checks refuse more (Breaking)**: an object carrying an expression key that json-render would not resolve (`{ "$state": 7 }`, `{ "$index": 1 }`, a `$cond` without both branches) is held to the prop's schema as the literal it renders as; a fixed-set prop nested inside another, such as a `DataTable` column's `format`, takes a literal alone; a named slot the component does not declare, or one named `default`, is refused; and an inline `ProportionBar` part's amount must be a number or read a number path, so an amount written as a text (`"40"` included) or reading a text path sends a stored layout back to the plain form.
+- **A `ProportionBar` part read whole is accepted**: `items: [{ "$state": "/result/split/0" }, …]` passes when each path holds a structure with both members, its value member a number, since it draws exactly as a part written out does.
+- **A failed element tries again**: an element that threw draws again once its resolved props, or the list it repeats over, change, without the host remounting the page; an equal value handed as a new object does not retry it, and while `loading` a failure is held and only what still fails when the stream ends reaches `onElementError`. Without a handler, an element's error is logged as json-render logs it rather than handed to json-render's boundary, which never retried.
+- **A run waits for the fields' own checks**: the page's `run` handler does not call `onRun` while a field's `checks` fail, and the press shows each failing field its message, so `[validateForm, run]` no longer starts a run of a form its own checks refused.
+- **A structure shown as a value writes out as nothing**: a `Fact`, `Detail`, `Metric` or `SummaryRow` handed a structure out of scratch state shows what it shows for an absent value instead of `[object Object]`, and a list writes out as its entries joined.
+- **Renderers hold refused lists to their bounds**: a list prop keeps the entries its items accept only while it still meets its own bounds (a `Tabs` left with one tab draws none), a number or a boolean among a list of texts is written out as it is in a text prop, and a refused list read from the store comes back as the same list at each render.
+
+### Fixed
+
+- **A hatch's path that is not a text**: an `MthdsField` or `MthdsResult` whose `path` resolved to a number no longer binds to the entry that number names inside a repeat; it resolves to nothing.
+- **Tabs and pills a layout names twice**: two tabs sharing a value are two tabs, and a `Segmented` option named twice no longer gives React two children with one key.
+
 ## [v0.32.0] - 2026-11-08
 
 ### Highlights
