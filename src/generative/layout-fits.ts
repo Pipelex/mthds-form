@@ -717,9 +717,9 @@ interface Offered {
  * or by delegation, because its items are the layout's business and not this
  * predicate's. A structure that requires no member still has to hold
  * something before the run takes it (`fieldFilled`), so it is covered by
- * covering any one member, and is itself the uncovered path when the layout
- * offers none: answering nothing there let a page through that no person
- * could complete.
+ * covering any one member, or by a member with a default, which the seed puts
+ * in it, and is itself the uncovered path otherwise: answering nothing there
+ * let a page through that no person could complete.
  */
 function uncoveredUnder(field: RunField, path: string, offered: Offered): string[] {
   if (isOffered(path, offered)) return [];
@@ -727,7 +727,13 @@ function uncoveredUnder(field: RunField, path: string, offered: Offered): string
     const under = (child: RunField) => uncoveredUnder(child, joinPath(path, child.name), offered);
     const required = field.fields.filter((child) => child.required);
     if (required.length > 0) return required.flatMap(under);
-    return field.fields.some((child) => under(child).length === 0) ? [] : [path];
+    // A member with a default holds it from the start (`seedInputs`), so the
+    // structure is filled before the person touches it.
+    return field.fields.some(
+      (child) => child.defaultValue !== undefined || under(child).length === 0,
+    )
+      ? []
+      : [path];
   }
   return [path];
 }

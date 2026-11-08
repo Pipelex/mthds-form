@@ -19,7 +19,7 @@ import { textOf, withDeclaredProps } from './declared-props';
 import { frameComponents } from './frame-definitions';
 import { shareAmount } from './share-amount';
 import { useFrameHost } from './frame-host';
-import { INPUTS_ROOT, joinPath } from './paths';
+import { INPUTS_ROOT, inputFieldAtPath, joinPath } from './paths';
 import { type PlacedInput, usePlacedInputs } from './placed-inputs';
 import { useDescriptorScope } from './registry';
 
@@ -90,14 +90,31 @@ function useRunWaitsFor(): string | undefined {
   const waiting = waitingFields(inputs ?? [], isRecord(values) ? values : undefined)
     .map(({ field, path }) => {
       const at = joinPath(INPUTS_ROOT, ...path);
-      return { field, on: placed.get(at), rank: rankOf(placed, at) };
+      return { field, path, on: placed.get(at), rank: rankOf(placed, at) };
     })
     // A stable sort: what the page does not place keeps the descriptor's order, after the rest.
     .sort((a, b) => a.rank - b.rank);
   if (waiting.length === 0) return undefined;
-  const names = waiting
-    .slice(0, NAMED_WAITING)
-    .map(({ field, on }) => on?.label ?? fieldLabel(field.title, field.name, presentation));
+  const labelAt = (path: readonly string[]): string | undefined => {
+    const field = inputFieldAtPath(inputs ?? [], joinPath(INPUTS_ROOT, ...path));
+    if (!field) return undefined;
+    return (
+      placed.get(joinPath(INPUTS_ROOT, ...path))?.label ??
+      fieldLabel(field.title, field.name, presentation)
+    );
+  };
+  const named = waiting.slice(0, NAMED_WAITING);
+  const labels = named.map(
+    ({ field, on }) => on?.label ?? fieldLabel(field.title, field.name, presentation),
+  );
+  // One concept used for two inputs gives two members one label: each is then
+  // said with the structure it belongs to, "Name (Sender)".
+  const names = labels.map((label, index) => {
+    const parent = named[index]!.path.slice(0, -1);
+    const shared = labels.filter((other) => other === label).length > 1;
+    const around = shared && parent.length > 0 ? labelAt(parent) : undefined;
+    return around ? `${label} (${around})` : label;
+  });
   return strings.runWaitsFor(names, waiting.length - names.length);
 }
 

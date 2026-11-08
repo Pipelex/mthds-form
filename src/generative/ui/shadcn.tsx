@@ -561,15 +561,22 @@ export function Radio({
       <legend className={LABEL}>{props.label}</legend>
       {/* Rows of 44 pixels need no gap between them on a phone. */}
       <div className="space-y-2 max-sm:space-y-0">
-        {(props.options ?? []).map((option, index) => (
+        {(props.options ?? []).map((option, index, options) => (
           <label key={`${index}-${option}`} className={NATIVE_CHECK_ROW}>
             <input
               type="radio"
               name={id}
               value={option}
               checked={field.value === option}
-              // The first option takes the focus a refused run gives the group.
-              ref={index === 0 ? field.focusRef : undefined}
+              // The focus a refused run gives the group goes to the checked
+              // option, as the group's own tab stop does, and to the first
+              // while none is.
+              ref={
+                field.value === option ||
+                (index === 0 && !options.some((other) => other === field.value))
+                  ? field.focusRef
+                  : undefined
+              }
               className={NATIVE_CHECK}
               onChange={() => {
                 field.setValue(option);

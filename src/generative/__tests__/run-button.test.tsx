@@ -258,6 +258,27 @@ describe('what a composer’s run waits for', () => {
     );
   });
 
+  it('says which structure a member belongs to when two waiting members share a label', () => {
+    const person = (name: string, title: string) =>
+      ({
+        kind: 'object',
+        name,
+        title,
+        required: true,
+        fields: [field('name', { title: 'Name' })],
+      }) as RunField;
+    render(
+      <GenerativePage
+        spec={COMPOSER}
+        store={createStateStore({ inputs: {} })}
+        scope={{ inputs: [person('sender', 'Sender'), person('recipient', 'Recipient')] }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Plan my trip/ })).toHaveAccessibleDescription(
+      'Fill in Name (Sender) and Name (Recipient) to run',
+    );
+  });
+
   it('keeps the time a run takes beside what it waits for', () => {
     render(
       <FrameHostProvider host={{ eta: 'About a minute' }}>
@@ -270,6 +291,52 @@ describe('what a composer’s run waits for', () => {
     );
     expect(screen.getByText('Fill in City to run')).toBeTruthy();
     expect(screen.getByText('About a minute')).toBeTruthy();
+  });
+});
+
+/** A refused run focuses a radio group where its own tab stop is: the checked option. */
+describe('a refused radio group', () => {
+  it('takes the focus on its checked option', async () => {
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: {
+          type: 'Stack',
+          props: { direction: 'vertical', gap: null, align: null, justify: null, className: null },
+          children: ['mode', 'cta'],
+        },
+        mode: {
+          type: 'Radio',
+          props: {
+            label: 'Mode',
+            name: 'mode',
+            options: ['train', 'car'],
+            value: { $bindState: '/inputs/mode' },
+            checks: [
+              {
+                type: 'equalTo',
+                message: 'Pick the boat',
+                args: { other: { $state: '/inputs/wanted' } },
+              },
+            ],
+            validateOn: null,
+          },
+          children: [],
+        },
+        cta: {
+          type: 'Cta',
+          props: { label: 'Plan my trip', hint: null },
+          children: [],
+          on: { press: [{ action: 'validateForm' }, { action: 'run' }] },
+        },
+      },
+    };
+    const onRun = vi.fn();
+    const store = createStateStore({ inputs: { mode: 'car', wanted: 'boat' } });
+    render(<GenerativePage spec={spec} store={store} scope={{}} onRun={onRun} />);
+    await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
+    expect(onRun).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'car' })).toHaveFocus());
   });
 });
 

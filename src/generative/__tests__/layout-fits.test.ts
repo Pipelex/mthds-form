@@ -47,6 +47,14 @@ describe('a layout that has gone stale', () => {
     expect(layoutProblems(descriptor, pageBinding('/inputs/city', '/inputs/request/tone'))).toEqual(
       [],
     );
+    // A member with a default fills the structure from the start.
+    const seeded: RunField = {
+      ...request,
+      fields: [text('note', false), { ...text('tone', false), defaultValue: 'formal' }],
+    } as RunField;
+    expect(
+      layoutProblems({ inputs: [text('city', true), seeded] }, pageBinding('/inputs/city')),
+    ).toEqual([]);
   });
 
   it('is refused when it binds a path no input has', () => {
