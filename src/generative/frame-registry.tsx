@@ -361,7 +361,7 @@ function Picture({
   // hand an expression's value here, which shows no picture, as does a
   // relative path outside any repeat. Neither is read as the empty path,
   // which inside a repeat is the item itself (`useAbsolutePath`).
-  const path = useAbsolutePath(props.path);
+  const path = useAbsolutePath(props.path, true);
   const value = useStateValue<unknown>(path ?? '');
   const resolve = useResolveUrl();
   // In the result view's order, each through the kernel's gate: the host's

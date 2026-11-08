@@ -220,12 +220,16 @@ export function pathFromDomId(prefix: string | undefined, id: string): string | 
 
 /**
  * The path a hatch or a `Picture` resolves: absolute as written, or, inside a
- * repeat, the item's field name joined onto the current item's base path, and
- * the empty path the item itself. A relative path outside any repeat resolves
- * to nothing, and the element says so. The one resolver every renderer that
- * names a path literally reads through, so two cannot read one path two ways.
+ * repeat, the item's field name joined onto the current item's base path. A
+ * relative path outside any repeat resolves to nothing, and the element says
+ * so. The one resolver every renderer that names a path literally reads
+ * through, so two cannot read one path two ways. The empty path is the item
+ * itself only where `emptyIsItem` says so, which is a `Picture`'s reading
+ * alone, as the fit check reads it (`layout-fits.ts`): for a hatch it stays
+ * the item's base and a trailing separator, which no field has, so the
+ * renderer and the check refuse it together.
  */
-export function useAbsolutePath(path: unknown): string | undefined {
+export function useAbsolutePath(path: unknown, emptyIsItem = false): string | undefined {
   const repeat = useRepeatScope();
   // The checks hold such a `path` to a literal text; a layout rendered past
   // them may hand anything here, which resolves to nothing - never read as
@@ -235,7 +239,7 @@ export function useAbsolutePath(path: unknown): string | undefined {
   if (!repeat) return undefined;
   // Raw, not `joinPath`: the same reason `absoluteHatchPath` gives - a relative
   // hatch path may name several segments, so its `/` are separators already.
-  return path === '' ? repeat.basePath : `${repeat.basePath}/${path}`;
+  return path === '' && emptyIsItem ? repeat.basePath : `${repeat.basePath}/${path}`;
 }
 
 // ─── The escape hatches ──────────────────────────────────────────────────────

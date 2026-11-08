@@ -49,12 +49,33 @@ interface Money {
 
 /**
  * The currencies already asked for, each with its formatters, or `null` for a
- * code `Intl` refuses. Bounded by what it can hold: three capital letters.
+ * code that names none. Bounded by what it can hold: three capital letters.
  */
 const currencies = new Map<string, Money | null>();
 
+/**
+ * The currency codes `Intl` lists, where it can list them. A well-formed code
+ * it does not know ("KWH", "MPH") does not make `Intl.NumberFormat` throw, it
+ * writes the code as a symbol ("KWH 12.50"), so a unit in capitals would read
+ * as money; the list is what says it is none. A runtime with no list falls
+ * back to what `Intl` accepts.
+ */
+const KNOWN_CURRENCIES: ReadonlySet<string> | null = (() => {
+  try {
+    return typeof Intl.supportedValuesOf === 'function'
+      ? new Set(Intl.supportedValuesOf('currency'))
+      : null;
+  } catch {
+    return null;
+  }
+})();
+
 function currencyFormat(code: string): Money | null {
   if (!currencies.has(code)) {
+    if (KNOWN_CURRENCIES && !KNOWN_CURRENCIES.has(code)) {
+      currencies.set(code, null);
+      return null;
+    }
     let money: Money | null;
     try {
       // The currency's own fraction digits (two for the euro, none for the
@@ -79,7 +100,7 @@ function currencyFormat(code: string): Money | null {
 }
 
 /**
- * An amount in `unit`: money when the unit is a currency code `Intl` knows,
+ * An amount in `unit`: money when the unit is a currency code `Intl` lists,
  * with that currency's own fraction digits; otherwise the number grouped,
  * with the unit after it ("12.5 km"), or alone with no unit.
  */

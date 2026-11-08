@@ -180,8 +180,10 @@ export function Stack({
   // as wide as the widest of them and never wider than its box, rather than
   // each child at its own width: `items-center` there gave a hero narrower
   // than the form under it a different left edge from the form, and the page
-  // read ragged. Its children then fill the column, so their edges agree. A
-  // horizontal stack centres its children on the cross axis, one by one.
+  // read ragged. Its children then fill the column, so their edges agree, and
+  // one that sizes itself (a `Button`) starts at the column's edge with the
+  // rest rather than in its middle. A horizontal stack centres its children
+  // on the cross axis, one by one.
   const column = !horizontal && props.align === 'center';
   return (
     <div

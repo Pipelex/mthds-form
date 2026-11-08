@@ -29,8 +29,9 @@ describe('the layout formatter', () => {
   it('writes a unit that is no currency after the grouped number, and none alone', () => {
     expect(formatAmount(12.5, 'km')).toBe('12.5 km');
     expect(formatAmount(1234.567, null)).toBe('1,234.57');
-    // Three capitals that no currency has still read as a unit, never a throw.
-    expect(formatAmount(3, 'ABC')).toMatch(/3/);
+    // Three capitals that name no currency read as a unit, never as money.
+    expect(formatAmount(12.5, 'KWH')).toBe('12.5 KWH');
+    expect(formatAmount(60, 'MPH')).toBe('60 MPH');
   });
 
   it('writes a number in each style a Metric names', () => {
