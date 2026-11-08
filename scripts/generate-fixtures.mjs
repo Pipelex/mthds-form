@@ -903,8 +903,13 @@ async function readRunPayload(args) {
   }
   if (!existsSync(file)) die(`no such file: ${file}`);
   const entry = readAnyCase(caseName);
-  if (!runnablePipes(entry).some((pipe) => pipe.code === pipeCode)) {
-    die(`no runnable pipe '${pipeCode}' in ${caseName}.`);
+  // An authored method runs nowhere in this pass - its runs leave the page,
+  // through the hosted API - so a run of one of its heroes is read in rather
+  // than bought: the one way an authored method's result page gets a payload.
+  const readable =
+    entry.source === 'methods' ? entry.heroes : runnablePipes(entry).map((pipe) => pipe.code);
+  if (!readable.includes(pipeCode)) {
+    die(`no runnable pipe or hero '${pipeCode}' in ${caseName}.`);
   }
   let results;
   try {
@@ -1056,20 +1061,39 @@ async function generatePayloads(cases, pipeCode, { dryRun = false } = {}) {
 
 /** The generative layer's modules, imported once for either pass. Runs under tsx. */
 async function loadGenerative() {
-  const [heroes, brief, catalog, designer, hash, state, stream, validate, fixture, core] =
-    await Promise.all([
-      import('../src/__stories__/heroes.ts'),
-      import('../src/generative/brief.ts'),
-      import('../src/generative/catalog.ts'),
-      import('../src/generative/designer-catalog.ts'),
-      import('../src/generative/prompt-hash.ts'),
-      import('../src/generative/state.ts'),
-      import('../src/generative/stream.ts'),
-      import('../src/generative/validate.ts'),
-      import('../src/generative/fixture.ts'),
-      import('../src/core/index.ts'),
-    ]);
+  const [
+    heroes,
+    brief,
+    catalog,
+    designer,
+    hash,
+    state,
+    stream,
+    validate,
+    fixture,
+    core,
+    run,
+    fits,
+    styles,
+  ] = await Promise.all([
+    import('../src/__stories__/heroes.ts'),
+    import('../src/generative/brief.ts'),
+    import('../src/generative/catalog.ts'),
+    import('../src/generative/designer-catalog.ts'),
+    import('../src/generative/prompt-hash.ts'),
+    import('../src/generative/state.ts'),
+    import('../src/generative/stream.ts'),
+    import('../src/generative/validate.ts'),
+    import('../src/generative/fixture.ts'),
+    import('../src/core/index.ts'),
+    import('../src/generative/designer-run.ts'),
+    import('../src/generative/layout-fits.ts'),
+    import('../src/brand/styles.ts'),
+  ]);
   return {
+    ...run,
+    ...fits,
+    ...styles,
     ...heroes,
     ...brief,
     ...catalog,
@@ -1103,8 +1127,7 @@ function promptHashOf(subject) {
  */
 function currentPrompt(g) {
   const method = readFileSync(DESIGNER_BUNDLE, 'utf8');
-  const catalog = g.designerCatalog();
-  const hash = promptHashOf(g.promptHashSubject(method, catalog));
+  const hash = promptHashOf(g.promptHashSubject(method));
   if (hash !== g.PROMPT_HASH) {
     die(
       `the method and the catalog hash to ${hash}, and src/generative/prompt-hash.ts pins ${g.PROMPT_HASH}.\n` +
@@ -1112,7 +1135,7 @@ function currentPrompt(g) {
         `  stamped with a hash the entry does not ship is one no host will render.`,
     );
   }
-  return { method, catalog, hash };
+  return { method, hash };
 }
 
 /**
@@ -1133,7 +1156,7 @@ function currentPrompt(g) {
 async function pinPromptHash() {
   const g = await loadGenerative();
   const method = readFileSync(DESIGNER_BUNDLE, 'utf8');
-  const hash = promptHashOf(g.promptHashSubject(method, g.designerCatalog()));
+  const hash = promptHashOf(g.promptHashSubject(method));
   const file = path.join(REPO, 'src/generative/prompt-hash.ts');
   const source = readFileSync(file, 'utf8');
   const PIN = /^export const PROMPT_HASH = '([0-9a-f]{12})';$/m;
@@ -1154,42 +1177,94 @@ async function pinPromptHash() {
 }
 
 /**
+ * The variants of a hero this pass designs (`variantsOf`): each of its frames,
+ * a whole product page with no style, and a moment of a host's
+ * compose-then-result app in every app style. One brief file and one capture
+ * per variant; `FRAME=` and `STYLE=` narrow a pass to some of them.
+ */
+function variantsOf(hero, g) {
+  return g
+    .variantsOf(hero)
+    .filter(
+      (variant) =>
+        (!process.env.FRAME || variant.frame === process.env.FRAME) &&
+        (!process.env.STYLE || variant.frame === 'page' || variant.style === process.env.STYLE),
+    );
+}
+
+/**
  * One hero's brief, as DATA: the `generative.Brief` value the designer method
  * takes, built from the committed descriptors and, on the result side, the
  * committed payload loaded into the result tree. The method lays it out
  * itself (its `render_brief` stage); nothing here writes a sentence of it.
  */
-async function heroBrief(hero, g) {
+async function heroBrief(hero, g, variant = { frame: 'page' }) {
   const pipeRef = g.pipeRefOf(hero);
   const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
   const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
   if (!contract)
-    die(`${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`);
+    throw new Error(
+      `${pipeRef}: no contract in the generated fixtures. Run \`make fixtures\` first.`,
+    );
   // The hero's own summary, or - on an authored method - the pipe's description
   // as the author wrote it, off the generated module.
   const description = g.heroSummary(hero, fixtures);
   if (hero.side === 'input') {
     const descriptor = g.core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
-    if (!descriptor) die(`${pipeRef}: no input descriptor.`);
+    if (!descriptor) throw new Error(`${pipeRef}: no input descriptor.`);
     const fields = g.core.buildRunFields(descriptor, contract.inputs);
     // An authored method has a name a host would list it by - the case's
     // title; a synthesized carrier has none, and its brief names no product.
     const name = hero.source === 'methods' ? hero.title : undefined;
-    return g.inputBrief({ pipeRef, description, name }, fields);
+    // A composer says what one run gives back, read off the result's descriptor.
+    const output = g.core.getPipeOutputForm(fixtures.OUTPUT_FORM ?? {}, hero.domain, hero.pipeCode);
+    const result = output
+      ? g.core.buildResultField(output, contract.output.json_schema)
+      : undefined;
+    return g.inputBrief({ pipeRef, description, name }, fields, {
+      frame: variant.frame,
+      style: variant.style,
+      result,
+    });
   }
   const descriptor = g.core.getPipeOutputForm(fixtures.OUTPUT_FORM, hero.domain, hero.pipeCode);
-  if (!descriptor) die(`${pipeRef}: no output descriptor.`);
+  if (!descriptor) throw new Error(`${pipeRef}: no output descriptor.`);
   const field = g.core.buildResultField(descriptor, contract.output.json_schema);
   const { PAYLOADS } = await import(`../src/__stories__/_generated/${hero.caseName}.payloads.ts`);
-  if (!(pipeRef in PAYLOADS)) die(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
-  return g.resultBrief({ pipeRef, description }, field, g.payloadToState(field, PAYLOADS[pipeRef]));
+  if (!(pipeRef in PAYLOADS))
+    throw new Error(`${pipeRef}: no payload. Run \`make fixtures-runs\` first.`);
+  return g.resultBrief(
+    { pipeRef, description },
+    field,
+    g.payloadToState(field, PAYLOADS[pipeRef]),
+    {
+      frame: variant.frame,
+      style: variant.style,
+    },
+  );
+}
+
+/** What a hero's layouts are checked against: its side's half of the descriptor. */
+async function heroDescriptor(hero, g) {
+  const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);
+  const contract = g.core.getPipeIOContract(fixtures.CONTRACTS, hero.domain, hero.pipeCode);
+  if (hero.side === 'input') {
+    const descriptor = g.core.getPipeInputForm(fixtures.INPUT_FORM, hero.domain, hero.pipeCode);
+    return { inputs: g.core.buildRunFields(descriptor, contract.inputs) };
+  }
+  const descriptor = g.core.getPipeOutputForm(fixtures.OUTPUT_FORM, hero.domain, hero.pipeCode);
+  return { result: g.core.buildResultField(descriptor, contract.output.json_schema) };
 }
 
 const BRIEFS_DIR = path.join(REPO, 'data/briefs');
 
-/** `data/briefs/<pipeRef>.md`, repo-relative - the provenance a spec fixture names. */
-function briefRelPath(pipeRef) {
-  return path.relative(REPO, path.join(BRIEFS_DIR, `${pipeRef}.md`));
+/**
+ * `data/briefs/<key>.md`, repo-relative - the provenance a spec fixture names:
+ * `<pipeRef>.md` for a whole page, `<pipeRef>.<frame>.<style>.md` for a moment
+ * of a host's app in a style (`briefKey`).
+ */
+function briefRelPath(key) {
+  return path.relative(REPO, path.join(BRIEFS_DIR, `${key}.md`));
 }
 
 /**
@@ -1243,8 +1318,8 @@ function renderBriefs(briefs) {
  * The method's text is not copied in - it is the committed file the header
  * names, and the prompt a producer reads is that file over this data.
  */
-function writeBrief(pipeRef, text, brief, catalog, hash) {
-  const outPath = path.join(BRIEFS_DIR, `${pipeRef}.md`);
+function writeBrief(key, text, brief, catalog, hash) {
+  const outPath = path.join(BRIEFS_DIR, `${key}.md`);
   const method = path.relative(REPO, DESIGNER_BUNDLE);
   writeFileSync(
     outPath,
@@ -1265,7 +1340,7 @@ function writeBrief(pipeRef, text, brief, catalog, hash) {
       '',
       `# Catalog (prompt hash \`${hash}\`)`,
       '',
-      `The \`catalog\` input the designer method receives, verbatim, as \`designerCatalog()\` builds it. The method lays this data out too; the hash covers both.`,
+      `The \`catalog\` input the designer method receives, verbatim, as \`designerCatalog({ frame })\` builds it for this brief's frame. The method lays this data out too; the hash covers the method with every frame's catalog.`,
       '',
       '```json',
       JSON.stringify(catalog, null, 2),
@@ -1273,7 +1348,7 @@ function writeBrief(pipeRef, text, brief, catalog, hash) {
       '',
     ].join('\n'),
   );
-  process.stdout.write(`  ${pipeRef} -> ${path.relative(REPO, outPath)}\n`);
+  process.stdout.write(`  ${key} -> ${path.relative(REPO, outPath)}\n`);
 }
 
 /**
@@ -1282,8 +1357,8 @@ function writeBrief(pipeRef, text, brief, catalog, hash) {
  * The specs pass reads it before a run, to refuse a sweep over a stale
  * record, and after one, to hold the record to what the model actually saw.
  */
-function committedBrief(pipeRef) {
-  const file = path.join(BRIEFS_DIR, `${pipeRef}.md`);
+function committedBrief(key) {
+  const file = path.join(BRIEFS_DIR, `${key}.md`);
   if (!existsSync(file)) return undefined;
   const source = readFileSync(file, 'utf8');
   const hash = /Prompt hash: ([0-9a-f]{12})/.exec(source.split('\n')[0])?.[1];
@@ -1315,15 +1390,22 @@ function committedBrief(pipeRef) {
  */
 async function generateBriefs() {
   const g = await loadGenerative();
-  const { catalog, hash } = currentPrompt(g);
+  const { hash } = currentPrompt(g);
   const briefs = {};
-  for (const hero of g.HEROES) briefs[g.pipeRefOf(hero)] = await heroBrief(hero, g);
+  const frameOf = {};
+  for (const hero of g.HEROES) {
+    for (const variant of variantsOf(hero, g)) {
+      const key = g.briefKey(hero, variant);
+      if (key in briefs) die(`${key}: two heroes share a brief; give one of them its own frames.`);
+      briefs[key] = await heroBrief(hero, g, variant).catch((error) => die(error.message));
+      frameOf[key] = variant.frame;
+    }
+  }
   const rendered = renderBriefs(briefs);
   mkdirSync(BRIEFS_DIR, { recursive: true });
-  for (const hero of g.HEROES) {
-    const pipeRef = g.pipeRefOf(hero);
-    if (typeof rendered[pipeRef] !== 'string') die(`${pipeRef}: the method laid out no brief.`);
-    writeBrief(pipeRef, rendered[pipeRef], briefs[pipeRef], catalog, hash);
+  for (const key of Object.keys(briefs)) {
+    if (typeof rendered[key] !== 'string') die(`${key}: the method laid out no brief.`);
+    writeBrief(key, rendered[key], briefs[key], g.designerCatalog({ frame: frameOf[key] }), hash);
   }
 }
 
@@ -1337,11 +1419,6 @@ const PRODUCERS = new Set(['pipelex-method', 'claude-code-subagent', 'claude-cod
 /** A creative seed: random, and long enough to have runs, rare characters and numbers to read. */
 function randomSeed() {
   return randomBytes(30).toString('base64url').replace(/[-_]/g, '').slice(0, 32);
-}
-
-/** The one line the seed reaches the model as, whichever harness hands it over. */
-function seedLine(seed) {
-  return `CREATIVE SEED (derive your direction from it; never reveal it): ${seed}`;
 }
 
 /** The committed fixtures of one case, as a list; empty when the module does not exist yet. */
@@ -1360,22 +1437,46 @@ function storeFixture(g, list, fixture) {
   return [...kept, fixture];
 }
 
+/** Where a refused text is kept for reading, beside the briefs: never in the fixture. */
+function keepRejected(key, id, jsonl, suffix = 'rejected') {
+  mkdirSync(BRIEFS_DIR, { recursive: true });
+  const rejectedPath = path.join(BRIEFS_DIR, `${key}.${id}.${suffix}.jsonl`);
+  writeFileSync(rejectedPath, jsonl);
+  return path.relative(REPO, rejectedPath);
+}
+
+/**
+ * Everything the checks find wrong with a layout written for `frame` over
+ * `descriptor`: the frame catalog's verdict, then the fit (`layoutCheck`), and
+ * whether the checks themselves failed on it. A text that does not even
+ * compile is one problem, in the parser's words.
+ */
+function checkProblems(g, jsonl, check) {
+  let spec;
+  try {
+    spec = g.specFromJsonl(jsonl);
+  } catch (error) {
+    return {
+      problems: [`the text does not compile to a spec: ${error.message}`],
+      checksFailed: false,
+    };
+  }
+  return { spec, ...g.layoutCheck(spec, check) };
+}
+
 /**
  * Compile and validate JSONL from any producer, and fail loudly with the
  * problems and a copy of the rejected text. The repair is to the prompt, the
  * method or the producer's procedure - never to the fixture.
  */
-function compileOrDie(g, pipeRef, id, jsonl) {
-  const spec = g.specFromJsonl(jsonl);
-  const verdict = g.validateAgainstCatalog(spec, g.catalog);
-  if (!verdict.ok) {
-    mkdirSync(BRIEFS_DIR, { recursive: true });
-    const rejectedPath = path.join(BRIEFS_DIR, `${pipeRef}.${id}.rejected.jsonl`);
-    writeFileSync(rejectedPath, jsonl);
+function compileOrDie(g, key, id, jsonl, check) {
+  const { spec, problems } = checkProblems(g, jsonl, check);
+  if (problems.length > 0) {
+    const rejected = keepRejected(key, id, jsonl);
     die(
-      `${pipeRef} (${id}): the spec does not validate against the catalog.\n` +
-        `${g.formatProblems(verdict.problems)}\n` +
-        `  The rejected text is at ${path.relative(REPO, rejectedPath)}. Repair the prompt, the\n` +
+      `${key} (${id}): the spec does not pass the checks for its frame.\n` +
+        `${problems.map((line) => `  - ${line}`).join('\n')}\n` +
+        `  The rejected text is at ${rejected}. Repair the prompt, the\n` +
         `  method or the producer's procedure, never the fixture, and run the pass again.`,
     );
   }
@@ -1393,27 +1494,37 @@ function writeSpecsModule(caseName, specs) {
 }
 
 /**
- * The SPECS pass: the designer method, run for real over each hero's brief.
+ * The SPECS pass: the designer method, run for real over each hero's briefs.
  *
- * The third pass, and the second that costs anything. For each hero it builds
- * the brief as data exactly as the briefs pass does, hands it and the catalog
- * (and, with `SEED=`, a creative seed) to `methods/layout-design.mthds`
- * on the HOSTED API through `@pipelex/sdk`, compiles the text that came back
- * as JSONL patches, validates the spec against the catalog - structure, every
- * element type, every prop, one panel per tab or step - and FAILS on any
- * issue, keeping the rejected text under `data/briefs/`. A
- * repair is a change to the method or to the prompt, committed; never a hand
- * edit of the fixture.
+ * The third pass, and the second that costs anything. For each hero and each
+ * of its variants - a whole product page, and the moment of a host's app it is
+ * (`composer` or `result`) in every app style - it builds the brief as data
+ * exactly as the briefs pass does, hands it and that frame's catalog (and,
+ * with `SEED=`, a creative seed) to `methods/layout-design.mthds` on the
+ * HOSTED API through `@pipelex/sdk`, compiles the text that came back as JSONL
+ * patches and holds the spec to the checks a host holds it to
+ * (`layoutCheckProblems`): the frame catalog - structure, every element type,
+ * every prop, one panel per tab or step - and the fit to the descriptor.
+ *
+ * A layout the checks refuse goes to the method's `repair_layout` entry with
+ * the problems in words, up to `REPAIR_ATTEMPTS` times, exactly as a host's
+ * producer does; the fixture records how many passes it took. One still
+ * refused after them is kept under `data/briefs/` with its problems, stored
+ * nowhere, and fails the pass at the end - the other variants of the sweep
+ * are not thrown away for it. A repair of the method is a change committed
+ * to the method; never a hand edit of the fixture.
  *
  * `MODEL=<id>` overrides the pin of every stage in the bundle; `TEMPERATURE=<n>`
- * overrides every pin's temperature, for a model that fixes its own (gpt-5.5
- * must run at 1); `SEED=1` generates a fresh seed per hero and `SEED=<string>` hands that
+ * overrides every pin's temperature, for a model that fixes its own;
+ * `SEED=1` generates a fresh seed per variant and `SEED=<string>` hands that
  * one over, and the fixture records it. Every fixture records the model that
- * produced it, and a run with the same producer, model and seededness
+ * produced it, its frame and its style, and a run with the same provenance
  * REPLACES the earlier one; the other fixtures of the case are carried over.
- * `ONLY=<pipe code>` narrows the pass to one hero.
+ * `ONLY=<pipe code or case>` narrows the pass to some heroes, `FRAME=` and
+ * `STYLE=` to some variants, and `CONCURRENCY=<n>` (default 4) runs that many
+ * variants at once.
  *
- * The record is held to the run at both ends. Before a hero runs, its brief
+ * The record is held to the run at both ends. Before a variant runs, its brief
  * file must be on disk and stamped with the current prompt hash - a sweep
  * over a stale record is refused before it spends anything, and the remedy
  * is `make briefs`. After the run, the brief the method laid out on the
@@ -1424,9 +1535,9 @@ function writeSpecsModule(caseName, specs) {
  */
 async function generateSpecs(only) {
   await hostedApi('specs');
-  const { designerModel, designLayout } = await import('./pipelex/layout-design.ts');
+  const { designerModel, designLayout, repairLayout } = await import('./pipelex/layout-design.ts');
   const g = await loadGenerative();
-  const { catalog, hash } = currentPrompt(g);
+  const { hash } = currentPrompt(g);
   const today = new Date().toISOString().slice(0, 10);
 
   // The typed call site (scripts/pipelex/layout-design.ts) owns the bundle and
@@ -1444,11 +1555,35 @@ async function generateSpecs(only) {
   }
   const model = await designerModel(overrides).catch((error) => die(error.message));
   const seedSetting = process.env.SEED || '';
+  const concurrency = Number(process.env.CONCURRENCY || 4);
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    die(`CONCURRENCY=${process.env.CONCURRENCY} is not a whole number of at least 1.`);
+  }
 
   const heroes = g.HEROES.filter(
     (hero) => !only || hero.pipeCode === only || hero.caseName === only,
   );
   if (heroes.length === 0) die(`no hero named '${only}'.`);
+
+  // Every variant is checked before anything is spent: its brief on disk,
+  // stamped with the prompt the sweep runs.
+  const jobs = [];
+  for (const hero of heroes) {
+    const pipeRef = g.pipeRefOf(hero);
+    const descriptor = await heroDescriptor(hero, g);
+    for (const variant of variantsOf(hero, g)) {
+      const key = g.briefKey(hero, variant);
+      const committed = committedBrief(key);
+      if (!committed || committed.hash !== hash) {
+        die(
+          `${key}: ${briefRelPath(key)} is ${committed ? `stamped ${committed.hash} while the prompt hashes to ${hash}` : 'missing'}.\n` +
+            '  Run `make briefs` first: the file a fixture points at must be the brief this run is given.',
+        );
+      }
+      jobs.push({ hero, pipeRef, variant, key, committed, descriptor });
+    }
+  }
+  if (jobs.length === 0) die('no variant left to design after FRAME= and STYLE=.');
 
   // One module per case, carrying over what the pass does not regenerate.
   const byCase = new Map();
@@ -1456,69 +1591,141 @@ async function generateSpecs(only) {
     if (!byCase.has(hero.caseName)) byCase.set(hero.caseName, await loadSpecs(hero.caseName));
   }
 
-  for (const hero of heroes) {
-    const pipeRef = g.pipeRefOf(hero);
+  let spent = 0;
+  let unpriced = false;
+  const tally = (cost) => {
+    if (cost === undefined) unpriced = true;
+    else spent += cost;
+  };
+  const refused = [];
+
+  async function designVariant({ hero, pipeRef, variant, key, committed, descriptor }) {
     const seed = seedSetting === '1' ? randomSeed() : seedSetting || undefined;
-    const provenance = { producer: 'pipelex-method', model, seed };
+    const frame = variant.frame === 'page' ? undefined : variant.frame;
+    const provenance = {
+      producer: 'pipelex-method',
+      model,
+      seed,
+      ...(frame ? { frame, style: variant.style } : {}),
+    };
     const id = g.fixtureId(provenance);
-    process.stdout.write(
-      `  ${pipeRef}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`,
-    );
-    const brief = await heroBrief(hero, g);
-    const committed = committedBrief(pipeRef);
-    if (!committed || committed.hash !== hash) {
-      die(
-        `${pipeRef}: ${briefRelPath(pipeRef)} is ${committed ? `stamped ${committed.hash} while the prompt hashes to ${hash}` : 'missing'}.\n` +
-          '  Run `make briefs` first: the file a fixture points at must be the brief this run is given.',
-      );
-    }
+    const catalog = g.designerCatalog({ frame: variant.frame });
+    const brief = await heroBrief(hero, g, variant);
+    const check = { frame: variant.frame, descriptor };
+    process.stdout.write(`  ${key}: designing with ${model}${seed ? ` (seed ${seed})` : ''}…\n`);
     const {
-      jsonl,
+      jsonl: designed,
       brief: briefText,
       plan,
       results,
-    } = await designPage(pipeRef, () =>
+    } = await designPage(key, () =>
       designLayout(
-        { catalog, brief, ...(seed ? { seed: seedLine(seed) } : {}) },
+        { catalog, brief, ...(seed ? { seed: g.seedLine(seed) } : {}) },
         { ...overrides, onPoll: heartbeat },
       ),
     );
-    const runId = results.pipeline_run_id;
-    const cost = runCost(results);
+    const runs = [results.pipeline_run_id];
+    let cost = runCost(results);
+    tally(cost);
     if (briefText.trimEnd() !== committed.text) {
-      const seenPath = path.join(BRIEFS_DIR, `${pipeRef}.${id}.as-run.md`);
+      const seenPath = path.join(BRIEFS_DIR, `${key}.${id}.as-run.md`);
       writeFileSync(seenPath, briefText);
-      die(
-        `${pipeRef} (${id}): the brief the run laid out is not the one on disk (run ${runId}).\n` +
-          `  The run's text is at ${path.relative(REPO, seenPath)}; the record is ${briefRelPath(pipeRef)}.\n` +
+      throw new Error(
+        `${key} (${id}): the brief the run laid out is not the one on disk (run ${runs[0]}).\n` +
+          `  The run's text is at ${path.relative(REPO, seenPath)}; the record is ${briefRelPath(key)}.\n` +
           "  The method's template rendered differently on the hosted runtime than through `make briefs`;\n" +
           '  read the diff before storing anything.',
       );
     }
 
-    const spec = compileOrDie(g, pipeRef, id, jsonl);
+    let jsonl = designed;
+    let { spec, problems, checksFailed } = checkProblems(g, jsonl, check);
+    let repairs = 0;
+    // A failure of the checks themselves is no slip of the layout's, and no
+    // repair pass can fix it, so none is paid for.
+    while (problems.length > 0 && !checksFailed && repairs < g.REPAIR_ATTEMPTS) {
+      repairs += 1;
+      process.stdout.write(
+        `  ${key} (${id}): ${problems.length} problem${problems.length === 1 ? '' : 's'}, repair ${repairs}…\n` +
+          problems.map((line) => `      - ${line}\n`).join(''),
+      );
+      keepRejected(key, id, jsonl, `before-repair-${repairs}`);
+      const repaired = await designPage(key, () =>
+        repairLayout(
+          { catalog, brief, page: jsonl, problems: problems.join('\n') },
+          { ...overrides, onPoll: heartbeat },
+        ),
+      );
+      runs.push(repaired.results.pipeline_run_id);
+      const repairCost = runCost(repaired.results);
+      tally(repairCost);
+      cost = cost === undefined || repairCost === undefined ? undefined : cost + repairCost;
+      jsonl = repaired.jsonl;
+      ({ spec, problems, checksFailed } = checkProblems(g, jsonl, check));
+    }
+    const price = cost === undefined ? '' : ` - $${cost.toFixed(4)}`;
+    if (problems.length > 0) {
+      const rejected = keepRejected(key, id, jsonl);
+      refused.push(`${key} (${id}): still refused after ${repairs} repairs, kept at ${rejected}`);
+      process.stdout.write(
+        `  ${key} (${id}): REFUSED after ${repairs} repairs${price} - runs ${runs.join(', ')}\n` +
+          problems.map((line) => `      - ${line}\n`).join(''),
+      );
+      return;
+    }
     byCase.set(
       hero.caseName,
       storeFixture(g, byCase.get(hero.caseName), {
         pipeRef,
         ...provenance,
+        ...(repairs > 0 ? { repairs } : {}),
         promptHash: hash,
         date: today,
-        brief: briefRelPath(pipeRef),
+        brief: briefRelPath(key),
         jsonl,
         spec,
         plan,
       }),
     );
     process.stdout.write(
-      `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid` +
-        `${cost === undefined ? '' : ` - $${cost.toFixed(4)}`} - run ${runId}\n`,
+      `  ${key} (${id}): ${Object.keys(spec.elements).length} elements, valid` +
+        `${repairs ? ` after ${repairs} repair${repairs === 1 ? '' : 's'}` : ''}${price} - runs ${runs.join(', ')}\n`,
     );
-    // Written after every hero and not after the sweep, as the payload pass
-    // writes its case after every run: the sweep is sequential and fatal on
-    // the first failure, and the heroes a `die` on the tenth would otherwise
-    // throw away were paid for.
+    // Written after every variant and not after the sweep, as the payload pass
+    // writes its case after every run: a `die` on the tenth would otherwise
+    // throw away the variants before it, which were paid for.
     writeSpecsModule(hero.caseName, byCase.get(hero.caseName));
+  }
+
+  // A variant that fails throws rather than exiting, so the variants still
+  // running finish and are stored: they were paid for. The failures are
+  // named together once the pool is done, and the pass still fails.
+  const queue = [...jobs];
+  const failed = [];
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+      while (queue.length > 0) {
+        try {
+          await designVariant(queue.shift());
+        } catch (error) {
+          failed.push(error instanceof Error ? error.message : String(error));
+        }
+      }
+    }),
+  );
+  process.stdout.write(
+    `  ${jobs.length - refused.length - failed.length} of ${jobs.length} variant${jobs.length === 1 ? '' : 's'} designed - $${spent.toFixed(4)}` +
+      `${unpriced ? ' priced, and some runs reported no price' : ''}\n`,
+  );
+  const lost = [
+    ...refused.map((line) => `refused: ${line}`),
+    ...failed.map((line) => `failed: ${line}`),
+  ];
+  if (lost.length > 0) {
+    die(
+      `${lost.length} variant${lost.length === 1 ? ' was' : 's were'} stored nowhere:\n` +
+        lost.map((line) => `  ${line}`).join('\n'),
+    );
   }
 }
 
@@ -1540,10 +1747,10 @@ async function designPage(pipeRef, run) {
   try {
     designed = await run();
   } catch (error) {
-    die(`${pipeRef}: ${describeRunError(error)}`);
+    throw new Error(`${pipeRef}: ${describeRunError(error)}`);
   }
   if (designed.jsonl.trim() === '') {
-    die(
+    throw new Error(
       `${pipeRef}: the run came back with an EMPTY text (run ${designed.results.pipeline_run_id}). On\n` +
         `  this runtime that is what a completion truncated at the model's output cap looks\n` +
         `  like; raise max_tokens in the designer's model pin, or read the run's token counts\n` +
@@ -1577,7 +1784,8 @@ function runCost(results) {
  * discipline as the method's.
  *
  *   --capture <file.jsonl> --pipe <pipeRef> --producer <producer> --model <id>
- *             [--seed <string>] [--critic <model>:<rounds>] [--check]
+ *             [--frame composer|result --style <style>] [--seed <string>]
+ *             [--critic <model>:<rounds>] [--check]
  *
  * `--check` validates and reports without storing anything - for a producer
  * whose text is in hand while another pass still holds the case module.
@@ -1607,8 +1815,17 @@ async function captureSpec(args) {
   }
   if (!PRODUCERS.has(producer))
     die(`unknown producer '${producer}'. One of: ${[...PRODUCERS].join(', ')}.`);
-  const hero = g.HEROES.find((candidate) => g.pipeRefOf(candidate) === pipeRef);
-  if (!hero) die(`${pipeRef} is not a hero.`);
+  const frame = option('--frame') ?? 'page';
+  const style = option('--style');
+  const hero = g.HEROES.find(
+    (candidate) => g.pipeRefOf(candidate) === pipeRef && g.framesOf(candidate).includes(frame),
+  );
+  if (!hero) die(`${pipeRef} is not a hero designed in the ${frame} frame.`);
+  if (frame !== 'page' && !g.isAppStyle(style)) {
+    die(`--frame ${frame} needs --style, one of: ${g.APP_STYLE_IDS.join(', ')}.`);
+  }
+  const variant = frame === 'page' ? { frame } : { frame, style };
+  const key = g.briefKey(hero, variant);
   let critic;
   if (criticText) {
     const match = /^(.+):(\d+)$/.exec(criticText);
@@ -1623,9 +1840,18 @@ async function captureSpec(args) {
     .join('\n');
   if (!jsonl) die(`${file} is empty.`);
 
-  const provenance = { producer, model, ...(seed ? { seed } : {}), ...(critic ? { critic } : {}) };
+  const provenance = {
+    producer,
+    model,
+    ...(seed ? { seed } : {}),
+    ...(critic ? { critic } : {}),
+    ...(frame === 'page' ? {} : { frame, style }),
+  };
   const id = g.fixtureId(provenance);
-  const spec = compileOrDie(g, pipeRef, id, jsonl);
+  const spec = compileOrDie(g, key, id, jsonl, {
+    frame,
+    descriptor: await heroDescriptor(hero, g),
+  });
   if (args.includes('--check')) {
     process.stdout.write(
       `  ${pipeRef} (${id}): ${Object.keys(spec.elements).length} elements, valid (not stored)\n`,
@@ -1637,7 +1863,7 @@ async function captureSpec(args) {
     ...provenance,
     promptHash: hash,
     date: new Date().toISOString().slice(0, 10),
-    brief: briefRelPath(pipeRef),
+    brief: briefRelPath(key),
     jsonl,
     spec,
   });
@@ -1673,9 +1899,16 @@ async function reemitModules() {
     return;
   }
   for (const caseName of specsModules) {
+    // A framed capture's brief is keyed by its frame and style as well, as
+    // `briefKey` names it when the sweep stores one; a page capture's by its
+    // pipe alone.
     const specs = (await loadSpecs(caseName)).map((fixture) => ({
       ...fixture,
-      brief: briefRelPath(fixture.pipeRef),
+      brief: briefRelPath(
+        fixture.frame && fixture.frame !== 'page'
+          ? `${fixture.pipeRef}.${fixture.frame}.${fixture.style}`
+          : fixture.pipeRef,
+      ),
     }));
     writeSpecsModule(caseName, specs);
   }

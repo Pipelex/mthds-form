@@ -1,8 +1,11 @@
 import type { Spec } from '@json-render/core';
 import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
-import { catalog as defaultCatalog } from './catalog';
+import { frameCatalog } from './catalog';
+import { isExpression } from './expressions';
 import { INPUTS_ROOT, RESULT_ROOT } from './paths';
+import { checksFailedLine, malformedLine, specMalformation } from './spec-shape';
+import { unwrapped } from './zod-definition';
 import { hasOwnProp } from '../core/own-property';
 
 /**
@@ -77,27 +80,33 @@ export interface SpecVerdict {
   problems: SpecProblem[];
 }
 
-const EXPRESSION_KEYS = [
-  '$state',
-  '$item',
-  '$index',
-  '$bindState',
-  '$bindItem',
-  '$cond',
-  '$computed',
-  '$template',
-];
+/**
+ * The components whose `path` the layer resolves as written - the two escape
+ * hatches, and the `Picture`, which shows a file the kind check will not read
+ * into a prop - so it is never an expression. The fit check resolves each
+ * through the repeat above it; an expression there resolved at render time to
+ * whatever it held, past this check.
+ */
+const LITERAL_PATHS = new Set(['MthdsField', 'MthdsResult', 'Picture']);
 
-/** The two escape hatches: their `path` is resolved by the layer, so it is never an expression. */
-const HATCHES = new Set(['MthdsField', 'MthdsResult']);
+/** The action a generative page hands to the host's `onRun`: the one that starts a billed run. */
+const RUN_ACTION = 'run';
 
-function isExpression(value: unknown): boolean {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.keys(value).some((key) => EXPRESSION_KEYS.includes(key))
-  );
+/**
+ * The events a run may start from: a press of a button, and Enter in a field,
+ * which is how a plain form submits. Every other event a control emits fires
+ * as the person edits or moves through the page.
+ */
+const DELIBERATE_EVENTS: readonly string[] = ['press', 'submit'];
+
+/** The value a zod issue path points at inside a prop's raw value. */
+function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {
+  let at: unknown = value;
+  for (const step of path) {
+    if (typeof at !== 'object' || at === null) return undefined;
+    at = (at as Record<PropertyKey, unknown>)[step];
+  }
+  return at;
 }
 
 /**
@@ -113,22 +122,43 @@ function isExpression(value: unknown): boolean {
  * the names, no expression can make it one.
  */
 function isClosedVocabulary(schema: z.ZodType): boolean {
-  let current: unknown = schema;
-  for (let depth = 0; depth < 8; depth += 1) {
-    const def = (current as { def?: { type?: string; innerType?: unknown } }).def;
-    if (!def) return false;
-    if (def.type === 'enum' || def.type === 'literal') return true;
-    if (def.innerType === undefined) return false;
-    current = def.innerType;
+  const type = unwrapped(schema)?.type;
+  return type === 'enum' || type === 'literal';
+}
+
+/**
+ * Where inside a prop's value an expression stands for one of a fixed set of
+ * names, as the issue path of the member it stands for: a `DataTable`
+ * column's `format` written as `{ "$state": ... }` is refused as a top-level
+ * closed prop is, rather than passed because it sits one level down. The
+ * value is walked beside its schema, through lists and structures; the whole
+ * prop is the caller's to judge.
+ */
+function closedExpressionPaths(
+  schema: z.ZodType | undefined,
+  value: unknown,
+  path: readonly PropertyKey[] = [],
+): PropertyKey[][] {
+  if (schema === undefined || typeof value !== 'object' || value === null) return [];
+  if (path.length > 0 && isExpression(value)) return isClosedVocabulary(schema) ? [[...path]] : [];
+  const def = unwrapped(schema);
+  if (Array.isArray(value)) {
+    return def?.type === 'array'
+      ? value.flatMap((entry, index) => closedExpressionPaths(def.element, entry, [...path, index]))
+      : [];
   }
-  return false;
+  if (def?.type !== 'object' || !def.shape) return [];
+  const shape = def.shape;
+  return Object.entries(value as Record<string, unknown>).flatMap(([name, member]) =>
+    hasOwnProp(shape, name) ? closedExpressionPaths(shape[name], member, [...path, name]) : [],
+  );
 }
 
 /** The catalog's definition of one component, or nothing for a type it does not have. */
 function definitionOf(
   catalog: ValidationCatalog,
   type: string,
-): { props?: unknown; events?: unknown } | undefined {
+): { props?: unknown; events?: unknown; slots?: unknown } | undefined {
   const components = (catalog.data as { components: Record<string, { props?: unknown }> })
     .components;
   // `hasOwnProp`, because the type is model-written and a prototype key would
@@ -237,14 +267,33 @@ function deepestChain(spec: Spec): number {
  */
 export function validateAgainstCatalog(
   spec: Spec,
-  catalog: ValidationCatalog = defaultCatalog,
+  // A whole page's vocabulary unless the caller names a frame's: the exported
+  // `catalog` also defines the frames' own components, which a whole page
+  // must not hold.
+  catalog: ValidationCatalog = frameCatalog('page'),
 ): SpecVerdict {
+  const malformed = specMalformation(spec);
+  if (malformed !== undefined) {
+    return { ok: false, problems: [{ message: malformedLine(malformed) }] };
+  }
+  return catalogCheck(spec, catalog).verdict;
+}
+
+/**
+ * The catalog's verdict on a spec already known to have the shape the checks
+ * walk, and whether the checks themselves failed on it - said beside the
+ * verdict, so no reader has to recognise the failure by its words.
+ */
+export function catalogCheck(
+  spec: Spec,
+  catalog: ValidationCatalog,
+): { verdict: SpecVerdict; checksFailed: boolean } {
   try {
-    return checkAgainstCatalog(spec, catalog);
+    return { verdict: checkAgainstCatalog(spec, catalog), checksFailed: false };
   } catch (error) {
     return {
-      ok: false,
-      problems: [{ message: `the layout is not a well-formed spec: ${String(error)}` }],
+      verdict: { ok: false, problems: [{ message: checksFailedLine(error) }] },
+      checksFailed: true,
     };
   }
 }
@@ -320,6 +369,31 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
     }
   }
 
+  // 2b. Every named slot is one its component declares. An element's
+  //     children in a slot its renderer does not have render nothing at all,
+  //     and json-render says so only in a development warning, which it
+  //     looks up by the registry object `defineRegistry` returned - and the
+  //     page renders through a registry of its own, every renderer wrapped in
+  //     a reporting boundary, so that warning never fires. `default` is
+  //     never a slot's name: a component's default content is its `children`.
+  for (const [key, element] of Object.entries(spec.elements)) {
+    const slots = element.slots;
+    if (typeof slots !== 'object' || slots === null) continue;
+    const definition = definitionOf(catalog, element.type);
+    if (!definition) continue;
+    const declared = Array.isArray(definition.slots) ? definition.slots : [];
+    for (const name of Object.keys(slots)) {
+      if (name !== 'default' && declared.includes(name)) continue;
+      problems.push({
+        elementKey: key,
+        message:
+          name === 'default'
+            ? `"${key}" puts children in a slot named "default"; a component's own content goes in "children".`
+            : `"${key}" puts children in slot "${name}", which ${element.type} does not have; its content goes in "children".`,
+      });
+    }
+  }
+
   // 3. Every prop exists on its component, and every literal parses.
   for (const [key, element] of Object.entries(spec.elements)) {
     const schema = propsSchemaOf(catalog, element.type);
@@ -336,7 +410,7 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         continue;
       }
       if (isExpression(value)) {
-        if (HATCHES.has(element.type) && name === 'path') {
+        if (LITERAL_PATHS.has(element.type) && name === 'path') {
           problems.push({
             elementKey: key,
             message: `${element.type}.path must be a literal string - absolute, or the item's field name inside a repeat - never an expression.`,
@@ -349,11 +423,27 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         }
         continue;
       }
-      const parsed = propSchema.safeParse(value);
-      if (!parsed.success) {
+      for (const at of closedExpressionPaths(propSchema, value)) {
         problems.push({
           elementKey: key,
-          message: `${element.type}.${name}: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+          message: `${element.type}.${name}.${at.map(String).join('.')} is one of a fixed set of names, so it must be written as a literal, never as an expression.`,
+        });
+      }
+      const parsed = propSchema.safeParse(value);
+      // json-render resolves an expression wherever it sits in a prop, inside
+      // an array or an object included, so an issue raised at a nested
+      // expression, or under one (an expression standing for an object draws
+      // issues at the object's members), is the literal check misreading it.
+      const issues = parsed.success
+        ? []
+        : parsed.error.issues.filter(
+            (issue) =>
+              !issue.path.some((_, n) => isExpression(valueAt(value, issue.path.slice(0, n + 1)))),
+          );
+      if (issues.length > 0) {
+        problems.push({
+          elementKey: key,
+          message: `${element.type}.${name}: ${issues.map((issue) => issue.message).join('; ')}`,
         });
       }
     }
@@ -558,6 +648,28 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   //    run through the same executor. Every one of those is a door into
   //    `/inputs` that the walk over `on` never saw, so a binding is checked
   //    wherever it sits, and a chain is followed as far as it goes.
+  //
+  //    And a run is billed, so it starts from a deliberate gesture and from
+  //    nothing else (`DELIBERATE_EVENTS`). Bound under `change`, `focus` or
+  //    `blur` it started a run at every edit, and under a `watch` at every
+  //    change of the state, with no gesture at all. A run in a chain is never
+  //    deliberate either: json-render applies a chain after a handler alone, so
+  //    one after `validateForm` or a state action never fires, and one after a
+  //    run starts a second billed run as the first settles.
+  /** Where a binding sits, which decides whether a run may start from it. */
+  type Trigger = { kind: 'event'; event: string } | { kind: 'watch' } | { kind: 'chain' };
+  const deliberately = `a run is billed, so it starts only from a deliberate gesture: bind it under ${DELIBERATE_EVENTS.map((event) => `"${event}"`).join(' or ')}.`;
+  const misplacedRun = (trigger: Trigger): string | undefined => {
+    if (trigger.kind === 'event') {
+      return DELIBERATE_EVENTS.includes(trigger.event)
+        ? undefined
+        : `runs the method on "${trigger.event}", which fires as the person edits or moves through the page; ${deliberately}`;
+    }
+    if (trigger.kind === 'watch') {
+      return `runs the method when the state changes, with no gesture at all; ${deliberately}`;
+    }
+    return `chains a run after another action, which either never fires or starts a second billed run as the first settles; bind run directly under ${DELIBERATE_EVENTS.map((event) => `"${event}"`).join(' or ')}.`;
+  };
   const declared = [
     ...(catalog.actionNames ?? []),
     ...(catalog.schema?.builtInActions ?? []).map((action) => action.name),
@@ -587,10 +699,11 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
   /**
    * One binding, wherever it sits - under `on.<event>`, under `watch.<path>`,
    * or as the `onSuccess` or `onError` of another - held to the name check,
-   * the write ban, and then to its own callbacks. `site` is the spelling a
-   * problem names the binding by.
+   * the write ban, where a run may start, and then to its own callbacks.
+   * `site` is the spelling a problem names the binding by, and `trigger` what
+   * fires it.
    */
-  const checkBinding = (key: string, site: string, entry: unknown): void => {
+  const checkBinding = (key: string, site: string, entry: unknown, trigger: Trigger): void => {
     const action = (entry as { action?: unknown } | null)?.action;
     if (typeof action !== 'string') {
       problems.push({ elementKey: key, message: `${site} has an entry with no "action" name.` });
@@ -602,6 +715,10 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         message: `${site} names the unknown action "${action}" (known: ${[...knownActions].join(', ')}); nothing would handle it.`,
       });
       return;
+    }
+    if (action === RUN_ACTION) {
+      const misplaced = misplacedRun(trigger);
+      if (misplaced) problems.push({ elementKey: key, message: `${site} ${misplaced}` });
     }
     // `hasOwnProp`: the action is model-written, and `constructor` would
     // find a function where a list of destinations belongs.
@@ -673,7 +790,7 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
           }
         }
       }
-      if (record.action !== undefined) checkBinding(key, hookSite, record);
+      if (record.action !== undefined) checkBinding(key, hookSite, record, { kind: 'chain' });
     }
   };
 
@@ -697,7 +814,9 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
                   : `on.${event}: ${element.type} emits no events, so nothing bound there would ever fire.`,
             });
           }
-          for (const entry of bindingsOf(binding)) checkBinding(key, `on.${event}`, entry);
+          for (const entry of bindingsOf(binding)) {
+            checkBinding(key, `on.${event}`, entry, { kind: 'event', event });
+          }
         }
       }
     }
@@ -714,7 +833,9 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         });
       } else {
         for (const [path, binding] of Object.entries(watch as Record<string, unknown>)) {
-          for (const entry of bindingsOf(binding)) checkBinding(key, `watch.${path}`, entry);
+          for (const entry of bindingsOf(binding)) {
+            checkBinding(key, `watch.${path}`, entry, { kind: 'watch' });
+          }
         }
       }
     }

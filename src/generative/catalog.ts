@@ -7,7 +7,14 @@ import {
   generativeComponents,
 } from './components';
 import { generativeSchema } from './schema';
-import type { ComponentRendering } from './validate';
+import {
+  COMPOSER_COMPONENTS,
+  FRAME_COMPONENTS,
+  RESULT_COMPONENTS,
+  frameComponents,
+  type Frame,
+} from './frame-definitions';
+import type { ComponentRendering, ValidationCatalog } from './validate';
 
 /**
  * The catalog: everything the base vocabulary has, plus the chrome of a
@@ -142,11 +149,14 @@ export const COMPONENT_RENDERINGS: Readonly<Record<string, ComponentRendering>> 
   Workspace: { children: { count: 2, roles: 'work, rail' } },
   Tabs: { panels: { prop: 'tabs', noun: 'tab' } },
   Steps: { panels: { prop: 'steps', noun: 'step' } },
+  Composer: { heading: { level: 1 }, once: 'the composer' },
+  ResultHeader: { heading: { level: 1 }, once: "the result's header" },
+  FieldGroup: { heading: { level: 2, when: 'title' } },
 };
 
 export const catalog = Object.assign(
   defineCatalog(generativeSchema, {
-    components: { ...generativeComponents, ...product },
+    components: { ...generativeComponents, ...product, ...frameComponents },
     actions: generativeActions,
   }),
   { renders: COMPONENT_RENDERINGS },
@@ -166,3 +176,111 @@ export const COMPONENT_NAMES: readonly string[] = [
   ...CUSTOM_COMPONENTS,
   ...PRODUCT_COMPONENTS,
 ];
+
+/**
+ * The vocabulary of each frame, in the order the designer method lists it.
+ * `page` is the product page: the base vocabulary and the product chrome, with
+ * none of the frames' own components, so a component added to either joins it.
+ * `composer` and `result` are the two moments of a host's compose-then-result
+ * app, and each is an allow-list, so a component added to the catalog joins
+ * neither until it is named here: their host draws the band, the action row's
+ * mechanics, the request bar and the result's actions, so they leave out the
+ * product chrome and the side panel (`AppBar`, `Footer`, `Workspace`,
+ * `Rail`), the stand-alone run controls (`Cta`, `Button`) and the hero the
+ * composer already carries, and each leaves out the other moment's
+ * components: a composer reads no result, a result page enters no input. A
+ * composer may still list short texts (`TextList`), such as what a run gives
+ * back.
+ */
+const FRAME_VOCABULARIES: Record<Exclude<Frame, 'page'>, readonly string[]> = {
+  composer: Object.freeze([
+    'Card',
+    'Stack',
+    'Grid',
+    'Separator',
+    'Heading',
+    'Text',
+    'Badge',
+    'Alert',
+    'Collapsible',
+    'Avatar',
+    'Input',
+    'Textarea',
+    'Select',
+    'Radio',
+    'Checkbox',
+    'Switch',
+    'Split',
+    'Tabs',
+    'Steps',
+    'Icon',
+    'Segmented',
+    'NumberInput',
+    'MthdsField',
+    'Section',
+    ...COMPOSER_COMPONENTS,
+    'TextList',
+  ]),
+  result: Object.freeze([
+    'Card',
+    'Stack',
+    'Grid',
+    'Separator',
+    'Heading',
+    'Text',
+    'Badge',
+    'Alert',
+    'Collapsible',
+    'Progress',
+    'Avatar',
+    'Split',
+    'Tabs',
+    'Icon',
+    'MthdsResult',
+    'DataTable',
+    'Metric',
+    'Section',
+    'SummaryRow',
+    ...RESULT_COMPONENTS,
+  ]),
+};
+
+/** A whole page's vocabulary: every component but the frames' own. */
+const PAGE_VOCABULARY: readonly string[] = Object.freeze(
+  COMPONENT_NAMES.filter((name) => !(FRAME_COMPONENTS as readonly string[]).includes(name)),
+);
+
+/**
+ * The component names a layout written for `frame` may use, in the order the
+ * designer method lists them. Frozen, like the catalog `frameCatalog` builds
+ * over them: both are shared by every check, so a caller that edited one
+ * would change what every later check accepts.
+ */
+export function componentNamesFor(frame: Frame): readonly string[] {
+  return frame === 'page' ? PAGE_VOCABULARY : FRAME_VOCABULARIES[frame];
+}
+
+const frameCatalogs = new Map<Frame, ValidationCatalog>();
+
+/**
+ * The catalog a layout written for `frame` is validated against: the same
+ * definitions and renderings as `catalog`, held to the frame's vocabulary.
+ * Built once per frame and shared, so it is frozen with its vocabulary. A
+ * composer that names an `AppBar` is refused here as an unknown component,
+ * though the entry's registry could render one, because the host's frame
+ * already draws what it stands for.
+ */
+export function frameCatalog(frame: Frame): ValidationCatalog {
+  // Built once per frame: every check of a layout asks for one.
+  const built = frameCatalogs.get(frame);
+  if (built) return built;
+  const made: ValidationCatalog = Object.freeze({
+    componentNames: componentNamesFor(frame),
+    actionNames: catalog.actionNames,
+    data: catalog.data,
+    schema: catalog.schema,
+    renders: COMPONENT_RENDERINGS,
+  });
+  frameCatalogs.set(frame, made);
+  return made;
+}

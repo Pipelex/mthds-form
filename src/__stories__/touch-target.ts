@@ -44,12 +44,35 @@ export async function atWidth(viewport: Viewport): Promise<void> {
 }
 
 /**
+ * The label a native input sits inside, when it sits inside its own: a tap
+ * anywhere on that label activates the input, so its box is the input's
+ * target. A label that names the input from elsewhere (`for`) is not counted,
+ * since the space between the two takes no tap.
+ */
+function wrappingLabel(control: Element): HTMLLabelElement | null {
+  if (!(control instanceof HTMLInputElement)) return null;
+  const label = control.closest('label');
+  return label && [...(control.labels ?? [])].includes(label) ? label : null;
+}
+
+/**
  * The area a finger gets of `control`, in viewport coordinates: its border
  * box, joined with the invisible `::after` it carries when it carries one (an
- * absolutely positioned pseudo-element, placed against its padding box).
+ * absolutely positioned pseudo-element, placed against its padding box), or
+ * the box of the label it sits inside, for a native radio or check box whose
+ * row is its target.
  */
 export function hitArea(control: Element): DOMRect {
   const box = control.getBoundingClientRect();
+  const label = wrappingLabel(control);
+  if (label) {
+    const row = label.getBoundingClientRect();
+    const x = Math.min(box.left, row.left);
+    const y = Math.min(box.top, row.top);
+    const right = Math.max(box.right, row.right);
+    const bottom = Math.max(box.bottom, row.bottom);
+    return new DOMRect(x, y, right - x, bottom - y);
+  }
   const after = getComputedStyle(control, '::after');
   if (after.content === 'none' || after.display === 'none' || after.position !== 'absolute') {
     return box;
@@ -64,10 +87,15 @@ export function hitArea(control: Element): DOMRect {
   return new DOMRect(x, y, right - x, bottom - y);
 }
 
-/** Whether a tap at `x`, `y` lands on `control`, with nothing covering it. */
+/**
+ * Whether a tap at `x`, `y` lands on `control`, with nothing covering it: on
+ * the control itself, or on the label it sits inside, which hands the tap on.
+ */
 export function tapLandsOn(control: Element, x: number, y: number): boolean {
   const hit = document.elementFromPoint(x, y);
-  return hit !== null && (hit === control || control.contains(hit));
+  if (hit === null) return false;
+  const target = wrappingLabel(control) ?? control;
+  return hit === control || target.contains(hit);
 }
 
 /** What a failure calls `control`: its label, or failing that its text or its tag. */
@@ -129,4 +157,29 @@ export async function expectClearOf(control: Element, neighbour: Element): Promi
   const y = Math.min(Math.max(cy, other.top + inset), other.bottom - inset);
   await expect(tapLandsOn(neighbour, x, y), 'a tap on the neighbour reaches it').toBe(true);
   await expect(tapLandsOn(control, x, y), 'a tap on the neighbour reaches the control').toBe(false);
+}
+
+/**
+ * Every control a finger may tap: a button (an option of a choice and a tab
+ * among them), an input other than a hidden one or a dropzone's file input
+ * (which the zone around it stands for), a text area and a select.
+ */
+const TAPPABLE =
+  'button, input:not([type="hidden"]):not([type="file"]):not([aria-hidden="true"]), textarea, select';
+
+/**
+ * Hold every control under `root` that is drawn to a 44 by 44 hit area
+ * (`expectTouchTarget`), and show there is at least one: a page whose controls
+ * all failed to render would otherwise pass. A control inside a closed
+ * `<details>` keeps a box - the browser skips drawing its content rather than
+ * dropping its layout - so it is asked whether it is visible too, which is
+ * the question a finger asks.
+ */
+export async function expectEveryTouchTarget(root: Element): Promise<void> {
+  const controls = [...root.querySelectorAll(TAPPABLE)].filter((control) => {
+    const box = control.getBoundingClientRect();
+    return box.width > 0 && box.height > 0 && control.checkVisibility();
+  });
+  await expect(controls.length, 'controls drawn').toBeGreaterThan(0);
+  for (const control of controls) await expectTouchTarget(control);
 }

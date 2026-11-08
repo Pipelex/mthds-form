@@ -32,6 +32,9 @@ const hex = (value: string): SrgbColor => ({
 
 const contrast = (a: string, b: string) => contrastRatio(hex(a), hex(b));
 
+/** What `deriveBrandRoles` throws when no shade of the accent reads on every surface. */
+const REFUSAL = /No accent ink can read on every surface at once/;
+
 /** A deterministic `#rrggbb` from hue (degrees), saturation and lightness (0..1). */
 function hsl(hue: number, saturation: number, lightness: number): string {
   const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
@@ -293,6 +296,229 @@ describe('deriveBrandRoles leaves what the team did not set to the host', () => 
     expect(() => deriveBrandRoles({ accent: '#fff' }, '#ffffff')).toThrow(/accent seed/);
     expect(() => deriveBrandRoles({ header: '' }, '#ffffff')).toThrow(/header seed/);
     expect(() => deriveBrandRoles({}, 'white')).toThrow(/page colour/);
+    expect(() => deriveBrandRoles({}, '#ffffff', ['#eee'])).toThrow(/Surface 1/);
+  });
+
+  it('refuses a surface no accent ink can read on, only when there is an accent', () => {
+    // An ink dark enough for the white page reaches at most 3.94:1 on
+    // #6b6b6b, and one light enough for #6b6b6b fails the page: no shade of
+    // the accent reads on both.
+    expect(() => deriveBrandRoles({ accent: '#2563eb' }, '#ffffff', ['#6b6b6b'])).toThrow(
+      /No accent ink can read on every surface at once: .*#ffffff.* and #6b6b6b/,
+    );
+    // With no accent no ink is derived, so the same surface costs the team
+    // nothing: its header is painted as it is without it.
+    expect(deriveBrandRoles({ header: '#14213d' }, '#ffffff', ['#6b6b6b'])).toStrictEqual(
+      deriveBrandRoles({ header: '#14213d' }, '#ffffff'),
+    );
+    expect(Object.keys(deriveBrandRoles(null, '#ffffff', ['#6b6b6b']))).toEqual([]);
+  });
+});
+
+describe('a surface on the far side of the page', () => {
+  /** Every grey a hex can carry, `#000000` to `#ffffff`. */
+  const GREYS = Array.from(
+    { length: 256 },
+    (_, value) => `#${value.toString(16).padStart(2, '0').repeat(3)}`,
+  );
+
+  it('finds an ink between the extremes before it refuses the surface', () => {
+    // A white page, the near-white pale fill of a pale accent and a black
+    // panel: black, the page's extreme, cannot read on the panel, yet one
+    // grey reads on all three, and it is the ink. The derivation used to
+    // refuse the panel before it measured anything.
+    const roles = deriveBrandRoles({ accent: '#f0f0f0' }, '#ffffff', ['#000000']);
+    expect(roles.accentInk).toBe('#757575');
+    for (const background of ['#ffffff', roles.accentFill!, '#000000']) {
+      expect(contrast(roles.accentInk!, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('moves the ink away from the extreme of a mid-tone page when the far side leaves no shade', () => {
+    // A mid grey counts as light, since black reads better on it, and alone
+    // it darkens the blue to its darkest. Beside a black panel no shade on
+    // that side reads on the panel, so the ink turns the other way, to the
+    // blue's lightest, as the module header says it may.
+    const page = '#767676';
+    expect(contrast('#000000', page)).toBeGreaterThan(contrast('#ffffff', page));
+    expect(deriveBrandRoles({ accent: '#1e40af' }, page).accentInk).toBe('#000001');
+    const roles = deriveBrandRoles({ accent: '#1e40af' }, page, ['#000000']);
+    expect(roles.accentInk).toBe('#fefeff');
+    for (const background of [page, roles.accentFill!, '#000000']) {
+      expect(contrast(roles.accentInk!, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('refuses one only when no shade of the accent reads on every background at once', () => {
+    // A grey accent's shades are the greys, so every one of them is tried
+    // here and the derivation's answer is held to the whole set: an ink that
+    // reads on the page, the pale fill and the surface, or a refusal exactly
+    // when no grey does.
+    for (const page of ['#ffffff', '#f6f7f9', '#0d0d0d', '#12151c']) {
+      for (const surface of ['#000000', '#1a1a1a', '#6b6b6b', '#f2f2f2', '#ffffff']) {
+        for (const accent of GREYS.filter((_, index) => index % 15 === 0)) {
+          // The pale fill depends on the accent and the page alone.
+          const fill = deriveBrandRoles({ accent }, page).accentFill!;
+          const backgrounds = [page, fill, surface];
+          const readable = GREYS.filter((grey) =>
+            backgrounds.every((background) => contrast(grey, background) >= 4.5),
+          );
+          let ink: string | undefined;
+          try {
+            ink = deriveBrandRoles({ accent }, page, [surface]).accentInk;
+          } catch (error) {
+            // The refusal, and nothing else, stands for no ink.
+            expect(String(error)).toMatch(REFUSAL);
+            ink = undefined;
+          }
+          const where = `${accent} on ${page} beside ${surface}`;
+          if (ink === undefined) expect(readable, where).toEqual([]);
+          else expect(readable, where).toContain(ink);
+        }
+      }
+    }
+  });
+
+  it('finds a shade that reads although it spans less lightness than a byte', () => {
+    // On a chromatic accent two channels can turn over to their next byte
+    // within a sliver of lightness, so the one shade that reads everywhere is
+    // narrower than any fixed step a walk could take: these each have a
+    // shade that reads at 4.5:1 on all three backgrounds, which a walk in
+    // steps of 1/1024 stepped over and refused.
+    const cases: [accent: string, page: string, surface: string, ink: string][] = [
+      ['#f3f4ee', '#ffffff', '#040404', '#727a4f'],
+      ['#100e11', '#000000', '#fdfdfd', '#7f7087'],
+    ];
+    for (const [accent, page, surface, ink] of cases) {
+      const roles = deriveBrandRoles({ accent }, page, [surface]);
+      expect(roles.accentInk, accent).toBe(ink);
+      for (const background of [page, roles.accentFill!, surface]) {
+        expect(contrast(ink, background)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('refuses a chromatic accent only when no shade of it reads', () => {
+    // The accents a far-side surface leaves the most room for: a white page
+    // beside a black panel and the reverse, swept over hues and
+    // lightnesses with a fixed seed. A shade is any hex on the accent's line
+    // of hue and saturation, sampled here independently, at a step far finer
+    // than all but the narrowest shades; wherever the derivation refuses, the
+    // sampling must find no shade that reads on every background.
+    let seed = 0x5eed;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+    const bytes = (channels: readonly number[]) =>
+      channels.map((channel) => Math.round(Math.min(1, Math.max(0, channel)) * 255));
+    const toHex = (channels: readonly number[]) =>
+      `#${bytes(channels)
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('')}`;
+    // Relative luminance by byte, so the sampling is cheap; a shade it finds
+    // is confirmed with the contrast the derivation itself measures.
+    const linear = Array.from({ length: 256 }, (_, byte) => {
+      const value = byte / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = ([r, g, b]: readonly number[]) =>
+      0.2126 * linear[r!]! + 0.7152 * linear[g!]! + 0.0722 * linear[b!]!;
+    const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    /** Each channel's weight on the chroma for the accent's hue, as `fromHsl` lays it out. */
+    const lineOf = (accent: string) => {
+      const [r, g, b] = [1, 3, 5].map((at) => parseInt(accent.slice(at, at + 2), 16) / 255) as [
+        number,
+        number,
+        number,
+      ];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const chroma = max - min;
+      const lightness = (max + min) / 2;
+      const saturation = chroma === 0 ? 0 : Math.min(1, chroma / (1 - Math.abs(2 * lightness - 1)));
+      const sector =
+        chroma === 0
+          ? 0
+          : max === r
+            ? ((g - b) / chroma + 6) % 6
+            : max === g
+              ? (b - r) / chroma + 2
+              : (r - g) / chroma + 4;
+      const x = 1 - Math.abs((sector % 2) - 1);
+      const weights = [
+        [1, x, 0],
+        [x, 1, 0],
+        [0, 1, x],
+        [0, x, 1],
+        [x, 0, 1],
+        [1, 0, x],
+      ][Math.min(5, Math.floor(sector))]!;
+      return { saturation, weights };
+    };
+    let refused = 0;
+    let derived = 0;
+    for (const [page, surface] of [
+      ['#ffffff', '#000000'],
+      ['#000000', '#ffffff'],
+    ] as const) {
+      for (let trial = 0; trial < 500; trial++) {
+        const accent = toHex([random(), random(), random()]);
+        const fill = deriveBrandRoles({ accent }, page).accentFill!;
+        const backgrounds = [page, fill, surface];
+        const where = `${accent} on ${page} beside ${surface}`;
+        let ink: string | undefined;
+        try {
+          ink = deriveBrandRoles({ accent }, page, [surface]).accentInk;
+        } catch (error) {
+          // The refusal, and nothing else, stands for no ink.
+          expect(String(error)).toMatch(REFUSAL);
+          ink = undefined;
+        }
+        if (ink) {
+          derived++;
+          for (const background of backgrounds) {
+            expect(contrast(ink, background), where).toBeGreaterThanOrEqual(4.5);
+          }
+          continue;
+        }
+        refused++;
+        const under = backgrounds.map((background) => luminance(bytes(hex(background).components)));
+        const { saturation, weights } = lineOf(accent);
+        const [wr, wg, wb] = weights as [number, number, number];
+        const byte = (channel: number) => Math.round(Math.min(1, Math.max(0, channel)) * 255);
+        for (let step = 0; step <= 8192; step++) {
+          // Scalar arithmetic, with nothing allocated, since it runs millions of times.
+          const value = step / 8192;
+          const c = (1 - Math.abs(2 * value - 1)) * saturation;
+          const m = value - c / 2;
+          const r = byte(c * wr + m);
+          const g = byte(c * wg + m);
+          const b = byte(c * wb + m);
+          const own = 0.2126 * linear[r]! + 0.7152 * linear[g]! + 0.0722 * linear[b]!;
+          if (!under.every((background) => ratio(own, background) >= 4.5)) continue;
+          const candidate = toHex([r / 255, g / 255, b / 255]);
+          const reads = backgrounds.every((background) => contrast(candidate, background) >= 4.5);
+          expect(
+            reads ? candidate : undefined,
+            `${where}: refused, yet this reads`,
+          ).toBeUndefined();
+        }
+      }
+    }
+    // The sweep reaches both answers.
+    expect(derived).toBeGreaterThan(0);
+    expect(refused).toBeGreaterThan(0);
+    // A sweep of a thousand derivations, each refusal sampled finely: a
+    // second here and several on a shared CI runner, past the default bound.
+  }, 30_000);
+
+  it('keeps every ink it found before, where the extreme reads on every surface', () => {
+    // The path every style's surfaces take: the extreme reads on each, so the
+    // ink is the first shade toward it that does, as it always was. Amber
+    // moves a little further to read on the host's grey panel than on the
+    // page alone.
+    expect(deriveBrandRoles({ accent: '#f59e0b' }, '#ffffff').accentInk).toBe('#9c6406');
+    expect(deriveBrandRoles({ accent: '#f59e0b' }, '#ffffff', ['#eef1f5']).accentInk).toBe(
+      '#996206',
+    );
   });
 });
 

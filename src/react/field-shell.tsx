@@ -128,6 +128,10 @@ export function OptionalMark() {
 }
 
 /** The line under a field's label that says what the field is for. */
-export function FieldDescription({ children }: { children: ReactNode }) {
-  return <p className="text-[12px] leading-relaxed text-muted-foreground">{children}</p>;
+export function FieldDescription({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <p id={id} className="text-[12px] leading-relaxed text-muted-foreground">
+      {children}
+    </p>
+  );
 }

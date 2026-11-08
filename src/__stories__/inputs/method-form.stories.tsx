@@ -5,6 +5,7 @@ import { getPipeInputForm, getPipeIOContract } from '../../core';
 import { MethodForm, useMethodForm, type FieldPresentation } from '../../react';
 import { CONTRACTS, INPUT_FORM } from '../_generated/structured';
 import { CONTRACTS as FILE_CONTRACTS, INPUT_FORM as FILE_INPUT_FORM } from '../_generated/files';
+import { backgroundOf, paintedContrast } from '../painted-color';
 
 /**
  * The whole input form of one method, `useMethodForm` + `MethodForm`, as a host
@@ -27,6 +28,8 @@ interface MethodFormStoryProps {
   foldOptional?: boolean;
   locale?: string;
   presentation?: FieldPresentation;
+  /** Draws the form in a host's panel and says so through `framed`. */
+  framed?: boolean;
 }
 
 function MethodFormStory({
@@ -38,6 +41,7 @@ function MethodFormStory({
   foldOptional,
   locale,
   presentation = 'app',
+  framed,
 }: MethodFormStoryProps) {
   const contract = getPipeIOContract(contracts, domain, pipeCode);
   const descriptor = getPipeInputForm(inputForm, domain, pipeCode);
@@ -50,14 +54,25 @@ function MethodFormStory({
     // The object URL is never revoked: a story's page is short-lived.
     uploadFile: upload ? async (file) => URL.createObjectURL(file) : undefined,
   });
+  const fields = (
+    <MethodForm
+      form={form}
+      foldOptional={foldOptional}
+      locale={locale}
+      presentation={presentation}
+      framed={framed}
+    />
+  );
   return (
     <div style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
-      <MethodForm
-        form={form}
-        foldOptional={foldOptional}
-        locale={locale}
-        presentation={presentation}
-      />
+      {framed ? (
+        // The host's own panel, as a method app draws its composer.
+        <div className="rounded-xl border border-border bg-card p-6" data-testid="host-panel">
+          {fields}
+        </div>
+      ) : (
+        fields
+      )}
       <button
         type="button"
         onClick={() => form.attempt()}
@@ -122,5 +137,137 @@ export const FilesWithFoldingOff: Story = {
     domain: 'files',
     pipeCode: 'required_vs_optional',
     foldOptional: false,
+  },
+};
+
+/**
+ * The form inside a host's own panel, which `framed` tells it about: the shop
+ * is a section under its heading rather than a card in the panel, and once
+ * the refund account is open a hairline across the form's width sets each
+ * structure off from what follows it, drawn on the section's own edge. One
+ * rule stands between two sections, and none above the form's first element
+ * or under its last, where the host's own action row would sit.
+ */
+export const FramedByTheHost: Story = {
+  args: { pipeCode: 'shop_with_bank', framed: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const more of canvas.getAllByRole('button', { name: '1 optional input' }))
+      await userEvent.click(more);
+    for (const panel of canvas.getAllByTestId('host-panel')) {
+      await expect(panel.querySelector('[data-structure-group="box"]')).toBeNull();
+      const sections = [...panel.querySelectorAll<HTMLElement>('[data-form-section]')];
+      await expect(sections).toHaveLength(2);
+      const stack = sections[0]!.parentElement!;
+      const children = [...stack.children] as HTMLElement[];
+      const edge = (child: HTMLElement, side: 'Top' | 'Bottom') =>
+        parseFloat(getComputedStyle(child)[`border${side}Width`]);
+      // Nothing over the form's first element or under its last.
+      await expect(edge(children[0]!, 'Top')).toBe(0);
+      await expect(edge(children.at(-1)!, 'Bottom')).toBe(0);
+      // Between two neighbours, one rule where either is a section, and it is
+      // the section's, spanning the form.
+      for (const [above, below] of children
+        .slice(1)
+        .map((child, index) => [children[index]!, child])) {
+        const drawn = [edge(above!, 'Bottom'), edge(below!, 'Top')].filter((width) => width > 0);
+        const sectioned = [above, below].some((child) => child!.hasAttribute('data-form-section'));
+        await expect(drawn).toEqual(sectioned ? [1] : []);
+        for (const child of [above!, below!].filter((one) =>
+          one.hasAttribute('data-form-section'),
+        )) {
+          await expect(child.getBoundingClientRect().width).toBe(
+            stack.getBoundingClientRect().width,
+          );
+        }
+      }
+      // The disclosure under the last section is untouched by the rule.
+      const disclosure = children.at(-1)!;
+      await expect(disclosure.hasAttribute('data-form-section')).toBe(false);
+      await expect(edge(disclosure, 'Top')).toBe(0);
+    }
+  },
+};
+
+/**
+ * The framed form after Run was pressed with the shop empty and the refund
+ * account started but not finished. Without the frame each structure's card
+ * would turn red; a section has no card, so each one in error draws a red
+ * edge down its whole height, 4 pixels off the form's start edge as a
+ * field's own error outline stands off its field, and its message at its
+ * heading rather than under its last field. No field moves sideways: the
+ * edge stands out of the flow and the message takes the heading's row, so a
+ * field moves down only by what that row grows when the message wraps under
+ * a long name on a narrow row. The play measures all of it, in both themes.
+ */
+export const FramedAfterAnAttempt: Story = {
+  args: { pipeCode: 'shop_with_bank', framed: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const more of canvas.getAllByRole('button', { name: '1 optional input' }))
+      await userEvent.click(more);
+    const panels = canvas.getAllByTestId('host-panel');
+    const inputsOf = (scope: HTMLElement) => [...scope.querySelectorAll('input')];
+    const across = (element: Element) => {
+      const { left, width } = element.getBoundingClientRect();
+      return [left, width];
+    };
+    /** Each section's heading row, where its message goes, in document order. */
+    const headingRows = (panel: HTMLElement) =>
+      [...panel.querySelectorAll<HTMLElement>('[data-form-section]')].map(
+        (section) =>
+          document.getElementById(section.getAttribute('aria-labelledby')!)!.parentElement!,
+      );
+    const measure = (panel: HTMLElement) => ({
+      across: inputsOf(panel).map(across),
+      tops: inputsOf(panel).map((input) => input.getBoundingClientRect().top),
+      rows: headingRows(panel).map((row) => row.getBoundingClientRect()),
+    });
+    const before = panels.map(measure);
+    for (const panel of panels) await expect(panel.querySelector('[data-error-edge]')).toBeNull();
+
+    for (const run of canvas.getAllByRole('button', { name: 'Run' })) await userEvent.click(run);
+
+    for (const [index, panel] of panels.entries()) {
+      const was = before[index]!;
+      const now = measure(panel);
+      // Not one field moved sideways or changed width.
+      await expect(now.across).toEqual(was.across);
+      // A field moved down only by what the heading rows above it grew: the
+      // message wrapping under a long name on a narrow row, and nothing else.
+      for (const [field, top] of now.tops.entries()) {
+        const grown = was.rows
+          .map((row, at) => (row.top < was.tops[field]! ? now.rows[at]!.height - row.height : 0))
+          .reduce((sum, growth) => sum + growth, 0);
+        await expect(Math.abs(top - was.tops[field]! - grown)).toBeLessThan(0.5);
+      }
+      const sections = [...panel.querySelectorAll<HTMLElement>('[data-form-section]')];
+      await expect(sections).toHaveLength(2);
+      const box = panel.getBoundingClientRect();
+      for (const section of sections) {
+        const mark = section.querySelector<HTMLElement>('[data-error-edge]');
+        await expect(mark).not.toBeNull();
+        const caption = within(section).getByRole('alert');
+        const heading = document.getElementById(section.getAttribute('aria-labelledby')!)!;
+        const rect = mark!.getBoundingClientRect();
+        const column = section.getBoundingClientRect();
+        const fields = inputsOf(section).map((input) => input.getBoundingClientRect());
+        // Down the section's whole height, its heading and its last field included.
+        await expect(rect.top).toBeLessThanOrEqual(heading.getBoundingClientRect().top);
+        await expect(rect.bottom).toBeGreaterThanOrEqual(fields.at(-1)!.bottom);
+        // Beside the form, asking no more room of the panel than a field's
+        // error outline does, and no hairline.
+        await expect(rect.right).toBeLessThan(column.left);
+        await expect(column.left - rect.left).toBeLessThanOrEqual(7);
+        await expect(rect.left).toBeGreaterThan(box.left);
+        await expect(rect.width).toBeGreaterThanOrEqual(2);
+        // The error colour, at the 3:1 a mark needs against the panel.
+        const painted = getComputedStyle(mark!).backgroundColor;
+        await expect(painted).toBe(getComputedStyle(caption).color);
+        await expect(paintedContrast(painted, backgroundOf(panel))).toBeGreaterThanOrEqual(3);
+        // The message on the heading's row, over the fields.
+        await expect(caption.getBoundingClientRect().bottom).toBeLessThan(fields[0]!.top);
+      }
+    }
   },
 };

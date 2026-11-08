@@ -8,10 +8,14 @@
  *
  * Run against a fresh `dist/` (see `make assert-bundle`).
  */
+import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DIST = resolve('dist');
+/** The repository, wherever the script is run from. */
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const DIST = resolve(ROOT, 'dist');
 
 /**
  * The entries that RENDER, as opposed to the headless core. Two things follow
@@ -22,13 +26,18 @@ const RENDERING_ENTRIES = ['react', 'generative'];
 
 /**
  * The entries that must import with no DOM and no React: the headless kernel,
- * and the brand entry, which a build script, a test and a server's fetcher
- * import alike. Neither may carry a `'use client'` prologue.
+ * the brand entry, which a build script, a test and a server's fetcher import
+ * alike, and the generative layer's half that renders nothing, which a host's
+ * server imports to produce and check a layout. None may carry a
+ * `'use client'` prologue.
  */
-const ISOMORPHIC_ENTRIES = ['core', 'brand'];
+const ISOMORPHIC_ENTRIES = ['core', 'brand', 'generative/headless'];
 
 /** Every entry, for the bans that hold everywhere. */
-const ENTRIES = ['core', 'react', 'generative', 'brand'];
+const ENTRIES = ['core', 'react', 'generative', 'generative/headless', 'brand'];
+
+/** How an entry is spelled in the package's `exports` map, for a failure's words. */
+const specifierOf = (entry) => (entry === 'core' ? '.' : `./${entry}`);
 
 /**
  * Import and re-export specifiers of a bundled module.
@@ -62,7 +71,7 @@ function specifiersOf(code) {
 function graphOf(entry) {
   const files = new Set();
   const externals = new Set();
-  const queue = [resolve(entry)];
+  const queue = [resolve(ROOT, entry)];
 
   while (queue.length > 0) {
     const file = queue.pop();
@@ -90,7 +99,7 @@ const BANNED = [
   ...ISOMORPHIC_ENTRIES.map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
     match: /^react($|\/)|^react-dom($|\/)/,
-    why: `The \`${entry === 'core' ? '.' : `./${entry}`}\` entry is isomorphic and must stay importable from a server component and a node script.`,
+    why: `The \`${specifierOf(entry)}\` entry is isomorphic and must stay importable from a server component and a node script.`,
   })),
   ...['react', 'generative', 'brand'].map((entry) => ({
     entry: `${DIST}/${entry}/index.js`,
@@ -162,7 +171,7 @@ function staticGraphOf(entry) {
   const files = new Set();
   const statics = new Set();
   const dynamics = new Set();
-  const queue = [resolve(entry)];
+  const queue = [resolve(ROOT, entry)];
   while (queue.length > 0) {
     const file = queue.pop();
     if (files.has(file)) continue;
@@ -229,6 +238,33 @@ for (const { entry, match, why } of BANNED) {
   } else {
     console.log(
       `ok  ${relative(DIST, entry)} (${files.size} modules) reaches nothing matching ${match.source}`,
+    );
+  }
+}
+
+/**
+ * The generative layer's server entry has an allow-list too: json-render's
+ * core, which compiles a layout's JSONL and checks its structure, and zod,
+ * which its catalog is written in - and nothing else. No React, no renderer,
+ * no icon set, no radix, no class helper, no validator: what a server imports
+ * to produce and check a layout is exactly what its budget line says, and a
+ * shared chunk that carried any of the rendering half's dependencies back
+ * into it fails here whatever the dependency is.
+ */
+{
+  const SERVER_ALLOWED = /^@json-render\/core$|^zod($|\/)/;
+  const { files, externals } = graphOf(`${DIST}/generative/headless/index.js`);
+  const outside = [...externals].filter((specifier) => !SERVER_ALLOWED.test(specifier));
+  const missing = ['@json-render/core', 'zod'].filter((name) => !externals.has(name));
+  if (outside.length > 0 || missing.length > 0) {
+    failures.push(
+      outside.length > 0
+        ? `generative/headless/index.js reaches ${outside.join(', ')} - the server entry depends on @json-render/core and zod and nothing else. See docs/dependency-budget.md.`
+        : `generative/headless/index.js does not reach ${missing.join(', ')}, so the allow-list compared less than the entry's budget names - the catalog is zod and the compiler is json-render's.`,
+    );
+  } else {
+    console.log(
+      `ok  generative/headless/index.js (${files.size} modules) reaches @json-render/core and zod and nothing else`,
     );
   }
 }
@@ -400,6 +436,65 @@ for (const entry of ISOMORPHIC_ENTRIES) {
   }
 }
 
+// A client boundary cannot carry `export *`: a bundler that turns a
+// `'use client'` module's exports into client references has to know their
+// names, and Next.js refuses the star form outright. `./generative` re-exports
+// the server entry with `export * from './headless'` in source, which esbuild
+// flattens into named exports because the module is inside the bundle - so
+// this checks the flattening happened, rather than trusting it.
+for (const entry of RENDERING_ENTRIES) {
+  const starred = statementsOf(readFileSync(`${DIST}/${entry}/index.js`, 'utf8')).filter(
+    (statement) => /^export\s*\*/.test(statement),
+  );
+  if (starred.length > 0) {
+    failures.push(
+      `${entry}/index.js carries ${starred.length} \`export *\` statement(s) behind its 'use client' directive - a client boundary must name its exports. first: ${starred[0].slice(0, 80)}`,
+    );
+  } else {
+    console.log(`ok  ${entry}/index.js names every export behind its 'use client' directive`);
+  }
+}
+
+// The server entry, imported as a server imports it: through the package's
+// own `exports` map, by its public specifier, under the `react-server`
+// condition a React Server Components server resolves with - where `react` is
+// the server build, which has no hooks and no context, so a module that so
+// much as touched the rendering half would fail to load. The graph check above
+// reads specifiers; this runs the entry, which is what catches a wrong path in
+// `package.json` or a chunk that throws on load. The client entry fails this
+// same import, and that failure is the reason the server entry exists.
+{
+  const probe = [
+    "const m = await import('@pipelex/mthds-form/generative/headless');",
+    "const catalog = m.designerCatalog({ frame: 'composer' });",
+    "const spec = m.specFromJsonl(m.specToJsonl({ root: 'p', elements: { p: { type: 'Composer', props: { headline: 'h', lede: null, runLabel: 'Run', columns: null, notes: null }, on: { press: [{ action: 'run' }] }, children: [] } } }));",
+    "const problems = m.layoutCheckProblems(spec, { frame: 'composer', descriptor: { inputs: [] } });",
+    "console.log(JSON.stringify({ components: catalog.components.length, hash: m.PROMPT_HASH, problems }));",
+  ].join('\n');
+  // Run from the repository, whose `package.json` the specifier resolves
+  // through, and bounded: a probe that hangs is a failure, never a wait.
+  const result = spawnSync(process.execPath, ['--conditions=react-server', '--input-type=module', '-e', probe], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  let answer;
+  try {
+    answer = JSON.parse(result.stdout.trim().split('\n').pop() ?? '');
+  } catch {
+    answer = undefined;
+  }
+  if (result.status === 0 && answer && answer.components > 0 && /^[0-9a-f]{12}$/.test(answer.hash) && Array.isArray(answer.problems) && answer.problems.length === 0) {
+    console.log(
+      `ok  ./generative/headless imports and runs under the react-server condition (${answer.components} composer components, prompt ${answer.hash})`,
+    );
+  } else {
+    failures.push(
+      `./generative/headless did not import and run under node --conditions=react-server: ${result.error ? result.error.message : `exit ${result.status}`}, ${(result.stderr || result.stdout || '').trim().split('\n').slice(0, 3).join(' / ')}`,
+    );
+  }
+}
+
 // The designer method ships as data beside the entries, reachable through the
 // `./layout-design.mthds` export. A missing file is a broken export a consumer
 // only discovers at run time.
@@ -429,7 +524,7 @@ if (existsSync(`${DIST}/layout-design.mthds`)) {
  * present, which is a moving target and a brittle test. The `@source` lines are
  * the actual contract, and they are exact.
  */
-const tailwindEntry = readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8');
+const tailwindEntry = readFileSync(resolve(ROOT, 'src/styles/tailwind-entry.css'), 'utf8');
 const scanned = [...tailwindEntry.matchAll(/@source\s+['"]\.\.\/([^'"]+)['"]/g)].map(
   (match) => match[1],
 );
@@ -457,9 +552,9 @@ const excludedTrees = [
   ...withoutComments(tailwindEntry).matchAll(/@source\s+not\s+['"]\.\.\/([^'"]+?)\/?['"]/g),
 ].map((match) => `src/${match[1]}/`);
 const testOnlyFiles = scanned.flatMap((tree) =>
-  readdirSync(resolve(`src/${tree}`), { recursive: true, withFileTypes: true })
+  readdirSync(resolve(ROOT, `src/${tree}`), { recursive: true, withFileTypes: true })
     .filter((file) => file.isFile())
-    .map((file) => relative(resolve('.'), `${file.parentPath ?? file.path}/${file.name}`))
+    .map((file) => relative(ROOT, `${file.parentPath ?? file.path}/${file.name}`))
     .filter(
       (path) => path.includes('/__tests__/') || /\.(test|spec|stories)\.[cm]?[jt]sx?$/.test(path),
     ),
@@ -570,11 +665,54 @@ const UNUSED_BY_CONTROLS = [
  * They exist because the button colour (`--primary`) may be a fill no text
  * can be read on. Focus is not among them: every focus the controls draw is the
  * contract's own `--ring`. See docs/theming.md § "Link, selected and focus".
+ *
+ * The style tokens follow: what a host sets from the roles `deriveStyleRoles`
+ * returns (docs/theming.md § "Style tokens"). A panel's fill and edge stand
+ * for the contract's card and hairline, as `--link` stands for `--primary`.
+ * The rest fall back to a VALUE rather than to a token (`literal`): the weight,
+ * tracking, face or shadow the element painted before it read the token,
+ * which differs from one element to the next - a title's 700, a section's
+ * 600, the rail's large shadow, the card's none - or `revert-layer`, which
+ * undoes the declaration alone, where the element set no value of its own.
+ * Each rule says what shape that value must have, so an empty or a mistyped
+ * fallback still fails. A shadow's shape admits almost any value, so in
+ * source its fallback must also be one of the values listed (`exact`), the
+ * shadows the elements painted before; the built sheet, where lightningcss
+ * has rewritten every colour and space, is held to the shape alone.
  */
+const LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:em|px)$/;
 const OPTIONAL_TOKENS = new Map([
   ['--link', { stand: '--primary', tint: false }],
   ['--selected', { stand: '--primary', tint: true }],
+  ['--panel-fill', { stand: '--card', tint: false }],
+  ['--panel-edge', { stand: '--border', tint: false }],
+  ['--font-heading', { literal: /^revert-layer$/, shape: '`revert-layer`' }],
+  ['--heading-weight', { literal: /^[1-9]00$/, shape: 'a weight such as `600`' }],
+  ['--heading-tracking', { literal: /^(?:revert-layer|-?(?:\d+\.?\d*|\.\d+)em)$/, shape: '`revert-layer` or an `em` length' }],
+  ['--panel-edge-width', { literal: LENGTH, shape: 'a length' }],
+  [
+    '--panel-shadow',
+    {
+      literal: /^(?:none|\S.*\d.*)$/,
+      exact: ['none', '0 20px 25px -5px rgb(0 0 0/0.1),0 8px 10px -6px rgb(0 0 0/0.1)'],
+      shape: '`none` or the rail\'s large shadow',
+    },
+  ],
+  [
+    '--action-shadow',
+    {
+      literal: /^(?:none|\S.*\d.*)$/,
+      exact: [
+        '0 0 28px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 35%,transparent)',
+        '0 0 44px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 50%,transparent)',
+      ],
+      shape: 'the call to action\'s glow in the button colour',
+    },
+  ],
 ]);
+
+/** A value with its spaces collapsed and none around a comma, to compare it whole. */
+const normalizeValue = (value) => value.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
 
 /**
  * CSS with its comments removed, newlines kept so error messages stay readable.
@@ -774,9 +912,13 @@ function unescapeArbitrary(value) {
  * the mix. Source spells the fallback in Tailwind's escaped form, so it is
  * unescaped first; the built sheet's is already plain.
  */
-function fallsBackTo(fallback, { stand, tint }, { built }) {
+function fallsBackTo(fallback, { stand, tint, literal, exact }, { built }) {
   if (!fallback) return false;
   const value = unescapeArbitrary(fallback).trim();
+  if (literal) {
+    if (!built && exact) return exact.map(normalizeValue).includes(normalizeValue(value));
+    return literal.test(value) && !/var\(\s*--[^,)]*\)/.test(value.replace(/var\(\s*--[\w-]+\s*,/g, ''));
+  }
   if (!tint) return isWholeRead(value, stand);
   const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
   if (mix !== null) return isWholeRead(mix[1].trim(), stand);
@@ -799,14 +941,15 @@ function isWholeRead(value, token) {
 }
 
 /** How an optional token's fallback must read, in words, for a failure message. */
-function fallbackRule({ stand, tint }, { built }) {
+function fallbackRule({ stand, tint, literal, shape }, { built }) {
+  if (literal) return `${shape}, the value it painted before`;
   if (!tint) return `\`var(${stand}, …)\``;
   return built
     ? `a \`color-mix()\` tint of \`var(${stand}, …)\`, or that read alone on lightningcss's pre-\`color-mix()\` line`
     : `a \`color-mix()\` tint of \`var(${stand}, …)\``;
 }
 
-const themeCss = withoutComments(readFileSync(resolve('src/styles/theme.css'), 'utf8'));
+const themeCss = withoutComments(readFileSync(resolve(ROOT, 'src/styles/theme.css'), 'utf8'));
 const lightBody = soleBlock(themeCss, /(?:^|[}\s;])(?::root)\s*\{/g, ':root', 'src/styles/theme.css');
 const darkBody = soleBlock(themeCss, /(?:^|[}\s;])(?:\.dark)\s*\{/g, '.dark', 'src/styles/theme.css');
 const lightPalette = lightBody === null ? new Map() : declarationsOf(lightBody);
@@ -817,7 +960,7 @@ if (lightBody !== null && lightPalette.size === 0) {
   );
 }
 
-const entryCss = withoutComments(readFileSync(resolve('src/styles/tailwind-entry.css'), 'utf8'));
+const entryCss = withoutComments(readFileSync(resolve(ROOT, 'src/styles/tailwind-entry.css'), 'utf8'));
 const themeBody = soleBlock(entryCss, /@theme\s+inline\s*\{/g, '@theme inline', 'src/styles/tailwind-entry.css');
 const arms = themeBody === null ? [] : readsOf(themeBody, 'src/styles/tailwind-entry.css `@theme inline`');
 const mapped = new Set(arms.map((arm) => arm.name));
@@ -902,7 +1045,7 @@ const arbitraryProblems = [];
 let arbitraryReads = 0;
 const optionalReads = new Map([...OPTIONAL_TOKENS.keys()].map((name) => [name, 0]));
 for (const dir of ARBITRARY_SOURCES) {
-  for (const file of readdirSync(resolve(dir), { recursive: true, withFileTypes: true })) {
+  for (const file of readdirSync(resolve(ROOT, dir), { recursive: true, withFileTypes: true })) {
     if (!file.isFile() || !/\.(tsx?|css)$/.test(file.name)) continue;
     const path = `${file.parentPath ?? file.path}/${file.name}`;
     const relative = path.slice(path.indexOf('src/'));
@@ -947,21 +1090,22 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
 //     host reads names each one.
 {
   const optionalProblems = [];
-  const themingText = readFileSync(resolve('docs/theming.md'), 'utf8');
-  for (const [name, { stand }] of OPTIONAL_TOKENS) {
+  const themingText = readFileSync(resolve(ROOT, 'docs/theming.md'), 'utf8');
+  for (const [name, { stand, literal }] of OPTIONAL_TOKENS) {
     // The chain of stand-ins must end at a token theme.css defines, and never
-    // loop back on itself.
+    // loop back on itself. A literal fallback has no chain.
     const chain = [name];
     let last = stand;
-    while (OPTIONAL_TOKENS.has(last) && !chain.includes(last)) {
+    while (!literal && OPTIONAL_TOKENS.has(last) && !chain.includes(last)) {
       chain.push(last);
       last = OPTIONAL_TOKENS.get(last).stand;
     }
-    if (!lightPalette.has(last)) {
+    if (!literal && !lightPalette.has(last)) {
       optionalProblems.push(`${name} falls back through ${chain.join(' → ')} to ${last}, which theme.css does not define`);
     }
     if (lightPalette.has(name) || darkPalette.has(name)) {
-      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${stand} never fires for a host that loads the file`);
+      const fallback = literal ? 'the value it painted before' : stand;
+      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${fallback} never fires for a host that loads the file`);
     }
     if (optionalReads.get(name) === 0) {
       optionalProblems.push(`nothing under ${ARBITRARY_SOURCES.join(', ')} reads ${name}, so listing it in OPTIONAL_TOKENS is stale`);
@@ -972,7 +1116,7 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
   }
   if (optionalProblems.length === 0) {
     console.log(
-      `ok  optional tokens are read, fall back toward the contract and are documented: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
+      `ok  optional tokens are read, fall back toward the contract or to the value they replaced, and are documented: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
     );
   } else {
     failures.push(`${optionalProblems.join('; ')}. See OPTIONAL_TOKENS in scripts/assert-bundle.mjs.`);
@@ -1133,7 +1277,7 @@ if (existsSync(`${DIST}/theme.css`)) {
 // is the one restatement nothing used to check - which is exactly how the
 // secondary pair went missing from it. The `@theme inline` block is the
 // authority; this asserts the doc says the same words.
-const themingDoc = readFileSync(resolve('docs/theming.md'), 'utf8');
+const themingDoc = readFileSync(resolve(ROOT, 'docs/theming.md'), 'utf8');
 const tableRows = /\n\| --- \| --- \|\n([\s\S]*?)\n\n/.exec(themingDoc);
 const documented = new Set(
   tableRows === null ? [] : [...tableRows[1].matchAll(/`(--[\w-]+)`/g)].map((m) => m[1]),

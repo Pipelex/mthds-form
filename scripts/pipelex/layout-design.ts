@@ -40,7 +40,9 @@ import { getPipelexClient } from './client';
  * input is text or data, so nothing here uploads either.
  */
 
-const PIPE_CODE = 'design_layout';
+const PIPE_CODE = 'generative.design_layout';
+/** The method's second entry: a refused page and what the checks said, in; the page emitted again, out. */
+const REPAIR_PIPE_CODE = 'generative.repair_layout';
 
 /** `methods/`: the bundle's directory, and the sidecar's `bundle_dir`. */
 const BUNDLE_DIR = fileURLToPath(new URL('../../methods/', import.meta.url));
@@ -218,4 +220,49 @@ export async function designLayout(
     plan: planOf(results),
     results,
   };
+}
+
+export type RepairLayoutInputs = {
+  /** The catalog the page was designed against: the same frame's `designerCatalog({ frame })`. */
+  catalog: Catalog;
+  /** The brief the page was designed from, verbatim. */
+  brief: Brief;
+  /** The page as the designer emitted it, the JSONL the checks refused. */
+  page: string;
+  /** What the checks found, one problem a line: `layoutCheckProblems`, joined. */
+  problems: string;
+};
+
+export interface RepairLayoutRun {
+  /** The page emitted again, whole, as JSONL patch lines. */
+  jsonl: string;
+  /** The run as the API returned it: its id, its token usages and what they cost. */
+  results: RunResults;
+}
+
+/**
+ * One repair run: the method's `repair_layout` entry, handed a page the
+ * package's checks refused and the problems they found in words, emits the
+ * whole page again with those problems fixed. The loop around it - check,
+ * repair, check again, a bounded number of times - is the caller's, because
+ * the checks are this package's TypeScript and the method cannot run them.
+ */
+export async function repairLayout(
+  inputs: RepairLayoutInputs,
+  options: DesignLayoutOptions = {},
+): Promise<RepairLayoutRun> {
+  const results = await getPipelexClient().startAndWaitForResult(
+    {
+      pipe_code: REPAIR_PIPE_CODE,
+      mthds_contents: withOverrides(await readBundle(), options),
+      inputs: {
+        catalog: { concept: DESIGNER_CATALOG_CONCEPT, content: serializeCatalog(inputs.catalog) },
+        brief: { concept: DESIGNER_BRIEF_CONCEPT, content: serializeBrief(inputs.brief) },
+        page: inputs.page,
+        problems: inputs.problems,
+      },
+    },
+    { onPoll: options.onPoll },
+  );
+  return { jsonl: parseText(results.main_stuff).text, results };
 }

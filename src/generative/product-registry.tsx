@@ -1,18 +1,22 @@
 'use client';
 
 import * as React from 'react';
+import { type BaseComponentProps, defineRegistry, useBoundProp } from '@json-render/react';
+import { useCheckedField } from './checked-fields';
+import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
-  type BaseComponentProps,
-  defineRegistry,
-  useBoundProp,
-  useFieldValidation,
-} from '@json-render/react';
-import { linkTextClass, selectedBorderClass, selectedFillClass } from '../react/role-tokens';
+  actionShadowClass,
+  headingClass,
+  panelRaisedShadowClass,
+  panelSurfaceClass,
+} from '../react/style-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { cn } from '../react/utils';
-import { useBrand } from './brand-context';
+import { BrandBar, CONTAINER } from './brand-bar';
 import { catalog } from './catalog';
-import { generativeRenderers } from './registry';
+import { textOf, withDeclaredProps } from './declared-props';
+import { frameRenderers } from './frame-registry';
+import { generativeRenderers, useDescriptorScope } from './registry';
 import { useResultSlot } from './result-slot';
 import { useControlId } from './ui/shadcn';
 
@@ -20,8 +24,11 @@ import { useControlId } from './ui/shadcn';
  * What the brand catalog's components RENDER as - the product page's chrome,
  * over the same tokens the kernel's controls read, and over NOTHING else: no
  * literal colour, no literal radius, no literal typeface. The rail's panel is
- * `bg-card` on `border-border`, a hairline is `border-border`, the call to
- * action's glow is the accent composed with `color-mix()`, the corners are
+ * the page's style panel (`--panel-*`), falling back to `bg-card` on
+ * `border-border` and a large shadow; a title reads the style's heading face,
+ * weight and tracking; a hairline is `border-border`; the call to action wears
+ * the style's `--action-shadow`, falling back to a glow of the button colour
+ * (`--primary`) composed with `color-mix()` (see `react/style-tokens`); the corners are
  * `--radius` and its multiples, a tag is `font-mono`, the logo is the
  * manifest's pair. The running text names no face at all: it inherits the
  * page's, which a brand's compiled stylesheet sets on its scope from
@@ -38,8 +45,6 @@ import { useControlId } from './ui/shadcn';
  * and that is all.
  */
 
-const CONTAINER = 'mx-auto w-full max-w-6xl px-6 sm:px-8';
-
 /** The kernel's app-presentation label, so a brand field and a kernel field read alike. */
 const LABEL = 'block text-[13.5px] leading-none font-medium text-foreground';
 
@@ -52,69 +57,7 @@ interface AppBarProps {
 }
 
 function AppBar({ props }: BaseComponentProps<AppBarProps>) {
-  const brand = useBrand();
-  return (
-    <header className="border-b border-border">
-      <div className={cn(CONTAINER, 'flex h-16 items-center gap-5')}>
-        {/* `no-referrer` on both, as on every image this package paints: the
-            scheme is already checked where the manifest is parsed, and a brand
-            asset has no more business learning where it was drawn than a
-            payload's picture does.
-
-            This pair is the one place a `dark:` variant and the token fallbacks
-            disagree. A fallback is frozen per utility and cannot vary by scope,
-            so a host that defines no tokens renders LIGHT inside `.dark` - but
-            the variant still flips, so that host gets the dark-ground asset on
-            a light surface. Documented in `docs/theming.md` rather than worked
-            around: the swap is right for every host that defines tokens, which
-            is every host that sets `.dark` deliberately. */}
-        <img
-          src={brand.logo.onLight}
-          alt={brand.name}
-          referrerPolicy="no-referrer"
-          className="h-7 w-auto dark:hidden"
-        />
-        <img
-          src={brand.logo.onDark}
-          alt={brand.name}
-          referrerPolicy="no-referrer"
-          className="hidden h-7 w-auto dark:block"
-        />
-        <span aria-hidden="true" className="h-5 w-px bg-border" />
-        <span className="text-sm font-medium text-foreground/80">{props.app}</span>
-        {/* `min-w-0` down to the pill: a pipe's code is one long word, and
-            at phone width an unshrinkable pill pushed the row past the viewport. */}
-        <div className="ml-auto flex min-w-0 items-center gap-6">
-          {props.links && props.links.length > 0 ? (
-            <nav aria-label="Site" className="hidden items-center gap-6 sm:flex">
-              {props.links.map((link) => (
-                <a
-                  key={link}
-                  href="#"
-                  onClick={(event) => event.preventDefault()}
-                  className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden"
-                >
-                  {link}
-                </a>
-              ))}
-            </nav>
-          ) : null}
-          {props.tag ? (
-            <span
-              className={cn(
-                'min-w-0 truncate rounded-lg border px-2.5 py-1 font-mono text-[11px]',
-                selectedBorderClass,
-                selectedFillClass,
-                linkTextClass,
-              )}
-            >
-              {props.tag}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </header>
-  );
+  return <BrandBar app={props.app} links={props.links} tag={props.tag} />;
 }
 
 interface HeroProps {
@@ -133,7 +76,12 @@ function Hero({ props }: BaseComponentProps<HeroProps>) {
           {props.eyebrow}
         </p>
       ) : null}
-      <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-[44px] sm:leading-[1.15]">
+      <h1
+        className={cn(
+          'max-w-2xl text-4xl text-foreground sm:text-[44px] sm:leading-[1.15]',
+          headingClass(700, true),
+        )}
+      >
         {props.headline}
       </h1>
       {props.lede ? (
@@ -184,7 +132,7 @@ function ResultPanel() {
   if (!slot?.content) return null;
   return (
     <section className="border-t border-border py-9" data-testid="result-panel" aria-live="polite">
-      <h2 className="mb-6 text-xl font-semibold tracking-tight text-foreground">
+      <h2 className={cn('mb-6 text-xl text-foreground', headingClass(600, true))}>
         {slot.title ?? 'Result'}
       </h2>
       {slot.content}
@@ -206,7 +154,7 @@ function Section({ props, children }: BaseComponentProps<SectionProps>) {
           {props.number ? (
             <span className={cn('font-mono text-[12px]', linkTextClass)}>{props.number}</span>
           ) : null}
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">{props.title}</h2>
+          <h2 className={cn('text-xl text-foreground', headingClass(600, true))}>{props.title}</h2>
         </div>
         {props.lede ? <p className="mt-1.5 text-sm text-muted-foreground">{props.lede}</p> : null}
       </div>
@@ -223,7 +171,14 @@ function Rail({ props, children }: BaseComponentProps<{ title: string }>) {
     // the `@theme inline` mapping and does not inherit its fallback - it has to
     // carry its own, or a host that defines no tokens loses the declaration
     // outright. See src/styles/tailwind-entry.css.
-    <div className="rounded-[calc(var(--radius,0.5rem)*1.5)] border border-border bg-card p-7 text-card-foreground shadow-xl">
+    <div
+      data-style-panel=""
+      className={cn(
+        'rounded-[calc(var(--radius,0.5rem)*1.5)] p-7 text-card-foreground',
+        panelSurfaceClass,
+        panelRaisedShadowClass,
+      )}
+    >
       <h2 className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {props.title}
       </h2>
@@ -240,14 +195,12 @@ interface SummaryRowProps {
   placeholder?: string | null;
 }
 
-function present(value: unknown): value is string | number | boolean {
-  return value !== undefined && value !== null && value !== '';
-}
-
 function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
+  // Each half as it writes out, so one that is a structure, which writes out
+  // as nothing, leaves no separator dangling.
   const text = [props.value, props.detail]
-    .filter(present)
-    .map(String)
+    .map(textOf)
+    .filter((half) => half !== '')
     .join(props.separator ?? ' ');
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-3 first:pt-0 last:border-b-0">
@@ -262,16 +215,23 @@ function SummaryRow({ props }: BaseComponentProps<SummaryRowProps>) {
 }
 
 function Cta({ props, emit }: BaseComponentProps<{ label: string; hint?: string | null }>) {
+  // The host's `env.disabled` holds the run while one is going, as it holds
+  // the plain form's submit: a second press would be a second billed run.
+  const busy = useDescriptorScope().env?.disabled ?? false;
   return (
     <div className="mt-6">
       <button
         type="button"
+        disabled={busy}
         onClick={() => emit('press')}
         className={cn(
-          'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground',
-          // The fallback is not decoration here either - see Rail above.
-          'shadow-[0_0_28px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_35%,transparent)] transition-all hover:bg-primary/90 hover:shadow-[0_0_44px_color-mix(in_oklab,var(--primary,hsl(240_5.9%_10%))_50%,transparent)]',
-          'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden',
+          'inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90',
+          // The page's call-to-action shadow, or the glow in the button colour
+          // it had. Focus is an outline, which no shadow a style sets can
+          // replace or hide.
+          actionShadowClass,
+          focusOutlineClass,
+          'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-primary',
         )}
       >
         {props.label}
@@ -339,7 +299,7 @@ function useTextField(
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'blur';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
@@ -445,15 +405,20 @@ type RegistryOptions = Parameters<typeof defineRegistry<typeof catalog>>[1];
 export const { registry: generativeRegistry } = defineRegistry(catalog, {
   components: {
     ...generativeRenderers,
-    Input: (ctx) => <BrandInput {...ctx} />,
-    Textarea: (ctx) => <BrandTextarea {...ctx} />,
-    AppBar: (ctx) => <AppBar {...ctx} />,
-    Hero: (ctx) => <Hero {...ctx} />,
-    Workspace: (ctx) => <Workspace {...ctx} />,
-    Section: (ctx) => <Section {...ctx} />,
-    Rail: (ctx) => <Rail {...ctx} />,
-    SummaryRow: (ctx) => <SummaryRow {...ctx} />,
-    Cta: (ctx) => <Cta {...ctx} />,
-    Footer: (ctx) => <Footer {...ctx} />,
+    // Held to their definitions as the base and frame renderers are
+    // (`declared-props.ts`).
+    ...withDeclaredProps(catalog.data.components as Record<string, { props?: unknown }>, {
+      Input: (ctx: Parameters<typeof BrandInput>[0]) => <BrandInput {...ctx} />,
+      Textarea: (ctx: Parameters<typeof BrandTextarea>[0]) => <BrandTextarea {...ctx} />,
+      AppBar: (ctx: Parameters<typeof AppBar>[0]) => <AppBar {...ctx} />,
+      Hero: (ctx: Parameters<typeof Hero>[0]) => <Hero {...ctx} />,
+      Workspace: (ctx: Parameters<typeof Workspace>[0]) => <Workspace {...ctx} />,
+      Section: (ctx: Parameters<typeof Section>[0]) => <Section {...ctx} />,
+      Rail: (ctx: Parameters<typeof Rail>[0]) => <Rail {...ctx} />,
+      SummaryRow: (ctx: Parameters<typeof SummaryRow>[0]) => <SummaryRow {...ctx} />,
+      Cta: (ctx: Parameters<typeof Cta>[0]) => <Cta {...ctx} />,
+      Footer: (ctx: Parameters<typeof Footer>[0]) => <Footer {...ctx} />,
+    }),
+    ...frameRenderers,
   },
 } as RegistryOptions);

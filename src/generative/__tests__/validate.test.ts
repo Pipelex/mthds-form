@@ -2,6 +2,7 @@ import type { Spec } from '@json-render/core';
 import { defineCatalog } from '@json-render/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { frameCatalog } from '../catalog';
 import { generativeSchema } from '../schema';
 import { formatProblems, validateAgainstCatalog, type ValidationCatalog } from '../validate';
 
@@ -446,6 +447,93 @@ describe('the event a layout binds', () => {
 });
 
 /**
+ * A run is billed, so it starts from a deliberate gesture and from nothing
+ * else: a press of a button, or Enter in a field, which is how a plain form
+ * submits. A `Select` whose `on.change` ran the method started a billed run at
+ * every edit, and a `watch` at every change of the state, with no gesture at
+ * all. And a run in a chain is never deliberate: json-render applies a chain
+ * after a handler alone, so one after `validateForm` never fires, and one
+ * after a run starts a second run as the first settles.
+ */
+describe('where a layout may start a run', () => {
+  const SELECT = {
+    label: 'Pace',
+    name: 'pace',
+    options: ['slow', 'fast'],
+    placeholder: null,
+    value: { $bindState: '/inputs/pace' },
+    checks: null,
+    validateOn: null,
+  };
+  const INPUT = {
+    label: 'City',
+    name: 'city',
+    type: null,
+    placeholder: null,
+    value: { $bindState: '/inputs/city' },
+    checks: null,
+    validateOn: null,
+  };
+  const page = (type: string, props: Record<string, unknown>, extra: Record<string, unknown>) =>
+    ({
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: { direction: 'vertical' }, children: ['title', 'el'] },
+        title: { type: 'Heading', props: { text: 'Plan the trip', level: 'h1' }, children: [] },
+        el: { type, props, children: [], ...extra },
+      },
+    }) as unknown as Spec;
+  const messages = (spec: Spec) =>
+    validateAgainstCatalog(spec).problems.map((problem) => problem.message);
+
+  it('is refused under an event that fires as the person edits or moves', () => {
+    expect(messages(page('Select', SELECT, { on: { change: [{ action: 'run' }] } }))).toContain(
+      'on.change runs the method on "change", which fires as the person edits or moves through the page; a run is billed, so it starts only from a deliberate gesture: bind it under "press" or "submit".',
+    );
+    expect(messages(page('Input', INPUT, { on: { blur: { action: 'run' } } }))).toContain(
+      'on.blur runs the method on "blur", which fires as the person edits or moves through the page; a run is billed, so it starts only from a deliberate gesture: bind it under "press" or "submit".',
+    );
+  });
+
+  it('is refused under a watch, which fires with no gesture at all', () => {
+    expect(
+      messages(page('Select', SELECT, { watch: { '/inputs/pace': { action: 'run' } } })),
+    ).toContain(
+      'watch./inputs/pace runs the method when the state changes, with no gesture at all; a run is billed, so it starts only from a deliberate gesture: bind it under "press" or "submit".',
+    );
+  });
+
+  it('is refused in a chain, after a run or after anything else', () => {
+    const cta = { label: 'Plan my trip' };
+    expect(
+      messages(page('Cta', cta, { on: { press: { action: 'run', onError: { action: 'run' } } } })),
+    ).toContain(
+      'on.press.onError chains a run after another action, which either never fires or starts a second billed run as the first settles; bind run directly under "press" or "submit".',
+    );
+    expect(
+      messages(
+        page('Cta', cta, {
+          on: { press: { action: 'validateForm', onSuccess: { action: 'run' } } },
+        }),
+      ),
+    ).toContain(
+      'on.press.onSuccess chains a run after another action, which either never fires or starts a second billed run as the first settles; bind run directly under "press" or "submit".',
+    );
+  });
+
+  it('is accepted under a press, and under a submit, which is Enter in a field', () => {
+    const press = validateAgainstCatalog(
+      page('Cta', { label: 'Plan my trip' }, { on: { press: [{ action: 'run' }] } }),
+    );
+    expect(press.ok, formatProblems(press.problems)).toBe(true);
+    const submit = validateAgainstCatalog(
+      page('Input', INPUT, { on: { submit: [{ action: 'validateForm' }, { action: 'run' }] } }),
+    );
+    expect(submit.ok, formatProblems(submit.problems)).toBe(true);
+  });
+});
+
+/**
  * An expression on a prop whose values are a fixed set.
  *
  * `{ "$template": "script" }` carries no interpolation, so json-render resolves
@@ -484,6 +572,76 @@ describe('an expression where a name belongs', () => {
       },
     });
     expect(bound.ok, formatProblems(bound.problems)).toBe(true);
+  });
+});
+
+/**
+ * A `Picture` names the image it shows literally, as a hatch names its field:
+ * the fit check resolves `path` as written, through the repeat above it, and
+ * an image is a file the kind check will not read into a prop. Written as an
+ * expression, it passed this check alone and resolved at render time to
+ * whatever the expression held - a url where a path belongs, or nothing.
+ */
+describe('the path a Picture shows', () => {
+  const picture = (path: unknown): Spec =>
+    ({
+      root: 'p',
+      elements: { p: { type: 'Picture', props: { path, alt: null, aspect: null }, children: [] } },
+    }) as unknown as Spec;
+
+  it('is refused as an expression, in the words a hatch is refused in', () => {
+    const verdict = validateAgainstCatalog(
+      picture({ $state: '/result/cover' }),
+      frameCatalog('result'),
+    );
+    expect(verdict.ok).toBe(false);
+    expect(formatProblems(verdict.problems)).toContain(
+      "Picture.path must be a literal string - absolute, or the item's field name inside a repeat - never an expression.",
+    );
+  });
+
+  it('is accepted written literally', () => {
+    // The page-level rules (one h1) are about a whole page, not this element.
+    const verdict = validateAgainstCatalog(picture('/result/cover'), frameCatalog('result'));
+    expect(verdict.problems.filter((p) => p.message.startsWith('Picture'))).toEqual([]);
+  });
+});
+
+/**
+ * An expression standing for a whole object inside a prop. The literal check
+ * reads `{ $state: ... }` as the object itself and raises its issues at the
+ * object's members, under the expression rather than at it, so a filter that
+ * looked only at the issue's own path refused a binding json-render resolves.
+ */
+describe('an expression standing for an object inside a prop', () => {
+  it('is accepted, as json-render resolves it', () => {
+    const verdict = validateAgainstCatalog({
+      root: 't',
+      elements: {
+        t: {
+          type: 'Tabs',
+          props: { tabs: [{ $state: '/state/first' }, { label: 'Later', value: 'later' }] },
+          children: ['a', 'b'],
+        },
+        a: { type: 'Text', props: { text: 'One' }, children: [] },
+        b: { type: 'Text', props: { text: 'Two' }, children: [] },
+      },
+    } as unknown as Spec);
+    expect(verdict.problems.filter((p) => p.message.startsWith('Tabs.tabs'))).toEqual([]);
+  });
+
+  it('still refuses a literal object missing a member', () => {
+    const verdict = validateAgainstCatalog({
+      root: 't',
+      elements: {
+        t: {
+          type: 'Tabs',
+          props: { tabs: [{ label: 'Now' }, { label: 'Later', value: 'later' }] },
+          children: [],
+        },
+      },
+    } as unknown as Spec);
+    expect(formatProblems(verdict.problems)).toContain('Tabs.tabs');
   });
 });
 
@@ -769,6 +927,126 @@ describe('a component a page has one of', () => {
     );
     expect(text).toContain(
       "[foot2] a second Footer (after [foot]): at most one on a page, since it renders as the page's contentinfo.",
+    );
+  });
+});
+
+/**
+ * An object is an expression to json-render only when its key holds what the
+ * runtime resolves - a text under `$state`, `true` under `$index`, a `$cond`
+ * beside both branches - so `{ "$state": 7 }` renders as the literal object
+ * it is, and the literal check holds it to the prop's schema.
+ */
+describe('an object that carries an expression key without being an expression', () => {
+  const heading = (text: unknown): Spec => ({
+    root: 'h',
+    elements: { h: { type: 'Heading', props: { text, level: 'h1' }, children: [] } },
+  });
+
+  it.each([{ $state: 7 }, { $index: 1 }, { $cond: { $state: '/ui/on' } }, { $template: 3 }])(
+    'is read as the literal it renders as: %j',
+    (value) => {
+      const verdict = validateAgainstCatalog(heading(value));
+      expect(verdict.ok).toBe(false);
+      expect(formatProblems(verdict.problems)).toContain('Heading.text');
+    },
+  );
+
+  it('is still an expression when its key holds what the runtime resolves', () => {
+    expect(validateAgainstCatalog(heading({ $state: '/ui/title' })).ok).toBe(true);
+  });
+});
+
+/**
+ * A prop whose values are a fixed set takes a literal alone, and so does one
+ * nested inside a prop: a `DataTable` column's `format` written as an
+ * expression is refused as a top-level closed prop is.
+ */
+describe('a closed vocabulary nested inside a prop', () => {
+  it('is refused when it is written as an expression', () => {
+    const spec: Spec = {
+      root: 't',
+      elements: {
+        t: {
+          type: 'DataTable',
+          props: {
+            rows: { $state: '/result/rows' },
+            columns: [{ key: 'when', label: 'When', format: { $state: '/ui/format' } }],
+            caption: null,
+          },
+          children: [],
+        },
+      },
+    };
+    const verdict = validateAgainstCatalog(spec);
+    expect(formatProblems(verdict.problems)).toContain(
+      'DataTable.columns.0.format is one of a fixed set of names',
+    );
+  });
+});
+
+/**
+ * Children in a slot the component does not declare render nothing, and the
+ * development warning json-render would print is looked up by a registry the
+ * page does not render through, so the check says it instead.
+ */
+describe('a named slot', () => {
+  const slotted = (name: string): Spec => ({
+    root: 's',
+    elements: {
+      s: {
+        type: 'Stack',
+        props: { direction: 'vertical', gap: null, align: null, justify: null },
+        children: [],
+        slots: { [name]: ['t'] },
+      },
+      t: { type: 'Text', props: { text: 'Hello', variant: null }, children: [] },
+    },
+  });
+
+  it('is refused when its component does not declare it', () => {
+    expect(formatProblems(validateAgainstCatalog(slotted('aside')).problems)).toContain(
+      'slot "aside", which Stack does not have',
+    );
+  });
+
+  it('is refused when it is named "default", which is what children are for', () => {
+    expect(formatProblems(validateAgainstCatalog(slotted('default')).problems)).toContain(
+      'a slot named "default"',
+    );
+  });
+});
+
+/**
+ * The checks answer a spec of the wrong shape as such, and a throw inside
+ * them on a spec of the right shape as their own failure - never the other
+ * way round, which sent a defect in the checks to the repair pass as a slip
+ * of the layout's.
+ */
+describe('a failure of the checks themselves', () => {
+  const spec: Spec = {
+    root: 't',
+    elements: { t: { type: 'Text', props: { text: 'Hello', variant: null }, children: [] } },
+  };
+
+  it('is answered as the checks failing, not as a malformed layout', () => {
+    const broken = {
+      ...frameCatalog('page'),
+      get componentNames(): readonly string[] {
+        throw new Error('boom');
+      },
+    } as ValidationCatalog;
+    const [problem] = validateAgainstCatalog(spec, broken).problems;
+    expect(problem?.message).toMatch(/^the checks failed on this layout \(Error: boom\)/);
+  });
+
+  it('names the shape a malformed layout lacks', () => {
+    const [problem] = validateAgainstCatalog({
+      root: 't',
+      elements: { t: { type: 'Text', children: 5 } },
+    } as unknown as Spec).problems;
+    expect(problem?.message).toBe(
+      'the layout is not a well-formed spec: the element "t" has "children" that are not a list',
     );
   });
 });

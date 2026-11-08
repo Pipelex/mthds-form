@@ -1,12 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { type BaseComponentProps, useBoundProp, useFieldValidation } from '@json-render/react';
+import { type BaseComponentProps, useBoundProp } from '@json-render/react';
+import { useCheckedField } from '../checked-fields';
 import { hasOwnProp } from '../../core/own-property';
 import { enumLabeler, useFieldPresentation } from '../../react/field-presentation';
 import { fieldControlClass } from '../../react/field-styles';
 import { checkedAccentClass, focusOutlineClass } from '../../react/role-tokens';
+import { headingClass, panelFlatShadowClass, panelSurfaceClass } from '../../react/style-tokens';
 import { cn } from '../../react/utils';
+import { ChevronDown } from 'lucide-react';
 import { Switch as SwitchPrimitive } from '../../react/ui/switch';
 
 /**
@@ -35,7 +38,7 @@ interface BoundFieldProps {
 /**
  * The one piece of binding every input repeats: the value the control shows,
  * the setter that writes it back, and the checks the spec attached to it.
- * `useFieldValidation` is given a binding only when there is both a path and a
+ * `useCheckedField` is given a binding only when there is both a path and a
  * check, so an unbound control never registers a validator the run would wait
  * on.
  */
@@ -50,7 +53,7 @@ function useBoundField<T>(
   const isBound = Boolean(binding);
   const hasValidation = Boolean(binding && checks?.length);
   const when = validateOn ?? 'change';
-  const { errors, validate } = useFieldValidation(
+  const { errors, validate } = useCheckedField(
     binding ?? '',
     hasValidation ? { checks: checks ?? [], validateOn: when } : undefined,
   );
@@ -114,11 +117,21 @@ export function Card({
   children,
 }: BaseComponentProps<{ title?: string | null; description?: string | null }>) {
   return (
-    <div className="rounded-lg border border-border bg-card p-6 text-card-foreground">
+    // A style's panel: a host writes the style's field fill onto `--input`
+    // here, as on its own panel, so the fields inside do not sink into it.
+    // A panel's corner is one and a half times a control's, as the rail's is.
+    <div
+      data-style-panel=""
+      className={cn(
+        'rounded-[calc(var(--radius,0.5rem)*1.5)] p-6 text-card-foreground',
+        panelSurfaceClass,
+        panelFlatShadowClass,
+      )}
+    >
       {props.title || props.description ? (
         <div className="mb-4 space-y-1.5">
           {props.title ? (
-            <h3 className="text-lg leading-none font-semibold">{props.title}</h3>
+            <h3 className={cn('text-lg leading-none', headingClass(600))}>{props.title}</h3>
           ) : null}
           {props.description ? (
             <p className="text-sm text-muted-foreground">{props.description}</p>
@@ -228,8 +241,14 @@ export function Collapsible({
       open={props.defaultOpen ?? false}
       data-slot="collapsible"
     >
-      <summary className="cursor-pointer list-none rounded-md px-4 py-3 text-sm font-medium select-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-        {props.title}
+      {/* A chevron that turns as it opens: without one the closed section
+          read as an empty text field with a placeholder. */}
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md px-4 py-3 text-sm font-medium select-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+        <span>{props.title}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground transition-transform [details[open]>summary_&]:rotate-180"
+        />
       </summary>
       <div className="border-t border-border px-4 py-3">{children}</div>
     </details>
@@ -238,11 +257,13 @@ export function Collapsible({
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
+// Every level reads the page's heading style (`react/style-tokens`), falling
+// back to the weight and tracking it was set in.
 const HEADING = {
-  h1: 'text-3xl font-bold tracking-tight',
-  h2: 'text-2xl font-semibold tracking-tight',
-  h3: 'text-lg font-semibold',
-  h4: 'text-base font-semibold',
+  h1: cn('text-3xl', headingClass(700, true)),
+  h2: cn('text-2xl', headingClass(600, true)),
+  h3: cn('text-lg', headingClass(600)),
+  h4: cn('text-base', headingClass(600)),
 };
 
 export function Heading({
@@ -487,7 +508,15 @@ export function Textarea({
  * reads the accent rather than the button colour, and focused in `--ring`, as
  * everything in the tab order is, never in the browser's own ring.
  */
-const NATIVE_CHECK = cn('size-4', checkedAccentClass, focusOutlineClass);
+const NATIVE_CHECK = cn('size-4 shrink-0', checkedAccentClass, focusOutlineClass);
+
+/**
+ * The label a native radio or check box sits in, which is where a finger
+ * lands: a tap anywhere on a label activates the control it wraps. The box
+ * keeps its 16 pixels, and below `sm` its row grows to 44 pixels tall across
+ * the column, so the target is the whole row rather than the box.
+ */
+const NATIVE_CHECK_ROW = 'flex items-center gap-2 text-sm max-sm:min-h-11';
 
 export function Radio({
   props,
@@ -502,9 +531,10 @@ export function Radio({
   return (
     <fieldset className="space-y-2" aria-invalid={field.error ? true : undefined}>
       <legend className={LABEL}>{props.label}</legend>
-      <div className="space-y-2">
+      {/* Rows of 44 pixels need no gap between them on a phone. */}
+      <div className="space-y-2 max-sm:space-y-0">
         {(props.options ?? []).map((option, index) => (
-          <label key={`${index}-${option}`} className="flex items-center gap-2 text-sm">
+          <label key={`${index}-${option}`} className={NATIVE_CHECK_ROW}>
             <input
               type="radio"
               name={id}
@@ -537,7 +567,7 @@ export function Checkbox({
   const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props);
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <label htmlFor={id} className={NATIVE_CHECK_ROW}>
         <input
           id={id}
           name={props.name}

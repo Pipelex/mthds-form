@@ -1,0 +1,437 @@
+/*
+ * A host's page around the kernel, as the app-styles stories draw it: the
+ * host's own palette mapped onto the kernel's theme contract, and its
+ * compose-then-result frame (the band, the headline over a composer column
+ * with its action row, the request bar over the result). Story-only, and
+ * written as a host would write it: every value a style may change is read
+ * through a token with the host's own value as its fallback, so a page that
+ * wears no style renders exactly the host's look. The kernel's controls and
+ * the generative layer read the same tokens themselves (docs/theming.md,
+ * "Style tokens"); this sheet only says what the host states through them.
+ *
+ * Story chrome, so it is plain CSS rather than utilities (see
+ * docs/storybook.md, "Styling: source, not the prebuilt sheet").
+ */
+
+/* ---- the host's palette, on the kernel's theme contract ---- */
+.app-host {
+  --canvas: #f6f7f9;
+  --background: #ffffff;
+  --foreground: #0f1729;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+  --primary: #0f1729;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f5;
+  --secondary-foreground: var(--foreground);
+  --muted: #eef1f5;
+  --muted-foreground: #556072;
+  --accent: #eef1f5;
+  --accent-foreground: var(--foreground);
+  --border: #dde2e9;
+  /* The host's field fill, kept by name so its panel can fall back to it. */
+  --host-input: #f2f4f7;
+  --input: var(--host-input);
+  --ring: #2f5bd3;
+  --link: #2f5bd3;
+  --radius: 6px;
+  /*
+   * The host's own titles, light and slightly tight, and its own call to
+   * action, a plain fill: stated through the style tokens on the whole page,
+   * so a captured layout's titles and call to action wear them too, and a
+   * style overrides them. Its panel is not stated here: a captured layout's
+   * rail and cards keep their own look unless a style dresses them, and the
+   * host's panel falls back to its hairline below.
+   */
+  --heading-weight: 300;
+  --heading-tracking: -0.025em;
+  --action-shadow: none;
+
+  min-height: 100%;
+  background: var(--canvas);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.dark .app-host {
+  --canvas: #0b0d12;
+  --background: #12151c;
+  --foreground: #eef1f6;
+  --card: #12151c;
+  --popover: #171b24;
+  --primary: #eef1f6;
+  --primary-foreground: #0b0d12;
+  --secondary: #1c212b;
+  --muted: #1c212b;
+  --muted-foreground: #a3acbb;
+  --accent: #1c212b;
+  --border: #353c49;
+  --host-input: #191d25;
+  --ring: #8aa7ff;
+  --link: #8aa7ff;
+  color-scheme: dark;
+}
+
+/* ---- the frame ---- */
+.af {
+  --d: var(--density, 1);
+  --panel-radius: calc(var(--radius) * 1.5);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.af-band {
+  flex: none;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  background: var(--band, var(--background));
+  color: var(--on-band, var(--foreground));
+  border-bottom: 1px solid var(--border);
+  /* A team's band colour as a rule under the band, where the band itself is
+     drawn as the page (a dark page). */
+  box-shadow: inset 0 -3px 0 var(--band-rule, transparent);
+}
+.af-band-l {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.af-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.af-logo img {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+.af-logo img.wide {
+  height: 28px;
+}
+.af-logo img.on-dark,
+.dark .af-logo img.on-light {
+  display: none;
+}
+.dark .af-logo img.on-dark {
+  display: block;
+}
+.af-band-sep {
+  width: 1px;
+  height: 22px;
+  background: currentColor;
+  opacity: 0.3;
+}
+.af-band-app {
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.af-band-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklab, currentColor 30%, transparent);
+  font-size: 14px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+}
+
+/* ---- compose ---- */
+.af-page {
+  flex: 1;
+  padding: calc(56px * var(--d)) 24px calc(32px * var(--d));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.af-col {
+  width: min(100%, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(28px * var(--d));
+}
+.af-display {
+  font-family: var(--font-heading, inherit);
+  font-size: 36px;
+  line-height: 1.1;
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  text-wrap: balance;
+  margin: 0;
+}
+.af-lead {
+  font-size: 17px;
+  color: var(--muted-foreground);
+  margin: calc(12px * var(--d)) 0 0;
+  max-width: 62ch;
+  text-wrap: pretty;
+}
+.af-panel,
+.af [data-style-panel] {
+  /*
+   * A style's field fill (`--panel-field`) is part of its panel treatment, so
+   * it reaches the fields inside every panel the style dresses, the host's
+   * and a captured layout's rail and cards, and no others.
+   */
+  --input: var(--panel-field, var(--host-input));
+}
+.af-panel {
+  background: var(--panel-fill, var(--card));
+  border: var(--panel-edge-width, 1px) solid var(--panel-edge, var(--border));
+  box-shadow: var(--panel-shadow, none);
+  border-radius: var(--panel-radius);
+}
+.af-comp {
+  --cp: calc(28px * var(--d));
+  padding: var(--cp);
+}
+.af-act {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: calc(28px * var(--d)) calc(var(--cp) * -1) calc(var(--cp) * -1);
+  padding: calc(18px * var(--d)) var(--cp) var(--cp);
+  background: var(--panel-fill, var(--card));
+  border-top: 1px solid var(--panel-edge, var(--border));
+  border-radius: 0 0 var(--panel-radius) var(--panel-radius);
+}
+/* What scrolls under the action row fades into it, rather than being cut. */
+.af-act::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 1px);
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--panel-fill, var(--card)));
+  pointer-events: none;
+}
+.af-eta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.af-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  border: 0;
+  cursor: pointer;
+}
+/*
+ * The page's one action wears the style's call-to-action shadow, as a
+ * captured layout's does, so a page's two calls to action match. The host's
+ * secondary buttons do not.
+ */
+.af-btn:not(.ghost, .link) {
+  box-shadow: var(--action-shadow, none);
+}
+.af-btn.ghost {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  font-weight: 500;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.af-btn.link {
+  background: transparent;
+  color: var(--link);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.af-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/*
+ * The band's own ink, the colour its name and logo are set in, which reads
+ * on the band by construction. `--ring` is a team's accent ink, measured on
+ * the page and the panels but never on the team's header colour the band is
+ * filled with: on gov.uk's blue band it was blue on blue.
+ */
+.af-band-btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* ---- result ---- */
+.af-req {
+  flex: none;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+.af-req-i {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.af-req-l {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+.af-req .af-btn {
+  flex: none;
+  white-space: nowrap;
+}
+.af-stage {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: calc(40px * var(--d)) 24px calc(32px * var(--d));
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: calc(28px * var(--d));
+}
+.af-res-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+}
+.af-eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--link);
+  margin: 0 0 6px;
+}
+.af-res-title {
+  font-family: var(--font-heading, inherit);
+  text-wrap: balance;
+  font-size: 30px;
+  line-height: 1.12;
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  margin: 0;
+}
+.af-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.af-result {
+  padding: calc(28px * var(--d));
+}
+/*
+ * A heading inside a result is the run's content, not a title of the page, so
+ * the host's light titles never reach it: on a page with no style, or
+ * `quiet`, it keeps the kernel's own weight and tracking. A style does reach
+ * it, so a style's result reads in the style's own type.
+ */
+.app-host:not(.app-style) .af-result,
+.app-style-quiet .af-result {
+  --heading-weight: initial;
+  --heading-tracking: initial;
+}
+
+/*
+ * A narrow frame, under 640px: marked by `data-narrow`, which the frame sets
+ * from its own width (frame.tsx). Not a container query: a size container
+ * contains its layout, and so becomes the containing block of every
+ * `position: fixed` descendant, which pinned the kernel's dialogs and sheets
+ * to the frame rather than the viewport.
+ */
+.af[data-narrow] .af-page {
+  padding: calc(28px * var(--d)) 16px 20px;
+  align-items: stretch;
+}
+.af[data-narrow] .af-display {
+  font-size: 30px;
+}
+.af[data-narrow] .af-res-title {
+  font-size: 26px;
+}
+.af[data-narrow] .af-comp {
+  --cp: 18px;
+}
+.af[data-narrow] .af-act {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  /* Room under the button for its shadow, so the duration below is not in it. */
+  gap: 16px;
+}
+.af[data-narrow] .af-act .af-btn {
+  width: 100%;
+}
+.af[data-narrow] .af-act .af-eta {
+  justify-content: center;
+}
+.af[data-narrow] .af-stage {
+  padding: 24px 16px;
+}
+.af[data-narrow] .af-req-i {
+  padding: 8px 16px;
+}
+.af[data-narrow] .af-req-l {
+  display: none;
+}
+.af[data-narrow] .af-req .af-btn.ghost {
+  margin-left: auto;
+}
+.af[data-narrow] .af-res-head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.af[data-narrow] .af-result {
+  padding: 18px;
+}
+.af[data-narrow] .af-band {
+  padding: 0 16px;
+}
+/* On a phone the product keeps its name beside the logo, and History is
+   its icon alone, a 44px target. */
+.af[data-narrow] .af-band-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.af[data-narrow] .af-band-btn-label {
+  display: none;
+}

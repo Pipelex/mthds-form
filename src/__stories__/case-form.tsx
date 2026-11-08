@@ -13,6 +13,7 @@ import {
   type FieldEnv,
   type FieldPresentation,
 } from '../react';
+import { standInUpload } from './stand-in-upload';
 
 /**
  * The one harness every fixture-driven story renders through.
@@ -135,7 +136,7 @@ export function CaseForm({
       onDropFile: upload
         ? (id, file) => {
             const path = id.slice(pipeCode.length + 1).split('.');
-            const stored = { url: URL.createObjectURL(file), filename: file.name };
+            const stored = standInUpload(file);
             setFailures((previous) => {
               if (!previous?.has(id)) return previous;
               const next = new Map(previous);

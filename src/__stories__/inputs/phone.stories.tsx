@@ -4,6 +4,7 @@ import { DEFAULT_FIELD_STRINGS as S } from '../../react';
 import { CaseForm } from '../case-form';
 import { CONTRACTS, INPUT_FORM } from '../_generated/files';
 import { CONTRACTS as STATES, INPUT_FORM as STATES_FORM } from '../_generated/states';
+import { CONTRACTS as TRIPS, INPUT_FORM as TRIPS_FORM } from '../_generated/trips';
 import { TOUCH_TARGET, atWidth, expectClearOf, expectTouchTarget, pinnedTo } from '../touch-target';
 
 /**
@@ -251,6 +252,75 @@ export const OptionalFieldsDesktop: Story = {
       await expect({ width, height }).toEqual({ width: 44, height: 24 });
       // No invisible area on a desktop.
       await expect(getComputedStyle(control, '::after').content).toBe('none');
+    }
+  },
+};
+
+// ─── A structure in a structure, and choices ─────────────────────────────────
+
+const trip = {
+  contracts: TRIPS,
+  inputForm: TRIPS_FORM,
+  domain: 'trips',
+  pipeCode: 'plan_trip',
+};
+
+/**
+ * The narrowest the stay's city may be on a phone, two structures down: the
+ * form's 327 pixels less the request's card (a hairline and 12 pixels on each
+ * side) and the stay's rule (2 pixels and a 12 pixel gap), 287 pixels. When
+ * the stay was a second card inside the first, it was 259.
+ */
+const NESTED_FLOOR = 285;
+
+/** The size an element's text is set in, in pixels. */
+function fontSize(element: Element): number {
+  return Number.parseFloat(getComputedStyle(element).fontSize);
+}
+
+/**
+ * **A trip request on a phone**: a structure (the request) holding another
+ * (the stay), a list of structures (the travellers) and two choices set as
+ * segmented rows. The stay's city keeps most of the phone's width, because a
+ * structure inside a structure hangs its fields from a rule under its name
+ * rather than drawing a second box; the names read as headings over the
+ * fields' labels, the request's larger than the stay's; and every option of
+ * the two choices is 44 pixels tall or more.
+ */
+export const TripRequestPhone: Story = {
+  name: 'A structure in a structure and its choices, phone',
+  ...pinnedTo('phone'),
+  args: { ...trip, presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNoSidewaysScroll(canvasElement);
+    const canvas = within(canvasElement);
+    const cities = canvas.getAllByRole('textbox', { name: 'City' });
+    await expect(cities).toHaveLength(2);
+    for (const city of cities) {
+      await expect(city.getBoundingClientRect().width).toBeGreaterThanOrEqual(NESTED_FLOOR);
+    }
+    const [request] = canvas.getAllByText('Request');
+    const [stay] = canvas.getAllByText('Stay');
+    const [cityLabel] = canvas.getAllByText('City');
+    await expect(fontSize(request!)).toBeGreaterThan(fontSize(stay!));
+    await expect(fontSize(stay!)).toBeGreaterThan(fontSize(cityLabel!));
+    // The currency's four options and the pace's three, in each theme pane.
+    const options = canvas.getAllByRole('radio');
+    await expect(options).toHaveLength(2 * (4 + 3));
+    for (const option of options) await expectTouchTarget(option);
+  },
+};
+
+/** The same request on a desktop: each option the 36 pixels it always was. */
+export const TripRequestDesktop: Story = {
+  name: 'A structure in a structure and its choices, desktop',
+  ...pinnedTo('desktop'),
+  args: { ...trip, presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    await atWidth('desktop');
+    for (const option of within(canvasElement).getAllByRole('radio')) {
+      await expect(Math.round(option.getBoundingClientRect().height)).toBe(36);
     }
   },
 };

@@ -1,6 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { FileRunField, ObjectRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
@@ -92,7 +92,7 @@ describe('the run handler', () => {
     },
   };
 
-  it('calls the latest onRun over the latest store, not the ones it mounted with', () => {
+  it('calls the latest onRun over the latest store, not the ones it mounted with', async () => {
     const first = vi.fn();
     const second = vi.fn();
     const before = createStateStore({ inputs: { city: 'Lyon' } });
@@ -102,6 +102,10 @@ describe('the run handler', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Plan my trip' }));
     expect(first).toHaveBeenCalledWith({ inputs: { city: 'Lyon' } });
+    // The run guard outlasts the run by one task, as a person's next press does.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     rerender(<GenerativePage spec={CTA} store={after} scope={{}} onRun={second} brand={BRAND} />);
     fireEvent.click(screen.getByRole('button', { name: 'Plan my trip' }));

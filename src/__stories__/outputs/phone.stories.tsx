@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { CONTRACTS as COMPOSITES, OUTPUT_FORM as COMPOSITES_FORM } from '../_generated/composites';
+import { PAYLOADS as COMPOSITE_RUNS } from '../_generated/composites.payloads';
 import { CONTRACTS as RESULTS, OUTPUT_FORM as RESULTS_FORM } from '../_generated/results';
 import { PAYLOADS as RESULT_RUNS } from '../_generated/results.payloads';
-import { DEFAULT_FIELD_STRINGS as S } from '../../react';
+import { DEFAULT_FIELD_STRINGS as S, JsonView } from '../../react';
 import { ResultView } from '../result-view';
 import { atWidth, expectTouchTarget, pinnedTo } from '../touch-target';
 import { REPORT } from './media-payloads';
@@ -231,3 +233,124 @@ export const ScrollingTableDesktop: Story = {
     }
   },
 };
+
+// ─── A report of parts, and its Download ─────────────────────────────────────
+
+const launch = {
+  contracts: COMPOSITES,
+  outputForm: COMPOSITES_FORM,
+  domain: 'composites',
+  pipeCode: 'launch_report',
+  value: COMPOSITE_RUNS['composites.launch_report'],
+};
+
+/** The summary's own heading, which names it in place of its member's name. */
+const SUMMARY_HEADING = 'Launch Executive Summary';
+
+/**
+ * **A launch report of three parts, on a phone**, as a host that heads the
+ * result itself mounts it. The summary opens with its own heading, which
+ * names it, so its member's name ("Executive summary") is said to assistive
+ * technology and not drawn over it. The panel's Download, with nothing beside
+ * it, is drawn at the report's foot rather than alone at its top right, and is
+ * 44 pixels tall.
+ */
+export const LaunchReportPhone: Story = {
+  name: 'A report of parts and its Download, phone',
+  ...pinnedTo('phone'),
+  args: launch,
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNoSidewaysScroll(canvasElement);
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole('heading', { name: SUMMARY_HEADING })).toHaveLength(2);
+    for (const name of canvas.getAllByText('Executive summary')) {
+      await expect(name.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+    }
+    const downloads = canvas.getAllByRole('button', { name: S.download });
+    await expect(downloads).toHaveLength(2);
+    const tables = canvas.getAllByRole('table');
+    for (const download of downloads) {
+      await expectTouchTarget(download);
+      // Under the report, past its last table.
+      const table = tables.filter((candidate) => sameCanvas(candidate, download)).at(-1)!;
+      await expect(download.getBoundingClientRect().top).toBeGreaterThan(
+        table.getBoundingClientRect().bottom,
+      );
+    }
+  },
+};
+
+/** The same report on a desktop: the Download the 28 pixels it always was. */
+export const LaunchReportDesktop: Story = {
+  name: 'A report of parts and its Download, desktop',
+  ...pinnedTo('desktop'),
+  args: launch,
+  play: async ({ canvasElement }) => {
+    await atWidth('desktop');
+    for (const download of within(canvasElement).getAllByRole('button', { name: S.download })) {
+      await expect(sizeOf(download).height).toBe(28);
+    }
+  },
+};
+
+/**
+ * **The same report under the name a host gives it, with both views offered.**
+ * Beside a title and a view switch the Download stays in the header, and the
+ * switch's two buttons, like the Download, are 44 by 44 on a phone, and so is
+ * the JSON view's Copy JSON.
+ */
+export const LaunchReportSwitchPhone: Story = {
+  name: 'A named report and its view switch, phone',
+  ...pinnedTo('phone'),
+  args: { ...launch, name: 'launch_report', views: ['rendered', 'json'] },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNoSidewaysScroll(canvasElement);
+    const canvas = within(canvasElement);
+    const controls = [
+      ...canvas.getAllByRole('button', { name: S.download }),
+      ...canvas.getAllByRole('button', { name: S.viewRendered }),
+      ...canvas.getAllByRole('button', { name: S.viewJson }),
+    ];
+    await expect(controls).toHaveLength(6);
+    for (const control of controls) await expectTouchTarget(control);
+    // The JSON view's one action, Copy JSON, is a target of its own.
+    for (const json of canvas.getAllByRole('button', { name: S.viewJson }))
+      await userEvent.click(json);
+    const copies = await canvas.findAllByRole('button', { name: S.copyJson });
+    await expect(copies).toHaveLength(2);
+    for (const copy of copies) await expectTouchTarget(copy);
+  },
+};
+
+/**
+ * **A scalar's JSON, on a phone.** One line of JSON is shorter than the 44
+ * pixel Copy JSON button and its inset, so the block keeps a floor that holds
+ * the button inside its border rather than hanging it past the edge.
+ */
+export const ScalarJsonPhone: Story = {
+  name: "A scalar's JSON, phone",
+  ...pinnedTo('phone'),
+  args: text,
+  render: () => <JsonView value="Lisbon" />,
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    const copies = await within(canvasElement).findAllByRole('button', { name: S.copyJson });
+    await expect(copies).toHaveLength(2);
+    for (const copy of copies) {
+      await expectTouchTarget(copy);
+      const block = copy.parentElement?.querySelector('pre');
+      await expect(block).toBeTruthy();
+      const button = copy.getBoundingClientRect();
+      const box = block!.getBoundingClientRect();
+      await expect(button.bottom).toBeLessThanOrEqual(box.bottom);
+    }
+  },
+};
+
+/** Whether two elements are drawn in the same theme pane. */
+function sameCanvas(a: Element, b: Element): boolean {
+  const pane = (element: Element) => element.closest('.dark') !== null;
+  return pane(a) === pane(b);
+}

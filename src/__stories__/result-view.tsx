@@ -9,6 +9,7 @@ import {
   type FieldPresentation,
   type ResolveRendition,
   type ResolveUrl,
+  type StuffViewerView,
   type TableLayout,
 } from '../react';
 
@@ -66,6 +67,8 @@ export interface ResultViewProps {
   presentation?: FieldPresentation;
   /** The stuff's name, passed to `StuffViewer` as a host that knows it passes it. */
   name?: string;
+  /** The views the panel offers, passed to `StuffViewer` as a host passes them. */
+  views?: readonly StuffViewerView[];
   /** The host's resolver for a stored reference, on `ResultEnvProvider`. */
   resolveUrl?: ResolveUrl;
   /** The host's smaller copy of a picture, on `ResultEnvProvider`. */
@@ -99,6 +102,7 @@ export function ResultView({
   tableColumns,
   presentation = 'studio',
   name,
+  views,
   resolveUrl,
   resolveRendition,
   locale,
@@ -113,6 +117,7 @@ export function ResultView({
       value={value}
       {...(tableLayout ? { tableLayout } : {})}
       {...(name ? { name } : {})}
+      {...(views ? { views } : {})}
     />
   );
   const env =

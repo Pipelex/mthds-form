@@ -8,6 +8,7 @@ import {
   heroFields,
   layoutStory,
   makeLayoutPage,
+  onAPhone,
 } from './layout-page';
 
 /**
@@ -26,7 +27,7 @@ const fields = heroFields(
   'generate_design_proposals_from_rough_brief',
 );
 const Page = makeLayoutPage(fields, SPECS);
-const PINNED = 'pipelex-method--claude-4.8-opus';
+const PINNED = 'pipelex-method--gpt-6.1-sol';
 const layout = findFixture(
   SPECS,
   'slide_designer.generate_design_proposals_from_rough_brief',
@@ -42,6 +43,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Opus48: Story = layoutStory(layout, STOCK);
+export const Gpt61Sol: Story = layoutStory(layout, STOCK);
 export const MthdsTokens: Story = layoutStory(layout, MTHDS);
 export const PipelexTokens: Story = layoutStory(layout, PIPELEX);
+
+/** The pinned layout on a phone: its segmented choices at the 44 pixels a finger needs. */
+export const Gpt61SolPhone: Story = onAPhone(layoutStory(layout, STOCK));

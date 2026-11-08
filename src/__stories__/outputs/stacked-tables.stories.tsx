@@ -8,6 +8,7 @@ import { CONTRACTS as TABLES, OUTPUT_FORM as TABLES_FORM } from '../_generated/t
 import { PAYLOADS as TABLE_RUNS } from '../_generated/tables.payloads';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
 import { ResultView, itemsOf } from '../result-view';
+import { atWidth, pinnedTo } from '../touch-target';
 import { REPORT } from './media-payloads';
 
 /**
@@ -17,13 +18,17 @@ import { REPORT } from './media-payloads';
  * | The table shows… | At 343px | At 720px |
  * | --- | --- | --- |
  * | up to three columns | a table, wrapping | a table, wrapping |
+ * | three columns whose rows open, on a phone | blocks | (no phone is 720px wide) |
  * | four to six columns | one block of label and value pairs per row | a table, wrapping |
  * | more than six columns | blocks | blocks |
  *
  * 343px is what a 375px phone leaves inside 16px gutters, and 720px a result
  * column on a desktop. The width is the table's own box, read by a container
  * query, so each story pins the panel to it exactly rather than leaving it to
- * whatever the runner's viewport gives.
+ * whatever the runner's viewport gives. The stories about a phone's headers
+ * also pin a 375px viewport, below `sm`, where a row's chevron is 44px square
+ * in a 3.25rem column, and the panel at the 309px a host's padded panel leaves
+ * there.
  *
  * Every story asserts the one promise first, in a browser because jsdom lays
  * nothing out: no table's box is wider inside than out. Then it asserts which
@@ -58,6 +63,11 @@ const PHONE = 343;
 const NARROW_PHONE = 327;
 /** A result column on a desktop. */
 const COLUMN = 720;
+/**
+ * What a 375px phone leaves a host's result panel: 16px gutters on the page,
+ * then the panel's own 1px border and 16px padding on each side.
+ */
+const HOST_PANEL_ON_PHONE = 309;
 
 const lists = { contracts: LISTS, outputForm: LISTS_FORM, domain: 'lists' };
 const results = { contracts: RESULTS, outputForm: RESULTS_FORM, domain: 'results' };
@@ -362,6 +372,80 @@ export const FrenchWordsPhone: Story = {
       await expectTable(table, 3);
       await expectWordsWholeBesideName(table, 3);
     }
+  },
+};
+
+// ─── Headers on a phone ──────────────────────────────────────────────────────
+
+/** Every word of a table's header row that the browser broke across two lines. */
+function brokenHeaderWords(table: HTMLTableElement): string[] {
+  return [...table.tHead!.rows[0]!.cells]
+    .flatMap((cell) => wordsIn(cell))
+    .filter((word) => !word.whole)
+    .map((word) => `${word.text} (${word.width.toFixed(1)}px)`);
+}
+
+/**
+ * **An invoice's lines on a 375px phone, in a host's panel.** A name and two
+ * numbers, which fit a cell whole, so the rows cannot open and no chevron
+ * column is drawn. The columns beside the name then share all the box leaves
+ * them: a chevron column used to be reserved from that share anyway, 3.25rem on
+ * a phone, which left a host's invoice table too little for its header
+ * "Quantity" and broke it as "Quantit" over "y". Each value's word floor is
+ * read back from the browser, so the share is measured rather than assumed.
+ */
+export const InvoiceLinesPhone: Story = {
+  name: 'Invoice lines, 375px → no chevron, its share left to the columns',
+  ...pinnedTo('phone'),
+  args: {
+    ...results,
+    pipeCode: 'plural_result',
+    value: RESULT_RUNS['results.plural_result'],
+    width: HOST_PANEL_ON_PHONE,
+  },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNothingScrollsSideways(canvasElement);
+    for (const table of tablesIn(canvasElement)) {
+      await expectTable(table, 3);
+      await expect(table.querySelector('button')).toBeNull();
+      await expect(brokenHeaderWords(table)).toEqual([]);
+      const box = table.parentElement as HTMLElement;
+      // Two columns beside the name split what the name's floor (28cqw) and
+      // three cells' padding leave of the box, and nothing for a chevron.
+      const share = (0.72 * box.clientWidth - 3 * 24) / 2;
+      for (const row of table.tBodies[0]!.rows) {
+        for (const cell of valueCells(row).slice(1)) {
+          const floor = Number.parseFloat(getComputedStyle(cell, '::after').maxWidth);
+          await expect(floor).toBeCloseTo(share, 0);
+        }
+      }
+    }
+  },
+};
+
+/**
+ * **A contract's clauses on a 375px phone, in a host's panel.** Three columns
+ * of sentences whose rows open: on a phone the chevron's column takes 3.25rem
+ * around the 44px a finger is given, which leaves the two columns beside the
+ * subject about 48px each. As a table, its headers "Obligation" and
+ * "Exception" broke in the middle of the word, and kept whole they pushed the
+ * table past its box. So on a phone three columns whose rows open are blocks,
+ * as four to six are, each value labelled by the header it replaces.
+ */
+export const ThreeColumnsThatOpenPhone: Story = {
+  name: 'Three columns whose rows open, 375px → blocks',
+  ...pinnedTo('phone'),
+  args: {
+    pipeCode: 'clauses',
+    value: TABLE_RUNS['tables.clauses'],
+    tableColumns: 3,
+    width: HOST_PANEL_ON_PHONE,
+  },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    await expectNothingScrollsSideways(canvasElement);
+    for (const table of tablesIn(canvasElement)) await expectStacked(table, 3);
   },
 };
 
