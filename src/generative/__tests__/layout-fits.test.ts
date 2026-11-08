@@ -81,9 +81,9 @@ describe('a layout that has gone stale', () => {
       required: true,
       fields: [{ kind: 'object', name: 'extras', required: false, fields: [tone] }],
     };
-    expect(layoutProblems({ inputs: [city, beneathOptional] }, pageBinding('/inputs/city'))).toEqual(
-      [refusal('request')],
-    );
+    expect(
+      layoutProblems({ inputs: [city, beneathOptional] }, pageBinding('/inputs/city')),
+    ).toEqual([refusal('request')]);
 
     // A required structure beneath the optional one is no nearer the seed.
     const requiredBeneathOptional: RunField = {
@@ -118,9 +118,9 @@ describe('a layout that has gone stale', () => {
       required: true,
       fields: [{ kind: 'object', name: 'extras', required: true, fields: [tone] }],
     };
-    expect(layoutProblems({ inputs: [city, beneathRequired] }, pageBinding('/inputs/city'))).toEqual(
-      [],
-    );
+    expect(
+      layoutProblems({ inputs: [city, beneathRequired] }, pageBinding('/inputs/city')),
+    ).toEqual([]);
   });
 
   it('is refused when it binds a path no input has', () => {
