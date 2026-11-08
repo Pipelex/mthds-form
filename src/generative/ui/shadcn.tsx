@@ -176,13 +176,22 @@ export function Stack({
   justify?: keyof typeof JUSTIFY | null;
 }>) {
   const horizontal = props.direction === 'horizontal';
+  // A vertical stack asked to centre centres ONE column its children share,
+  // as wide as the widest of them and never wider than its box, rather than
+  // each child at its own width: `items-center` there gave a hero narrower
+  // than the form under it a different left edge from the form, and the page
+  // read ragged. Its children then fill the column, so their edges agree. A
+  // horizontal stack centres its children on the cross axis, one by one.
+  const column = !horizontal && props.align === 'center';
   return (
     <div
       className={cn(
         'flex',
         horizontal ? 'flex-row' : 'flex-col',
         pick(GAP, props.gap, 'md'),
-        pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
+        column
+          ? 'mx-auto w-fit max-w-full items-stretch'
+          : pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
         props.justify ? pick(JUSTIFY, props.justify, 'start') : undefined,
       )}
     >

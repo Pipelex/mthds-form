@@ -507,3 +507,42 @@ describe('a file input the page delegates to the kernel', () => {
     expect(screen.queryByText(DEFAULT_FIELD_STRINGS.uploadUnavailable)).not.toBeInTheDocument();
   });
 });
+
+describe('a stack asked to centre', () => {
+  const centred = (direction: 'vertical' | 'horizontal'): Spec => ({
+    root: 'stack',
+    elements: {
+      stack: {
+        type: 'Stack',
+        props: { direction, gap: null, align: 'center', justify: null },
+        children: ['title', 'body'],
+      },
+      title: { type: 'Heading', props: { text: 'Extract an invoice', level: 'h1' }, children: [] },
+      body: { type: 'Text', props: { text: 'Drop the PDF.', variant: null }, children: [] },
+    },
+  });
+  const stackOf = (container: HTMLElement) =>
+    container.querySelector('h1')!.parentElement!.className.split(/\s+/);
+
+  it('centres one column its children share when vertical, so their edges agree', () => {
+    // `items-center` set each child at its own width, so a heading narrower
+    // than the form under it started at a different left edge.
+    const { container } = render(
+      <GenerativePage spec={centred('vertical')} store={createStateStore({})} scope={{}} />,
+    );
+    const classes = stackOf(container);
+    expect(classes).toEqual(
+      expect.arrayContaining(['mx-auto', 'w-fit', 'max-w-full', 'items-stretch']),
+    );
+    expect(classes).not.toContain('items-center');
+  });
+
+  it('centres each child on the cross axis when horizontal', () => {
+    const { container } = render(
+      <GenerativePage spec={centred('horizontal')} store={createStateStore({})} scope={{}} />,
+    );
+    const classes = stackOf(container);
+    expect(classes).toContain('items-center');
+    expect(classes).not.toContain('mx-auto');
+  });
+});
