@@ -2,6 +2,7 @@ import type { Spec } from '@json-render/core';
 import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
 import { frameCatalog } from './catalog';
+import { isExpression } from './expressions';
 import { INPUTS_ROOT, RESULT_ROOT } from './paths';
 import { hasOwnProp } from '../core/own-property';
 
@@ -77,17 +78,6 @@ export interface SpecVerdict {
   problems: SpecProblem[];
 }
 
-const EXPRESSION_KEYS = [
-  '$state',
-  '$item',
-  '$index',
-  '$bindState',
-  '$bindItem',
-  '$cond',
-  '$computed',
-  '$template',
-];
-
 /**
  * The components whose `path` the layer resolves as written - the two escape
  * hatches, and the `Picture`, which shows a file the kind check will not read
@@ -106,15 +96,6 @@ const RUN_ACTION = 'run';
  * as the person edits or moves through the page.
  */
 const DELIBERATE_EVENTS: readonly string[] = ['press', 'submit'];
-
-function isExpression(value: unknown): boolean {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.keys(value).some((key) => EXPRESSION_KEYS.includes(key))
-  );
-}
 
 /** The value a zod issue path points at inside a prop's raw value. */
 function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {

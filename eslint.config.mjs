@@ -143,7 +143,7 @@ const HEADLESS_GENERATIVE_PATTERNS = [
   },
   {
     regex:
-      '^(?:\\.\\./)+react(?:/.*)?$|^\\.\\.?/(?:brand-context|frame-host|frame-registry|page|product-registry|registry|result-slot|ui(?:/.*)?)$',
+      '^(?:\\.\\./)+react(?:/.*)?$|^\\.\\.?/(?:brand-bar|brand-context|element-errors|frame-host|frame-registry|index|page|product-registry|registry|result-slot|ui(?:/.*)?)$',
     allowTypeImports: true,
     message:
       'A value import of the control set or of a renderer drags React into `./generative/headless`, which a host\'s server imports. See docs/dependency-budget.md.',

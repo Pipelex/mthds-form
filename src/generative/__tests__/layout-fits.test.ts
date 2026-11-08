@@ -1052,6 +1052,15 @@ describe("a share's parts", () => {
     ).toEqual([]);
   });
 
+  it('reads a part as an expression only by the keys json-render resolves, as the catalog check does', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([{ $label: 'x', category: 'Food', amount: 4 }]),
+      ),
+    ).toEqual([]);
+  });
+
   it('refuses a part written out as a null, a scalar, an expression or a structure missing a member', () => {
     expect(
       layoutProblems(

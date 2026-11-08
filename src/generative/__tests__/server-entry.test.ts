@@ -111,6 +111,10 @@ describe('the server entry, ./generative/headless', () => {
     // The control: the same import of the client entry fails, so the
     // condition above was in force and the pass is a fact about the entry.
     expect(control.code).not.toBe(0);
+    // And it fails for the reason the condition gives it - the server build of
+    // React has no context - rather than for one that would hide a harness no
+    // longer emulating the server.
+    expect(control.stderr).toMatch(/createContext/);
   }, 60_000);
 
   it('hashes, with the method shipped beside it, to the pin it exports', () => {

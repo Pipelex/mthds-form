@@ -2,6 +2,7 @@ import type { Spec } from '@json-render/core';
 import type { RunField, RunFieldKind } from '../core';
 import { hasOwnProp } from '../core/own-property';
 import { catalog } from './catalog';
+import { isExpression } from './expressions';
 import {
   INPUTS_ROOT,
   RESULT_ROOT,
@@ -260,11 +261,6 @@ function memberWords(name: string): string {
   return `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${JSON.stringify(name)}`;
 }
 
-/** Whether a value is a json-render expression - `{ "$state": ... }` and its kin - rather than a literal. */
-function isExpressionObject(value: object): boolean {
-  return Object.keys(value).some((name) => name.startsWith('$'));
-}
-
 /** What a path of `kind` holds, in the words of a refusal: "a structure", "a file", "a text value". */
 function kindWords(kind: RunFieldKind): string {
   if (kind === 'object') return 'a structure';
@@ -467,7 +463,7 @@ function nonScalarReads(
           problems.push(`${part} is ${shown}, not a structure; ${how}`);
           return false;
         }
-        if (isExpressionObject(entry)) {
+        if (isExpression(entry)) {
           problems.push(`${part} is an expression, not a structure; ${how}`);
           return false;
         }
