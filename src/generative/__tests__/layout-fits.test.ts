@@ -32,6 +32,23 @@ function pageBinding(...paths: string[]): Spec {
 }
 
 describe('a layout that has gone stale', () => {
+  it('is refused when it offers nothing of a required structure that requires no member', () => {
+    // The run needs the structure to hold something, so a page that offers
+    // none of its members is one nobody can complete.
+    const request: RunField = {
+      kind: 'object',
+      name: 'request',
+      required: true,
+      fields: [text('note', false), text('tone', false)],
+    };
+    const descriptor = { inputs: [text('city', true), request] };
+    const missing = layoutProblems(descriptor, pageBinding('/inputs/city'));
+    expect(missing.some((line) => line.includes('/inputs/request'))).toBe(true);
+    expect(layoutProblems(descriptor, pageBinding('/inputs/city', '/inputs/request/tone'))).toEqual(
+      [],
+    );
+  });
+
   it('is refused when it binds a path no input has', () => {
     const problems = layoutProblems({ inputs: [text('city', true)] }, pageBinding('/inputs/town'));
     expect(problems).toContain('/inputs/town is bound, and no input has it');
