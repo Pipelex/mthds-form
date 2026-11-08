@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import storybook from 'eslint-plugin-storybook';
@@ -112,15 +113,12 @@ const BRAND_PATTERNS = [
  *
  * `./generative/headless` exports the producer and the checks to a host's server,
  * where a module that touches React cannot load (docs/dependency-budget.md),
- * so every module it reaches is held off React and the rendering half's
- * dependencies. Those modules are the `.ts` files directly under
- * `src/generative/` - the renderers are `.tsx`, the split vitest's two
- * generative projects already read - and the entry's own index. A value
- * import of the control set or of one of the layer's renderers would drag
- * React in through a relative path no package pattern sees, so both are named
- * too; a type import is erased and stays allowed. `scripts/assert-bundle.mjs`
- * holds the entry to an allow-list of `@json-render/core` and `zod` on the
- * built graph, which is the backstop for a renderer added after this list.
+ * so every module it reaches is held off React, the rendering half's
+ * dependencies and the run gate's validator. Those modules are the `.ts` files
+ * directly under `src/generative/` - the renderers are `.tsx`, the split
+ * vitest's two generative projects already read - and every module under the
+ * entry's own directory. The packages are named here; what a relative import
+ * reaches is the rule below's, since no specifier pattern can say it.
  */
 const HEADLESS_GENERATIVE_PATTERNS = [
   {
@@ -137,18 +135,123 @@ const HEADLESS_GENERATIVE_PATTERNS = [
       'clsx',
       'tailwind-merge',
       'marked',
+      'ajv',
+      'ajv/*',
+      'ajv-formats',
     ],
     message:
-      'This module is in the half of the generative layer that renders nothing, which `./generative/headless` exports to a host\'s server: React and the rendering half\'s dependencies belong in a `.tsx` module. See docs/dependency-budget.md.',
-  },
-  {
-    regex:
-      '^(?:\\.\\./)+react(?:/.*)?$|^\\.\\.?/(?:\\.\\./)*(?:generative/)?(?:brand-bar|brand-context|element-errors|frame-host|frame-registry|index|page|product-registry|registry|result-slot|ui(?:/.*)?)$',
-    allowTypeImports: true,
-    message:
-      'A value import of the control set or of a renderer drags React into `./generative/headless`, which a host\'s server imports. See docs/dependency-budget.md.',
+      'This module is in the half of the generative layer that renders nothing, which `./generative/headless` exports to a host\'s server: React, the rendering half\'s dependencies and the run gate\'s validator stay out of it. See docs/dependency-budget.md.',
   },
 ];
+
+const SRC = path.join(dirname, 'src');
+const CLIENT_ENTRY = path.join(SRC, 'generative', 'index.ts');
+const CONTROL_SET = path.join(SRC, 'react');
+
+/** The file a relative specifier names, as the bundler resolves it, or nothing. */
+function resolveRelative(fromFile, specifier) {
+  const base = path.resolve(path.dirname(fromFile), specifier.replace(/\.(?:[cm]?js|tsx?)$/, ''));
+  const candidates = [`${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts'), path.join(base, 'index.tsx')];
+  return candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile());
+}
+
+/** The specifiers a module's value imports and re-exports name - a type-only one is erased, and left out. */
+function valueSpecifiers(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const found = [];
+  const clauses = /(?:^|\n)\s*(?:import|export)\s+([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/g;
+  for (const [, clause, specifier] of text.matchAll(clauses)) {
+    const typeOnly =
+      /^type\b/.test(clause) ||
+      (/^\{[\s\S]*\}$/.test(clause) &&
+        clause
+          .slice(1, -1)
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .every((part) => part.startsWith('type ')));
+    if (!typeOnly) found.push(specifier);
+  }
+  for (const [, specifier] of text.matchAll(/(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g)) found.push(specifier);
+  return found;
+}
+
+/** Whether a module reaches ajv through value imports, at any depth. */
+const reachesAjvMemo = new Map();
+function reachesAjv(file) {
+  if (reachesAjvMemo.has(file)) return reachesAjvMemo.get(file);
+  reachesAjvMemo.set(file, false);
+  const reaches = valueSpecifiers(file).some((specifier) => {
+    if (/^ajv(?:-formats)?(?:\/|$)/.test(specifier)) return true;
+    if (!specifier.startsWith('.')) return false;
+    const target = resolveRelative(file, specifier);
+    return target !== undefined && reachesAjv(target);
+  });
+  reachesAjvMemo.set(file, reaches);
+  return reaches;
+}
+
+/**
+ * The half that renders nothing reaches no module that renders, judged by the
+ * module a relative import RESOLVES to rather than by how its specifier is
+ * spelt: a `.tsx` renderer, the client entry (`src/generative/index.ts`,
+ * however its directory is named), or the control set. A list of renderer
+ * names went stale with each renderer added and missed a barrel imported by
+ * its directory. And it reaches no kernel module that value-imports ajv at
+ * any depth, which only following the imports can tell. A type import is
+ * erased and stays allowed. `scripts/assert-bundle.mjs` holds the built entry
+ * to its allow-list, the backstop this rule cannot be.
+ */
+const headlessImportsRule = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      renders:
+        'A value import of {{what}} drags React into `./generative/headless`, which a host\'s server imports. See docs/dependency-budget.md.',
+      ajv: 'A value import of `{{specifier}}` reaches ajv, which `./generative/headless` does not carry: import the specific module that does not. See docs/dependency-budget.md.',
+    },
+  },
+  create(context) {
+    const filename = context.filename;
+    const judge = (node, specifier) => {
+      if (typeof specifier !== 'string' || !specifier.startsWith('.')) return;
+      const target = resolveRelative(filename, specifier);
+      if (target === undefined) return;
+      const what = target.endsWith('.tsx')
+        ? `the renderer \`${specifier}\``
+        : target === CLIENT_ENTRY
+          ? `the client entry \`${specifier}\``
+          : target.startsWith(`${CONTROL_SET}${path.sep}`)
+            ? `the control set \`${specifier}\``
+            : undefined;
+      if (what !== undefined) {
+        context.report({ node, messageId: 'renders', data: { what } });
+      } else if (reachesAjv(target)) {
+        context.report({ node, messageId: 'ajv', data: { specifier } });
+      }
+    };
+    const typeOnly = (node) =>
+      node.importKind === 'type' ||
+      node.exportKind === 'type' ||
+      (node.specifiers?.length > 0 &&
+        node.specifiers.every((s) => s.importKind === 'type' || s.exportKind === 'type'));
+    return {
+      ImportDeclaration(node) {
+        if (!typeOnly(node)) judge(node.source, node.source.value);
+      },
+      ExportNamedDeclaration(node) {
+        if (node.source && !typeOnly(node)) judge(node.source, node.source.value);
+      },
+      ExportAllDeclaration(node) {
+        if (node.exportKind !== 'type') judge(node.source, node.source.value);
+      },
+      ImportExpression(node) {
+        if (node.source.type === 'Literal') judge(node.source, node.source.value);
+      },
+    };
+  },
+};
 
 const TERRAZZO_PATTERN = {
   group: ['@terrazzo/*'],
@@ -265,13 +368,19 @@ export default tseslint.config(
   {
     // The half of the generative layer that renders nothing, which the server
     // entry reaches. Listed after the block above so its patterns win here.
-    files: ['src/generative/*.ts', 'src/generative/headless/**/*.ts'],
+    files: [
+      'src/generative/*.ts',
+      'src/generative/headless/**/*.ts',
+      'src/generative/headless/**/*.tsx',
+    ],
     ignores: ['src/generative/index.ts'],
+    plugins: { mthds: { rules: { 'headless-imports': headlessImportsRule } } },
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
         { patterns: [...BUDGET_PATTERNS, CORE_BARREL_PATTERN, ...HEADLESS_GENERATIVE_PATTERNS] },
       ],
+      'mthds/headless-imports': 'error',
     },
   },
   {
