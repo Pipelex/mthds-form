@@ -24,8 +24,10 @@ export const statedFactsSchema = z.strictObject({
     .optional(),
   /**
    * The logo for a canvas: `logo.onLight` or `logo.onDark` in the manifest,
-   * which the brand must carry exactly, so it obeys the manifest's rule (http
-   * or https) or no brand could ever honour it.
+   * which the brand must carry exactly. It is held to the http(s) half of the
+   * manifest's logo rule, so a manifest can always carry it; the manifest's
+   * other half, a root-relative path, names a file on the host serving the
+   * page, which means nothing as a fact stated beside another site's URL.
    */
   logo: z
     .strictObject({

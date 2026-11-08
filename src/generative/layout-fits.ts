@@ -389,6 +389,39 @@ function nonScalarReads(
         `${key}: ${prop} takes a list of values, and ${path} is a list of ${of}; a list of ${of} is laid out as a repeat or a DataTable`,
       );
     };
+    // A share's parts are read by member name, so a list of scalars or a
+    // misspelt key would draw an empty bar with nothing to say why; it is
+    // refused here instead, and the page falls back.
+    const checkShares = (path: string): void => {
+      if (element.type !== 'ProportionBar' || !isUnder(root, path)) return;
+      const field = fieldAt(path);
+      if (field?.kind !== 'list') return;
+      if (field.item.kind !== 'object') {
+        problems.push(
+          `${key}: ProportionBar reads ${path}, a list of ${field.item.kind} values; its parts are structures, each with a label member and a number member`,
+        );
+        return;
+      }
+      const members = field.item.fields;
+      const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
+      const member = (name: unknown) =>
+        typeof name === 'string' ? members.find((m) => m.name === name) : undefined;
+      if (!member(labelKey)) {
+        problems.push(
+          `${key}: ProportionBar's labelKey ${JSON.stringify(labelKey)} is no member of ${path}'s items`,
+        );
+      }
+      const value = member(valueKey);
+      if (!value) {
+        problems.push(
+          `${key}: ProportionBar's valueKey ${JSON.stringify(valueKey)} is no member of ${path}'s items`,
+        );
+      } else if (value.kind !== 'number') {
+        problems.push(
+          `${key}: ProportionBar's valueKey ${JSON.stringify(valueKey)} holds a ${value.kind}, not a number`,
+        );
+      }
+    };
     const walk = (prop: string, value: unknown): void => {
       if (Array.isArray(value)) {
         value.forEach((entry) => walk(prop, entry));
@@ -416,10 +449,15 @@ function nonScalarReads(
       }
       if (typeof value !== 'object' || value === null) continue;
       const record = value as Record<string, unknown>;
-      if (typeof record.$state === 'string') checkList(prop, record.$state, items);
-      if (typeof record.$item === 'string') {
-        const path = itemPath(record.$item);
-        if (path !== undefined) checkList(prop, path, items);
+      const listPath =
+        typeof record.$state === 'string'
+          ? record.$state
+          : typeof record.$item === 'string'
+            ? itemPath(record.$item)
+            : undefined;
+      if (listPath !== undefined) {
+        checkList(prop, listPath, items);
+        if (prop === 'items') checkShares(listPath);
       }
     }
   }
@@ -543,6 +581,31 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     if (element.type === 'MthdsResult') {
       if (!path || !descriptor.result || !resultFieldAtPath(descriptor.result, path)) {
         problems.push(`${key}: MthdsResult delegates ${String(written)}, which no result has`);
+      }
+    }
+    // A repeat renders its element ONCE and that element's children once per
+    // item, so a Grid whose only child carries the repeat is a grid of one
+    // cell holding every item in a column: three directions in a third of
+    // the page, the rest empty. The repeat belongs on the Grid.
+    const [onlyKey] = element.children?.length === 1 ? element.children : [];
+    const only = onlyKey === undefined ? undefined : spec.elements[onlyKey];
+    if (element.type === 'Grid' && element.repeat === undefined && only?.repeat !== undefined) {
+      problems.push(
+        `${key}: Grid's only child ${onlyKey} carries the repeat, so every item lands in one cell; put the repeat on ${key} itself, with the item's element as its child`,
+      );
+    }
+    // A picture names its path literally, as a hatch does, because an image is
+    // a file the kind check refuses to read into a prop; so it is held here to
+    // what a hatch is held to, and to the one kind it can show. Inside a repeat
+    // over a list of images, "" is the item itself.
+    if (element.type === 'Picture') {
+      const shown = written === '' ? repeatBasePathOf(spec, key, parents) : (path ?? undefined);
+      const field =
+        shown && descriptor.result ? resultFieldAtPath(descriptor.result, shown) : undefined;
+      if (!field) {
+        problems.push(`${key}: Picture shows ${JSON.stringify(written)}, which no result has`);
+      } else if (field.kind !== 'image') {
+        problems.push(`${key}: Picture shows ${shown}, which holds a ${field.kind}, not an image`);
       }
     }
   }

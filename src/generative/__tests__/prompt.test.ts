@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { PRODUCT_COMPONENTS, catalog } from '../catalog';
 import { CUSTOM_COMPONENTS, PICKED_SHADCN } from '../components';
 import { designerCatalog } from '../designer-catalog';
+import { COMPOSER_COMPONENTS, FRAMES, RESULT_COMPONENTS } from '../frame-definitions';
 import { PROMPT_HASH, promptHashSubject } from '../prompt-hash';
 import { propsSignature } from '../props-signature';
 
@@ -42,7 +43,7 @@ describe('the catalog as the designer method receives it', () => {
   >;
 
   it('hashes, with the method, to the pin every stored layout is compared against', () => {
-    expect(promptHashOf(promptHashSubject(METHOD, data))).toBe(PROMPT_HASH);
+    expect(promptHashOf(promptHashSubject(METHOD))).toBe(PROMPT_HASH);
   });
 
   it('lists every component of the catalog, in the order the vocabulary states', () => {
@@ -276,5 +277,49 @@ describe('the designer method, as package data', () => {
     ).toBeNull();
     expect(templates).toContain('"$$state"');
     expect(templates).toContain('`$$bindState`');
+  });
+});
+
+describe('the catalog of each frame', () => {
+  const names = (frame: (typeof FRAMES)[number]) =>
+    designerCatalog({ frame }).components.map((component) => component.name);
+
+  it("keeps the page frame the product page, with none of the frames' own components", () => {
+    expect(names('page')).toEqual(designerCatalog().components.map((component) => component.name));
+    for (const name of [...COMPOSER_COMPONENTS, ...RESULT_COMPONENTS]) {
+      expect(names('page')).not.toContain(name);
+    }
+  });
+
+  it('leaves out of both moments what the host draws, and the side panel', () => {
+    for (const frame of ['composer', 'result'] as const) {
+      for (const name of ['AppBar', 'Footer', 'Workspace', 'Rail', 'Cta', 'Button', 'Hero']) {
+        expect(names(frame), `${frame}: ${name}`).not.toContain(name);
+      }
+    }
+  });
+
+  it('gives the composer its frame and the inputs, and no result', () => {
+    const composer = names('composer');
+    expect(composer).toEqual(expect.arrayContaining([...COMPOSER_COMPONENTS, 'MthdsField']));
+    for (const name of ['MthdsResult', 'DataTable', 'ResultHeader', 'Picture']) {
+      expect(composer).not.toContain(name);
+    }
+  });
+
+  it('gives the result page its header and its figures, and no input', () => {
+    const result = names('result');
+    expect(result).toEqual(expect.arrayContaining([...RESULT_COMPONENTS, 'MthdsResult']));
+    for (const name of ['MthdsField', 'Input', 'Segmented', 'Composer', 'FieldGroup']) {
+      expect(result).not.toContain(name);
+    }
+  });
+
+  it("hashes every frame's catalog with the method, in a fixed order", () => {
+    const subject = promptHashSubject(METHOD);
+    expect(subject.startsWith(`${METHOD}\n`)).toBe(true);
+    expect(JSON.parse(subject.slice(METHOD.length + 1))).toEqual(
+      FRAMES.map((frame) => designerCatalog({ frame })),
+    );
   });
 });

@@ -15,6 +15,9 @@
  * reads it off the generated module.
  */
 
+import { APP_STYLE_IDS, type AppStyleId } from '../brand/styles';
+import type { Frame } from '../generative/frame-definitions';
+
 /** Where a hero's case lives, and what the fixtures pass did to it. */
 export type HeroSource = 'structures' | 'methods';
 
@@ -40,6 +43,48 @@ export interface Hero {
    * is the sentence (see `heroSummary`).
    */
   summary?: string;
+  /**
+   * The frames the hero is designed in. Absent, both of its side's: a whole
+   * product page, and the moment of a host's compose-then-result app its side
+   * is (`composer` for an input hero, `result` for a result one), the latter in
+   * every app style. A hero whose pipe already has a page on the other side
+   * names its moment alone, so the two pages of one pipe never share a brief.
+   */
+  frames?: readonly Frame[];
+}
+
+/** The frames a hero is designed in: its own, or both of its side's. */
+export function framesOf(hero: Hero): readonly Frame[] {
+  return hero.frames ?? (hero.side === 'input' ? ['page', 'composer'] : ['page', 'result']);
+}
+
+/** One brief a hero is designed from: a whole page with no style, or a moment of a host's app in one. */
+export type Variant =
+  { frame: 'page'; style?: undefined } | { frame: Exclude<Frame, 'page'>; style: AppStyleId };
+
+/** Every variant of a hero: each of its frames, a moment of a host's app in every app style. */
+export function variantsOf(hero: Hero): Variant[] {
+  return framesOf(hero).flatMap((frame): Variant[] =>
+    frame === 'page' ? [{ frame }] : APP_STYLE_IDS.map((style) => ({ frame, style })),
+  );
+}
+
+/**
+ * The name a variant's brief is filed under in `data/briefs/`: the pipe ref
+ * for a whole page, then the frame and the style for a moment of a host's app,
+ * `trip_planner.plan_trip.composer.soft`.
+ */
+export function briefKey(hero: Hero, variant: Variant): string {
+  const pipeRef = pipeRefOf(hero);
+  return variant.frame === 'page' ? pipeRef : `${pipeRef}.${variant.frame}.${variant.style}`;
+}
+
+/** The hero a captured layout was written for: its pipe, in the frame the capture names. */
+export function heroOfCapture(capture: { pipeRef: string; frame?: Frame }): Hero | undefined {
+  const frame = capture.frame ?? 'page';
+  return HEROES.find(
+    (hero) => pipeRefOf(hero) === capture.pipeRef && framesOf(hero).includes(frame),
+  );
 }
 
 export const HEROES: readonly Hero[] = [
@@ -107,6 +152,55 @@ export const HEROES: readonly Hero[] = [
     domain: 'summarize_people',
     pipeCode: 'summarize_people',
     title: 'People summaries',
+  },
+  // The three methods a host's compose-then-result app was drawn for: a trip
+  // planner and a slide designer written here, each ending on a structure a
+  // result page can lay out, and the invoice extractor as the library carries
+  // it. Each names the moments it is drawn in where its side's defaults would
+  // design a whole page the corpus already has.
+  {
+    side: 'input',
+    source: 'methods',
+    caseName: 'plan_trip',
+    domain: 'trip_planner',
+    pipeCode: 'plan_trip',
+    title: 'Trip planner',
+  },
+  {
+    side: 'result',
+    source: 'methods',
+    caseName: 'plan_trip',
+    domain: 'trip_planner',
+    pipeCode: 'plan_trip',
+    title: 'Trip planner',
+    frames: ['result'],
+  },
+  {
+    side: 'result',
+    source: 'methods',
+    caseName: 'extract_invoice',
+    domain: 'invoice_extraction',
+    pipeCode: 'process_invoice',
+    title: 'Invoice extraction',
+    frames: ['result'],
+  },
+  {
+    side: 'input',
+    source: 'methods',
+    caseName: 'slide_directions',
+    domain: 'slide_directions',
+    pipeCode: 'generate_design_proposals_from_rough_brief',
+    title: 'Slide directions',
+    frames: ['composer'],
+  },
+  {
+    side: 'result',
+    source: 'methods',
+    caseName: 'slide_directions',
+    domain: 'slide_directions',
+    pipeCode: 'generate_design_proposals_from_rough_brief',
+    title: 'Slide directions',
+    frames: ['result'],
   },
 ];
 

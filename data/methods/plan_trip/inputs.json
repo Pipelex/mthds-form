@@ -1,0 +1,12 @@
+{
+  "request": {
+    "concept": "trip_planner.TripRequest",
+    "content": {
+      "title": "Lisbon in April",
+      "stay": { "city": "Lisbon", "country": "Portugal", "arriving_on": "2027-04-14", "leaving_on": "2027-04-19", "must_see": ["Belém Tower", "Sintra", "LX Factory"] },
+      "travellers": [ { "name": "Maya Okafor", "age": 38, "dietary": "Vegetarian" }, { "name": "Tom Okafor", "age": 40 }, { "name": "Ada Okafor", "age": 9 } ],
+      "budget": 3200, "currency": "EUR", "pace": "balanced", "style": "family", "with_children": true,
+      "notes": "Ada loves trams and anything with pastries. We would like one day out of the city."
+    }
+  }
+}

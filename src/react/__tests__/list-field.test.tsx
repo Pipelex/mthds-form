@@ -305,3 +305,27 @@ describe('a host that reports the moves it makes', () => {
     expect(second?.isConnected).toBe(false);
   });
 });
+
+describe("a structured row's fields take the row's width", () => {
+  const traveller: ListRunField['item'] = {
+    kind: 'object',
+    name: 'traveller',
+    conceptRef: 'trip.Traveller',
+    required: true,
+    fields: [{ ...textItem, name: 'name' }],
+  };
+
+  it('puts the number and the remove button on a line above the fields, which span the row', () => {
+    const { container } = render(<Harness field={listOf(traveller)} initial={[{ name: 'Ada' }]} />);
+    const row = container.querySelector<HTMLElement>('[data-list-row]')!;
+    const fields = row.querySelector('input')!.closest('[data-list-row] > div') as HTMLElement;
+    expect(row.className).toMatch(/\bgrid\b/);
+    expect(fields.className).toMatch(/\bcol-span-3\b/);
+    expect(removeButtons()[0]!.className).toMatch(/\brow-start-1\b/);
+  });
+
+  it('keeps a scalar row on one line, its input beside the button', () => {
+    const { container } = render(<Harness field={listOf(textItem)} initial={['x']} />);
+    expect(container.querySelector<HTMLElement>('[data-list-row]')!.className).toMatch(/\bflex\b/);
+  });
+});

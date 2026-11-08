@@ -21,7 +21,7 @@ import {
 
 const fields = heroFields(CONTRACTS, INPUT_FORM, 'summarize_people', 'summarize_people');
 const Page = makeLayoutPage(fields, SPECS);
-const PINNED = 'pipelex-method--claude-4.8-opus';
+const PINNED = 'pipelex-method--gpt-6.1-sol';
 const layout = findFixture(SPECS, 'summarize_people.summarize_people', PINNED);
 
 const meta = {
@@ -33,6 +33,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Opus48: Story = layoutStory(layout, STOCK);
+export const Gpt61Sol: Story = layoutStory(layout, STOCK);
 export const MthdsTokens: Story = layoutStory(layout, MTHDS);
 export const PipelexTokens: Story = layoutStory(layout, PIPELEX);

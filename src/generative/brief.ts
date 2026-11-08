@@ -5,7 +5,9 @@ import {
   isNativeHtmlNode,
   isNativeValueNode,
 } from '../core/native-content';
-import type { Brief, PathEntry } from '../generated/layout-design/types';
+import { APP_STYLES, type AppStyleId } from '../brand/styles';
+import type { Brief, PathEntry, Style } from '../generated/layout-design/types';
+import type { Frame } from './frame-definitions';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
 
 /**
@@ -42,6 +44,8 @@ import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
 export type DesignerBrief = Brief;
 /** One path of the brief: where it is, what it holds, what constrains it, whether the kernel keeps it. */
 export type DesignerPathEntry = PathEntry;
+/** The style a brief carries: its name and its direction, as `APP_STYLES` states them. */
+export type DesignerStyle = Style;
 
 /** The concept a run request names for the `brief` input: the method's own, domain-qualified. */
 export const DESIGNER_BRIEF_CONCEPT = 'generative.Brief';
@@ -55,6 +59,8 @@ export const DESIGNER_BRIEF_CONCEPT = 'generative.Brief';
  * the pass that made it.
  */
 const RUN_COMPONENT = 'Cta';
+/** In a host's composer frame the composer itself runs the method: its foot is the host's action row. */
+const COMPOSER_RUN_COMPONENT = 'Composer';
 
 export interface BriefSubject {
   /** `results.nested_result`. */
@@ -98,9 +104,16 @@ export function isDelegatedInput(field: RunField): boolean {
  * predicates refuse a `list` node, because a list of dates is a list and not a
  * date, but no catalog component reads a date's `{date, time}` either, so the
  * kernel renders the list whole - one value per line, as the result view does.
+ *
+ * The result frame's vocabulary shows two of them itself: a picture
+ * (`Picture`) and a date in words (`DateText`), so on a result page written
+ * for that frame neither is delegated. A date with a time stays delegated:
+ * `DateText` writes the day alone, and the kernel's result shows the time.
  */
-export function isDelegatedResult(field: RunField): boolean {
+export function isDelegatedResult(field: RunField, frame: Frame = 'page'): boolean {
   if (isNativeValueNode(field)) return true;
+  if (frame === 'result' && (field.kind === 'image' || (field.kind === 'date' && !field.datetime)))
+    return false;
   if (field.kind === 'list' && isNativeValueNode(field.item)) return true;
   return (
     field.kind === 'document' ||
@@ -195,6 +208,7 @@ function entryOf(
   side: Side,
   relative: boolean,
   seeded: boolean,
+  frame: Frame = 'page',
 ): DesignerPathEntry {
   const notes = constraints(field);
   return {
@@ -209,7 +223,7 @@ function entryOf(
     notes: notes.length > 0 ? notes : undefined,
     default:
       seeded || field.defaultValue === undefined ? undefined : JSON.stringify(field.defaultValue),
-    delegated: side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field),
+    delegated: side === 'input' ? isDelegatedInput(field) : isDelegatedResult(field, frame),
     relative: relative ? true : undefined,
   };
 }
@@ -227,8 +241,9 @@ function describe(
   side: Side,
   entries: DesignerPathEntry[],
   seeded = false,
+  frame: Frame = 'page',
 ): void {
-  const entry = entryOf(field, path, depth, side, false, seeded);
+  const entry = entryOf(field, path, depth, side, false, seeded, frame);
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
@@ -239,17 +254,17 @@ function describe(
     const seededBelow =
       seeded || field.defaultValue !== undefined || (side === 'input' && !field.required);
     for (const child of field.fields) {
-      describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow);
+      describe(child, joinPath(path, child.name), depth + 1, side, entries, seededBelow, frame);
     }
   }
   if (field.kind === 'list' && side === 'result') {
     const item = field.item;
     entry.item_kind = kindLabel(item);
     entry.item_description = item.description;
-    if (item.kind === 'object' && !isDelegatedResult(item)) {
+    if (item.kind === 'object' && !isDelegatedResult(item, frame)) {
       entry.item_laid_out = true;
       for (const child of item.fields) {
-        describeRelative(child, child.name, depth + 2, entries);
+        describeRelative(child, child.name, depth + 2, entries, side, frame);
       }
     }
   }
@@ -261,46 +276,115 @@ function describeRelative(
   relativePath: string,
   depth: number,
   entries: DesignerPathEntry[],
+  side: Side = 'result',
+  frame: Frame = 'page',
 ): void {
-  const entry = entryOf(field, relativePath, depth, 'result', true, false);
+  const entry = entryOf(field, relativePath, depth, side, true, false, frame);
   entries.push(entry);
   if (entry.delegated) return;
   if (field.kind === 'object') {
     for (const child of field.fields) {
-      describeRelative(child, joinPath(relativePath, child.name), depth + 1, entries);
+      describeRelative(child, joinPath(relativePath, child.name), depth + 1, entries, side, frame);
     }
   }
-  if (field.kind === 'list') {
+  if (field.kind === 'list' && side === 'result') {
     const item = field.item;
     entry.item_kind = kindLabel(item);
     entry.item_description = item.description;
-    if (item.kind === 'object' && !isDelegatedResult(item)) {
+    if (item.kind === 'object' && !isDelegatedResult(item, frame)) {
       entry.item_laid_out = true;
       for (const child of item.fields) {
-        describeRelative(child, joinPath(relativePath, '<i>', child.name), depth + 2, entries);
+        describeRelative(
+          child,
+          joinPath(relativePath, '<i>', child.name),
+          depth + 2,
+          entries,
+          side,
+          frame,
+        );
       }
     }
   }
 }
 
+/**
+ * What one run gives back, one line per member of the result (of one item,
+ * for a list), from the result's own titles and descriptions - so a composer
+ * can say what comes back before the run.
+ */
+function returnsOf(result: RunField): string[] {
+  const shape = result.kind === 'list' ? result.item : result;
+  const members = shape.kind === 'object' ? shape.fields : [shape];
+  return members.map((member) => {
+    const title = member.title ?? member.name.replace(/_/g, ' ');
+    return member.description && member.description !== title
+      ? `${title}: ${member.description}`
+      : title;
+  });
+}
+
+/** The style a brief carries, read off `APP_STYLES`: its name and its direction, as data. */
+function styleOf(style: AppStyleId | undefined): DesignerStyle | undefined {
+  if (!style) return undefined;
+  const { name, direction } = APP_STYLES[style];
+  return { name, direction };
+}
+
+/** How an input page's brief is built: the frame it is written for, the team's style, and what a run returns. */
+export interface InputBriefOptions {
+  /** `page` (the default), a whole product page; `composer`, the inputs of a host's compose-then-result app. */
+  frame?: Extract<Frame, 'page' | 'composer'>;
+  /**
+   * The style the team's apps wear. The brief carries its name and its
+   * direction, which the composition follows; its faces, radii and panels are
+   * the components' to draw and never reach the brief. Absent, the brief
+   * names no style.
+   */
+  style?: AppStyleId;
+  /** The result's descriptor, from which a composer's brief says what one run gives back. */
+  result?: RunField;
+}
+
+/** How a result page's brief is built: the frame it is written for and the team's style. */
+export interface ResultBriefOptions {
+  /** `page` (the default), a whole product page; `result`, the result page of a host's compose-then-result app. */
+  frame?: Extract<Frame, 'page' | 'result'>;
+  /** The style the team's apps wear (see `InputBriefOptions.style`). */
+  style?: AppStyleId;
+}
+
 /** The brief for an INPUT page: the form a run is started from. */
-export function inputBrief(subject: BriefSubject, fields: readonly RunField[]): DesignerBrief {
+export function inputBrief(
+  subject: BriefSubject,
+  fields: readonly RunField[],
+  { frame = 'page', style, result }: InputBriefOptions = {},
+): DesignerBrief {
   const paths: DesignerPathEntry[] = [];
-  for (const field of fields) describe(field, joinPath(INPUTS_ROOT, field.name), 0, 'input', paths);
+  for (const field of fields) {
+    describe(field, joinPath(INPUTS_ROOT, field.name), 0, 'input', paths, false, frame);
+  }
   return {
     side: 'input',
+    frame,
     pipe_ref: subject.pipeRef,
     description: subject.description,
     name: subject.name,
     paths,
-    run_control: RUN_COMPONENT,
+    run_control: frame === 'composer' ? COMPOSER_RUN_COMPONENT : RUN_COMPONENT,
+    ...(frame === 'composer' && result ? { returns: returnsOf(result) } : {}),
+    ...(style ? { style: styleOf(style) } : {}),
   };
 }
 
 /** The brief for a RESULT page: what one run produced, laid out. */
-export function resultBrief(subject: BriefSubject, field: RunField, state: unknown): DesignerBrief {
+export function resultBrief(
+  subject: BriefSubject,
+  field: RunField,
+  state: unknown,
+  { frame = 'page', style }: ResultBriefOptions = {},
+): DesignerBrief {
   const paths: DesignerPathEntry[] = [];
-  if (field.kind === 'object' && !isDelegatedResult(field)) {
+  if (field.kind === 'object' && !isDelegatedResult(field, frame)) {
     // The result itself is the root, and its line names no member: it IS the
     // structure, whose members then follow one level down.
     paths.push({
@@ -311,16 +395,18 @@ export function resultBrief(subject: BriefSubject, field: RunField, state: unkno
       delegated: false,
     });
     for (const child of field.fields) {
-      describe(child, joinPath(RESULT_ROOT, child.name), 1, 'result', paths);
+      describe(child, joinPath(RESULT_ROOT, child.name), 1, 'result', paths, false, frame);
     }
   } else {
-    describe(field, RESULT_ROOT, 0, 'result', paths);
+    describe(field, RESULT_ROOT, 0, 'result', paths, false, frame);
   }
   return {
     side: 'result',
+    frame,
     pipe_ref: subject.pipeRef,
     description: subject.description,
     paths,
+    ...(style ? { style: styleOf(style) } : {}),
     sample_state: JSON.stringify(state, null, 2),
   };
 }

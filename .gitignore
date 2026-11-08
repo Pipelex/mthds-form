@@ -10,3 +10,8 @@ storybook-static/
 
 # A pipelex run writes its config, traces and generated files here.
 .pipelex/
+
+# What a specs sweep keeps beside the briefs for a person to read: a refused
+# layout, a layout before its repair, the brief a run actually saw. Never a fixture.
+data/briefs/*.jsonl
+data/briefs/*.as-run.md

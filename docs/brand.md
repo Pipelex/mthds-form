@@ -15,7 +15,7 @@ Nothing in the entry calls a model or reads a site. Producing a brand, which mea
 A brand is three JSON files:
 
 - **`tokens.json`** is a [DTCG](https://www.designtokens.org/) token file (the Design Tokens Community Group format, 2025.10) setting exactly the contract's tokens, in both colour modes.
-- **`brand.json`** is the manifest: the product's name, its site, one logo for each canvas (`onLight` is the mark drawn on the light canvas, `onDark` the one drawn on the dark), and the web font to load, or `null`. The generative layer's app bar reads it through `BrandProvider`, which also loads the web font. `brandManifestSchema` is exported here and re-exported from `./generative`.
+- **`brand.json`** is the manifest: the product's name, its site, one logo for each canvas (`onLight` is the mark drawn on the light canvas, `onDark` the one drawn on the dark), and the web font to load, or `null`. The site is an http(s) URL; a logo is one too, or a root-relative path on the host's own origin (`/brand/logo.svg`), so a host served from `localhost` can point at a file in its own public folder. A path is accepted only when resolving it against a sentinel origin stays on that origin, the result view's own test, so `//elsewhere.example/logo.svg` and a backslash a browser reads as one are refused. The generative layer's app bar reads it through `BrandProvider`, which also loads the web font. `brandManifestSchema` is exported here and re-exported from `./generative`.
 - **`provenance.json`** says who produced the brand, on which model, on which day, against which brief and from which facts, with the brief's hash and, when the facts are a file, that file's hash. It is a record, never rewritten to make a check pass.
 
 A brand's directory is named by `brandProducerId(provenance)`, which is `producer--model`, with `--seeded` added when a seed was given. That is the recipe a captured layout's id uses, so the tree and the record cannot disagree about who made a brand.
@@ -24,17 +24,23 @@ A brand's directory is named by `brandProducerId(provenance)`, which is `produce
 
 `BRAND_CONTRACT` is the list of tokens a brand sets: which DTCG token sets which custom property, and what that property paints, in the words a producer is told.
 
-| Tokens | Set | Held to |
-| --- | --- | --- |
-| `color.background` … `color.ring` | the colour properties, `--background` … `--ring` | `theme.css`'s `:root` and `.dark` blocks |
-| `radius.base` | `--radius` | `theme.css`'s `:root` block |
-| `font.sans`, `font.mono` | `--font-sans`, `--font-mono` | Tailwind's own theme variables, which `theme.css` leaves alone |
+| Tokens                            | Set                                              | Held to                                                        |
+| --------------------------------- | ------------------------------------------------ | -------------------------------------------------------------- |
+| `color.background` … `color.ring` | the colour properties, `--background` … `--ring` | `theme.css`'s `:root` and `.dark` blocks                       |
+| `radius.base`                     | `--radius`                                       | `theme.css`'s `:root` block                                    |
+| `font.sans`, `font.mono`          | `--font-sans`, `--font-mono`                     | Tailwind's own theme variables, which `theme.css` leaves alone |
 
 The colour and radius rows are not a second list kept beside the theme. `src/brand/__tests__/contract.test.ts` holds them to `theme.css` over the source, and `make assert-bundle` holds them over the built entry, so a token added to the theme is a token a producer must set.
 
 **The two typefaces are the exception, and on purpose.** `--font-sans` and `--font-mono` are the names of Tailwind's own theme variables: the prebuilt sheet already declares both with Tailwind's stacks, and the `font-sans` and `font-mono` utilities read them. `theme.css` does not define them, because it is unlayered while a Tailwind host declares its theme in `@layer theme`, so a value there would override the typeface of every host that loads the file. The stock typeface is therefore the host's own, and only a brand's scope sets these two. `make assert-bundle` fails if `theme.css` ever defines either, or if the shipped sheet stops declaring them.
 
-`CONTRAST_PAIRS` names the text pairs that must reach WCAG AA (`MIN_CONTRAST`, 4.5:1) in both modes: the ink on the canvas, and the secondary text on the canvas.
+`CONTRAST_PAIRS` names the pairs a brand must hold in both modes, each with its own `minimum`. The ink on the canvas and the secondary text on the canvas are text, at WCAG AA (`MIN_CONTRAST`, 4.5:1).
+
+The secondary text on the field fill, `--muted-foreground` on `--input`, is held to the 3:1 a control needs (`MIN_CONTROL_CONTRAST`, WCAG 1.4.11). The kernel draws marks in that colour on the fill, an off switch's track and a number field's stepper icons, which a reader must see to know the control is there. It also sets text in that colour on the fill: a boolean row's description, an unselected pill's label and a placeholder. AA would hold that text to 4.5:1, but the stock palette's light mode measures 4.39:1 on its own field fill, the same grey it measures on `--muted`, so the text bar on the fill waits on the stock palette's own contrast decision (L-260904-bfcb02, [theming.md](theming.md)) rather than refusing the stock values.
+
+The error colour, `--destructive`, is held to the same 3:1, as a solid colour, on the canvas and on a card laid over it, which is what a host's panel usually is, because a framed section's error bar is drawn in that colour, solid, on either. The outlines of a card and of a field in error are drawn at half and seven tenths of it, so they read fainter than the pair measures, and the contract does not hold them. The error captions are text, but the stock palette's red measures 3.76:1 on white, so the text bar for them waits on the same decision.
+
+A pair's surface may be translucent where the contract lets it be, as a style's field fill often is: the pair names the canvas it lies `over`, and the fill is blended onto that canvas before anything is measured on it, so it is measured as a reader sees it. The canvas itself must be opaque, and a translucent one is named once however many pairs stand on it.
 
 ## The token file
 
@@ -45,7 +51,7 @@ The colour and radius rows are not a second list kept beside the theme. `src/bra
 - A colour is an object, `{ "colorSpace": "srgb", "components": [r, g, b], "alpha": a }`, each number in 0..1, with an optional `hex` that must be exactly the hex the components compile to, each channel rounded to its byte. The colour space is always sRGB.
 - A colour token whose value is a colour object states its dark value in `$extensions.mode.dark`, and `dark` is the only mode. An alias, the string `"{color.<name>}"`, may stand for both modes, and then follows its target's dark value. An alias names a colour token of the contract and never forms a cycle.
 - `radius.base` is `{ "value": <number>, "unit": "rem" | "px" }`, and each font token is a list of family names, the site's own first and a generic family last.
-- The contrast pairs reach AA in both modes, read through the aliases and measured as they render: the canvas of a pair must be opaque, since a translucent one shows whatever the host paints beneath it, and the ink is blended over it by its alpha, so a translucent ink counts at the strength it actually has and a transparent one fails. Both colours are measured as the compiler writes them, each channel rounded to its byte and the alpha to three decimals, because that is what a page renders: a grey that clears 4.5:1 at full precision can round below it.
+- Each contrast pair reaches its own `minimum` in both modes, 4.5:1 for text and 3:1 for a control's marks, read through the aliases and measured as they render: the canvas of a pair must be opaque, since a translucent one shows whatever the host paints beneath it; a surface a pair lays `over` the canvas, the field fill or a card, is blended onto it first; and the ink is blended over that by its alpha, so a translucent ink counts at the strength it actually has and a transparent one fails. Every colour is measured as the compiler writes it, each channel rounded to its byte and the alpha to three decimals, because that is what a page renders: a grey that clears 4.5:1 at full precision can round below it.
 - A family name holds no control character, since a form feed would end the CSS string it is written into.
 
 A standard DTCG tool accepts far more than this, and the difference is not academic. The study that first built this chain compiled through Terrazzo 2.7.1, and found that it silently turned an unparseable string colour into black, crashed its build on a hex with no components, crashed its CSS plugin on a colour outside sRGB, and checked contrast in the light mode only. Each is a way a producer's file is wrong and a page is painted anyway, and the validator refuses every one of them.
@@ -72,7 +78,10 @@ Whether a brand was produced against the current brief, and from the facts its p
 Some things a site does not show, and no reading can supply them: the accent of a site with no button, a different accent for its dark canvas, a logo for a canvas the site draws none for. A person states them beside the URL, as `StatedFacts`:
 
 ```json
-{ "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" }, "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" } }
+{
+  "accent": { "light": "#1a1a1a", "dark": "#e5e5e5" },
+  "logo": { "onDark": "https://mthds.ai/latest/images/mthds-white_on_transparent.png" }
+}
 ```
 
 A stated fact outranks every reading, and whatever runs a producer tells it so, outside this package (see [Where a brand comes from](#where-a-brand-comes-from)). The provenance records it, and `assembleBrand` refuses a brand that does not carry it: `color.primary` must compile to exactly the stated accent in each mode it was stated for, and be opaque there, since a hex carries no alpha and a primary nobody can see would otherwise match it; and the manifest must carry each stated logo. Only what was stated is checked.
@@ -114,7 +123,7 @@ import '../brands/acme.css';
 
 <div className={scope}>
   <GenerativePage spec={spec} store={store} scope={descriptorScope} brand={manifest} />
-</div>
+</div>;
 ```
 
 The tokens and the manifest are separate on purpose: the tokens are the palette, and the manifest is what the page says it is.
@@ -132,25 +141,25 @@ const dark = deriveBrandRoles(resolveDarkSeeds(colors, darkColors), '#0d0d0d');
 
 ### The seeds
 
-| Seed | What it paints | When it is not set |
-| --- | --- | --- |
-| `action` | The button colour: the run button, every main button, the selected state of a pill | No role: the host's own button colour stays |
-| `accent` | Secondary highlights: links, the active tab, the upload area on hover, progress | The button colour, so a red button never sits beside links in another hue; no role when that is unset too |
-| `header` | The band across the top of the page, behind the logo | No role: the host draws its own band, or none |
+| Seed     | What it paints                                                                     | When it is not set                                                                                        |
+| -------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `action` | The button colour: the run button, every main button, the selected state of a pill | No role: the host's own button colour stays                                                               |
+| `accent` | Secondary highlights: links, the active tab, the upload area on hover, progress    | The button colour, so a red button never sits beside links in another hue; no role when that is unset too |
+| `header` | The band across the top of the page, behind the logo                               | No role: the host draws its own band, or none                                                             |
 
 A seed is `#rrggbb` in any case, or `null` or `undefined` for unset, so a host passes a team's stored colours as they arrive. Anything else, the page colour included, throws an error naming it: a host validates what a person typed before it reaches here.
 
 ### The roles
 
-| Role | What it is | What is guaranteed | Present when |
-| --- | --- | --- | --- |
-| `action` | The button colour, as a fill | The seed itself | `action` is set |
-| `onAction` | Text and icons on the button colour | `#000000` or `#ffffff`, whichever contrasts more | `action` is set |
-| `accent` | The accent, as a fill: an active tab's underline, a progress bar | The seed itself | `accent` or `action` is set |
-| `accentFill` | A pale accent fill behind accent text: a pill, a badge | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page | `accent` or `action` is set |
-| `accentInk` | The accent as text | At least 4.5:1 on the page, on `accentFill` and on every other surface the host names (§ "The accent on a style's surfaces") | `accent` or `action` is set |
-| `header` | The header band, as a fill | The seed itself | `header` is set |
-| `onHeader` | Text on the band: the back link, a wordmark | `#000000` or `#ffffff`, whichever contrasts more | `header` is set |
+| Role         | What it is                                                       | What is guaranteed                                                                                                           | Present when                |
+| ------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `action`     | The button colour, as a fill                                     | The seed itself                                                                                                              | `action` is set             |
+| `onAction`   | Text and icons on the button colour                              | `#000000` or `#ffffff`, whichever contrasts more                                                                             | `action` is set             |
+| `accent`     | The accent, as a fill: an active tab's underline, a progress bar | The seed itself                                                                                                              | `accent` or `action` is set |
+| `accentFill` | A pale accent fill behind accent text: a pill, a badge           | The accent laid over the page at a low strength: a pale tint on a light page, a deep one on a dark page                      | `accent` or `action` is set |
+| `accentInk`  | The accent as text                                               | At least 4.5:1 on the page, on `accentFill` and on every other surface the host names (§ "The accent on a style's surfaces") | `accent` or `action` is set |
+| `header`     | The header band, as a fill                                       | The seed itself                                                                                                              | `header` is set             |
+| `onHeader`   | Text on the band: the back link, a wordmark                      | `#000000` or `#ffffff`, whichever contrasts more                                                                             | `header` is set             |
 
 Every role is `#rrggbb` in lower case, and an absent role is not a key of the result at all, so with no seed the result is `{}`. The roles come in three groups (the button colour's pair, the accent's three, the band's pair), each present whole or absent whole, and the type says so: checking one role of a group, `roles.action !== undefined`, narrows the rest of it. The function returns roles, never custom property names, because each host maps them onto its own tokens.
 
@@ -174,10 +183,10 @@ A host maps each role onto the tokens it paints with, and leaves its own value o
 
 ### Warning a person who sets colours
 
-Two checks serve a settings screen that previews the colours and warns without refusing anything. Each takes the seeds and one page colour, so a screen runs them for each theme and names the theme a colour is weak in.
+Two checks serve a settings screen that previews the colours and warns without refusing anything. Each takes the seeds and one page colour, so a screen runs them for each theme and names the theme a colour is weak in; `isAccentAdjusted` also takes the surfaces `deriveBrandRoles` does.
 
 - `isActionFaint(seeds, page)` is true when the button colour sits below 3:1 against the page (`MIN_CONTROL_CONTRAST`, WCAG's level for a control's outline), so a button may be hard to see in that theme.
-- `isAccentAdjusted(seeds, page)` is true when the accent had to move to become ink there, so links will read in a darker (light theme) or lighter (dark theme) shade of it. When the accent or the button colour is set, it is exactly `accentInk !== accent`.
+- `isAccentAdjusted(seeds, page, surfaces?)` is true when the accent had to move to become ink there, so links will read in another shade of it: a darker one in a light theme and a lighter one in a dark theme, unless a surface on the far side of the page's lightness moved it the other way (§ "The accent on a style's surfaces"). Its optional `surfaces` are the ones `deriveBrandRoles` takes, so a screen previewing a style asks about the ink the style's panels will show, and it throws on the surfaces `deriveBrandRoles` throws on. When the accent or the button colour is set, it is exactly `accentInk !== accent`.
 
 Both judge only a colour the person set: with no button colour, `isActionFaint` is false, since the button is then the host's own; with neither an accent nor a button colour, so is `isAccentAdjusted`. An unset accent that follows a button colour the person set counts as set.
 
@@ -191,16 +200,16 @@ A team brands its pages with more than colours: it picks a **style** from a clos
 
 ### The styles
 
-| Style | Its direction, as a designer reads it | Headings | Body face | Control radius | Panel | Call to action | Rhythm |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `quiet` | Calm and precise: light titles, hairline panels, generous air, nothing decorated. | the host's | the host's | the host's | the host's | the host's | the host's |
-| `soft` | Friendly and rounded: generous corners, panels that float on a soft shadow with no outline, warm medium-weight titles. | the body face, 500, −0.015em | DM Sans | 12px | the card, no visible edge, a two-layer shadow; on a dark page the card lifted 7% toward the foreground under a deeper shadow, with a faint highlight along its top edge; fields on the card (light) or the page (dark) | a short shadow in the button colour at 50% on a light page, none on a dark one | 1.08 |
-| `editorial` | Considered and literary: serif display titles, fine hairlines, wide margins and a reading rhythm. | Newsreader, 500, −0.01em | Source Sans 3 | 2px | the card on a 1px hairline, no shadow; fields on the card, so each reads as its hairline | none | 1.25 |
-| `bold` | Confident and graphic: heavy, tightly set titles, solid panels with firm edges, a compact rhythm. | the body face, 700, −0.03em | Space Grotesk | 6px | the muted fill on a 2px edge of the foreground at 62% (30% on a dark page), no shadow; fields on the card (light) or the page (dark) | none | 0.85 |
+| Style       | Its direction, as a designer reads it                                                                                  | Headings                     | Body face     | Control radius | Panel                                                                                                                                                                                                                  | Call to action                                                                 | Rhythm     |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------- |
+| `quiet`     | The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated.                  | the host's                   | the host's    | the host's     | the host's                                                                                                                                                                                                             | the host's                                                                     | the host's |
+| `soft`      | Friendly and rounded: generous corners, panels that float on a soft shadow with no outline, warm medium-weight titles. | the body face, 500, −0.015em | DM Sans       | 12px           | the card, no visible edge, a two-layer shadow; on a dark page the card lifted 7% toward the foreground under a deeper shadow, with a faint highlight along its top edge; fields on the card (light) or the page (dark) | a short shadow in the button colour at 50% on a light page, none on a dark one | 1.08       |
+| `editorial` | Considered and literary: serif display titles, fine hairlines, wide margins and a reading rhythm.                      | Newsreader, 500, −0.01em     | Source Sans 3 | 2px            | the card on a 1px hairline, no shadow; fields on the card, so each reads as its hairline                                                                                                                               | none                                                                           | 1.25       |
+| `bold`      | Confident and graphic: heavy, tightly set titles, solid panels with firm edges, a compact rhythm.                      | the body face, 700, −0.03em  | Space Grotesk | 6px            | the muted fill on a 2px edge of the foreground at 62% (30% on a dark page), no shadow; fields on the card (light) or the page (dark)                                                                                   | none                                                                           | 0.85       |
 
 **`quiet` sets nothing.** It is the host's own look, named, so that "no style" and "the default style" are one state: a team that has set no style is on `quiet`, and a page wearing it renders exactly as one wearing none. That holds only because the host states its own treatment of what a style changes, its titles, its panels and its call to action, through the same tokens a style sets; a style overrides them, and `quiet` leaves them.
 
-The values were tuned in the `Generative/App styles` stories before they were encoded here, and their history is the campaign's. A panel's radius is never a role: a host derives it from the control radius as it already does (the kernel's `calc(var(--radius) * 1.5)`).
+The values were tuned in the `Generative/App styles` stories before they were encoded here, and their history is the campaign's. A panel's radius is never a role: a host derives it from the control radius as it already does (the kernel's `calc(var(--radius) * 1.5)`, which the generative layer's rail and card both take).
 
 ### The typefaces
 
@@ -219,7 +228,7 @@ A team's typeface replaces the style's body face, and its heading face wherever 
 - `actionShadow`, the call to action's shadow in each theme (`{ light, dark }`, for the panel's reason: a shadow in the button colour that lifts a button on a light page smears under it on a dark one), each its geometry and a role colour, or `none`;
 - `density`, a multiple of the host's own margins, paddings and gaps around the form.
 
-**It returns roles, never custom property names**, as `deriveBrandRoles` does, and a colour is a `RoleColor`: the contract role it is (`card`, `muted`, `foreground`, `border`, `primary`), optionally mixed toward another role in Oklab by a share, or laid at an opacity. A host writes each onto its own tokens, `{ role: 'card', toward: { role: 'foreground', share: 0.07 } }` being `color-mix(in oklab, var(--card) 93%, var(--foreground))` on this package's contract.
+**It returns roles, never custom property names**, as `deriveBrandRoles` does, and a colour is a `RoleColor`: the contract role it is, any colour token the contract names (the styles use `background`, `card`, `muted`, `foreground`, `border` and `primary`, `background` for `soft`'s and `bold`'s dark fields), optionally mixed toward another role in Oklab by a share, or laid at an opacity. A host writes each onto its own tokens, `{ role: 'card', toward: { role: 'foreground', share: 0.07 } }` being `color-mix(in oklab, var(--card) 93%, var(--foreground))` on this package's contract.
 
 **An absent role is not a key**, and an unknown or absent id is unset: an unknown style is `quiet`, which sets nothing, and an unknown typeface, or Newsreader, is no typeface, so the style's own face (or the host's) stays. `isAppStyle(id)` and `isTypeface(id)` let a host check an id it received; `APP_STYLES` holds each style's id, name, direction and the roles it sets with no typeface, and `APP_STYLE_IDS` their order.
 
@@ -235,7 +244,7 @@ Two roles are written by the host, since no token of the kernel carries either. 
 
 ### The accent on a style's surfaces
 
-A style can draw the form on a surface that is not the page: `bold`'s panel is the muted fill, and `soft`'s dark panel is lifted toward the foreground. A team's accent ink derived against the page alone falls just under 4.5:1 on those, in the dark theme, for every accent tried. So `deriveBrandRoles(seeds, page, surfaces)` takes the other surfaces accent text sits on, as `#rrggbb`, and moves the ink until it reads on all of them, the page and the pale fill included; and `resolveRoleColor(color, palette, behind?)` turns a style's role colour into the `#rrggbb` it paints over a host's palette, mixing in Oklab exactly as `color-mix()` does, so a host passes the panel's fill and its field fill (and its page canvas, where that is not the page). When there is an accent to derive, a surface on which not even the page's own text extreme (pure black on a light page, pure white on a dark one) reaches 4.5:1 is refused, since no ink moving the page's way could read there; with no accent, the surfaces are only checked to be colours. `src/brand/__tests__/styles.test.ts` holds every style's panel and field fills, in both themes, to the bar across a sweep of accents.
+A style can draw the form on a surface that is not the page: `bold`'s panel is the muted fill, and `soft`'s dark panel is lifted toward the foreground. A team's accent ink derived against the page alone falls just under 4.5:1 on those, in the dark theme, for every accent tried. So `deriveBrandRoles(seeds, page, surfaces)` takes the other surfaces accent text sits on, as `#rrggbb`, and moves the ink until it reads on all of them, the page and the pale fill included; and `resolveRoleColor(color, palette, behind?)` turns a style's role colour into the `#rrggbb` it paints over a host's palette, mixing in Oklab exactly as `color-mix()` does, so a host passes the panel's fill and its field fill (and its page canvas, where that is not the page). The accent is measured first, and kept as its own ink when it reads on all of them. Otherwise the ink moves toward the page's own text extreme (pure black on a light page, pure white on a dark one), which reads on every surface a style draws, since each sits on the page's side of its lightness. A surface on the far side, a dark panel on a light page, is one the extreme does not read on, and the shades that read on it and on the page are then a run between the two extremes: dark enough for the light surfaces and light enough for the dark ones. The ink is the first such shade of the accent, toward the extreme and then away from it, and the derivation throws, naming the page, the pale fill and the surfaces, only when no shade of the accent reads on all of them at once. A pale accent on a white page beside a black panel finds one, a grey a hair darker than `#767676`; a mid-grey panel on a white page has none, since every shade dark enough for the page is too dark for the panel. With no accent, the surfaces are only checked to be colours. `src/brand/__tests__/styles.test.ts` holds every style's panel and field fills, in both themes, to the bar across a sweep of accents.
 
 ## Where a brand comes from
 

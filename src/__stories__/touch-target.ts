@@ -170,12 +170,15 @@ const TAPPABLE =
 /**
  * Hold every control under `root` that is drawn to a 44 by 44 hit area
  * (`expectTouchTarget`), and show there is at least one: a page whose controls
- * all failed to render would otherwise pass.
+ * all failed to render would otherwise pass. A control inside a closed
+ * `<details>` keeps a box - the browser skips drawing its content rather than
+ * dropping its layout - so it is asked whether it is visible too, which is
+ * the question a finger asks.
  */
 export async function expectEveryTouchTarget(root: Element): Promise<void> {
   const controls = [...root.querySelectorAll(TAPPABLE)].filter((control) => {
     const box = control.getBoundingClientRect();
-    return box.width > 0 && box.height > 0;
+    return box.width > 0 && box.height > 0 && control.checkVisibility();
   });
   await expect(controls.length, 'controls drawn').toBeGreaterThan(0);
   for (const control of controls) await expectTouchTarget(control);

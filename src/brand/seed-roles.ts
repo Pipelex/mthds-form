@@ -1,4 +1,4 @@
-import { MIN_CONTRAST } from './contract';
+import { MIN_CONTRAST, MIN_CONTROL_CONTRAST } from './contract';
 import { colorHex, contrastRatio, type SrgbColor } from './tokens';
 
 /**
@@ -19,11 +19,18 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  *   colour, so every label clears WCAG AA. Only the two extremes carry that
  *   guarantee: a warm near-black or an off-white falls below 4.5:1 on some
  *   mid-tone, so no other colour is ever returned for text.
- * - **The accent as text is ink** (`accentInk`): the accent darkened on a
- *   light page or lightened on a dark one, keeping its hue and saturation,
- *   just until it reads at 4.5:1 on the page and on the pale accent fill, the
- *   two backgrounds a host draws accent text on. An accent that already reads
- *   is its own ink.
+ * - **The accent as text is ink** (`accentInk`): the accent with its hue
+ *   and saturation kept and its lightness moved just until it reads at 4.5:1
+ *   on the page, on the pale accent fill and on every other surface the host
+ *   names (a style's panel and its fields), the backgrounds a host draws
+ *   accent text on. The lightness moves toward the page's extreme, darker on
+ *   a light page and lighter on a dark one, and away from it only when a
+ *   surface on the far side of the page's lightness leaves no shade that way
+ *   reading on every background at once. A random search over accents and
+ *   surfaces on a white and on a black page found no case of it; on a
+ *   mid-tone page it happens: `#1e40af` on the grey `#767676`, which counts
+ *   as light, inks as `#000001` alone and as `#fefeff` beside a black panel.
+ *   An accent that already reads is its own ink.
  * - **The pale accent fill** (`accentFill`) is the accent laid over the page
  *   at a low strength: a pale tint on a light page, a deep one on a dark page.
  *
@@ -44,13 +51,6 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  * It returns roles, never custom property names: each host maps the roles onto
  * its own tokens. See docs/brand.md § "Three seed colours".
  */
-
-/**
- * The contrast a control's outline needs against what surrounds it: WCAG 2's
- * level for a user interface component (1.4.11). A button colour below it
- * against the page is a button whose shape is hard to see.
- */
-export const MIN_CONTROL_CONTRAST = 3;
 
 /**
  * How strongly the accent is laid over the page to make the pale accent fill:
@@ -131,11 +131,12 @@ export type BrandRoles = (ActionRoles | Absent<ActionRoles>) &
  * `surfaces` are the other colours accent text sits on besides the page and
  * the pale fill, each `#rrggbb`: a style's panel and the fields inside it
  * (`resolveRoleColor` turns a style's role colour into one), or a canvas
- * behind the page. The ink is moved until it reads on all of them. When
- * there is an accent to derive, a surface on which not even the page's own
- * text extreme, pure black on a light page or pure white on a dark one,
- * reaches 4.5:1 throws, since no ink moving the page's way could read there.
- * With no accent, no ink is derived, and the surfaces are only parsed.
+ * behind the page. The ink is moved until it reads on all of them, and an
+ * accent that already reads on every one is its own ink. When there is an
+ * accent to derive and no shade of it reads on the page, the pale fill and
+ * every surface at once, which a surface on the far side of the page's
+ * lightness can cause, it throws, naming them. With no accent, no ink is
+ * derived, and the surfaces are only parsed.
  */
 export function deriveBrandRoles(
   seeds: BrandSeeds | null | undefined,
@@ -161,10 +162,12 @@ export function deriveBrandRoles(
 
 /**
  * The accent as a fill, its pale fill on the page, and its ink on both and on
- * every other surface. The way accent text moves is the way text on the page
- * moves, toward `extreme`: whichever of black and white reads better there,
- * which always reaches 4.58:1 on the page itself, and which is checked first
- * to read on each surface, so the ink's search always has an end.
+ * every other surface. The way accent text moves first is the way text on the
+ * page moves, toward `extreme`: whichever of black and white reads better
+ * there, which always reaches 4.58:1 on the page itself. The accent is
+ * measured before any surface is judged, so an accent that already reads
+ * everywhere is kept, and a surface is refused only when no shade of the
+ * accent reads on it and on the others at once.
  */
 function accentRolesOf(
   accent: SrgbColor,
@@ -172,15 +175,14 @@ function accentRolesOf(
   extreme: SrgbColor,
   surfaces: readonly SrgbColor[],
 ): AccentRoles {
-  for (const surface of surfaces) {
-    if (contrastRatio(extreme, surface) < MIN_CONTRAST) {
-      throw new Error(
-        `No accent ink can read on ${colorHex(surface)}: not even ${colorHex(extreme)}, the page's own text extreme, reaches ${MIN_CONTRAST}:1 there.`,
-      );
-    }
-  }
   const accentFill = paleFill(accent, canvas, extreme);
-  const accentInk = inkFor(accent, [canvas, accentFill, ...surfaces], extreme);
+  const backgrounds = [canvas, accentFill, ...surfaces];
+  const accentInk = inkFor(accent, backgrounds, extreme);
+  if (accentInk === undefined) {
+    throw new Error(
+      `No accent ink can read on every surface at once: no shade of ${colorHex(accent)} reaches ${MIN_CONTRAST}:1 on the page ${colorHex(canvas)}, the pale fill ${colorHex(accentFill)} and ${surfaces.map(colorHex).join(', ')}.`,
+    );
+  }
   return {
     accent: colorHex(accent),
     accentFill: colorHex(accentFill),
@@ -296,35 +298,92 @@ function paleFill(accent: SrgbColor, page: SrgbColor, extreme: SrgbColor): SrgbC
 }
 
 /**
+ * Every shade of one hue and saturation, as the lightness of a point inside
+ * it, from black to white. Each channel is linear in the lightness on either
+ * side of the middle (`fromHsl`), so the lightness at which it turns over to
+ * its next byte is solved for rather than searched; between two neighbouring
+ * turnovers every channel keeps its byte, and the hex is one shade. A walk in
+ * fixed steps could not promise this: where two channels turn over close
+ * together, a shade spans less lightness than any step, and the one shade
+ * that reads may be it.
+ */
+function shadeLightnesses(hue: number, saturation: number): number[] {
+  const bounds = new Set<number>([0, 0.5, 1]);
+  for (const [low, high] of [
+    [0, 0.5],
+    [0.5, 1],
+  ] as const) {
+    const from = fromHsl(hue, saturation, low);
+    const to = fromHsl(hue, saturation, high);
+    for (let channel = 0; channel < 3; channel++) {
+      const start = from[channel]! * 255;
+      const rise = to[channel]! * 255 - start;
+      if (rise === 0) continue;
+      // `snapped` rounds a channel, so its byte turns over at each half.
+      for (let byte = 0; byte < 255; byte++) {
+        const at = low + ((byte + 0.5 - start) / rise) * (high - low);
+        if (at > low && at < high) bounds.add(at);
+      }
+    }
+  }
+  const sorted = [...bounds].sort((a, b) => a - b);
+  return sorted.slice(1).map((bound, index) => (sorted[index]! + bound) / 2);
+}
+
+/**
  * The accent as text on every background given: the accent itself if it
- * reads, otherwise the accent with its lightness moved toward the extreme
- * (black or white) just until it does. Hue and saturation are kept, so a pale
- * yellow becomes a gold rather than a grey.
+ * reads, otherwise the accent with its lightness moved just until it does, or
+ * `undefined` when no lightness reads on all of them. Hue and saturation are
+ * kept, so a pale yellow becomes a gold rather than a grey.
  *
- * The search halves the lightness between a value known to fall short and one
- * known to read, and only ever returns the one known to read, measured as a
- * hex - so the result reads whatever the rounding does. The extreme itself
- * reads on the page by the choice of direction and on the fill by
- * `paleFill`'s construction, so the search starts with an answer.
+ * The lightness moves toward the extreme (black or white) first. When the
+ * extreme reads on every background, which it does on the page by the choice
+ * of direction and on the fill by `paleFill`'s construction, each step that
+ * way only brings the ink closer to reading, and a search halves the
+ * lightness between a value known to fall short and one known to read. It
+ * only ever returns the one known to read, measured as a hex, so the result
+ * reads whatever the rounding does.
+ *
+ * A surface on the far side of the page's lightness, a dark panel on a light
+ * page, is one the extreme does not read on. The shades that read on every
+ * background then lie between the two extremes, if there are any: a shade
+ * dark enough for the light backgrounds and light enough for the dark ones,
+ * and sometimes a single one. Every shade of the accent's hue and saturation
+ * is tried (`shadeLightnesses`), nearest first, toward the extreme and then
+ * away from it, and the first that reads is the ink; `undefined` means no
+ * shade does.
  */
 function inkFor(
   accent: SrgbColor,
   backgrounds: readonly SrgbColor[],
   extreme: SrgbColor,
-): SrgbColor {
+): SrgbColor | undefined {
   const reads = (color: SrgbColor) =>
     backgrounds.every((background) => contrastRatio(color, background) >= MIN_CONTRAST);
   if (reads(accent)) return accent;
   const [hue, saturation, lightness] = toHsl(accent.components);
   const at = (value: number) => snapped(fromHsl(hue, saturation, value));
-  let short = lightness;
-  let enough = extreme === BLACK ? 0 : 1;
-  for (let step = 0; step < SEARCH_STEPS; step++) {
-    const middle = (short + enough) / 2;
-    if (reads(at(middle))) enough = middle;
-    else short = middle;
+  /** The first lightness that reads between one known to fall short and one known to read. */
+  const narrowed = (short: number, enough: number): SrgbColor => {
+    for (let step = 0; step < SEARCH_STEPS; step++) {
+      const middle = (short + enough) / 2;
+      if (reads(at(middle))) enough = middle;
+      else short = middle;
+    }
+    return at(enough);
+  };
+  const toward = extreme === BLACK ? 0 : 1;
+  if (reads(extreme)) return narrowed(lightness, toward);
+  const shades = shadeLightnesses(hue, saturation);
+  const darker = shades.filter((value) => value < lightness).reverse();
+  const lighter = shades.filter((value) => value > lightness);
+  for (const side of toward === 0 ? [darker, lighter] : [lighter, darker]) {
+    for (const value of side) {
+      const shade = at(value);
+      if (reads(shade)) return shade;
+    }
   }
-  return at(enough);
+  return undefined;
 }
 
 /** sRGB components to hue (degrees), saturation and lightness, each of the last two in 0..1. */

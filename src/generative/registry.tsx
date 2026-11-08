@@ -79,6 +79,7 @@ import {
 } from 'lucide-react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
+import { readDateContent } from '../core/native-content';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
 import { linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
@@ -227,10 +228,31 @@ function useAbsolutePath(path: string): string | undefined {
 
 // ─── The escape hatches ──────────────────────────────────────────────────────
 
-function MthdsField({ props }: BaseComponentProps<{ path: string }>) {
+/** A label without a trailing "(optional)", which the kernel's own badge says. */
+function withoutOptionalMark(label: string): string {
+  return label.replace(/\s*\(optional\)\s*$/i, '') || label;
+}
+
+function MthdsField({
+  props,
+}: BaseComponentProps<{ path: string; label?: string | null; hint?: string | null }>) {
   const scope = React.useContext(DescriptorContext);
   const path = useAbsolutePath(props.path) ?? '';
-  const field = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
+  const found = scope.inputs && path ? inputFieldAtPath(scope.inputs, path) : undefined;
+  // The page's own words for the label and the line under it, where it wrote them.
+  const field = React.useMemo(
+    () =>
+      found && (props.label || props.hint)
+        ? {
+            ...found,
+            // The control marks an optional field itself, so a label that
+            // says "(optional)" too would say it twice.
+            title: props.label ? withoutOptionalMark(props.label) : found.title,
+            description: props.hint || found.description,
+          }
+        : found,
+    [found, props.label, props.hint],
+  );
   const value = useStateValue<unknown>(path);
   const { set } = useStateStore();
   const onChange = React.useCallback((next: unknown) => set(path, next), [set, path]);
@@ -351,9 +373,31 @@ function formatCell(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** A cell in a column the layout stated a format for. */
+function formatColumnCell(value: unknown, format: string | null | undefined): string {
+  // The calendar day is the one written: a time beside it ("2025-03-09
+  // 00:30") must not move it across midnight in the reader's zone, so only the
+  // leading day is read, anchored at noon UTC, as `DateText` reads one.
+  // The value is the day as text, or a native date's own structure
+  // ({ date, time }); either way its day is read, never stringified.
+  const written = format === 'date' ? readDateContent(value)?.date : undefined;
+  const day = written === undefined ? null : /^\d{4}-\d{2}-\d{2}/.exec(written);
+  if (day) {
+    const date = new Date(`${day[0]}T12:00:00Z`);
+    if (!Number.isNaN(date.getTime()))
+      return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+      });
+  }
+  return formatCell(value);
+}
+
 interface DataTableProps {
   rows: unknown;
-  columns: { path: string; label: string }[];
+  columns: { path: string; label: string; format?: 'text' | 'date' | 'number' | null }[];
   caption?: string | null;
 }
 
@@ -386,7 +430,7 @@ function DataTable({ props }: BaseComponentProps<DataTableProps>) {
             <tr key={index} className="border-b border-border/60 last:border-b-0">
               {columns.map((column) => (
                 <td key={column.path} className="px-2.5 py-1.5 align-top text-foreground">
-                  {formatCell(valueAt(row, column.path))}
+                  {formatColumnCell(valueAt(row, column.path), column.format)}
                 </td>
               ))}
             </tr>

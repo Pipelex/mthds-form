@@ -1,7 +1,7 @@
 import type { Spec } from '@json-render/core';
 import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
-import { catalog as defaultCatalog } from './catalog';
+import { frameCatalog } from './catalog';
 import { INPUTS_ROOT, RESULT_ROOT } from './paths';
 import { hasOwnProp } from '../core/own-property';
 
@@ -98,6 +98,16 @@ function isExpression(value: unknown): boolean {
     !Array.isArray(value) &&
     Object.keys(value).some((key) => EXPRESSION_KEYS.includes(key))
   );
+}
+
+/** The value a zod issue path points at inside a prop's raw value. */
+function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {
+  let at: unknown = value;
+  for (const step of path) {
+    if (typeof at !== 'object' || at === null) return undefined;
+    at = (at as Record<PropertyKey, unknown>)[step];
+  }
+  return at;
 }
 
 /**
@@ -237,7 +247,10 @@ function deepestChain(spec: Spec): number {
  */
 export function validateAgainstCatalog(
   spec: Spec,
-  catalog: ValidationCatalog = defaultCatalog,
+  // A whole page's vocabulary unless the caller names a frame's: the exported
+  // `catalog` also defines the frames' own components, which a whole page
+  // must not hold.
+  catalog: ValidationCatalog = frameCatalog('page'),
 ): SpecVerdict {
   try {
     return checkAgainstCatalog(spec, catalog);
@@ -350,10 +363,20 @@ function checkAgainstCatalog(spec: Spec, catalog: ValidationCatalog): SpecVerdic
         continue;
       }
       const parsed = propSchema.safeParse(value);
-      if (!parsed.success) {
+      // json-render resolves an expression wherever it sits in a prop, inside
+      // an array or an object included, so an issue raised at a nested
+      // expression, or under one (an expression standing for an object draws
+      // issues at the object's members), is the literal check misreading it.
+      const issues = parsed.success
+        ? []
+        : parsed.error.issues.filter(
+            (issue) =>
+              !issue.path.some((_, n) => isExpression(valueAt(value, issue.path.slice(0, n + 1)))),
+          );
+      if (issues.length > 0) {
         problems.push({
           elementKey: key,
-          message: `${element.type}.${name}: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+          message: `${element.type}.${name}: ${issues.map((issue) => issue.message).join('; ')}`,
         });
       }
     }
