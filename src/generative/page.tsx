@@ -18,6 +18,7 @@ import {
   type ReportedRenderers,
 } from './element-errors';
 import type { BrandManifest } from '../brand/manifest';
+import { PlacedInputsProvider } from './placed-inputs';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
 import { isThenable } from '../react/utils';
@@ -200,27 +201,29 @@ export function GenerativePage({
   });
   const page = (
     <DescriptorProvider scope={stableScope}>
-      <JSONUIProvider
-        registry={pageRegistry}
-        store={store}
-        handlers={handlers}
-        validationFunctions={CHECKED_FIELD_FUNCTIONS}
-      >
-        <ReportingContext.Provider value={reporting}>
-          <CheckedFieldsContext.Provider value={checkedFields}>
-            <ValidationBridge into={validation} fields={checkedFields} />
-            <RootBoundary
-              type={rootType}
-              report={report}
-              reporting={reporting}
-              loading={loading === true}
-              spec={spec}
-            >
-              <Renderer spec={spec} registry={pageRegistry} loading={loading} />
-            </RootBoundary>
-          </CheckedFieldsContext.Provider>
-        </ReportingContext.Provider>
-      </JSONUIProvider>
+      <PlacedInputsProvider spec={spec}>
+        <JSONUIProvider
+          registry={pageRegistry}
+          store={store}
+          handlers={handlers}
+          validationFunctions={CHECKED_FIELD_FUNCTIONS}
+        >
+          <ReportingContext.Provider value={reporting}>
+            <CheckedFieldsContext.Provider value={checkedFields}>
+              <ValidationBridge into={validation} fields={checkedFields} />
+              <RootBoundary
+                type={rootType}
+                report={report}
+                reporting={reporting}
+                loading={loading === true}
+                spec={spec}
+              >
+                <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+              </RootBoundary>
+            </CheckedFieldsContext.Provider>
+          </ReportingContext.Provider>
+        </JSONUIProvider>
+      </PlacedInputsProvider>
     </DescriptorProvider>
   );
   return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;

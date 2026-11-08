@@ -105,7 +105,8 @@ export const OptionalStructureAtTheTop: Story = { args: { pipeCode: 'shop_with_b
 
 /**
  * The same form after Run was pressed with nothing filled: the required shop
- * is marked, the optional input is not.
+ * is marked, and so is its empty name, which is what the gate refuses inside
+ * it; the optional input is not.
  */
 export const AfterAnAttempt: Story = {
   args: { pipeCode: 'shop_with_bank' },
@@ -113,7 +114,7 @@ export const AfterAnAttempt: Story = {
     const canvas = within(canvasElement);
     // Two of each: two theme panes.
     for (const run of canvas.getAllByRole('button', { name: 'Run' })) await userEvent.click(run);
-    await expect(canvas.getAllByText('Required')).toHaveLength(2);
+    await expect(canvas.getAllByText('Required')).toHaveLength(4);
   },
 };
 
@@ -195,10 +196,13 @@ export const FramedByTheHost: Story = {
  * would turn red; a section has no card, so each one in error draws a red
  * edge down its whole height, 4 pixels off the form's start edge as a
  * field's own error outline stands off its field, and its message at its
- * heading rather than under its last field. No field moves sideways: the
- * edge stands out of the flow and the message takes the heading's row, so a
- * field moves down only by what that row grows when the message wraps under
- * a long name on a narrow row. The play measures all of it, in both themes.
+ * heading rather than under its last field. Inside each, the empty
+ * required field the gate refuses is marked as a field of the form is: the
+ * shop's name, the account's IBAN. No field moves sideways: the edge stands
+ * out of the flow and the message takes the heading's row, so a field moves
+ * down only by what that row grows when the message wraps under a long name
+ * on a narrow row, and by the marks under the fields above it. The play
+ * measures all of it, in both themes.
  */
 export const FramedAfterAnAttempt: Story = {
   args: { pipeCode: 'shop_with_bank', framed: true },
@@ -218,6 +222,21 @@ export const FramedAfterAnAttempt: Story = {
         (section) =>
           document.getElementById(section.getAttribute('aria-labelledby')!)!.parentElement!,
       );
+    /**
+     * Where each mark under a field stands, and what it adds to the column:
+     * from the bottom of what it follows, which ended its field before the
+     * mark came, to its own bottom.
+     */
+    const fieldMarks = (panel: HTMLElement) => {
+      const rows = headingRows(panel);
+      return [...panel.querySelectorAll<HTMLElement>('[role="alert"]')]
+        .filter((alert) => !rows.some((row) => row.contains(alert)))
+        .map((alert) => {
+          const { top, bottom } = alert.getBoundingClientRect();
+          const above = alert.previousElementSibling!.getBoundingClientRect().bottom;
+          return { top, adds: bottom - above };
+        });
+    };
     const measure = (panel: HTMLElement) => ({
       across: inputsOf(panel).map(across),
       tops: inputsOf(panel).map((input) => input.getBoundingClientRect().top),
@@ -233,13 +252,19 @@ export const FramedAfterAnAttempt: Story = {
       const now = measure(panel);
       // Not one field moved sideways or changed width.
       await expect(now.across).toEqual(was.across);
-      // A field moved down only by what the heading rows above it grew: the
-      // message wrapping under a long name on a narrow row, and nothing else.
+      // A field moved down only by what the heading rows above it grew - the
+      // message wrapping under a long name on a narrow row - and by the marks
+      // under the fields above it, and nothing else.
+      const marks = fieldMarks(panel);
+      await expect(marks).toHaveLength(2);
       for (const [field, top] of now.tops.entries()) {
         const grown = was.rows
           .map((row, at) => (row.top < was.tops[field]! ? now.rows[at]!.height - row.height : 0))
           .reduce((sum, growth) => sum + growth, 0);
-        await expect(Math.abs(top - was.tops[field]! - grown)).toBeLessThan(0.5);
+        const marked = marks
+          .filter((mark) => mark.top < top)
+          .reduce((sum, mark) => sum + mark.adds, 0);
+        await expect(Math.abs(top - was.tops[field]! - grown - marked)).toBeLessThan(0.5);
       }
       const sections = [...panel.querySelectorAll<HTMLElement>('[data-form-section]')];
       await expect(sections).toHaveLength(2);
@@ -247,8 +272,8 @@ export const FramedAfterAnAttempt: Story = {
       for (const section of sections) {
         const mark = section.querySelector<HTMLElement>('[data-error-edge]');
         await expect(mark).not.toBeNull();
-        const caption = within(section).getByRole('alert');
         const heading = document.getElementById(section.getAttribute('aria-labelledby')!)!;
+        const caption = within(heading.parentElement!).getByRole('alert');
         const rect = mark!.getBoundingClientRect();
         const column = section.getBoundingClientRect();
         const fields = inputsOf(section).map((input) => input.getBoundingClientRect());

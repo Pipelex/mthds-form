@@ -140,6 +140,79 @@ describe('what a composer’s run waits for', () => {
     expect(button).toHaveAccessibleDescription('Fill in b, c, d and 2 more to run');
   });
 
+  it('names the members a structure refuses, which a composer spreads over the page', () => {
+    const inputs = [
+      {
+        kind: 'object',
+        name: 'request',
+        required: true,
+        fields: [
+          field('city', { title: 'City' }),
+          field('budget', { title: 'Budget' }),
+          field('notes', { required: false }),
+          {
+            kind: 'object',
+            name: 'stay',
+            title: 'Stay',
+            required: false,
+            fields: [field('hotel', { title: 'Hotel' }), field('nights', { title: 'Nights' })],
+          } as RunField,
+        ],
+      } as RunField,
+    ];
+    const store = createStateStore({ inputs: {} });
+    render(<GenerativePage spec={COMPOSER} store={store} scope={{ inputs }} />);
+    const button = screen.getByRole('button', { name: /Plan my trip/ });
+    expect(button).toHaveAccessibleDescription('Fill in City and Budget to run');
+    act(() => store.set('/inputs/request', { city: 'Lisbon', stay: { hotel: 'Bairro' } }));
+    expect(button).toHaveAccessibleDescription('Fill in Budget and Nights to run');
+  });
+
+  it('names the inputs as the page words and orders them, and as the descriptor does where the page does not', () => {
+    const worded: Spec = {
+      root: 'composer',
+      elements: {
+        composer: { ...COMPOSER.elements.composer!, children: ['city', 'name'] },
+        name: {
+          type: 'Input',
+          props: {
+            label: 'Trip name',
+            name: 'title',
+            type: null,
+            placeholder: null,
+            value: { $bindState: '/inputs/request/title' },
+            checks: null,
+            validateOn: null,
+          },
+          children: [],
+        },
+        city: {
+          type: 'MthdsField',
+          props: { path: '/inputs/request/city', label: null, hint: null },
+          children: [],
+        },
+      },
+    };
+    const inputs = [
+      {
+        kind: 'object',
+        name: 'request',
+        required: true,
+        fields: [
+          field('title', { title: 'Title' }),
+          field('city', { title: 'City' }),
+          field('budget', { title: 'Budget' }),
+        ],
+      } as RunField,
+    ];
+    render(
+      <GenerativePage spec={worded} store={createStateStore({ inputs: {} })} scope={{ inputs }} />,
+    );
+    expect(screen.getByRole('button', { name: /Plan my trip/ })).toHaveAccessibleDescription(
+      'Fill in City, Trip name and Budget to run',
+    );
+  });
+
   it('keeps the time a run takes beside what it waits for', () => {
     render(
       <FrameHostProvider host={{ eta: 'About a minute' }}>

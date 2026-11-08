@@ -249,6 +249,60 @@ export function missingFields(
   return missingAmong(gatingFields(fields, values), values);
 }
 
+/**
+ * Why the run gate refuses a field, as the structure or the form holding it
+ * holds it: a field that must be filled (`mustFill`) and is not is
+ * `required`, and a field that need not be but holds something short of what
+ * its concept demands is `incomplete`. This is `fieldFilled`'s own rule for a
+ * structure's members, so a structure the gate refuses has at least one
+ * member it refuses, unless it is a structure that must be touched and holds
+ * nothing at all.
+ */
+export function gateRefusal(
+  field: RunField,
+  value: unknown,
+  mustFill: boolean,
+): 'required' | 'incomplete' | undefined {
+  if (mustFill) return fieldFilled(field, value) ? undefined : 'required';
+  return isFilled(value) && !fieldFilled(field, value) ? 'incomplete' : undefined;
+}
+
+/**
+ * The fields a person fills to let the run go, at the depth a form draws
+ * them: each missing input (`missingFields`), and in place of a structure the
+ * members it refuses (`gateRefusal`), at every depth, which is where a form
+ * marks them and where a layout that spreads a structure's members over the
+ * page puts them. A structure that refuses no member of its own - one that
+ * must be touched and holds nothing, with no required member - is itself the
+ * field to fill. A list is one field: its rows are the person's own.
+ */
+export function waitingFields(
+  fields: readonly RunField[],
+  values: Record<string, unknown> | undefined,
+): WaitingField[] {
+  return missingFields(fields, values).flatMap((field) =>
+    refusedWithin(field, ownProp(values, field.name), [field.name]),
+  );
+}
+
+/** A field the run waits for, and the names that lead to it from the inputs, its own last. */
+export interface WaitingField {
+  field: RunField;
+  path: readonly string[];
+}
+
+function refusedWithin(field: RunField, value: unknown, path: readonly string[]): WaitingField[] {
+  if (field.kind !== 'object') return [{ field, path }];
+  const members = optionalStructureOpen(value) ? (value as Record<string, unknown>) : undefined;
+  const refused = field.fields.flatMap((member) => {
+    const held = ownProp(members, member.name);
+    return gateRefusal(member, held, member.required)
+      ? refusedWithin(member, held, [...path, member.name])
+      : [];
+  });
+  return refused.length > 0 ? refused : [{ field, path }];
+}
+
 /** The fields that gate: every one the method demands, and an optional one once it is touched. */
 function gatingFields(
   fields: readonly RunField[],

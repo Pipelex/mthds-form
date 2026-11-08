@@ -6,8 +6,7 @@ import type { ObjectRunField, RunField } from '../core';
 import { ownProp } from '../core/own-property';
 import {
   anyOptionalStructureOpen,
-  fieldFilled,
-  isFilled,
+  gateRefusal,
   isFoldedOptional,
   isOptionalStructure,
 } from '../core/readiness';
@@ -46,24 +45,6 @@ const StructureDepthContext = createContext(0);
  * form's own structure (`section`, below).
  */
 export const FramedFormContext = createContext(false);
-
-/**
- * Why the run gate refuses a field, as the structure or the form holding it
- * holds it: a field that must be filled (`mustFill`) and is not is
- * `required`, and a field that need not be but holds something short of what
- * its concept demands is `incomplete`. This is `fieldFilled`'s own rule for a
- * structure's members, so a structure the gate refuses has at least one
- * member it refuses, unless it is a structure that must be touched and holds
- * nothing at all.
- */
-export function gateRefusal(
-  field: RunField,
-  value: unknown,
-  mustFill: boolean,
-): 'required' | 'incomplete' | undefined {
-  if (mustFill) return fieldFilled(field, value) ? undefined : 'required';
-  return isFilled(value) && !fieldFilled(field, value) ? 'incomplete' : undefined;
-}
 
 /**
  * The id of the structure the form's own run gate refuses, after the person

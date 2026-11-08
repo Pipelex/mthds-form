@@ -7,6 +7,7 @@ import { ownProp } from '../core/own-property';
 import {
   anyOptionalStructureOpen,
   computeReadiness,
+  gateRefusal,
   isFoldedOptional,
   isOptionalStructure,
   mustBeFilled,
@@ -17,7 +18,7 @@ import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/v
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { UploadedFile } from './file-field';
-import { FramedFormContext, RefusedStructureContext, gateRefusal } from './object-field';
+import { FramedFormContext, RefusedStructureContext } from './object-field';
 import type { FilePickerSource } from './file-picker';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';

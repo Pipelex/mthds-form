@@ -7,7 +7,7 @@ import {
   type ObjectRunField,
 } from '..';
 import { describe, expect, it } from 'vitest';
-import { missingFields } from '../readiness';
+import { missingFields, waitingFields } from '../readiness';
 import type { InputFormTopLevelField } from 'mthds/protocol';
 import type { InputForm, PipeInputContract } from '..';
 import {
@@ -326,6 +326,20 @@ describe('required / readiness over optional and plural inputs', () => {
       );
     }
     expect(missingFields(f, undefined).map((field) => field.name)).toEqual(['supplier_quote']);
+  });
+
+  it('names a structure that refuses no member of its own as the field to fill', () => {
+    // A required structure with no required member is refused while it holds
+    // nothing, and no member is to blame: the structure is what to fill.
+    const loose = {
+      kind: 'object' as const,
+      name: 'preferences',
+      required: true,
+      gating: true,
+      fields: [{ kind: 'text' as const, name: 'tone', required: false }],
+    };
+    expect(waitingFields([loose], {}).map(({ path }) => path)).toEqual([['preferences']]);
+    expect(waitingFields([loose], { preferences: { tone: 'warm' } })).toEqual([]);
   });
 });
 

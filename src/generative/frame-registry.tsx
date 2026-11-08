@@ -4,7 +4,7 @@ import * as React from 'react';
 import { type BaseComponentProps, useRepeatScope, useStateValue } from '@json-render/react';
 import { ArrowRight, Clock } from 'lucide-react';
 import { readImageContent, viewableUrl } from '../core/native-content';
-import { missingFields } from '../core/readiness';
+import { waitingFields } from '../core/readiness';
 import { useFieldStrings, useResolveUrl } from '../react';
 import { fieldLabel, useFieldPresentation } from '../react/field-presentation';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
@@ -19,6 +19,8 @@ import { textOf, withDeclaredProps } from './declared-props';
 import { frameComponents } from './frame-definitions';
 import { shareAmount } from './share-amount';
 import { useFrameHost } from './frame-host';
+import { INPUTS_ROOT, joinPath } from './paths';
+import { type PlacedInput, usePlacedInputs } from './placed-inputs';
 import { useDescriptorScope } from './registry';
 
 /**
@@ -69,22 +71,35 @@ interface ComposerProps {
 const NAMED_WAITING = 3;
 
 /**
- * What the run waits for, in the action row's words: the inputs the kernel's
- * readiness counts as missing (`missingFields`), named as their fields label
- * them, or nothing once none is. The designer method tells a model writing a
- * composer that the host's action row says this, so the page itself does not.
+ * What the run waits for, in the action row's words: the fields to fill for
+ * the inputs the kernel's readiness counts as missing (`waitingFields`), or
+ * nothing once none is. Inside a structure those are the members it refuses,
+ * since a composer commonly spreads one structure's members over the page,
+ * and "fill in Request" would name a field nobody can see. They are named and
+ * ordered as the page words and orders them (`placedInputs`), and as the
+ * descriptor labels and orders them where the page does not. The designer
+ * method tells a model writing a composer that the host's action row says
+ * this, so the page itself does not.
  */
 function useRunWaitsFor(): string | undefined {
   const { inputs } = useDescriptorScope();
-  const values = useStateValue<Record<string, unknown>>('/inputs');
+  const values = useStateValue<Record<string, unknown>>(INPUTS_ROOT);
+  const placed = usePlacedInputs();
   const presentation = useFieldPresentation();
   const strings = useFieldStrings();
-  const waiting = missingFields(inputs ?? [], isRecord(values) ? values : undefined);
+  const waiting = waitingFields(inputs ?? [], isRecord(values) ? values : undefined)
+    .map(({ field, path }) => ({ field, on: placed.get(joinPath(INPUTS_ROOT, ...path)) }))
+    // A stable sort: what the page does not place keeps the descriptor's order, after the rest.
+    .sort((a, b) => rankOf(a.on) - rankOf(b.on));
   if (waiting.length === 0) return undefined;
   const names = waiting
     .slice(0, NAMED_WAITING)
-    .map((field) => fieldLabel(field.title, field.name, presentation));
+    .map(({ field, on }) => on?.label ?? fieldLabel(field.title, field.name, presentation));
   return strings.runWaitsFor(names, waiting.length - names.length);
+}
+
+function rankOf(placed: PlacedInput | undefined): number {
+  return placed?.order ?? Number.MAX_SAFE_INTEGER;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
