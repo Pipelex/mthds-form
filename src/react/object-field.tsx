@@ -2,14 +2,20 @@
 
 import { createContext, use, useState } from 'react';
 import { cn } from './utils';
-import type { ObjectRunField } from '../core';
+import type { ObjectRunField, RunField } from '../core';
 import { ownProp } from '../core/own-property';
-import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from '../core/readiness';
+import {
+  anyOptionalStructureOpen,
+  gateRefusal,
+  isFoldedOptional,
+  isOptionalStructure,
+} from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
 import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { useFieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 import { headingFaceClass } from './style-tokens';
 
@@ -39,6 +45,18 @@ const StructureDepthContext = createContext(0);
  * form's own structure (`section`, below).
  */
 export const FramedFormContext = createContext(false);
+
+/**
+ * The id of the structure the form's own run gate refuses, after the person
+ * has tried to run, whose members it refuses are marked one by one: each
+ * empty required member `requiredField`, each started optional one that is
+ * not complete `incompleteField`, at every depth, as `MethodForm` marks its
+ * own inputs. `MethodForm` sets it for an input it refuses, and a structure
+ * sets it for a member it marks; any other structure, a list's row included,
+ * sees an id that is not its own and marks nothing. A host's `errors` entry
+ * sets none: its message is about the structure.
+ */
+export const RefusedStructureContext = createContext<string | null>(null);
 
 /**
  * How a structure groups its sub-fields, by where it stands.
@@ -82,9 +100,9 @@ function structureGrouping(depth: number, labelled: boolean, framed: boolean): S
  * host's panel pads its form by more than that, and a host that clips
  * closer loses the bar as it loses the outline, while the section's message
  * at its heading stays. Three pixels in the solid error colour, where the
- * card's outline was one at half strength, because a single edge has less
- * length to be seen by; the brand contract holds that colour to the 3:1 a
- * mark needs on the page and on a card. `m-0` undoes the spacing the stack
+ * card's outline is one, because a single edge has less length to be seen
+ * by; the brand contract holds that colour to the 3:1 a mark needs on the
+ * page and on a card. `m-0` undoes the spacing the stack
  * it heads gives its children, which would shorten it.
  */
 const SECTION_ERROR_EDGE =
@@ -138,6 +156,16 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   // Document-unique, as every control's id is: two forms mounting the same
   // method must not label one structure with the other's name.
   const domId = useFieldDomId(id);
+  // Whether the form's run gate refuses this structure, in which case each
+  // member it refuses is marked as the form marks its own inputs.
+  const refused = use(RefusedStructureContext) === id;
+  const s = useFieldStrings();
+  const markOf = (child: RunField): string | undefined => {
+    if (!refused) return undefined;
+    const refusal = gateRefusal(child, ownProp(data, child.name), child.required);
+    if (refusal === 'required') return s.requiredField;
+    return refusal === 'incomplete' ? s.incompleteField : undefined;
+  };
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
@@ -217,21 +245,30 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           grouping === 'box' && 'rounded-lg border bg-card/40 p-4 max-sm:p-3',
           grouping === 'section' && 'pt-2',
           grouping === 'rule' && 'border-l-2 pl-4 max-sm:pl-3',
+          // In error, a card's outline and a rule turn the error colour
+          // itself, which the brand contract holds at 3:1 on the page and on
+          // a card: at half of it they read under that bar in every palette.
           (grouping === 'box' || grouping === 'rule') &&
-            (error ? 'border-destructive/50' : 'border-border'),
+            (error ? 'border-destructive' : 'border-border'),
         )}
       >
         <StructureDepthContext value={depth + 1}>
-          {visible.map((child) => (
-            <FieldRenderer
-              key={child.name}
-              field={child}
-              value={ownProp(data, child.name)}
-              onChange={(v) => setChild(child.name, v)}
-              id={`${id}.${child.name}`}
-              env={env}
-            />
-          ))}
+          {visible.map((child) => {
+            const childId = `${id}.${child.name}`;
+            const mark = markOf(child);
+            return (
+              <RefusedStructureContext key={child.name} value={mark ? childId : null}>
+                <FieldRenderer
+                  field={child}
+                  value={ownProp(data, child.name)}
+                  onChange={(v) => setChild(child.name, v)}
+                  id={childId}
+                  error={mark}
+                  env={env}
+                />
+              </RefusedStructureContext>
+            );
+          })}
         </StructureDepthContext>
 
         {(folded.length > 0 || structureOpen) && (

@@ -1,9 +1,12 @@
 'use client';
 
-import { type BaseComponentProps, useRepeatScope, useStateValue } from '@json-render/react';
+import * as React from 'react';
+import { type BaseComponentProps, useStateValue } from '@json-render/react';
 import { ArrowRight, Clock } from 'lucide-react';
 import { readImageContent, viewableUrl } from '../core/native-content';
-import { useResolveUrl } from '../react';
+import { waitingFields } from '../core/readiness';
+import { useFieldStrings, useResolveUrl } from '../react';
+import { fieldLabel, useFieldPresentation } from '../react/field-presentation';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
@@ -16,7 +19,10 @@ import { textOf, withDeclaredProps } from './declared-props';
 import { frameComponents } from './frame-definitions';
 import { shareAmount } from './share-amount';
 import { useFrameHost } from './frame-host';
-import { useDescriptorScope } from './registry';
+import { formatAmount, formatDay } from './format';
+import { INPUTS_ROOT, inputFieldAtPath, joinPath } from './paths';
+import { type PlacedInput, usePlacedInputs } from './placed-inputs';
+import { useAbsolutePath, useDescriptorScope } from './registry';
 
 /**
  * The renderers of the two frames' vocabularies (`frame-definitions.ts`): the
@@ -38,20 +44,6 @@ import { useDescriptorScope } from './registry';
 
 const RADIUS = 'rounded-[calc(var(--radius,0.5rem)*1.5)]';
 
-function useAbsolute(path: string): string {
-  const repeat = useRepeatScope();
-  if (path.startsWith('/')) return path;
-  if (!repeat) return path;
-  return path === '' ? repeat.basePath : `${repeat.basePath}/${path}`;
-}
-
-/** A date path's value as a date at noon UTC, so no time zone moves its day; `undefined` for anything else. */
-function asDate(value: unknown): Date | undefined {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value)) return undefined;
-  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
-  return Number.isNaN(date.getTime()) ? undefined : date;
-}
-
 // ─── Composer ────────────────────────────────────────────────────────────────
 
 interface ComposerProps {
@@ -62,11 +54,92 @@ interface ComposerProps {
   notes?: string[] | null;
 }
 
+/** How many of the inputs a run waits for the action row names before it counts the rest. */
+const NAMED_WAITING = 3;
+
+/**
+ * What the run waits for, in the action row's words: the fields to fill for
+ * the inputs the kernel's readiness counts as missing (`waitingFields`), or
+ * nothing once none is. Inside a structure those are the members it refuses,
+ * since a composer commonly spreads one structure's members over the page,
+ * and "fill in Request" would name a field nobody can see. They are named and
+ * ordered as the page words and orders them (`placedInputs`), and as the
+ * descriptor labels and orders them where the page does not. The designer
+ * method tells a model writing a composer that the host's action row says
+ * this, so the page itself does not.
+ */
+function useRunWaitsFor(): string | undefined {
+  const { inputs } = useDescriptorScope();
+  const values = useStateValue<Record<string, unknown>>(INPUTS_ROOT);
+  const placed = usePlacedInputs();
+  const presentation = useFieldPresentation();
+  const strings = useFieldStrings();
+  const waiting = waitingFields(inputs ?? [], isRecord(values) ? values : undefined)
+    .map(({ field, path }) => {
+      const at = joinPath(INPUTS_ROOT, ...path);
+      return { field, path, on: placed.get(at), rank: rankOf(placed, at) };
+    })
+    // A stable sort: what the page does not place keeps the descriptor's order, after the rest.
+    .sort((a, b) => a.rank - b.rank);
+  if (waiting.length === 0) return undefined;
+  const labelAt = (path: readonly string[]): string | undefined => {
+    const field = inputFieldAtPath(inputs ?? [], joinPath(INPUTS_ROOT, ...path));
+    if (!field) return undefined;
+    return (
+      placed.get(joinPath(INPUTS_ROOT, ...path))?.label ??
+      fieldLabel(field.title, field.name, presentation)
+    );
+  };
+  const named = waiting.slice(0, NAMED_WAITING);
+  const labels = named.map(
+    ({ field, on }) => on?.label ?? fieldLabel(field.title, field.name, presentation),
+  );
+  // One concept used for two inputs gives two members one label: each is then
+  // said with the structure it belongs to, "Name (Sender)".
+  const names = labels.map((label, index) => {
+    const parent = named[index]!.path.slice(0, -1);
+    const shared = labels.filter((other) => other === label).length > 1;
+    const around = shared && parent.length > 0 ? labelAt(parent) : undefined;
+    return around ? `${label} (${around})` : label;
+  });
+  return strings.runWaitsFor(names, waiting.length - names.length);
+}
+
+/**
+ * Where the page shows a field: where it places the field itself, else where
+ * it places the nearest structure around it whole (an `MthdsField` over the
+ * structure draws its members), else where it places the first of the
+ * field's own members, and after everything the page places otherwise.
+ */
+function rankOf(placed: ReadonlyMap<string, PlacedInput>, path: string): number {
+  const own = placed.get(path);
+  if (own) return own.order;
+  for (
+    let at = path.lastIndexOf('/');
+    at > INPUTS_ROOT.length;
+    at = path.lastIndexOf('/', at - 1)
+  ) {
+    const around = placed.get(path.slice(0, at));
+    if (around) return around.order;
+  }
+  let first = Number.MAX_SAFE_INTEGER;
+  for (const [inside, { order }] of placed) {
+    if (inside.startsWith(`${path}/`)) first = Math.min(first, order);
+  }
+  return first;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) {
   const host = useFrameHost();
   // The host's `env.disabled` holds the run while one is going, as it holds
   // the plain form's submit: a second press would be a second billed run.
   const busy = useDescriptorScope().env?.disabled ?? false;
+  const waitsFor = useRunWaitsFor();
+  const waitsForId = React.useId();
   const two = props.columns === '2';
   return (
     <div
@@ -112,16 +185,21 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           {children}
         </div>
         <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
-          {host.eta ? (
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground max-sm:justify-center">
-              <Clock className="size-4" aria-hidden="true" /> {host.eta}
-            </span>
-          ) : (
-            <span />
-          )}
+          {/* What the run waits for, which describes the button, and how long
+              a run takes. The run is not held by it: a press runs the page's
+              checks and the host's gate, which say what is wrong where. */}
+          <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground max-sm:items-center max-sm:text-center">
+            {waitsFor ? <p id={waitsForId}>{waitsFor}</p> : null}
+            {host.eta ? (
+              <span className="inline-flex items-center gap-2">
+                <Clock className="size-4" aria-hidden="true" /> {host.eta}
+              </span>
+            ) : null}
+          </div>
           <button
             type="button"
             disabled={busy}
+            aria-describedby={waitsFor ? waitsForId : undefined}
             onClick={() => emit('press')}
             className={cn(
               'inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius,0.5rem)] bg-primary px-[22px] text-[15px] font-semibold text-primary-foreground transition-all hover:bg-primary/90',
@@ -219,8 +297,9 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
 
 interface ProportionBarProps {
   label: string;
-  total?: number | null;
-  of?: number | null;
+  /** Read as written (`asWritten` below): a number, a numeric text, or what the layout check let by. */
+  total?: unknown;
+  of?: unknown;
   unit?: string | null;
   items?: unknown[] | null;
   labelKey: string;
@@ -241,20 +320,21 @@ function segmentColor(index: number, count: number): string {
   return `color-mix(in oklab, var(--link, var(--primary, hsl(240 5.9% 10%))) ${segmentMix(index, count)}%, var(--muted, hsl(240 4.8% 95.9%)))`;
 }
 
-function amount(value: number, unit: string | null | undefined): string {
-  if (unit && /^[A-Z]{3}$/.test(unit)) {
-    try {
-      return new Intl.NumberFormat('en-GB', {
-        style: 'currency',
-        currency: unit,
-        maximumFractionDigits: 0,
-      }).format(value);
-    } catch {
-      /* not a currency code */
-    }
-  }
-  const n = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(value);
-  return unit ? `${n} ${unit}` : n;
+/**
+ * A total or a ceiling as the layout wrote it: `null` when it wrote none, the
+ * number a number or a text writes out (a payload's decimal may arrive as
+ * text, and the prop's schema would otherwise drop a `$state` read of it to
+ * nothing), and `undefined` for anything else, which is shown as no figure.
+ * `null` is none whoever wrote it: the layout, or a run that left the path a
+ * `$state` read names empty, which the renderer cannot tell apart, since it
+ * sees the value resolved. Only an unreadable total is never read as the
+ * parts' sum: a total of 2,400 shown as the 100 its parts add up to was a
+ * wrong figure in large type.
+ */
+function statedAmount(raw: unknown): number | null | undefined {
+  if (raw === null || raw === undefined) return null;
+  const amount = shareAmount(raw);
+  return Number.isFinite(amount) ? amount : undefined;
 }
 
 function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
@@ -272,8 +352,10 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     }))
     .filter((p) => Number.isFinite(p.value) && p.value > 0);
   const sum = parts.reduce((s, p) => s + p.value, 0);
-  const total = typeof props.total === 'number' ? props.total : sum;
-  const scale = Math.max(sum, total, typeof props.of === 'number' ? props.of : 0) || 1;
+  const stated = statedAmount(props.total);
+  const total = stated === null ? sum : stated;
+  const ceiling = statedAmount(props.of) ?? undefined;
+  const scale = Math.max(sum, total ?? 0, ceiling ?? 0) || 1;
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   return (
     <div
@@ -287,12 +369,14 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <span className="text-[15px] text-muted-foreground">{props.label}</span>
-        <strong className="text-2xl font-semibold tabular-nums text-foreground">
-          {amount(total, props.unit)}
-        </strong>
-        {typeof props.of === 'number' ? (
+        {total !== undefined ? (
+          <strong className="text-2xl font-semibold tabular-nums text-foreground">
+            {formatAmount(total, props.unit)}
+          </strong>
+        ) : null}
+        {ceiling !== undefined ? (
           <span className="text-[15px] text-muted-foreground">
-            of {amount(props.of, props.unit)}
+            of {formatAmount(ceiling, props.unit)}
           </span>
         ) : null}
       </div>
@@ -320,7 +404,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
               }}
               aria-hidden="true"
             />
-            {cap(p.label)} {amount(p.value, props.unit)}
+            {cap(p.label)} {formatAmount(p.value, props.unit)}
           </li>
         ))}
       </ul>
@@ -368,16 +452,16 @@ function Picture({
   props,
 }: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>) {
   // The checks hold `path` to a literal; a layout rendered past them may still
-  // hand an expression's value here, which shows no picture. It is not read as
-  // the empty path, which inside a repeat is the item itself.
-  const written = typeof props.path === 'string' ? props.path : undefined;
-  const path = useAbsolute(written ?? '');
-  const value = useStateValue<unknown>(path);
+  // hand an expression's value here, which shows no picture, as does a
+  // relative path outside any repeat. Neither is read as the empty path,
+  // which inside a repeat is the item itself (`useAbsolutePath`).
+  const path = useAbsolutePath(props.path, true);
+  const value = useStateValue<unknown>(path ?? '');
   const resolve = useResolveUrl();
   // In the result view's order, each through the kernel's gate: the host's
   // resolver on the stored reference, then the file's own public URL, then the
   // reference itself, so a picture shows wherever the result view shows it.
-  const content = written === undefined ? undefined : readImageContent(value);
+  const content = path === undefined ? undefined : readImageContent(value);
   const src = content
     ? (viewableUrl(resolve?.(content.url)) ??
       viewableUrl(content.publicUrl) ??
@@ -432,12 +516,6 @@ function Detail({ props }: BaseComponentProps<{ label: string; value?: unknown }
   );
 }
 
-const DATE_STYLES: Record<string, Intl.DateTimeFormatOptions> = {
-  long: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' },
-  short: { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' },
-  weekday: { weekday: 'short', day: 'numeric', month: 'long', timeZone: 'UTC' },
-};
-
 interface DateTextProps {
   value?: string | null;
   style?: 'long' | 'short' | 'weekday' | null;
@@ -445,19 +523,19 @@ interface DateTextProps {
 }
 
 function DateText({ props }: BaseComponentProps<DateTextProps>) {
-  const date = asDate(props.value);
-  if (!date) return null;
+  // A day written as text, its leading day read through the layer's one
+  // formatter (`formatDay`) at noon UTC, so no time zone moves it. The prop is
+  // a text, so a native date's structure never reaches here: a `native.Date`
+  // is delegated to the result view, which reads its structure.
+  const day = formatDay(props.value, props.style ?? 'long');
+  if (day === undefined) return null;
   const tone =
     props.tone === 'accent'
       ? cn('text-[13px] font-semibold', linkTextClass)
       : props.tone === 'muted'
         ? 'text-sm text-muted-foreground'
         : 'text-[15px] text-foreground';
-  return (
-    <span className={cn('block', tone)}>
-      {date.toLocaleDateString('en-GB', DATE_STYLES[props.style ?? 'long'])}
-    </span>
-  );
+  return <span className={cn('block', tone)}>{day}</span>;
 }
 
 interface TextListProps {
@@ -520,6 +598,9 @@ export const frameRenderers = withDeclaredProps(
     Detail: (ctx: BaseComponentProps<{ label: string; value?: unknown }>) => <Detail {...ctx} />,
   },
   // A refused `path` reaches the renderer as refused: its nearest value, the
-  // empty text, is the item itself inside a repeat.
-  { Picture: ['path'] },
+  // empty text, is the item itself inside a repeat. A share's total and its
+  // ceiling are read as written too: a decimal a payload carries as text is
+  // a number the bar can draw, where its nearest value, nothing, would put
+  // the parts' sum in its place.
+  { Picture: ['path'], ProportionBar: ['total', 'of'] },
 );

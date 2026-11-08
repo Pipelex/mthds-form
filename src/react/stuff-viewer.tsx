@@ -152,6 +152,15 @@ export interface StuffViewerProps {
    * row included.
    */
   tableLayout?: TableLayout;
+  /**
+   * Whether the host draws this panel inside a panel of its own, laid over
+   * what `ResultEnvProvider` says. Every table in the result, except one
+   * nested in another table (in an open row or in a cell), then drops its
+   * own rounded hairline box and keeps its header band and its row rules, so
+   * it does not read as a box in the host's box. Unset, tables keep their
+   * box, as on a bare page. The same seam as `MethodForm`'s `framed`.
+   */
+  framed?: boolean;
   className?: string;
 }
 
@@ -373,12 +382,12 @@ function resultKey(field: RunField, baseName: string, value: unknown): string | 
   }
 }
 
-export function StuffViewer({ downloads, tableLayout, ...props }: StuffViewerProps) {
+export function StuffViewer({ downloads, tableLayout, framed, ...props }: StuffViewerProps) {
   // The panel's own settings reach every file button and every table in its
   // tree, not only its header, so they are laid over the provider's before
   // anything beneath reads them.
   return (
-    <PanelEnvOverride downloads={downloads} tableLayout={tableLayout}>
+    <PanelEnvOverride downloads={downloads} tableLayout={tableLayout} framed={framed}>
       <StuffPanel {...props} />
     </PanelEnvOverride>
   );
@@ -392,7 +401,7 @@ function StuffPanel({
   defaultView = 'rendered',
   downloadBaseName,
   className,
-}: Omit<StuffViewerProps, 'downloads' | 'tableLayout'>) {
+}: Omit<StuffViewerProps, 'downloads' | 'tableLayout' | 'framed'>) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const offered =

@@ -7,6 +7,7 @@ import { Upload } from 'lucide-react';
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { acceptLabel, acceptMap, isAcceptedFile, type FileFormat } from '../core/file-formats';
 import { useFieldStrings } from './field-strings';
+import { focusWithinOutlineClass } from './role-tokens';
 import { cn } from './utils';
 
 /** How many of a batch's names a message names before it counts the rest. */
@@ -83,7 +84,7 @@ export function ListFileDrop({ label, formats, shut, onPlace }: ListFileDropProp
         className={cn(
           'flex flex-col items-center justify-center gap-1 rounded-md border border-dashed px-4 py-4 text-center max-sm:min-h-11',
           'cursor-pointer select-none transition-colors',
-          'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+          focusWithinOutlineClass,
           isDragActive
             ? 'border-primary/60 bg-primary/5'
             : 'border-border bg-input hover:border-border hover:bg-muted',

@@ -9,7 +9,7 @@ import {
   useStateStore,
   useStateValue,
 } from '@json-render/react';
-import { useCheckedField } from './checked-fields';
+import { RevealPanel, useCheckedField } from './checked-fields';
 import {
   Accessibility,
   AlertCircle,
@@ -79,9 +79,8 @@ import {
 } from 'lucide-react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
-import { readDateContent } from '../core/native-content';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
-import { linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
+import { focusOutlineClass, linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { enumLabeler, useFieldPresentation } from '../react/field-presentation';
 import { ResultRoot } from '../react/result-location';
@@ -96,6 +95,8 @@ import { ToggleGroup, ToggleGroupItem } from '../react/ui/toggle-group';
 import { cn } from '../react/utils';
 import { baseCatalog, type ICON_NAMES, type METRIC_FORMATS } from './components';
 import { textOf, withDeclaredProps } from './declared-props';
+import { formatDay, formatNumber } from './format';
+import { shareAmount } from './share-amount';
 import * as shadcn from './ui/shadcn';
 import { inputFieldAtPath, RESULT_ROOT, resultFieldAtPath, segmentsUnder } from './paths';
 
@@ -218,20 +219,27 @@ export function pathFromDomId(prefix: string | undefined, id: string): string | 
 }
 
 /**
- * The path a hatch resolves: absolute as written, or, inside a repeat, the
- * item's field name joined onto the current item's base path. A relative path
- * outside any repeat resolves to nothing, and the hatch says so.
+ * The path a hatch or a `Picture` resolves: absolute as written, or, inside a
+ * repeat, the item's field name joined onto the current item's base path. A
+ * relative path outside any repeat resolves to nothing, and the element says
+ * so. The one resolver every renderer that names a path literally reads
+ * through, so two cannot read one path two ways. The empty path is the item
+ * itself only where `emptyIsItem` says so, which is a `Picture`'s reading
+ * alone, as the fit check reads it (`layout-fits.ts`): for a hatch it stays
+ * the item's base and a trailing separator, which no field has, so the
+ * renderer and the check refuse it together.
  */
-function useAbsolutePath(path: unknown): string | undefined {
+export function useAbsolutePath(path: unknown, emptyIsItem = false): string | undefined {
   const repeat = useRepeatScope();
-  // The checks hold a hatch's `path` to a literal text; a layout rendered
-  // past them may hand anything here, which resolves to nothing - never read
-  // as some other path, as a number written out would be inside a repeat.
+  // The checks hold such a `path` to a literal text; a layout rendered past
+  // them may hand anything here, which resolves to nothing - never read as
+  // some other path, as a number written out would be inside a repeat.
   if (typeof path !== 'string') return undefined;
   if (path.startsWith('/')) return path;
+  if (!repeat) return undefined;
   // Raw, not `joinPath`: the same reason `absoluteHatchPath` gives - a relative
   // hatch path may name several segments, so its `/` are separators already.
-  return repeat ? `${repeat.basePath}/${path}` : undefined;
+  return path === '' && emptyIsItem ? repeat.basePath : `${repeat.basePath}/${path}`;
 }
 
 // ─── The escape hatches ──────────────────────────────────────────────────────
@@ -317,11 +325,13 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'change';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useCheckedField(
+  const { errors, validate, focusRef } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
   const id = shadcn.useControlId(props.name);
+  const errorId = `${id}-error`;
+  const error = errors[0];
   const labelOf = enumLabeler(props.options ?? [], useFieldPresentation());
   return (
     <div className="space-y-2">
@@ -338,7 +348,13 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
       >
         {/* As tall as the layer's text input beside it, and the 44 pixels a
             finger needs. */}
-        <SelectTrigger id={id} className="h-11 w-full">
+        <SelectTrigger
+          id={id}
+          ref={focusRef}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className="h-11 w-full"
+        >
           <SelectValue placeholder={props.placeholder ?? 'Select...'} />
         </SelectTrigger>
         <SelectContent>
@@ -353,7 +369,11 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
           ))}
         </SelectContent>
       </SelectRoot>
-      {errors.length > 0 ? <p className="text-sm text-destructive">{errors[0]}</p> : null}
+      {error ? (
+        <p id={errorId} className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -370,35 +390,29 @@ function valueAt(row: unknown, relativePath: string): unknown {
 }
 
 /** A cell shows a number as it is: grouped, with the places it has, never padded. */
-const CELL_NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'number') return CELL_NUMBER.format(value);
+  if (typeof value === 'number') return formatNumber(value);
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(formatCell).join(', ');
   return JSON.stringify(value);
 }
 
-/** A cell in a column the layout stated a format for. */
+/**
+ * A cell in a column the layout stated a format for. `date` writes the day
+ * the value names (`formatDay`), never a stringified structure. `text` writes
+ * a number in full and ungrouped, never in exponent notation, since a column the layout calls text holds a
+ * year, a reference or a code, and "2,024" is damage there. `number` groups a
+ * number, and a text that writes one out too, as a payload's decimal may
+ * arrive. With no format, a number is grouped and the rest written as it is.
+ */
 function formatColumnCell(value: unknown, format: string | null | undefined): string {
-  // The calendar day is the one written: a time beside it ("2025-03-09
-  // 00:30") must not move it across midnight in the reader's zone, so only the
-  // leading day is read, anchored at noon UTC, as `DateText` reads one.
-  // The value is the day as text, or a native date's own structure
-  // ({ date, time }); either way its day is read, never stringified.
-  const written = format === 'date' ? readDateContent(value)?.date : undefined;
-  const day = written === undefined ? null : /^\d{4}-\d{2}-\d{2}/.exec(written);
-  if (day) {
-    const date = new Date(`${day[0]}T12:00:00Z`);
-    if (!Number.isNaN(date.getTime()))
-      return date.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-      });
+  if (format === 'date') return formatDay(value, 'short') ?? formatCell(value);
+  if (format === 'text' && typeof value === 'number') return formatNumber(value, 'plain');
+  if (format === 'number') {
+    const amount = shareAmount(value);
+    if (Number.isFinite(amount)) return formatNumber(amount);
   }
   return formatCell(value);
 }
@@ -451,21 +465,6 @@ function DataTable({ props }: BaseComponentProps<DataTableProps>) {
 
 type MetricFormat = (typeof METRIC_FORMATS)[number];
 
-function numberFormat(format: MetricFormat): Intl.NumberFormat {
-  switch (format) {
-    case 'integer':
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-    case 'decimal':
-      return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    case 'compact':
-      return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
-    case 'plain':
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 20, useGrouping: false });
-    default:
-      return format satisfies never;
-  }
-}
-
 interface MetricProps {
   label: string;
   value: unknown;
@@ -478,9 +477,7 @@ function Metric({ props }: BaseComponentProps<MetricProps>) {
   // Anything but a number as it writes out, so a structure, which writes out
   // as nothing, shows the dash an absent value shows.
   const text =
-    typeof value === 'number'
-      ? numberFormat(props.format ?? 'plain').format(value)
-      : textOf(value) || '—';
+    typeof value === 'number' ? formatNumber(value, props.format ?? 'plain') : textOf(value) || '—';
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -536,7 +533,8 @@ interface TabsProps {
  * state, so a spec never touches /state for it. An inactive panel stays
  * mounted and hidden, so the checks of the fields in it still hold the run:
  * unmounted, as Radix does by default, they left the page's record, and a
- * run pressed from another tab started past a field that refused it.
+ * run pressed from another tab started past a field that refused it. A run
+ * refused by a field in a hidden panel opens that panel's tab to show it.
  */
 function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const tabs = props.tabs ?? [];
@@ -581,7 +579,7 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
           hidden={index !== open}
           className="mt-4 focus-visible:outline-hidden"
         >
-          {panels[index] ?? null}
+          <RevealPanel open={() => choose(String(index))}>{panels[index] ?? null}</RevealPanel>
         </TabsPrimitive.Content>
       ))}
     </TabsPrimitive.Root>
@@ -603,8 +601,12 @@ function openIndex(
 }
 
 // As tall as the layer's own `Button`, which is the 44 pixels a finger needs.
-const BUTTON_BASE =
-  'inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50';
+// Its focus is the kernel's one outline, whose offset is a gap the panel
+// shows through rather than a ring offset painted in the page colour.
+const BUTTON_BASE = cn(
+  'inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+  focusOutlineClass,
+);
 const PRIMARY_BUTTON = cn(BUTTON_BASE, 'bg-primary text-primary-foreground hover:bg-primary/90');
 const SECONDARY_BUTTON = cn(
   BUTTON_BASE,
@@ -623,7 +625,8 @@ interface StepsProps {
  * inside the last one, which is why Next disappears there. The current step
  * is local state. A hidden panel stays mounted, so its inputs keep their
  * values in the store and their checks hold the run - a step hides from the
- * eye, never from the run.
+ * eye, never from the run - and a run refused by a field on another step goes
+ * back to that step to show it.
  */
 function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const steps = props.steps ?? [];
@@ -631,7 +634,8 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const [chosen, setIndex] = React.useState(0);
   const last = steps.length - 1;
   // A layout patched or swapped mid-way may have fewer steps than the one
-  // reached: the last there is shows rather than none.
+  // reached: the last there is shows rather than none, and Back and Next
+  // move from the step shown, not from the one reached.
   const index = Math.max(0, Math.min(chosen, last));
   return (
     <div className="flex flex-col gap-5">
@@ -663,7 +667,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
       </ol>
       {steps.map((_step, position) => (
         <div key={position} hidden={position !== index}>
-          {panels[position] ?? null}
+          <RevealPanel open={() => setIndex(position)}>{panels[position] ?? null}</RevealPanel>
         </div>
       ))}
       {index > 0 || index < last ? (
@@ -672,7 +676,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
             <button
               type="button"
               data-testid="steps-back"
-              onClick={() => setIndex((current) => Math.max(0, current - 1))}
+              onClick={() => setIndex(Math.max(0, index - 1))}
               className={SECONDARY_BUTTON}
             >
               {props.backLabel ?? 'Back'}
@@ -684,7 +688,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
             <button
               type="button"
               data-testid="steps-next"
-              onClick={() => setIndex((current) => Math.min(last, current + 1))}
+              onClick={() => setIndex(Math.min(last, index + 1))}
               className={PRIMARY_BUTTON}
             >
               {props.nextLabel ?? 'Next'}

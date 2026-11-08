@@ -255,6 +255,12 @@ export interface FieldStrings {
    * required field.
    */
   incompleteField: string;
+  /**
+   * What a composer's action row says beside its run button while inputs the
+   * run needs are still empty or incomplete: the first few inputs' labels, and
+   * how many more there are.
+   */
+  runWaitsFor: (names: readonly string[], more: number) => string;
   /** What a file field says when the host's `uploadFile` rejected its file. */
   uploadFailed: string;
 

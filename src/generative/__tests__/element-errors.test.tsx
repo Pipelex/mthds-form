@@ -5,6 +5,7 @@ import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrandManifest } from '../../brand/manifest';
 import { BrandProvider } from '../brand-context';
+import { contentOf } from '../element-errors';
 import { BrandBar, GenerativePage, generativeRegistry } from '../index';
 import type { ElementErrorInfo } from '../index';
 
@@ -162,13 +163,14 @@ describe('an element that throws while rendering', () => {
   it('is reported by the element it is in, when a repeat path cannot be resolved', () => {
     // A repeat path relative to the list around it, written without its
     // member, throws as json-render resolves it - inside the element's render,
-    // where its own boundary catches it and reports it.
+    // where its own boundary catches it and reports it. The list around it is
+    // a Card, so the type reported says which of the two boundaries it was.
     const spec: Spec = {
       root: 'rows',
       elements: {
         rows: {
-          type: 'Stack',
-          props: { direction: 'vertical' },
+          type: 'Card',
+          props: { title: null, description: null },
           repeat: { statePath: '/rows' },
           children: ['cells'],
         },
@@ -387,6 +389,38 @@ describe('an element that threw, once what it renders from is corrected', () => 
     expect(onElementError).toHaveBeenCalledTimes(1);
   });
 
+  it('draws a repeated child whose props threw, once the store outside the list holds what they read', () => {
+    // A repeated child's props are resolved in its render, under the item's
+    // scope, and a throw there is the repeating element's to catch - whose
+    // own props and list have not changed.
+    const spec: Spec = {
+      root: 'page',
+      elements: {
+        page: { type: 'Stack', props: STACK, children: ['list'] },
+        list: {
+          type: 'Stack',
+          props: STACK,
+          repeat: { statePath: '/result/lines' },
+          children: ['line'],
+        },
+        line: {
+          type: 'Text',
+          props: { text: { $template: '${/result/unit}: ${name}' }, variant: null },
+          children: [],
+        },
+      },
+    };
+    const store = createStateStore({
+      result: { lines: [{ name: 'Lyon' }], unit: { toString: 1 } },
+    });
+    const onElementError = vi.fn();
+    render(<GenerativePage spec={spec} store={store} scope={{}} onElementError={onElementError} />);
+    expect(onElementError).toHaveBeenCalledTimes(1);
+    act(() => store.set('/result/unit', 'City'));
+    expect(screen.getByText('City: Lyon')).toBeTruthy();
+    expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+
   it('draws a root whose props threw, once the store holds what they read', () => {
     const spec: Spec = {
       root: 'title',
@@ -507,6 +541,52 @@ describe('an element that threw, once what it renders from is corrected', () => 
       />,
     );
     expect(onElementError).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * What a failed boundary compares, to tell a corrected input from the one it
+ * failed on: the content, whatever objects carry it.
+ */
+describe('the content a failed boundary compares', () => {
+  it('writes a structure held at two places out at both', () => {
+    const shared = { name: 'Lyon' };
+    expect(contentOf({ list: [shared], read: shared })).toBe(
+      contentOf({ list: [{ name: 'Lyon' }], read: { name: 'Lyon' } }),
+    );
+  });
+
+  it('sees a change at the second place a structure was held', () => {
+    const shared = { name: 'Lyon' };
+    expect(contentOf({ list: [shared], read: shared })).not.toBe(
+      contentOf({ list: [shared], read: '[cycle]' }),
+    );
+  });
+
+  it('still writes a structure inside itself out, once', () => {
+    const loop: Record<string, unknown> = { name: 'Lyon' };
+    loop.self = loop;
+    expect(contentOf(loop)).toBe('{"name":"Lyon","self":"[cycle]"}');
+  });
+
+  it('still tells a list of tens of thousands of rows from the same list corrected', () => {
+    // Each row writes out as its object and its members, the most a repeated
+    // child was seen to cost; one object is written at every place it stands.
+    const row = Object.fromEntries(
+      Array.from({ length: 43 }, (_, index) => [`member${index}`, `value ${index}`]),
+    );
+    const rows: object[] = Array.from({ length: 90_000 }, () => row);
+    const failed = contentOf({ rows });
+    expect(failed).not.toBe('an input that cannot be written out');
+    expect(contentOf({ rows: [...rows.slice(0, -1), { ...row, member0: 'corrected' }] })).not.toBe(
+      failed,
+    );
+  });
+
+  it('gives up on sharing nested so deep that writing it out would freeze the page', () => {
+    let shared: object = { v: 1 };
+    for (let level = 0; level < 30; level += 1) shared = { a: shared, b: shared };
+    expect(contentOf(shared)).toBe('an input that cannot be written out');
   });
 });
 

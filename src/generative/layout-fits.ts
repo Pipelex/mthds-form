@@ -1,6 +1,7 @@
 import type { Spec } from '@json-render/core';
 import type { RunField, RunFieldKind } from '../core';
 import { hasOwnProp } from '../core/own-property';
+import { isFilled } from '../core/readiness';
 import { catalog } from './catalog';
 import { condBranches, expressionForm, isExpression } from './expressions';
 import { shareAmount } from './share-amount';
@@ -468,6 +469,54 @@ function nonScalarReads(
       const branches = depth < MAX_COND_DEPTH ? condBranches(value) : undefined;
       return branches ? branches.flatMap((branch) => outcomes(branch, depth + 1)) : [value];
     };
+    // Why an amount draws nothing, or nothing when it draws: what the
+    // renderer draws from is a number, or a text that writes one out
+    // (`shareAmount`), so a literal must be one and a read must name a path
+    // that holds one. A `$template` writes a text that may carry anything
+    // around the number, so it reads none.
+    const amountPathRefusal = (path: string): string | undefined => {
+      const field = isUnder(root, path) ? fieldAt(path) : undefined;
+      if (field && field.kind !== 'number' && field.kind !== 'unknown') {
+        return `reads ${path}, which holds ${kindWords(field.kind)}, not a number`;
+      }
+      return undefined;
+    };
+    const amountRefusal = (amount: unknown): string | undefined => {
+      if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return undefined;
+      const path = readPath(amount);
+      if (path === undefined) {
+        const shown = isExpression(amount)
+          ? 'an expression that reads no number'
+          : String(JSON.stringify(amount ?? null));
+        return `is ${shown}, not a number`;
+      }
+      return amountPathRefusal(path);
+    };
+    // A share's total and its ceiling, held to what the renderer draws as
+    // either: a number, or a read of one. The renderer shows no figure for
+    // anything else rather than the parts' sum, so a total a model wrote as
+    // a `$template` around a currency would be a bar with no figure; it is
+    // refused here instead, in each branch of a `$cond`, and the page falls
+    // back. Writing none (`null`) is the parts' sum, and no ceiling. The
+    // repeat's index, which a part's amount may read, is never a total, and
+    // outside a repeat it resolves to nothing, which the renderer would take
+    // for no total and draw the parts' sum in its place.
+    if (element.type === 'ProportionBar') {
+      const props = (element.props ?? {}) as Record<string, unknown>;
+      for (const prop of ['total', 'of'] as const) {
+        const refusals = outcomes(props[prop])
+          .filter((outcome) => outcome !== null && outcome !== undefined)
+          .map((outcome) =>
+            readsIndex(outcome) ? "is the repeat's index, not an amount" : amountRefusal(outcome),
+          )
+          .filter((refusal): refusal is string => refusal !== undefined);
+        for (const refusal of new Set(refusals)) {
+          problems.push(
+            `${key}: ProportionBar's ${prop} ${refusal}; a total or a ceiling is a number, or reads a path that holds one with { "$state" }`,
+          );
+        }
+      }
+    }
     // Parts written out inline. The catalog takes a share's items as a list
     // of anything, and the renderer reads each by member name and its value
     // member as a number, so every entry must be a structure naming both
@@ -486,27 +535,47 @@ function nonScalarReads(
       const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
       if (typeof labelKey !== 'string' || typeof valueKey !== 'string') return entries;
       const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member holding a number, or the whole list is read with { "$state" }`;
+      // What a template amount writes out: a template whose text is one
+      // interpolation and nothing else, whitespace aside, writes out the
+      // value at the path it reads, so it is read as that path - the renderer
+      // draws the text a number writes out as that number. One with words or
+      // a second interpolation beside it writes a number only by accident,
+      // and one with none writes its own text.
+      const templateAmount = (
+        amount: unknown,
+      ): { path: string } | { text: string } | 'more' | undefined => {
+        if (expressionForm(amount) !== '$template') return undefined;
+        const text = (amount as { $template: string }).$template;
+        const sole = /^\s*(\$\{[^}]+\})\s*$/.exec(text)?.[1];
+        if (sole !== undefined) {
+          const [path] = interpolatedPaths(sole, itemPath);
+          return path === undefined ? 'more' : { path };
+        }
+        return interpolatedPaths(text, itemPath).length > 0 ? 'more' : { text };
+      };
+      // An inline amount may also be a template that writes one out; a page
+      // hands json-render no functions, so a `$computed` resolves to nothing
+      // there, which draws no share. Everything else is any amount's refusal.
+      const inlineAmountRefusal = (amount: unknown): string | undefined => {
+        if (expressionForm(amount) === '$computed') {
+          return 'is a $computed, which a page has no function to resolve, not a number';
+        }
+        const written = templateAmount(amount);
+        if (written === undefined) return amountRefusal(amount);
+        if (written === 'more') {
+          return 'is a template that writes text beside its value, not a number';
+        }
+        if ('path' in written) return amountPathRefusal(written.path);
+        return Number.isFinite(shareAmount(written.text))
+          ? undefined
+          : `is a template that writes ${JSON.stringify(written.text)} out, not a number`;
+      };
       // Whether an amount draws no share, naming why when it does not.
       const amountRefused = (part: string, amount: unknown): boolean => {
-        // What the renderer draws a share from: a number, or a text that
-        // writes one out (`shareAmount`).
-        if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return false;
-        const path = readPath(amount);
-        if (path === undefined) {
-          const shown = isExpression(amount)
-            ? 'an expression that reads no number'
-            : String(JSON.stringify(amount ?? null));
-          problems.push(`${part}'s ${JSON.stringify(valueKey)} is ${shown}, not a number; ${how}`);
-          return true;
-        }
-        const field = isUnder(root, path) ? fieldAt(path) : undefined;
-        if (field && field.kind !== 'number' && field.kind !== 'unknown') {
-          problems.push(
-            `${part}'s ${JSON.stringify(valueKey)} reads ${path}, which holds ${kindWords(field.kind)}, not a number; ${how}`,
-          );
-          return true;
-        }
-        return false;
+        const refusal = inlineAmountRefusal(amount);
+        if (refusal === undefined) return false;
+        problems.push(`${part}'s ${JSON.stringify(valueKey)} ${refusal}; ${how}`);
+        return true;
       };
       // One value a part can resolve to, held to the rule above.
       const sharePart = (part: string, entry: unknown): unknown[] => {
@@ -578,6 +647,9 @@ function nonScalarReads(
       }
     };
     for (const [prop, value] of Object.entries(element.props ?? {})) {
+      // A share's total and ceiling were held to a number above, which says
+      // more than that they are no value.
+      if (element.type === 'ProportionBar' && (prop === 'total' || prop === 'of')) continue;
       const items = listy?.get(prop);
       if (items === undefined || Array.isArray(value)) {
         walk(prop, prop === 'items' && Array.isArray(value) ? inlineShares(value) : value);
@@ -680,14 +752,37 @@ interface Offered {
  * A structure is covered by covering what it requires, so a layout may leave
  * out an optional member and still fit; a list is covered whole, by a repeat
  * or by delegation, because its items are the layout's business and not this
- * predicate's.
+ * predicate's. A structure that requires no member still has to hold
+ * something before the run takes it (`fieldFilled`), so it is covered by
+ * covering any one member, or by a member whose default the seed writes into
+ * it, and is itself the uncovered path otherwise: answering nothing there let
+ * a page through that no person could complete.
+ *
+ * `seeded` says that `seedInputs` walks `field`: true of every top-level
+ * input, and of a member only down a chain of required structures with no
+ * default of their own. The seed leaves an optional structure absent and
+ * writes a structure's own default whole, so a member's default anywhere else
+ * never arrives, however required the structures between are.
  */
-function uncoveredUnder(field: RunField, path: string, offered: Offered): string[] {
+function uncoveredUnder(
+  field: RunField,
+  path: string,
+  offered: Offered,
+  seeded: boolean,
+): string[] {
   if (isOffered(path, offered)) return [];
   if (field.kind === 'object') {
-    return field.fields
-      .filter((child) => child.required)
-      .flatMap((child) => uncoveredUnder(child, joinPath(path, child.name), offered));
+    const seededBelow = seeded && field.required && field.defaultValue === undefined;
+    const under = (child: RunField) =>
+      uncoveredUnder(child, joinPath(path, child.name), offered, seededBelow);
+    const required = field.fields.filter((child) => child.required);
+    if (required.length > 0) return required.flatMap(under);
+    // A blank default fills nothing, whatever the seed does with it.
+    return field.fields.some(
+      (child) => (seededBelow && isFilled(child.defaultValue)) || under(child).length === 0,
+    )
+      ? []
+      : [path];
   }
   return [path];
 }
@@ -712,27 +807,120 @@ export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
 /**
  * What makes `descriptor` no descriptor the fit check can read, in words, or
  * nothing. A descriptor is the host's, derived from the method; one of the
- * wrong shape is answered as such, never as the checks' own failure. An
+ * wrong shape is answered as such, in words saying what is wrong with it,
+ * and `layoutCheck` flags it as no repair of the layout can mend. An
  * absent half - `null` written for it included, which is how JSON carries one
- * - is a descriptor with nothing on that side.
+ * - is a descriptor with nothing on that side. Every field is held to the
+ * shape the walks read, at every depth: a structure naming its `kind` and its
+ * `name` as texts, a structure's members a list of fields and a list's item a
+ * field, with no field inside itself, none nested deeper than
+ * `MAX_FIELD_DEPTH` and no more than `MAX_DESCRIPTOR_FIELDS` in all. Reading
+ * one never throws: a descriptor whose own reading
+ * throws is answered as one that cannot be read.
  */
 export function descriptorMalformation(descriptor: unknown): string | undefined {
   if (typeof descriptor !== 'object' || descriptor === null) {
     return 'the layout has no descriptor to be checked against';
   }
-  const { inputs, result } = descriptor as { inputs?: unknown; result?: unknown };
-  if (inputs != null && !Array.isArray(inputs)) {
-    return 'the descriptor\'s "inputs" is not a list of fields';
+  try {
+    const budget = { fields: 0 };
+    const { inputs, result } = descriptor as { inputs?: unknown; result?: unknown };
+    if (inputs != null && !Array.isArray(inputs)) {
+      return 'the descriptor\'s "inputs" is not a list of fields';
+    }
+    for (const [index, input] of (inputs ?? []).entries()) {
+      const problem = fieldMalformation(input, `input ${index + 1}`, new Set(), budget);
+      if (problem !== undefined) return `the descriptor's ${problem}`;
+    }
+    if (result != null) {
+      if (!isField(result)) return 'the descriptor\'s "result" is not a field';
+      const problem = fieldMalformation(result, '"result"', new Set(), budget);
+      if (problem !== undefined) return `the descriptor's ${problem}`;
+    }
+    return undefined;
+  } catch (error) {
+    let said: string;
+    try {
+      said = String(error);
+    } catch {
+      said = 'an error that cannot be written out';
+    }
+    return `the descriptor cannot be read (${said})`;
   }
-  if (
-    result != null &&
-    (typeof result !== 'object' ||
-      Array.isArray(result) ||
-      typeof (result as { kind?: unknown }).kind !== 'string')
-  ) {
-    return 'the descriptor\'s "result" is not a field';
+}
+
+/** How many fields deep a descriptor is read before it is refused as too deep. */
+const MAX_FIELD_DEPTH = 64;
+
+/**
+ * How many fields a descriptor holds, counted at each place one is held,
+ * before it is refused as too large. A field held at two places is two fields
+ * the form draws and the fit check walks, so a descriptor built in memory that
+ * shares a structure level under level doubles at every level within the
+ * depth cap; no method declares anywhere near this many.
+ */
+const MAX_DESCRIPTOR_FIELDS = 10_000;
+
+/** Whether `value` names its `kind` and its `name` as texts, as a field does. */
+function isField(value: unknown): value is { kind: string; name: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { kind?: unknown }).kind === 'string' &&
+    typeof (value as { name?: unknown }).name === 'string'
+  );
+}
+
+/**
+ * What makes `value`, which the descriptor holds as `subject`, no field the
+ * walks can read, or nothing. `ancestors` holds the fields it sits inside,
+ * so a field held twice - two members sharing one definition - is read at
+ * each place, and only one inside itself is refused.
+ */
+function fieldMalformation(
+  value: unknown,
+  subject: string,
+  ancestors: Set<object>,
+  budget: { fields: number },
+): string | undefined {
+  if (++budget.fields > MAX_DESCRIPTOR_FIELDS) {
+    return `fields number more than ${MAX_DESCRIPTOR_FIELDS}, counted at each place one is held`;
   }
-  return undefined;
+  if (!isField(value)) return `${subject} is not a field`;
+  const named = `${subject} (${JSON.stringify(value.name)})`;
+  if (ancestors.has(value)) return `${named} contains itself`;
+  if (ancestors.size >= MAX_FIELD_DEPTH) {
+    return `${named} is nested more than ${MAX_FIELD_DEPTH} fields deep`;
+  }
+  ancestors.add(value);
+  try {
+    if (value.kind === 'object') {
+      const { fields } = value as { fields?: unknown };
+      if (!Array.isArray(fields)) return `${named} has no list of member "fields"`;
+      for (const [index, member] of fields.entries()) {
+        const problem = fieldMalformation(
+          member,
+          `${named} member ${index + 1}`,
+          ancestors,
+          budget,
+        );
+        if (problem !== undefined) return problem;
+      }
+    }
+    if (value.kind === 'list') {
+      const problem = fieldMalformation(
+        (value as { item?: unknown }).item,
+        `${named} item`,
+        ancestors,
+        budget,
+      );
+      if (problem !== undefined) return problem;
+    }
+    return undefined;
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 /**
@@ -848,7 +1036,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
   };
   for (const field of inputs) {
     if (!field.required) continue;
-    for (const path of uncoveredUnder(field, joinPath(INPUTS_ROOT, field.name), offered)) {
+    for (const path of uncoveredUnder(field, joinPath(INPUTS_ROOT, field.name), offered, true)) {
       problems.push(`${path} is required, and the layout offers nowhere to enter it`);
     }
   }
