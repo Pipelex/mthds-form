@@ -3,7 +3,8 @@
 import { cn } from './utils';
 import type { BooleanRunField } from '../core';
 import { ConceptPill } from './concept-pill';
-import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { fieldLabel, shownDescription, useFieldPresentation } from './field-presentation';
+import { FieldDescription } from './field-shell';
 import { Switch } from './ui/switch';
 import { useFieldDomId } from './field-dom-id';
 
@@ -26,6 +27,8 @@ export function BooleanField({ field, value, onChange, id, disabled }: BooleanFi
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
   const domId = useFieldDomId(id);
+  const label = fieldLabel(field.title, field.name, presentation);
+  const description = shownDescription(field.description, label, ['boolean'], presentation);
   return (
     <div
       className={cn(
@@ -42,13 +45,11 @@ export function BooleanField({ field, value, onChange, id, disabled }: BooleanFi
               isApp ? 'text-[13.5px]' : 'font-mono',
             )}
           >
-            {fieldLabel(field.title, field.name, presentation)}
+            {label}
           </label>
           {!isApp && <ConceptPill conceptRef={field.conceptRef} category="boolean" />}
         </div>
-        {field.description && (
-          <p className="text-[12px] leading-relaxed text-muted-foreground">{field.description}</p>
-        )}
+        {description && <FieldDescription>{description}</FieldDescription>}
       </div>
       <Switch
         id={domId}

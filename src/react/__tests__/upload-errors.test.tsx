@@ -222,7 +222,7 @@ describe('leaving the upload behind hides it', () => {
   it('hides it when a link is typed instead', async () => {
     const user = userEvent.setup();
     render(<Host field={doc('cv')} uploadErrors={failed} />);
-    await user.click(screen.getByRole('button', { name: /paste a url instead/i }));
+    await user.click(screen.getByRole('button', { name: /paste a link instead/i }));
     await user.type(screen.getByRole('textbox'), 'h');
     expect(alerts()).toHaveLength(0);
   });
@@ -246,7 +246,7 @@ describe('what the host sends after the user moved on is shown', () => {
   }
 
   const typeALink = async (user: ReturnType<typeof userEvent.setup>) => {
-    await user.click(screen.getByRole('button', { name: /paste a url instead/i }));
+    await user.click(screen.getByRole('button', { name: /paste a link instead/i }));
     await user.type(screen.getByRole('textbox'), 'h');
   };
 

@@ -1,15 +1,25 @@
 {
   "comment": "Written by /pipelex-integrate. `method` and `target` are how this tree was generated — re-run the skill to refresh it. `bundle_dir` is the directory the call site loads and `sources` the SHA-256 of every .mthds file under it, so a bundle change that was never regenerated — a file edited, removed or added — is detectable. Not part of the codegen lock; do not hand-edit.",
   "generator": "pipelex-integrate",
-  "method": { "files": ["methods/layout-design.mthds"] },
+  "method": {
+    "files": [
+      "methods/layout-design.mthds",
+      "methods/layout-sample.mthds"
+    ]
+  },
   "target": "ts-zod",
   "pipe": {
     "pipe_ref": "generative.design_layout",
-    "inputs": { "catalog": "generative.Catalog", "brief": "generative.Brief", "seed": "native.Text?" },
+    "inputs": {
+      "catalog": "generative.Catalog",
+      "brief": "generative.Brief",
+      "seed": "native.Text?"
+    },
     "output": "native.Text"
   },
   "bundle_dir": "methods",
   "sources": {
-    "methods/layout-design.mthds": "e87b837d9025966a181a1c6b71eaec4bb0f32737e21d2155f2833b41ba706bce"
+    "methods/layout-design.mthds": "e87b837d9025966a181a1c6b71eaec4bb0f32737e21d2155f2833b41ba706bce",
+    "methods/layout-sample.mthds": "7e19c8452631f5e0d3b182322b046a916873ac56e8aaa7179ecbb57d3b533399"
   }
 }

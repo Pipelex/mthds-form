@@ -635,7 +635,9 @@ describe('the brand bar a host draws itself', () => {
     const page = render(
       <GenerativePage spec={spec} store={createStateStore({})} scope={{}} brand={BRAND} />,
     );
-    expect(page.container.innerHTML).toBe(ownHtml);
+    const root = page.container.firstElementChild!;
+    expect(root.className).toContain('@container');
+    expect(root.innerHTML).toBe(ownHtml);
   });
 
   it('draws a link the layout names twice twice, under keys React can tell apart', () => {

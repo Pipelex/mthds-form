@@ -127,6 +127,30 @@ describe('the server entry, ./generative/headless', () => {
       .digest('hex');
     expect(digest.slice(0, 12)).toBe(server.PROMPT_HASH);
   });
+
+  it('hashes nothing of the written-sample entry, so an edit to it stales no stored layout', () => {
+    const method = readFileSync(
+      new URL('../../../methods/layout-design.mthds', import.meta.url),
+      'utf8',
+    );
+    const entry = readFileSync(
+      new URL('../../../methods/layout-sample.mthds', import.meta.url),
+      'utf8',
+    );
+    expect(entry).toMatch(/main_pipe\s*=\s*"design_from_written_sample"/);
+    expect(server.promptHashSubject(method)).not.toContain(entry);
+    expect(server.promptHashSubject(method)).not.toContain('layout_sample');
+  });
+
+  it('ships the written-sample entry and its check beside the designer', () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
+    ) as { exports: Record<string, unknown> };
+    expect(manifest.exports['./layout-design.mthds']).toBe('./dist/layout-design.mthds');
+    expect(manifest.exports['./layout-sample.mthds']).toBe('./dist/layout-sample.mthds');
+    expect(server.writtenSampleOf).toBeTypeOf('function');
+    expect(client.writtenSampleOf).toBe(server.writtenSampleOf);
+  });
 });
 
 describe('the client entry, ./generative', () => {

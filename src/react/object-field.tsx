@@ -14,7 +14,8 @@ import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
 import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
-import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { fieldLabel, shownDescription, useFieldPresentation } from './field-presentation';
+import { FieldDescription } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 import { headingFaceClass } from './style-tokens';
@@ -152,6 +153,7 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   const depth = use(StructureDepthContext);
   const data = value ?? {};
   const label = fieldLabel(field.title, field.name, presentation);
+  const description = shownDescription(field.description, label, ['structured'], presentation);
   const grouping = structureGrouping(depth, label.trim() !== '', use(FramedFormContext));
   // Document-unique, as every control's id is: two forms mounting the same
   // method must not label one structure with the other's name.
@@ -206,7 +208,7 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
       : {
           role: 'group',
           'aria-labelledby': nameId,
-          'aria-describedby': field.description ? descriptionId : undefined,
+          'aria-describedby': description ? descriptionId : undefined,
         };
 
   const section = grouping === 'section';
@@ -230,11 +232,7 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
             wraps. */}
         {section && caption}
       </div>
-      {field.description && (
-        <p id={descriptionId} className="text-[12px] leading-relaxed text-muted-foreground">
-          {field.description}
-        </p>
-      )}
+      {description && <FieldDescription id={descriptionId}>{description}</FieldDescription>}
 
       <div
         // Names the grouping for a host's stylesheet and for tests, which

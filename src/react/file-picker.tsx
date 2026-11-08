@@ -25,6 +25,7 @@ import type {
 import { formatOfFilename, normalizeMimeType, type FileFormat } from '../core/file-formats';
 import { chosenFilesAdded } from '../core/sources';
 import { useFieldStrings, type FieldStrings } from './field-strings';
+import { rowActionClass } from './field-styles';
 import { focusOutlineClass, focusOutlineInsetClass, selectedCheckedFillClass } from './role-tokens';
 import {
   DimRows,
@@ -112,10 +113,7 @@ export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePicker
       disabled={disabled}
       aria-haspopup="dialog"
       aria-label={s.chooseFromSourceAria(label)}
-      className={cn(
-        'flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-border px-3 text-[14px] text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9',
-        focusOutlineClass,
-      )}
+      className={cn(rowActionClass, focusOutlineClass)}
     >
       <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       {s.chooseFromSource}

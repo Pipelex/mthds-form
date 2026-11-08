@@ -1,0 +1,85 @@
+domain      = "layout_sample"
+description = "Designs a result page when no run exists: writes an invented sample of the result, then hands the designer the brief with that sample in it."
+main_pipe   = "design_from_written_sample"
+
+# The designer's second entry, kept in a file of its own. A layout records the
+# hash of `layout-design.mthds`, whose text is hashed whole, so any edit to that
+# file stales every stored layout. Writing the sample here leaves that file and
+# its hash exactly as they were, and keeps one run per design: a host sends both
+# files, starts this entry, and reads the page from the run as it reads any other
+# design.
+#
+# The sample is INVENTED. It holds no customer data, which is why a host may
+# store it beside a layout, where a real run's output may never go, and why it
+# leaves out files and images, since a made-up link would draw nothing. A host
+# checks it with `writtenSampleOf`, reading it out of the run's working memory
+# under `written_sample`; a sample with problems never blocks a layout.
+#
+# Every stage past the sample is the designer's own, by reference: this bundle
+# states nothing about how a page is designed, and a change to how a page is
+# designed is made in `layout-design.mthds`.
+
+[pipe.design_from_written_sample]
+type = "PipeSequence"
+description = "Design one result page with no run to read: write a sample of the result, put it in the brief, then lay the brief out, plan the page and build it."
+inputs = { catalog = "generative.Catalog", brief = "generative.Brief", seed = "Text?" }
+output = "Text"
+steps = [
+  { pipe = "write_sample", result = "written_sample" },
+  { pipe = "brief_with_sample", result = "brief" },
+  { pipe = "generative.render_brief", result = "brief_text" },
+  { pipe = "generative.plan_page", result = "plan" },
+  { pipe = "generative.emit_page", result = "page" },
+]
+
+[pipe.write_sample]
+type = "PipeLLM"
+description = "Invent one plausible state of the result, as JSON, from the brief's paths and description."
+inputs = { brief = "generative.Brief" }
+output = "Text"
+model = { model = "gpt-6.1-sol", temperature = 0.5, max_tokens = 8192 }
+system_prompt = """
+You write realistic sample data. You are given the description of what a method returns, and you write one invented example of it, as JSON, so a designer can see how long its texts run and how large its figures are before anyone has run the method.
+"""
+prompt = """
+WHAT THE METHOD DOES:
+{% if brief.description %}{{ brief.description }}{% else %}Nothing is said about it beyond the paths below; read its purpose off them.{% endif %}
+
+WHAT ONE RUN RETURNS, AS PATHS:
+{% for entry in brief.paths -%}
+{{ "  " * entry.depth }}- `{{ entry.path }}` - {{ entry.kind }}{% if entry.title %} - {{ entry.title }}{% endif %}{% if entry.description %}: {{ entry.description }}{% endif %}{% if entry.notes %} ({{ entry.notes | join("; ") }}){% endif %}{% if entry.delegated %} [LEAVE OUT]{% endif +%}
+{% if entry.item_kind %}
+{{ "  " * (entry.depth + 1) }}- each item is a {{ entry.item_kind }}{% if entry.item_description %} ({{ entry.item_description }}){% endif %}{% if entry.item_laid_out %}, with these members, named relative to one item:{% endif +%}
+{% endif %}
+{% endfor %}
+
+HOW TO WRITE IT:
+1. Write the value of `/result`, and nothing around it. Where the first path is a structure, write one JSON object whose keys are its members; where it is a list, write a JSON array; where it is a single value, write that value.
+2. A member of a structure is a key of that structure's object, and a path spelled relative to one item of a list is a key of each of that list's items. A key is the last part of a path. Write no key the paths do not list.
+3. Fill every path unless it says LEAVE OUT.
+4. Leave out every path marked LEAVE OUT, and every path that holds a file or an image, as a document or an image is, and every list of them. Leave the key out altogether: no null, no empty value, no placeholder and no link.
+5. Give a value the kind its path states: a text as a JSON string, a number or an integer as a JSON number, a boolean as true or false, a date as "YYYY-MM-DD", and a choice as exactly one of the words it lists, spelled exactly. Respect every minimum, maximum and length that is stated.
+6. Write two to four items for a list, unless its stated bounds ask for something else.
+7. Make it read like one real outcome of this method: the texts as long as a real one would be, the figures of a realistic size that agree with each other, a total that is the sum of its parts.
+8. Invent everything. Name no real person, company, brand, product, place or address: make up plausible ones.
+
+Output only the JSON value: no prose before or after it, no code fence.
+"""
+
+[pipe.brief_with_sample]
+type        = "PipeCompose"
+description = "Build the brief again as it was given, with the written sample as the state the designer reads."
+inputs      = { brief = "generative.Brief", written_sample = "Text" }
+output      = "generative.Brief"
+
+[pipe.brief_with_sample.construct]
+side         = { from = "brief.side" }
+pipe_ref     = { from = "brief.pipe_ref" }
+description  = { from = "brief.description" }
+name         = { from = "brief.name" }
+paths        = { from = "brief.paths" }
+run_control  = { from = "brief.run_control" }
+returns      = { from = "brief.returns" }
+frame        = { from = "brief.frame" }
+style        = { from = "brief.style" }
+sample_state = { from = "written_sample" }

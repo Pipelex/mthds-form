@@ -118,9 +118,10 @@ describe('the run handler', () => {
  * A choice's options are its codes - the descriptor carries nothing else, and
  * a layout copies them out of the brief spelled exactly, because the value a
  * control writes must be one the enum declares. What a person reads is the
- * kernel's wording of each code under the presentation the page is mounted
- * in, exactly as the kernel's own choice control words it, so a produced
- * screen no longer offers `keynote` where a designed one says "Keynote".
+ * kernel's wording of each code under the presentation the page renders in -
+ * `app` unless its host passes `presentation="studio"` - exactly as the
+ * kernel's own choice control words it, so a produced screen no longer offers
+ * `keynote` where a designed one says "Keynote".
  */
 describe('the options a catalog choice offers', () => {
   const OPTIONS = ['keynote', 'executives', 'formal'];
@@ -161,6 +162,7 @@ describe('the options a catalog choice offers', () => {
         store={createStateStore({ inputs: {} })}
         scope={{}}
         brand={BRAND}
+        presentation="studio"
       />,
     );
     for (const code of OPTIONS) expect(screen.getByText(code)).toBeInTheDocument();
@@ -187,6 +189,7 @@ describe('the options a catalog choice offers', () => {
         store={createStateStore({ inputs: { talk: 'executives' } })}
         scope={{}}
         brand={BRAND}
+        presentation="studio"
       />,
     );
     expect(screen.getByRole('combobox', { name: 'Talk' })).toHaveTextContent('executives');
@@ -379,20 +382,19 @@ describe('a part of the result a hatch delegates, in an app', () => {
   };
 
   it('keeps its count and draws its verdict at the size of a value', () => {
+    // No provider: a produced page renders the kernel's results in `app` itself.
     const { container } = render(
-      <FieldPresentationProvider presentation="app">
-        <GenerativePage
-          spec={SPEC}
-          store={createStateStore({
-            result: {
-              findings: ['Clause 4 caps liability.', 'Clause 9 renews silently.'],
-              compliant: { yes_no: false, probability: 0.2 },
-            },
-          })}
-          scope={{ result: RESULT }}
-          brand={BRAND}
-        />
-      </FieldPresentationProvider>,
+      <GenerativePage
+        spec={SPEC}
+        store={createStateStore({
+          result: {
+            findings: ['Clause 4 caps liability.', 'Clause 9 renews silently.'],
+            compliant: { yes_no: false, probability: 0.2 },
+          },
+        })}
+        scope={{ result: RESULT }}
+        brand={BRAND}
+      />,
     );
     expect(container.textContent).toContain(DEFAULT_FIELD_STRINGS.itemsCount(2));
     expect(screen.getByText(DEFAULT_FIELD_STRINGS.no).className).toContain('text-[15px]');
@@ -467,9 +469,39 @@ describe('a file input the page delegates to the kernel', () => {
       />,
     );
     expect(container.querySelectorAll('input[type="file"]')).toHaveLength(0);
-    expect(screen.getByLabelText('cv')).toHaveAccessibleDescription(
+    // `Cv`, not `cv`: a produced page renders the kernel's fields in `app`.
+    expect(screen.getByLabelText('Cv')).toHaveAccessibleDescription(
       DEFAULT_FIELD_STRINGS.uploadUnavailable,
     );
+  });
+
+  it("reads in the app's voice, whatever presentation the host is in", () => {
+    // A produced page is a product page: the kernel's field under it wears the
+    // app's label, as the page's own fields do, even inside a studio host.
+    render(
+      <FieldPresentationProvider presentation="studio">
+        <GenerativePage
+          spec={DELEGATED}
+          store={createStateStore({ inputs: {} })}
+          scope={{ inputs: [CV], env: { disabled: false } }}
+        />
+      </FieldPresentationProvider>,
+    );
+    expect(screen.getByLabelText('Cv')).toBeInTheDocument();
+    expect(screen.queryByText('native.Document')).toBeNull();
+  });
+
+  it("reads in the studio's voice when the host asks for it", () => {
+    render(
+      <GenerativePage
+        spec={DELEGATED}
+        store={createStateStore({ inputs: {} })}
+        scope={{ inputs: [CV], env: { disabled: false } }}
+        presentation="studio"
+      />,
+    );
+    expect(screen.getByLabelText('cv')).toBeInTheDocument();
+    expect(screen.getByText('native.Document')).toBeInTheDocument();
   });
 
   it('is reported through the element boundary when the scope offers neither way in', () => {

@@ -6,7 +6,9 @@ import { Upload } from 'lucide-react';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
 import { acceptLabel, acceptMap, isAcceptedFile, type FileFormat } from '../core/file-formats';
+import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
+import { smallPrintClass } from './field-styles';
 import { focusWithinOutlineClass } from './role-tokens';
 import { cn } from './utils';
 
@@ -48,6 +50,7 @@ interface Notice {
  */
 export function ListFileDrop({ label, formats, shut, onPlace }: ListFileDropProps) {
   const s = useFieldStrings();
+  const isApp = useFieldPresentation() === 'app';
   const hint = acceptLabel(formats);
   const accept = useMemo(() => acceptMap(formats), [formats]);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -100,7 +103,7 @@ export function ListFileDrop({ label, formats, shut, onPlace }: ListFileDropProp
         <p className="text-[13px] text-foreground">
           {isDragActive ? s.dropFilesToAdd : s.dropFilesOrBrowse}
         </p>
-        {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
+        {hint && <p className={smallPrintClass(isApp)}>{hint}</p>}
       </div>
       {notice && (notice.refused.length > 0 || notice.leftOut.length > 0) && (
         <div role="alert" className="space-y-1 text-[12px] text-destructive">

@@ -120,7 +120,7 @@ describe('a file field with no upload path offers a link, and nothing else', () 
         const { container } = render(<Host field={cv} env={env} />);
         expect(fileInputs(container)).toHaveLength(0);
         expect(screen.queryByText(DROPZONE_TEXT)).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /paste a url instead/i })).toBeNull();
+        expect(screen.queryByRole('button', { name: /paste a link instead/i })).toBeNull();
       });
 
       it("opens the link input from the start, bound to the field's label", () => {
@@ -211,7 +211,7 @@ describe('a host that uploads keeps the control it has always had', () => {
     const { container } = render(<Host field={cv} env={{ onDropFile: () => {} }} />);
     expect(fileInputs(container)).toHaveLength(1);
     expect(screen.getByText(DROPZONE_TEXT)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /paste a url instead/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /paste a link instead/i })).toBeInTheDocument();
     expect(screen.queryByText(LINE)).not.toBeInTheDocument();
   });
 
@@ -233,7 +233,7 @@ describe('allowUrl: false takes the link away', () => {
   it('leaves the dropzone and removes the toggle', () => {
     const { container } = render(<Host field={cv} env={upload} />);
     expect(fileInputs(container)).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: /paste a url instead/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /paste a link instead/i })).toBeNull();
     expect(linkInputs()).toHaveLength(0);
   });
 

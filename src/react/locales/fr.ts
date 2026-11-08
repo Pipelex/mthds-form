@@ -74,7 +74,7 @@ function someNames(names: readonly string[], more: number): string {
 }
 
 export const FR_FIELD_STRINGS: FieldStrings = {
-  optionalBadge: 'facultatif',
+  optionalBadge: 'Facultatif',
   selectPlaceholder: 'Choisir…',
   typeValuePlaceholder: 'Saisissez une valeur…',
   writeHerePlaceholder: 'Écrivez ici…',
@@ -89,8 +89,8 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   fieldsCount: (count) => `${count} ${plural(count, 'champ', 'champs')}`,
   uploading: 'Envoi en cours…',
   dropToUpload: 'Déposez pour envoyer',
-  dropOrBrowse: 'Déposez un fichier ou cliquez pour parcourir',
-  pasteUrlInstead: 'coller un lien à la place',
+  dropOrBrowse: 'Choisissez un fichier ou déposez-le ici',
+  pasteUrlInstead: 'Collez plutôt un lien',
   uploadUnavailable: 'Impossible d’envoyer un fichier ici. Collez plutôt un lien vers le fichier.',
   urlPlaceholder: 'https://…',
   fileUrlAria: (label) => (label ? `Lien vers le fichier pour ${label}` : 'Lien vers le fichier'),
@@ -146,7 +146,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   openOriginal: 'Ouvrir l’original',
   unsupportedFileType: (formats) =>
     `Ce type de fichier n’est pas pris en charge. Formats acceptés\u00a0: ${formats}.`,
-  dropFilesOrBrowse: 'Déposez des fichiers ou cliquez pour parcourir',
+  dropFilesOrBrowse: 'Choisissez des fichiers ou déposez-les ici',
   dropFilesToAdd: 'Déposez pour ajouter les fichiers',
   addFilesAria: (label) => (label ? `Ajouter des fichiers à ${label}` : 'Ajouter des fichiers'),
   filesAdded: (count) => `${count} ${plural(count, 'fichier ajouté', 'fichiers ajoutés')}`,
