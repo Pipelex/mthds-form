@@ -6,6 +6,7 @@ import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
 import type { NumberRunField } from '../core';
 import { FieldShell } from './field-shell';
+import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { fieldControlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
@@ -23,6 +24,7 @@ interface NumberFieldProps {
 export function NumberField({ field, value, onChange, id, error, disabled }: NumberFieldProps) {
   const s = useFieldStrings();
   const domId = useFieldDomId(id);
+  const isApp = useFieldPresentation() === 'app';
   const step = field.integer ? 1 : 0.1;
 
   const clamp = (n: number) => {
@@ -45,7 +47,8 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
       title={field.title}
       conceptRef={field.conceptRef}
       category="number"
-      description={field.description ?? rangeHint}
+      description={field.description}
+      hint={rangeHint}
       required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
@@ -65,7 +68,10 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
           onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
           className={cn(
             fieldControlClass,
-            'h-11 px-3 font-mono tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none',
+            'h-11 px-3 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none',
+            // A number is a value, not an identifier: mono in a studio, beside
+            // the field's mono name, and the page's own face in an app.
+            !isApp && 'font-mono',
           )}
         />
         <StepButton onClick={() => nudge(-step)} disabled={disabled} label={s.decrease}>

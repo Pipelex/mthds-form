@@ -192,7 +192,7 @@ export const PasteALink: Story = {
   args: { pipeCode: 'one_document' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    for (const toggle of canvas.getAllByRole('button', { name: 'paste a URL instead' })) {
+    for (const toggle of canvas.getAllByRole('button', { name: 'Paste a link instead' })) {
       await userEvent.click(toggle);
     }
     const inputs = canvas.getAllByRole('textbox', { name: 'Link to the file for attachment' });
@@ -212,7 +212,7 @@ const NO_UPLOAD_LINE = 'Files cannot be uploaded here. Paste a link to the file 
 async function expectLinkOnly(canvasElement: HTMLElement, name: string, count: number) {
   const canvas = within(canvasElement);
   await expect(canvasElement.querySelectorAll('input[type="file"]')).toHaveLength(0);
-  await expect(canvas.queryAllByRole('button', { name: 'paste a URL instead' })).toHaveLength(0);
+  await expect(canvas.queryAllByRole('button', { name: 'Paste a link instead' })).toHaveLength(0);
   const inputs = canvas.getAllByRole('textbox', { name });
   await expect(inputs).toHaveLength(count);
   for (const input of inputs) await expect(input).toHaveAccessibleDescription(NO_UPLOAD_LINE);
@@ -269,7 +269,7 @@ export const LinkOnlyApp: Story = {
 
 /**
  * **A host that takes uploads and no links**, with `allowUrl: false`. The
- * dropzone is the only way in, so the "paste a URL instead" toggle is gone. A
+ * dropzone is the only way in, so the "Paste a link instead" toggle is gone. A
  * host that writes a web link into the value still sees it on the card, since
  * hiding a way in is no reason to hide a value.
  */
@@ -278,7 +278,7 @@ export const UploadOnly: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvasElement.querySelectorAll('input[type="file"]')).toHaveLength(2);
-    await expect(canvas.queryAllByRole('button', { name: 'paste a URL instead' })).toHaveLength(0);
+    await expect(canvas.queryAllByRole('button', { name: 'Paste a link instead' })).toHaveLength(0);
     await expect(canvas.queryAllByRole('textbox')).toHaveLength(0);
   },
 };

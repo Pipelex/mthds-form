@@ -8,6 +8,7 @@ import {
   useOptionalValidation,
   type ValidationContextValue,
 } from '@json-render/react';
+import { FieldPresentationProvider, type FieldPresentation } from '../react';
 import { BrandProvider } from './brand-context';
 import { CHECKED_FIELD_FUNCTIONS, CheckedFields, CheckedFieldsContext } from './checked-fields';
 import {
@@ -53,6 +54,14 @@ export interface GenerativePageProps {
    */
   brand?: BrandManifest;
   /**
+   * How the kernel's own controls and results on the page read: `app` unless
+   * a host says otherwise. A produced page is a product page, its own fields
+   * already wear the app's labels, and the kernel's under the studio's mono
+   * names and concept pills read as a builder's form dropped into it. A host
+   * previewing a layout for a builder may pass `studio`.
+   */
+  presentation?: FieldPresentation;
+  /**
    * Called once for each element that throws while rendering, with the error
    * and the element's component type. json-render drops such an element from
    * the page and catches its throw in a boundary of its own, so a boundary
@@ -82,6 +91,7 @@ export function GenerativePage({
   loading,
   registry = generativeRegistry,
   brand,
+  presentation = 'app',
   onElementError,
 }: GenerativePageProps) {
   // The scope reaches every control through context, so a fresh object on each
@@ -200,31 +210,33 @@ export function GenerativePage({
     };
   });
   const page = (
-    <DescriptorProvider scope={stableScope}>
-      <PlacedInputsProvider spec={spec}>
-        <JSONUIProvider
-          registry={pageRegistry}
-          store={store}
-          handlers={handlers}
-          validationFunctions={CHECKED_FIELD_FUNCTIONS}
-        >
-          <ReportingContext.Provider value={reporting}>
-            <CheckedFieldsContext.Provider value={checkedFields}>
-              <ValidationBridge into={validation} fields={checkedFields} />
-              <RootBoundary
-                type={rootType}
-                report={report}
-                reporting={reporting}
-                loading={loading === true}
-                spec={spec}
-              >
-                <Renderer spec={spec} registry={pageRegistry} loading={loading} />
-              </RootBoundary>
-            </CheckedFieldsContext.Provider>
-          </ReportingContext.Provider>
-        </JSONUIProvider>
-      </PlacedInputsProvider>
-    </DescriptorProvider>
+    <FieldPresentationProvider presentation={presentation}>
+      <DescriptorProvider scope={stableScope}>
+        <PlacedInputsProvider spec={spec}>
+          <JSONUIProvider
+            registry={pageRegistry}
+            store={store}
+            handlers={handlers}
+            validationFunctions={CHECKED_FIELD_FUNCTIONS}
+          >
+            <ReportingContext.Provider value={reporting}>
+              <CheckedFieldsContext.Provider value={checkedFields}>
+                <ValidationBridge into={validation} fields={checkedFields} />
+                <RootBoundary
+                  type={rootType}
+                  report={report}
+                  reporting={reporting}
+                  loading={loading === true}
+                  spec={spec}
+                >
+                  <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+                </RootBoundary>
+              </CheckedFieldsContext.Provider>
+            </ReportingContext.Provider>
+          </JSONUIProvider>
+        </PlacedInputsProvider>
+      </DescriptorProvider>
+    </FieldPresentationProvider>
   );
   return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;
 }

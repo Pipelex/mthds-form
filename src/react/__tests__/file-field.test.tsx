@@ -36,7 +36,7 @@ beforeAll(() => {
 });
 
 const fileInput = () => screen.getByLabelText('cv') as HTMLInputElement;
-const urlToggle = () => screen.getByRole('button', { name: /paste a url instead/i });
+const urlToggle = () => screen.getByRole('button', { name: /paste a link instead/i });
 const previewButton = () => screen.queryByRole('button', { name: /^preview$/i });
 
 function renderField(props: Partial<Parameters<typeof DocumentField>[0]> = {}) {
@@ -97,7 +97,7 @@ describe('an upload in flight shuts every door into the value', () => {
     expect(fileInput()).toBeDisabled();
   });
 
-  it('disables the "paste a URL instead" toggle as well', () => {
+  it('disables the "Paste a link instead" toggle as well', () => {
     renderField({ uploading: true });
     expect(urlToggle()).toBeDisabled();
   });
@@ -207,7 +207,7 @@ describe('a stored reference never reaches an end user', () => {
 describe('the link input never prints a stored reference in app', () => {
   /**
    * The card was not the only place a storage address reached an end user. The
-   * "paste a URL instead" input showed the value's URL verbatim, and it can be
+   * "Paste a link instead" input showed the value's URL verbatim, and it can be
    * open while a stored file is the value: opened after a file was attached,
    * left open through an upload, or written into by the host. These read the
    * INPUT'S VALUE - `textContent` never contains it, which is how the first

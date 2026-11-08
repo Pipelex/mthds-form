@@ -81,7 +81,7 @@ export interface CaseFormProps {
    * host with no way to store a file does, and every file field is link-only.
    */
   upload?: boolean;
-  /** `FieldEnv.allowUrl`: `false` takes the "paste a URL instead" link away. */
+  /** `FieldEnv.allowUrl`: `false` takes the "Paste a link instead" link away. */
   allowUrl?: boolean;
 }
 

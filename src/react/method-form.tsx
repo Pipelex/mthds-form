@@ -712,7 +712,7 @@ export interface MethodFormProps {
   form: MethodFormController;
   /** Holds every control read-only, as a host does while a run is in flight. */
   disabled?: boolean;
-  /** `FieldEnv.allowUrl`: `false` takes the "paste a URL instead" link away. */
+  /** `FieldEnv.allowUrl`: `false` takes the "Paste a link instead" link away. */
   allowUrl?: boolean;
   /** `FieldEnv.resolveUrl`: turns a stored reference into a URL a preview can load. */
   resolveUrl?: (uri: string) => Promise<string | null>;

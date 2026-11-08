@@ -22,7 +22,7 @@ import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
 import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
 import { useFieldStrings, type FieldStrings } from './field-strings';
-import { fieldControlClass } from './field-styles';
+import { fieldControlClass, smallPrintClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
@@ -67,7 +67,7 @@ interface FileFieldProps {
   onDropFile?: (file: File) => void | PromiseLike<UploadedFile | void>;
   /**
    * Whether the link input is offered, `true` when absent. `false` removes the
-   * "paste a URL instead" toggle and the input behind it, and says nothing about
+   * "Paste a link instead" toggle and the input behind it, and says nothing about
    * which values are valid. With no `onDropFile` either, the control throws.
    */
   allowUrl?: boolean;
@@ -241,6 +241,7 @@ function FileField({
 }: FileFieldProps & { category: 'document' | 'image' }) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
+  const isApp = presentation === 'app';
   const domId = useFieldDomId(id);
   const [showUrl, setShowUrl] = useState(false);
   // The last text the link input itself wrote into the value. See `urlText`.
@@ -756,7 +757,7 @@ function FileField({
                   {s.uploadUnavailable}
                 </p>
               )}
-              {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
+              {hint && <p className={smallPrintClass(isApp)}>{hint}</p>}
             </>
           )}
         </div>
@@ -798,7 +799,7 @@ function FileField({
                 <p className="text-[13px] text-foreground">
                   {isDragActive ? s.dropToUpload : s.dropOrBrowse}
                 </p>
-                {hint && <p className="font-mono text-[10.5px] text-muted-foreground">{hint}</p>}
+                {hint && <p className={smallPrintClass(isApp)}>{hint}</p>}
               </div>
             </>
           )}
@@ -817,7 +818,8 @@ function FileField({
           <p role="alert" className="text-[12px] text-destructive">
             {refusal.kind === 'type' ? (
               <>
-                <span className="font-mono">{refusal.name}</span> — {s.unsupportedFileType(hint)}
+                <span className={isApp ? 'font-medium' : 'font-mono'}>{refusal.name}</span> —{' '}
+                {s.unsupportedFileType(hint)}
               </>
             ) : dropArea?.open ? (
               // Pointed to only while it takes files: a full list's area is
@@ -870,7 +872,12 @@ function FileField({
             setTypedUrl(e.target.value);
             onChange(e.target.value ? { url: e.target.value } : undefined);
           }}
-          className={cn(fieldControlClass, 'h-9 px-3 font-mono text-[12px]')}
+          className={cn(
+            fieldControlClass,
+            // In an app, a control of the field family like any other; in a
+            // studio, a reference set as code, under the field's mono name.
+            isApp ? 'h-11 px-3' : 'h-9 px-3 font-mono text-[12px]',
+          )}
         />
       ) : (
         allowUrl && (
@@ -879,13 +886,20 @@ function FileField({
             disabled={busy}
             onClick={() => setShowUrl(true)}
             className={cn(
-              'flex w-fit items-center gap-1 rounded-sm text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
-              presentation !== 'app' && 'font-mono',
+              'flex w-fit items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
+              // A studio's aside is a mono footnote; an app's is a quiet text
+              // action in the page's face, underlined under the pointer.
+              isApp
+                ? 'gap-1.5 text-[13px] underline-offset-4 hover:underline'
+                : 'gap-1 font-mono text-[11px]',
               focusOutlineClass,
               'focus-visible:outline-offset-2',
             )}
           >
-            <Link2 className="h-3 w-3" />
+            <Link2
+              className={cn('shrink-0', isApp ? 'h-3.5 w-3.5' : 'h-3 w-3')}
+              aria-hidden="true"
+            />
             {s.pasteUrlInstead}
           </button>
         )
@@ -1049,7 +1063,14 @@ function FileChip({
           {value?.filename ?? s.uploadedFile}
         </p>
         {subtitle && (
-          <p className="truncate font-mono text-[10.5px] text-muted-foreground">{subtitle}</p>
+          <p
+            className={cn(
+              'truncate text-muted-foreground',
+              presentation === 'app' ? 'text-[12px]' : 'font-mono text-[10.5px]',
+            )}
+          >
+            {subtitle}
+          </p>
         )}
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-3">
@@ -1058,12 +1079,14 @@ function FileChip({
             type="button"
             onClick={onTogglePreview}
             className={cn(
-              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-11 max-sm:px-3',
+              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:size-11 max-sm:justify-center max-sm:px-0',
               focusOutlineClass,
             )}
           >
             {previewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {s.preview}
+            {/* On a phone the word crowded the file's name for a row it did not
+                need: the button is its icon, and the word is still its name. */}
+            <span className="max-sm:sr-only">{s.preview}</span>
           </button>
         )}
         <ClearButton disabled={disabled} onClick={onClear} />

@@ -133,7 +133,9 @@ describe('what a composer’s run waits for', () => {
       } as RunField,
     ];
     const store = createStateStore({ inputs: { a: 'filled' } });
-    render(<GenerativePage spec={COMPOSER} store={store} scope={{ inputs }} />);
+    render(
+      <GenerativePage spec={COMPOSER} store={store} scope={{ inputs }} presentation="studio" />,
+    );
     const button = screen.getByRole('button', { name: /Plan my trip/ });
     expect(button).toHaveAccessibleDescription('Fill in b, c, d and 1 more to run');
     act(() => store.set('/inputs/extra', { x: 'started' }));
@@ -251,6 +253,7 @@ describe('what a composer’s run waits for', () => {
         spec={placedWhole}
         store={createStateStore({ inputs: {} })}
         scope={{ inputs }}
+        presentation="studio"
       />,
     );
     expect(screen.getByRole('button', { name: /Plan my trip/ })).toHaveAccessibleDescription(
@@ -333,7 +336,9 @@ describe('a refused radio group', () => {
     };
     const onRun = vi.fn();
     const store = createStateStore({ inputs: { mode: 'car', wanted: 'boat' } });
-    render(<GenerativePage spec={spec} store={store} scope={{}} onRun={onRun} />);
+    render(
+      <GenerativePage spec={spec} store={store} scope={{}} onRun={onRun} presentation="studio" />,
+    );
     await userEvent.click(screen.getByRole('button', { name: /Plan my trip/ }));
     expect(onRun).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByRole('radio', { name: 'car' })).toHaveFocus());

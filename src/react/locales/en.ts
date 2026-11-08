@@ -40,7 +40,7 @@ function someNames(names: readonly string[], more: number): string {
 }
 
 export const EN_FIELD_STRINGS: FieldStrings = {
-  optionalBadge: 'optional',
+  optionalBadge: 'Optional',
   selectPlaceholder: 'Select…',
   typeValuePlaceholder: 'Type a value…',
   writeHerePlaceholder: 'Write here…',
@@ -55,8 +55,8 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   fieldsCount: (count) => (count === 1 ? '1 field' : `${count} fields`),
   uploading: 'Uploading…',
   dropToUpload: 'Drop to upload',
-  dropOrBrowse: 'Drop a file or click to browse',
-  pasteUrlInstead: 'paste a URL instead',
+  dropOrBrowse: 'Choose a file or drop it here',
+  pasteUrlInstead: 'Paste a link instead',
   uploadUnavailable: 'Files cannot be uploaded here. Paste a link to the file instead.',
   urlPlaceholder: 'https://…',
   fileUrlAria: (label) => (label ? `Link to the file for ${label}` : 'Link to the file'),
@@ -108,7 +108,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   openOriginal: 'Open the original',
   unsupportedFileType: (formats) =>
     `That file type is not supported. Accepted formats: ${formats}.`,
-  dropFilesOrBrowse: 'Drop files or click to browse',
+  dropFilesOrBrowse: 'Choose files or drop them here',
   dropFilesToAdd: 'Drop to add the files',
   addFilesAria: (label) => (label ? `Add files to ${label}` : 'Add files'),
   filesAdded: (count) => (count === 1 ? '1 file added' : `${count} files added`),

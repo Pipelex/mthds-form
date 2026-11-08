@@ -12,8 +12,9 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FileRunField, ListRunField, TextRunField } from '../../core';
+import type { FileRunField, ListRunField, ObjectRunField, TextRunField } from '../../core';
 import { DOCUMENT_FORMATS } from '../../core/file-formats';
+import { FieldPresentationProvider } from '../field-presentation';
 import { ListField } from '../list-field';
 import type { RowMove } from '../row-moves';
 
@@ -303,6 +304,76 @@ describe('a host that reports the moves it makes', () => {
     expect(textboxes().map((input) => input.value)).toEqual(['alpha', 'gamma']);
     expectSameNodes(textboxes(), [first, third]);
     expect(second?.isConnected).toBe(false);
+  });
+});
+
+/**
+ * In `app` the list's chrome is a product's: an empty list is its Add button,
+ * with no count beside the label and no box saying it is empty; a list that
+ * holds rows counts them; a list that wants an exact count says so from the
+ * start. The studio keeps the count and the empty box it always had.
+ */
+describe('a list in an app', () => {
+  const renderIn = (presentation: 'app' | 'studio', field: ListRunField, initial: unknown[]) =>
+    render(
+      <FieldPresentationProvider presentation={presentation}>
+        <Harness field={field} initial={initial} />
+      </FieldPresentationProvider>,
+    );
+
+  it('shows an empty list as its Add button alone', () => {
+    renderIn('app', listOf(textItem), []);
+    expect(screen.queryByText('0 items')).toBeNull();
+    expect(screen.queryByText('No items yet')).toBeNull();
+    expect(addButton()).toBeInTheDocument();
+  });
+
+  it('counts its rows once it has some', async () => {
+    renderIn('app', listOf(textItem), []);
+    await userEvent.click(addButton());
+    expect(screen.getByText('1 item')).toBeInTheDocument();
+  });
+
+  it('says how many an exact count wants, from the start', () => {
+    renderIn('app', fixedOf(textItem, 3), []);
+    expect(screen.getByText('0 of 3 items')).toBeInTheDocument();
+  });
+
+  it('keeps the count and the empty box in studio', () => {
+    renderIn('studio', listOf(textItem), []);
+    expect(screen.getByText('0 items')).toBeInTheDocument();
+    expect(screen.getByText('No items yet')).toBeInTheDocument();
+  });
+
+  it("says a row's description once, under the list's, rather than on every row", () => {
+    const traveller: ObjectRunField = {
+      kind: 'object',
+      name: 'traveller',
+      conceptRef: 'trips.Traveller',
+      required: true,
+      description: 'One person on the trip',
+      fields: [textItem],
+    };
+    renderIn('app', listOf(traveller, { name: 'travellers', description: 'Who is going' }), [
+      {},
+      {},
+    ]);
+    expect(screen.getByText('Who is going')).toBeInTheDocument();
+    expect(screen.getAllByText('One person on the trip')).toHaveLength(1);
+  });
+
+  it("leaves a row's description out when the list has already said it", () => {
+    const guest: ObjectRunField = {
+      kind: 'object',
+      name: 'guest',
+      conceptRef: 'trips.Guest',
+      required: true,
+      description: 'A guest',
+      fields: [textItem],
+    };
+    renderIn('app', listOf(guest, { name: 'guests', description: 'Who is invited' }), [{}, {}]);
+    expect(screen.getByText('Who is invited')).toBeInTheDocument();
+    expect(screen.queryByText('A guest')).toBeNull();
   });
 });
 
