@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { type BaseComponentProps, useBoundProp } from '@json-render/react';
-import { useCheckedField } from '../checked-fields';
+import { RevealPanel, useCheckedField } from '../checked-fields';
 import { hasOwnProp } from '../../core/own-property';
 import { enumLabeler, useFieldPresentation } from '../../react/field-presentation';
 import { fieldControlClass } from '../../react/field-styles';
@@ -40,30 +40,37 @@ interface BoundFieldProps {
  * the setter that writes it back, and the checks the spec attached to it.
  * `useCheckedField` is given a binding only when there is both a path and a
  * check, so an unbound control never registers a validator the run would wait
- * on.
+ * on. `focusRef` goes on the element a refused run puts the focus on, and
+ * `describedBy` on the element the message describes, so the message is
+ * heard with the focus.
  */
 function useBoundField<T>(
   literal: T | null | undefined,
   binding: string | undefined,
   empty: T,
   { checks, validateOn }: BoundFieldProps,
+  id: string,
 ) {
   const [boundValue, setBoundValue] = useBoundProp<T>(literal ?? undefined, binding);
   const [localValue, setLocalValue] = React.useState<T>(literal ?? empty);
   const isBound = Boolean(binding);
   const hasValidation = Boolean(binding && checks?.length);
   const when = validateOn ?? 'change';
-  const { errors, validate } = useCheckedField(
+  const { errors, validate, focusRef } = useCheckedField(
     binding ?? '',
     hasValidation ? { checks: checks ?? [], validateOn: when } : undefined,
   );
+  const error = errors[0];
   return {
     value: isBound ? (boundValue ?? empty) : localValue,
     setValue: (next: T) => {
       if (isBound) setBoundValue(next);
       else setLocalValue(next);
     },
-    error: errors[0],
+    error,
+    errorId: `${id}-error`,
+    describedBy: error ? `${id}-error` : undefined,
+    focusRef,
     validateOnChange: () => {
       if (hasValidation && when === 'change') validate();
     },
@@ -75,8 +82,12 @@ function useBoundField<T>(
 
 const LABEL = 'block text-sm leading-none font-medium';
 
-function FieldError({ message }: { message?: string }) {
-  return message ? <p className="text-sm text-destructive">{message}</p> : null;
+function FieldError({ id, message }: { id: string; message?: string }) {
+  return message ? (
+    <p id={id} className="text-sm text-destructive">
+      {message}
+    </p>
+  ) : null;
 }
 
 /**
@@ -249,14 +260,21 @@ export function Separator({
 /**
  * `details`/`summary` rather than a disclosure primitive: the open state is the
  * element's own, which is what the catalog asks for (a page's UI state never
- * reaches `/state`), and a closed section still exists for find-in-page.
+ * reaches `/state`), and a closed section still exists for find-in-page. A
+ * closed section keeps its fields mounted, so their checks hold the run, and
+ * a run one of them refuses opens it to show that field.
  */
 export function Collapsible({
   props,
   children,
 }: BaseComponentProps<{ title: string; defaultOpen?: boolean | null }>) {
+  const details = React.useRef<HTMLDetailsElement>(null);
+  const open = React.useCallback(() => {
+    if (details.current) details.current.open = true;
+  }, []);
   return (
     <details
+      ref={details}
       className="rounded-md border border-border"
       open={props.defaultOpen ?? false}
       data-slot="collapsible"
@@ -270,7 +288,9 @@ export function Collapsible({
           className="size-4 shrink-0 text-muted-foreground transition-transform [details[open]>summary_&]:rotate-180"
         />
       </summary>
-      <div className="border-t border-border px-4 py-3">{children}</div>
+      <div className="border-t border-border px-4 py-3">
+        <RevealPanel open={open}>{children}</RevealPanel>
+      </div>
     </details>
   );
 }
@@ -456,7 +476,7 @@ export function Input({
   } & BoundFieldProps
 >) {
   const id = useControlId(props.name);
-  const field = useBoundField<string>(props.value, bindings?.value, '', props);
+  const field = useBoundField<string>(props.value, bindings?.value, '', props, id);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className={LABEL}>
@@ -469,7 +489,9 @@ export function Input({
         className={cn(fieldControlClass, 'min-h-11 px-3 py-2')}
         placeholder={props.placeholder ?? undefined}
         value={field.value}
+        ref={field.focusRef}
         aria-invalid={field.error ? true : undefined}
+        aria-describedby={field.describedBy}
         onChange={(event) => {
           field.setValue(event.target.value);
           field.validateOnChange();
@@ -480,7 +502,7 @@ export function Input({
           emit('blur');
         }}
       />
-      <FieldError message={field.error} />
+      <FieldError id={field.errorId} message={field.error} />
     </div>
   );
 }
@@ -498,7 +520,7 @@ export function Textarea({
   } & BoundFieldProps
 >) {
   const id = useControlId(props.name);
-  const field = useBoundField<string>(props.value, bindings?.value, '', props);
+  const field = useBoundField<string>(props.value, bindings?.value, '', props, id);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className={LABEL}>
@@ -511,14 +533,16 @@ export function Textarea({
         className={cn(fieldControlClass, 'px-3 py-2')}
         placeholder={props.placeholder ?? undefined}
         value={field.value}
+        ref={field.focusRef}
         aria-invalid={field.error ? true : undefined}
+        aria-describedby={field.describedBy}
         onChange={(event) => {
           field.setValue(event.target.value);
           field.validateOnChange();
         }}
         onBlur={field.validateOnBlur}
       />
-      <FieldError message={field.error} />
+      <FieldError id={field.errorId} message={field.error} />
     </div>
   );
 }
@@ -546,20 +570,33 @@ export function Radio({
   { label: string; name: string; options: string[]; value?: string | null } & BoundFieldProps
 >) {
   const id = useControlId(props.name);
-  const field = useBoundField<string>(props.value, bindings?.value, '', props);
+  const field = useBoundField<string>(props.value, bindings?.value, '', props, id);
   const labelOf = enumLabeler(props.options ?? [], useFieldPresentation());
   return (
-    <fieldset className="space-y-2" aria-invalid={field.error ? true : undefined}>
+    <fieldset
+      className="space-y-2"
+      aria-invalid={field.error ? true : undefined}
+      aria-describedby={field.describedBy}
+    >
       <legend className={LABEL}>{props.label}</legend>
       {/* Rows of 44 pixels need no gap between them on a phone. */}
       <div className="space-y-2 max-sm:space-y-0">
-        {(props.options ?? []).map((option, index) => (
+        {(props.options ?? []).map((option, index, options) => (
           <label key={`${index}-${option}`} className={NATIVE_CHECK_ROW}>
             <input
               type="radio"
               name={id}
               value={option}
               checked={field.value === option}
+              // The focus a refused run gives the group goes to the checked
+              // option, as the group's own tab stop does, and to the first
+              // while none is.
+              ref={
+                field.value === option ||
+                (index === 0 && !options.some((other) => other === field.value))
+                  ? field.focusRef
+                  : undefined
+              }
               className={NATIVE_CHECK}
               onChange={() => {
                 field.setValue(option);
@@ -571,7 +608,7 @@ export function Radio({
           </label>
         ))}
       </div>
-      <FieldError message={field.error} />
+      <FieldError id={field.errorId} message={field.error} />
     </fieldset>
   );
 }
@@ -584,7 +621,7 @@ export function Checkbox({
   { label: string; name: string; checked?: boolean | null } & BoundFieldProps
 >) {
   const id = useControlId(props.name);
-  const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props);
+  const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props, id);
   return (
     <div className="space-y-2">
       <label htmlFor={id} className={NATIVE_CHECK_ROW}>
@@ -594,7 +631,9 @@ export function Checkbox({
           type="checkbox"
           className={NATIVE_CHECK}
           checked={field.value}
+          ref={field.focusRef}
           aria-invalid={field.error ? true : undefined}
+          aria-describedby={field.describedBy}
           onChange={(event) => {
             field.setValue(event.target.checked);
             field.validateOnChange();
@@ -603,7 +642,7 @@ export function Checkbox({
         />
         <span>{props.label}</span>
       </label>
-      <FieldError message={field.error} />
+      <FieldError id={field.errorId} message={field.error} />
     </div>
   );
 }
@@ -616,7 +655,7 @@ export function Switch({
   { label: string; name: string; checked?: boolean | null } & BoundFieldProps
 >) {
   const id = useControlId(props.name);
-  const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props);
+  const field = useBoundField<boolean>(props.checked, bindings?.checked, false, props, id);
   return (
     <div className="space-y-2">
       {/* Room for the switch's 44px hit area below `sm`, inside its own row. */}
@@ -625,7 +664,9 @@ export function Switch({
           id={id}
           name={props.name}
           checked={field.value}
+          ref={field.focusRef}
           aria-invalid={field.error ? true : undefined}
+          aria-describedby={field.describedBy}
           onCheckedChange={(next) => {
             field.setValue(next);
             field.validateOnChange();
@@ -636,7 +677,7 @@ export function Switch({
           {props.label}
         </label>
       </div>
-      <FieldError message={field.error} />
+      <FieldError id={field.errorId} message={field.error} />
     </div>
   );
 }

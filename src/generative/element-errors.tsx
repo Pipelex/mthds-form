@@ -5,9 +5,11 @@ import {
   evaluateVisibility,
   getByPath,
   resolveElementProps,
+  resolveRepeatItemStatePath,
   resolveRepeatStatePath,
 } from '@json-render/core';
 import { useRepeatScope, useVisibility } from '@json-render/react';
+import { ownProp } from '../core/own-property';
 
 /**
  * How a page tells its host that one of its elements failed to render.
@@ -110,16 +112,35 @@ function said(error: unknown): string {
  * those are written out too, and anything still unwritable is one text: an
  * input read afresh is a new object every time, and compared as itself it
  * would read as changed at every render, retrying and reporting each time.
+ *
+ * Only a structure inside itself is a cycle. A structure held at two places -
+ * a list a repeat lays out that a child's props read again, two members
+ * sharing one value - is written out at each, so the same content shared
+ * differently reads the same, and what one place shows is never left to the
+ * other to show. json-render calls the replacer with the structure holding
+ * each entry, so the structures open above an entry are the ones down the
+ * chain of holders, and a structure is closed once the walk leaves it.
+ *
+ * Exported for its test; not part of the entry.
  */
-function contentOf(value: unknown): string {
-  const open = new WeakSet<object>();
+export function contentOf(value: unknown): string {
+  const open: object[] = [];
+  let entries = 0;
   try {
     return (
       JSON.stringify(value, function (this: unknown, _key, entry: unknown) {
+        // A structure shared at several places is written out at each, so
+        // sharing nested level under level doubles the text at every level:
+        // past a bound no real input reaches, it is an input that cannot be
+        // written out, rather than a page frozen writing it.
+        if (++entries > MAX_CONTENT_ENTRIES) throw new RangeError('too large to compare');
+        // Close every structure the walk has left: the one holding this
+        // entry is the innermost still open.
+        while (open.length > 0 && open[open.length - 1] !== this) open.pop();
         if (typeof entry === 'bigint') return `${entry}n`;
         if (typeof entry === 'object' && entry !== null) {
-          if (open.has(entry)) return '[cycle]';
-          open.add(entry);
+          if (open.includes(entry)) return '[cycle]';
+          open.push(entry);
         }
         return entry;
       }) ?? 'undefined'
@@ -128,6 +149,14 @@ function contentOf(value: unknown): string {
     return 'an input that cannot be written out';
   }
 }
+
+/** How many values `contentOf` writes out before it gives up on an input. */
+// A failed repeat writes each repeated child out once per item, a few dozen
+// values an item, so this covers a list of tens of thousands of rows: an input
+// past it reads the same before and after a correction, and the element stays
+// blank until it is remounted. It is still far below what sharing nested level
+// under level reaches, and only a boundary that has failed pays for the walk.
+const MAX_CONTENT_ENTRIES = 5_000_000;
 
 /** Whether two cues are the same: a list entry by entry, anything else by identity. */
 function sameCue(a: unknown, b: unknown): boolean {
@@ -270,14 +299,41 @@ function childElementOf(node: React.ReactNode): ElementLike | undefined {
 }
 
 /**
+ * The children json-render repeats under an element, when `node` is the one
+ * node it hands a repeating element in their place: that node names no
+ * element of its own, and carries the layout and the repeating element, whose
+ * `children` are the keys of the elements laid out once per item.
+ */
+function repeatOf(
+  node: React.ReactNode,
+):
+  { keys: readonly unknown[]; elements: Record<string, unknown>; itemFilter: unknown } | undefined {
+  if (!React.isValidElement(node)) return undefined;
+  const { element, spec, elementKey, itemFilter } = node.props as {
+    element?: ElementLike;
+    spec?: { elements?: unknown };
+    elementKey?: unknown;
+    itemFilter?: unknown;
+  };
+  if (elementKey !== undefined || element?.repeat === undefined) return undefined;
+  const elements = spec?.elements;
+  if (typeof elements !== 'object' || elements === null || !Array.isArray(element.children)) {
+    return undefined;
+  }
+  return { keys: element.children, elements: elements as Record<string, unknown>, itemFilter };
+}
+
+/**
  * What one element renders from, for its boundary to tell a corrected input
  * from the one it failed on: its own props as resolved; for one that
  * repeats, the list it repeats over, which json-render reads inside the
  * element's render; and each child json-render renders under it, as written
  * and as resolved, since a child's props are resolved inside the child's
- * render and a throw there is caught by this boundary, the element above.
- * Read only while the boundary has failed, so a render that does not fail
- * pays for none of it.
+ * render and a throw there is caught by this boundary, the element above -
+ * for one that repeats, each child for each item it lays out, resolved
+ * against that item, so a repeated child that threw on what the store holds
+ * outside the list draws again once that changes. Read only while the
+ * boundary has failed, so a render that does not fail pays for none of it.
  */
 function inputOfElement(
   props: Record<string, unknown>,
@@ -294,16 +350,47 @@ function inputOfElement(
   };
   const statePath = element?.repeat?.statePath;
   let list: unknown;
+  let listPath: string | undefined;
   if (statePath !== undefined) {
     try {
-      const path = resolveRepeatStatePath(statePath as never, scope?.basePath);
-      list = path === undefined ? undefined : getByPath(state, path);
+      listPath = resolveRepeatStatePath(statePath as never, scope?.basePath);
+      list = listPath === undefined ? undefined : getByPath(state, listPath);
     } catch (error) {
       list = `throws: ${said(error)}`;
     }
   }
+  // Each child under each item json-render lays out, as it resolves there:
+  // the items its filter keeps, each child under the item's own scope.
+  const repeated = (repeat: NonNullable<ReturnType<typeof repeatOf>>): unknown => {
+    if (listPath === undefined || !Array.isArray(list)) return null;
+    const path = listPath;
+    return list.map((item: unknown, index: number) => {
+      const itemCtx: ResolveContext = {
+        ...visibility,
+        repeatItem: item,
+        repeatIndex: index,
+        repeatBasePath: resolveRepeatItemStatePath(path, index),
+      };
+      if (repeat.itemFilter !== undefined) {
+        try {
+          if (!evaluateVisibility(repeat.itemFilter as never, itemCtx)) return null;
+        } catch (error) {
+          return `throws: ${said(error)}`;
+        }
+      }
+      return repeat.keys.map((key) => {
+        const child =
+          typeof key === 'string'
+            ? (ownProp(repeat.elements, key) as ElementLike | undefined)
+            : undefined;
+        return child ? { element: child, resolved: resolvedOf(child, itemCtx) } : null;
+      });
+    });
+  };
   const under = (nodes: unknown) =>
     React.Children.toArray(nodes as React.ReactNode).map((node) => {
+      const repeat = repeatOf(node);
+      if (repeat) return { repeated: repeated(repeat) };
       const child = childElementOf(node);
       return child ? { element: child, resolved: resolvedOf(child, ctx) } : null;
     });

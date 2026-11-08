@@ -9,7 +9,7 @@ import {
   useStateStore,
   useStateValue,
 } from '@json-render/react';
-import { useCheckedField } from './checked-fields';
+import { RevealPanel, useCheckedField } from './checked-fields';
 import {
   Accessibility,
   AlertCircle,
@@ -325,11 +325,13 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
   const setValue = isBound ? setBoundValue : setLocalValue;
   const validateOn = props.validateOn ?? 'change';
   const hasValidation = Boolean(bindings?.value && props.checks?.length);
-  const { errors, validate } = useCheckedField(
+  const { errors, validate, focusRef } = useCheckedField(
     bindings?.value ?? '',
     hasValidation ? { checks: props.checks ?? [], validateOn } : undefined,
   );
   const id = shadcn.useControlId(props.name);
+  const errorId = `${id}-error`;
+  const error = errors[0];
   const labelOf = enumLabeler(props.options ?? [], useFieldPresentation());
   return (
     <div className="space-y-2">
@@ -346,7 +348,13 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
       >
         {/* As tall as the layer's text input beside it, and the 44 pixels a
             finger needs. */}
-        <SelectTrigger id={id} className="h-11 w-full">
+        <SelectTrigger
+          id={id}
+          ref={focusRef}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className="h-11 w-full"
+        >
           <SelectValue placeholder={props.placeholder ?? 'Select...'} />
         </SelectTrigger>
         <SelectContent>
@@ -361,7 +369,11 @@ function AccessibleSelect({ props, bindings, emit }: BaseComponentProps<SelectPr
           ))}
         </SelectContent>
       </SelectRoot>
-      {errors.length > 0 ? <p className="text-sm text-destructive">{errors[0]}</p> : null}
+      {error ? (
+        <p id={errorId} className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -521,7 +533,8 @@ interface TabsProps {
  * state, so a spec never touches /state for it. An inactive panel stays
  * mounted and hidden, so the checks of the fields in it still hold the run:
  * unmounted, as Radix does by default, they left the page's record, and a
- * run pressed from another tab started past a field that refused it.
+ * run pressed from another tab started past a field that refused it. A run
+ * refused by a field in a hidden panel opens that panel's tab to show it.
  */
 function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
   const tabs = props.tabs ?? [];
@@ -566,7 +579,7 @@ function Tabs({ props, children }: BaseComponentProps<TabsProps>) {
           hidden={index !== open}
           className="mt-4 focus-visible:outline-hidden"
         >
-          {panels[index] ?? null}
+          <RevealPanel open={() => choose(String(index))}>{panels[index] ?? null}</RevealPanel>
         </TabsPrimitive.Content>
       ))}
     </TabsPrimitive.Root>
@@ -612,7 +625,8 @@ interface StepsProps {
  * inside the last one, which is why Next disappears there. The current step
  * is local state. A hidden panel stays mounted, so its inputs keep their
  * values in the store and their checks hold the run - a step hides from the
- * eye, never from the run.
+ * eye, never from the run - and a run refused by a field on another step goes
+ * back to that step to show it.
  */
 function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const steps = props.steps ?? [];
@@ -620,7 +634,8 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
   const [chosen, setIndex] = React.useState(0);
   const last = steps.length - 1;
   // A layout patched or swapped mid-way may have fewer steps than the one
-  // reached: the last there is shows rather than none.
+  // reached: the last there is shows rather than none, and Back and Next
+  // move from the step shown, not from the one reached.
   const index = Math.max(0, Math.min(chosen, last));
   return (
     <div className="flex flex-col gap-5">
@@ -652,7 +667,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
       </ol>
       {steps.map((_step, position) => (
         <div key={position} hidden={position !== index}>
-          {panels[position] ?? null}
+          <RevealPanel open={() => setIndex(position)}>{panels[position] ?? null}</RevealPanel>
         </div>
       ))}
       {index > 0 || index < last ? (
@@ -661,7 +676,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
             <button
               type="button"
               data-testid="steps-back"
-              onClick={() => setIndex((current) => Math.max(0, current - 1))}
+              onClick={() => setIndex(Math.max(0, index - 1))}
               className={SECONDARY_BUTTON}
             >
               {props.backLabel ?? 'Back'}
@@ -673,7 +688,7 @@ function Steps({ props, children }: BaseComponentProps<StepsProps>) {
             <button
               type="button"
               data-testid="steps-next"
-              onClick={() => setIndex((current) => Math.min(last, current + 1))}
+              onClick={() => setIndex(Math.min(last, index + 1))}
               className={PRIMARY_BUTTON}
             >
               {props.nextLabel ?? 'Next'}

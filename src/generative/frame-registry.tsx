@@ -1,9 +1,12 @@
 'use client';
 
+import * as React from 'react';
 import { type BaseComponentProps, useStateValue } from '@json-render/react';
 import { ArrowRight, Clock } from 'lucide-react';
 import { readImageContent, viewableUrl } from '../core/native-content';
-import { useResolveUrl } from '../react';
+import { waitingFields } from '../core/readiness';
+import { useFieldStrings, useResolveUrl } from '../react';
+import { fieldLabel, useFieldPresentation } from '../react/field-presentation';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
@@ -17,6 +20,8 @@ import { frameComponents } from './frame-definitions';
 import { shareAmount } from './share-amount';
 import { useFrameHost } from './frame-host';
 import { formatAmount, formatDay } from './format';
+import { INPUTS_ROOT, inputFieldAtPath, joinPath } from './paths';
+import { type PlacedInput, usePlacedInputs } from './placed-inputs';
 import { useAbsolutePath, useDescriptorScope } from './registry';
 
 /**
@@ -49,11 +54,92 @@ interface ComposerProps {
   notes?: string[] | null;
 }
 
+/** How many of the inputs a run waits for the action row names before it counts the rest. */
+const NAMED_WAITING = 3;
+
+/**
+ * What the run waits for, in the action row's words: the fields to fill for
+ * the inputs the kernel's readiness counts as missing (`waitingFields`), or
+ * nothing once none is. Inside a structure those are the members it refuses,
+ * since a composer commonly spreads one structure's members over the page,
+ * and "fill in Request" would name a field nobody can see. They are named and
+ * ordered as the page words and orders them (`placedInputs`), and as the
+ * descriptor labels and orders them where the page does not. The designer
+ * method tells a model writing a composer that the host's action row says
+ * this, so the page itself does not.
+ */
+function useRunWaitsFor(): string | undefined {
+  const { inputs } = useDescriptorScope();
+  const values = useStateValue<Record<string, unknown>>(INPUTS_ROOT);
+  const placed = usePlacedInputs();
+  const presentation = useFieldPresentation();
+  const strings = useFieldStrings();
+  const waiting = waitingFields(inputs ?? [], isRecord(values) ? values : undefined)
+    .map(({ field, path }) => {
+      const at = joinPath(INPUTS_ROOT, ...path);
+      return { field, path, on: placed.get(at), rank: rankOf(placed, at) };
+    })
+    // A stable sort: what the page does not place keeps the descriptor's order, after the rest.
+    .sort((a, b) => a.rank - b.rank);
+  if (waiting.length === 0) return undefined;
+  const labelAt = (path: readonly string[]): string | undefined => {
+    const field = inputFieldAtPath(inputs ?? [], joinPath(INPUTS_ROOT, ...path));
+    if (!field) return undefined;
+    return (
+      placed.get(joinPath(INPUTS_ROOT, ...path))?.label ??
+      fieldLabel(field.title, field.name, presentation)
+    );
+  };
+  const named = waiting.slice(0, NAMED_WAITING);
+  const labels = named.map(
+    ({ field, on }) => on?.label ?? fieldLabel(field.title, field.name, presentation),
+  );
+  // One concept used for two inputs gives two members one label: each is then
+  // said with the structure it belongs to, "Name (Sender)".
+  const names = labels.map((label, index) => {
+    const parent = named[index]!.path.slice(0, -1);
+    const shared = labels.filter((other) => other === label).length > 1;
+    const around = shared && parent.length > 0 ? labelAt(parent) : undefined;
+    return around ? `${label} (${around})` : label;
+  });
+  return strings.runWaitsFor(names, waiting.length - names.length);
+}
+
+/**
+ * Where the page shows a field: where it places the field itself, else where
+ * it places the nearest structure around it whole (an `MthdsField` over the
+ * structure draws its members), else where it places the first of the
+ * field's own members, and after everything the page places otherwise.
+ */
+function rankOf(placed: ReadonlyMap<string, PlacedInput>, path: string): number {
+  const own = placed.get(path);
+  if (own) return own.order;
+  for (
+    let at = path.lastIndexOf('/');
+    at > INPUTS_ROOT.length;
+    at = path.lastIndexOf('/', at - 1)
+  ) {
+    const around = placed.get(path.slice(0, at));
+    if (around) return around.order;
+  }
+  let first = Number.MAX_SAFE_INTEGER;
+  for (const [inside, { order }] of placed) {
+    if (inside.startsWith(`${path}/`)) first = Math.min(first, order);
+  }
+  return first;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) {
   const host = useFrameHost();
   // The host's `env.disabled` holds the run while one is going, as it holds
   // the plain form's submit: a second press would be a second billed run.
   const busy = useDescriptorScope().env?.disabled ?? false;
+  const waitsFor = useRunWaitsFor();
+  const waitsForId = React.useId();
   const two = props.columns === '2';
   return (
     <div
@@ -99,16 +185,21 @@ function Composer({ props, children, emit }: BaseComponentProps<ComposerProps>) 
           {children}
         </div>
         <div className="sticky bottom-0 z-[2] -mx-7 -mb-7 mt-7 flex items-center justify-between gap-4 rounded-b-[calc(var(--radius,0.5rem)*1.5)] border-t border-border [background-color:var(--panel-fill,var(--card,hsl(0_0%_100%)))] px-7 pt-[18px] pb-7 max-sm:-mx-5 max-sm:-mb-5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-5 max-sm:pb-5">
-          {host.eta ? (
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground max-sm:justify-center">
-              <Clock className="size-4" aria-hidden="true" /> {host.eta}
-            </span>
-          ) : (
-            <span />
-          )}
+          {/* What the run waits for, which describes the button, and how long
+              a run takes. The run is not held by it: a press runs the page's
+              checks and the host's gate, which say what is wrong where. */}
+          <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground max-sm:items-center max-sm:text-center">
+            {waitsFor ? <p id={waitsForId}>{waitsFor}</p> : null}
+            {host.eta ? (
+              <span className="inline-flex items-center gap-2">
+                <Clock className="size-4" aria-hidden="true" /> {host.eta}
+              </span>
+            ) : null}
+          </div>
           <button
             type="button"
             disabled={busy}
+            aria-describedby={waitsFor ? waitsForId : undefined}
             onClick={() => emit('press')}
             className={cn(
               'inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius,0.5rem)] bg-primary px-[22px] text-[15px] font-semibold text-primary-foreground transition-all hover:bg-primary/90',

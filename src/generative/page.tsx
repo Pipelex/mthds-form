@@ -9,7 +9,7 @@ import {
   type ValidationContextValue,
 } from '@json-render/react';
 import { BrandProvider } from './brand-context';
-import { CheckedFields, CheckedFieldsContext } from './checked-fields';
+import { CHECKED_FIELD_FUNCTIONS, CheckedFields, CheckedFieldsContext } from './checked-fields';
 import {
   ReportingContext,
   RootBoundary,
@@ -18,6 +18,7 @@ import {
   type ReportedRenderers,
 } from './element-errors';
 import type { BrandManifest } from '../brand/manifest';
+import { PlacedInputsProvider } from './placed-inputs';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
 import { isThenable } from '../react/utils';
@@ -170,17 +171,13 @@ export function GenerativePage({
         // refused, and only the host's run gate stood between it and a billed
         // run. A run is started only when every field's checks pass, and
         // running them shows each failing field its message, as
-        // `validateForm` does. The checks are those of the fields mounted now,
-        // which the page's record keeps json-render told of, so a field
-        // hidden or dropped since does not hold the run.
-        // The record's own checks run too, as it holds them now, since the
-        // provider's may lag a field mounted the task before.
+        // `validateForm` does, and takes the person to the first one, its
+        // tab, step or section opened. The checks are those of the fields
+        // mounted now, as the page's record holds them at the press, so a
+        // field hidden or dropped since does not hold the run, whatever
+        // json-render's own reading, which lags it by a render, still says.
         const checks = validation.current;
-        if (checks) {
-          const registered = checks.validateAll();
-          const mounted = checkedFields.check(checks);
-          if (!registered || !mounted) return undefined;
-        }
+        if (checks && !checkedFields.check(checks)) return undefined;
         running.current = true;
         let pending: unknown;
         try {
@@ -204,22 +201,29 @@ export function GenerativePage({
   });
   const page = (
     <DescriptorProvider scope={stableScope}>
-      <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
-        <ReportingContext.Provider value={reporting}>
-          <CheckedFieldsContext.Provider value={checkedFields}>
-            <ValidationBridge into={validation} fields={checkedFields} />
-            <RootBoundary
-              type={rootType}
-              report={report}
-              reporting={reporting}
-              loading={loading === true}
-              spec={spec}
-            >
-              <Renderer spec={spec} registry={pageRegistry} loading={loading} />
-            </RootBoundary>
-          </CheckedFieldsContext.Provider>
-        </ReportingContext.Provider>
-      </JSONUIProvider>
+      <PlacedInputsProvider spec={spec}>
+        <JSONUIProvider
+          registry={pageRegistry}
+          store={store}
+          handlers={handlers}
+          validationFunctions={CHECKED_FIELD_FUNCTIONS}
+        >
+          <ReportingContext.Provider value={reporting}>
+            <CheckedFieldsContext.Provider value={checkedFields}>
+              <ValidationBridge into={validation} fields={checkedFields} />
+              <RootBoundary
+                type={rootType}
+                report={report}
+                reporting={reporting}
+                loading={loading === true}
+                spec={spec}
+              >
+                <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+              </RootBoundary>
+            </CheckedFieldsContext.Provider>
+          </ReportingContext.Provider>
+        </JSONUIProvider>
+      </PlacedInputsProvider>
     </DescriptorProvider>
   );
   return brand ? <BrandProvider manifest={brand}>{page}</BrandProvider> : page;

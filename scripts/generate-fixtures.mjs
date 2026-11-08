@@ -1507,15 +1507,17 @@ function writeSpecsModule(caseName, specs) {
  * with `SEED=`, a creative seed) to `methods/layout-design.mthds` on the
  * HOSTED API through `@pipelex/sdk`, compiles the text that came back as JSONL
  * patches and holds the spec to the checks a host holds it to
- * (`layoutCheckProblems`): the frame catalog - structure, every element type,
- * every prop, one panel per tab or step - and the fit to the descriptor.
+ * (`layoutCheck`): the frame catalog - structure, every element type, every
+ * prop, one panel per tab or step - and the fit to the descriptor.
  *
  * A layout the checks refuse goes to the method's `repair_layout` entry with
  * the problems in words, up to `REPAIR_ATTEMPTS` times, exactly as a host's
- * producer does; the fixture records how many passes it took. One still
- * refused after them is kept under `data/briefs/` with its problems, stored
- * nowhere, and fails the pass at the end - the other variants of the sweep
- * are not thrown away for it. A repair of the method is a change committed
+ * producer does; the fixture records how many passes it took. When
+ * `layoutCheck` says the checks themselves failed on the layout
+ * (`checksFailed`), no repair can fix it, so it skips the repair passes
+ * altogether. One still refused after them, or refused that way, is kept
+ * under `data/briefs/` with its problems, stored nowhere, and fails the pass
+ * at the end - the other variants of the sweep are not thrown away for it. A repair of the method is a change committed
  * to the method; never a hand edit of the fixture.
  *
  * `MODEL=<id>` overrides the pin of every stage in the bundle; `TEMPERATURE=<n>`
