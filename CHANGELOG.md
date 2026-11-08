@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [v0.31.0] - 2026-11-08
+
+### Highlights
+
+- **The designer method lays out one moment of a host's app, in the team's style.** A layout may now be a host's composer or its result page rather than a whole product page, written in that frame's own vocabulary and checked against it, and a layout the checks refuse goes back to the method for a repair pass before the host falls back to the plain form.
+- **The brand contract holds the marks a control draws to 3:1**, which is a breaking change for a brand whose muted marks read fainter than that.
 
 ### Added
 
