@@ -1174,7 +1174,7 @@ describe("a share's parts", () => {
           { category: 'Food', amount: 'abc' },
           { category: 'Food', amount: ' ' },
           { category: 'Food', amount: { $state: '/result/costs/0/category' } },
-          { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
+          { category: 'Food', amount: { $computed: 'total' } },
           { category: 'Food', amount: { $state: '/result/costs/0/amount' } },
           { category: 'Food', amount: { $state: '/ui/scratch' } },
         ]),
@@ -1183,7 +1183,44 @@ describe("a share's parts", () => {
       `bar: ProportionBar's part 1's "amount" is "abc", not a number;${HOW}`,
       `bar: ProportionBar's part 2's "amount" is " ", not a number;${HOW}`,
       `bar: ProportionBar's part 3's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
-      `bar: ProportionBar's part 4's "amount" is an expression that reads no number, not a number;${HOW}`,
+      `bar: ProportionBar's part 4's "amount" is a $computed, which a page has no function to resolve, not a number;${HOW}`,
+    ]);
+  });
+
+  /**
+   * A template writes a text out, which the renderer draws as a share when it
+   * writes a number: one that writes out a single path's value and nothing
+   * else does exactly that when the path holds a number, so it is read as
+   * that path; one with words beside its value cannot be known to.
+   */
+  it('reads a template amount that writes one value out as the path it reads', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $template: '${/result/costs/0/amount}' } },
+          { category: 'Food', amount: { $template: ' ${/result/costs/1/amount} ' } },
+          { category: 'Food', amount: { $template: '${/ui/scratch}' } },
+          { category: 'Food', amount: { $template: '40' } },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a template amount that writes more than a number out, or reads no number', () => {
+    expect(
+      layoutProblems(
+        { result: costs(LINE) },
+        inline([
+          { category: 'Food', amount: { $template: '${/result/costs/0/amount} EUR' } },
+          { category: 'Food', amount: { $template: '${/result/costs/0/category}' } },
+          { category: 'Food', amount: { $template: 'forty' } },
+        ]),
+      ),
+    ).toEqual([
+      `bar: ProportionBar's part 1's "amount" is a template that writes text beside its value, not a number;${HOW}`,
+      `bar: ProportionBar's part 2's "amount" reads /result/costs/0/category, which holds a text value, not a number;${HOW}`,
+      `bar: ProportionBar's part 3's "amount" is a template that writes "forty" out, not a number;${HOW}`,
     ]);
   });
 

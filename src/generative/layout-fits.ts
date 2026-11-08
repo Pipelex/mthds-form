@@ -486,16 +486,51 @@ function nonScalarReads(
       const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
       if (typeof labelKey !== 'string' || typeof valueKey !== 'string') return entries;
       const how = `each part is written as a structure with ${memberWords(labelKey)} member and ${memberWords(valueKey)} member holding a number, or the whole list is read with { "$state" }`;
+      // What a template amount writes out: a template whose text is one
+      // interpolation and nothing else, whitespace aside, writes out the
+      // value at the path it reads, so it is read as that path - the renderer
+      // draws the text a number writes out as that number. One with words or
+      // a second interpolation beside it writes a number only by accident,
+      // and one with none writes its own text.
+      const templateAmount = (
+        amount: unknown,
+      ): { path: string } | { text: string } | 'more' | undefined => {
+        if (expressionForm(amount) !== '$template') return undefined;
+        const text = (amount as { $template: string }).$template;
+        const sole = /^\s*(\$\{[^}]+\})\s*$/.exec(text)?.[1];
+        if (sole !== undefined) {
+          const [path] = interpolatedPaths(sole, itemPath);
+          return path === undefined ? 'more' : { path };
+        }
+        return interpolatedPaths(text, itemPath).length > 0 ? 'more' : { text };
+      };
       // Whether an amount draws no share, naming why when it does not.
       const amountRefused = (part: string, amount: unknown): boolean => {
         // What the renderer draws a share from: a number, or a text that
         // writes one out (`shareAmount`).
         if (Number.isFinite(shareAmount(amount)) || readsIndex(amount)) return false;
-        const path = readPath(amount);
+        const written = templateAmount(amount);
+        if (written !== undefined && written !== 'more' && 'text' in written) {
+          if (Number.isFinite(shareAmount(written.text))) return false;
+        }
+        const path =
+          readPath(amount) ??
+          (written !== undefined && written !== 'more' && 'path' in written
+            ? written.path
+            : undefined);
         if (path === undefined) {
-          const shown = isExpression(amount)
-            ? 'an expression that reads no number'
-            : String(JSON.stringify(amount ?? null));
+          // A page hands json-render no functions, so a `$computed` resolves
+          // to nothing there, which draws no share.
+          const shown =
+            written === 'more'
+              ? 'a template that writes text beside its value'
+              : written !== undefined && 'text' in written
+                ? `a template that writes ${JSON.stringify(written.text)} out`
+                : expressionForm(amount) === '$computed'
+                  ? 'a $computed, which a page has no function to resolve'
+                  : isExpression(amount)
+                    ? 'an expression that reads no number'
+                    : String(JSON.stringify(amount ?? null));
           problems.push(`${part}'s ${JSON.stringify(valueKey)} is ${shown}, not a number; ${how}`);
           return true;
         }
