@@ -105,7 +105,9 @@ export interface StuffViewerProps {
    * second heading under its own.
    *
    * It also supplies `downloadBaseName`'s default, so the file a reader saves
-   * is named after the thing they were reading rather than `output.json`.
+   * is named after the thing they were reading rather than `output.json`. It
+   * replaces a `title` the root carries as well: that names the output slot,
+   * not the stuff.
    */
   name?: string;
   /**
@@ -250,6 +252,32 @@ export function JsonView({ value }: { value: unknown }) {
         ? stringifyValue(value)
         : JSON.stringify(value);
 
+  // Whether a line is wider than the block, so the block scrolls sideways: a
+  // scroll is a place a keyboard must reach, so the block takes focus while it
+  // overflows, and only then, as a result table's box does. A short value
+  // left a stop per block that scrolled nothing. Measured, because only the
+  // browser knows a line's width; it decides a tab stop, never the block's
+  // shape, so a server and the first paint render the same block.
+  const block = useRef<HTMLPreElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const pre = block.current;
+    if (!pre) return;
+    const measure = () => setOverflows(pre.scrollWidth > pre.clientWidth);
+    measure();
+    // A host's monospace webfont that arrives after this widens every line
+    // inside a box that keeps its size, which the observer never hears of.
+    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+    fonts?.addEventListener('loadingdone', measure);
+    const observer =
+      typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+    observer?.observe(pre);
+    return () => {
+      fonts?.removeEventListener('loadingdone', measure);
+      observer?.disconnect();
+    };
+  }, [text]);
+
   if (text === undefined) {
     return <Absent />;
   }
@@ -275,14 +303,16 @@ export function JsonView({ value }: { value: unknown }) {
           )}
         </button>
       )}
-      {/* A region that scrolls sideways takes focus, so a keyboard can scroll
-          it, and is named, as a result table's is. On a phone, beside the
-          Copy JSON button, it is never shorter than the button's 44px and its
-          inset, so a scalar's one line keeps the button inside its border. */}
+      {/* A region that scrolls sideways takes focus while it does, so a
+          keyboard can scroll it, and is named, as a result table's is. On a
+          phone, beside the Copy JSON button, it is never shorter than the
+          button's 44px and its inset, so a scalar's one line keeps the button
+          inside its border. */}
       <pre
+        ref={block}
         role="group"
         aria-label={s.viewJson}
-        tabIndex={0}
+        {...(overflows ? { tabIndex: 0 } : {})}
         className={cn(
           'overflow-x-auto rounded-lg border border-border bg-card/40 px-3.5 py-3 pr-12 font-mono text-[12px] leading-relaxed',
           canCopy && 'max-sm:min-h-[60px] max-sm:pr-14',
@@ -293,6 +323,13 @@ export function JsonView({ value }: { value: unknown }) {
       </pre>
     </div>
   );
+}
+
+/** `field` under the name its host gave it, with no title of the descriptor's left to outrank it. */
+function underHostName(field: RunField, name: string): RunField {
+  const renamed = { ...field, name };
+  delete renamed.title;
+  return renamed;
 }
 
 /** One press of the panel's Download, and the result it saved. */
@@ -367,8 +404,13 @@ function StuffPanel({
   // The caller's name wins over the descriptor's, and it is applied to the
   // FIELD rather than passed to the header alone: the download's default base
   // name reads the same property, and the two naming the item differently is
-  // exactly the drift this component exists to prevent.
-  const named = name ? { ...field, name } : field;
+  // exactly the drift this component exists to prevent. It wins over a title
+  // the descriptor's root carries too, which would otherwise outrank it in
+  // every label (`fieldLabel`): the root names the pipe's output slot, the
+  // same for every stuff a host shows through it, and only the caller knows
+  // which stuff this is. The host's name gives way to one thing alone, the
+  // heading a text the run wrote opens with (`headsItself`, below).
+  const named = name ? underHostName(field, name) : field;
   const baseName = downloadBaseName ?? named.name ?? 'result';
   const [chosen, setView] = useState<StuffViewerView>(defaultView);
   // A host may narrow the views after mounting (a presentation switched to

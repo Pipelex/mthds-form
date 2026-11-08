@@ -20,6 +20,7 @@
 
 - **A brand's logo at a root-relative path**: `logo.onLight` and `logo.onDark` in `brand.json` may be a path on the host's own origin (`/brand/logo.svg`) as well as an http(s) URL, accepted only when it resolves on that origin, so `//elsewhere.example/x.svg` is still refused. See [docs/brand.md](docs/brand.md).
 - **A run button a host can hold**: a whole page's `Cta` and a `Composer`'s run button are disabled while the scope's `env.disabled` is set, as the plain form's submit is, so a second press during a run is not a second billed run.
+- **`MethodForm`'s `framed`**: a host that draws the form inside a panel of its own says so, and a structure among the inputs is then a section, its name a heading over its fields, set off from the inputs beside it by a hairline across the form, rather than a card inside the host's panel; without it a structure keeps its card. The grouping is on the DOM as `data-structure-group="section"`. See [docs/method-form.md](docs/method-form.md).
 
 ### Changed
 
@@ -39,6 +40,11 @@
 - **A date column reads the day as written**: a `DataTable` column with `format: 'date'` reads the leading calendar day of a value, so a time beside it ("2025-03-09 00:30") no longer moves the day across midnight in the reader's time zone.
 - **A `TextList` of bullets or checks is an unordered list**; only numbered items are an ordered one.
 - **Two parts of a `ProportionBar` with the same label both draw**, and so do two result actions with the same name: the rows are keyed by position.
+- **`deriveBrandRoles` measures the accent before it refuses a surface**: a surface on the far side of the page's lightness, such as a dark panel on a light page, is refused only when no shade of the accent reads on the page, the pale fill and every surface at once, and otherwise the ink is the first shade that does; it used to be refused whenever pure black, or pure white on a dark page, did not read on it. Every ink derived before is unchanged. See [docs/brand.md](docs/brand.md).
+- **A host's name outranks a title on the result's root**: `StuffViewer` draws and says the `name` a host gives it, and names the download after it, even when the descriptor's root carries a `title`, which used to be drawn instead while the download followed the name; a root with a title and no host name keeps its title. See [docs/result-view.md](docs/result-view.md).
+- **The JSON view's block is a tab stop only while it scrolls**: it takes keyboard focus while a line is wider than it, as a result table's box does, rather than always, which left a stop per block that scrolled nothing. See [docs/result-view.md](docs/result-view.md).
+- **A produced page's card rounds like a panel**: the generative layer's `Card` takes one and a half times `--radius` at its corners, as the `Rail` and a host's own panel do, where it kept a control's corner and so disagreed with the rail under any style that sets a radius. See [docs/theming.md](docs/theming.md).
+- **An off switch shows its track**: the switch's track, in the form and on a produced page, is `--muted-foreground` when off rather than `--input`, the fill of the boolean's own row, so it reads at 3:1 on its row and its thumb shows on it, where an off switch read as a lone thumb. See [docs/theming.md](docs/theming.md).
 
 ## [v0.30.0] - 2026-11-07
 

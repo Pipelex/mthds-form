@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { findFixture, type SpecFixture } from '../../../generative';
-import type { InputForm, PipeIOContracts, RunField } from '../../../core';
+import type { BooleanRunField, InputForm, PipeIOContracts, RunField } from '../../../core';
+import { BooleanField, FieldPresentationProvider } from '../../../react';
 import * as designSlides from '../../_generated/design_slides';
 import { SPECS as DESIGN_SLIDES_SPECS } from '../../_generated/design_slides.specs';
 import * as extractInvoice from '../../_generated/extract_invoice';
@@ -16,6 +17,7 @@ import { DesignedPage, Frame } from './frame';
 import { AppScope, styleFontsReady } from './scope';
 import { APP_STYLE_IDS, TYPEFACES, type AppStyleId, type TypefaceId } from '../../../brand';
 import { TEAM_KEYS, type TeamKey } from './teams';
+import { backgroundOf, paintedContrast } from '../../painted-color';
 
 /**
  * The app styles, worn by a host's page: a style (`quiet`, `soft`,
@@ -155,8 +157,9 @@ function resolvedBeside(beside: HTMLElement, property: string, value: string): s
  * weight and tracking, and its face where a style or a team's typeface sets
  * one; a result's own headings under a style; the layout's call to action,
  * found by its role and label, wearing `--action-shadow` and, while it has
- * keyboard focus, the focus outline no shadow can hide; and the host's own
- * main action wearing the same shadow.
+ * keyboard focus, the focus outline no shadow can hide; the host's own main
+ * action wearing the same shadow; every panel the style dresses on a produced
+ * page in a panel's corner; and the band's focus outline reading on the band.
  */
 async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subject) {
   const pages = [...canvasElement.querySelectorAll<HTMLElement>('.app-host')];
@@ -206,6 +209,37 @@ async function expectStyleReachesPage(canvasElement: HTMLElement, subject: Subje
         resolvedBeside(main, 'box-shadow', 'var(--action-shadow)'),
       );
     }
+    // Every panel a style dresses on a produced page, the rail and the card,
+    // takes a panel's corner, one and a half times a control's.
+    for (const panel of page.querySelectorAll<HTMLElement>('[data-style-panel]')) {
+      await expect(getComputedStyle(panel).borderTopLeftRadius, 'a style panel: corner').toBe(
+        resolvedBeside(panel, 'border-top-left-radius', 'calc(var(--radius) * 1.5)'),
+      );
+    }
+    for (const button of page.querySelectorAll<HTMLElement>('.af-band-btn')) {
+      await expectFocusReadsOn(button, button.closest<HTMLElement>('.af-band')!, 'the band');
+    }
+  }
+}
+
+/**
+ * `control`'s focus outline, drawn while it has keyboard focus, reads at 3:1
+ * on `ground` (WCAG 1.4.11), the surface the outline is drawn over. A team's
+ * accent ink is measured on the page and the panels; a band in the team's
+ * header colour is none of those, so its controls' outline is held here.
+ */
+async function expectFocusReadsOn(control: HTMLElement, ground: HTMLElement, where: string) {
+  control.focus({ preventScroll: true });
+  try {
+    await expect(control.matches(':focus-visible'), `${where}: focus-visible`).toBe(true);
+    const outline = getComputedStyle(control);
+    await expect(outline.outlineStyle, `${where}: focus outline`).toBe('solid');
+    await expect(
+      paintedContrast(outline.outlineColor, backgroundOf(ground)),
+      `${where}: focus outline contrast`,
+    ).toBeGreaterThanOrEqual(3);
+  } finally {
+    control.blur();
   }
 }
 
@@ -337,3 +371,75 @@ export const ComposeEditorialPhone = onAPhone('compose', 'editorial', 'gov-uk');
 export const ComposeBoldPhone = onAPhone('compose', 'bold', 'typer');
 export const ResultEditorialPhone = onAPhone('result', 'editorial', 'stripe');
 export const ResultBoldPhone = onAPhone('result', 'bold', 'typer');
+
+// ─── A switch, in every style ──────────────────────────────────────────────
+
+const SWITCHES: BooleanRunField[] = [
+  { kind: 'boolean', name: 'with_children', conceptRef: 'native.Boolean', required: false },
+  { kind: 'boolean', name: 'step_free', conceptRef: 'native.Boolean', required: false },
+];
+
+/**
+ * The kernel's boolean, off and on, in the host's panel under every style,
+ * with a team's colours: the field fill a style gives its panel is the row
+ * the switch sits in, so the off track must show on it as well as on the
+ * host's own grey.
+ */
+function SwitchesInEveryStyle({ team }: { team: TeamKey | null }) {
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {(['none', ...APP_STYLE_IDS] as const).map((style) => (
+        <AppScope key={style} style={style} team={team}>
+          <div className="af" style={{ minHeight: 0, padding: 16 }}>
+            <div className="af-panel" style={{ display: 'grid', gap: 12, padding: 16 }}>
+              <FieldPresentationProvider presentation="app">
+                {SWITCHES.map((field, index) => (
+                  <BooleanField
+                    key={field.name}
+                    field={field}
+                    value={index === 1}
+                    onChange={() => undefined}
+                    id={`${style}-${field.name}`}
+                  />
+                ))}
+              </FieldPresentationProvider>
+            </div>
+          </div>
+        </AppScope>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * An off switch's track reads at 3:1 on the row it sits in, which is the
+ * field fill of the panel around it (WCAG 1.4.11), and the thumb reads on
+ * the track, in every style and both themes.
+ */
+export const SwitchesEveryStyle: Story = {
+  name: 'Switches · every style · stripe.com colours',
+  args: { subject: 'compose', style: 'quiet', team: 'stripe' },
+  render: (args) => <SwitchesInEveryStyle team={args.team === 'none' ? null : args.team} />,
+  play: async ({ canvasElement, globals }) => {
+    const off = [...canvasElement.querySelectorAll<HTMLElement>('[role="switch"]')].filter(
+      (track) => track.getAttribute('aria-checked') === 'false',
+    );
+    // One off switch for no style and for each style, in each theme pane the
+    // toolbar shows.
+    const panes = globals.themeView === 'light' || globals.themeView === 'dark' ? 1 : 2;
+    await expect(off).toHaveLength((APP_STYLE_IDS.length + 1) * panes);
+    for (const track of off) {
+      const row = track.parentElement!;
+      const style = track.closest('.app-host')?.className ?? '';
+      await expect(
+        paintedContrast(getComputedStyle(track).backgroundColor, backgroundOf(row)),
+        `${style}: the off track on its row`,
+      ).toBeGreaterThanOrEqual(3);
+      const thumb = track.firstElementChild!;
+      await expect(
+        paintedContrast(getComputedStyle(thumb).backgroundColor, backgroundOf(track)),
+        `${style}: the thumb on the off track`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  },
+};

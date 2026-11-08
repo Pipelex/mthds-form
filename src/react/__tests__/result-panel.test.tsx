@@ -232,6 +232,34 @@ describe('the stuff name', () => {
     expect(screen.getByText('output')).toBeTruthy();
   });
 
+  it("wins over a title the descriptor's root carries, in the header and the download", async () => {
+    // The protocol allows a title on any node, and an authored title outranks
+    // a name in every label; on the root it names the output slot, not the
+    // stuff the host is showing, so the host's name replaces it.
+    const titledRoot: ObjectRunField = { ...invoice, title: 'Invoice extraction' };
+    const saveFiles = vi.fn<SaveFiles>(async () => ({ failed: [] }));
+    render(
+      <ResultEnvProvider saveFiles={saveFiles}>
+        <StuffViewer field={titledRoot} value={{ reference: 'INV-1' }} name="report_pages" />
+      </ResultEnvProvider>,
+    );
+    expect(screen.getByText('report_pages')).toBeTruthy();
+    expect(screen.queryByText('Invoice extraction')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.download }));
+    await waitFor(() => expect(saveFiles).toHaveBeenCalledOnce());
+    expect(saveFiles.mock.calls[0]?.[0]).toMatchObject([{ name: 'report_pages.json' }]);
+  });
+
+  it("keeps the descriptor's title when the host names nothing", () => {
+    render(
+      <StuffViewer
+        field={{ ...invoice, title: 'Invoice extraction' }}
+        value={{ reference: 'INV-1' }}
+      />,
+    );
+    expect(screen.getByText('Invoice extraction')).toBeTruthy();
+  });
+
   it('feeds the same name to the download, so the file agrees with the header', async () => {
     // Asserted on the seam rather than by driving a real download: a host save
     // function receives the plan, and the JSON copy is named from the SAME
@@ -352,6 +380,21 @@ describe("a host's title over a text that heads itself", () => {
       expect(before(screen.getByText(/^Executive summary/), heading())).toBe(true);
     });
   }
+
+  it("says the host's name, not a title the descriptor's root carries", () => {
+    inApp(
+      <StuffViewer
+        field={{ ...memo('prose'), title: 'Memo' }}
+        value={headed}
+        name="executive_summary"
+      />,
+    );
+    expect(heading()).toBeTruthy();
+    expect(screen.getByText('Executive summary: What the launch is about').className).toContain(
+      'sr-only',
+    );
+    expect(screen.queryByText(/^Memo/)).toBeNull();
+  });
 
   it('draws nothing for a label that gives way and has no text, not even its concept', () => {
     // A member whose descriptor title is empty: where a label is drawn, its

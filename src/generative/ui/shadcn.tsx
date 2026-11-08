@@ -118,9 +118,14 @@ export function Card({
   return (
     // A style's panel: a host writes the style's field fill onto `--input`
     // here, as on its own panel, so the fields inside do not sink into it.
+    // A panel's corner is one and a half times a control's, as the rail's is.
     <div
       data-style-panel=""
-      className={cn('rounded-lg p-6 text-card-foreground', panelSurfaceClass, panelFlatShadowClass)}
+      className={cn(
+        'rounded-[calc(var(--radius,0.5rem)*1.5)] p-6 text-card-foreground',
+        panelSurfaceClass,
+        panelFlatShadowClass,
+      )}
     >
       {props.title || props.description ? (
         <div className="mb-4 space-y-1.5">

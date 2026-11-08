@@ -19,6 +19,7 @@ import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/v
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { UploadedFile } from './file-field';
+import { FramedFormContext } from './object-field';
 import type { FilePickerSource } from './file-picker';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
@@ -734,6 +735,14 @@ export interface MethodFormProps {
   strings?: Partial<FieldStrings>;
   /** Mounts `FieldPresentationProvider`; absent, the nearest one applies. */
   presentation?: FieldPresentation;
+  /**
+   * The host draws the form inside a panel of its own, so the form draws no
+   * card inside it: a structure among the inputs is a section, its name a
+   * heading over its fields, set off from the inputs beside it by a hairline
+   * rather than boxed. Absent, a structure that is an input draws its own
+   * card, which is what says where it ends on a bare page.
+   */
+  framed?: boolean;
   /** Classes for the stack the fields sit in. */
   className?: string;
 }
@@ -748,8 +757,12 @@ export interface MethodFormProps {
  * disclosure folds and opens exactly as the one inside a structure does,
  * optional structures included.
  */
-export function MethodForm({ locale, strings, presentation, ...props }: MethodFormProps) {
-  let body: ReactNode = <MethodFormFields {...props} />;
+export function MethodForm({ locale, strings, presentation, framed, ...props }: MethodFormProps) {
+  let body: ReactNode = (
+    <FramedFormContext value={framed ?? false}>
+      <MethodFormFields {...props} framed={framed} />
+    </FramedFormContext>
+  );
   if (presentation) {
     body = (
       <FieldPresentationProvider presentation={presentation}>{body}</FieldPresentationProvider>
@@ -767,6 +780,21 @@ export function MethodForm({ locale, strings, presentation, ...props }: MethodFo
 
 type MethodFormFieldsProps = Omit<MethodFormProps, 'locale' | 'strings' | 'presentation'>;
 
+/**
+ * The hairline a framed form sets between a structure's section and any
+ * input, disclosure or example row beside it: under a section that anything
+ * follows, and over a section that follows anything but another section, so
+ * two sections share one rule. It is the edge the section's card drew when
+ * the form was not framed, drawn once between two neighbours rather than
+ * around one of them, so a section last in the form leaves no rule over the
+ * host's own action row. Each rule is the section's own: a neighbour's root
+ * may be a box of its own (a boolean's row is filled, bordered and padded),
+ * and a border or padding set on it would reshape that box. Tailwind reads
+ * the classes whole in source, so they are spelled out.
+ */
+const SECTION_RULES =
+  '[&>[data-form-section]:not(:last-child)]:border-b [&>[data-form-section]:not(:last-child)]:border-border [&>[data-form-section]:not(:last-child)]:pb-6 [&>:not([data-form-section])+[data-form-section]]:border-t [&>:not([data-form-section])+[data-form-section]]:border-border [&>:not([data-form-section])+[data-form-section]]:pt-6';
+
 function MethodFormFields({
   form,
   disabled,
@@ -774,6 +802,7 @@ function MethodFormFields({
   resolveUrl,
   foldOptional = true,
   errors,
+  framed,
   className,
 }: MethodFormFieldsProps) {
   const s = useFieldStrings();
@@ -864,7 +893,7 @@ function MethodFormFields({
   };
 
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn('space-y-6', framed && SECTION_RULES, className)}>
       {exampleSource && (
         <FillWithExample
           source={exampleSource}
