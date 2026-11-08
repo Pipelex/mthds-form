@@ -4,12 +4,13 @@ The input form for MTHDS methods, as a library: a headless kernel that maps the 
 
 It exists because "the form" is one problem that keeps being solved separately. A method declares its inputs; something has to decide what widget each input deserves, whether the Run button may light up, what shape the values take on the wire, and what a validation failure says to a person. That logic belongs in one place with tests around it, not copied into each surface that happens to need a form.
 
-## Four entry points
+## Five entry points
 
 ```ts
 import { buildRunFields, computeReadiness } from '@pipelex/mthds-form'; // headless
 import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
 import { GenerativePage } from '@pipelex/mthds-form/generative'; // a produced layout
+import { layoutCheckProblems } from '@pipelex/mthds-form/generative/headless'; // producing and checking one, on a server
 import { assembleBrand } from '@pipelex/mthds-form/brand'; // a brand, held to the theme contract
 ```
 
@@ -17,7 +18,9 @@ import { assembleBrand } from '@pipelex/mthds-form/brand'; // a brand, held to t
 
 `./react` is the control set — one control per field kind behind a single dispatch point, styled with Tailwind classes over standard shadcn/ui tokens. `react` and `react-dom` are optional peer dependencies, so a consumer that only wants the kernel never installs them.
 
-`./generative` renders a **layout** — a data file a model wrote once for a method, naming paths in the same descriptor and restating nothing about what a field is. It is the only entry that carries json-render, and with `./brand` the only one that carries zod, so a host that renders an ordinary form pays for neither. When there is no layout, or the one on file no longer fits the method, the page falls back to the kernel's own form. See [docs/generative-ui.md](docs/generative-ui.md).
+`./generative` renders a **layout** — a data file a model wrote once for a method, naming paths in the same descriptor and restating nothing about what a field is. It and `./generative/headless` are the only entries that carry json-render, and with `./brand` the only ones that carry zod, so a host that renders an ordinary form pays for neither. When there is no layout, or the one on file no longer fits the method, the page falls back to the kernel's own form. See [docs/generative-ui.md](docs/generative-ui.md).
+
+`./generative/headless` is the half of that layer that renders nothing: the designer method's catalog and brief, the prompt pin, the JSONL compiler and the checks a layout is held to. It carries `@json-render/core` and `zod` but no React and no `'use client'` directive, so a host producing layouts calls it on its server, in a server action or a route handler; `./generative` re-exports all of it beside the page.
 
 `./brand` holds a **brand** (a product's colours, radius, typefaces and logos, as a DTCG token file and a manifest) to the theme contract the controls are styled against, and compiles it into a stylesheet scoped to one class. It also turns up to three seed colours a person picked into colour roles whose text always reads (`deriveBrandRoles`). It renders nothing, fetches nothing and depends on zod alone. See [docs/brand.md](docs/brand.md).
 
