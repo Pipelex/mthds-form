@@ -1,6 +1,11 @@
 'use client';
 
-import { linkTextClass, selectedBorderClass, selectedFillClass } from '../react/role-tokens';
+import {
+  focusOutlineClass,
+  linkTextClass,
+  selectedBorderClass,
+  selectedFillClass,
+} from '../react/role-tokens';
 import { cn } from '../react/utils';
 import { useBrand } from './brand-context';
 
@@ -67,7 +72,10 @@ export function BrandBar({ app, links, tag }: BrandBarProps) {
                   key={`${index}-${link}`}
                   href="#"
                   onClick={(event) => event.preventDefault()}
-                  className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-hidden"
+                  className={cn(
+                    'rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground',
+                    focusOutlineClass,
+                  )}
                 >
                   {link}
                 </a>

@@ -30,6 +30,12 @@ interface FieldShellProps {
 }
 
 /**
+ * A field in error, in `app`: a 1px outline in the solid error colour, 4px
+ * clear of the field, at a panel's corner.
+ */
+const ERROR_OUTLINE = 'rounded-lg outline-solid outline-1 outline-offset-4 outline-destructive';
+
+/**
  * The label / type / description / error chrome around a single input control.
  * Every field type composes this so the form reads as one consistent column -
  * the control itself is the only thing that varies.
@@ -58,6 +64,7 @@ export function FieldShell({
   const labelText = fieldLabel(title, name, presentation);
   const showLabel = labelText.trim() !== '';
   const shownText = shownDescription(description, labelText, [category], presentation) ?? hint;
+  const outlined = isApp && !!error;
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -85,14 +92,16 @@ export function FieldShell({
           used to be rendered only while the field was in error, so the element
           at this position changed type whenever the error toggled, and React
           remounted the control: a host that clears an error as the user types
-          took the focus and the keystroke after the first with it. */}
+          took the focus and the keystroke after the first with it.
+          The outline is the error colour itself, which the brand contract
+          holds at 3:1 on the page and on a card; at seven tenths of it, it
+          read under that bar even in the stock palette. And it is an outline,
+          whose offset is a gap the surface shows through: a ring's offset is
+          painted in the page colour, and inside a host's panel filled
+          otherwise it drew a band of the page round the field. */}
       <div
-        className={cn(
-          'space-y-2',
-          isApp &&
-            error &&
-            'rounded-lg ring-1 ring-destructive/70 ring-offset-4 ring-offset-background',
-        )}
+        data-error-outline={outlined ? '' : undefined}
+        className={cn('space-y-2', outlined && ERROR_OUTLINE)}
       >
         {children}
       </div>

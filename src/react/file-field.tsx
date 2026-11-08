@@ -4,7 +4,7 @@ import { shownAsOptional } from '../core/readiness';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
-import { focusOutlineClass } from './role-tokens';
+import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
 import { cn, isThenable } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
@@ -766,14 +766,15 @@ function FileField({
         // the visual affordance, and the control inside it is a real
         // `<input type="file">`, which already has the right role and now has a
         // name. Giving the div a `role="button"` of its own would put a second
-        // named control in the accessibility tree for one value. The focus ring
-        // is `focus-within` because the element that takes focus is clip-hidden.
+        // named control in the accessibility tree for one value. The focus
+        // outline is `focus-within` because the element that takes focus is
+        // clip-hidden.
         <div
           {...getRootProps()}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center',
             'cursor-pointer select-none transition-colors',
-            'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+            focusWithinOutlineClass,
             isDragActive
               ? 'border-primary/60 bg-primary/5'
               : 'border-border bg-input hover:border-border hover:bg-muted',
