@@ -397,3 +397,44 @@ describe("a frame's vocabulary", () => {
     },
   );
 });
+
+/**
+ * What the host hands over - the frame and the descriptor - is no layout's
+ * to mend, so a producer is told to stop rather than pay for repairs, and
+ * reading it never throws or freezes.
+ */
+describe('an answer about what the host handed over', () => {
+  const page = { root: 'p', elements: { p: { type: 'Stack', props: {}, children: [] } } } as Spec;
+
+  it('flags a frame the package does not draw as beyond repair', () => {
+    const verdict = layoutCheck(page, { frame: 'sidebar' as never, descriptor: {} });
+    expect(verdict.checksFailed).toBe(true);
+  });
+
+  it('answers a descriptor whose reading throws a value that cannot be written out', () => {
+    const descriptor = {
+      get inputs(): never {
+        throw Object.create(null);
+      },
+    } as unknown as LayoutDescriptor;
+    expect(layoutCheck(page, { frame: 'page', descriptor })).toEqual({
+      problems: ['the descriptor cannot be read (an error that cannot be written out)'],
+      checksFailed: true,
+    });
+  });
+
+  it('refuses a descriptor sharing a structure level under level before it doubles out of reach', () => {
+    let shared: object = { kind: 'text', name: 'leaf', required: true };
+    for (let level = 0; level < 40; level += 1) {
+      shared = { kind: 'object', name: `l${level}`, required: true, fields: [shared, shared] };
+    }
+    const started = Date.now();
+    const verdict = layoutCheck(page, {
+      frame: 'page',
+      descriptor: { inputs: [shared] } as unknown as LayoutDescriptor,
+    });
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(verdict.checksFailed).toBe(true);
+    expect(verdict.problems[0]).toMatch(/more than 10000/);
+  });
+});

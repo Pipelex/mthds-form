@@ -752,13 +752,15 @@ export function layoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
 /**
  * What makes `descriptor` no descriptor the fit check can read, in words, or
  * nothing. A descriptor is the host's, derived from the method; one of the
- * wrong shape is answered as such, never as the checks' own failure. An
+ * wrong shape is answered as such, in words saying what is wrong with it,
+ * and `layoutCheck` flags it as no repair of the layout can mend. An
  * absent half - `null` written for it included, which is how JSON carries one
  * - is a descriptor with nothing on that side. Every field is held to the
  * shape the walks read, at every depth: a structure naming its `kind` and its
  * `name` as texts, a structure's members a list of fields and a list's item a
- * field, with no field inside itself and none nested deeper than
- * `MAX_FIELD_DEPTH`. Reading one never throws: a descriptor whose own reading
+ * field, with no field inside itself, none nested deeper than
+ * `MAX_FIELD_DEPTH` and no more than `MAX_DESCRIPTOR_FIELDS` in all. Reading
+ * one never throws: a descriptor whose own reading
  * throws is answered as one that cannot be read.
  */
 export function descriptorMalformation(descriptor: unknown): string | undefined {
@@ -766,27 +768,43 @@ export function descriptorMalformation(descriptor: unknown): string | undefined 
     return 'the layout has no descriptor to be checked against';
   }
   try {
+    const budget = { fields: 0 };
     const { inputs, result } = descriptor as { inputs?: unknown; result?: unknown };
     if (inputs != null && !Array.isArray(inputs)) {
       return 'the descriptor\'s "inputs" is not a list of fields';
     }
     for (const [index, input] of (inputs ?? []).entries()) {
-      const problem = fieldMalformation(input, `input ${index + 1}`, new Set());
+      const problem = fieldMalformation(input, `input ${index + 1}`, new Set(), budget);
       if (problem !== undefined) return `the descriptor's ${problem}`;
     }
     if (result != null) {
       if (!isField(result)) return 'the descriptor\'s "result" is not a field';
-      const problem = fieldMalformation(result, '"result"', new Set());
+      const problem = fieldMalformation(result, '"result"', new Set(), budget);
       if (problem !== undefined) return `the descriptor's ${problem}`;
     }
     return undefined;
   } catch (error) {
-    return `the descriptor cannot be read (${String(error)})`;
+    let said: string;
+    try {
+      said = String(error);
+    } catch {
+      said = 'an error that cannot be written out';
+    }
+    return `the descriptor cannot be read (${said})`;
   }
 }
 
 /** How many fields deep a descriptor is read before it is refused as too deep. */
 const MAX_FIELD_DEPTH = 64;
+
+/**
+ * How many fields a descriptor holds, counted at each place one is held,
+ * before it is refused as too large. A field held at two places is two fields
+ * the form draws and the fit check walks, so a descriptor built in memory that
+ * shares a structure level under level doubles at every level within the
+ * depth cap; no method declares anywhere near this many.
+ */
+const MAX_DESCRIPTOR_FIELDS = 10_000;
 
 /** Whether `value` names its `kind` and its `name` as texts, as a field does. */
 function isField(value: unknown): value is { kind: string; name: string } {
@@ -809,7 +827,11 @@ function fieldMalformation(
   value: unknown,
   subject: string,
   ancestors: Set<object>,
+  budget: { fields: number },
 ): string | undefined {
+  if (++budget.fields > MAX_DESCRIPTOR_FIELDS) {
+    return `fields number more than ${MAX_DESCRIPTOR_FIELDS}, counted at each place one is held`;
+  }
   if (!isField(value)) return `${subject} is not a field`;
   const named = `${subject} (${JSON.stringify(value.name)})`;
   if (ancestors.has(value)) return `${named} contains itself`;
@@ -822,7 +844,12 @@ function fieldMalformation(
       const { fields } = value as { fields?: unknown };
       if (!Array.isArray(fields)) return `${named} has no list of member "fields"`;
       for (const [index, member] of fields.entries()) {
-        const problem = fieldMalformation(member, `${named} member ${index + 1}`, ancestors);
+        const problem = fieldMalformation(
+          member,
+          `${named} member ${index + 1}`,
+          ancestors,
+          budget,
+        );
         if (problem !== undefined) return problem;
       }
     }
@@ -831,6 +858,7 @@ function fieldMalformation(
         (value as { item?: unknown }).item,
         `${named} item`,
         ancestors,
+        budget,
       );
       if (problem !== undefined) return problem;
     }
