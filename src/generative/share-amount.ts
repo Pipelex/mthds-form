@@ -3,7 +3,7 @@
  * exponent. `Number` reads more than that - "0x1A" as 26, "0b11" as 3 - and a
  * code that happens to look like one is no amount.
  */
-const DECIMAL = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
+const DECIMAL = /^[-+]?(\d+(\.\d*)?|\.\d+)(e[-+]?\d+)?$/i;
 
 /**
  * The amount a `ProportionBar` part draws, read as its renderer reads it and

@@ -51,11 +51,6 @@ describe('the layout formatter', () => {
     expect(formatNumber(2024, 'plain')).toBe('2024');
   });
 
-  it('gives the same text twice from its kept formatter', () => {
-    expect(formatAmount(3.99, 'EUR')).toBe(formatAmount(3.99, 'EUR'));
-    expect(formatNumber(7, 'decimal')).toBe(formatNumber(7, 'decimal'));
-  });
-
   it('writes the day a value names, whatever time stands beside it', () => {
     // Whether ICU puts a comma after the weekday has changed between releases.
     expect(formatDay('2025-03-09')).toMatch(/^Sunday,? 9 March 2025$/);

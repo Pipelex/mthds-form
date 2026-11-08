@@ -154,7 +154,8 @@ export interface StuffViewerProps {
   tableLayout?: TableLayout;
   /**
    * Whether the host draws this panel inside a panel of its own, laid over
-   * what `ResultEnvProvider` says. Every table in the result then drops its
+   * what `ResultEnvProvider` says. Every table in the result, except one
+   * nested in another table (in an open row or in a cell), then drops its
    * own rounded hairline box and keeps its header band and its row rules, so
    * it does not read as a box in the host's box. Unset, tables keep their
    * box, as on a bare page. The same seam as `MethodForm`'s `framed`.
