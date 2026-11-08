@@ -545,12 +545,6 @@ describe('an element that threw, once what it renders from is corrected', () => 
 });
 
 /**
- * The brand's mark, for a host to draw as its own chrome: over a plain form,
- * or above a designed page whose layout has no app bar. It used to be drawn
- * only by the catalog's `AppBar`, so a host built a one-element spec and a
- * second page to show its own logo.
- */
-/**
  * What a failed boundary compares, to tell a corrected input from the one it
  * failed on: the content, whatever objects carry it.
  */
@@ -574,8 +568,22 @@ describe('the content a failed boundary compares', () => {
     loop.self = loop;
     expect(contentOf(loop)).toBe('{"name":"Lyon","self":"[cycle]"}');
   });
+
+  it('gives up on sharing nested so deep that writing it out would freeze the page', () => {
+    let shared: object = { v: 1 };
+    for (let level = 0; level < 30; level += 1) shared = { a: shared, b: shared };
+    const started = Date.now();
+    expect(contentOf(shared)).toBe('an input that cannot be written out');
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
 });
 
+/**
+ * The brand's mark, for a host to draw as its own chrome: over a plain form,
+ * or above a designed page whose layout has no app bar. It used to be drawn
+ * only by the catalog's `AppBar`, so a host built a one-element spec and a
+ * second page to show its own logo.
+ */
 describe('the brand bar a host draws itself', () => {
   it("draws the brand's logo pair and the app's name off the brand in scope", () => {
     const { container } = render(

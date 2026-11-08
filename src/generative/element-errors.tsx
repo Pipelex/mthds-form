@@ -125,9 +125,15 @@ function said(error: unknown): string {
  */
 export function contentOf(value: unknown): string {
   const open: object[] = [];
+  let entries = 0;
   try {
     return (
       JSON.stringify(value, function (this: unknown, _key, entry: unknown) {
+        // A structure shared at several places is written out at each, so
+        // sharing nested level under level doubles the text at every level:
+        // past a bound no real input reaches, it is an input that cannot be
+        // written out, rather than a page frozen writing it.
+        if (++entries > MAX_CONTENT_ENTRIES) throw new RangeError('too large to compare');
         // Close every structure the walk has left: the one holding this
         // entry is the innermost still open.
         while (open.length > 0 && open[open.length - 1] !== this) open.pop();
@@ -143,6 +149,9 @@ export function contentOf(value: unknown): string {
     return 'an input that cannot be written out';
   }
 }
+
+/** How many values `contentOf` writes out before it gives up on an input. */
+const MAX_CONTENT_ENTRIES = 100_000;
 
 /** Whether two cues are the same: a list entry by entry, anything else by identity. */
 function sameCue(a: unknown, b: unknown): boolean {
