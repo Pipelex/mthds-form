@@ -195,9 +195,10 @@ export const FramedByTheHost: Story = {
  * would turn red; a section has no card, so each one in error draws a red
  * edge down its whole height, 4 pixels off the form's start edge as a
  * field's own error outline stands off its field, and its message at its
- * heading rather than under its last field.
- * Neither moves a field: the edge stands out of the flow and the message
- * takes the heading's row. The play measures all of it, in both themes.
+ * heading rather than under its last field. No field moves sideways: the
+ * edge stands out of the flow and the message takes the heading's row, so a
+ * field moves down only by what that row grows when the message wraps under
+ * a long name on a narrow row. The play measures all of it, in both themes.
  */
 export const FramedAfterAnAttempt: Story = {
   args: { pipeCode: 'shop_with_bank', framed: true },
@@ -211,14 +212,35 @@ export const FramedAfterAnAttempt: Story = {
       const { left, width } = element.getBoundingClientRect();
       return [left, width];
     };
-    const before = panels.map((panel) => inputsOf(panel).map(across));
+    /** Each section's heading row, where its message goes, in document order. */
+    const headingRows = (panel: HTMLElement) =>
+      [...panel.querySelectorAll<HTMLElement>('[data-form-section]')].map(
+        (section) =>
+          document.getElementById(section.getAttribute('aria-labelledby')!)!.parentElement!,
+      );
+    const measure = (panel: HTMLElement) => ({
+      across: inputsOf(panel).map(across),
+      tops: inputsOf(panel).map((input) => input.getBoundingClientRect().top),
+      rows: headingRows(panel).map((row) => row.getBoundingClientRect()),
+    });
+    const before = panels.map(measure);
     for (const panel of panels) await expect(panel.querySelector('[data-error-edge]')).toBeNull();
 
     for (const run of canvas.getAllByRole('button', { name: 'Run' })) await userEvent.click(run);
 
     for (const [index, panel] of panels.entries()) {
+      const was = before[index]!;
+      const now = measure(panel);
       // Not one field moved sideways or changed width.
-      await expect(inputsOf(panel).map(across)).toEqual(before[index]);
+      await expect(now.across).toEqual(was.across);
+      // A field moved down only by what the heading rows above it grew: the
+      // message wrapping under a long name on a narrow row, and nothing else.
+      for (const [field, top] of now.tops.entries()) {
+        const grown = was.rows
+          .map((row, at) => (row.top < was.tops[field]! ? now.rows[at]!.height - row.height : 0))
+          .reduce((sum, growth) => sum + growth, 0);
+        await expect(Math.abs(top - was.tops[field]! - grown)).toBeLessThan(0.5);
+      }
       const sections = [...panel.querySelectorAll<HTMLElement>('[data-form-section]')];
       await expect(sections).toHaveLength(2);
       const box = panel.getBoundingClientRect();

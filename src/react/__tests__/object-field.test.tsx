@@ -233,9 +233,9 @@ describe('how a structure groups its fields', () => {
 /**
  * What a form's own structure shows when it fails the run gate. A card turns
  * its outline red; a framed form's section has no outline to turn, so it says
- * so at its heading and along its edge instead, and neither cue moves a box:
- * the edge stands out of the flow, in the host's panel's padding, and the
- * caption takes the heading's row.
+ * so at its heading and along its edge instead, and neither cue reshapes a
+ * box: the edge stands out of the flow, beside the form, and the caption
+ * takes the heading's row, which grows by a line only when it wraps.
  */
 describe('a structure in error', () => {
   const shop: ObjectRunField = {

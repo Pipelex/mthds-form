@@ -154,12 +154,14 @@ export interface ContrastPair {
  * may be translucent, as a style's often is, so it is laid over the canvas
  * first.
  *
- * The error colour is held to the same 3:1 on the canvas and on a card, the
- * surfaces the kernel marks an error on: a framed section's error bar, the
- * outline of a field or a card in error. Its captions are text, which AA
- * would hold to 4.5:1, but the stock palette's red measures 3.76:1 on white,
- * so that bar waits on the stock palette too. A card may be translucent, so
- * it is laid over the canvas first.
+ * The error colour is held to the same 3:1, as a solid colour, on the canvas
+ * and on a card laid over it, which is what a host's panel usually is: a
+ * framed section's error bar is drawn in it solid there. The outlines of a
+ * card and of a field in error are drawn at half and seven tenths of it, so
+ * they read fainter than this pair measures, and the pair does not hold
+ * them. Its captions are text, which AA would hold to 4.5:1, but the stock
+ * palette's red measures 3.76:1 on white, so that bar waits on the stock
+ * palette too.
  */
 export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   { foreground: 'foreground', background: 'background', minimum: MIN_CONTRAST },
