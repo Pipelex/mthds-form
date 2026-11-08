@@ -84,14 +84,27 @@ export const selectedHoverBorderClass =
 export const checkedAccentClass = 'accent-[color:var(--link,var(--primary,hsl(240_5.9%_10%)))]';
 
 /**
- * The keyboard focus of everything in the tab order that draws it neither as a
- * field's border nor as a primitive's ring: a solid 2px outline in `--ring`,
- * 1px clear of the element. The style is
- * stated, not left to Tailwind's `--tw-outline-style` default, so the outline
- * is drawn whatever else sets that variable.
+ * The keyboard focus of everything in the tab order that does not draw it as
+ * a field's border: a solid 2px outline in `--ring`, 1px clear of the element.
+ * The style is stated, not left to Tailwind's `--tw-outline-style` default, so
+ * the outline is drawn whatever else sets that variable.
+ *
+ * An outline, never a ring with an offset: Tailwind's ring offset is a solid
+ * box-shadow painted in a colour (`ring-offset-background`, the page's), not
+ * a gap, so inside a panel filled otherwise, a style's muted or lifted panel,
+ * it showed as a band of the page between the control and its ring. An
+ * outline's offset is a real gap, through which the surface shows.
  */
 export const focusOutlineClass =
   'focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
+
+/**
+ * The same outline on a drop target whose own input is clip-hidden, drawn
+ * while focus is anywhere inside it, since the element that takes focus
+ * cannot show one.
+ */
+export const focusWithinOutlineClass =
+  'focus-within:outline-solid focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring';
 
 /**
  * The same outline drawn 2px inside the element's edge, for a row, a frame or

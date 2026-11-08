@@ -81,7 +81,7 @@ import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
 import { readDateContent } from '../core/native-content';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
-import { linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
+import { focusOutlineClass, linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
 import { enumLabeler, useFieldPresentation } from '../react/field-presentation';
 import { ResultRoot } from '../react/result-location';
@@ -603,8 +603,12 @@ function openIndex(
 }
 
 // As tall as the layer's own `Button`, which is the 44 pixels a finger needs.
-const BUTTON_BASE =
-  'inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50';
+// Its focus is the kernel's one outline, whose offset is a gap the panel
+// shows through rather than a ring offset painted in the page colour.
+const BUTTON_BASE = cn(
+  'inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+  focusOutlineClass,
+);
 const PRIMARY_BUTTON = cn(BUTTON_BASE, 'bg-primary text-primary-foreground hover:bg-primary/90');
 const SECONDARY_BUTTON = cn(
   BUTTON_BASE,

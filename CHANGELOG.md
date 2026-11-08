@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`data-error-outline`**: the wrapper that outlines a field in error, in `app`, carries the attribute, so a host's stylesheet and a test can find the mark.
+
+### Changed
+
+- **Focus is an outline, never a ring with an offset (Breaking)**: the vendored toggle and switch, a file field's drop target, a produced page's buttons and its brand bar's link draw the kernel's focus outline, 2px in `--ring` with a 1px gap the surface shows through, where they drew a 2px ring 2px off the element over a band painted in `--background`. Inside a panel filled with anything but the page colour, that band showed as a stripe round the control. `focusWithinOutlineClass` is the same outline on a container whose input is clip-hidden.
+- **Error marks are the error colour, solid (Breaking)**: a field's error outline in `app` is a 1px outline in `--destructive`, 4px off the field, where it was a ring at 70% over a band painted in `--background`, and a structure's card or rule in error is `border-destructive` where it was at 50%. Both now reach the 3:1 the brand contract holds `--destructive` to; at their old strength they did not, even in the stock palette.
+
 ## [v0.33.0] - 2026-11-08
 
 ### Added
