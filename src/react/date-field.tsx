@@ -3,7 +3,7 @@
 import { shownAsOptional } from '../core/readiness';
 import { cn } from './utils';
 import type { DateRunField } from '../core';
-import { toDateInputValue, toStoredDateValue } from '../core/date-format';
+import { asCalendarDate, toDateInputValue, toStoredDateValue } from '../core/date-format';
 import { FieldShell } from './field-shell';
 import { useFieldPresentation } from './field-presentation';
 import { fieldControlClass } from './field-styles';
@@ -59,7 +59,9 @@ export function DateField({ field, value, onChange, id, error, disabled }: DateF
         value={shown}
         disabled={disabled}
         aria-invalid={!!error}
-        data-empty={shown === '' ? '' : undefined}
+        // By whether it is a day, not by the text: the browser empties a value
+        // that names none (`2026-02-30`), and paints the pattern over it.
+        data-empty={asCalendarDate(shown) === null ? '' : undefined}
         onChange={(e) => onChange(toStoredDateValue(e.target.value, field.datetime))}
         className={cn(
           fieldControlClass,

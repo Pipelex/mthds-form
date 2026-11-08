@@ -142,4 +142,9 @@ describe("the date's empty face", () => {
     rerender(<FieldRenderer field={date} value="2026-05-14" onChange={() => {}} id="d" />);
     expect(screen.getByLabelText('arriving_on')).not.toHaveAttribute('data-empty');
   });
+
+  it('is marked empty over a value that names no day, which the browser empties', () => {
+    render(<FieldRenderer field={date} value="2026-02-30" onChange={() => {}} id="d" />);
+    expect(screen.getByLabelText('arriving_on')).toHaveAttribute('data-empty');
+  });
 });

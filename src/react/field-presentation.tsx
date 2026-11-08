@@ -267,14 +267,25 @@ function contentStems(text: string): string[] {
 
 const WORD = /[\p{L}\p{M}\p{N}]+|[\p{S}%‰#@]/gu;
 
-/** One suffix off, never below three letters: `arriving` and `arrive` both give `arriv`. */
+/**
+ * One suffix off: `arriving` and `arrive` both give `arriv`. Each suffix keeps
+ * a floor of letters, because two words that stem alike read as one word and
+ * hide a sentence: a three-letter floor read `care` and `caring` as `car`.
+ * A word the floors leave whole only ever shows a description.
+ */
 function stem(word: string): string {
-  for (const suffix of SUFFIXES) {
-    if (word.endsWith(suffix) && word.length - suffix.length >= 3) {
+  for (const [suffix, floor] of SUFFIXES) {
+    if (word.endsWith(suffix) && word.length - suffix.length >= floor) {
       return word.slice(0, -suffix.length);
     }
   }
   return word;
 }
 
-const SUFFIXES = ['ing', 'ed', 'es', 's', 'e'] as const;
+const SUFFIXES = [
+  ['ing', 4],
+  ['ed', 4],
+  ['es', 4],
+  ['s', 3],
+  ['e', 4],
+] as const;

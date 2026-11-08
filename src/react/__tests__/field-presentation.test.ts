@@ -58,6 +58,16 @@ describe('enumLabeler', () => {
  * was found wanting: three sentences restating "Arriving on" over a date.
  */
 describe('descriptionAddsToLabel', () => {
+  it('does not read two words as one for sharing a short stem', () => {
+    expect(descriptionAddsToLabel('A car', 'Care', ['text'])).toBe(true);
+    expect(descriptionAddsToLabel('The car', 'Caring for', ['text'])).toBe(true);
+  });
+
+  it('still reads a plural as its singular', () => {
+    expect(descriptionAddsToLabel('The names', 'Name', ['text'])).toBe(false);
+    expect(descriptionAddsToLabel('The images', 'Image', ['text'])).toBe(false);
+  });
+
   it('drops a sentence that only restates the label, whatever its inflection', () => {
     expect(descriptionAddsToLabel('The day they arrive', 'Arriving on', ['date'])).toBe(false);
     expect(descriptionAddsToLabel('The day they leave', 'Leaving on', ['date'])).toBe(false);

@@ -30,7 +30,7 @@ export const fieldControlClass = cn(
  */
 export const rowActionClass = cn(
   'flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-border px-3 text-[14px] text-foreground transition-colors',
-  'hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9',
+  'enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9',
 );
 
 /**
