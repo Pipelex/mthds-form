@@ -569,6 +569,20 @@ describe('the content a failed boundary compares', () => {
     expect(contentOf(loop)).toBe('{"name":"Lyon","self":"[cycle]"}');
   });
 
+  it('still tells a list of tens of thousands of rows from the same list corrected', () => {
+    // Each row writes out as its object and its members, the most a repeated
+    // child was seen to cost; one object is written at every place it stands.
+    const row = Object.fromEntries(
+      Array.from({ length: 43 }, (_, index) => [`member${index}`, `value ${index}`]),
+    );
+    const rows: object[] = Array.from({ length: 90_000 }, () => row);
+    const failed = contentOf({ rows });
+    expect(failed).not.toBe('an input that cannot be written out');
+    expect(contentOf({ rows: [...rows.slice(0, -1), { ...row, member0: 'corrected' }] })).not.toBe(
+      failed,
+    );
+  });
+
   it('gives up on sharing nested so deep that writing it out would freeze the page', () => {
     let shared: object = { v: 1 };
     for (let level = 0; level < 30; level += 1) shared = { a: shared, b: shared };

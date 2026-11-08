@@ -280,9 +280,10 @@ export function RevealPanel({ open, children }: { open: () => void; children: Re
 export type CheckedField = ReturnType<typeof useFieldValidation> & {
   /**
    * A ref for the element a refused run puts the focus on: the input, the
-   * select's trigger, the first radio. A control that attaches it is focused
-   * when it is the first failing field of a refused run; one that does not is
-   * still revealed, after every field that does.
+   * select's trigger, a radio group's checked option or its first while none
+   * is. A control that attaches it is focused when it is the first failing
+   * field of a refused run; one that does not is still revealed, after every
+   * field that does.
    */
   focusRef: (element: HTMLElement | null) => void;
 };

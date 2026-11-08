@@ -67,6 +67,62 @@ describe('a layout that has gone stale', () => {
     ).toEqual([]);
   });
 
+  it('counts a default only where the seed reaches it', () => {
+    const tone = { ...text('tone', false), defaultValue: 'formal' } as RunField;
+    const city = text('city', true);
+    const refusal = (name: string) =>
+      `/inputs/${name} is required, and the layout offers nowhere to enter it`;
+
+    // `seedInputs` does not open an optional structure, so `tone`'s default
+    // never reaches `request`, and the run would refuse it.
+    const beneathOptional: RunField = {
+      kind: 'object',
+      name: 'request',
+      required: true,
+      fields: [{ kind: 'object', name: 'extras', required: false, fields: [tone] }],
+    };
+    expect(layoutProblems({ inputs: [city, beneathOptional] }, pageBinding('/inputs/city'))).toEqual(
+      [refusal('request')],
+    );
+
+    // A required structure beneath the optional one is no nearer the seed.
+    const requiredBeneathOptional: RunField = {
+      kind: 'object',
+      name: 'r',
+      required: true,
+      fields: [
+        {
+          kind: 'object',
+          name: 's',
+          required: false,
+          fields: [{ kind: 'object', name: 'c', required: true, fields: [tone] }],
+        },
+      ],
+    };
+    expect(
+      layoutProblems({ inputs: [city, requiredBeneathOptional] }, pageBinding('/inputs/city')),
+    ).toEqual([refusal('r')]);
+
+    // Offering the member is still enough: the person enters it there.
+    expect(
+      layoutProblems(
+        { inputs: [city, beneathOptional] },
+        pageBinding('/inputs/city', '/inputs/request/extras/tone'),
+      ),
+    ).toEqual([]);
+
+    // A chain of required structures is walked by the seed, at any depth.
+    const beneathRequired: RunField = {
+      kind: 'object',
+      name: 'request',
+      required: true,
+      fields: [{ kind: 'object', name: 'extras', required: true, fields: [tone] }],
+    };
+    expect(layoutProblems({ inputs: [city, beneathRequired] }, pageBinding('/inputs/city'))).toEqual(
+      [],
+    );
+  });
+
   it('is refused when it binds a path no input has', () => {
     const problems = layoutProblems({ inputs: [text('city', true)] }, pageBinding('/inputs/town'));
     expect(problems).toContain('/inputs/town is bound, and no input has it');

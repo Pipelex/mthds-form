@@ -718,20 +718,33 @@ interface Offered {
  * or by delegation, because its items are the layout's business and not this
  * predicate's. A structure that requires no member still has to hold
  * something before the run takes it (`fieldFilled`), so it is covered by
- * covering any one member, or by a member with a default, which the seed puts
- * in it, and is itself the uncovered path otherwise: answering nothing there
- * let a page through that no person could complete.
+ * covering any one member, or by a member whose default the seed writes into
+ * it, and is itself the uncovered path otherwise: answering nothing there let
+ * a page through that no person could complete.
+ *
+ * `seeded` says that `seedInputs` walks `field`: true of every top-level
+ * input, and of a member only down a chain of required structures with no
+ * default of their own. The seed leaves an optional structure absent and
+ * writes a structure's own default whole, so a member's default anywhere else
+ * never arrives, however required the structures between are.
  */
-function uncoveredUnder(field: RunField, path: string, offered: Offered): string[] {
+function uncoveredUnder(
+  field: RunField,
+  path: string,
+  offered: Offered,
+  seeded: boolean,
+): string[] {
   if (isOffered(path, offered)) return [];
   if (field.kind === 'object') {
-    const under = (child: RunField) => uncoveredUnder(child, joinPath(path, child.name), offered);
+    const seededBelow = seeded && field.required && field.defaultValue === undefined;
+    const under = (child: RunField) =>
+      uncoveredUnder(child, joinPath(path, child.name), offered, seededBelow);
     const required = field.fields.filter((child) => child.required);
     if (required.length > 0) return required.flatMap(under);
-    // A member whose default holds something has it from the start
-    // (`seedInputs`), so the structure is filled before the person touches
-    // it; a blank default fills nothing.
-    return field.fields.some((child) => isFilled(child.defaultValue) || under(child).length === 0)
+    // A blank default fills nothing, whatever the seed does with it.
+    return field.fields.some(
+      (child) => (seededBelow && isFilled(child.defaultValue)) || under(child).length === 0,
+    )
       ? []
       : [path];
   }
@@ -987,7 +1000,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
   };
   for (const field of inputs) {
     if (!field.required) continue;
-    for (const path of uncoveredUnder(field, joinPath(INPUTS_ROOT, field.name), offered)) {
+    for (const path of uncoveredUnder(field, joinPath(INPUTS_ROOT, field.name), offered, true)) {
       problems.push(`${path} is required, and the layout offers nowhere to enter it`);
     }
   }

@@ -152,9 +152,11 @@ export function contentOf(value: unknown): string {
 
 /** How many values `contentOf` writes out before it gives up on an input. */
 // A failed repeat writes each repeated child out once per item, a few dozen
-// values an item, so the bound sits well above a list of tens of thousands of
-// rows and well below what sharing nested level under level reaches.
-const MAX_CONTENT_ENTRIES = 500_000;
+// values an item, so this covers a list of tens of thousands of rows: an input
+// past it reads the same before and after a correction, and the element stays
+// blank until it is remounted. It is still far below what sharing nested level
+// under level reaches, and only a boundary that has failed pays for the walk.
+const MAX_CONTENT_ENTRIES = 5_000_000;
 
 /** Whether two cues are the same: a list entry by entry, anything else by identity. */
 function sameCue(a: unknown, b: unknown): boolean {
