@@ -18,8 +18,12 @@ export interface GenerativePageProps {
   store: StateStore;
   /** The descriptor the escape hatches resolve paths against. */
   scope: DescriptorScope;
-  /** What `run` does. Receives the state at the moment the call to action was pressed. */
-  onRun?: (state: StateModel) => void;
+  /**
+   * What `run` does. Receives the state at the moment the call to action was
+   * pressed. Return the run's promise and a press while it is pending starts
+   * nothing.
+   */
+  onRun?: (state: StateModel) => void | Promise<unknown>;
   /** Whether a stream is still arriving. */
   loading?: boolean;
   /** A registry over a catalog that extends this entry's, when a host has one. */
@@ -77,9 +81,31 @@ export function GenerativePage({
   React.useEffect(() => {
     latest.current = { onRun, store };
   });
+  // One run at a time. The run button is held by the host's `env.disabled`,
+  // which arrives on a later render: a host that sets it after an await (or
+  // never) left a second press inside that wait free to start a second
+  // billed run. The guard is held until what `onRun` returns settles, and
+  // released at once for an `onRun` that returns nothing, where the host's
+  // own state covers the run.
+  const running = React.useRef(false);
   const [handlers] = React.useState(() => ({
     run: () => {
-      latest.current.onRun?.(latest.current.store.getSnapshot());
+      if (running.current) return undefined;
+      running.current = true;
+      let pending: unknown;
+      try {
+        pending = latest.current.onRun?.(latest.current.store.getSnapshot());
+      } catch (error) {
+        running.current = false;
+        throw error;
+      }
+      if (pending instanceof Promise) {
+        return pending.finally(() => {
+          running.current = false;
+        });
+      }
+      running.current = false;
+      return undefined;
     },
   }));
   const page = (

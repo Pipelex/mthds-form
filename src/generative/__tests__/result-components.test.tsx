@@ -1,6 +1,6 @@
 import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
-import { render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GenerativePage } from '../page';
 
@@ -96,5 +96,79 @@ describe("a result page's components read result text as data", () => {
     );
     const cells = [...container.querySelectorAll('td')].map((td) => td.textContent);
     expect(cells).toEqual(['9 Mar 2025', '9 Mar 2025']);
+  });
+
+  it('reads a native date in a date column by its day, never as its structure', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('DataTable', {
+          rows: { $state: '/result/rows' },
+          columns: [{ path: 'when', label: 'When', format: 'date' }],
+          caption: null,
+        })}
+        store={createStateStore({
+          result: { rows: [{ when: { date: '2025-03-09', time: '23:30' } }] },
+        })}
+        scope={{}}
+      />,
+    );
+    expect([...container.querySelectorAll('td')].map((td) => td.textContent)).toEqual([
+      '9 Mar 2025',
+    ]);
+  });
+
+  it('shows a picture at its public URL when no host resolves its stored reference', () => {
+    const { container } = render(
+      <GenerativePage
+        spec={one('Picture', { path: '/result/cover', alt: 'Cover', aspect: null })}
+        store={createStateStore({
+          result: {
+            cover: {
+              url: 'pipelex-storage://x/cover.png',
+              public_url: 'https://cdn.test/cover.png',
+            },
+          },
+        })}
+        scope={{}}
+      />,
+    );
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/cover.png');
+  });
+});
+
+describe('a run starts once per press while it is going', () => {
+  const PAGE: Spec = {
+    root: 'cta',
+    elements: {
+      cta: {
+        type: 'Cta',
+        props: { label: 'Plan my trip', hint: null },
+        children: [],
+        on: { press: [{ action: 'run' }] },
+      },
+    },
+  };
+
+  it('ignores a second press while the run the first one started is pending', async () => {
+    let finish: () => void = () => {};
+    const calls: unknown[] = [];
+    const onRun = (state: unknown) => {
+      calls.push(state);
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    };
+    render(<GenerativePage spec={PAGE} store={createStateStore({})} scope={{}} onRun={onRun} />);
+    const button = screen.getByRole('button', { name: /Plan my trip/ });
+    await act(async () => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    expect(calls).toHaveLength(1);
+    await act(async () => finish());
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(calls).toHaveLength(2);
   });
 });

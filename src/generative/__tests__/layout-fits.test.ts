@@ -976,3 +976,55 @@ describe('a repeat inside a Grid', () => {
     expect(layoutProblems({ result: nested }, spec)).toEqual([]);
   });
 });
+
+describe("a share's parts", () => {
+  const costs = (item: RunField): RunField => ({
+    kind: 'object',
+    name: 'plan',
+    required: true,
+    fields: [{ kind: 'list', name: 'costs', required: true, item }],
+  });
+  const LINE: RunField = {
+    kind: 'object',
+    name: 'line',
+    required: true,
+    fields: [
+      text('category', true),
+      { kind: 'number', name: 'amount', required: true, integer: false },
+    ],
+  };
+  const bar = (labelKey: string, valueKey: string): Spec => ({
+    root: 'bar',
+    elements: {
+      bar: {
+        type: 'ProportionBar',
+        props: {
+          label: 'Costs',
+          total: null,
+          of: null,
+          unit: null,
+          items: { $state: '/result/costs' },
+          labelKey,
+          valueKey,
+        },
+        children: [],
+      },
+    },
+  });
+
+  it('accepts a list of structures whose label member exists and whose value member is a number', () => {
+    expect(layoutProblems({ result: costs(LINE) }, bar('category', 'amount'))).toEqual([]);
+  });
+
+  it('refuses a misspelt key, a value that is not a number, and a list of scalars', () => {
+    expect(layoutProblems({ result: costs(LINE) }, bar('category', 'amonut'))).toEqual([
+      expect.stringContaining('valueKey "amonut" is no member of /result/costs'),
+    ]);
+    expect(layoutProblems({ result: costs(LINE) }, bar('amount', 'category'))).toEqual([
+      expect.stringContaining('valueKey "category" holds a text, not a number'),
+    ]);
+    expect(layoutProblems({ result: costs(text('cost', true)) }, bar('a', 'b'))).toEqual([
+      expect.stringContaining('ProportionBar reads /result/costs, a list of text values'),
+    ]);
+  });
+});

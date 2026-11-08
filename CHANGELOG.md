@@ -32,6 +32,7 @@
 - **In the `app` presentation, the meta marks read in the body face**: a field's optional badge, a list's item count and "paste a URL instead" were monospace beside labels that are not. `studio` keeps them monospace.
 - **A `MthdsField` label that says "(optional)"** has the mark dropped, since the control's own badge says it.
 - **A `Collapsible` draws a chevron that turns as it opens**, so a closed section no longer reads as an empty text field, and its summary is 44 pixels tall.
+- **`GenerativePage` starts one run at a time**: `onRun` may return the run's promise, and a press while it is pending starts nothing, so a host that holds the run button only after an await cannot start a second billed run.
 - **`validateAgainstCatalog(spec)` checks a whole page's vocabulary by default**: the exported `catalog` defines every frame's components as well, so a whole page holding a `Composer` used to pass it while `layoutCheckProblems` with the page frame refused it. A frame's layout passes `frameCatalog(frame)` as the second argument.
 - **A layout's props may hold an expression anywhere inside them**: the catalog check no longer refuses a `{ "$state": … }` nested in an array or an object, which json-render resolves where it sits.
 

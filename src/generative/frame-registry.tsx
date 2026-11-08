@@ -2,8 +2,8 @@
 
 import { type BaseComponentProps, useRepeatScope, useStateValue } from '@json-render/react';
 import { ArrowRight, Clock } from 'lucide-react';
-import { viewableUrl } from '../core/native-content';
-import { useResolvedUrl } from '../react';
+import { readImageContent, viewableUrl } from '../core/native-content';
+import { useResolveUrl } from '../react';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
 import {
   actionShadowClass,
@@ -188,7 +188,7 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
           <p className="mt-2 text-[15px] text-muted-foreground">{props.subtitle}</p>
         ) : null}
       </div>
-      {host.actions && host.actions.length > 0 ? (
+      {host.actions && host.actions.length > 0 && host.onAction ? (
         <div className="flex shrink-0 gap-2">
           {host.actions.map((label, i) => (
             <button
@@ -360,11 +360,16 @@ function Picture({
 }: BaseComponentProps<{ path: string; alt?: string | null; aspect?: string | null }>) {
   const path = useAbsolute(props.path);
   const value = useStateValue<unknown>(path);
-  const file = value as { url?: unknown } | undefined;
-  const stored = typeof file?.url === 'string' ? file.url : '';
-  // The host's resolver first, then the kernel's gate: a picture is shown
-  // only at a URL the result view would show it at.
-  const src = viewableUrl(useResolvedUrl(stored));
+  const resolve = useResolveUrl();
+  // In the result view's order, each through the kernel's gate: the host's
+  // resolver on the stored reference, then the file's own public URL, then the
+  // reference itself, so a picture shows wherever the result view shows it.
+  const content = readImageContent(value);
+  const src = content
+    ? (viewableUrl(resolve?.(content.url)) ??
+      viewableUrl(content.publicUrl) ??
+      viewableUrl(content.url))
+    : undefined;
   const aspect = props.aspect && props.aspect !== 'auto' ? ASPECT[props.aspect] : undefined;
   if (!src) return null;
   return (

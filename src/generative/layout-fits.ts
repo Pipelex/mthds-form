@@ -389,6 +389,39 @@ function nonScalarReads(
         `${key}: ${prop} takes a list of values, and ${path} is a list of ${of}; a list of ${of} is laid out as a repeat or a DataTable`,
       );
     };
+    // A share's parts are read by member name, so a list of scalars or a
+    // misspelt key would draw an empty bar with nothing to say why; it is
+    // refused here instead, and the page falls back.
+    const checkShares = (path: string): void => {
+      if (element.type !== 'ProportionBar' || !isUnder(root, path)) return;
+      const field = fieldAt(path);
+      if (field?.kind !== 'list') return;
+      if (field.item.kind !== 'object') {
+        problems.push(
+          `${key}: ProportionBar reads ${path}, a list of ${field.item.kind} values; its parts are structures, each with a label member and a number member`,
+        );
+        return;
+      }
+      const members = field.item.fields;
+      const { labelKey, valueKey } = (element.props ?? {}) as Record<string, unknown>;
+      const member = (name: unknown) =>
+        typeof name === 'string' ? members.find((m) => m.name === name) : undefined;
+      if (!member(labelKey)) {
+        problems.push(
+          `${key}: ProportionBar's labelKey ${JSON.stringify(labelKey)} is no member of ${path}'s items`,
+        );
+      }
+      const value = member(valueKey);
+      if (!value) {
+        problems.push(
+          `${key}: ProportionBar's valueKey ${JSON.stringify(valueKey)} is no member of ${path}'s items`,
+        );
+      } else if (value.kind !== 'number') {
+        problems.push(
+          `${key}: ProportionBar's valueKey ${JSON.stringify(valueKey)} holds a ${value.kind}, not a number`,
+        );
+      }
+    };
     const walk = (prop: string, value: unknown): void => {
       if (Array.isArray(value)) {
         value.forEach((entry) => walk(prop, entry));
@@ -416,10 +449,15 @@ function nonScalarReads(
       }
       if (typeof value !== 'object' || value === null) continue;
       const record = value as Record<string, unknown>;
-      if (typeof record.$state === 'string') checkList(prop, record.$state, items);
-      if (typeof record.$item === 'string') {
-        const path = itemPath(record.$item);
-        if (path !== undefined) checkList(prop, path, items);
+      const listPath =
+        typeof record.$state === 'string'
+          ? record.$state
+          : typeof record.$item === 'string'
+            ? itemPath(record.$item)
+            : undefined;
+      if (listPath !== undefined) {
+        checkList(prop, listPath, items);
+        if (prop === 'items') checkShares(listPath);
       }
     }
   }

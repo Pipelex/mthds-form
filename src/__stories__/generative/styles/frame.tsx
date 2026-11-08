@@ -497,7 +497,9 @@ function DesignedResult({ app, fixture }: { app: HostApp; fixture: SpecFixture }
   );
   return (
     <main className="af-stage">
-      <FrameHostProvider host={{ actions: app.actions }}>
+      {/* A story's actions go nowhere, but a host's do: the frame draws an
+          action only with a handler to press. */}
+      <FrameHostProvider host={{ actions: app.actions, onAction: () => {} }}>
         <ResultEnvProvider resolveUrl={app.result.resolveUrl}>
           <FieldPresentationProvider presentation="app">
             <GenerativePage

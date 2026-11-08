@@ -1177,12 +1177,6 @@ async function pinPromptHash() {
 }
 
 /**
- * One hero's brief, as DATA: the `generative.Brief` value the designer method
- * takes, built from the committed descriptors and, on the result side, the
- * committed payload loaded into the result tree. The method lays it out
- * itself (its `render_brief` stage); nothing here writes a sentence of it.
- */
-/**
  * The variants of a hero this pass designs (`variantsOf`): each of its frames,
  * a whole product page with no style, and a moment of a host's
  * compose-then-result app in every app style. One brief file and one capture
@@ -1198,6 +1192,12 @@ function variantsOf(hero, g) {
     );
 }
 
+/**
+ * One hero's brief, as DATA: the `generative.Brief` value the designer method
+ * takes, built from the committed descriptors and, on the result side, the
+ * committed payload loaded into the result tree. The method lays it out
+ * itself (its `render_brief` stage); nothing here writes a sentence of it.
+ */
 async function heroBrief(hero, g, variant = { frame: 'page' }) {
   const pipeRef = g.pipeRefOf(hero);
   const fixtures = await import(`../src/__stories__/_generated/${hero.caseName}.ts`);

@@ -79,6 +79,7 @@ import {
 } from 'lucide-react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
+import { readDateContent } from '../core/native-content';
 import { FieldRenderer, ResultField, type FieldEnv } from '../react';
 import { linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
@@ -377,8 +378,10 @@ function formatColumnCell(value: unknown, format: string | null | undefined): st
   // The calendar day is the one written: a time beside it ("2025-03-09
   // 00:30") must not move it across midnight in the reader's zone, so only the
   // leading day is read, anchored at noon UTC, as `DateText` reads one.
-  const day =
-    format === 'date' && typeof value === 'string' ? /^\d{4}-\d{2}-\d{2}/.exec(value) : null;
+  // The value is the day as text, or a native date's own structure
+  // ({ date, time }); either way its day is read, never stringified.
+  const written = format === 'date' ? readDateContent(value)?.date : undefined;
+  const day = written === undefined ? null : /^\d{4}-\d{2}-\d{2}/.exec(written);
   if (day) {
     const date = new Date(`${day[0]}T12:00:00Z`);
     if (!Number.isNaN(date.getTime()))

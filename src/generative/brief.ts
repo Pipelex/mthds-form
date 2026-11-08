@@ -107,11 +107,13 @@ export function isDelegatedInput(field: RunField): boolean {
  *
  * The result frame's vocabulary shows two of them itself: a picture
  * (`Picture`) and a date in words (`DateText`), so on a result page written
- * for that frame neither is delegated.
+ * for that frame neither is delegated. A date with a time stays delegated:
+ * `DateText` writes the day alone, and the kernel's result shows the time.
  */
 export function isDelegatedResult(field: RunField, frame: Frame = 'page'): boolean {
   if (isNativeValueNode(field)) return true;
-  if (frame === 'result' && (field.kind === 'image' || field.kind === 'date')) return false;
+  if (frame === 'result' && (field.kind === 'image' || (field.kind === 'date' && !field.datetime)))
+    return false;
   if (field.kind === 'list' && isNativeValueNode(field.item)) return true;
   return (
     field.kind === 'document' ||
