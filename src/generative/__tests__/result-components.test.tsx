@@ -181,9 +181,12 @@ describe('a run starts once per press while it is going', () => {
     });
     expect(calls).toHaveLength(1);
     // The guard outlasts the settled run by one task, the task json-render
-    // runs the binding's chain in; a person's next press comes after it.
+    // runs the binding's chain in; a person's next press comes after it. The
+    // release is scheduled only once the settled promise's callbacks have run,
+    // after a timer set here at once, so the press waits a task beyond that.
     await act(async () => {
       finish();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     await act(async () => {
@@ -239,9 +242,12 @@ describe('a run starts once per press while it is going', () => {
     });
     expect(calls).toHaveLength(1);
     // The guard outlasts the settled run by one task, the task json-render
-    // runs the binding's chain in; a person's next press comes after it.
+    // runs the binding's chain in; a person's next press comes after it. The
+    // release is scheduled only once the settled promise's callbacks have run,
+    // after a timer set here at once, so the press waits a task beyond that.
     await act(async () => {
       finish();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     await act(async () => {
