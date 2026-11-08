@@ -1623,7 +1623,7 @@ async function generateSpecs(only) {
     if (briefText.trimEnd() !== committed.text) {
       const seenPath = path.join(BRIEFS_DIR, `${key}.${id}.as-run.md`);
       writeFileSync(seenPath, briefText);
-      die(
+      throw new Error(
         `${key} (${id}): the brief the run laid out is not the one on disk (run ${runs[0]}).\n` +
           `  The run's text is at ${path.relative(REPO, seenPath)}; the record is ${briefRelPath(key)}.\n` +
           "  The method's template rendered differently on the hosted runtime than through `make briefs`;\n" +
@@ -1688,20 +1688,34 @@ async function generateSpecs(only) {
     writeSpecsModule(hero.caseName, byCase.get(hero.caseName));
   }
 
+  // A variant that fails throws rather than exiting, so the variants still
+  // running finish and are stored: they were paid for. The failures are
+  // named together once the pool is done, and the pass still fails.
   const queue = [...jobs];
+  const failed = [];
   await Promise.all(
     Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
-      while (queue.length > 0) await designVariant(queue.shift());
+      while (queue.length > 0) {
+        try {
+          await designVariant(queue.shift());
+        } catch (error) {
+          failed.push(error instanceof Error ? error.message : String(error));
+        }
+      }
     }),
   );
   process.stdout.write(
-    `  ${jobs.length} variant${jobs.length === 1 ? '' : 's'} designed - $${spent.toFixed(4)}` +
+    `  ${jobs.length - refused.length - failed.length} of ${jobs.length} variant${jobs.length === 1 ? '' : 's'} designed - $${spent.toFixed(4)}` +
       `${unpriced ? ' priced, and some runs reported no price' : ''}\n`,
   );
-  if (refused.length > 0) {
+  const lost = [
+    ...refused.map((line) => `refused: ${line}`),
+    ...failed.map((line) => `failed: ${line}`),
+  ];
+  if (lost.length > 0) {
     die(
-      `${refused.length} variant${refused.length === 1 ? ' was' : 's were'} refused, and stored nowhere:\n` +
-        refused.map((line) => `  ${line}`).join('\n'),
+      `${lost.length} variant${lost.length === 1 ? ' was' : 's were'} stored nowhere:\n` +
+        lost.map((line) => `  ${line}`).join('\n'),
     );
   }
 }
@@ -1724,10 +1738,10 @@ async function designPage(pipeRef, run) {
   try {
     designed = await run();
   } catch (error) {
-    die(`${pipeRef}: ${describeRunError(error)}`);
+    throw new Error(`${pipeRef}: ${describeRunError(error)}`);
   }
   if (designed.jsonl.trim() === '') {
-    die(
+    throw new Error(
       `${pipeRef}: the run came back with an EMPTY text (run ${designed.results.pipeline_run_id}). On\n` +
         `  this runtime that is what a completion truncated at the model's output cap looks\n` +
         `  like; raise max_tokens in the designer's model pin, or read the run's token counts\n` +
