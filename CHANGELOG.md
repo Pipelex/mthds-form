@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`MethodForm`'s `framed`**: a host that draws the form inside a panel of its own says so, and a structure among the inputs is then a section, its name a heading over its fields, set off from the inputs beside it by a hairline across the form, rather than a card inside the host's panel; without it a structure keeps its card. The grouping is on the DOM as `data-structure-group="section"`. See [docs/method-form.md](docs/method-form.md).
+- **`MethodForm`'s `framed`**: a host that draws the form inside a panel of its own says so, and a structure among the inputs is then a section, its name a heading over its fields, set off from the inputs beside it by a hairline across the form, rather than a card inside the host's panel; without it a structure keeps its card. A section the run gate refuses, which has no card to turn red, draws a 3 pixel bar in `--destructive` down its whole height, in the panel's padding beside the form, and sets its message beside its heading rather than under its last field, and neither moves a field. The grouping is on the DOM as `data-structure-group="section"`, and the bar as `data-error-edge`. See [docs/method-form.md](docs/method-form.md).
 
 ### Fixed
 

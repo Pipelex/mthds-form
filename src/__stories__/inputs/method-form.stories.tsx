@@ -5,6 +5,7 @@ import { getPipeInputForm, getPipeIOContract } from '../../core';
 import { MethodForm, useMethodForm, type FieldPresentation } from '../../react';
 import { CONTRACTS, INPUT_FORM } from '../_generated/structured';
 import { CONTRACTS as FILE_CONTRACTS, INPUT_FORM as FILE_INPUT_FORM } from '../_generated/files';
+import { backgroundOf, paintedContrast } from '../painted-color';
 
 /**
  * The whole input form of one method, `useMethodForm` + `MethodForm`, as a host
@@ -184,6 +185,64 @@ export const FramedByTheHost: Story = {
       const disclosure = children.at(-1)!;
       await expect(disclosure.hasAttribute('data-form-section')).toBe(false);
       await expect(edge(disclosure, 'Top')).toBe(0);
+    }
+  },
+};
+
+/**
+ * The framed form after Run was pressed with the shop empty and the refund
+ * account started but not finished. Without the frame each structure's card
+ * would turn red; a section has no card, so each one in error draws a red
+ * edge down its whole height, in the host's panel's padding beside the
+ * form, and its message at its heading rather than under its last field.
+ * Neither moves a field: the edge stands out of the flow and the message
+ * takes the heading's row. The play measures all of it, in both themes.
+ */
+export const FramedAfterAnAttempt: Story = {
+  args: { pipeCode: 'shop_with_bank', framed: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const more of canvas.getAllByRole('button', { name: '1 optional input' }))
+      await userEvent.click(more);
+    const panels = canvas.getAllByTestId('host-panel');
+    const inputsOf = (scope: HTMLElement) => [...scope.querySelectorAll('input')];
+    const across = (element: Element) => {
+      const { left, width } = element.getBoundingClientRect();
+      return [left, width];
+    };
+    const before = panels.map((panel) => inputsOf(panel).map(across));
+    for (const panel of panels) await expect(panel.querySelector('[data-error-edge]')).toBeNull();
+
+    for (const run of canvas.getAllByRole('button', { name: 'Run' })) await userEvent.click(run);
+
+    for (const [index, panel] of panels.entries()) {
+      // Not one field moved sideways or changed width.
+      await expect(inputsOf(panel).map(across)).toEqual(before[index]);
+      const sections = [...panel.querySelectorAll<HTMLElement>('[data-form-section]')];
+      await expect(sections).toHaveLength(2);
+      const box = panel.getBoundingClientRect();
+      for (const section of sections) {
+        const mark = section.querySelector<HTMLElement>('[data-error-edge]');
+        await expect(mark).not.toBeNull();
+        const caption = within(section).getByRole('alert');
+        const heading = document.getElementById(section.getAttribute('aria-labelledby')!)!;
+        const rect = mark!.getBoundingClientRect();
+        const column = section.getBoundingClientRect();
+        const fields = inputsOf(section).map((input) => input.getBoundingClientRect());
+        // Down the section's whole height, its heading and its last field included.
+        await expect(rect.top).toBeLessThanOrEqual(heading.getBoundingClientRect().top);
+        await expect(rect.bottom).toBeGreaterThanOrEqual(fields.at(-1)!.bottom);
+        // Beside the form, in the panel's padding, and no hairline.
+        await expect(rect.right).toBeLessThan(column.left);
+        await expect(rect.left).toBeGreaterThan(box.left);
+        await expect(rect.width).toBeGreaterThanOrEqual(2);
+        // The error colour, at the 3:1 a mark needs against the panel.
+        const painted = getComputedStyle(mark!).backgroundColor;
+        await expect(painted).toBe(getComputedStyle(caption).color);
+        await expect(paintedContrast(painted, backgroundOf(panel))).toBeGreaterThanOrEqual(3);
+        // The message on the heading's row, over the fields.
+        await expect(caption.getBoundingClientRect().bottom).toBeLessThan(fields[0]!.top);
+      }
     }
   },
 };

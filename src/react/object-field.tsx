@@ -50,7 +50,9 @@ export const FramedFormContext = createContext(false);
  *   card, so a second one inside it read as a box in a box: the structure's
  *   name heads its fields with nothing drawn around them, and `MethodForm`
  *   sets a hairline between it and any input beside it, which is what says
- *   where it ends.
+ *   where it ends. In error it has no outline to turn red, so it draws its
+ *   own edge instead (`SECTION_ERROR_EDGE`) and sets its message at its
+ *   heading.
  * - `rule`: a structure inside a structure, under its name - its fields hang
  *   from a rule along their left edge rather than from a second card inside
  *   the first. A card in a card in a host's panel is three boxes deep, and on
@@ -66,6 +68,22 @@ function structureGrouping(depth: number, labelled: boolean, framed: boolean): S
   if (depth > 0) return 'rule';
   return framed ? 'section' : 'box';
 }
+
+/**
+ * What a section in error draws where a card would turn its outline red: a
+ * bar in the error colour down the section's whole height, from its heading
+ * to its last field, set in the host's panel's padding, 12 pixels outside
+ * the form's own edge. It stands out of the flow, so it moves no field when
+ * the error comes or goes, and it is one edge rather than four, so no card
+ * comes back inside the host's panel. A framed form always has that padding,
+ * since the host's panel is what `framed` states. Three pixels in the solid
+ * error colour, where the card's outline was one at half strength, because
+ * a single edge has less length to be seen by; the stock palette's red
+ * reaches the 3:1 a mark needs on the panel in both themes. `m-0` undoes the
+ * spacing the stack it heads gives its children, which would shorten it.
+ */
+const SECTION_ERROR_EDGE =
+  'pointer-events-none absolute inset-y-0 -left-3 m-0 w-[3px] rounded-full bg-destructive';
 
 /**
  * A structure's name, set as a heading over its fields' labels in `app`: the
@@ -158,19 +176,26 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           'aria-describedby': field.description ? descriptionId : undefined,
         };
 
-  return (
-    <div
-      className="space-y-2"
-      // What `MethodForm` sets its hairline against, beside a framed form's
-      // own structure.
-      data-form-section={grouping === 'section' ? '' : undefined}
-      {...group}
-    >
+  const section = grouping === 'section';
+  const caption = error && (
+    <p className="text-[11px] text-destructive" role="alert">
+      {error}
+    </p>
+  );
+
+  const content = (
+    <>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span id={nameId} className={cn('text-foreground', structureNameClass(isApp, depth))}>
           {label}
         </span>
         {!isApp && <ConceptPill conceptRef={field.conceptRef} category="structured" />}
+        {/* A section has no outline to turn red, so its message is set where
+            it starts, beside its name, rather than under its last field,
+            which on a tall section is a screen away from the heading. The
+            heading's row has room for it, so it adds no line unless the row
+            wraps. */}
+        {section && caption}
       </div>
       {field.description && (
         <p id={descriptionId} className="text-[12px] leading-relaxed text-muted-foreground">
@@ -213,10 +238,29 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           />
         )}
       </div>
-      {error && (
-        <p className="text-[11px] text-destructive" role="alert">
-          {error}
-        </p>
+      {!section && caption}
+    </>
+  );
+
+  return (
+    <div
+      className={section ? undefined : 'space-y-2'}
+      // What `MethodForm` sets its hairline against, beside a framed form's
+      // own structure.
+      data-form-section={section ? '' : undefined}
+      {...group}
+    >
+      {section ? (
+        // The section's content, without the padding `MethodForm`'s
+        // hairlines give the section's own box: what the error edge runs
+        // beside. Positioned whether or not it is in error, so an error
+        // changes nothing a descendant is placed against.
+        <div className="relative space-y-2">
+          {error && <span aria-hidden="true" data-error-edge="" className={SECTION_ERROR_EDGE} />}
+          {content}
+        </div>
+      ) : (
+        content
       )}
     </div>
   );

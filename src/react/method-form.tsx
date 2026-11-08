@@ -739,8 +739,11 @@ export interface MethodFormProps {
    * The host draws the form inside a panel of its own, so the form draws no
    * card inside it: a structure among the inputs is a section, its name a
    * heading over its fields, set off from the inputs beside it by a hairline
-   * rather than boxed. Absent, a structure that is an input draws its own
-   * card, which is what says where it ends on a bare page.
+   * rather than boxed. A section the run gate refuses draws a red bar down
+   * its side, in the panel's padding beside the form, and sets its message
+   * beside its heading, where a card would turn its outline red. Absent, a
+   * structure that is an input draws its own card, which is what says where
+   * it ends on a bare page.
    */
   framed?: boolean;
   /** Classes for the stack the fields sit in. */
