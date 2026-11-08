@@ -8,11 +8,18 @@ import * as React from 'react';
  * json-render wraps every element in a boundary of its own that catches what
  * the element throws, logs it and renders nothing, so a boundary a host puts
  * around the page never fires: the page arrives with an element missing, its
- * call to action perhaps still there, and the host has nothing to act on. When
- * a host asks to hear of it, every renderer of the page's registry is wrapped
- * in a boundary of this module's, inside json-render's, which catches the
- * throw first, renders nothing in its place as json-render's would, and hands
- * the error to the host after the commit, once per element that failed.
+ * call to action perhaps still there, and the host has nothing to act on.
+ * Every renderer of the page's registry is wrapped in a boundary of this
+ * module's, inside json-render's, and the page's root gets one too, since
+ * json-render resolves an element's props before its renderer runs and puts no
+ * boundary above the root. When the host passes a handler, the boundary
+ * catches the throw first, renders nothing in its place as json-render's
+ * would, and hands the error to the host after the commit, once per element
+ * that failed. When it passes none, the boundary throws the error on, so the
+ * page behaves exactly as json-render alone does: an element's throw is logged
+ * and dropped, and a root's reaches the host's own boundary. The wrapping does
+ * not depend on whether there is a handler, so a host that starts or stops
+ * passing one remounts nothing.
  */
 
 /** What a host is told of an element that failed to render. */
@@ -29,14 +36,34 @@ export type ElementErrorHandler = (error: unknown, info: ElementErrorInfo) => vo
 interface BoundaryProps {
   type: string;
   report: React.RefObject<ElementErrorHandler | undefined>;
+  /** A value whose change gives a failed boundary another try: the root's spec. */
+  resetOn?: unknown;
   children: React.ReactNode;
 }
 
-class ElementBoundary extends React.Component<BoundaryProps, { failed: boolean }> {
-  override state = { failed: false };
+interface BoundaryState {
+  failed: boolean;
+  error: unknown;
+  resetOn: unknown;
+}
 
-  static getDerivedStateFromError(): { failed: boolean } {
-    return { failed: true };
+/** One element's boundary: reports a render error to the host, or throws it on when there is none to report to. */
+export class ElementBoundary extends React.Component<BoundaryProps, BoundaryState> {
+  constructor(props: BoundaryProps) {
+    super(props);
+    this.state = { failed: false, error: undefined, resetOn: props.resetOn };
+  }
+
+  static getDerivedStateFromError(error: unknown): Partial<BoundaryState> {
+    return { failed: true, error };
+  }
+
+  static getDerivedStateFromProps(
+    props: BoundaryProps,
+    state: BoundaryState,
+  ): Partial<BoundaryState> | null {
+    if (Object.is(props.resetOn, state.resetOn)) return null;
+    return { failed: false, error: undefined, resetOn: props.resetOn };
   }
 
   override componentDidCatch(error: unknown, info: React.ErrorInfo): void {
@@ -48,7 +75,11 @@ class ElementBoundary extends React.Component<BoundaryProps, { failed: boolean }
   }
 
   override render(): React.ReactNode {
-    return this.state.failed ? null : this.props.children;
+    if (!this.state.failed) return this.props.children;
+    // No host to tell: the error goes on to json-render's boundary, or the
+    // host's around the page, exactly as if this one were not here.
+    if (!this.props.report.current) throw this.state.error;
+    return null;
   }
 }
 

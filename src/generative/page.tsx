@@ -4,7 +4,7 @@ import * as React from 'react';
 import type { Spec, StateModel, StateStore } from '@json-render/core';
 import { JSONUIProvider, Renderer } from '@json-render/react';
 import { BrandProvider } from './brand-context';
-import { reportingRegistry, type ElementErrorHandler } from './element-errors';
+import { ElementBoundary, reportingRegistry, type ElementErrorHandler } from './element-errors';
 import type { BrandManifest } from '../brand/manifest';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';
@@ -93,22 +93,23 @@ export function GenerativePage({
   React.useEffect(() => {
     latest.current = { onRun, store };
   });
-  // The registry is wrapped in reporting boundaries only when the host asks to
-  // hear of a render error, so a page without the callback renders exactly as
-  // json-render does. Wrapped once per registry, so no element remounts on a
-  // new callback; the callback itself is read through a ref at the error. The
-  // ref is refreshed in an insertion effect, which runs before the layout
-  // phase a boundary reports in, so an element that fails in the same commit
-  // as a new callback reports to that one.
+  // Every renderer is wrapped in a reporting boundary, once per registry, so
+  // no element remounts on a new callback or on a host that starts or stops
+  // passing one; without a callback the boundary throws the error on, and the
+  // page renders exactly as json-render does. The callback is read through a
+  // ref at the error, refreshed in an insertion effect, which runs before the
+  // layout phase a boundary reports in, so an element that fails in the same
+  // commit as a new callback reports to that one.
   const report = React.useRef(onElementError);
   React.useInsertionEffect(() => {
     report.current = onElementError;
   });
-  const reporting = onElementError !== undefined;
-  const pageRegistry = React.useMemo(
-    () => (reporting ? reportingRegistry(registry, report) : registry),
-    [registry, reporting],
-  );
+  const pageRegistry = React.useMemo(() => reportingRegistry(registry, report), [registry]);
+  // json-render resolves an element's props before its renderer runs, so a
+  // throw there is caught by the boundary of the element above - and the root
+  // has none. Its own boundary is given another try with every new spec.
+  const rootType = spec?.elements?.[spec.root]?.type ?? 'root';
+
   // One run at a time. The run button is held by the host's `env.disabled`,
   // which arrives on a later render: a host that sets it after an await (or
   // never) left a second press inside that wait free to start a second
@@ -153,7 +154,9 @@ export function GenerativePage({
   const page = (
     <DescriptorProvider scope={stableScope}>
       <JSONUIProvider registry={pageRegistry} store={store} handlers={handlers}>
-        <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+        <ElementBoundary type={rootType} report={report} resetOn={spec}>
+          <Renderer spec={spec} registry={pageRegistry} loading={loading} />
+        </ElementBoundary>
       </JSONUIProvider>
     </DescriptorProvider>
   );

@@ -129,6 +129,55 @@ describe('an element that throws while rendering', () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 
+  it('is reported, not thrown out of the page, when the root element fails while its props resolve', () => {
+    // json-render resolves a `$template` before any renderer runs, and writes
+    // out what it interpolates with `String`, which throws on JSON carrying a
+    // `toString` member; at the root no element's boundary is above it.
+    const spec: Spec = {
+      root: 'title',
+      elements: {
+        title: {
+          type: 'Heading',
+          props: { text: { $template: 'For ${/result/name}' }, level: 'h1' },
+          children: [],
+        },
+      },
+    };
+    const onElementError = vi.fn();
+    const mount = () =>
+      render(
+        <GenerativePage
+          spec={spec}
+          store={createStateStore({ result: { name: { toString: 1 } } })}
+          scope={{}}
+          brand={BRAND}
+          onElementError={onElementError}
+        />,
+      );
+    expect(mount).not.toThrow();
+    expect(onElementError).toHaveBeenCalledTimes(1);
+    expect(onElementError.mock.calls[0]![1]).toMatchObject({ type: 'Heading' });
+  });
+
+  it('keeps every element mounted when the host starts or stops passing the callback', () => {
+    const store = createStateStore({});
+    const page = (onElementError?: () => void) => (
+      <GenerativePage
+        spec={BARRED}
+        store={store}
+        scope={{}}
+        brand={BRAND}
+        {...(onElementError ? { onElementError } : {})}
+      />
+    );
+    const { rerender } = render(page());
+    const heading = screen.getByRole('heading', { name: 'Plan the trip' });
+    rerender(page(() => {}));
+    expect(screen.getByRole('heading', { name: 'Plan the trip' })).toBe(heading);
+    rerender(page());
+    expect(screen.getByRole('heading', { name: 'Plan the trip' })).toBe(heading);
+  });
+
   it('reports nothing for a page that renders cleanly', () => {
     const onElementError = vi.fn();
     render(
