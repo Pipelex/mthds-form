@@ -1548,7 +1548,10 @@ async function generateSpecs(only) {
   }
   const model = await designerModel(overrides).catch((error) => die(error.message));
   const seedSetting = process.env.SEED || '';
-  const concurrency = Math.max(1, Number(process.env.CONCURRENCY || 4));
+  const concurrency = Number(process.env.CONCURRENCY || 4);
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    die(`CONCURRENCY=${process.env.CONCURRENCY} is not a whole number of at least 1.`);
+  }
 
   const heroes = g.HEROES.filter(
     (hero) => !only || hero.pipeCode === only || hero.caseName === only,
@@ -1873,9 +1876,16 @@ async function reemitModules() {
     return;
   }
   for (const caseName of specsModules) {
+    // A framed capture's brief is keyed by its frame and style as well, as
+    // `briefKey` names it when the sweep stores one; a page capture's by its
+    // pipe alone.
     const specs = (await loadSpecs(caseName)).map((fixture) => ({
       ...fixture,
-      brief: briefRelPath(fixture.pipeRef),
+      brief: briefRelPath(
+        fixture.frame && fixture.frame !== 'page'
+          ? `${fixture.pipeRef}.${fixture.frame}.${fixture.style}`
+          : fixture.pipeRef,
+      ),
     }));
     writeSpecsModule(caseName, specs);
   }

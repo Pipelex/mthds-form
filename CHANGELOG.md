@@ -25,11 +25,19 @@
 
 - **`PROMPT_HASH` moves, so every layout stored under the previous hash is stale**: the method's Brief gained the style, the method gained `repair_layout`, and the hash now covers every frame's catalog as well as the method's text. A host that keys stored layouts on the hash designs them again; until then it renders the plain form, as it does for any stale layout. An edit to the designer method is a minor release, never a patch.
 - **`designerCatalog()` takes options**: `designerCatalog({ frame })`, the page frame when omitted, which is the catalog it returned before.
-- **The layout checks refuse a Grid whose only child carries the repeat**: json-render renders a repeat's element once and its children once per item, so that Grid was one cell holding every item in a column. `layoutProblems` says to put the repeat on the Grid, which is what the repair pass then does.
+- **The layout checks refuse a Grid whose only child carries the repeat**: json-render renders a repeat's element once and its children once per item, so that Grid was one cell holding every item in a column. `layoutProblems` says to put the repeat on the Grid, which is what the repair pass then does. A Grid that carries a repeat of its own, whose only child repeats over each item, is a list in every cell and passes.
 - **In the `app` presentation, the meta marks read in the body face**: a field's optional badge, a list's item count and "paste a URL instead" were monospace beside labels that are not. `studio` keeps them monospace.
 - **A `MthdsField` label that says "(optional)"** has the mark dropped, since the control's own badge says it.
 - **A `Collapsible` draws a chevron that turns as it opens**, so a closed section no longer reads as an empty text field, and its summary is 44 pixels tall.
+- **`validateAgainstCatalog(spec)` checks a whole page's vocabulary by default**: the exported `catalog` defines every frame's components as well, so a whole page holding a `Composer` used to pass it while `layoutCheckProblems` with the page frame refused it. A frame's layout passes `frameCatalog(frame)` as the second argument.
 - **A layout's props may hold an expression anywhere inside them**: the catalog check no longer refuses a `{ "$state": … }` nested in an array or an object, which json-render resolves where it sits.
+
+### Fixed
+
+- **A result's colours are painted only as colours**: `Swatches` paints a value only when it is a hex code, a colour function or a keyword, and as a background colour, so a result text such as `url(https://…)` draws no swatch rather than making the browser fetch it when the page is shown.
+- **A date column reads the day as written**: a `DataTable` column with `format: 'date'` reads the leading calendar day of a value, so a time beside it ("2025-03-09 00:30") no longer moves the day across midnight in the reader's time zone.
+- **A `TextList` of bullets or checks is an unordered list**; only numbered items are an ordered one.
+- **Two parts of a `ProportionBar` with the same label both draw**, and so do two result actions with the same name: the rows are keyed by position.
 
 ## [v0.30.0] - 2026-11-07
 

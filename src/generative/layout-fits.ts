@@ -551,7 +551,7 @@ function collectLayoutProblems(descriptor: LayoutDescriptor, spec: Spec): string
     // the page, the rest empty. The repeat belongs on the Grid.
     const [onlyKey] = element.children?.length === 1 ? element.children : [];
     const only = onlyKey === undefined ? undefined : spec.elements[onlyKey];
-    if (element.type === 'Grid' && only?.repeat !== undefined) {
+    if (element.type === 'Grid' && element.repeat === undefined && only?.repeat !== undefined) {
       problems.push(
         `${key}: Grid's only child ${onlyKey} carries the repeat, so every item lands in one cell; put the repeat on ${key} itself, with the item's element as its child`,
       );

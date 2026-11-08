@@ -10,7 +10,7 @@ import {
   seedInputs,
   useStoreSnapshot,
   validateAgainstCatalog,
-  catalog,
+  frameCatalog,
   fixtureId,
   fixtureLabel,
   formatProblems,
@@ -141,7 +141,7 @@ export function heroFields(
  * the entry actually renders.
  */
 export function assertRenderable(fixture: SpecFixture, fields: RunField[]): SpecFixture {
-  const verdict = validateAgainstCatalog(fixture.spec, catalog);
+  const verdict = validateAgainstCatalog(fixture.spec, frameCatalog(fixture.frame ?? 'page'));
   if (!verdict.ok) {
     throw new Error(`${fixture.pipeRef}: ${formatProblems(verdict.problems)}`);
   }

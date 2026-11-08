@@ -374,8 +374,13 @@ function formatCell(value: unknown): string {
 
 /** A cell in a column the layout stated a format for. */
 function formatColumnCell(value: unknown, format: string | null | undefined): string {
-  if (format === 'date' && typeof value === 'string') {
-    const date = new Date(value.length === 10 ? `${value}T00:00:00Z` : value);
+  // The calendar day is the one written: a time beside it ("2025-03-09
+  // 00:30") must not move it across midnight in the reader's zone, so only the
+  // leading day is read, anchored at noon UTC, as `DateText` reads one.
+  const day =
+    format === 'date' && typeof value === 'string' ? /^\d{4}-\d{2}-\d{2}/.exec(value) : null;
+  if (day) {
+    const date = new Date(`${day[0]}T12:00:00Z`);
     if (!Number.isNaN(date.getTime()))
       return date.toLocaleDateString('en-GB', {
         day: 'numeric',

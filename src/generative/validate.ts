@@ -1,7 +1,7 @@
 import type { Spec } from '@json-render/core';
 import { validateSpec } from '@json-render/core';
 import type { z } from 'zod';
-import { catalog as defaultCatalog } from './catalog';
+import { frameCatalog } from './catalog';
 import { INPUTS_ROOT, RESULT_ROOT } from './paths';
 import { hasOwnProp } from '../core/own-property';
 
@@ -247,7 +247,10 @@ function deepestChain(spec: Spec): number {
  */
 export function validateAgainstCatalog(
   spec: Spec,
-  catalog: ValidationCatalog = defaultCatalog,
+  // A whole page's vocabulary unless the caller names a frame's: the exported
+  // `catalog` also defines the frames' own components, which a whole page
+  // must not hold.
+  catalog: ValidationCatalog = frameCatalog('page'),
 ): SpecVerdict {
   try {
     return checkAgainstCatalog(spec, catalog);

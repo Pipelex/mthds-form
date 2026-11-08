@@ -191,7 +191,7 @@ function ResultHeader({ props }: BaseComponentProps<ResultHeaderProps>) {
         <div className="flex shrink-0 gap-2">
           {host.actions.map((label, i) => (
             <button
-              key={label}
+              key={`${i}-${label}`}
               type="button"
               onClick={() => host.onAction?.(label)}
               className={cn(
@@ -289,7 +289,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
       <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
         {parts.map((p, i) => (
           <span
-            key={p.label}
+            key={`${i}-${p.label}`}
             style={{
               width: `${(p.value / scale) * 100}%`,
               background: segmentColor(i, parts.length),
@@ -300,7 +300,7 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
       <ul className="flex flex-wrap gap-x-5 gap-y-1">
         {parts.map((p, i) => (
           <li
-            key={p.label}
+            key={`${i}-${p.label}`}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground"
           >
             <span
@@ -320,15 +320,26 @@ function ProportionBar({ props }: BaseComponentProps<ProportionBarProps>) {
 
 // ─── Result: Swatches, Picture, Fact, Detail ─────────────────────────────────
 
+/**
+ * A colour value a swatch may paint: a hex code, a colour function, or a
+ * keyword. Anything else is result text a model wrote, and painting it would
+ * let `url(…)` or `image-set(…)` fetch on paint, the channel the prose
+ * renderer closes for images; such an entry draws no swatch.
+ */
+const COLOR_VALUE =
+  /^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([\w\s.,%/+-]*\)|[a-z]+)$/i;
+
 function Swatches({ props }: BaseComponentProps<{ colors: string[] }>) {
-  const colors = (props.colors ?? []).filter((c): c is string => typeof c === 'string' && c !== '');
+  const colors = (props.colors ?? []).filter(
+    (c): c is string => typeof c === 'string' && COLOR_VALUE.test(c.trim()),
+  );
   return (
     <div className="flex flex-wrap gap-2">
       {colors.map((color, i) => (
         <div key={`${color}-${i}`} className="flex flex-col gap-1">
           <span
             className="h-7 w-11 rounded-[3px] border border-border"
-            style={{ background: color }}
+            style={{ backgroundColor: color.trim() }}
           />
           <span className="font-mono text-[11px] text-muted-foreground">{color}</span>
         </div>
@@ -438,8 +449,10 @@ function TextList({ props }: BaseComponentProps<TextListProps>) {
     : [];
   if (items.length === 0) return null;
   const marker = props.marker ?? 'bullet';
+  // Only numbered items are ordered; bullets and checks are a plain list.
+  const List = marker === 'number' ? 'ol' : 'ul';
   return (
-    <ol className="flex flex-col gap-2.5">
+    <List className="flex flex-col gap-2.5">
       {items.map((text, index) => (
         <li key={index} className="flex gap-3 text-[15px] leading-relaxed text-foreground">
           <span
@@ -458,7 +471,7 @@ function TextList({ props }: BaseComponentProps<TextListProps>) {
           <span className="min-w-0">{String(text)}</span>
         </li>
       ))}
-    </ol>
+    </List>
   );
 }
 

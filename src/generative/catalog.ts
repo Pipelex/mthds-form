@@ -204,6 +204,8 @@ const FRAME_EXCLUDED: Record<Frame, readonly string[]> = {
     'DataTable',
     'Metric',
     'Progress',
+    // `TextList` stays: a composer may list short texts too, such as what a
+    // run gives back.
     ...RESULT_COMPONENTS.filter((name) => name !== 'TextList'),
   ],
   result: [

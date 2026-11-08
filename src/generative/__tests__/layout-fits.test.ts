@@ -929,4 +929,50 @@ describe('a repeat inside a Grid', () => {
   it('accepts the repeat on the Grid itself', () => {
     expect(layoutProblems({ result: RESULT }, grid('grid'))).toEqual([]);
   });
+
+  it('accepts a Grid with a repeat of its own whose only child repeats over each item, a list in every cell', () => {
+    const nested: RunField = {
+      kind: 'object',
+      name: 'plan',
+      required: true,
+      fields: [
+        {
+          kind: 'list',
+          name: 'days',
+          required: true,
+          item: {
+            kind: 'object',
+            name: 'day',
+            required: true,
+            fields: [
+              {
+                kind: 'list',
+                name: 'activities',
+                required: true,
+                item: text('activity', true),
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const spec: Spec = {
+      root: 'days',
+      elements: {
+        days: {
+          type: 'Grid',
+          props: { columns: 2, gap: null },
+          repeat: { statePath: '/result/days' },
+          children: ['activities'],
+        },
+        activities: {
+          type: 'Stack',
+          props: { direction: 'vertical', gap: null, align: null, justify: null },
+          repeat: { statePath: 'activities' },
+          children: [],
+        },
+      },
+    };
+    expect(layoutProblems({ result: nested }, spec)).toEqual([]);
+  });
 });
