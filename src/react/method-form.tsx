@@ -7,8 +7,6 @@ import { ownProp } from '../core/own-property';
 import {
   anyOptionalStructureOpen,
   computeReadiness,
-  fieldFilled,
-  isFilled,
   isFoldedOptional,
   isOptionalStructure,
   mustBeFilled,
@@ -19,7 +17,7 @@ import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/v
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { UploadedFile } from './file-field';
-import { FramedFormContext } from './object-field';
+import { FramedFormContext, RefusedStructureContext, gateRefusal } from './object-field';
 import type { FilePickerSource } from './file-picker';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
@@ -757,7 +755,9 @@ export interface MethodFormProps {
  * Each input's id is its name, so a file's upload id is its value path. A
  * gating input still empty after `form.attempt()` is marked `requiredField`,
  * and an optional input started but not complete `incompleteField`; a host's
- * `errors` entry replaces either. The top-level "+ N optional inputs"
+ * `errors` entry replaces either. A structure the gate refuses marks each
+ * field inside it that the gate refuses the same way, at every depth, and a
+ * host's entry for the structure marks none of them. The top-level "+ N optional inputs"
  * disclosure folds and opens exactly as the one inside a structure does,
  * optional structures included.
  */
@@ -887,13 +887,16 @@ function MethodFormFields({
     }
   };
 
+  // Why the form's own gate refuses an input, once the person has tried to
+  // run: what a structure's members are marked by as well.
+  const refusalOf = (field: RunField) =>
+    attempted ? gateRefusal(field, ownProp(values, field.name), mustBeFilled(field)) : undefined;
   const errorFor = (field: RunField): string | undefined => {
     const hostError = errors ? ownProp(errors, field.name) : undefined;
     if (hostError) return hostError;
-    if (!attempted) return undefined;
-    const value = ownProp(values, field.name);
-    if (mustBeFilled(field)) return fieldFilled(field, value) ? undefined : s.requiredField;
-    return isFilled(value) && !fieldFilled(field, value) ? s.incompleteField : undefined;
+    const refusal = refusalOf(field);
+    if (refusal === 'required') return s.requiredField;
+    return refusal === 'incomplete' ? s.incompleteField : undefined;
   };
 
   return (
@@ -910,17 +913,23 @@ function MethodFormFields({
         />
       )}
       {visible.map((field) => (
-        <FieldRenderer
-          // Remounted on each reset, so no control keeps what it held for the
-          // values the reset replaced (a file still arriving, a failed drop).
+        // Remounted on each reset, so no control keeps what it held for the
+        // values the reset replaced (a file still arriving, a failed drop). A
+        // structure the gate refuses marks the members it refuses, whatever
+        // a host's message says of the structure.
+        <RefusedStructureContext
           key={`${field.name}:${resets}`}
-          field={field}
-          id={field.name}
-          value={ownProp(values, field.name)}
-          error={errorFor(field)}
-          env={env}
-          onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
-        />
+          value={refusalOf(field) ? field.name : null}
+        >
+          <FieldRenderer
+            field={field}
+            id={field.name}
+            value={ownProp(values, field.name)}
+            error={errorFor(field)}
+            env={env}
+            onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
+          />
+        </RefusedStructureContext>
       ))}
       {(folded.length > 0 || structureOpen) && (
         <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />

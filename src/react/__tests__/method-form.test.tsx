@@ -202,11 +202,13 @@ describe('a form its host has framed', () => {
       [refund, 'Incomplete: fill in its required fields', 'iban'],
     ] as const) {
       expect(section.querySelectorAll('[data-error-edge]')).toHaveLength(1);
-      const caption = within(section).getByRole('alert');
+      // The section's own message comes first; the empty field it holds
+      // carries its own mark under it.
+      const [caption] = within(section).getAllByRole('alert');
       expect(caption).toHaveTextContent(message);
       const input = within(section).getByLabelText(field);
       expect(
-        caption.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+        caption!.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
 
@@ -294,9 +296,60 @@ describe('the required marks', () => {
     expect(screen.queryByText('Required')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Run' }));
     expect(state().attempted).toBe(true);
-    expect(screen.getByText('Required')).toBeInTheDocument();
+    // The shop, and the empty name inside it.
+    expect(screen.getAllByText('Required')).toHaveLength(2);
     await user.type(screen.getByLabelText('name'), 'Boutique Exemple');
     expect(screen.queryByText('Required')).not.toBeInTheDocument();
+  });
+
+  /**
+   * A structure the gate refuses used to be marked as a whole and nothing in
+   * it: with several required fields, or a started optional structure, the
+   * person had to read every field to find the empty ones.
+   */
+  it('marks each field a refused structure holds that the gate refuses, as it marks an input', async () => {
+    const user = userEvent.setup();
+    render(<Harness {...SHOP} />);
+    // The refund account opens on its seeded holder and bank, so it is
+    // started, and its IBAN is empty.
+    await user.click(screen.getByRole('button', { name: '1 optional input' }));
+    await user.click(screen.getByRole('button', { name: 'Run' }));
+    const shop = screen.getByRole('group', { name: 'shop' });
+    const refund = screen.getByRole('group', { name: 'refund_account' });
+    expect(within(shop).getByLabelText('name')).toHaveAttribute('aria-invalid', 'true');
+    expect(within(refund).getByLabelText('iban')).toHaveAttribute('aria-invalid', 'true');
+    expect(within(refund).getByLabelText('holder')).toHaveAttribute('aria-invalid', 'false');
+    // The IBAN's mark under it, then the account's own under its last field.
+    expect(
+      within(refund)
+        .getAllByRole('alert')
+        .map((mark) => mark.textContent),
+    ).toEqual(['Required', 'Incomplete: fill in its required fields']);
+    await user.type(within(refund).getByLabelText('iban'), 'FR7630006000011234567890189');
+    expect(within(refund).queryAllByRole('alert')).toHaveLength(0);
+  });
+
+  it('marks a started structure inside a refused one, and the empty field inside that', async () => {
+    const user = userEvent.setup();
+    render(<Harness {...SHOP} />);
+    // The shop's own bank account opens on its seed, started and incomplete.
+    await user.click(screen.getByRole('button', { name: '1 optional field' }));
+    await user.type(screen.getByLabelText('name'), 'Boutique Exemple');
+    await user.click(screen.getByRole('button', { name: 'Run' }));
+    const bank = screen.getByRole('group', { name: 'bank_account' });
+    expect(
+      within(bank)
+        .getAllByRole('alert')
+        .map((mark) => mark.textContent),
+    ).toEqual(['Required', 'Incomplete: fill in its required fields']);
+    expect(within(bank).getByLabelText('iban')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('name')).toHaveAttribute('aria-invalid', 'false');
+  });
+
+  it("marks none of a structure's fields for a host's message about the structure", () => {
+    render(<Harness {...SHOP} formProps={{ errors: { shop: 'The server refused this shop.' } }} />);
+    expect(screen.getByText('The server refused this shop.')).toBeInTheDocument();
+    expect(screen.getByLabelText('name')).toHaveAttribute('aria-invalid', 'false');
   });
 
   it('marks a started optional input that is not complete', async () => {
@@ -312,7 +365,7 @@ describe('the required marks', () => {
     render(<Harness {...SHOP} formProps={{ locale: 'fr' }} />);
     expect(screen.getByRole('button', { name: '1 entrée facultative' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Run' }));
-    expect(screen.getByText('Obligatoire')).toBeInTheDocument();
+    expect(screen.getAllByText('Obligatoire')).toHaveLength(2);
   });
 
   it('shows a host’s message over its own marks', () => {

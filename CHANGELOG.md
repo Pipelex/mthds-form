@@ -10,6 +10,8 @@
 
 - **A `ProportionBar` amount written as a template**: an inline part's amount written as a `$template` that writes out one number path's value and nothing else (`{ "$template": "${/result/food}" }`) is read as that path, since the renderer draws the text it writes as that number, so a stored layout using one now renders; a template with words beside its value, or one reading a text path, is still refused, and a `$computed` amount is refused in words saying a page has no function to resolve it.
 
+- **A refused structure marks its fields**: after an attempt, a structure `MethodForm`'s run gate refuses marks each field inside it that the gate refuses, at every depth, as the form marks its own inputs: an empty required field "Required", a started optional structure that is not complete "Incomplete", so the person no longer reads every field to find the empty ones; a host's `errors` entry for the structure marks none of them.
+
 ### Fixed
 
 - **A run refused by a field nobody can see**: a field in a tab, a step or a `Collapsible` that is not open holds the run, and its message was drawn inside the hidden panel; a refused run now takes the person to the first failing field in the page's order, opening every panel around it, showing its message, which the field names as its accessible description, and putting the focus on it.

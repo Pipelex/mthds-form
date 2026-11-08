@@ -2,14 +2,21 @@
 
 import { createContext, use, useState } from 'react';
 import { cn } from './utils';
-import type { ObjectRunField } from '../core';
+import type { ObjectRunField, RunField } from '../core';
 import { ownProp } from '../core/own-property';
-import { anyOptionalStructureOpen, isFoldedOptional, isOptionalStructure } from '../core/readiness';
+import {
+  anyOptionalStructureOpen,
+  fieldFilled,
+  isFilled,
+  isFoldedOptional,
+  isOptionalStructure,
+} from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
 import { useFieldDomId } from './field-dom-id';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import { fieldLabel, useFieldPresentation } from './field-presentation';
+import { useFieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 import { headingFaceClass } from './style-tokens';
 
@@ -39,6 +46,36 @@ const StructureDepthContext = createContext(0);
  * form's own structure (`section`, below).
  */
 export const FramedFormContext = createContext(false);
+
+/**
+ * Why the run gate refuses a field, as the structure or the form holding it
+ * holds it: a field that must be filled (`mustFill`) and is not is
+ * `required`, and a field that need not be but holds something short of what
+ * its concept demands is `incomplete`. This is `fieldFilled`'s own rule for a
+ * structure's members, so a structure the gate refuses has at least one
+ * member it refuses, unless it is a structure that must be touched and holds
+ * nothing at all.
+ */
+export function gateRefusal(
+  field: RunField,
+  value: unknown,
+  mustFill: boolean,
+): 'required' | 'incomplete' | undefined {
+  if (mustFill) return fieldFilled(field, value) ? undefined : 'required';
+  return isFilled(value) && !fieldFilled(field, value) ? 'incomplete' : undefined;
+}
+
+/**
+ * The id of the structure the form's own run gate refuses, after the person
+ * has tried to run, whose members it refuses are marked one by one: each
+ * empty required member `requiredField`, each started optional one that is
+ * not complete `incompleteField`, at every depth, as `MethodForm` marks its
+ * own inputs. `MethodForm` sets it for an input it refuses, and a structure
+ * sets it for a member it marks; any other structure, a list's row included,
+ * sees an id that is not its own and marks nothing. A host's `errors` entry
+ * sets none: its message is about the structure.
+ */
+export const RefusedStructureContext = createContext<string | null>(null);
 
 /**
  * How a structure groups its sub-fields, by where it stands.
@@ -138,6 +175,16 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   // Document-unique, as every control's id is: two forms mounting the same
   // method must not label one structure with the other's name.
   const domId = useFieldDomId(id);
+  // Whether the form's run gate refuses this structure, in which case each
+  // member it refuses is marked as the form marks its own inputs.
+  const refused = use(RefusedStructureContext) === id;
+  const s = useFieldStrings();
+  const markOf = (child: RunField): string | undefined => {
+    if (!refused) return undefined;
+    const refusal = gateRefusal(child, ownProp(data, child.name), child.required);
+    if (refusal === 'required') return s.requiredField;
+    return refusal === 'incomplete' ? s.incompleteField : undefined;
+  };
 
   const setChild = (name: string, childValue: unknown) => onChange({ ...data, [name]: childValue });
 
@@ -222,16 +269,22 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
         )}
       >
         <StructureDepthContext value={depth + 1}>
-          {visible.map((child) => (
-            <FieldRenderer
-              key={child.name}
-              field={child}
-              value={ownProp(data, child.name)}
-              onChange={(v) => setChild(child.name, v)}
-              id={`${id}.${child.name}`}
-              env={env}
-            />
-          ))}
+          {visible.map((child) => {
+            const childId = `${id}.${child.name}`;
+            const mark = markOf(child);
+            return (
+              <RefusedStructureContext key={child.name} value={mark ? childId : null}>
+                <FieldRenderer
+                  field={child}
+                  value={ownProp(data, child.name)}
+                  onChange={(v) => setChild(child.name, v)}
+                  id={childId}
+                  error={mark}
+                  env={env}
+                />
+              </RefusedStructureContext>
+            );
+          })}
         </StructureDepthContext>
 
         {(folded.length > 0 || structureOpen) && (
