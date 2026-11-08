@@ -176,19 +176,39 @@ export function Stack({
   justify?: keyof typeof JUSTIFY | null;
 }>) {
   const horizontal = props.direction === 'horizontal';
-  return (
+  // A vertical stack asked to centre centres ONE column its children share,
+  // as wide as the widest of them and never wider than its box, rather than
+  // each child at its own width: `items-center` there gave a hero narrower
+  // than the form under it a different left edge from the form, and the page
+  // read ragged. Its children then fill the column, so their edges agree, and
+  // one that sizes itself (a `Button`) starts at the column's edge with the
+  // rest rather than in its middle. A horizontal stack centres its children
+  // on the cross axis, one by one.
+  //
+  // The column is centred by an outer box that centres it as `items-center`
+  // centred each child, never by auto margins: inside a horizontal stack an
+  // auto margin takes the row's free space ahead of its `gap` and `justify`,
+  // so two centred columns side by side spread apart instead of packing. The
+  // column grows to the outer box's height, so a parent that stretches the
+  // box (a grid cell, a row asked to stretch) still gives its `justify` and a
+  // child that grows the room they had.
+  const column = !horizontal && props.align === 'center';
+  const stack = (
     <div
       className={cn(
         'flex',
         horizontal ? 'flex-row' : 'flex-col',
         pick(GAP, props.gap, 'md'),
-        pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
+        column
+          ? 'w-fit max-w-full grow items-stretch'
+          : pick(ALIGN, props.align, horizontal ? 'start' : 'stretch'),
         props.justify ? pick(JUSTIFY, props.justify, 'start') : undefined,
       )}
     >
       {children}
     </div>
   );
+  return column ? <div className="flex flex-col items-center">{stack}</div> : stack;
 }
 
 /** Enumerated rather than interpolated: Tailwind compiles the class names it can see. */
@@ -643,7 +663,7 @@ export function Button({
       disabled={props.disabled ?? false}
       className={cn(
         'inline-flex min-h-11 w-fit items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        focusOutlineClass,
         'disabled:pointer-events-none disabled:opacity-50',
         pick(BUTTON, props.variant, 'primary'),
       )}

@@ -113,6 +113,24 @@ describe('deriveStyleRoles', () => {
     }
   });
 
+  it('sets a dark field a step above its panel, never down at the page under it', () => {
+    // On a dark page a field darker than the panel round it reads as a well
+    // cut into the panel, a hole rather than a control on it. Held on the
+    // host's palette and on the stock one, whose card is its background.
+    const lighter = (a: string, b: string) => luminance(hex(a)) > luminance(hex(b));
+    for (const palette of [PALETTE.dark, STOCK_DARK]) {
+      for (const id of APP_STYLE_IDS) {
+        const panel = deriveStyleRoles(id).panel?.dark;
+        if (!panel?.field) continue;
+        const fill = resolveRoleColor(panel.fill, palette);
+        const field = resolveRoleColor(panel.field, palette);
+        if (field === fill) continue;
+        expect(lighter(field, fill), `${id}: field ${field} on panel ${fill}`).toBe(true);
+        expect(field, `${id}: the page`).not.toBe(palette.background);
+      }
+    }
+  });
+
   it("never lays a call to action's light shadow on a dark page", () => {
     for (const id of APP_STYLE_IDS) {
       const shadow = deriveStyleRoles(id).actionShadow;
@@ -179,6 +197,23 @@ const PALETTE: Record<'light' | 'dark', Partial<Record<ColorTokenName, string>>>
     muted: '#1c212b',
     border: '#353c49',
   },
+};
+
+/** `theme.css`'s dark palette, the stock one, as hex: its card is its background. */
+const STOCK_DARK: Partial<Record<ColorTokenName, string>> = {
+  background: '#09090b',
+  foreground: '#fafafa',
+  card: '#09090b',
+  muted: '#27272a',
+  border: '#27272a',
+};
+
+/** WCAG's relative luminance, to say which of two surfaces is the lighter. */
+const luminance = (color: SrgbColor): number => {
+  const [r, g, b] = color.components.map((c) =>
+    c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
+  ) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
 const hex = (value: string): SrgbColor => {

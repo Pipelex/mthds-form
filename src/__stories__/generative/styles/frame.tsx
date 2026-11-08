@@ -263,9 +263,11 @@ function ResultBody() {
         <div className="af-panel af-result">
           <ResultEnvProvider resolveUrl={resolveLaunchPicture}>
             <FieldPresentationProvider presentation="app">
+              {/* The panel is the host's, so the result's tables draw no box inside it. */}
               <StuffViewer
                 field={LAUNCH_FIELD}
                 value={COMPOSITE_PAYLOADS['composites.launch_report']}
+                framed
               />
             </FieldPresentationProvider>
           </ResultEnvProvider>
@@ -476,7 +478,7 @@ function PlainResult({ app }: { app: HostApp }) {
       <div className="af-panel af-result">
         <ResultEnvProvider resolveUrl={app.result.resolveUrl}>
           <FieldPresentationProvider presentation="app">
-            <StuffViewer field={app.result.field} value={app.result.payload} />
+            <StuffViewer field={app.result.field} value={app.result.payload} framed />
           </FieldPresentationProvider>
         </ResultEnvProvider>
       </div>

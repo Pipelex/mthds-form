@@ -31,6 +31,11 @@ const WIDTH = String.raw`(?:[1-9]\d*|\[(?!0[a-z]*\])[^\]]+\])`;
  * a style, a width and the colour (what `focusOutlineClass` spells), a ring
  * with a width and the colour, or a border in the colour on an element that
  * has a border to colour. A zero width draws nothing, so it counts as none.
+ * A ring standing off its element counts as none too: Tailwind paints a
+ * ring's offset as a solid shadow in a colour, the page's, so inside a panel
+ * filled otherwise it drew a band of the page between the control and its
+ * mark. A focus that stands off its element is an outline, whose offset is
+ * a gap.
  */
 function drawsUnder(classes: readonly string[], variant: string): boolean {
   const under = (pattern: RegExp) =>
@@ -41,7 +46,12 @@ function drawsUnder(classes: readonly string[], variant: string): boolean {
     under(/^outline-ring(?:\/\d+)?$/) &&
     under(/^outline-(?:solid|dashed|dotted|double)$/) &&
     under(new RegExp(`^outline-${WIDTH}$`));
-  const ring = under(/^ring-ring(?:\/\d+)?$/) && under(new RegExp(`^ring(?:-${WIDTH})?$`));
+  const offset = new RegExp(`^ring-offset-${WIDTH}$`);
+  const ring =
+    under(/^ring-ring(?:\/\d+)?$/) &&
+    under(new RegExp(`^ring(?:-${WIDTH})?$`)) &&
+    !under(offset) &&
+    !classes.some((name) => offset.test(name));
   const borderWidth = new RegExp(`^border(?:-${WIDTH})?$`);
   const border =
     under(/^border-ring(?:\/\d+)?$/) &&
