@@ -184,6 +184,38 @@ describe('a form its host has framed', () => {
     expect(hits.map(({ rule }) => rule)).toEqual(['border-b', 'pb-6']);
     for (const { element } of hits) expect(element).toBe(sections[0]);
   });
+
+  it('marks each section the run gate refuses at its heading and along its edge', async () => {
+    // Without the frame the structure's card turned red. A section has no
+    // card, so it says so where it starts and down its side instead, rather
+    // than in a caption under its last field.
+    const user = userEvent.setup();
+    const { container } = render(<Harness {...SHOP} formProps={{ framed: true }} />);
+    await user.click(screen.getByRole('button', { name: '1 optional input' }));
+    expect(container.querySelector('[data-error-edge]')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Run' }));
+
+    const shop = screen.getByRole('group', { name: 'shop' });
+    const refund = screen.getByRole('group', { name: 'refund_account' });
+    for (const [section, message, field] of [
+      [shop, 'Required', 'name'],
+      [refund, 'Incomplete: fill in its required fields', 'iban'],
+    ] as const) {
+      expect(section.querySelectorAll('[data-error-edge]')).toHaveLength(1);
+      const caption = within(section).getByRole('alert');
+      expect(caption).toHaveTextContent(message);
+      const input = within(section).getByLabelText(field);
+      expect(
+        caption.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+
+    // Filling the shop's name clears its cue and leaves the refund account's.
+    await user.type(within(shop).getByLabelText('name'), 'Boutique Exemple');
+    expect(shop.querySelector('[data-error-edge]')).toBeNull();
+    expect(within(shop).queryByRole('alert')).toBeNull();
+    expect(refund.querySelectorAll('[data-error-edge]')).toHaveLength(1);
+  });
 });
 
 describe('initial values', () => {

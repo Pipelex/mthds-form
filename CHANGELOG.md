@@ -2,7 +2,6 @@
 
 ## [Unreleased]
 
-
 ### Added
 
 - **The designer method lays out a host's composer and result page, in the team's style**: a layout may now be one moment of a compose-then-result app rather than a whole product page. The designer is handed the frame's own vocabulary (`designerCatalog({ frame })`), the brief names the frame and the team's app style, and the page it writes is validated against the same vocabulary (`frameCatalog`, `layoutCheckProblems`). Storybook's `Generative/Designer frames` stories show each app's composer and result page, as the kernel's plain view and as the designer method laid them out, in each style.
@@ -15,13 +14,13 @@
 - **`promptHashSubject(method)`**: what `PROMPT_HASH` hashes, the method's text followed by every frame's catalog.
 - **A `MthdsField` worded by the page**: optional `label` and `hint` props replace the descriptor's title and description where the layout wrote its own.
 - **A `DataTable` column's format**: a column may state `format: 'date'` (or `'text'`, `'number'`), and a date column reads the calendar day as written, whatever time stands beside it, rather than an ISO string.
-
 - **A brand's logo at a root-relative path**: `logo.onLight` and `logo.onDark` in `brand.json` may be a path on the host's own origin (`/brand/logo.svg`) as well as an http(s) URL, accepted only when it resolves on that origin, so `//elsewhere.example/x.svg` is still refused. See [docs/brand.md](docs/brand.md).
 - **A run button a host can hold**: a whole page's `Cta` and a `Composer`'s run button are disabled while the scope's `env.disabled` is set, as the plain form's submit is, so a second press during a run is not a second billed run.
 - **`MethodForm`'s `framed`**: a host that draws the form inside a panel of its own says so, and a structure among the inputs is then a section, its name a heading over its fields, set off from the inputs beside it by a hairline across the form, rather than a card inside the host's panel; without it a structure keeps its card. The grouping is on the DOM as `data-structure-group="section"`. See [docs/method-form.md](docs/method-form.md).
 
 ### Changed
 
+- **The brand contract holds the marks a control draws (Breaking)**: `validateBrandTokens` refuses a brand whose `--muted-foreground` reads under 3:1 on its `--input`, or whose `--destructive` reads under 3:1 on its `--background` or its `--card`, in either mode, a translucent fill or card laid over the page first, since the kernel draws an off switch's track and a number field's steppers on the field fill in the one colour and a framed section's error bar, solid, in the other; every committed brand holds them. Each `CONTRAST_PAIRS` entry now carries its own `minimum` and, for a translucent surface, the canvas it lies `over`, `MIN_CONTROL_CONTRAST` is exported beside `MIN_CONTRAST`, and a translucent canvas is named once among the problems rather than once per pair. See [docs/brand.md](docs/brand.md).
 - **`PROMPT_HASH` moves, so every layout stored under the previous hash is stale**: the method's Brief gained the style, the method gained `repair_layout`, and the hash now covers every frame's catalog as well as the method's text. A host that keys stored layouts on the hash designs them again; until then it renders the plain form, as it does for any stale layout. An edit to the designer method is a minor release, never a patch.
 - **`designerCatalog()` takes options**: `designerCatalog({ frame })`, the page frame when omitted, which is the catalog it returned before.
 - **The layout checks refuse a Grid whose only child carries the repeat**: json-render renders a repeat's element once and its children once per item, so that Grid was one cell holding every item in a column. `layoutProblems` says to put the repeat on the Grid, which is what the repair pass then does. A Grid that carries a repeat of its own, whose only child repeats over each item, is a list in every cell and passes.

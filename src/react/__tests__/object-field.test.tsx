@@ -229,3 +229,83 @@ describe('how a structure groups its fields', () => {
     expect(groupingAround(screen.getByDisplayValue('London'))).toBe('rule');
   });
 });
+
+/**
+ * What a form's own structure shows when it fails the run gate. A card turns
+ * its outline red; a framed form's section has no outline to turn, so it says
+ * so at its heading and along its edge instead, and neither cue reshapes a
+ * box: the edge stands out of the flow, beside the form, and the caption
+ * takes the heading's row, which grows by a line only when it wraps.
+ */
+describe('a structure in error', () => {
+  const shop: ObjectRunField = {
+    kind: 'object',
+    name: 'shop',
+    conceptRef: 'demo.Shop',
+    required: true,
+    fields: [{ kind: 'text', name: 'name', conceptRef: 'native.Text', required: true }],
+  };
+
+  function renderShop({ framed, error }: { framed: boolean; error?: string }) {
+    return render(
+      <FramedFormContext value={framed}>
+        <ObjectField field={shop} value={{}} onChange={() => {}} id="shop" error={error} />
+      </FramedFormContext>,
+    );
+  }
+
+  /** Every element's classes but the error's own two, in document order. */
+  function boxes(container: HTMLElement): string[] {
+    return [...container.querySelectorAll('*')]
+      .filter((element) => !element.matches('[data-error-edge], [role="alert"]'))
+      .map((element) => `${element.tagName}.${element.getAttribute('class') ?? ''}`);
+  }
+
+  it("turns a card's outline red, with the caption under it", () => {
+    const { container } = renderShop({ framed: false, error: 'Required' });
+    const card = container.querySelector('[data-structure-group="box"]')!;
+    expect(card.className).toMatch(/\bborder-destructive\/50\b/);
+    const caption = screen.getByRole('alert');
+    expect(card.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('[data-error-edge]')).toBeNull();
+  });
+
+  it('marks a framed section along its edge, with no card drawn back', () => {
+    const { container } = renderShop({ framed: true, error: 'Required' });
+    const section = container.querySelector('[data-structure-group="section"]')!;
+    expect(section.className).not.toMatch(/\bborder\b|\brounded|\bring\b/);
+    const edge = container.querySelector('[data-error-edge]')!;
+    expect(edge).not.toBeNull();
+    expect(edge).toHaveAttribute('aria-hidden', 'true');
+    // Out of the flow, so it moves nothing, and in the error colour.
+    expect(edge.className).toMatch(/\babsolute\b/);
+    expect(edge.className).toMatch(/\bbg-destructive\b/);
+    // It runs beside the whole section, its heading included.
+    const group = screen.getByRole('group', { name: 'shop' });
+    expect(group.contains(edge)).toBe(true);
+    expect(edge.parentElement!.contains(screen.getByText('shop'))).toBe(true);
+    expect(edge.parentElement!.contains(screen.getByLabelText('name'))).toBe(true);
+  });
+
+  it("puts a framed section's caption at its heading, over its fields", () => {
+    renderShop({ framed: true, error: 'Required' });
+    const caption = screen.getByRole('alert');
+    expect(caption).toHaveTextContent('Required');
+    // In the heading's own row, so it is read where the section starts and
+    // not under its last field, however tall the section is.
+    expect(screen.getByText('shop').parentElement).toBe(caption.parentElement);
+    const name = screen.getByLabelText('name');
+    expect(caption.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The group is still named by its heading alone.
+    expect(screen.getByRole('group', { name: 'shop' })).toBeInTheDocument();
+  });
+
+  it('changes no box of a framed section when the error comes and goes', () => {
+    const calm = renderShop({ framed: true });
+    const before = boxes(calm.container);
+    expect(calm.container.querySelector('[data-error-edge]')).toBeNull();
+    calm.unmount();
+    const failed = renderShop({ framed: true, error: 'Required' });
+    expect(boxes(failed.container)).toEqual(before);
+  });
+});

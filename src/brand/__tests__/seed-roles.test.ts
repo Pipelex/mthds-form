@@ -334,6 +334,21 @@ describe('a surface on the far side of the page', () => {
     }
   });
 
+  it('moves the ink away from the extreme of a mid-tone page when the far side leaves no shade', () => {
+    // A mid grey counts as light, since black reads better on it, and alone
+    // it darkens the blue to its darkest. Beside a black panel no shade on
+    // that side reads on the panel, so the ink turns the other way, to the
+    // blue's lightest, as the module header says it may.
+    const page = '#767676';
+    expect(contrast('#000000', page)).toBeGreaterThan(contrast('#ffffff', page));
+    expect(deriveBrandRoles({ accent: '#1e40af' }, page).accentInk).toBe('#000001');
+    const roles = deriveBrandRoles({ accent: '#1e40af' }, page, ['#000000']);
+    expect(roles.accentInk).toBe('#fefeff');
+    for (const background of [page, roles.accentFill!, '#000000']) {
+      expect(contrast(roles.accentInk!, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('refuses one only when no shade of the accent reads on every background at once', () => {
     // A grey accent's shades are the greys, so every one of them is tried
     // here and the derivation's answer is held to the whole set: an ink that
