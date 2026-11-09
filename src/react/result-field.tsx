@@ -1097,13 +1097,26 @@ function ConvertedDocumentPreview({
 }) {
   const s = useFieldStrings();
   const { answer, retry } = useDocumentPdf(ask);
+  // The button a reader presses to try again is gone once the retry renders, so
+  // focus lands on the region that replaced it rather than on the page's body.
+  // Only that press sets `retried`, so neither the first render nor a poll
+  // takes the focus.
+  const preparing = useRef<HTMLDivElement>(null);
+  const retried = useRef(false);
+  useEffect(() => {
+    if (!retried.current) return;
+    retried.current = false;
+    preparing.current?.focus();
+  });
   if (answer.state === 'preparing') {
     return (
       <div
+        ref={preparing}
         role="status"
+        tabIndex={-1}
         className={cn(
           NESTED_FRAME,
-          'flex items-center justify-center gap-2 rounded-lg border border-border bg-card/40 text-[12px] text-muted-foreground',
+          'flex items-center justify-center gap-2 rounded-lg border border-border bg-card/40 text-[12px] text-muted-foreground outline-none',
         )}
       >
         <Loader2 aria-hidden className="size-4 animate-spin" />
@@ -1123,7 +1136,10 @@ function ConvertedDocumentPreview({
         </p>
         <button
           type="button"
-          onClick={retry}
+          onClick={() => {
+            retried.current = true;
+            retry();
+          }}
           className={cn(CARD_ACTION, 'text-foreground', focusOutlineClass)}
         >
           {s.tryAgain}

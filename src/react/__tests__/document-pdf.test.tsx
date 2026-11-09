@@ -100,6 +100,8 @@ function answering(...answers: DocumentPdfAnswer[]) {
 
 const previewToggle = () => screen.queryByRole('button', { name: S.preview });
 const frame = (container: HTMLElement) => container.querySelector('iframe');
+/** Through `window`, because this file's `document` builds a field. */
+const focused = () => window.document.activeElement;
 /** The live region saying `words`: a panel holds empty ones for its downloads' reports too. */
 const statusSaying = (words: string) => screen.getByText(words).closest('[role="status"]');
 
@@ -376,6 +378,48 @@ describe('when the host cannot make the PDF', () => {
     expect(ask).toHaveBeenCalledTimes(2);
     expect(frame(container)).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('moves the focus to the preparing region on Try again, as the button goes away', async () => {
+    const { resolve } = answering({ state: 'failed' }, { state: 'preparing' });
+    render(viewer(resolve));
+    fireEvent.click(previewToggle()!);
+    await elapse();
+    const tryAgain = screen.getByRole('button', { name: S.tryAgain });
+    tryAgain.focus();
+    expect(focused()).toBe(tryAgain);
+    fireEvent.click(tryAgain);
+    expect(focused()).toBe(statusSaying(S.documentPdfPreparing));
+  });
+
+  it('leaves the focus where the reader put it when a poll follows Try again', async () => {
+    const { ask, resolve } = answering({ state: 'failed' }, { state: 'preparing' });
+    render(viewer(resolve));
+    const toggle = previewToggle()!;
+    fireEvent.click(toggle);
+    await elapse();
+    fireEvent.click(screen.getByRole('button', { name: S.tryAgain }));
+    await elapse();
+    expect(focused()).toBe(statusSaying(S.documentPdfPreparing));
+    expect(ask).toHaveBeenCalledTimes(2);
+    toggle.focus();
+    await elapse(1_500);
+    expect(ask).toHaveBeenCalledTimes(3);
+    expect(focused()).toBe(toggle);
+  });
+
+  it('takes the focus neither when the preview opens nor on a poll', async () => {
+    const { ask, resolve } = answering({ state: 'preparing' });
+    render(viewer(resolve));
+    const toggle = previewToggle()!;
+    toggle.focus();
+    fireEvent.click(toggle);
+    await elapse();
+    expect(statusSaying(S.documentPdfPreparing)).toBeTruthy();
+    expect(focused()).toBe(toggle);
+    await elapse(1_500);
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(focused()).toBe(toggle);
   });
 
   it('shows the host’s own reason when it gives one', async () => {
