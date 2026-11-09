@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.35.1] - 2026-11-09
+
+### Fixed
+
+- **"Fill with an example" no longer draws the sparkles icon**: choosing an example fills the form from saved values and uses no AI, so the control now draws `ClipboardPaste`, which leaves the sparkles to mark work that AI does.
+
 ## [v0.35.0] - 2026-11-08
 
 ### Added
