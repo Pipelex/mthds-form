@@ -84,6 +84,12 @@ export interface FieldStrings {
   pdfViewerUnavailable: string;
   /** The link that opens a file in a new tab, where it cannot be shown in the page. */
   openInNewTab: string;
+  /** Said in a document's preview while the host makes a PDF of it. */
+  documentPdfPreparing: string;
+  /** Said in a document's preview when the host could not make a PDF of it and gives no reason. */
+  documentPdfFailed: string;
+  /** Said in a document's preview when the host has no PDF of it to offer. */
+  documentPdfUnavailable: string;
   /**
    * What a result slot the run resolved as an absence SHOWS — a dash, not a
    * sentence. Beside forty values in a grid, "not provided" repeated is louder

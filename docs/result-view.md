@@ -269,7 +269,7 @@ A table of records draws its own rounded hairline box, which is what says where 
 
 ## Files
 
-**A document offers a preview when the browser can both frame and render it.** Two conditions, both necessary: `frameableUrl` (a `pipelex-storage://` reference resolves nowhere without the host's resolver, and a `data:` document is never framed — see [The URL policy](#the-url-policy)) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none. A preview opens on its toggle, except a PDF that is the whole result in `app`, which opens on its own ([A result that is one PDF](#a-result-that-is-one-pdf)). Which formats are worth framing is read from the payload's declared type, and that is the right source: whether a preview is worth OFFERING is a usability question, and the producer is the one that knows. What the declared type may not do is admit a URL.
+**A document offers a preview when the browser can both frame and render it, or when its host answers a PDF of it.** The browser's way takes two conditions, both necessary: `frameableUrl` (a `pipelex-storage://` reference resolves nowhere without the host's resolver, and a `data:` document is never framed — see [The URL policy](#the-url-policy)) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none, so a `.docx` offers a preview only through its host ([A document the browser cannot render](#a-document-the-browser-cannot-render-the-hosts-pdf)). A preview opens on its toggle, except a PDF that is the whole result in `app`, which opens on its own ([A result that is one PDF](#a-result-that-is-one-pdf)). Which formats are worth framing is read from the payload's declared type, and that is the right source: whether a preview is worth OFFERING is a usability question, and the producer is the one that knows. What the declared type may not do is admit a URL.
 
 **A file always exposes its URL, three ways.** A picture is a _preview_ of a file, not a replacement for it — once the image painted, the URL used to vanish entirely, leaving a result you could look at and could not use. So a painted image opens in a viewer that offers the file it previews in a tab of its own, its reference is printed beneath it, and the reference carries a copy control and, beside it, a button that saves the file ([A file's own download button](#a-files-own-download-button)). A gallery's tile in `app` is the one place the line under the picture is left out, and there the same three are in the viewer ([What a tile says](#what-a-tile-says-in-each-presentation)).
 
@@ -292,6 +292,43 @@ A table of records draws its own rounded hairline box, which is what says where 
 **The answer is the browser's, so a server never asks for it.** The view reads it through `useSyncExternalStore`, whose server snapshot is "unknown". A server render therefore touches no `navigator` (Node has one of its own, with no such property), and until the browser has answered, which for a page rendered on a server is the hydration just after it, a box of the frame's size holds the place. So a PDF on Android never flashes as a blank frame, and on a desktop the frame is drawn once. A tree rendered in the browser alone has the answer on its first render.
 
 The headless Chromium the stories run in reports no viewer, so each story about a PDF pins the answer it is about. `Outputs/Media` › "A PDF that is the whole result, in an app → open" frames the PDF with no toggle, "A lone PDF" at a phone's, a tablet's and a desktop's width holds the frame to a page's size, "A PDF inside a report, in an app → toggle" keeps the toggle, and "No PDF viewer → a card", its phone story and "No PDF viewer, a PDF inside a report → the same card" show the card; `lone-pdf.test.tsx` pins each case, the server render and the hydration after it.
+
+### A document the browser cannot render: the host's PDF
+
+**A browser renders a PDF and a picture, and a run can hand back a Word file.** A method whose result is a Word, Excel or PowerPoint file then shows a name and a download, with nothing to look at. The view cannot convert the file, since it holds a reference and the host holds the file, so it asks the host, through an optional function on `ResultEnvProvider`, beside `resolveRendition`:
+
+```ts
+type ResolveDocumentPdf = (url: string, request: DocumentPdfRequest) => AskDocumentPdf | undefined;
+interface DocumentPdfRequest {
+  filename?: string;
+  mimeType?: string;
+}
+type AskDocumentPdf = () => Promise<DocumentPdfAnswer>;
+type DocumentPdfAnswer =
+  | { state: 'ready'; url: string }
+  | { state: 'preparing' }
+  | { state: 'failed'; message?: string }
+  | { state: 'unavailable' };
+```
+
+**With no function, or one that answers `undefined`, the viewer behaves exactly as it did**: a `.docx` is its name, its link and its download, with no toggle. `document-pdf.test.tsx` compares the markup in those cases with a viewer that has no provider at all.
+
+**Deciding on a toggle and starting a conversion are different questions, so they are asked apart.** `resolveDocumentPdf` is called with the document's own `url` member, exactly as `resolveUrl` is, and what the payload declares about it. It is called while the view renders, so it is synchronous and pure, as `resolveRendition` is, and all it says is whether this host has a way to a PDF of this document. That keeps the toggle off a file the host will never convert, with no round trip and no difference between a server render and the first browser render. The `AskDocumentPdf` it returns is the round trip, and it is asked only when a reader opens the preview: a result can hold many documents nobody opens, a host may convert on first request, and a document converted because a panel happened to draw it is work done for nobody.
+
+**The view keeps no list of formats.** Any document the browser cannot render is asked about, so a host answers for what it converts, the legacy Office formats and OpenDocument included where it converts them, and a new format needs no release of this package. A document the browser can render is never asked about, and neither is a PDF the view could not frame, which a PDF of it would not help.
+
+**A preview follows the state the host answers, and a first view never waits on the conversion.**
+
+- `preparing`: the host is making the PDF. The preview says so in the box the pages will fill (`documentPdfPreparing`), and the view asks again, after a second and a half at first and then less often. The asking stops when the reader closes the preview, and after three minutes, which reads as `failed`, so a stuck conversion ends in a way to try again rather than a spinner that turns for as long as the tab stays open. An ask must therefore answer quickly and must be safe to repeat: asking twice must not start the work twice.
+- `ready`: `url` is where the PDF is read, and from there it is a PDF like any other, framed at the size a toggle gives one, with the same card where the browser has no PDF viewer. The answer passes the [URL gate](#the-url-policy) and the frame rule, as a resolver's does, so a root-relative path on the host's own origin is admitted, and an answer that is refused reads as `unavailable`.
+- `failed`: the host could not make the PDF. The preview says so and offers Try again, which asks from the start. `message` is the host's own sentence, in the reader's language, for a reason worth saying (a file protected by a password), and is shown as it stands; with none, the view says `documentPdfFailed`. An ask that throws, rejects, answers anything else or runs for more than thirty seconds reads as `failed` too.
+- `unavailable`: there is no PDF of this document to be had and asking again would change nothing, such as a file past the host's limits. The preview says so (`documentPdfUnavailable`). The toggle stays, so the reader's focus is not lost when the answer arrives.
+
+**It keeps its toggle, in both presentations and as the whole result.** A PDF that is the whole result in `app` opens by itself because the file is already there to show. A document that has to be converted opens on the reader's click, for the reason above.
+
+**It only ever shows pages.** The PDF is the frame's `src`, or the link on the card shown where the browser has no PDF viewer, because that link is a reader's way to the pages. Everything else keeps the original: the document's name, its link, its copy control and every download, so a reader who saves a Word result gets the Word file.
+
+`Outputs/Media` shows a Word document with a host answering a PDF, one whose PDF is prepared for a moment first, one that failed and one with no PDF to offer, beside "A .docx → link, no preview", which is the host that does not answer; `document-pdf.test.tsx` pins each state, the asking and the gates.
 
 ## A picture opens in a viewer
 

@@ -77,13 +77,18 @@ export { saveInBrowser } from './save-in-browser';
 // provider takes the host's save function, which download controls to draw, and
 // whether a table too wide for its box scrolls or stacks its rows, and the
 // host's own PDF maker for an HTML page. `resolveRendition` is the host's
-// smaller copy of a picture, for a gallery's tiles and a cell's thumbnail.
+// smaller copy of a picture, for a gallery's tiles and a cell's thumbnail, and
+// `resolveDocumentPdf` the host's PDF of a document the browser cannot render.
 export type {
+  AskDocumentPdf,
+  DocumentPdfAnswer,
+  DocumentPdfRequest,
   DownloadDisplay,
   PdfPage,
   ProseImages,
   RenderPdf,
   RenditionRequest,
+  ResolveDocumentPdf,
   ResolveRendition,
   ResolveShareUrl,
   ResolveUrl,
@@ -93,6 +98,7 @@ export type {
 export {
   ResultEnvProvider,
   useProseImages,
+  useResolveDocumentPdf,
   useResolveRendition,
   useResolveShareUrl,
   useResolveUrl,
