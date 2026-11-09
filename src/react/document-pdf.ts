@@ -26,12 +26,20 @@ const LONGEST_WAIT_MS = 10_000;
 const PREPARING: DocumentPdfAnswer = { state: 'preparing' };
 const FAILED: DocumentPdfAnswer = { state: 'failed' };
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value !== '';
+
 /**
- * One question to the host, which never rejects: an ask that throws, rejects,
- * takes longer than `DOCUMENT_PDF_ASK_TIMEOUT_MS` or answers something other
- * than a state reads as `failed`. A host's function may be typed loosely, or be
- * a bridge resolving `any`, and an answer that reaches the view unread would
+ * One question to the host, which never rejects, and the one place its answer
+ * is read before the view sees it. A host's function may be typed loosely, or
+ * be a bridge resolving `any`, and an answer that reaches the view unread would
  * throw inside the render that shows it.
+ *
+ * So an ask that throws, rejects, takes longer than
+ * `DOCUMENT_PDF_ASK_TIMEOUT_MS` or answers something other than a state reads
+ * as `failed`, and so does a `ready` whose `url` is not a non-empty string. A
+ * `failed` whose `message` is not a non-empty string carries none, so the view
+ * says its own words. A string URL is left to the view's URL and frame gates.
  */
 async function askOnce(ask: AskDocumentPdf): Promise<DocumentPdfAnswer> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -42,8 +50,10 @@ async function askOnce(ask: AskDocumentPdf): Promise<DocumentPdfAnswer> {
     const answer = (await Promise.race([ask(), timeout])) as DocumentPdfAnswer | undefined;
     switch (answer?.state) {
       case 'ready':
-      case 'preparing':
+        return isNonEmptyString(answer.url) ? answer : FAILED;
       case 'failed':
+        return isNonEmptyString(answer.message) ? answer : FAILED;
+      case 'preparing':
       case 'unavailable':
         return answer;
       default:

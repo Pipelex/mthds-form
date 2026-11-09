@@ -451,6 +451,23 @@ describe('when the host cannot make the PDF', () => {
     }
   });
 
+  // A render that throws rejects `elapse`, so getting past it is the proof that
+  // nothing did.
+  it.each<[string, unknown]>([
+    ['an empty message', { state: 'failed', message: '' }],
+    ['a message that is a structure', { state: 'failed', message: { code: 'x' } }],
+    ['a URL that is a number', { state: 'ready', url: 123 }],
+    ['a URL that is empty', { state: 'ready', url: '' }],
+    ['no URL', { state: 'ready' }],
+  ])('says it in the package’s own words for %s', async (_, answer) => {
+    const { container } = render(viewer(() => () => Promise.resolve(answer as DocumentPdfAnswer)));
+    fireEvent.click(previewToggle()!);
+    await elapse();
+    expect(screen.getByRole('alert').textContent).toBe(S.documentPdfFailed);
+    expect(screen.getByRole('button', { name: S.tryAgain })).toBeTruthy();
+    expect(frame(container)).toBeNull();
+  });
+
   it('reads an ask that never answers as a failure', async () => {
     const resolve: ResolveDocumentPdf = () => () => new Promise<DocumentPdfAnswer>(() => {});
     render(viewer(resolve));
