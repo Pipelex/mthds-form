@@ -84,13 +84,17 @@ function viewer(
   );
 }
 
-/** A host whose ask returns each answer in turn, holding the last one. */
+/**
+ * A host whose ask returns each answer in turn, holding the last one. Its
+ * resolver hands over a new function on every call, as a host writing it inline
+ * does, and `ask` counts the questions across all of them.
+ */
 function answering(...answers: DocumentPdfAnswer[]) {
   const ask = vi.fn<AskDocumentPdf>(() => {
     const answer = answers.length > 1 ? answers.shift()! : answers[0]!;
     return Promise.resolve(answer);
   });
-  const resolve = vi.fn<ResolveDocumentPdf>(() => ask);
+  const resolve = vi.fn<ResolveDocumentPdf>(() => () => ask());
   return { ask, resolve };
 }
 
@@ -318,6 +322,7 @@ describe('while the host prepares the PDF', () => {
     const { rerender } = render(viewer(resolve));
     fireEvent.click(previewToggle()!);
     await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
     rerender(viewer((...args) => resolve(...args)));
     await elapse();
     expect(ask).toHaveBeenCalledTimes(1);

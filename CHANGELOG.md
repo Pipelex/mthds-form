@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`resolveDocumentPdf` on `ResultEnvProvider`**: a host that can make a PDF of a document the browser cannot render, such as a Word, Excel or PowerPoint file, answers `(url, { filename, mimeType }) => ask | undefined`, and that document then offers its Preview toggle and opens onto the PDF's pages. The view calls `ask` when the reader opens the preview and again while it answers `preparing`, and shows `failed` with Try again; a host that passes nothing, or answers `undefined`, sees no change.
+- **`resolveDocumentPdf` on `ResultEnvProvider`, and `FieldStrings` gains `documentPdfPreparing`, `documentPdfFailed` and `documentPdfUnavailable` (Breaking)**: a host that can make a PDF of a document the browser cannot render, such as a Word, Excel or PowerPoint file, answers `(url, { filename, mimeType }) => ask | undefined`, and that document then offers its Preview toggle and opens onto the PDF's pages. The view calls `ask` when the reader opens the preview and again while it answers `preparing`, and shows `failed` with Try again; a host that passes nothing, or answers `undefined`, sees no change. The three strings are supplied in English and French; a host that supplies a complete `FieldStrings` rather than a partial override adds them. See [docs/result-view.md](docs/result-view.md).
 
 ## [v0.35.1] - 2026-11-09
 
