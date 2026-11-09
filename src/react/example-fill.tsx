@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { MoreHorizontal, Sparkles, X } from 'lucide-react';
+import { ClipboardPaste, MoreHorizontal, X } from 'lucide-react';
 import type { ExampleSource, FormExample, RunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
@@ -304,7 +304,7 @@ export function FillWithExample({
         }}
         className={cn(secondaryClass, className)}
       >
-        <Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
+        <ClipboardPaste className="size-4 text-muted-foreground" aria-hidden="true" />
         {s.fillWithExample}
       </button>
 

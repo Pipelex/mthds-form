@@ -101,6 +101,14 @@ describe('no source, no control', () => {
   });
 });
 
+describe('the control', () => {
+  it('draws no AI spark, since choosing an example uses no AI', async () => {
+    render(<Harness exampleSource={sourceOf([PARIS])} />);
+    const control = await screen.findByRole('button', { name: S.fillWithExample });
+    expect(control.querySelector('.lucide-sparkles')).toBeNull();
+  });
+});
+
 describe('filling the form', () => {
   it('fills an untouched form at once, and starts no run', async () => {
     const user = userEvent.setup();
