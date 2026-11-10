@@ -14,7 +14,7 @@ import {
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
 import { expectTouchTarget, VIEWPORTS } from '../touch-target';
-import { PDF_URL, REPORT } from './media-payloads';
+import { PDF_URL, pdfViewer, REPORT, REVIEW_PACKET } from './media-payloads';
 
 /**
  * Results carrying FILES, and what it takes to show them.
@@ -208,27 +208,6 @@ const SOLAR_SYSTEM = {
   snippet: 'The Solar System is a gravitationally bound system comprising the Sun…',
 };
 
-/**
- * Pins what the browser says of its PDF viewer for one story, and gives the
- * browser its own answer back afterwards.
- *
- * The result view asks `navigator.pdfViewerEnabled`, and the answer is the
- * browser's: the headless Chromium the stories run in says it has no viewer,
- * as Android's browsers do, and a desktop browser says it has one. A story
- * about one case has to say which it is, so it reads the same in both.
- */
-function pdfViewer(enabled: boolean) {
-  return () => {
-    Object.defineProperty(navigator, 'pdfViewerEnabled', {
-      configurable: true,
-      get: () => enabled,
-    });
-    return () => {
-      delete (navigator as { pdfViewerEnabled?: boolean }).pdfViewerEnabled;
-    };
-  };
-}
-
 /** The frames showing the served PDF, one in each theme pane. */
 function pdfFrames(canvasElement: HTMLElement): HTMLIFrameElement[] {
   return [...canvasElement.querySelectorAll<HTMLIFrameElement>('iframe')].filter(
@@ -308,12 +287,14 @@ export const ALonePdfTablet = lonePdfOn('tablet');
 export const ALonePdfDesktop = lonePdfOn('desktop');
 
 /**
- * **A PDF inside a larger result keeps its toggle.** The report's source
- * document is one field of a structure, so in `app` it is still named with a
- * Preview, closed, and the frame opens on the click.
+ * **A report with its one PDF, in an app: open, with its toggle.** The report
+ * is the whole result and its source is its only document, so the document is
+ * the deliverable the report captions: it opens under the other fields at the
+ * size a toggle gives a nested preview, and its toggle stays, pressed, so a
+ * reader can fold it away and read the rest.
  */
-export const ANestedPdf: StoryObj<typeof ResultView> = {
-  name: 'A PDF inside a report, in an app → toggle',
+export const AReportWithItsPdf: StoryObj<typeof ResultView> = {
+  name: 'A report with its one PDF, in an app → open with its toggle',
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
@@ -329,6 +310,36 @@ export const ANestedPdf: StoryObj<typeof ResultView> = {
     const canvas = within(canvasElement);
     const toggles = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
     await expect(toggles).toHaveLength(2);
+    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    await expect(pdfFrames(canvasElement)).toHaveLength(2);
+    await userEvent.click(toggles[0]!);
+    await expect(toggles[0]!.getAttribute('aria-expanded')).toBe('false');
+    await expect(pdfFrames(canvasElement)).toHaveLength(1);
+  },
+};
+
+/**
+ * **A report with two documents keeps both toggles, closed.** With two, opening
+ * one would read as a bug and opening both would push the rest of the result
+ * below the first screen, so each opens on its click.
+ */
+export const AReportWithTwoDocuments: StoryObj<typeof ResultView> = {
+  name: 'A report with two documents, in an app → toggles',
+  render: (args) => <ResultView {...args} />,
+  args: {
+    contracts: CONTRACTS,
+    outputForm: OUTPUT_FORM,
+    domain: 'results',
+    pipeCode: 'two_documents_result',
+    value: REVIEW_PACKET,
+    maxWidth: 720,
+    presentation: 'app',
+  },
+  beforeEach: pdfViewer(true),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggles = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
+    await expect(toggles).toHaveLength(2 * 2);
     for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('false');
     await expect(pdfFrames(canvasElement)).toHaveLength(0);
     await userEvent.click(toggles[0]!);
@@ -392,12 +403,12 @@ export const NoPdfViewerPhone: Story = {
 };
 
 /**
- * **The same card behind a toggle.** A PDF inside a report, in a browser with
- * no viewer, keeps its Preview, and opening it shows the card rather than a
- * blank frame.
+ * **The same card under a report's one PDF.** In a browser with no viewer, the
+ * report's lone document opens onto the card rather than a blank frame, and
+ * keeps its toggle, pressed.
  */
 export const NoPdfViewerNested: StoryObj<typeof ResultView> = {
-  name: 'No PDF viewer, a PDF inside a report → the same card',
+  name: 'No PDF viewer, a report’s one PDF → the same card',
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
@@ -411,9 +422,8 @@ export const NoPdfViewerNested: StoryObj<typeof ResultView> = {
   beforeEach: pdfViewer(false),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(0);
     for (const toggle of canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })) {
-      await userEvent.click(toggle);
+      await expect(toggle.getAttribute('aria-expanded')).toBe('true');
     }
     await expect(pdfFrames(canvasElement)).toHaveLength(0);
     await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(2);
@@ -524,5 +534,72 @@ export const AWordDocumentUnavailable: Story = {
     await expect(
       canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.tryAgain }),
     ).toHaveLength(0);
+  },
+};
+
+// ─── A deck that is the whole result ─────────────────────────────────────────
+
+/** A PowerPoint deck, which a browser fetches and cannot render. */
+const DECK = {
+  url: 'https://example.com/quarterly_review.pptx',
+  filename: 'quarterly_review.pptx',
+  mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  title: 'Quarterly review',
+};
+
+/**
+ * **A deck that is the whole result, in an app: its pages, with no click.** The
+ * reader came for the deck, so the view asks its host for the PDF as it
+ * mounts. The place the pages will fill says "Preparing the preview…" at a
+ * page's size, so the result does not jump when the PDF arrives, and there is
+ * no toggle, since closing the only thing the result holds would leave it
+ * empty. The viewer is pinned on, as on a desktop browser.
+ */
+export const ALoneDeck: Story = {
+  name: 'A deck that is the whole result, in an app → open, preparing then ready',
+  args: { value: DECK, presentation: 'app', resolveDocumentPdf: convertingForAMoment },
+  beforeEach: () => {
+    firstAsked = undefined;
+    return pdfViewer(true)();
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
+    const preparing = canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing);
+    await expect(preparing).toHaveLength(2);
+    for (const words of preparing) await expectPageSized(words.closest('[role="status"]')!);
+    await waitFor(() => expect(pdfFrames(canvasElement)).toHaveLength(2), { timeout: 5_000 });
+    for (const frame of pdfFrames(canvasElement)) {
+      await expect(frame.getAttribute('title')).toBe(DECK.title);
+      await expectPageSized(frame);
+    }
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
+  },
+};
+
+/**
+ * **The same deck in studio: its toggle, closed, and nothing converted.** The
+ * builder's presentation opens nothing by itself, so the host is asked only
+ * when the builder opens the preview.
+ */
+export const ALoneDeckStudio: Story = {
+  name: 'The same deck in studio → toggle',
+  args: { value: DECK, presentation: 'studio', resolveDocumentPdf: convertingForAMoment },
+  beforeEach: () => {
+    firstAsked = undefined;
+    return pdfViewer(true)();
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggles = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
+    await expect(toggles).toHaveLength(2);
+    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await expect(canvas.queryAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing)).toHaveLength(0);
+    await expect(firstAsked).toBeUndefined();
+    await expect(pdfFrames(canvasElement)).toHaveLength(0);
   },
 };

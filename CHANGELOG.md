@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The document a run delivered opens without a click in `app`**: a document that is the whole result opens on its pages whenever it has a preview, a picture and a Word, Excel or PowerPoint file whose host answers `resolveDocumentPdf` included, asking the host for the PDF as it mounts and showing "Preparing the preview…" at a page's size meanwhile; and a record that is the whole result opens its only document under its other members, at a nested preview's size, with its toggle pressed. `studio`, lists (a list of one included), records holding several documents or a list of documents, nested records and parts mounted on their own through `ResultField` keep their toggles, closed. No export and nothing on the wire changes. See [docs/result-view.md](docs/result-view.md).
+
 ## [v0.36.0] - 2026-11-10
 
 ### Added

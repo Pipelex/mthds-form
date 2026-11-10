@@ -4,7 +4,9 @@
  * The first half is the promise to every other host: a viewer whose host does
  * not answer draws exactly what it drew before the seam existed. The second is
  * the seam itself: the toggle, the question asked only when a reader opens it,
- * and each state the host can answer.
+ * and each state the host can answer. The third is the document the run
+ * delivered, in `app`: the whole result, or a whole-result record's lone
+ * document, asked for as it mounts with no click.
  */
 import { act, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -56,6 +58,13 @@ const PDF = {
   mime_type: 'application/pdf',
   title: 'Quarterly report',
 };
+const PPTX = {
+  url: 'pipelex-storage://org/deck.pptx',
+  public_url: 'https://cdn.example/deck.pptx',
+  filename: 'deck.pptx',
+  mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  title: 'Quarterly review',
+};
 const READY: DocumentPdfAnswer = { state: 'ready', url: 'https://cdn.example/contract.pdf' };
 
 function setPdfViewer(enabled: boolean) {
@@ -99,6 +108,13 @@ function answering(...answers: DocumentPdfAnswer[]) {
 }
 
 const previewToggle = () => screen.queryByRole('button', { name: S.preview });
+/** Whether a frame, or the box holding its place, takes a page's size or a toggle's 28rem. */
+const sizeOf = (element: Element | null | undefined) =>
+  element?.className.includes('aspect-[1/1.414]')
+    ? 'page'
+    : element?.className.includes('h-112')
+      ? 'nested'
+      : undefined;
 const frame = (container: HTMLElement) => container.querySelector('iframe');
 /** Through `window`, because this file's `document` builds a field. */
 const focused = () => window.document.activeElement;
@@ -222,15 +238,16 @@ describe('a host that answers a PDF', () => {
     expect(frame(container)?.getAttribute('src')).toBe('/api/assets/contract.pdf');
   });
 
-  it('keeps the toggle on a whole result in app, so nothing converts unasked', async () => {
+  it('keeps the toggle on a whole result in studio, so nothing converts unasked', async () => {
     const { ask, resolve } = answering(READY);
-    const { container } = render(viewer(resolve, DOCX, 'app'));
-    await elapse();
+    const { container } = render(viewer(resolve, PPTX, 'studio'));
+    await elapse(60_000);
     expect(ask).not.toHaveBeenCalled();
     expect(frame(container)).toBeNull();
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(previewToggle()!);
     await elapse();
-    expect(frame(container)).toBeTruthy();
+    expect(sizeOf(frame(container))).toBe('nested');
   });
 
   it('works on a document inside a larger result', async () => {
@@ -502,5 +519,123 @@ describe('when the host has no PDF to offer', () => {
       expect(statusSaying(S.documentPdfUnavailable)).toBeTruthy();
       unmount();
     }
+  });
+});
+
+describe('the document the run delivered, in app', () => {
+  it('asks for the PDF of a whole-result deck as it mounts, with no toggle', async () => {
+    const { ask, resolve } = answering({ state: 'preparing' }, READY);
+    const { container } = render(viewer(resolve, PPTX, 'app'));
+    expect(previewToggle()).toBeNull();
+    // Preparing at once, at the size the pages will take.
+    const preparing = statusSaying(S.documentPdfPreparing);
+    expect(sizeOf(preparing)).toBe('page');
+    await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
+    await elapse(1_500);
+    expect(ask).toHaveBeenCalledTimes(2);
+    const shown = frame(container);
+    expect(shown?.getAttribute('src')).toBe('https://cdn.example/contract.pdf');
+    expect(shown?.getAttribute('title')).toBe(PPTX.title);
+    expect(sizeOf(shown)).toBe('page');
+    expect(previewToggle()).toBeNull();
+  });
+
+  it('holds a page’s size when the conversion fails, and on Try again', async () => {
+    const { ask, resolve } = answering({ state: 'failed' }, { state: 'preparing' });
+    render(viewer(resolve, PPTX, 'app'));
+    await elapse();
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe(S.documentPdfFailed);
+    expect(sizeOf(alert.parentElement)).toBe('page');
+    fireEvent.click(screen.getByRole('button', { name: S.tryAgain }));
+    expect(sizeOf(statusSaying(S.documentPdfPreparing))).toBe('page');
+    await elapse();
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts again from Preparing for a new file', async () => {
+    const resolve: ResolveDocumentPdf = (url) =>
+      url === PPTX.url
+        ? () => Promise.resolve(READY)
+        : () => Promise.resolve({ state: 'preparing' });
+    const second = { ...PPTX, url: 'pipelex-storage://org/second.pptx', public_url: undefined };
+    const { container, rerender } = render(viewer(resolve, PPTX, 'app'));
+    await elapse();
+    expect(frame(container)).toBeTruthy();
+    rerender(viewer(resolve, second, 'app'));
+    await elapse();
+    expect(frame(container)).toBeNull();
+    expect(statusSaying(S.documentPdfPreparing)).toBeTruthy();
+  });
+
+  it('asks for the PDF of a record’s lone document as it mounts, its toggle pressed', async () => {
+    const { ask, resolve } = answering({ state: 'preparing' });
+    render(viewer(resolve, { title: 'Q3', source: DOCX }, 'app', report));
+    const toggle = previewToggle();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(sizeOf(statusSaying(S.documentPdfPreparing))).toBe('nested');
+    await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
+    // Folding it away stops the asking, as closing any preview does.
+    fireEvent.click(toggle!);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    await elapse(60_000);
+    expect(ask).toHaveBeenCalledTimes(1);
+  });
+
+  it('frames a record’s lone document at a toggle’s size once ready', async () => {
+    const { resolve } = answering(READY);
+    const { container } = render(viewer(resolve, { title: 'Q3', source: DOCX }, 'app', report));
+    await elapse();
+    expect(sizeOf(frame(container))).toBe('nested');
+  });
+
+  it('asks nothing of a record’s lone document in studio', async () => {
+    const { ask, resolve } = answering(READY);
+    render(viewer(resolve, { title: 'Q3', source: DOCX }, 'studio', report));
+    await elapse(60_000);
+    expect(ask).not.toHaveBeenCalled();
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('asks nothing of a record holding two documents', async () => {
+    const { ask, resolve } = answering(READY);
+    const twoDocuments: ObjectRunField = {
+      ...report,
+      fields: [text('title'), document('source'), document('annex')],
+    };
+    render(viewer(resolve, { title: 'Q3', source: DOCX, annex: PPTX }, 'app', twoDocuments));
+    await elapse(60_000);
+    expect(ask).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getAllByRole('button', { name: S.preview })
+        .map((toggle) => toggle.getAttribute('aria-expanded')),
+    ).toEqual(['false', 'false']);
+  });
+
+  it('asks nothing of a list of one deck', async () => {
+    const { ask, resolve } = answering(READY);
+    render(
+      inPresentation(
+        'app',
+        <ResultEnvProvider resolveDocumentPdf={resolve}>
+          <StuffViewer
+            field={{
+              kind: 'list',
+              name: 'output',
+              conceptRef: 'native.Document',
+              required: true,
+              item: document('item'),
+            }}
+            value={[PPTX]}
+          />
+        </ResultEnvProvider>,
+      ),
+    );
+    await elapse(60_000);
+    expect(ask).not.toHaveBeenCalled();
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
   });
 });

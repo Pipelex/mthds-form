@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 /**
- * A result that is one PDF, and a PDF the browser cannot draw.
+ * A document the run delivered, and a PDF the browser cannot draw.
  *
- * In `app`, a PDF that is the whole result a panel shows opens without a click:
- * the reader came for that file. Anywhere else, inside a record, a list or a
- * part mounted on its own, and in `studio`, it keeps its toggle, closed.
+ * In `app`, a document that is the whole result a panel shows opens without a
+ * click, framed at a page's size with no toggle: the reader came for that file.
+ * So does the lone document of a record that is the whole result, at a nested
+ * frame's size, with its toggle pressed. Anywhere else, in a record holding
+ * several, a list or a part mounted on its own, and in `studio`, a document
+ * keeps its toggle, closed.
  *
  * Where the browser has no PDF viewer (Android's browsers, a headless browser:
  * `navigator.pdfViewerEnabled === false`) a frame onto a PDF is blank, so a card
@@ -60,6 +63,28 @@ const sources: ListRunField = {
   required: true,
   item: document('item'),
 };
+const picture = (name: string): FileRunField => ({
+  kind: 'image',
+  name,
+  conceptRef: 'native.Image',
+  required: true,
+  formats: formatsForKind('image'),
+});
+/** A record of the given members, as the whole result or as a member. */
+const record = (name: string, ...fields: ObjectRunField['fields']): ObjectRunField => ({
+  kind: 'object',
+  name,
+  conceptRef: 'demo.Record',
+  required: true,
+  fields,
+});
+const listOf = (name: string, item: FileRunField): ListRunField => ({
+  kind: 'list',
+  name,
+  conceptRef: item.conceptRef,
+  required: true,
+  item,
+});
 
 const PDF = {
   url: 'https://cdn.example/report.pdf',
@@ -85,6 +110,14 @@ function inPresentation(presentation: FieldPresentation, node: ReactNode) {
 }
 
 const previewToggle = () => screen.queryByRole('button', { name: S.preview });
+const previewToggles = () => screen.queryAllByRole('button', { name: S.preview });
+/** Whether a frame, or the box holding its place, takes a page's size or a toggle's 28rem. */
+const sizeOf = (element: Element | null | undefined) =>
+  element?.className.includes('aspect-[1/1.414]')
+    ? 'page'
+    : element?.className.includes('h-112')
+      ? 'nested'
+      : undefined;
 
 describe('a PDF that is the whole result', () => {
   it('opens in app, framed with no referrer and no sandbox, and has no toggle', () => {
@@ -98,6 +131,7 @@ describe('a PDF that is the whole result', () => {
     expect(frame?.getAttribute('referrerpolicy')).toBe('no-referrer');
     // The policy is unchanged: no `sandbox`, which deletes Chrome's PDF viewer.
     expect(frame?.hasAttribute('sandbox')).toBe(false);
+    expect(sizeOf(frame)).toBe('page');
     // Opened, the result has nothing a toggle could hide but the result.
     expect(previewToggle()).toBeNull();
   });
@@ -135,7 +169,7 @@ describe('a PDF that is the whole result', () => {
     expect(container.querySelector('iframe')).toBeNull();
   });
 
-  it('keeps its toggle for a whole-result document that is not a PDF', () => {
+  it('opens a whole-result document that is a picture too, at a page’s size', () => {
     setPdfViewer(true);
     const { container } = render(
       inPresentation(
@@ -146,7 +180,39 @@ describe('a PDF that is the whole result', () => {
         />,
       ),
     );
-    expect(previewToggle()).toBeTruthy();
+    const frame = container.querySelector('iframe');
+    expect(frame?.getAttribute('src')).toBe('https://cdn.example/scan.png');
+    expect(sizeOf(frame)).toBe('page');
+    expect(previewToggle()).toBeNull();
+  });
+
+  it('keeps a picture’s toggle, closed, in studio', () => {
+    setPdfViewer(true);
+    const { container } = render(
+      inPresentation(
+        'studio',
+        <StuffViewer
+          field={document('output')}
+          value={{ url: 'https://cdn.example/scan.png', mime_type: 'image/png' }}
+        />,
+      ),
+    );
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('draws a document with no preview as it always did, with no toggle and no frame', () => {
+    setPdfViewer(true);
+    const { container } = render(
+      inPresentation(
+        'app',
+        <StuffViewer
+          field={document('output')}
+          value={{ url: 'https://cdn.example/notes.txt', mime_type: 'text/plain' }}
+        />,
+      ),
+    );
+    expect(previewToggle()).toBeNull();
     expect(container.querySelector('iframe')).toBeNull();
   });
 
@@ -185,17 +251,117 @@ describe('a PDF that is the whole result', () => {
   });
 });
 
-describe('a PDF inside a larger result keeps its toggle, closed', () => {
-  it('in a record', () => {
+describe('the lone document of a record that is the whole result', () => {
+  it('opens in app, at a toggle’s size, with its toggle pressed, and closes on it', () => {
     setPdfViewer(true);
     const { container } = render(
       inPresentation('app', <StuffViewer field={report} value={{ title: 'Q3', source: PDF }} />),
     );
     const toggle = previewToggle();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    const frame = container.querySelector('iframe');
+    expect(frame?.getAttribute('src')).toBe(PDF.url);
+    expect(sizeOf(frame)).toBe('nested');
+    fireEvent.click(toggle!);
     expect(toggle?.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelector('iframe')).toBeNull();
     fireEvent.click(toggle!);
     expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+  });
+
+  it('opens beside a picture, which does not count against it', () => {
+    setPdfViewer(true);
+    const field = record('output', text('title'), picture('cover'), document('source'));
+    const { container } = render(
+      inPresentation(
+        'app',
+        <StuffViewer
+          field={field}
+          value={{
+            title: 'Q3',
+            cover: { url: 'https://cdn.example/cover.png', mime_type: 'image/png' },
+            source: PDF,
+          }}
+        />,
+      ),
+    );
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+  });
+
+  it('keeps its toggle, closed, in studio', () => {
+    setPdfViewer(true);
+    const { container } = render(
+      inPresentation('studio', <StuffViewer field={report} value={{ title: 'Q3', source: PDF }} />),
+    );
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('shows what it shows today when its value is absent', () => {
+    setPdfViewer(true);
+    const { container } = render(
+      inPresentation('app', <StuffViewer field={report} value={{ title: 'Q3' }} />),
+    );
+    expect(previewToggle()).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(screen.getByText('Q3')).toBeTruthy();
+  });
+});
+
+describe('a PDF inside a larger result keeps its toggle, closed', () => {
+  it('in a record holding two documents', () => {
+    setPdfViewer(true);
+    const field = record('output', text('title'), document('source'), document('annex'));
+    const { container } = render(
+      inPresentation(
+        'app',
+        <StuffViewer field={field} value={{ title: 'Q3', source: PDF, annex: PDF }} />,
+      ),
+    );
+    const toggles = previewToggles();
+    expect(toggles.map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual([
+      'false',
+      'false',
+    ]);
+    expect(container.querySelector('iframe')).toBeNull();
+    fireEvent.click(toggles[0]!);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+  });
+
+  it('in a record holding one document beside a list of documents', () => {
+    setPdfViewer(true);
+    const field = record('output', document('source'), listOf('annexes', document('item')));
+    const { container } = render(
+      inPresentation('app', <StuffViewer field={field} value={{ source: PDF, annexes: [PDF] }} />),
+    );
+    expect(previewToggles().map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual([
+      'false',
+      'false',
+    ]);
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('in a record nested in the whole result, which counts neither way', () => {
+    setPdfViewer(true);
+    const field = record('output', text('title'), record('appendix', document('source')));
+    const { container } = render(
+      inPresentation(
+        'app',
+        <StuffViewer field={field} value={{ title: 'Q3', appendix: { source: PDF } }} />,
+      ),
+    );
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('in a record mounted through ResultField on its own, as a part a layout delegates', () => {
+    setPdfViewer(true);
+    const { container } = render(
+      inPresentation('app', <ResultField field={report} value={{ title: 'Q3', source: PDF }} />),
+    );
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('iframe')).toBeNull();
   });
 
   it('in a list, even a list of one', () => {
@@ -242,15 +408,30 @@ describe('where the browser draws no PDF', () => {
 
   it('shows the same card when a nested PDF is toggled open', () => {
     setPdfViewer(false);
+    const field = record('output', text('title'), document('source'), document('annex'));
     const { container } = render(
-      inPresentation('app', <StuffViewer field={report} value={{ title: 'Q3', source: PDF }} />),
+      inPresentation(
+        'app',
+        <StuffViewer field={field} value={{ title: 'Q3', source: PDF, annex: PDF }} />,
+      ),
     );
     expect(screen.queryByText(S.pdfViewerUnavailable)).toBeNull();
-    fireEvent.click(previewToggle()!);
-    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
+    const [toggle] = previewToggles();
+    fireEvent.click(toggle!);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('iframe')).toBeNull();
     expect(screen.getByText(S.pdfViewerUnavailable)).toBeTruthy();
     expect(screen.getByRole('link', { name: S.openInNewTab }).getAttribute('href')).toBe(PDF.url);
+  });
+
+  it('shows the card under a record’s lone document, opened', () => {
+    setPdfViewer(false);
+    const { container } = render(
+      inPresentation('app', <StuffViewer field={report} value={{ title: 'Q3', source: PDF }} />),
+    );
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(screen.getByText(S.pdfViewerUnavailable)).toBeTruthy();
   });
 
   it('shows the card in studio too, once the toggle opens it', () => {
@@ -274,7 +455,8 @@ describe('where the browser draws no PDF', () => {
         />,
       ),
     );
-    fireEvent.click(previewToggle()!);
+    // A picture that is the whole result opens by itself, in `app`.
+    expect(previewToggle()).toBeNull();
     expect(container.querySelector('iframe')?.getAttribute('src')).toBe(
       'https://cdn.example/scan.png',
     );
@@ -345,7 +527,7 @@ describe('a page rendered on a server', () => {
   });
 
   /** Hydrate `html` in a container, recording every frame inserted on the way. */
-  async function hydrate(html: string) {
+  async function hydrate(html: string, tree: ReactNode = lonePdf()) {
     const container = window.document.createElement('div');
     container.innerHTML = html;
     window.document.body.append(container);
@@ -362,7 +544,7 @@ describe('a page rendered on a server', () => {
     const mismatches: unknown[] = [];
     let root: ReturnType<typeof hydrateRoot> | undefined;
     await act(async () => {
-      root = hydrateRoot(container, lonePdf(), {
+      root = hydrateRoot(container, tree, {
         onRecoverableError: (error) => mismatches.push(error),
       });
     });
@@ -398,6 +580,42 @@ describe('a page rendered on a server', () => {
     expect(mismatches).toEqual([]);
     expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
     expect(within(container).queryByText(S.pdfViewerUnavailable)).toBeNull();
+    done();
+  });
+
+  /** A record whose lone document is a PDF, the whole result in `app`. */
+  const reportWithItsPdf = () =>
+    inPresentation('app', <StuffViewer field={report} value={{ title: 'Q3', source: PDF }} />);
+
+  it('renders a record’s lone document open on the server, its toggle pressed', () => {
+    const asked = vi.fn(() => true);
+    setPdfViewer(undefined, asked);
+    const html = renderToString(reportWithItsPdf());
+    expect(asked).not.toHaveBeenCalled();
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).not.toContain('aria-expanded="false"');
+    expect(html).not.toContain('<iframe');
+  });
+
+  it('hydrates a record’s lone document into its frame, with no mismatch', async () => {
+    const html = renderToString(reportWithItsPdf());
+    setPdfViewer(true);
+    const { container, mismatches, done } = await hydrate(html, reportWithItsPdf());
+    expect(mismatches).toEqual([]);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+    expect(
+      within(container).getByRole('button', { name: S.preview }).getAttribute('aria-expanded'),
+    ).toBe('true');
+    done();
+  });
+
+  it('hydrates a record’s lone document into the card on a browser with no viewer', async () => {
+    const html = renderToString(reportWithItsPdf());
+    setPdfViewer(false);
+    const { container, inserted, mismatches, done } = await hydrate(html, reportWithItsPdf());
+    expect(mismatches).toEqual([]);
+    expect(inserted).toEqual([]);
+    expect(within(container).getByText(S.pdfViewerUnavailable)).toBeTruthy();
     done();
   });
 });

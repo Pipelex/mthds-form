@@ -155,6 +155,23 @@ summary = { type = "concept", concept_ref = "native.Html", description = "The su
 source  = { type = "concept", concept_ref = "native.Document", description = "The document it was drawn from", required = true }
 figures = { type = "list", item_type = "concept", item_concept_ref = "Figure", description = "The illustrations", required = true }
 
+# ─── Two documents in one record ─────────────────────────────────────────────
+#
+# A record holding two documents, side by side. In `app` a record's ONLY
+# document opens under it, since it is the deliverable the record captions;
+# with two, choosing one would read as a bug, so both keep their toggles,
+# closed. Like `nested_media_result`, its pipe carries no 'run' block: the
+# story supplies a payload of served files, because a run's file URLs are
+# storage references a browser cannot fetch.
+
+[concept.ReviewPacket]
+description = "A review sent with the document it reviews and an appendix"
+
+[concept.ReviewPacket.structure]
+title    = { type = "text", description = "The review's title", required = true }
+reviewed = { type = "concept", concept_ref = "native.Document", description = "The document under review", required = true }
+appendix = { type = "concept", concept_ref = "native.Document", description = "The appendix sent with it", required = true }
+
 # ─── A refined page ──────────────────────────────────────────────────────────
 #
 # A method whose answer is one printable page declares its own concept over

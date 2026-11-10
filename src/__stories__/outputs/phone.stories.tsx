@@ -7,7 +7,7 @@ import { PAYLOADS as RESULT_RUNS } from '../_generated/results.payloads';
 import { DEFAULT_FIELD_STRINGS as S, JsonView } from '../../react';
 import { ResultView } from '../result-view';
 import { atWidth, expectTouchTarget, pinnedTo } from '../touch-target';
-import { REPORT } from './media-payloads';
+import { pdfViewer, REPORT } from './media-payloads';
 
 /**
  * The result view's controls on a phone, and the same controls on a desktop.
@@ -93,11 +93,17 @@ async function expectNoSidewaysScroll(canvasElement: HTMLElement) {
  * link, its copy and download buttons and its Preview, the summary's download
  * button and each figure row's chevron are 44 pixels square or more, and a tap
  * at each edge of each one lands on it.
+ *
+ * The source is the report's only document, so in `app` it opens as the result
+ * does. The viewer is pinned on, as on a desktop browser, so it opens onto a
+ * frame: the card a browser with no viewer draws in its place has controls of
+ * its own, which `Outputs/Media` holds to the same size.
  */
 export const ReportPhone: Story = {
   name: 'A report with a document, phone',
   ...pinnedTo('phone'),
   args: report,
+  beforeEach: pdfViewer(true),
   play: async ({ canvasElement }) => {
     await atWidth('phone');
     await expectNoSidewaysScroll(canvasElement);
@@ -115,6 +121,7 @@ export const ReportDesktop: Story = {
   name: 'A report with a document, desktop',
   ...pinnedTo('desktop'),
   args: report,
+  beforeEach: pdfViewer(true),
   play: async ({ canvasElement }) => {
     await atWidth('desktop');
     const canvas = within(canvasElement);
