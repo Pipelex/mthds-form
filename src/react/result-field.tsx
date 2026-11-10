@@ -916,8 +916,7 @@ function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): str
 /**
  * Whether a previewable document is a PDF, read as `previewableUrl` reads
  * renderability: the declared type when there is one, else the name's
- * extension. Only a PDF needs the browser's PDF viewer, and only a PDF that is
- * the whole result opens without a click.
+ * extension. Only a PDF needs the browser's PDF viewer.
  */
 function isPdfDocument(content: DocumentContentView, url: string): boolean {
   return content.mimeType
@@ -1090,18 +1089,27 @@ function PdfUnavailable({
  * a browser with no PDF viewer gets the same card: there, its link opens the
  * PDF, because the link is the reader's way to the pages, and its download
  * saves the original, because that is the file the result holds.
+ *
+ * As the whole result it takes a page's size from its first render: the
+ * "Preparing" box and the failure that offers to try again hold the place the
+ * pages will fill, so the result does not jump when the PDF arrives, nor when
+ * a reader tries again.
  */
 function ConvertedDocumentPreview({
   ask,
   name,
   file,
+  whole,
 }: {
   ask: AskDocumentPdf;
   name: string;
   file: StuffFile | undefined;
+  /** The preview is the whole result, and takes a page's size (`WHOLE_RESULT_FRAME`). */
+  whole: boolean;
 }) {
   const s = useFieldStrings();
   const { answer, retry } = useDocumentPdf(ask);
+  const size = whole ? WHOLE_RESULT_FRAME : NESTED_FRAME;
   // The button a reader presses to try again is gone once the retry renders, so
   // focus lands on the region that replaced it rather than on the page's body.
   // Only that press sets `retried`, so neither the first render nor a poll
@@ -1120,7 +1128,7 @@ function ConvertedDocumentPreview({
         role="status"
         tabIndex={-1}
         className={cn(
-          NESTED_FRAME,
+          size,
           'flex items-center justify-center gap-2 rounded-lg border border-border bg-card/40 text-[12px] text-muted-foreground outline-none',
         )}
       >
@@ -1131,10 +1139,18 @@ function ConvertedDocumentPreview({
   }
   if (answer.state === 'failed') {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/40 px-3.5 py-3 sm:flex-row sm:items-center">
+      <div
+        className={cn(
+          'flex flex-col gap-3 rounded-lg border border-border bg-card/40 px-3.5 py-3',
+          whole ? cn(size, 'items-center justify-center') : 'sm:flex-row sm:items-center',
+        )}
+      >
         <p
           role="alert"
-          className="flex min-w-0 flex-1 items-start gap-2 text-[12.5px] leading-relaxed text-muted-foreground"
+          className={cn(
+            'flex min-w-0 items-start gap-2 text-[12.5px] leading-relaxed text-muted-foreground',
+            !whole && 'flex-1',
+          )}
         >
           <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
           <span>{answer.message ?? s.documentPdfFailed}</span>
@@ -1154,7 +1170,7 @@ function ConvertedDocumentPreview({
   }
   const gated = answer.state === 'ready' ? viewableUrl(answer.url) : undefined;
   const url = gated && frameableUrl({ url: gated, fromResolver: true });
-  if (url) return <DocumentPreview url={url} name={name} pdf file={file} whole={false} />;
+  if (url) return <DocumentPreview url={url} name={name} pdf file={file} whole={whole} />;
   return (
     <p
       role="status"
@@ -1169,24 +1185,34 @@ function ConvertedDocumentPreview({
  * A document: its name, its reference and snippet, and a preview where the
  * browser can both frame and render it, or where its host answers a PDF of it.
  *
- * **Asked when the reader opens it.** The host's function is called on every
- * render, and says only whether it has a way to a PDF of this document; the
- * question that starts the work is asked when the preview opens, so a result
- * full of documents converts only the ones somebody looks at. That is why such
- * a document keeps its toggle even as the whole result in `app`, where a PDF
- * opens on its own.
+ * **A preview opens on its toggle, and the host is asked when it opens.** The
+ * host's function is called on every render, and says only whether it has a
+ * way to a PDF of this document; the question that starts the work is asked
+ * when the preview opens, so a result full of documents converts only the ones
+ * somebody looks at.
  *
- * **A PDF that is the whole result opens without a click, in `app`.** The
- * reader of a method app came for that file, and a small toggle stood between
- * them and its pages. Opened, it has no toggle at all, since closing the only
- * thing the result holds would leave it empty. `whole` is the panel's own word
- * that this is the whole result (`PanelResult`), so a PDF in a record, a list,
- * a composite or a part a generative layout delegates keeps its toggle, closed.
+ * **In `app`, the document the run delivered opens without a click**, because
+ * the reader came for it. Two places count, both decided by the panel and the
+ * descriptor, never by the value:
  *
- * `studio` keeps the toggle on a whole result too. It is the builder's
- * presentation and the default, also mounted in a graph's node panel that a
- * builder moves through node after node; opening every PDF there would fetch
- * each one and fill a narrow panel before anyone asked, and the builder's first
+ * - **The whole result** (`whole`, the panel's own word: `PanelResult`), when it
+ *   has any preview: a PDF or a picture the browser frames, or the host's PDF
+ *   of a Word, Excel or PowerPoint file, which is then asked for as it mounts.
+ *   It is framed at a page's size and has no toggle, since closing the only
+ *   thing the result holds would leave it empty.
+ * - **The lone document of a whole-result record** (`startsOpen`, said by the
+ *   record: `DeliveredDocumentContext`). It opens at the size a toggle gives a
+ *   nested preview and keeps its toggle, pressed, so a reader can fold it away
+ *   and read the rest of the record.
+ *
+ * Everything else keeps its toggle, closed: a document in a list (a list of one
+ * included), in a record with several, in a nested record or a composite, or in
+ * a part a generative layout delegates.
+ *
+ * `studio` keeps every toggle closed. It is the builder's presentation and the
+ * default, also mounted in a graph's node panel that a builder moves through
+ * node after node; opening every document there would fetch or convert each
+ * one and fill a narrow panel before anyone asked, and the builder's first
  * question is usually what came back rather than what it looks like.
  *
  * **The file is named once.** The link's label is the file's name (`fileLabel`:
@@ -1195,7 +1221,17 @@ function ConvertedDocumentPreview({
  * that fell back to the filename printed the same words twice over every
  * document a producer leaves untitled, and an exported presentation is one.
  */
-function DocumentValue({ value, whole = false }: { value: unknown; whole?: boolean }) {
+function DocumentValue({
+  value,
+  whole = false,
+  startsOpen = false,
+}: {
+  value: unknown;
+  /** The whole result a panel shows, in any presentation: see {@link PanelResult}. */
+  whole?: boolean;
+  /** The lone document of a whole-result record in `app`: see `DeliveredDocumentContext`. */
+  startsOpen?: boolean;
+}) {
   const s = useFieldStrings();
   // Above the early return: a hook after one runs conditionally, which React
   // forbids and which the `<Absent />` path would trigger on any payload
@@ -1203,7 +1239,9 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   const resolve = useResolveUrl();
   const resolveDocumentPdf = useResolveDocumentPdf();
   const isApp = useFieldPresentation() === 'app';
-  const [open, setOpen] = useState(false);
+  // Decided from the descriptor alone, so a server render and the hydration
+  // after it start from the same state.
+  const [open, setOpen] = useState(startsOpen);
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
@@ -1217,7 +1255,6 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   const name = title || label;
   const preview = previewableUrl(content, resolve);
   const pdf = preview !== undefined && isPdfDocument(content, preview);
-  const opened = whole && isApp && pdf;
   // Only a document the browser cannot render is asked about: a PDF that cannot
   // be framed is still a PDF, and a PDF of it would change nothing.
   const askPdf =
@@ -1227,6 +1264,7 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
           mimeType: content.mimeType,
         })
       : undefined;
+  const opened = whole && isApp && (preview !== undefined || askPdf !== undefined);
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -1277,8 +1315,14 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
       {preview && (opened || open) && (
         <DocumentPreview url={preview} name={name} pdf={pdf} file={file} whole={opened} />
       )}
-      {askPdf && open && (
-        <ConvertedDocumentPreview key={content.url} ask={askPdf} name={name} file={file} />
+      {askPdf && (opened || open) && (
+        <ConvertedDocumentPreview
+          key={content.url}
+          ask={askPdf}
+          name={name}
+          file={file}
+          whole={opened}
+        />
       )}
     </div>
   );
@@ -3657,6 +3701,42 @@ export function PanelResult({
 }
 
 /**
+ * Said by a record that is the whole result, in `app`, around the one member
+ * that is its lone document: that member is the deliverable the record
+ * captions, so its preview starts open (`DocumentValue`'s `startsOpen`).
+ *
+ * A context rather than a prop, for the reason `PanelResult` is one: the
+ * record reaches its member through `ResultField`, whose props are the public
+ * API, and a prop there would let any host or layout open any document. It is
+ * set around that member's `ResultField` alone, and a document is a leaf, so no
+ * node beneath it reads it.
+ *
+ * What counts as lone is read from the descriptor (`loneDocumentMember`), as
+ * every layout decision here is, so a server render and the hydration after it
+ * agree.
+ */
+const DeliveredDocumentContext = createContext(false);
+
+/**
+ * The name of a record's lone document member: exactly one direct member of
+ * kind `document`, and no direct member that is a list of documents. A picture
+ * does not count against it, since a picture already shows inline; a member of
+ * a nested record counts neither way, since the rule reads one level so a
+ * reader can predict it from the record they see. `undefined` when there is
+ * none, or when there are several, where choosing one would read as a bug.
+ */
+function loneDocumentMember(field: ObjectRunField): string | undefined {
+  let lone: string | undefined;
+  for (const child of field.fields) {
+    if (child.kind === 'list' && child.item.kind === 'document') return undefined;
+    if (child.kind !== 'document') continue;
+    if (lone !== undefined) return undefined;
+    lone = child.name;
+  }
+  return lone;
+}
+
+/**
  * The single dispatch point, mirroring `FieldRenderer` on the input side.
  *
  * The outermost one also marks the root of the result, when no panel above it
@@ -3703,6 +3783,7 @@ function ResultNode({
   const pdfShown = usePdfSaveShown();
   const location = useResultLocation();
   const isApp = useFieldPresentation() === 'app';
+  const delivered = use(DeliveredDocumentContext);
 
   // The description rides the label's `title`, at every depth including this
   // one.
@@ -3866,6 +3947,9 @@ function ResultNode({
       const sharesALine = (child: RunField) =>
         isInlineColumn(child) &&
         !(isApp && child.kind === 'text' && isLongText(unwrap(child, memberValue(child))));
+      // The record the run delivered, in `app`, opens its lone document: the
+      // deliverable it captions (see `DeliveredDocumentContext`).
+      const lone = whole && isApp ? loneDocumentMember(field) : undefined;
       return (
         <div className="space-y-2">
           {header}
@@ -3943,7 +4027,13 @@ function ResultNode({
               ) : (
                 <div key={child.name} className="col-span-2 min-w-0">
                   <ResultAt segment={child.name}>
-                    <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                    {child.name === lone ? (
+                      <DeliveredDocumentContext value>
+                        <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                      </DeliveredDocumentContext>
+                    ) : (
+                      <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                    )}
                   </ResultAt>
                 </div>
               ),
@@ -4152,12 +4242,13 @@ function ResultNode({
               `prose` value, as `LeafValue` would set it, and a long `text`
               value in `app`, typeset as the prose it is (see `isLongText`),
               where a chip and a cell keep it plain. So is a document that is
-              the whole result a panel shows, which is told so: a PDF there
-              opens without a click (see `DocumentValue`). */}
+              the whole result a panel shows, or the lone document of a record
+              that is, which is told so: in `app` its preview opens without a
+              click (see `DocumentValue`). */}
           {typeset !== undefined ? (
             <Markdown text={typeset} />
-          ) : field.kind === 'document' && whole ? (
-            <DocumentValue value={unwrapped} whole />
+          ) : field.kind === 'document' && (whole || delivered) ? (
+            <DocumentValue value={unwrapped} whole={whole} startsOpen={delivered} />
           ) : (
             <LeafValue field={field} value={value} />
           )}

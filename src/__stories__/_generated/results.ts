@@ -1,7 +1,7 @@
 /**
  * Generated from src/__stories__/_structures/results.mthds - DO NOT EDIT.
  *
- * Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. Two pipes carry no 'run' block. `nested_media_result` cannot: it resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch. `quote_page_result` need not: its story supplies a whole document linking a face Storybook serves, which no run can produce. Both descriptors are generated like every other.
+ * Pipes whose OUTPUT is the interesting half, chosen to span the whole result surface rather than to repeat one shape: every native scalar, a wrapping content model and a multi-property one, a flat structure, one and four levels of nesting, a list long enough to scroll, and both file-bearing kinds. Each pipe carries a 'run' block (or states its own prompt), so `make fixtures-runs` produces the real payload beside the descriptor. The two carriers that are not PipeLLM are there because the language forbids one: a PipeLLM may not resolve to a concept that contains images, so the image case is a PipeImgGen and the page case a PipeExtract. Some pipes carry no 'run' block. `nested_media_result` cannot: it resolves to a concept containing images, which the language forbids a PipeLLM producing, and no other operator produces a structure; the story that renders it supplies its own payload of served files, because a run's file URLs are storage references a browser cannot fetch. `two_documents_result` carries none for the file half of that reason: a run's documents are storage references a browser cannot fetch, so its story supplies served files. `quote_page_result` need not: its story supplies a whole document linking a face Storybook serves, which no run can produce. Every descriptor is generated like every other.
  *
  * Regenerate with `make fixtures`. The pipes below are synthesized carriers:
  * the authored bundle declares structures only. See scripts/generate-fixtures.mjs.
@@ -24,6 +24,7 @@ export const PIPE_REFS = [
   'results.plain_text_result',
   'results.plural_result',
   'results.quote_page_result',
+  'results.two_documents_result',
   'results.yes_no_result',
 ] as const;
 
@@ -1637,6 +1638,137 @@ export const CONTRACTS: PipeIOContracts = {
       optional: false,
     },
   },
+  'results.two_documents_result': {
+    inputs: {
+      note: {
+        concept_ref: 'native.Text',
+        item_count: null,
+        json_schema: {
+          description: 'A text',
+          properties: {
+            text: {
+              description: 'The text',
+              title: 'Text',
+              type: 'string',
+            },
+          },
+          required: ['text'],
+          title: 'native.Text',
+          type: 'object',
+        },
+        multiplicity: 'single',
+        presence: 'plain',
+      },
+    },
+    output: {
+      concept_ref: 'results.ReviewPacket',
+      item_count: null,
+      json_schema: {
+        $defs: {
+          DocumentContent: {
+            description: 'A document',
+            properties: {
+              filename: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The original filename of the document',
+                title: 'Filename',
+              },
+              mime_type: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The MIME type of the document',
+                title: 'Mime Type',
+              },
+              public_url: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The public HTTPS URL of the document',
+                title: 'Public Url',
+              },
+              snippet: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'A text snippet or excerpt from the document',
+                title: 'Snippet',
+              },
+              title: {
+                anyOf: [
+                  {
+                    type: 'string',
+                  },
+                  {
+                    type: 'null',
+                  },
+                ],
+                default: null,
+                description: 'The title of the document or source',
+                title: 'Title',
+              },
+              url: {
+                description:
+                  'The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL',
+                title: 'Url',
+                type: 'string',
+              },
+            },
+            required: ['url'],
+            title: 'DocumentContent',
+            type: 'object',
+          },
+        },
+        description: 'A review sent with the document it reviews and an appendix',
+        properties: {
+          appendix: {
+            $ref: '#/$defs/DocumentContent',
+            description: 'The appendix sent with it',
+          },
+          reviewed: {
+            $ref: '#/$defs/DocumentContent',
+            description: 'The document under review',
+          },
+          title: {
+            description: "The review's title",
+            title: 'Title',
+            type: 'string',
+          },
+        },
+        required: ['title', 'reviewed', 'appendix'],
+        title: 'results.ReviewPacket',
+        type: 'object',
+      },
+      multiplicity: 'single',
+      optional: false,
+    },
+  },
   'results.yes_no_result': {
     inputs: {
       note: {
@@ -1842,6 +1974,19 @@ export const INPUT_FORM: InputForm = {
     ],
   },
   'results.quote_page_result': {
+    fields: [
+      {
+        concept_ref: 'native.Text',
+        description: 'A text',
+        gating: true,
+        kind: 'prose',
+        name: 'note',
+        presence: 'plain',
+        required: true,
+      },
+    ],
+  },
+  'results.two_documents_result': {
     fields: [
       {
         concept_ref: 'native.Text',
@@ -2544,6 +2689,37 @@ export const OUTPUT_FORM: OutputForm = {
       required: true,
     },
   },
+  'results.two_documents_result': {
+    field: {
+      concept_ref: 'results.ReviewPacket',
+      description: 'A review sent with the document it reviews and an appendix',
+      fields: [
+        {
+          description: "The review's title",
+          kind: 'text',
+          name: 'title',
+          required: true,
+        },
+        {
+          concept_ref: 'native.Document',
+          description: 'The document under review',
+          kind: 'document',
+          name: 'reviewed',
+          required: true,
+        },
+        {
+          concept_ref: 'native.Document',
+          description: 'The appendix sent with it',
+          kind: 'document',
+          name: 'appendix',
+          required: true,
+        },
+      ],
+      kind: 'object',
+      name: 'output',
+      required: true,
+    },
+  },
   'results.yes_no_result': {
     field: {
       concept_ref: 'native.YesNo',
@@ -2589,6 +2765,8 @@ export const PIPE_DESCRIPTIONS: Record<string, string> = {
   'results.plural_result':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'results.quote_page_result':
+    'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
+  'results.two_documents_result':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
   'results.yes_no_result':
     'Carrier pipe, synthesized by scripts/generate-fixtures.mjs - not authored.',
