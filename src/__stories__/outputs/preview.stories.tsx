@@ -13,7 +13,7 @@ import {
 } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
-import { expectTouchTarget, VIEWPORTS } from '../touch-target';
+import { expectTouchTarget, pinnedTo, VIEWPORTS } from '../touch-target';
 import { PDF_URL, REPORT } from './media-payloads';
 
 /**
@@ -524,5 +524,76 @@ export const AWordDocumentUnavailable: Story = {
     await expect(
       canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.tryAgain }),
     ).toHaveLength(0);
+  },
+};
+
+// ─── A document named once ───────────────────────────────────────────────────
+
+/** An exported presentation, as a producer leaves it: a filename and no title. */
+const UNTITLED_PRESENTATION = {
+  url: 'https://example.com/files/generated-presentation.pptx',
+  filename: 'generated-presentation.pptx',
+  mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};
+
+/**
+ * Each theme pane names the file once: the link is its name, and an untitled
+ * document draws no line above it. Two panes, so two of each.
+ */
+async function expectNamedOnce(canvasElement: HTMLElement, name: string) {
+  const canvas = within(canvasElement);
+  await expect(canvas.getAllByText(name)).toHaveLength(2);
+  await expect(canvas.getAllByRole('link', { name })).toHaveLength(2);
+}
+
+/**
+ * **An untitled document is named by its link alone.** Its name used to stand
+ * above the link as well, the same words twice. The host answers a PDF of it,
+ * so the Preview toggle sits beside the one line.
+ */
+export const AnUntitledPresentation: Story = {
+  name: 'An untitled .pptx → named once, by its link',
+  args: {
+    value: UNTITLED_PRESENTATION,
+    presentation: 'app',
+    resolveDocumentPdf: hostAnswering({ state: 'ready', url: PDF_URL }),
+  },
+  ...pinnedTo('desktop'),
+  play: async ({ canvasElement }) => {
+    await expectNamedOnce(canvasElement, UNTITLED_PRESENTATION.filename);
+    await expect(
+      within(canvasElement).getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(2);
+  },
+};
+
+/** The same on a phone, where the link's line grows to a finger's 44px. */
+export const AnUntitledPresentationOnAPhone: Story = {
+  name: 'An untitled .pptx on a phone → named once',
+  args: AnUntitledPresentation.args,
+  ...pinnedTo('phone'),
+  play: async ({ canvasElement }) => {
+    await expectNamedOnce(canvasElement, UNTITLED_PRESENTATION.filename);
+  },
+};
+
+/** **Neither title nor filename: named once, by its URL's last segment.** */
+export const ABareDocument: Story = {
+  name: 'A document with no title or filename → named once, from its URL',
+  args: { value: { url: 'https://example.com/files/minutes.docx' }, presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    await expectNamedOnce(canvasElement, 'minutes.docx');
+  },
+};
+
+/** **A title that only repeats the filename adds nothing, and is not drawn.** */
+export const ATitleRepeatingItsFilename: Story = {
+  name: 'A title equal to its filename → named once',
+  args: {
+    value: { ...UNTITLED_PRESENTATION, title: UNTITLED_PRESENTATION.filename },
+    presentation: 'app',
+  },
+  play: async ({ canvasElement }) => {
+    await expectNamedOnce(canvasElement, UNTITLED_PRESENTATION.filename);
   },
 };
