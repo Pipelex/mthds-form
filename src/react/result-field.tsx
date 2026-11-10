@@ -40,6 +40,7 @@ import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff
 import {
   useFileDownloadShown,
   usePdfSaveShown,
+  useResolveDocumentPdf,
   useResolveRendition,
   useResolveShareUrl,
   useResolveUrl,
@@ -48,6 +49,7 @@ import {
   useSaveFiles,
   useTableColumns,
   useTableLayout,
+  type AskDocumentPdf,
   type ResolveRendition,
   type ResolveUrl,
 } from './result-env';
@@ -69,6 +71,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { ConceptPill } from './concept-pill';
+import { useDocumentPdf } from './document-pdf';
 import { FocusFrame } from './focus-frame';
 import { usePdfViewer } from './pdf-viewer';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
@@ -876,15 +879,23 @@ function frameableUrl(candidate: PaintableUrl | undefined): string | undefined {
   return candidate.fromResolver && candidate.url.startsWith('/') ? candidate.url : undefined;
 }
 
+/** Whether a browser renders this document with nothing installed, `url` naming it when its filename does not. */
+function browserRenders(content: DocumentContentView, url: string): boolean {
+  return content.mimeType
+    ? PREVIEWABLE_MIME_RE.test(content.mimeType)
+    : PREVIEWABLE_EXT_RE.test(content.filename ?? url);
+}
+
 /**
- * Whether a document can be shown here, rather than only linked to.
+ * Whether a document can be shown here as it is, rather than only linked to.
  *
  * Two conditions, and both are necessary: the browser must be able to FRAME the
  * URL (`frameableUrl` — a `pipelex-storage://` reference resolves nowhere
  * without the host's resolver, and a `data:` document is not framed at all) and
  * to RENDER it with nothing installed. A `.docx` satisfies the first and not the
  * second, and offering a preview that opens onto a download prompt is worse than
- * offering none.
+ * offering none; such a document is shown only as a PDF its host makes of it
+ * (`ConvertedDocumentPreview`).
  *
  * The declared type is what decides RENDERABILITY, and reading it from the
  * payload is right — whether a preview is worth offering is a usability
@@ -894,12 +905,7 @@ function frameableUrl(candidate: PaintableUrl | undefined): string | undefined {
  */
 function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): string | undefined {
   const url = frameableUrl(paintable(content, resolve));
-  if (!url) return undefined;
-  const named = content.filename ?? url;
-  const renderable = content.mimeType
-    ? PREVIEWABLE_MIME_RE.test(content.mimeType)
-    : PREVIEWABLE_EXT_RE.test(named);
-  return renderable ? url : undefined;
+  return url && browserRenders(content, url) ? url : undefined;
 }
 
 /**
@@ -1070,8 +1076,100 @@ function PdfUnavailable({
 }
 
 /**
+ * The preview of a document the browser cannot render, as the PDF its host
+ * makes of it, for as long as the preview is open.
+ *
+ * The answer is the host's, so it goes through the same two gates as a
+ * resolver's: `viewableUrl`, and `frameableUrl`, where a root-relative path is
+ * the host's own choice of origin. Once framed, it is a PDF like any other, and
+ * a browser with no PDF viewer gets the same card: there, its link opens the
+ * PDF, because the link is the reader's way to the pages, and its download
+ * saves the original, because that is the file the result holds.
+ */
+function ConvertedDocumentPreview({
+  ask,
+  name,
+  file,
+}: {
+  ask: AskDocumentPdf;
+  name: string;
+  file: StuffFile | undefined;
+}) {
+  const s = useFieldStrings();
+  const { answer, retry } = useDocumentPdf(ask);
+  // The button a reader presses to try again is gone once the retry renders, so
+  // focus lands on the region that replaced it rather than on the page's body.
+  // Only that press sets `retried`, so neither the first render nor a poll
+  // takes the focus.
+  const preparing = useRef<HTMLDivElement>(null);
+  const retried = useRef(false);
+  useEffect(() => {
+    if (!retried.current) return;
+    retried.current = false;
+    preparing.current?.focus();
+  });
+  if (answer.state === 'preparing') {
+    return (
+      <div
+        ref={preparing}
+        role="status"
+        tabIndex={-1}
+        className={cn(
+          NESTED_FRAME,
+          'flex items-center justify-center gap-2 rounded-lg border border-border bg-card/40 text-[12px] text-muted-foreground outline-none',
+        )}
+      >
+        <Loader2 aria-hidden className="size-4 animate-spin" />
+        <span>{s.documentPdfPreparing}</span>
+      </div>
+    );
+  }
+  if (answer.state === 'failed') {
+    return (
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/40 px-3.5 py-3 sm:flex-row sm:items-center">
+        <p
+          role="alert"
+          className="flex min-w-0 flex-1 items-start gap-2 text-[12.5px] leading-relaxed text-muted-foreground"
+        >
+          <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          <span>{answer.message ?? s.documentPdfFailed}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            retried.current = true;
+            retry();
+          }}
+          className={cn(CARD_ACTION, 'text-foreground', focusOutlineClass)}
+        >
+          {s.tryAgain}
+        </button>
+      </div>
+    );
+  }
+  const gated = answer.state === 'ready' ? viewableUrl(answer.url) : undefined;
+  const url = gated && frameableUrl({ url: gated, fromResolver: true });
+  if (url) return <DocumentPreview url={url} name={name} pdf file={file} whole={false} />;
+  return (
+    <p
+      role="status"
+      className="rounded-lg border border-border bg-card/40 px-3.5 py-3 text-[12.5px] leading-relaxed text-muted-foreground"
+    >
+      {s.documentPdfUnavailable}
+    </p>
+  );
+}
+
+/**
  * A document: its name, its reference and snippet, and a preview where the
- * browser can both frame and render it.
+ * browser can both frame and render it, or where its host answers a PDF of it.
+ *
+ * **Asked when the reader opens it.** The host's function is called on every
+ * render, and says only whether it has a way to a PDF of this document; the
+ * question that starts the work is asked when the preview opens, so a result
+ * full of documents converts only the ones somebody looks at. That is why such
+ * a document keeps its toggle even as the whole result in `app`, where a PDF
+ * opens on its own.
  *
  * **A PDF that is the whole result opens without a click, in `app`.** The
  * reader of a method app came for that file, and a small toggle stood between
@@ -1092,6 +1190,7 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   // forbids and which the `<Absent />` path would trigger on any payload
   // missing a URL.
   const resolve = useResolveUrl();
+  const resolveDocumentPdf = useResolveDocumentPdf();
   const isApp = useFieldPresentation() === 'app';
   const [open, setOpen] = useState(false);
   const file = useStuffFile('document', value);
@@ -1101,6 +1200,15 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   const preview = previewableUrl(content, resolve);
   const pdf = preview !== undefined && isPdfDocument(content, preview);
   const opened = whole && isApp && pdf;
+  // Only a document the browser cannot render is asked about: a PDF that cannot
+  // be framed is still a PDF, and a PDF of it would change nothing.
+  const askPdf =
+    preview === undefined && !browserRenders(content, content.url)
+      ? resolveDocumentPdf?.(content.url, {
+          filename: content.filename,
+          mimeType: content.mimeType,
+        })
+      : undefined;
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -1120,7 +1228,7 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
             </p>
           )}
         </div>
-        {preview && !opened && (
+        {(preview || askPdf) && !opened && (
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
@@ -1141,6 +1249,9 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
       </div>
       {preview && (opened || open) && (
         <DocumentPreview url={preview} name={name} pdf={pdf} file={file} whole={opened} />
+      )}
+      {askPdf && open && (
+        <ConvertedDocumentPreview key={content.url} ask={askPdf} name={name} file={file} />
       )}
     </div>
   );

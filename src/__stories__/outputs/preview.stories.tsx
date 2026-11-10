@@ -5,8 +5,11 @@ import type { FileRunField } from '../../core/descriptor';
 import {
   DEFAULT_FIELD_STRINGS,
   FieldPresentationProvider,
+  ResultEnvProvider,
   StuffViewer,
+  type DocumentPdfAnswer,
   type FieldPresentation,
+  type ResolveDocumentPdf,
 } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
@@ -41,8 +44,10 @@ import { PDF_URL, REPORT } from './media-payloads';
  * result view has no business telling a third party where it was opened from.
  *
  * The button appears only when the browser can both **frame** the URL and
- * **render** it unaided. A `.docx` satisfies the first and not the second, and a
- * preview that opens onto a download prompt is worse than no preview.
+ * **render** it unaided, or when the host answers a PDF of the document. A
+ * `.docx` satisfies the first and not the second, and a preview that opens onto
+ * a download prompt is worse than no preview, so it offers one only when its
+ * host can make a PDF of it (`resolveDocumentPdf`).
  */
 
 const document: FileRunField = {
@@ -57,14 +62,19 @@ const document: FileRunField = {
 function Preview({
   value,
   presentation = 'studio',
+  resolveDocumentPdf,
 }: {
   value: unknown;
   presentation?: FieldPresentation;
+  /** The host's PDF of a document the browser cannot render. */
+  resolveDocumentPdf?: ResolveDocumentPdf;
 }) {
   return (
     <div style={{ maxWidth: 640 }}>
       <FieldPresentationProvider presentation={presentation}>
-        <StuffViewer field={document} value={value} />
+        <ResultEnvProvider resolveDocumentPdf={resolveDocumentPdf}>
+          <StuffViewer field={document} value={value} />
+        </ResultEnvProvider>
       </FieldPresentationProvider>
     </div>
   );
@@ -121,20 +131,22 @@ export const AStorageReference: Story = {
   },
 };
 
+/** A Word document, which a browser fetches and cannot render. */
+const WORD_DOCUMENT = {
+  url: 'https://example.com/contract.docx',
+  filename: 'contract.docx',
+  mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  title: 'Supply agreement',
+};
+
 /**
  * A format the browser cannot render unaided. Fetchable, so it links — and
- * offers no preview, because the preview would be a download prompt.
+ * offers no preview, because the preview would be a download prompt. This is
+ * what a host that does not answer a PDF of it still shows.
  */
 export const AWordDocument: Story = {
   name: 'A .docx → link, no preview',
-  args: {
-    value: {
-      url: 'https://example.com/contract.docx',
-      filename: 'contract.docx',
-      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      title: 'Supply agreement',
-    },
-  },
+  args: { value: WORD_DOCUMENT },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
@@ -405,5 +417,112 @@ export const NoPdfViewerNested: StoryObj<typeof ResultView> = {
     }
     await expect(pdfFrames(canvasElement)).toHaveLength(0);
     await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(2);
+  },
+};
+
+// ─── A document the browser cannot render, as the PDF its host makes of it ───
+
+/** A host whose answer about a document never changes. */
+function hostAnswering(answer: DocumentPdfAnswer): ResolveDocumentPdf {
+  return () => () => Promise.resolve(answer);
+}
+
+/** Opens the Preview toggle of the document in each theme pane. */
+async function openPreviews(canvasElement: HTMLElement) {
+  const toggles = within(canvasElement).getAllByRole('button', {
+    name: DEFAULT_FIELD_STRINGS.preview,
+  });
+  await expect(toggles).toHaveLength(2);
+  for (const toggle of toggles) await userEvent.click(toggle);
+}
+
+/**
+ * **A host that answers a PDF: the document's pages, on the Preview toggle.**
+ * Nothing is asked of the host until a reader opens the preview, and the frame
+ * is the PDF's, while the document's own line and download stay the original's.
+ * The viewer is pinned on, as on a desktop browser.
+ */
+export const AWordDocumentAsAPdf: Story = {
+  name: 'A .docx whose host answers a PDF → its pages',
+  args: {
+    value: WORD_DOCUMENT,
+    resolveDocumentPdf: hostAnswering({ state: 'ready', url: PDF_URL }),
+  },
+  beforeEach: pdfViewer(true),
+  play: async ({ canvasElement }) => {
+    await expect(pdfFrames(canvasElement)).toHaveLength(0);
+    await openPreviews(canvasElement);
+    await waitFor(() => expect(pdfFrames(canvasElement)).toHaveLength(2));
+    for (const frame of pdfFrames(canvasElement)) {
+      await expect(frame.getAttribute('title')).toBe(WORD_DOCUMENT.title);
+      await expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
+      await expect(frame.hasAttribute('sandbox')).toBe(false);
+    }
+  },
+};
+
+/** When this story's host was first asked; `beforeEach` clears it for each run. */
+let firstAsked: number | undefined;
+
+/** A host whose conversion takes a moment: `preparing`, then the PDF. */
+const convertingForAMoment: ResolveDocumentPdf = () => () => {
+  firstAsked ??= Date.now();
+  return Promise.resolve<DocumentPdfAnswer>(
+    Date.now() - firstAsked < 1_000 ? { state: 'preparing' } : { state: 'ready', url: PDF_URL },
+  );
+};
+
+/**
+ * **A first view does not wait on the conversion.** The host answers
+ * `preparing`, the preview says so in the box the pages will fill, and the view
+ * asks again until the PDF is ready.
+ */
+export const AWordDocumentPreparing: Story = {
+  name: 'A .docx whose PDF is being made → preparing, then its pages',
+  args: { value: WORD_DOCUMENT, resolveDocumentPdf: convertingForAMoment },
+  beforeEach: () => {
+    firstAsked = undefined;
+    return pdfViewer(true)();
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await openPreviews(canvasElement);
+    await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing)).toHaveLength(2);
+    await waitFor(() => expect(pdfFrames(canvasElement)).toHaveLength(2), { timeout: 5_000 });
+    await expect(canvas.queryAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing)).toHaveLength(0);
+  },
+};
+
+/** **A conversion that failed says so, and offers to try again.** */
+export const AWordDocumentFailed: Story = {
+  name: 'A .docx whose PDF could not be made → Try again',
+  args: { value: WORD_DOCUMENT, resolveDocumentPdf: hostAnswering({ state: 'failed' }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await openPreviews(canvasElement);
+    await waitFor(() =>
+      expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfFailed)).toHaveLength(2),
+    );
+    await expect(
+      canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.tryAgain }),
+    ).toHaveLength(2);
+    await expect(canvasElement.querySelectorAll('iframe')).toHaveLength(0);
+  },
+};
+
+/** **A document past the host's limits has no PDF to offer, and the preview says that.** */
+export const AWordDocumentUnavailable: Story = {
+  name: 'A .docx with no PDF to offer → says so',
+  args: { value: WORD_DOCUMENT, resolveDocumentPdf: hostAnswering({ state: 'unavailable' }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await openPreviews(canvasElement);
+    await waitFor(() =>
+      expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfUnavailable)).toHaveLength(2),
+    );
+    await expect(canvasElement.querySelectorAll('iframe')).toHaveLength(0);
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.tryAgain }),
+    ).toHaveLength(0);
   },
 };
