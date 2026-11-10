@@ -624,7 +624,9 @@ function FileRef({
       ) : (
         <span
           title={title}
-          className="min-w-0 truncate font-mono text-[12px] text-muted-foreground"
+          // As tall as the link's line below `sm`, so a row beside it reads the
+          // same whichever of the two it holds and whatever buttons follow.
+          className="min-w-0 truncate font-mono text-[12px] text-muted-foreground max-sm:leading-11"
         >
           {label}
         </span>
@@ -1202,9 +1204,11 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
-  const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename, s);
-  const linkUrl = paintableUrl(content, resolve) ?? content.url;
+  // A blank title is no title, here as on the line above the link: `||`, since
+  // a trimmed blank is the empty string. `name` names the preview's frame.
   const title = content.title?.trim();
+  const name = title || content.filename || fileLabel(content.url, content.filename, s);
+  const linkUrl = paintableUrl(content, resolve) ?? content.url;
   // Asked only when there is a title: the label of a `data:` URL walks its
   // payload, and `FileRef` already walks it once per render.
   const heading = title && title !== fileLabel(linkUrl, content.filename, s) ? title : undefined;

@@ -340,6 +340,37 @@ describe('the URL policy', () => {
       ).toBeNull();
     });
 
+    it('and its preview by its filename, when its title is blank', async () => {
+      // A blank title used to name the frame, whose accessible name was then blank.
+      const { container } = render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{
+            url: 'https://example.com/files/deck.pdf',
+            filename: 'deck.pdf',
+            mime_type: 'application/pdf',
+            title: '   ',
+          }}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+      expect(container.querySelector('iframe')?.getAttribute('title')).toBe('deck.pdf');
+    });
+
+    it('on a line as tall as a link on a phone, when it is a reference nothing can open', () => {
+      // With no title the reference is the row's first line, and the icon is set
+      // level with a 44px line below `sm`; a reference that is not a link must be
+      // that tall too, or the icon sits below it wherever no button grows the row.
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'pipelex-storage://9c1f/deck.pptx', filename: 'deck.pptx' }}
+        />,
+      );
+      expect(screen.queryByRole('link')).toBeNull();
+      expect(screen.getByText('deck.pptx').className).toContain('max-sm:leading-11');
+    });
+
     it('with its title above the link, when the title says something else', () => {
       render(
         <ResultField
