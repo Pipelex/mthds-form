@@ -1,10 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.36.1] - 2026-11-10
 
 ### Fixed
 
-- **A document result names its file once**: the line above a document's link is now its `title`, drawn only when it differs from the link's label. An untitled document, or one whose title is blank or repeats its filename, used to show its name twice in a row, once as plain text and once as the link. See [docs/result-view.md](docs/result-view.md).
+- **A document result names its file once**: the line above a document's link is now its `title`, drawn only when it differs from the link's label, and the link is named from the stored reference rather than from the URL a host resolves it to. An untitled document, or one whose title is blank or repeats its filename, used to show its name twice in a row, once as plain text and once as the link. A blank title no longer names the preview's frame either. See [docs/result-view.md](docs/result-view.md).
 
 ## [v0.36.0] - 2026-11-10
 
