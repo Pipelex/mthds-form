@@ -581,6 +581,7 @@ function FileRef({
   storageUrl,
   mimeType,
   filename,
+  label: named,
   file,
 }: {
   url: string;
@@ -588,6 +589,8 @@ function FileRef({
   storageUrl?: string;
   mimeType?: string;
   filename?: string;
+  /** The name to show, when the caller has read it off the stored reference. */
+  label?: string;
   /** The file as the download reads it, when this line may offer to save it. */
   file?: StuffFile;
 }) {
@@ -597,7 +600,7 @@ function FileRef({
   // has no path to give, and instead of a whole file in a `title` tooltip -
   // and the second call was a second walk of the same megabytes per render.
   const encoded = encodedFileSummary(url, s);
-  const label = filename ? filename : (encoded ?? pathLabel(url));
+  const label = named ?? (filename ? filename : (encoded ?? pathLabel(url)));
   const reference = encoded ?? url;
   const title = mimeType ? `${reference} · ${mimeType}` : reference;
   // Judged here as well as by the caller, because this component is also given
@@ -1204,14 +1207,14 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
-  // A blank title is no title, here as on the line above the link: `||`, since
-  // a trimmed blank is the empty string. `name` names the preview's frame.
+  // The file's name, read off the stored reference rather than the URL a host
+  // resolves it to, which may name nothing (`/api/assets/<id>`). The link shows
+  // it, so the line above is drawn only for a title that differs from it, and a
+  // blank title is no title. `name` names the preview's frame.
+  const label = fileLabel(content.url, content.filename, s);
   const title = content.title?.trim();
-  const name = title || content.filename || fileLabel(content.url, content.filename, s);
-  const linkUrl = paintableUrl(content, resolve) ?? content.url;
-  // Asked only when there is a title: the label of a `data:` URL walks its
-  // payload, and `FileRef` already walks it once per render.
-  const heading = title && title !== fileLabel(linkUrl, content.filename, s) ? title : undefined;
+  const heading = title && title !== label ? title : undefined;
+  const name = title || label;
   const preview = previewableUrl(content, resolve);
   const pdf = preview !== undefined && isPdfDocument(content, preview);
   const opened = whole && isApp && pdf;
@@ -1239,7 +1242,8 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
         <div className="min-w-0 flex-1 space-y-0.5">
           {heading && <span className="block truncate text-[13px] text-foreground">{heading}</span>}
           <FileRef
-            url={linkUrl}
+            url={paintableUrl(content, resolve) ?? content.url}
+            label={label}
             storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}

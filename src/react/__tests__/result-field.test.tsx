@@ -371,6 +371,23 @@ describe('the URL policy', () => {
       expect(screen.getByText('deck.pptx').className).toContain('max-sm:leading-11');
     });
 
+    it('by its stored name, when its host resolves it to a URL that names nothing', () => {
+      // The link used to be named by the resolved URL's last segment, an opaque
+      // id here, and with the line above it gone the file's name went with it.
+      render(
+        <ResultEnvProvider resolveUrl={() => '/api/assets/0f3c9a'}>
+          <ResultField
+            field={file('output', 'document')}
+            value={{ url: 'pipelex-storage://x/deck.pptx' }}
+          />
+        </ResultEnvProvider>,
+      );
+      expect(screen.getByRole('link', { name: 'deck.pptx' }).getAttribute('href')).toBe(
+        '/api/assets/0f3c9a',
+      );
+      expect(screen.queryByText('0f3c9a')).toBeNull();
+    });
+
     it('with its title above the link, when the title says something else', () => {
       render(
         <ResultField
