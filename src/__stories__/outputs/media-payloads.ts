@@ -8,6 +8,9 @@
  * fetched by a browser looking at Storybook. The files named here are served by
  * Storybook itself. The descriptors these payloads are rendered against are the
  * corpus's own, generated like every other.
+ *
+ * Beside them, `pdfViewer` pins what the browser says of its PDF viewer, which
+ * decides whether an opened PDF is a frame or a card.
  */
 
 /**
@@ -70,3 +73,46 @@ export const REPORT = {
     { caption: 'Under morning light', image: { url: figureUrl(3), mime_type: 'image/jpeg' } },
   ],
 };
+
+/**
+ * A payload for `results.two_documents_result`: a review sent with the document
+ * it reviews and an appendix, both the served PDF under names of their own.
+ * Hand-built for the reason `REPORT` is: a run's documents are storage
+ * references a browser cannot fetch.
+ */
+export const REVIEW_PACKET = {
+  title: 'Retrofit review, March 2026',
+  reviewed: {
+    url: PDF_URL,
+    filename: 'retrofit_plan.pdf',
+    mime_type: 'application/pdf',
+    title: 'Retrofit plan',
+  },
+  appendix: {
+    url: PDF_URL,
+    filename: 'site_survey.pdf',
+    mime_type: 'application/pdf',
+    title: 'Site survey',
+  },
+};
+
+/**
+ * Pins what the browser says of its PDF viewer for one story, and gives the
+ * browser its own answer back afterwards.
+ *
+ * The result view asks `navigator.pdfViewerEnabled`, and the answer is the
+ * browser's: the headless Chromium the stories run in says it has no viewer,
+ * as Android's browsers do, and a desktop browser says it has one. A story
+ * about one case has to say which it is, so it reads the same in both.
+ */
+export function pdfViewer(enabled: boolean) {
+  return () => {
+    Object.defineProperty(navigator, 'pdfViewerEnabled', {
+      configurable: true,
+      get: () => enabled,
+    });
+    return () => {
+      delete (navigator as { pdfViewerEnabled?: boolean }).pdfViewerEnabled;
+    };
+  };
+}

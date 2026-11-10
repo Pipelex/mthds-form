@@ -148,8 +148,12 @@ export type DocumentPdfAnswer =
 /**
  * One question to the host about one document: where does its PDF stand?
  *
- * The view asks when the reader opens the preview, and again while the answer
- * is `preparing`, so asking twice must not start the work twice. An ask that
+ * The view asks when the preview opens, and again while the answer is
+ * `preparing`, so asking twice must not start the work twice. In the `app`
+ * presentation the preview of the document the run delivered (the whole
+ * result, or the only document of a record that is the whole result) opens at
+ * once, so its ask comes as the view mounts, with no click; everywhere else,
+ * and in `studio`, it comes on the reader's click. An ask that
  * throws, rejects, answers something else or takes longer than thirty seconds
  * reads as `failed`.
  */
@@ -177,10 +181,14 @@ export type AskDocumentPdf = () => Promise<DocumentPdfAnswer>;
  * the first browser render agree.
  *
  * Asking is the {@link AskDocumentPdf} it returns, which is the round
- * trip. It is asked only when a reader opens the preview, because a conversion
- * is real work and a run's result can hold many documents nobody will open: a
- * host that converts on first request therefore converts only what someone
- * asked to see.
+ * trip. It is asked only when the preview opens, because a conversion is real
+ * work and a run's result can hold many documents nobody will open. In `app`,
+ * the preview of the document the run delivered opens by itself: a document
+ * that is the whole result, or the only document of a record that is the whole
+ * result, is asked about as the view mounts, since the reader came for it.
+ * Every other document, and every document in `studio`, is asked about only
+ * on the reader's click, so a host that converts on first request converts the
+ * delivered document and otherwise only what someone asked to see.
  *
  * ## The contract
  *
