@@ -271,8 +271,8 @@ describe('the URL policy', () => {
     // Named rather than linked, which is the honest floor for a reference no
     // sink here will act on.
     expect(screen.queryByRole('link')).toBeNull();
-    // Twice: the document's name above, the reference below it.
-    expect(screen.getAllByText('report.pdf').length).toBeGreaterThan(0);
+    // Once: an untitled document is named by its reference alone.
+    expect(screen.getAllByText('report.pdf')).toHaveLength(1);
   });
 
   it('names a data: document by its format and size, never by a slice of its base64', () => {
@@ -284,8 +284,124 @@ describe('the URL policy', () => {
         value={{ url: 'data:application/pdf;base64,JVBE/Ri0x' }}
       />,
     );
-    expect(screen.getAllByText('PDF · 6 bytes').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('PDF · 6 bytes')).toHaveLength(1);
     expect(container.textContent).not.toContain('Ri0x');
+  });
+
+  // The link IS the file's name, so the line above it is only ever a title that
+  // says something else. It used to fall back to the filename, and an untitled
+  // document read its name twice in a row.
+  describe('names a document once', () => {
+    it('by its filename, when it has no title', () => {
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{
+            url: 'https://example.com/files/generated-presentation.pptx',
+            filename: 'generated-presentation.pptx',
+          }}
+        />,
+      );
+      expect(screen.getAllByText('generated-presentation.pptx')).toHaveLength(1);
+      expect(screen.getByRole('link', { name: 'generated-presentation.pptx' })).toBeTruthy();
+    });
+
+    it("by its URL's last segment, when it has neither title nor filename", () => {
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'https://example.com/files/report.pdf' }}
+        />,
+      );
+      expect(screen.getAllByText('report.pdf')).toHaveLength(1);
+    });
+
+    it('when its title only repeats its filename', () => {
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'https://example.com/files/q3.pdf', filename: 'q3.pdf', title: ' q3.pdf ' }}
+        />,
+      );
+      expect(screen.getAllByText('q3.pdf')).toHaveLength(1);
+    });
+
+    it('when its title is blank', () => {
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'https://example.com/files/q3.pdf', filename: 'q3.pdf', title: '   ' }}
+        />,
+      );
+      expect(screen.getAllByText('q3.pdf')).toHaveLength(1);
+      // No line of blanks above the link: the blank title draws nothing.
+      expect(
+        screen.queryByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '   '),
+      ).toBeNull();
+    });
+
+    it('and its preview by its filename, when its title is blank', async () => {
+      // A blank title used to name the frame, whose accessible name was then blank.
+      const { container } = render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{
+            url: 'https://example.com/files/deck.pdf',
+            filename: 'deck.pdf',
+            mime_type: 'application/pdf',
+            title: '   ',
+          }}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+      expect(container.querySelector('iframe')?.getAttribute('title')).toBe('deck.pdf');
+    });
+
+    it('on a line as tall as a link on a phone, when it is a reference nothing can open', () => {
+      // With no title the reference is the row's first line, and the icon is set
+      // level with a 44px line below `sm`; a reference that is not a link must be
+      // that tall too, or the icon sits below it wherever no button grows the row.
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'pipelex-storage://9c1f/deck.pptx', filename: 'deck.pptx' }}
+        />,
+      );
+      expect(screen.queryByRole('link')).toBeNull();
+      expect(screen.getByText('deck.pptx').className).toContain('max-sm:leading-11');
+    });
+
+    it('by its stored name, when its host resolves it to a URL that names nothing', () => {
+      // The link used to be named by the resolved URL's last segment, an opaque
+      // id here, and with the line above it gone the file's name went with it.
+      render(
+        <ResultEnvProvider resolveUrl={() => '/api/assets/0f3c9a'}>
+          <ResultField
+            field={file('output', 'document')}
+            value={{ url: 'pipelex-storage://x/deck.pptx' }}
+          />
+        </ResultEnvProvider>,
+      );
+      expect(screen.getByRole('link', { name: 'deck.pptx' }).getAttribute('href')).toBe(
+        '/api/assets/0f3c9a',
+      );
+      expect(screen.queryByText('0f3c9a')).toBeNull();
+    });
+
+    it('with its title above the link, when the title says something else', () => {
+      render(
+        <ResultField
+          field={file('output', 'document')}
+          value={{
+            url: 'https://example.com/files/q3.pdf',
+            filename: 'q3.pdf',
+            title: 'Quarterly report',
+          }}
+        />,
+      );
+      expect(screen.getAllByText('Quarterly report')).toHaveLength(1);
+      expect(screen.getAllByText('q3.pdf')).toHaveLength(1);
+    });
   });
 
   it('refuses a data: URL whose type is outside the allow-list', () => {
@@ -1476,7 +1592,7 @@ describe('native.Composite', () => {
       />,
     );
     expect(screen.getByText('brief')).toBeTruthy();
-    expect(screen.getAllByText('brief.pdf').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('brief.pdf')).toHaveLength(1);
   });
 
   it('falls back to raw for a member whose model it does not know', () => {
