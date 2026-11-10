@@ -3,10 +3,11 @@
  *
  * The first half is the promise to every other host: a viewer whose host does
  * not answer draws exactly what it drew before the seam existed. The second is
- * the seam itself: the toggle, the question asked only when a reader opens it,
- * and each state the host can answer. The third is the document the run
- * delivered, in `app`: the whole result, or a whole-result record's lone
- * document, asked for as it mounts with no click.
+ * the seam itself: the toggle, the question asked when the preview opens, and
+ * each state the host can answer. The preview opens on the reader's click
+ * everywhere but one place, which is the third half: the document the run
+ * delivered, in `app` (the whole result, or a whole-result record's only
+ * document), whose preview opens at once, so it is asked for as it mounts.
  */
 import { act, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
