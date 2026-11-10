@@ -581,6 +581,7 @@ function FileRef({
   storageUrl,
   mimeType,
   filename,
+  label: named,
   file,
 }: {
   url: string;
@@ -588,6 +589,8 @@ function FileRef({
   storageUrl?: string;
   mimeType?: string;
   filename?: string;
+  /** The name to show, when the caller has read it off the stored reference. */
+  label?: string;
   /** The file as the download reads it, when this line may offer to save it. */
   file?: StuffFile;
 }) {
@@ -597,7 +600,7 @@ function FileRef({
   // has no path to give, and instead of a whole file in a `title` tooltip -
   // and the second call was a second walk of the same megabytes per render.
   const encoded = encodedFileSummary(url, s);
-  const label = filename ? filename : (encoded ?? pathLabel(url));
+  const label = named ?? (filename ? filename : (encoded ?? pathLabel(url)));
   const reference = encoded ?? url;
   const title = mimeType ? `${reference} · ${mimeType}` : reference;
   // Judged here as well as by the caller, because this component is also given
@@ -624,7 +627,9 @@ function FileRef({
       ) : (
         <span
           title={title}
-          className="min-w-0 truncate font-mono text-[12px] text-muted-foreground"
+          // As tall as the link's line below `sm`, so a row beside it reads the
+          // same whichever of the two it holds and whatever buttons follow.
+          className="min-w-0 truncate font-mono text-[12px] text-muted-foreground max-sm:leading-11"
         >
           {label}
         </span>
@@ -1209,6 +1214,12 @@ function ConvertedDocumentPreview({
  * node after node; opening every document there would fetch or convert each
  * one and fill a narrow panel before anyone asked, and the builder's first
  * question is usually what came back rather than what it looks like.
+ *
+ * **The file is named once.** The link's label is the file's name (`fileLabel`:
+ * its filename, else what a `data:` URL holds, else its URL's last segment), so
+ * the line above it is drawn only for a title that says something else. A line
+ * that fell back to the filename printed the same words twice over every
+ * document a producer leaves untitled, and an exported presentation is one.
  */
 function DocumentValue({
   value,
@@ -1234,7 +1245,14 @@ function DocumentValue({
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
-  const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename, s);
+  // The file's name, read off the stored reference rather than the URL a host
+  // resolves it to, which may name nothing (`/api/assets/<id>`). The link shows
+  // it, so the line above is drawn only for a title that differs from it, and a
+  // blank title is no title. `name` names the preview's frame.
+  const label = fileLabel(content.url, content.filename, s);
+  const title = content.title?.trim();
+  const heading = title && title !== label ? title : undefined;
+  const name = title || label;
   const preview = previewableUrl(content, resolve);
   const pdf = preview !== undefined && isPdfDocument(content, preview);
   // Only a document the browser cannot render is asked about: a PDF that cannot
@@ -1250,11 +1268,20 @@ function DocumentValue({
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
-        <FileText aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <FileText
+          aria-hidden
+          // Level with the first line: the title, or with none the link, whose
+          // line is a finger's 44px below `sm`.
+          className={cn(
+            'mt-0.5 size-4 shrink-0 text-muted-foreground',
+            !heading && 'max-sm:mt-3.5',
+          )}
+        />
         <div className="min-w-0 flex-1 space-y-0.5">
-          {name && <span className="block truncate text-[13px] text-foreground">{name}</span>}
+          {heading && <span className="block truncate text-[13px] text-foreground">{heading}</span>}
           <FileRef
             url={paintableUrl(content, resolve) ?? content.url}
+            label={label}
             storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
