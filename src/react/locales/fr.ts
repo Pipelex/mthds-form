@@ -101,6 +101,9 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   previewUnavailablePdf: 'Aperçu indisponible - ouvrez le fichier pour le consulter.',
   pdfViewerUnavailable: 'Ce navigateur ne peut pas afficher le PDF ici.',
   openInNewTab: 'Ouvrir dans un nouvel onglet',
+  documentPdfPreparing: 'Préparation de l’aperçu…',
+  documentPdfFailed: 'Impossible de préparer un aperçu.',
+  documentPdfUnavailable: 'Aucun aperçu pour ce fichier.',
   // U+002D HYPHEN-MINUS, as in the English defaults.
   resultAbsent: '-',
   resultAbsentDescription: 'Non renseigné',

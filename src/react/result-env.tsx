@@ -115,6 +115,95 @@ export interface RenditionRequest {
 export type ResolveRendition = (url: string, request: RenditionRequest) => string | undefined;
 
 /**
+ * What the payload declares about a document a host is asked for a PDF of, so
+ * that a host can decide by the document's format.
+ */
+export interface DocumentPdfRequest {
+  filename?: string;
+  mimeType?: string;
+}
+
+/**
+ * Where the PDF of a document stands, in the host's answer.
+ *
+ * - `ready`: `url` is where the PDF is read. It is the URL of a document the
+ *   view will frame, so it passes the same gate as any resolver's answer: an
+ *   `http(s):` URL, or a root-relative path on the host's own origin. An answer
+ *   the gate refuses reads as `unavailable`.
+ * - `preparing`: the host is making the PDF. The view says so and asks again.
+ * - `failed`: the host could not make the PDF. `message`, when the host can
+ *   say why (a file protected by a password), is shown to the reader as it
+ *   stands, so it must be in the reader's language; with none, the view says
+ *   the package's `documentPdfFailed`. The reader is offered to try again.
+ * - `unavailable`: there is no PDF of this document to be had, and asking
+ *   again would not change that (a file past the host's limits). The view says
+ *   there is no preview.
+ */
+export type DocumentPdfAnswer =
+  | { state: 'ready'; url: string }
+  | { state: 'preparing' }
+  | { state: 'failed'; message?: string }
+  | { state: 'unavailable' };
+
+/**
+ * One question to the host about one document: where does its PDF stand?
+ *
+ * The view asks when the reader opens the preview, and again while the answer
+ * is `preparing`, so asking twice must not start the work twice. An ask that
+ * throws, rejects, answers something else or takes longer than thirty seconds
+ * reads as `failed`.
+ */
+export type AskDocumentPdf = () => Promise<DocumentPdfAnswer>;
+
+/**
+ * The host's seam for a PDF of a document the browser cannot render itself,
+ * such as a Word, Excel or PowerPoint file.
+ *
+ * ## Why a result view needs one
+ *
+ * A browser renders a PDF and a picture and nothing else a run hands back, so
+ * a `.docx` result is a name and a download. The kernel cannot convert it,
+ * since it holds a reference and the host holds the file; a host that can make
+ * a PDF of the file (a conversion service behind its storage) answers here.
+ *
+ * ## Why deciding and asking are apart
+ *
+ * Deciding is this function, which answers synchronously and is pure, as
+ * `ResolveRendition` is. It is called while the view renders, for every
+ * document the browser cannot render, and says only whether this host has a
+ * way to a PDF of this document: `undefined` means it has none, and the view
+ * behaves exactly as it does with no such function, offering no preview. So
+ * the Preview toggle is decided with no round trip, and a server render and
+ * the first browser render agree.
+ *
+ * Asking is the {@link AskDocumentPdf} it returns, which is the round
+ * trip. It is asked only when a reader opens the preview, because a conversion
+ * is real work and a run's result can hold many documents nobody will open: a
+ * host that converts on first request therefore converts only what someone
+ * asked to see.
+ *
+ * ## The contract
+ *
+ * Called with the document's own `url` member, exactly as `resolveUrl` is, and
+ * what the payload declares about it. The view decides which documents to ask
+ * about only from whether the browser renders them, so a host answers for the
+ * formats it converts, and the kernel keeps no list of them.
+ *
+ * - **A first view does not wait.** The ask is expected to answer quickly,
+ *   `preparing` while the PDF is being made, and the view shows that it is
+ *   preparing and asks again, at growing intervals, until the answer changes.
+ *   It stops after three minutes and reads that as `failed`, and it stops when
+ *   the reader closes the preview.
+ * - **It only ever shows pages.** The PDF is framed, or linked from the card
+ *   shown where the browser has no PDF viewer, and it is nothing else: the
+ *   document's name, its copy control and every download keep the original.
+ */
+export type ResolveDocumentPdf = (
+  url: string,
+  request: DocumentPdfRequest,
+) => AskDocumentPdf | undefined;
+
+/**
  * How a stored reference becomes a URL that works OUTSIDE this page — pasted
  * into another tab, another app, a colleague's message.
  *
@@ -266,6 +355,13 @@ interface ResultEnv {
    * {@link ResolveRendition}.
    */
   resolveRendition?: ResolveRendition;
+  /**
+   * A PDF of a document the browser cannot render, such as a Word file, which
+   * the view shows in that document's preview. Optional; unset, or for a
+   * document it does not answer, the document offers no preview. See
+   * {@link ResolveDocumentPdf}.
+   */
+  resolveDocumentPdf?: ResolveDocumentPdf;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
   /**
@@ -331,6 +427,7 @@ export function ResultEnvProvider({
   resolveUrl,
   resolveUrls,
   resolveRendition,
+  resolveDocumentPdf,
   resolveShareUrl,
   proseImages,
   tableColumns,
@@ -346,6 +443,7 @@ export function ResultEnvProvider({
       resolveUrl,
       resolveUrls,
       resolveRendition,
+      resolveDocumentPdf,
       resolveShareUrl,
       proseImages,
       tableColumns,
@@ -359,6 +457,7 @@ export function ResultEnvProvider({
       resolveUrl,
       resolveUrls,
       resolveRendition,
+      resolveDocumentPdf,
       resolveShareUrl,
       proseImages,
       tableColumns,
@@ -449,6 +548,11 @@ export function useMarkupResolvers(): MarkupResolvers {
 /** The host's smaller copies of a picture, when it supplies them. */
 export function useResolveRendition(): ResolveRendition | undefined {
   return use(ResultEnvContext).resolveRendition;
+}
+
+/** The host's way to a PDF of a document the browser cannot render, when it supplies one. */
+export function useResolveDocumentPdf(): ResolveDocumentPdf | undefined {
+  return use(ResultEnvContext).resolveDocumentPdf;
 }
 
 /** The share-URL minter, when the host supplies one. */
