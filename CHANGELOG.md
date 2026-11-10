@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A document result names its file once**: the line above a document's link is now its `title`, drawn only when it differs from the link's label. An untitled document, or one whose title is blank or repeats its filename, used to show its name twice in a row, once as plain text and once as the link. See [docs/result-view.md](docs/result-view.md).
+
 ## [v0.36.0] - 2026-11-10
 
 ### Added

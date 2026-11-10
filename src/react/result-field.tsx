@@ -1183,6 +1183,12 @@ function ConvertedDocumentPreview({
  * builder moves through node after node; opening every PDF there would fetch
  * each one and fill a narrow panel before anyone asked, and the builder's first
  * question is usually what came back rather than what it looks like.
+ *
+ * **The file is named once.** The link's label is the file's name (`fileLabel`:
+ * its filename, else what a `data:` URL holds, else its URL's last segment), so
+ * the line above it is drawn only for a title that says something else. A line
+ * that fell back to the filename printed the same words twice over every
+ * document a producer leaves untitled, and an exported presentation is one.
  */
 function DocumentValue({ value, whole = false }: { value: unknown; whole?: boolean }) {
   const s = useFieldStrings();
@@ -1197,6 +1203,11 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
   const name = content.title ?? content.filename ?? fileLabel(content.url, content.filename, s);
+  const linkUrl = paintableUrl(content, resolve) ?? content.url;
+  const title = content.title?.trim();
+  // Asked only when there is a title: the label of a `data:` URL walks its
+  // payload, and `FileRef` already walks it once per render.
+  const heading = title && title !== fileLabel(linkUrl, content.filename, s) ? title : undefined;
   const preview = previewableUrl(content, resolve);
   const pdf = preview !== undefined && isPdfDocument(content, preview);
   const opened = whole && isApp && pdf;
@@ -1212,11 +1223,19 @@ function DocumentValue({ value, whole = false }: { value: unknown; whole?: boole
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
-        <FileText aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <FileText
+          aria-hidden
+          // Level with the first line: the title, or with none the link, whose
+          // line is a finger's 44px below `sm`.
+          className={cn(
+            'mt-0.5 size-4 shrink-0 text-muted-foreground',
+            !heading && 'max-sm:mt-3.5',
+          )}
+        />
         <div className="min-w-0 flex-1 space-y-0.5">
-          {name && <span className="block truncate text-[13px] text-foreground">{name}</span>}
+          {heading && <span className="block truncate text-[13px] text-foreground">{heading}</span>}
           <FileRef
-            url={paintableUrl(content, resolve) ?? content.url}
+            url={linkUrl}
             storageUrl={content.url}
             mimeType={content.mimeType}
             {...(content.filename ? { filename: content.filename } : {})}
