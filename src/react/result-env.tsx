@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, use, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { SaveFile, SaveFiles, SaveResult } from '../core/save-plan';
+import type { LoadText } from '../core/stored-value';
 import type { StuffFileKind } from '../core/stuff-files';
 import { absoluteUrl } from './absolute-url';
 import { resolveHtmlStorageUrls, type MarkupResolvers, type ResolveUrls } from './markup-storage';
@@ -336,6 +337,28 @@ export type RenderPdf = (page: PdfPage) => Promise<Blob>;
 interface ResultEnv {
   resolveUrl?: ResolveUrl;
   /**
+   * Reads a stored text: a `Text`, `Markdown`, `Html` or `JSON` value a run
+   * kept in its storage rather than in the payload, which arrives as
+   * `{url, size, mime_type, preview}`. Called with that `url`; resolve to the
+   * text as stored, reject when it cannot be read.
+   *
+   * Asynchronous, unlike `resolveUrl`, because a text is read rather than
+   * painted: nothing in the page can be handed a URL in its place, so the
+   * host fetches the bytes through whatever authorises its storage. The view
+   * shows the reference's `preview` with the value's size until it resolves,
+   * then the value; a rejection shows the reference's description, never an
+   * error that takes the view down. Each url is asked once per provider, and
+   * only for a value the view shows, or a download saves.
+   *
+   * It need not be stable: an inline function is fine. The provider keeps one
+   * cache for as long as it has a loader, and asks through the newest one.
+   *
+   * Optional. Unset, a stored value shows its `preview` and size, and a
+   * download saves its reference. See {@link LoadText} and
+   * `docs/stored-values.md`.
+   */
+  loadText?: LoadText;
+  /**
    * Every stored reference an HTML page's pictures name, resolved in one call.
    *
    * A `native.Html` page embeds the pictures its method produced as
@@ -433,6 +456,7 @@ const ResultEnvContext = createContext<ResultEnv>({});
 
 export function ResultEnvProvider({
   resolveUrl,
+  loadText,
   resolveUrls,
   resolveRendition,
   resolveDocumentPdf,
@@ -446,9 +470,30 @@ export function ResultEnvProvider({
   framed,
   children,
 }: ResultEnv & { children: ReactNode }) {
+  // One cache per provider, so a value shown twice (a panel and a download, a
+  // delegated subtree) is read once. Kept whatever the loader's identity: a
+  // host passing an inline function hands a new one on every render, and a
+  // cache keyed on it was emptied each time, so every stored text in view was
+  // fetched again. The cache asks through the newest loader the host gave.
+  const loadRef = useRef(loadText);
+  useEffect(() => {
+    loadRef.current = loadText;
+  });
+  const hasLoader = loadText !== undefined;
+  const cachedLoadText = useMemo(
+    () =>
+      hasLoader
+        ? onceEach((url) => {
+            const load = loadRef.current;
+            return load ? load(url) : Promise.reject(new Error('The host gave no loader'));
+          })
+        : undefined,
+    [hasLoader],
+  );
   const env = useMemo(
     () => ({
       resolveUrl,
+      loadText: cachedLoadText,
       resolveUrls,
       resolveRendition,
       resolveDocumentPdf,
@@ -463,6 +508,7 @@ export function ResultEnvProvider({
     }),
     [
       resolveUrl,
+      cachedLoadText,
       resolveUrls,
       resolveRendition,
       resolveDocumentPdf,
@@ -477,6 +523,31 @@ export function ResultEnvProvider({
     ],
   );
   return <ResultEnvContext value={env}>{children}</ResultEnvContext>;
+}
+
+/**
+ * The loader, asking each url once: a second ask while the first is in flight
+ * or after it succeeded shares its answer. A failure is forgotten, so a view
+ * mounted later asks again, rather than repeating a failure that may have been
+ * a moment's.
+ */
+function onceEach(load: LoadText): LoadText {
+  const asked = new Map<string, Promise<string>>();
+  return (url) => {
+    const known = asked.get(url);
+    if (known) return known;
+    const pending = Promise.resolve()
+      .then(() => load(url))
+      .then((text) => {
+        if (typeof text !== 'string') throw new Error('The loader answered no text');
+        return text;
+      });
+    asked.set(url, pending);
+    pending.catch(() => {
+      if (asked.get(url) === pending) asked.delete(url);
+    });
+    return pending;
+  };
 }
 
 /**
@@ -542,6 +613,11 @@ export function useResolvedUrl(url: string): string {
 /** For the non-React readers that need the same answer (previewability). */
 export function useResolveUrl(): ResolveUrl | undefined {
   return use(ResultEnvContext).resolveUrl;
+}
+
+/** The host's stored-text loader, when it supplies one. */
+export function useLoadText(): LoadText | undefined {
+  return use(ResultEnvContext).loadText;
 }
 
 /**

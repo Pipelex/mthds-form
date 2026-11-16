@@ -38,7 +38,14 @@ import { ownProp } from '../core/own-property';
 import { planFileSave, splitFileName } from '../core/save-plan';
 import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff-files';
 import {
+  inlineStoredValue,
+  isStoredValueNode,
+  readStoredReference,
+  type StoredReferenceView,
+} from '../core/stored-value';
+import {
   useFileDownloadShown,
+  useLoadText,
   usePdfSaveShown,
   useResolveDocumentPdf,
   useResolveRendition,
@@ -78,6 +85,7 @@ import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './
 import { HtmlPreview } from './html-preview';
 import { ImageViewer } from './image-viewer';
 import { PdfDownloadButton } from './pdf-download-button';
+import { StoredTextPreview, useStoredText } from './stored-text';
 import { useFileNamePrompt } from './file-name-dialog';
 import { Markdown, opensWithHeading } from './markdown';
 import { ExtractedPageText } from './extracted-page-text';
@@ -3795,6 +3803,29 @@ function ResultNode({
   // reachable, and the dotted underline is what says it is there.
   const header = hideLabel ? null : <Label field={field} describe />;
 
+  // A value kept in the run's storage, before every arm: a `Text`, `Markdown`,
+  // `Html` or `JSON` value (or one refining it) that arrived as its reference,
+  // `{url, size, mime_type, preview}`, with no value to draw. The concept says
+  // the value may be stored, and only then is the documented stored form read
+  // off it. It shows its start until the host's loader answers, then the value
+  // through this very node, so every arm below draws a loaded value exactly as
+  // it draws one that arrived inline. See docs/stored-values.md.
+  const reference = readStoredReference(field, value);
+  if (reference) {
+    return (
+      <StoredResult
+        field={field}
+        value={value}
+        depth={depth}
+        hideLabel={hideLabel}
+        whole={whole}
+        hostHeaded={hostHeaded}
+        reference={reference}
+        header={header}
+      />
+    );
+  }
+
   // The text a copy control would write, or `undefined` where there is none to
   // offer: only the two text kinds, and only when the value actually is a
   // non-empty string. A button that copies "[object Object]" or an empty string
@@ -4074,13 +4105,17 @@ function ResultNode({
           )}
           {items.length === 0 ? (
             <p className="text-[13px] italic text-muted-foreground">{s.noItemsYet}</p>
-          ) : isNativeValueNode(field.item) ? (
+          ) : isNativeValueNode(field.item) ||
+            (isStoredValueNode(field.item) &&
+              items.some((item) => readStoredReference(field.item, item))) ? (
             // A list of dates, pages or composites is a list of VALUES, each read
             // by its own arm - one per line. Their nodes are `object` (or, for a
             // composite, `unknown`), so the branches below would tabulate a
             // date's `date` and `time`, print a page's markup source down a
             // column named by it, and show a composite as JSON. The arm keyed by
-            // concept is the one that knows what each entry is.
+            // concept is the one that knows what each entry is. So is a list of
+            // texts holding one kept in storage: a chip or a line cannot show a
+            // reference loading, and the node arm can.
             <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
               {items.map((item, index) => (
                 <div key={index} className="bg-card/40 px-3 py-1.5">
@@ -4263,6 +4298,46 @@ function ResultNode({
   // rendered as `[object Object]`, silently, with nothing to notice it.
   field satisfies never;
   return null;
+}
+
+/**
+ * A stored value, drawn by its reference until the host's loader answers, then
+ * as the value through the same node.
+ *
+ * The loaded text becomes the value's inline form (`inlineStoredValue`), so the
+ * node beneath draws it as it draws a value that arrived inline: a text
+ * typeset and copyable, an HTML page framed with its downloads, a JSON value as
+ * its record. A text that is not a value of the concept (a JSON text that is
+ * not an object) is read as a failed load. A failure shows the reference's
+ * description, its size and its start, and never takes the view down.
+ */
+function StoredResult({
+  reference,
+  header,
+  ...node
+}: ResultFieldProps & {
+  whole: boolean;
+  hostHeaded: boolean;
+  reference: StoredReferenceView;
+  header: React.ReactNode;
+}) {
+  const load = useLoadText();
+  const state = useStoredText(reference.url, load);
+  const loadedText = state.status === 'loaded' ? state.text : undefined;
+  const inline = useMemo(
+    () =>
+      loadedText === undefined ? undefined : inlineStoredValue(node.field, node.value, loadedText),
+    [loadedText, node.field, node.value],
+  );
+  if (inline) return <ResultNode {...node} value={inline} />;
+  const status =
+    state.status === 'idle' ? 'idle' : state.status === 'loading' ? 'loading' : 'failed';
+  return (
+    <div className="space-y-1">
+      {header}
+      <StoredTextPreview reference={reference} status={status} />
+    </div>
+  );
 }
 
 /** A saved file's name without its extension: what a PDF of the same page is called. */

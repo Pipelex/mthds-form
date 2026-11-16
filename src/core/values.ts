@@ -22,6 +22,7 @@ import { buildRunFields } from './derive';
 import { ownProp } from './own-property';
 import { isFilled, isOptionalStructure, optionalStructureOpen } from './readiness';
 import { isOptionalInput, isPluralInput } from './contracts';
+import { inlineStoredValue, readStoredReference } from './stored-value';
 import { deflateAllInputs, inflateAllInputs, isWrappedForm } from './wire-format';
 import type { PipeIOContract, PipeInputContract } from './contracts';
 
@@ -97,6 +98,11 @@ function textFromStored(value: unknown, depth = 0): string | undefined {
 
 /** RJSF full form value → the runner's field value. */
 function fromRjsf(field: RunField, value: unknown): unknown {
+  // A value held in storage stays its reference: the control shows it as such
+  // and the run sends it back as it came, so the runtime reads it where a step
+  // reads it. Read by the concept the field states, before the kind, because
+  // a stored HTML page is an `object` node whose members the reference lacks.
+  if (readStoredReference(field, value)) return value;
   switch (field.kind) {
     case 'text':
     case 'prose':
@@ -175,6 +181,8 @@ function fromRjsf(field: RunField, value: unknown): unknown {
  * reads the flag.
  */
 function toRjsf(field: RunField, value: unknown, collapseEmpty = true): unknown {
+  // A stored value's reference is already its content model's stored form.
+  if (readStoredReference(field, value)) return value;
   switch (field.kind) {
     case 'text':
     case 'prose':
@@ -236,6 +244,18 @@ function toRjsf(field: RunField, value: unknown, collapseEmpty = true): unknown 
     default:
       return value;
   }
+}
+
+/**
+ * The control's value for a stored value once its text is loaded: what a
+ * person edits in place of the reference. `undefined` when the text is not a
+ * value of the field's concept (a JSON text that is not an object), or when
+ * the value is no stored reference of this field.
+ */
+export function loadedRunValue(field: RunField, value: unknown, text: string): unknown {
+  if (!readStoredReference(field, value)) return undefined;
+  const inline = inlineStoredValue(field, value, text);
+  return inline === undefined ? undefined : fromRjsf(field, inline);
 }
 
 // ─── Store  ↔  RunField values ──────────────────────────────────────────────
