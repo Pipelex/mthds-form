@@ -252,6 +252,31 @@ describe('loadStoredValues', () => {
     expect(result.value).toEqual({ items: [{ text: 'loaded' }] });
   });
 
+  it('loads the members of a structure together, not one after another', async () => {
+    const field: ObjectRunField = {
+      kind: 'object',
+      name: 'output',
+      conceptRef: 'demo.Pair',
+      required: true,
+      fields: [memo, { ...memo, name: 'other' }],
+    };
+    const other = { ...TEXT_REF, url: 'pipelex-storage://runs/r1/generated/xyz/value.txt' };
+    const answers: Array<(text: string) => void> = [];
+    const load = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          answers.push(resolve);
+        }),
+    );
+    const pending = loadStoredValues(field, { memo: TEXT_REF, other }, load);
+    // Both asked before either answers.
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    answers.forEach((answer, index) => answer(`text ${index}`));
+    const result = await pending;
+    expect(result.unloaded).toBe(0);
+    expect(result.value).toEqual({ memo: { text: 'text 0' }, other: { text: 'text 1' } });
+  });
+
   it('keeps a reference it cannot load, and counts it', async () => {
     const result = await loadStoredValues(memo, TEXT_REF, () => Promise.reject(new Error('403')));
     expect(result).toEqual({ value: TEXT_REF, unloaded: 1 });
@@ -338,9 +363,127 @@ describe('the simplified wire form of a stored native.Text', () => {
       content: TEXT_REF,
     });
     expect(deflateInput({ text: 'short' }, 'native.Text')).toBe('short');
-    expect(deflateInput([TEXT_REF, { text: 'short' }], 'native.Text[]')).toEqual([
-      TEXT_REF,
-      'short',
-    ]);
+  });
+});
+
+/**
+ * A list holding a stored text goes as one `{ concept, content: [...] }`
+ * envelope. The runtime reads a bare list of a text concept as one string per
+ * item, and refuses a reference (or a per-item `{ concept, content }`) inside
+ * it; the list-level envelope hands each item to the concept's content model,
+ * which takes either form. The same holds for `Markdown`, `Html` and `JSON`
+ * lists, whose items have no bare form at all.
+ */
+describe('the wire form of a list holding a stored text', () => {
+  it('sends a text list holding a reference as one envelope', () => {
+    expect(deflateInput([TEXT_REF, { text: 'short' }], 'native.Text[]')).toEqual({
+      concept: 'native.Text',
+      content: [TEXT_REF, { text: 'short' }],
+    });
+    expect(deflateInput(['short', TEXT_REF], 'Text[]')).toEqual({
+      concept: 'Text',
+      content: [{ text: 'short' }, TEXT_REF],
+    });
+  });
+
+  it('keeps a text list of inline texts the bare string list it was', () => {
+    expect(deflateInput([{ text: 'a' }, { text: 'b' }], 'native.Text[]')).toEqual(['a', 'b']);
+    expect(deflateInput([], 'native.Text[]')).toEqual([]);
+  });
+
+  it('sends a Markdown, Html or JSON list as one envelope, stored or inline', () => {
+    expect(deflateInput([TEXT_REF], 'native.Markdown[]')).toEqual({
+      concept: 'native.Markdown',
+      content: [TEXT_REF],
+    });
+    expect(deflateInput([{ text: '# a' }, TEXT_REF], 'Markdown[]')).toEqual({
+      concept: 'Markdown',
+      content: [{ text: '# a' }, TEXT_REF],
+    });
+    expect(deflateInput([{ inner_html: '<p>x</p>' }, HTML_REF], 'native.Html[]')).toEqual({
+      concept: 'native.Html',
+      content: [{ inner_html: '<p>x</p>' }, HTML_REF],
+    });
+    expect(deflateInput([{ json_obj: { a: 1 } }, JSON_REF], 'native.JSON[]')).toEqual({
+      concept: 'native.JSON',
+      content: [{ json_obj: { a: 1 } }, JSON_REF],
+    });
+    // An item already wrapped (a form seeded with a raw stored value) is
+    // unwrapped, so the envelope holds content, never a nested envelope.
+    expect(
+      deflateInput([{ concept: 'native.Markdown', content: { text: 'x' } }], 'native.Markdown[]'),
+    ).toEqual({ concept: 'native.Markdown', content: [{ text: 'x' }] });
+  });
+
+  it('sends an empty Markdown list bare, as every empty plural goes', () => {
+    // The runtime's factory types an enveloped list by its first item, and
+    // refuses an empty one; the bare `[]` keeps the declared concept.
+    expect(deflateInput([], 'native.Markdown[]')).toEqual([]);
+  });
+
+  it('inflates the envelope back to the items it holds', () => {
+    expect(
+      inflateInput(
+        { concept: 'native.Text', content: [TEXT_REF, { text: 'short' }] },
+        'native.Text[]',
+      ),
+    ).toEqual([TEXT_REF, { text: 'short' }]);
+    expect(
+      inflateInput({ concept: 'native.Markdown', content: [TEXT_REF] }, 'native.Markdown[]'),
+    ).toEqual([TEXT_REF]);
+  });
+
+  describe('through the store, for a declared `Text[]` input', () => {
+    // A plural input of `native.Text`, whose item schema is the engine's own
+    // `native.Text` content model (the fixture's output), as a `Text[]` slot
+    // states it.
+    const notesSchema = {
+      concept_ref: 'native.Text',
+      presence: 'plain',
+      multiplicity: 'variable',
+      item_count: null,
+      json_schema: { type: 'array', items: STORED_NATIVES_CONTRACT.output.json_schema },
+    } as const;
+    const listInputs = {
+      notes_in: notesSchema,
+    } as unknown as typeof STORED_NATIVES_CONTRACT.inputs;
+    const listFields = () =>
+      buildRunFields(
+        {
+          fields: [
+            {
+              kind: 'list',
+              name: 'notes_in',
+              concept_ref: 'native.Text',
+              required: true,
+              presence: 'plain',
+              gating: false,
+              item: { kind: 'prose', concept_ref: 'native.Text', required: true },
+            },
+          ],
+        } as unknown as typeof STORED_NATIVES_INPUT_FORM,
+        listInputs,
+      );
+
+    it('stores the list as one envelope, and reads it back as it was', () => {
+      const values = { notes_in: ['A short note', TEXT_REF] };
+      const stored = storeInputDataFromRunValues(values, listFields(), listInputs);
+      expect(stored.notes_in).toEqual({
+        concept: 'native.Text',
+        content: [{ text: 'A short note' }, TEXT_REF],
+      });
+      expect(runValuesFromStore(stored, listFields(), listInputs).notes_in).toEqual([
+        'A short note',
+        TEXT_REF,
+      ]);
+    });
+
+    it('sends the run the same list-level envelope', () => {
+      const values = { notes_in: ['A short note', TEXT_REF] };
+      expect(apiInputsFromRunValues(values, listFields(), listInputs).notes_in).toEqual({
+        concept: 'native.Text',
+        content: [{ text: 'A short note' }, TEXT_REF],
+      });
+    });
   });
 });

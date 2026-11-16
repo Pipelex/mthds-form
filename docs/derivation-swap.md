@@ -36,7 +36,7 @@ So the gate's emptiness re-check runs over its own private tree, `src/core/gatin
 
 ## What survived, and where it lives now
 
-The deflate/inflate taxonomy — which native concepts use a *simplified wire form* (`native.Text` as a bare string; `native.Document`/`Image`/`Page` as a bare URL) — is a fact about the runtime's input parser, not about rendering, so it did not swap. It moved into `wire-format.ts` as private code, and it is the one piece of native-concept knowledge left in the package. Everything render-flavoured — the text/document/number/yes-no/date render sets, the text-wrapper fallback, the url-bearing-object test, the depth rule, the prose-length rule, the schema-`enum` dispatch — is gone with `native-concepts.ts`.
+The deflate/inflate taxonomy — which native concepts use a *simplified wire form* (`native.Text` as a bare string; `native.Document`/`Image`/`Page` as a bare URL) — is a fact about the runtime's input parser, not about rendering, so it did not swap. It moved into `wire-format.ts` as private code, and it is the one piece of native-concept knowledge left in the package. A list whose items have no bare form, a text list holding a stored text or a `Markdown`, `Html` or `JSON` list, travels as one list-level `{concept, content: [...]}` envelope rather than as a list of per-item envelopes, which the runtime refuses ([stored-values.md](stored-values.md)). Everything render-flavoured — the text/document/number/yes-no/date render sets, the text-wrapper fallback, the url-bearing-object test, the depth rule, the prose-length rule, the schema-`enum` dispatch — is gone with `native-concepts.ts`.
 
 ## The reviewed differences
 

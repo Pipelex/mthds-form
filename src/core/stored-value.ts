@@ -224,10 +224,15 @@ export async function loadStoredValues(
       return { ...held, [node.contentKey]: await walk(node, items) };
     }
     if (node.kind === 'object' && isRecord(held)) {
+      // The members load together, as a list's items do: a download waits on
+      // the slowest text, not on the sum of them.
+      const entries = await Promise.all(
+        node.fields
+          .filter((member) => hasOwnProp(held, member.name))
+          .map(async (member) => [member.name, await walk(member, held[member.name])] as const),
+      );
       const out: Record<string, unknown> = { ...held };
-      for (const member of node.fields) {
-        if (hasOwnProp(held, member.name)) out[member.name] = await walk(member, held[member.name]);
-      }
+      for (const [name, loaded] of entries) out[name] = loaded;
       return out;
     }
     return held;
