@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, use, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { SaveFile, SaveFiles, SaveResult } from '../core/save-plan';
 import type { LoadText } from '../core/stored-value';
 import type { StuffFileKind } from '../core/stuff-files';
@@ -350,6 +350,9 @@ interface ResultEnv {
    * error that takes the view down. Each url is asked once per provider, and
    * only for a value the view shows, or a download saves.
    *
+   * It need not be stable: an inline function is fine. The provider keeps one
+   * cache for as long as it has a loader, and asks through the newest one.
+   *
    * Optional. Unset, a stored value shows its `preview` and size, and a
    * download saves its reference. See {@link LoadText} and
    * `docs/stored-values.md`.
@@ -467,9 +470,26 @@ export function ResultEnvProvider({
   framed,
   children,
 }: ResultEnv & { children: ReactNode }) {
-  // One cache per loader, so a value shown twice (a panel and a download, a
-  // delegated subtree) is read once.
-  const cachedLoadText = useMemo(() => (loadText ? onceEach(loadText) : undefined), [loadText]);
+  // One cache per provider, so a value shown twice (a panel and a download, a
+  // delegated subtree) is read once. Kept whatever the loader's identity: a
+  // host passing an inline function hands a new one on every render, and a
+  // cache keyed on it was emptied each time, so every stored text in view was
+  // fetched again. The cache asks through the newest loader the host gave.
+  const loadRef = useRef(loadText);
+  useEffect(() => {
+    loadRef.current = loadText;
+  });
+  const hasLoader = loadText !== undefined;
+  const cachedLoadText = useMemo(
+    () =>
+      hasLoader
+        ? onceEach((url) => {
+            const load = loadRef.current;
+            return load ? load(url) : Promise.reject(new Error('The host gave no loader'));
+          })
+        : undefined,
+    [hasLoader],
+  );
   const env = useMemo(
     () => ({
       resolveUrl,

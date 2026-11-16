@@ -12,12 +12,13 @@
  * these natives (`../../core/__tests__/stored-natives-fixtures`).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 
 import type { InputFormField } from 'mthds/protocol';
 import { buildResultField, buildRunFields } from '../../core/derive';
-import type { RunField } from '../../core/descriptor';
+import type { ObjectRunField, RunField } from '../../core/descriptor';
 import type { SaveFile, SaveFiles } from '../../core/save-plan';
 import {
   STORED_NATIVES_CONTRACT,
@@ -37,6 +38,18 @@ const TEXT_REF = {
   preview: 'The parties agree to the following terms',
 };
 const LOADED = 'The parties agree to the following terms, and to every one after them.';
+
+/** A loader whose answers the test gives, one per call, in the order asked. */
+function heldLoader() {
+  const answers: Array<{ resolve: (text: string) => void; reject: (error: Error) => void }> = [];
+  const load = vi.fn(
+    (_url: string) =>
+      new Promise<string>((resolve, reject) => {
+        answers.push({ resolve, reject });
+      }),
+  );
+  return { load, answers };
+}
 
 const textOutput = (): RunField =>
   buildResultField(
@@ -164,6 +177,28 @@ describe('a stored text in a result', () => {
   });
 });
 
+describe('the loader a provider is given', () => {
+  it('is asked once per url, even when the host passes a new function each render', async () => {
+    const spy = vi.fn((_url: string) => Promise.resolve(LOADED));
+    const { rerender } = render(
+      <ResultEnvProvider loadText={(url) => spy(url)}>
+        <ResultField field={textOutput()} value={TEXT_REF} />
+      </ResultEnvProvider>,
+    );
+    await waitFor(() => expect(screen.getByText(LOADED)).toBeTruthy());
+    rerender(
+      <ResultEnvProvider loadText={(url) => spy(url)}>
+        <ResultField field={textOutput()} value={TEXT_REF} />
+      </ResultEnvProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText(LOADED)).toBeTruthy();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('a download of a result holding a stored text', () => {
   it('saves the loaded text, not its reference', async () => {
     const plans: SaveFile[][] = [];
@@ -182,6 +217,82 @@ describe('a download of a result holding a stored text', () => {
     const saved = plans[0]?.map((file) => ('text' in file ? file.text : undefined)).join('\n');
     expect(saved).toContain(LOADED);
     expect(saved).not.toContain(TEXT_REF.url);
+  });
+
+  const memo: RunField = {
+    kind: 'prose',
+    name: 'memo',
+    conceptRef: 'native.Text',
+    required: true,
+    contentKey: 'text',
+  };
+  const dossier: ObjectRunField = {
+    kind: 'object',
+    name: 'output',
+    conceptRef: 'demo.Dossier',
+    required: true,
+    fields: [memo, { ...memo, name: 'annex' }],
+  };
+  const ANNEX_REF = { ...TEXT_REF, url: 'pipelex-storage://runs/r1/generated/xyz/annex.md' };
+
+  function recordingSave() {
+    const plans: SaveFile[][] = [];
+    const saveFiles: SaveFiles = vi.fn(async (files) => {
+      plans.push([...files]);
+      return { failed: [] };
+    });
+    return { plans, saveFiles };
+  }
+  const savedText = (plan: SaveFile[] | undefined) =>
+    plan?.map((file) => ('text' in file ? file.text : undefined)).join('\n') ?? '';
+
+  it('says so when a stored text could not be loaded, and the file keeps its link', async () => {
+    const { plans, saveFiles } = recordingSave();
+    const loadText = (url: string) =>
+      url === ANNEX_REF.url ? Promise.reject(new Error('403')) : Promise.resolve(LOADED);
+    render(
+      <ResultEnvProvider saveFiles={saveFiles} loadText={loadText}>
+        <StuffViewer field={dossier} value={{ memo: TEXT_REF, annex: ANNEX_REF }} name="dossier" />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: S.download }));
+    await waitFor(() => expect(plans).toHaveLength(1));
+    const saved = savedText(plans[0]);
+    expect(saved).toContain(LOADED);
+    expect(saved).toContain(ANNEX_REF.url);
+    expect(await screen.findByText(S.storedTextsNotLoaded(1))).toBeTruthy();
+  });
+
+  it('counts a stored JSON text that is no JSON object as not loaded', async () => {
+    const { plans, saveFiles } = recordingSave();
+    const payload = { url: 'pipelex-storage://x/value.json', size: 5000, preview: '{"a' };
+    render(
+      <ResultEnvProvider saveFiles={saveFiles} loadText={() => Promise.resolve('{"a": ')}>
+        <StuffViewer field={input('payload_in')} value={payload} name="payload" />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: S.download }));
+    await waitFor(() => expect(plans).toHaveLength(1));
+    expect(savedText(plans[0])).toContain(payload.url);
+    expect(await screen.findByText(S.storedTextsNotLoaded(1))).toBeTruthy();
+  });
+
+  it('is busy, and takes no second press, while the stored texts load', async () => {
+    const { saveFiles } = recordingSave();
+    const load = vi.fn((_url: string) => new Promise<string>(() => undefined));
+    render(
+      <ResultEnvProvider saveFiles={saveFiles} loadText={load}>
+        <StuffViewer field={dossier} value={{ memo: TEXT_REF }} name="dossier" />
+      </ResultEnvProvider>,
+    );
+    const button = screen.getByRole('button', { name: S.download });
+    await userEvent.click(button);
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true));
+    expect(button.textContent).toContain(S.downloading);
+    await userEvent.click(button);
+    // The view and the download share the provider's one ask for the url.
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(saveFiles).not.toHaveBeenCalled();
   });
 });
 
@@ -211,6 +322,131 @@ describe('an input holding a stored text', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: S.storedTextEdit }));
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(LOADED));
+  });
+
+  it('drops a loaded text once the field holds another value', async () => {
+    const onChange = vi.fn();
+    const { load, answers } = heldLoader();
+    const field = input('markdown_in');
+    const { rerender } = render(
+      <FieldRenderer
+        field={field}
+        value={TEXT_REF}
+        onChange={onChange}
+        id="md"
+        env={{ loadText: load }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: S.storedTextEdit }));
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    const other = { ...TEXT_REF, url: 'pipelex-storage://runs/r2/generated/abc/value.md' };
+    rerender(
+      <FieldRenderer
+        field={field}
+        value={other}
+        onChange={onChange}
+        id="md"
+        env={{ loadText: load }}
+      />,
+    );
+    await act(async () => answers[0]?.resolve(LOADED));
+    expect(onChange).not.toHaveBeenCalled();
+    // The field is not left loading: its buttons answer again.
+    expect(screen.getByRole('button', { name: S.storedTextEdit }).hasAttribute('disabled')).toBe(
+      false,
+    );
+  });
+
+  it('drops a loaded text once the field is gone', async () => {
+    const onChange = vi.fn();
+    const { load, answers } = heldLoader();
+    const { unmount } = render(
+      <FieldRenderer
+        field={input('markdown_in')}
+        value={TEXT_REF}
+        onChange={onChange}
+        id="md"
+        env={{ loadText: load }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: S.storedTextEdit }));
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    unmount();
+    await act(async () => answers[0]?.resolve(LOADED));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  describe('in a list', () => {
+    // A `Text[]` input, its item the engine's own `native.Text` content model.
+    const notesInputs = {
+      notes_in: {
+        concept_ref: 'native.Text',
+        presence: 'plain',
+        multiplicity: 'variable',
+        item_count: null,
+        json_schema: { type: 'array', items: STORED_NATIVES_CONTRACT.output.json_schema },
+      },
+    } as unknown as typeof STORED_NATIVES_CONTRACT.inputs;
+    const notesField = () =>
+      buildRunFields(
+        {
+          fields: [
+            {
+              kind: 'list',
+              name: 'notes_in',
+              concept_ref: 'native.Text',
+              required: true,
+              presence: 'plain',
+              gating: false,
+              item: { kind: 'prose', concept_ref: 'native.Text', required: true },
+            },
+          ],
+        } as unknown as typeof STORED_NATIVES_INPUT_FORM,
+        notesInputs,
+      )[0]!;
+
+    function Notes({
+      start,
+      loadText,
+    }: {
+      start: unknown[];
+      loadText: (url: string) => Promise<string>;
+    }) {
+      const [value, setValue] = useState<unknown>(start);
+      return (
+        <FieldRenderer
+          field={notesField()}
+          value={value}
+          onChange={setValue}
+          id="notes"
+          env={{ loadText }}
+        />
+      );
+    }
+
+    it('does not bring back a row removed while its text loaded', async () => {
+      const { load, answers } = heldLoader();
+      render(<Notes start={['A short note', TEXT_REF]} loadText={load} />);
+      await userEvent.click(screen.getByRole('button', { name: S.storedTextEdit }));
+      await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+      await userEvent.click(screen.getByRole('button', { name: S.removeItemAria(2) }));
+      await act(async () => answers[0]?.resolve(LOADED));
+      expect(screen.getByRole('button', { name: S.removeItemAria(1) })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: S.removeItemAria(2) })).toBeNull();
+      expect(screen.queryByDisplayValue(LOADED)).toBeNull();
+      expect(screen.getByDisplayValue('A short note')).toBeTruthy();
+    });
+
+    it('keeps an edit made to another row while the text loaded', async () => {
+      const { load, answers } = heldLoader();
+      render(<Notes start={[TEXT_REF, 'A short note']} loadText={load} />);
+      await userEvent.click(screen.getByRole('button', { name: S.storedTextEdit }));
+      await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+      await userEvent.type(screen.getByDisplayValue('A short note'), ', amended');
+      await act(async () => answers[0]?.resolve(LOADED));
+      expect(screen.getByDisplayValue(LOADED)).toBeTruthy();
+      expect(screen.getByDisplayValue('A short note, amended')).toBeTruthy();
+    });
   });
 
   it('keeps the reference and says so when the text cannot be loaded', async () => {

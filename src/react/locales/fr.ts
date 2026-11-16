@@ -263,4 +263,8 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   storedTextReplace: 'Remplacer',
   storedTextEditFailed:
     'Le texte n’a pas pu être chargé. Vous pouvez tout de même lancer avec lui tel quel.',
+  storedTextsNotLoaded: (count) =>
+    count <= 1
+      ? 'Un texte stocké n’a pas pu être chargé\u00a0; le fichier contient son lien à la place.'
+      : `${count} textes stockés n’ont pas pu être chargés\u00a0; le fichier contient leurs liens à la place.`,
 };

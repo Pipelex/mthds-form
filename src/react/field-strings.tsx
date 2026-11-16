@@ -388,6 +388,11 @@ export interface FieldStrings {
   storedTextReplace: string;
   /** Under a stored input whose text could not be loaded for editing. */
   storedTextEditFailed: string;
+  /**
+   * Under the whole-result download when some stored texts could not be
+   * loaded, so the file holds their links instead. Takes how many.
+   */
+  storedTextsNotLoaded: (count: number) => string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

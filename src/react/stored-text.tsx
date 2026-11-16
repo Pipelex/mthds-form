@@ -53,6 +53,20 @@ export function useStoredText(
 }
 
 /**
+ * A stored text's start, its `preview`, as written and followed by an ellipsis,
+ * since it is the start of a longer text. Nothing when the reference states no
+ * preview. Shared by the result view and an input holding a stored text.
+ */
+export function StoredTextStart({ preview }: { preview?: string }) {
+  if (!preview) return null;
+  return (
+    <p className="whitespace-pre-wrap wrap-anywhere text-[13px] leading-relaxed text-foreground">
+      {preview}…
+    </p>
+  );
+}
+
+/**
  * A stored text shown by its reference: its start (`preview`), and a line that
  * says what it is: the start of a longer text, one being loaded, or one that
  * could not be loaded, each with the text's size.
@@ -82,11 +96,7 @@ export function StoredTextPreview({
       data-stored-text={status}
     >
       {status === 'failed' ? <p className="text-[12px] text-muted-foreground">{note}</p> : null}
-      {reference.preview ? (
-        <p className="whitespace-pre-wrap wrap-anywhere text-[13px] leading-relaxed text-foreground">
-          {reference.preview}…
-        </p>
-      ) : null}
+      <StoredTextStart preview={reference.preview} />
       {status === 'failed' ? null : (
         <p className="text-[11px] text-muted-foreground" role="status">
           {note}

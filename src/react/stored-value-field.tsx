@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import { shownAsOptional } from '../core/readiness';
-import type { LoadText, StoredReferenceView } from '../core/stored-value';
+import { readStoredReference, type LoadText, type StoredReferenceView } from '../core/stored-value';
 import { loadedRunValue } from '../core/values';
 import { FieldShell } from './field-shell';
 import { useFieldDomId } from './field-dom-id';
 import { useFieldStrings } from './field-strings';
 import { focusOutlineClass } from './role-tokens';
+import { StoredTextStart } from './stored-text';
 import { cn } from './utils';
 
 interface StoredValueFieldProps {
@@ -43,6 +44,13 @@ const ACTION = cn(
  * two ways out: "Edit the text", when the host supplies a loader, puts the
  * loaded text in the field's own control, and "Replace" empties the field for
  * another value.
+ *
+ * A load answers into the field as it is when the answer comes, not as it was
+ * when it was asked: the answer is dropped when the field has gone (a list row
+ * removed), when a later Edit asked again, or when the field no longer holds
+ * the reference it loaded (a reset, a seed, another row's value moved in), and
+ * it is handed to the newest `onChange`, so a list writes it into the rows it
+ * holds now rather than the ones it held at the press.
  */
 export function StoredValueField({
   field,
@@ -58,21 +66,40 @@ export function StoredValueField({
   const domId = useFieldDomId(id);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  // What the field holds now, read when a load answers.
+  const current = useRef({ field, value, onChange });
+  useEffect(() => {
+    current.current = { field, value, onChange };
+  });
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const lastAsk = useRef(0);
 
   const edit = async () => {
     if (!loadText) return;
+    const ask = ++lastAsk.current;
+    const url = reference.url;
     setLoading(true);
     setFailed(false);
+    let text: unknown;
     try {
-      const text = await loadText(reference.url);
-      const loaded = typeof text === 'string' ? loadedRunValue(field, value, text) : undefined;
-      if (loaded === undefined) setFailed(true);
-      else onChange(loaded);
+      text = await loadText(url);
     } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
+      text = undefined;
     }
+    if (!mounted.current || ask !== lastAsk.current) return;
+    setLoading(false);
+    const now = current.current;
+    if (readStoredReference(now.field, now.value)?.url !== url) return;
+    const loaded =
+      typeof text === 'string' ? loadedRunValue(now.field, now.value, text) : undefined;
+    if (loaded === undefined) setFailed(true);
+    else now.onChange(loaded);
   };
 
   return (
@@ -91,11 +118,7 @@ export function StoredValueField({
         data-stored-text="held"
       >
         <p className="text-[12px] text-muted-foreground">{s.storedTextHeld(reference.size)}</p>
-        {reference.preview ? (
-          <p className="whitespace-pre-wrap wrap-anywhere text-[13px] leading-relaxed text-foreground">
-            {reference.preview}…
-          </p>
-        ) : null}
+        <StoredTextStart preview={reference.preview} />
         <div className="flex flex-wrap gap-2">
           {loadText ? (
             <button

@@ -209,4 +209,8 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   storedTextEdit: 'Edit the text',
   storedTextReplace: 'Replace',
   storedTextEditFailed: 'The text could not be loaded. You can still run with it as it is.',
+  storedTextsNotLoaded: (count) =>
+    count === 1
+      ? 'One stored text could not be loaded; the file holds its link instead.'
+      : `${count} stored texts could not be loaded; the file holds their links instead.`,
 };

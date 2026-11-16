@@ -435,16 +435,20 @@ function StuffPanel({
   // shown is drawn — matched by what it holds rather than by the object, since
   // a host may rebuild an equal result on every render.
   const [saving, setSaving] = useState<DownloadAttempt | null>(null);
-  // The names of the files the last download could not hand over, shown until
-  // the next one. Empty when everything arrived.
+  // What the last download could not hand over, shown until the next one: the
+  // names of the files that did not arrive, and how many stored texts went
+  // into the file as their links because they did not load. Empty and zero
+  // when everything arrived.
   const [missed, setMissed] = useState<{
     attempt: DownloadAttempt;
     names: readonly string[];
+    unloadedTexts: number;
   } | null>(null);
   const latest = useRef<DownloadAttempt | null>(null);
   const savingShown = saving !== null && isShownResult(saving, field, baseName, value);
-  const missedShown =
-    missed && isShownResult(missed.attempt, field, baseName, value) ? missed.names : [];
+  const missedNow = missed && isShownResult(missed.attempt, field, baseName, value) ? missed : null;
+  const missedShown = missedNow?.names ?? [];
+  const unloadedShown = missedNow?.unloadedTexts ?? 0;
   // The same resolver the rendered view paints images through, so a download
   // saves exactly what the reader is looking at — a host that proxies its
   // storage does not need to configure the two separately.
@@ -467,10 +471,28 @@ function StuffPanel({
     // path is its place in the result, which is the descriptor's, and the
     // file buttons below plan from the same place.
     const options = resolveUrl ? { resolveUrl } : {};
+    const attempt: DownloadAttempt = {
+      field,
+      baseName,
+      value,
+      key: resultKey(field, baseName, value),
+    };
+    // Busy from the press: loading the stored texts below may take a while,
+    // and a second press meanwhile would start a second download.
+    latest.current = attempt;
+    setSaving(attempt);
     // The texts a run kept in its storage are saved as the texts the reader
     // sees, not as links to them: each is loaded through the host's loader
-    // first, and one that does not load keeps its reference in the file.
-    const saved = loadText ? (await loadStoredValues(field, value, loadText)).value : value;
+    // first, and one that does not load keeps its reference in the file, and
+    // is counted, so the reader is told.
+    const loaded = loadText
+      ? await loadStoredValues(field, value, loadText)
+      : { value, unloaded: 0 };
+    // The name prompt is the reader's to answer, so the control is not busy
+    // behind it, as it never was.
+    setSaving((current) => (current === attempt ? null : current));
+    if (latest.current !== attempt) return;
+    const saved = loaded.value;
     let plan: SavePlan = planStuffSave(field, saved, { baseName, ...options });
     // The reader's name, when the host asks for one, flows into the plan. A
     // plan of one file asks for that file's name and keeps its extension; a
@@ -491,13 +513,7 @@ function StuffPanel({
       if (name === null) return;
       if (name !== stem) plan = planStuffSave(field, saved, { baseName: name, ...options });
     }
-    const attempt: DownloadAttempt = {
-      field,
-      baseName,
-      value,
-      key: resultKey(field, baseName, value),
-    };
-    latest.current = attempt;
+    if (latest.current !== attempt) return;
     setSaving(attempt);
     setMissed(null);
     try {
@@ -509,6 +525,7 @@ function StuffPanel({
           ...plan.unavailable.map((file) => file.name),
           ...failed.map((failure) => failure.file.name),
         ],
+        unloadedTexts: loaded.unloaded,
       });
     } finally {
       setSaving((current) => (current === attempt ? null : current));
@@ -570,12 +587,25 @@ function StuffPanel({
   // and only its text changes, because a region inserted with its message
   // already in it is not reliably announced. It sits under the Download,
   // wherever that is drawn.
+  // A stored text that did not load is said the same way: the file holds its
+  // link where the reader expected its text.
+  const missedMessages = [
+    ...(missedShown.length > 0 ? [s.downloadIncomplete(missedShown)] : []),
+    ...(unloadedShown > 0 ? [s.storedTextsNotLoaded(unloadedShown)] : []),
+  ];
   const missedStatus = downloadShown && (
     <p
       role="status"
-      className={cn('shrink-0 text-[12px] text-destructive', missedShown.length === 0 && 'sr-only')}
+      className={cn(
+        'shrink-0 text-[12px] text-destructive',
+        missedMessages.length === 0 && 'sr-only',
+      )}
     >
-      {missedShown.length > 0 ? s.downloadIncomplete(missedShown) : ''}
+      {missedMessages.map((message) => (
+        <span key={message} className="block">
+          {message}
+        </span>
+      ))}
     </p>
   );
 
