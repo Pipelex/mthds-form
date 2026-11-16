@@ -15,6 +15,7 @@ import {
 } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures, seedInputs } from '../core/seed';
 import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/values';
+import type { LoadText } from '../core/stored-value';
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { UploadedFile } from './file-field';
@@ -716,6 +717,8 @@ export interface MethodFormProps {
   allowUrl?: boolean;
   /** `FieldEnv.resolveUrl`: turns a stored reference into a URL a preview can load. */
   resolveUrl?: (uri: string) => Promise<string | null>;
+  /** `FieldEnv.loadText`: reads a stored text, so an input holding one can be edited. */
+  loadText?: LoadText;
   /**
    * Whether the empty optional inputs fold behind a "+ N optional inputs"
    * disclosure (the default), as they do inside a structure. `false` shows
@@ -806,6 +809,7 @@ function MethodFormFields({
   disabled,
   allowUrl,
   resolveUrl,
+  loadText,
   foldOptional = true,
   errors,
   framed,
@@ -848,6 +852,7 @@ function MethodFormFields({
       rowMoves,
       allowUrl,
       resolveUrl,
+      loadText,
       fileSource,
     }),
     [
@@ -859,6 +864,7 @@ function MethodFormFields({
       rowMoves,
       allowUrl,
       resolveUrl,
+      loadText,
       fileSource,
     ],
   );

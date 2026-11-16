@@ -245,4 +245,26 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   showMore: 'Afficher plus',
   loadingMore: 'Chargement de la suite…',
   loadMoreFailed: 'Impossible de charger la suite.',
+  storedTextLoading: (bytes) =>
+    bytes === undefined
+      ? 'Chargement du texte complet…'
+      : `Chargement du texte complet (${formatBytes(bytes)})…`,
+  storedTextStart: (bytes) =>
+    bytes === undefined
+      ? 'Le début d’un texte stocké'
+      : `Le début d’un texte stocké de ${formatBytes(bytes)}`,
+  storedTextUnloaded: (bytes) =>
+    bytes === undefined
+      ? 'Ce texte stocké n’a pas pu être chargé. Il commence ainsi\u00a0:'
+      : `Ce texte stocké de ${formatBytes(bytes)} n’a pas pu être chargé. Il commence ainsi\u00a0:`,
+  storedTextHeld: (bytes) =>
+    bytes === undefined ? 'Un texte stocké' : `Un texte stocké de ${formatBytes(bytes)}`,
+  storedTextEdit: 'Modifier le texte',
+  storedTextReplace: 'Remplacer',
+  storedTextEditFailed:
+    'Le texte n’a pas pu être chargé. Vous pouvez tout de même lancer avec lui tel quel.',
+  storedTextsNotLoaded: (count) =>
+    count <= 1
+      ? 'Un texte stocké n’a pas pu être chargé\u00a0; le fichier contient son lien à la place.'
+      : `${count} textes stockés n’ont pas pu être chargés\u00a0; le fichier contient leurs liens à la place.`,
 };

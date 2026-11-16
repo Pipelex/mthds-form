@@ -63,6 +63,8 @@ describe('FR_FIELD_STRINGS', () => {
       s.pageNumber(3),
       s.viewImage('a.png'),
       s.imagePosition(3, 6),
+      s.storedTextsNotLoaded(1),
+      s.storedTextsNotLoaded(3),
     ];
     for (const answer of answers) expect(answer.trim()).not.toBe('');
   });
@@ -94,6 +96,16 @@ describe('FR_FIELD_STRINGS', () => {
     expect(s.downloadIncomplete(['a.pdf'])).toBe('Un fichier n’a pas pu être enregistré : a.pdf');
     expect(s.downloadIncomplete(['a.pdf', 'b.png'])).toBe(
       '2 fichiers n’ont pas pu être enregistrés : a.pdf, b.png',
+    );
+  });
+
+  it('counts the stored texts a download could not load, in the singular and the plural', () => {
+    const s = FR_FIELD_STRINGS;
+    expect(normalize(s.storedTextsNotLoaded(1))).toBe(
+      'Un texte stocké n’a pas pu être chargé ; le fichier contient son lien à la place.',
+    );
+    expect(normalize(s.storedTextsNotLoaded(2))).toBe(
+      '2 textes stockés n’ont pas pu être chargés ; le fichier contient leurs liens à la place.',
     );
   });
 });

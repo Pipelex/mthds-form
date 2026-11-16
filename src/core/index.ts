@@ -145,6 +145,22 @@ export {
   viewableUrl,
 } from './native-content';
 
+// The natives whose value may live in storage (`Text`, `Markdown`, `Html`,
+// `JSON`, and every concept refining one), read by concept: which property
+// holds the value inline, the reference a stored one carries instead, and the
+// inline form once its text is loaded. Loading is the host's (`LoadText`).
+// See ./stored-value and docs/stored-values.md.
+export type { LoadText, StoredReferenceView } from './stored-value';
+export {
+  STORED_REFERENCE_MEMBERS,
+  STORED_VALUE_KEYS,
+  inlineStoredValue,
+  isStoredValueNode,
+  loadStoredValues,
+  readStoredReference,
+  storedValueKeyOf,
+} from './stored-value';
+
 // Readiness - what the Run button gates on.
 //
 // `computeReadiness` is the answer for a form; `gateRunInputs` (below) is the
@@ -228,6 +244,7 @@ export {
   apiInputsFromRunValues,
   fieldsForContract,
   inputDataFromWorkingMemory,
+  loadedRunValue,
   outputsFromPipeOutput,
   rjsfDataFromRunValues,
   runValuesFromInputs,

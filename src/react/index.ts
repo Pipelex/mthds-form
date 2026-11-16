@@ -95,8 +95,13 @@ export type {
   ResolveUrls,
   TableLayout,
 } from './result-env';
+// `loadText` reads a stored text (`{url, size, mime_type, preview}`) for the
+// result view and the form. Its shape is the core entry's, where a host's
+// server can name it too. See docs/stored-values.md.
+export type { LoadText, StoredReferenceView } from '../core';
 export {
   ResultEnvProvider,
+  useLoadText,
   useProseImages,
   useResolveDocumentPdf,
   useResolveRendition,

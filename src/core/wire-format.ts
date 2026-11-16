@@ -7,6 +7,8 @@
  * - Image:      same as Document
  * - Text[]:     ["t1", "t2"]
  * - Document[]: ["f1.pdf"] or [{ url: "..." }]
+ * - Text[] holding a stored text, and every Markdown[], Html[] and JSON[]:
+ *               { concept, content: [item, item] } (one list-level envelope)
  * - Custom:     { concept, content }           (no simplification)
  *
  * The RJSF form uses the FULL concept structure from the json_schema.
@@ -19,6 +21,7 @@
 import { asCalendarDate } from './date-format';
 import { hasOwnProp, ownProp } from './own-property';
 import { collectSchemaDefs, resolveSchemaIndirection, schemaTypeOf } from './schema-utils';
+import { readStoredReference } from './stored-value';
 
 // ─── The wire taxonomy ──────────────────────────────────────────────────────
 //
@@ -43,12 +46,37 @@ const WIRE_TEXT_CONCEPTS = nativeSet('Text');
 /** Concepts whose simplified wire form is a bare URL string. */
 const WIRE_DOCUMENT_LIKE_CONCEPTS = nativeSet('Document', 'Image', 'Page');
 
+/**
+ * Concepts whose items have no bare form, so a list of them travels as one
+ * list-level `{ concept, content: [...] }` envelope. The runtime refuses a
+ * bare list of per-item `{ concept, content }` envelopes for these, and reads
+ * the list-level envelope by handing each item to the concept's content model,
+ * which takes its value inline or as a stored reference.
+ */
+const WIRE_ENVELOPED_LIST_CONCEPTS = nativeSet('Markdown', 'Html', 'JSON');
+
 function isTextConcept(concept: string): boolean {
   return WIRE_TEXT_CONCEPTS.has(concept);
 }
 
 function isDocumentLikeConcept(concept: string): boolean {
   return WIRE_DOCUMENT_LIKE_CONCEPTS.has(concept);
+}
+
+/** The node `readStoredReference` reads a text concept's value against. */
+const TEXT_NODE = { conceptRef: 'native.Text' } as const;
+
+/**
+ * A text held in storage: no `text`, and a `url` naming where it is, beside
+ * its `size`, `mime_type` and `preview`. Read only for a value of a text
+ * concept, so this reads the documented stored form of a stated concept rather
+ * than guessing which concept a value is, and it is `./stored-value`'s own
+ * reading of that form, so the two cannot disagree. It has no simplified form
+ * - a bare string is the text itself - so it travels as the runtime's explicit
+ * `{ concept, content }` form, and inflates as itself.
+ */
+function isStoredTextReference(value: unknown): value is Record<string, unknown> {
+  return readStoredReference(TEXT_NODE, value) !== undefined;
 }
 
 /** A concept ref like `native.Document[]` → base `native.Document`, isList true. */
@@ -68,7 +96,8 @@ function isListConcept(conceptCode: string): { isList: boolean; baseConcept: str
  * - Document { url: "file.pdf", ... } → "file.pdf" (if only url) or { url, ... }
  * - Image: same as Document
  * - Page: same as Document
- * - List types → array of deflated items
+ * - List types → array of deflated items, except a text list holding a stored
+ *   text and a non-empty Markdown, Html or JSON list → one `{ concept, content }`
  * - Custom → { concept, content }
  */
 export function deflateInput(value: unknown, conceptCode: string): unknown {
@@ -76,8 +105,26 @@ export function deflateInput(value: unknown, conceptCode: string): unknown {
 
   if (isList) {
     const items = Array.isArray(value) ? value : [];
-    // pipelex accepts Sequence[str] for list inputs, not list of dicts.
-    // Always simplify list items to their scalar form (URL string for docs, plain string for text).
+    // pipelex reads a bare list of a native input as one scalar per item (a
+    // string for a text, a URL for a document), never a list of dicts, so the
+    // items are simplified to that form. Two kinds of list have an item with
+    // no scalar form, and go as ONE list-level `{ concept, content: [...] }`
+    // envelope instead, whose items the runtime hands to the concept's
+    // content model: a text list holding a stored text (a reference is not a
+    // string), and every Markdown, Html or JSON list (a per-item envelope is
+    // refused). An EMPTY list still goes bare: the runtime types an enveloped
+    // list by its first item, and has none to read.
+    if (isTextConcept(baseConcept) && items.some(isStoredTextReference)) {
+      return {
+        concept: baseConcept,
+        content: items.map((item) =>
+          isStoredTextReference(item) ? item : { text: deflateListItem(item, baseConcept) },
+        ),
+      };
+    }
+    if (WIRE_ENVELOPED_LIST_CONCEPTS.has(baseConcept) && items.length > 0) {
+      return { concept: baseConcept, content: items.map(unwrapAllWrappers) };
+    }
     return items.map((item) => deflateListItem(item, baseConcept));
   }
 
@@ -115,6 +162,9 @@ function deflateListItem(value: unknown, concept: string): unknown {
 
 function deflateSingleValue(value: unknown, concept: string): unknown {
   if (isTextConcept(concept)) {
+    // A stored text: the explicit form, which the runtime reads a text input
+    // given as a URL from. `String()` of it wrote "[object Object]".
+    if (isStoredTextReference(value)) return { concept, content: value };
     // { text: "hello" } → "hello"
     if (value && typeof value === 'object' && 'text' in value) {
       return (value as { text: string }).text;
@@ -219,6 +269,9 @@ function inflateSingleValue(value: unknown, concept: string): unknown {
     if (typeof value === 'string') {
       return { text: value };
     }
+    // A stored text is already full, and is kept: inflating it to `{ text: '' }`
+    // emptied the input and lost the reference.
+    if (isStoredTextReference(value)) return value;
     // Already full structure { text: "..." }
     if (value && typeof value === 'object' && 'text' in value) {
       return value;

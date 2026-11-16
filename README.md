@@ -98,6 +98,7 @@ The controls carry Tailwind classes over the standard shadcn/ui semantic tokens 
 | [docs/wire-correspondence.md](docs/wire-correspondence.md) | the name-for-name wire ↔ `RunField` mapping |
 | [docs/method-form.md](docs/method-form.md) | the whole form of one method: `useMethodForm` and `MethodForm`, what they cover and what stays the host's |
 | [docs/upload-seam.md](docs/upload-seam.md) | what a file control and its host owe each other: accepted formats and narrowing them, write-back paths, previews, the file card |
+| [docs/stored-values.md](docs/stored-values.md) | a `Text`, `Markdown`, `Html` or `JSON` value kept in the run's storage: read by concept, loaded through the host's `loadText`, shown by its start until then, kept as its reference in the form |
 | [docs/sources.md](docs/sources.md) | the two optional host sources: a team's files, chosen into a file field, and a method's examples, filled into the whole form |
 | [docs/i18n.md](docs/i18n.md) | wording a form for its reader: the controls' strings, the French set and the locale switch |
 | [docs/derivation-swap.md](docs/derivation-swap.md) | the record of the swap to the wire descriptor — what changed, what survived |

@@ -1,6 +1,8 @@
 'use client';
 
 import type { RunField } from '../core';
+import { readStoredReference, type LoadText } from '../core/stored-value';
+import { StoredValueField } from './stored-value-field';
 import { BooleanField } from './boolean-field';
 import { DateField } from './date-field';
 import { DocumentField, ImageField, type FileValue, type UploadedFile } from './file-field';
@@ -106,6 +108,15 @@ export interface FieldEnv {
    *  of already-stored files). */
   resolveUrl?: (uri: string) => Promise<string | null>;
   /**
+   * Reads a stored text, for an input holding a `Text`, `Markdown`, `Html` or
+   * `JSON` value as its reference (`{url, size, mime_type, preview}`) rather
+   * than as its text. Given, the field offers "Edit the text", which loads the
+   * text into the field's own control; without it, the field still shows the
+   * text's start and size, keeps the reference, and offers to replace it. The
+   * same function a host hands the result view. See docs/stored-values.md.
+   */
+  loadText?: LoadText;
+  /**
    * Where a file field can take a file the host already stores. Its presence
    * is the capability, as `onDropFile`'s is: every empty file field then
    * offers "Choose from your team's files", and a list of files offers it for
@@ -138,6 +149,25 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
   // is what gave every file field an armed dropzone over a callback that did
   // nothing.
   const drop = env?.onDropFile;
+
+  // An input holding a text kept in storage, whatever its kind: the concept
+  // says its value may be stored, and the value is the stored form. No control
+  // below can hold a reference, and emptying it into one would lose it.
+  const reference = readStoredReference(field, value);
+  if (reference) {
+    return (
+      <StoredValueField
+        field={field}
+        value={value}
+        reference={reference}
+        onChange={onChange}
+        id={id}
+        error={error}
+        disabled={disabled}
+        loadText={env?.loadText}
+      />
+    );
+  }
 
   switch (field.kind) {
     case 'text':

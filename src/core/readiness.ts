@@ -5,6 +5,7 @@
 
 import type { ObjectRunField, RunField } from './descriptor';
 import { hasOwnProp, ownProp } from './own-property';
+import { readStoredReference } from './stored-value';
 
 /**
  * How deep `isFilled` walks a value before it stops looking, and the answer it
@@ -115,6 +116,10 @@ function walkFilled(value: unknown, depth: number, seen: Map<object, number> | u
  * the caller's data is walked, and where the cap lives.
  */
 export function fieldFilled(field: RunField, value: unknown): boolean {
+  // A stored value's reference stands for the value, which the runtime reads
+  // where a step reads it: an HTML page held in storage holds none of the
+  // members its inline form requires, and is filled all the same.
+  if (readStoredReference(field, value)) return true;
   if (field.kind === 'object') {
     if (!isFilled(value)) return false;
     const obj = (value ?? {}) as Record<string, unknown>;

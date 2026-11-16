@@ -192,4 +192,25 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   showMore: 'Show more',
   loadingMore: 'Loading more…',
   loadMoreFailed: "Couldn't load more.",
+  storedTextLoading: (bytes) =>
+    bytes === undefined
+      ? 'Loading the whole text…'
+      : `Loading the whole text (${formatBytes(bytes)})…`,
+  storedTextStart: (bytes) =>
+    bytes === undefined
+      ? 'The start of a stored text'
+      : `The start of a stored text of ${formatBytes(bytes)}`,
+  storedTextUnloaded: (bytes) =>
+    bytes === undefined
+      ? 'This stored text could not be loaded. It starts:'
+      : `This stored text of ${formatBytes(bytes)} could not be loaded. It starts:`,
+  storedTextHeld: (bytes) =>
+    bytes === undefined ? 'A stored text' : `A stored text of ${formatBytes(bytes)}`,
+  storedTextEdit: 'Edit the text',
+  storedTextReplace: 'Replace',
+  storedTextEditFailed: 'The text could not be loaded. You can still run with it as it is.',
+  storedTextsNotLoaded: (count) =>
+    count === 1
+      ? 'One stored text could not be loaded; the file holds its link instead.'
+      : `${count} stored texts could not be loaded; the file holds their links instead.`,
 };
