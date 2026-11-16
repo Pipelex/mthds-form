@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import { shownAsOptional } from '../core/readiness';
@@ -66,13 +66,17 @@ export function StoredValueField({
   const domId = useFieldDomId(id);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  // What the field holds now, read when a load answers.
+  // What the field holds now, read when a load answers. Both refs move in the
+  // commit itself, in layout effects: passive effects can run a frame later,
+  // and a load answering in between would read the value the field held
+  // before, writing its text over a newer value or into a field a reset has
+  // already removed.
   const current = useRef({ field, value, onChange });
-  useEffect(() => {
+  useLayoutEffect(() => {
     current.current = { field, value, onChange };
   });
   const mounted = useRef(true);
-  useEffect(() => {
+  useLayoutEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;

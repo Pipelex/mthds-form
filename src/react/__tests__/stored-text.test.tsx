@@ -13,7 +13,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import userEvent from '@testing-library/user-event';
 
 import type { InputFormField } from 'mthds/protocol';
@@ -374,6 +375,125 @@ describe('an input holding a stored text', () => {
     unmount();
     await act(async () => answers[0]?.resolve(LOADED));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  describe('when the host changes it outside an event', () => {
+    // `act` flushes passive effects with the commit, which hides the gap this
+    // guards: these tests mount through `createRoot` with act's environment
+    // off, so React yields between a commit and its passive effects as it
+    // does in a browser. A slow sibling makes the render long enough to yield,
+    // and its layout effect answers the pending load inside that gap.
+    const OTHER_REF = { ...TEXT_REF, url: 'pipelex-storage://runs/r2/generated/abc/value.md' };
+    const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    function Slow({ answerNow, answer }: { answerNow: boolean; answer: () => void }) {
+      const start = performance.now();
+      while (performance.now() - start < 20) {
+        // A long render, so the scheduler yields before the passive effects.
+      }
+      useLayoutEffect(() => {
+        if (answerNow) answer();
+      }, [answerNow, answer]);
+      return null;
+    }
+
+    async function inLiveRoot(run: (root: Root, container: HTMLElement) => Promise<void>) {
+      const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+      const before = env.IS_REACT_ACT_ENVIRONMENT;
+      env.IS_REACT_ACT_ENVIRONMENT = false;
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const root = createRoot(container);
+      try {
+        await run(root, container);
+      } finally {
+        root.unmount();
+        container.remove();
+        env.IS_REACT_ACT_ENVIRONMENT = before;
+      }
+    }
+
+    const pressEdit = (container: HTMLElement) =>
+      [...container.querySelectorAll('button')]
+        .find((button) => button.textContent === S.storedTextEdit)!
+        .click();
+
+    it('keeps a new value when a load answers before the passive effects run', async () => {
+      const { load, answers } = heldLoader();
+      const field = input('markdown_in');
+      const written: unknown[] = [];
+      let hostSets: (value: unknown) => void = () => undefined;
+      let held: unknown;
+      const answer = () => answers[0]?.resolve(LOADED);
+      function Host() {
+        const [value, setValue] = useState<unknown>(TEXT_REF);
+        hostSets = setValue;
+        held = value;
+        return (
+          <>
+            <FieldRenderer
+              field={field}
+              value={value}
+              onChange={(next) => {
+                written.push(next);
+                setValue(next);
+              }}
+              id="md"
+              env={{ loadText: load }}
+            />
+            <Slow answerNow={value === OTHER_REF} answer={answer} />
+          </>
+        );
+      }
+      await inLiveRoot(async (root, container) => {
+        root.render(<Host />);
+        await pause(30);
+        pressEdit(container);
+        await pause(30);
+        expect(load).toHaveBeenCalledTimes(1);
+        // A timer's update is not a discrete event, so React may yield.
+        setTimeout(() => hostSets(OTHER_REF), 0);
+        await pause(200);
+        expect(held).toBe(OTHER_REF);
+        expect(written).toEqual([]);
+        expect(container.querySelector('[data-stored-text="held"]')).not.toBeNull();
+      });
+    });
+
+    it('drops a load answering after a reset, before the passive effects run', async () => {
+      const { load, answers } = heldLoader();
+      const field = input('markdown_in');
+      const written: Array<[number, unknown]> = [];
+      let reset: () => void = () => undefined;
+      const answer = () => answers[0]?.resolve(LOADED);
+      function Host() {
+        const [generation, setGeneration] = useState(0);
+        reset = () => setGeneration((n) => n + 1);
+        return (
+          <>
+            <FieldRenderer
+              key={generation}
+              field={field}
+              value={TEXT_REF}
+              onChange={(next) => written.push([generation, next])}
+              id="md"
+              env={{ loadText: load }}
+            />
+            <Slow answerNow={generation > 0} answer={answer} />
+          </>
+        );
+      }
+      await inLiveRoot(async (root, container) => {
+        root.render(<Host />);
+        await pause(30);
+        pressEdit(container);
+        await pause(30);
+        expect(load).toHaveBeenCalledTimes(1);
+        setTimeout(reset, 0);
+        await pause(200);
+        expect(written).toEqual([]);
+      });
+    });
   });
 
   describe('in a list', () => {
