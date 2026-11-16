@@ -51,6 +51,23 @@ function isDocumentLikeConcept(concept: string): boolean {
   return WIRE_DOCUMENT_LIKE_CONCEPTS.has(concept);
 }
 
+/**
+ * A text held in storage: no `text`, and a `url` naming where it is, beside
+ * its `size`, `mime_type` and `preview` (see `./stored-value`). Read only for
+ * a value of a text concept, so this reads the documented stored form of a
+ * stated concept rather than guessing which concept a value is. It has no
+ * simplified form - a bare string is the text itself - so it travels as the
+ * runtime's explicit `{ concept, content }` form, and inflates as itself.
+ */
+function isStoredTextReference(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const text = ownProp(record, 'text');
+  if (text !== undefined && text !== null) return false;
+  const url = ownProp(record, 'url');
+  return typeof url === 'string' && url.trim() !== '';
+}
+
 /** A concept ref like `native.Document[]` → base `native.Document`, isList true. */
 function isListConcept(conceptCode: string): { isList: boolean; baseConcept: string } {
   if (conceptCode.endsWith('[]')) return { isList: true, baseConcept: conceptCode.slice(0, -2) };
@@ -87,6 +104,8 @@ export function deflateInput(value: unknown, conceptCode: string): unknown {
 /** Deflate a single item within a list - always reduces to the simplest scalar form. */
 function deflateListItem(value: unknown, concept: string): unknown {
   if (isTextConcept(concept)) {
+    // A stored text has no scalar form, and goes as its reference.
+    if (isStoredTextReference(value)) return value;
     if (value && typeof value === 'object' && 'text' in value) {
       return (value as { text: string }).text;
     }
@@ -115,6 +134,9 @@ function deflateListItem(value: unknown, concept: string): unknown {
 
 function deflateSingleValue(value: unknown, concept: string): unknown {
   if (isTextConcept(concept)) {
+    // A stored text: the explicit form, which the runtime reads a text input
+    // given as a URL from. `String()` of it wrote "[object Object]".
+    if (isStoredTextReference(value)) return { concept, content: value };
     // { text: "hello" } → "hello"
     if (value && typeof value === 'object' && 'text' in value) {
       return (value as { text: string }).text;
@@ -219,6 +241,9 @@ function inflateSingleValue(value: unknown, concept: string): unknown {
     if (typeof value === 'string') {
       return { text: value };
     }
+    // A stored text is already full, and is kept: inflating it to `{ text: '' }`
+    // emptied the input and lost the reference.
+    if (isStoredTextReference(value)) return value;
     // Already full structure { text: "..." }
     if (value && typeof value === 'object' && 'text' in value) {
       return value;

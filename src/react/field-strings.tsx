@@ -370,6 +370,24 @@ export interface FieldStrings {
   loadingMore: string;
   /** The next page could not be read; the rows already shown stay. Try again follows it. */
   loadMoreFailed: string;
+
+  // A stored text (docs/stored-values.md): a `Text`, `Markdown`, `Html` or
+  // `JSON` value a run kept in its storage, shown by its start until it loads.
+  // Each takes the value's size in bytes, when the reference states it.
+  /** Under the start of a stored text while the host loads the rest. */
+  storedTextLoading: (bytes: number | undefined) => string;
+  /** Under the start of a stored text when the host offers no way to load it. */
+  storedTextStart: (bytes: number | undefined) => string;
+  /** Over the start of a stored text the host could not load. */
+  storedTextUnloaded: (bytes: number | undefined) => string;
+  /** An input holding a stored text: what the field says it holds. */
+  storedTextHeld: (bytes: number | undefined) => string;
+  /** Loads a stored input's text into the field, to edit it. */
+  storedTextEdit: string;
+  /** Clears a stored input, to type or drop another value. */
+  storedTextReplace: string;
+  /** Under a stored input whose text could not be loaded for editing. */
+  storedTextEditFailed: string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Stored texts in the result view and the form, through the host's `loadText` (Breaking)**: a `Text`, `Markdown`, `Html` or `JSON` value (or a refining concept's) that arrives as its reference, `{url, size, mime_type, preview}`, shows its preview and size until `loadText` (`(url) => Promise<string>`, on `ResultEnvProvider`, `FieldEnv` and `MethodForm`) answers, then the value as if it had arrived inline, and the reference's description when the load fails; an input holding one keeps the reference, sends it back as it came and offers "Edit the text" and "Replace". `FieldStrings` gains `storedTextLoading`, `storedTextStart`, `storedTextUnloaded`, `storedTextHeld`, `storedTextEdit`, `storedTextReplace` and `storedTextEditFailed`, which a host spelling the whole set must supply. See `docs/stored-values.md`.
+- **The core entry reads stored values by concept**: `storedValueKeyOf`, `isStoredValueNode`, `readStoredReference`, `inlineStoredValue`, `loadStoredValues`, `loadedRunValue`, `STORED_VALUE_KEYS`, `STORED_REFERENCE_MEMBERS` and the types `LoadText` and `StoredReferenceView`, with `useLoadText` in the control set.
+
+### Fixed
+
+- **A text keeps its `text` wrapper against the current schemas**: `TextContent` now declares the stored reference's members beside `text`, so `contentKey` found no single property and every `native.Text` and `native.Markdown` field, and every concept refining one, lost its key. A text's `contentKey` is now named by its concept, kept when its schema declares it, so a typed input goes out as `{text}` and a text result is drawn as its text.
+- **A stored `native.Text` survives the store's simplified form**: inflating it no longer empties it to `{text: ''}` and deflating it no longer writes `"[object Object]"`; it is written as `{concept, content: reference}`.
+
 ## [v0.36.2] - 2026-11-10
 
 ### Changed

@@ -7,6 +7,7 @@ import type { RunField } from '../core';
 import { isNativeHtmlNode, readHtmlContent } from '../core/native-content';
 import { planFileSave, planStuffSave, splitFileName, type SavePlan } from '../core/save-plan';
 import { readStuffFile } from '../core/stuff-files';
+import { loadStoredValues } from '../core/stored-value';
 import {
   Absent,
   PanelResult,
@@ -22,6 +23,7 @@ import {
   PanelEnvOverride,
   useFileDownloadShown,
   usePdfSaveShown,
+  useLoadText,
   useResolveUrl,
   useResultDownloadShown,
   useSaveFiles,
@@ -447,6 +449,7 @@ function StuffPanel({
   // saves exactly what the reader is looking at — a host that proxies its
   // storage does not need to configure the two separately.
   const resolveUrl = useResolveUrl();
+  const loadText = useLoadText();
   const save = useSaveFiles();
   const resultDownloadShown = useResultDownloadShown();
   const pageDownloadShown = useFileDownloadShown('markup');
@@ -464,7 +467,11 @@ function StuffPanel({
     // path is its place in the result, which is the descriptor's, and the
     // file buttons below plan from the same place.
     const options = resolveUrl ? { resolveUrl } : {};
-    let plan: SavePlan = planStuffSave(field, value, { baseName, ...options });
+    // The texts a run kept in its storage are saved as the texts the reader
+    // sees, not as links to them: each is loaded through the host's loader
+    // first, and one that does not load keeps its reference in the file.
+    const saved = loadText ? (await loadStoredValues(field, value, loadText)).value : value;
+    let plan: SavePlan = planStuffSave(field, saved, { baseName, ...options });
     // The reader's name, when the host asks for one, flows into the plan. A
     // plan of one file asks for that file's name and keeps its extension; a
     // plan of several asks for the name they share, the base name (prefilled
@@ -482,7 +489,7 @@ function StuffPanel({
       const { stem } = splitFileName(json.name);
       const name = await ask(stem, '');
       if (name === null) return;
-      if (name !== stem) plan = planStuffSave(field, value, { baseName: name, ...options });
+      if (name !== stem) plan = planStuffSave(field, saved, { baseName: name, ...options });
     }
     const attempt: DownloadAttempt = {
       field,
@@ -506,7 +513,7 @@ function StuffPanel({
     } finally {
       setSaving((current) => (current === attempt ? null : current));
     }
-  }, [field, value, baseName, resolveUrl, save, ask]);
+  }, [field, value, baseName, resolveUrl, loadText, save, ask]);
   const labels: Record<StuffViewerView, string> = { rendered: s.viewRendered, json: s.viewJson };
   // The PDF is named as the page's HTML download is, with its own extension, so
   // the two files a reader saves of one page share a name.

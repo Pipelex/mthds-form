@@ -18,7 +18,10 @@
  *   holds the bare scalar; the value bridge wraps by this name. It is read off
  *   the contract's `json_schema` because it is a fact about the PAYLOAD shape,
  *   which is the schema's job - the descriptor describes the form, never the
- *   payload.
+ *   payload. A text whose value may be stored (`native.Text`,
+ *   `native.Markdown`, or a concept refining one) is the exception: its schema
+ *   declares the reference's members beside the value, so the CONCEPT names the
+ *   property (`./stored-value`) and the schema only confirms it declares it.
  * - **Nested list bounds** - the wire puts `item_count` only on a top-level
  *   fixed `[N]` slot, but the model behind a structured concept may state
  *   `minItems`/`maxItems` on an array property of its own, and ajv enforces
@@ -35,7 +38,8 @@ import type { InputForm, InputFormField, InputFormItem } from 'mthds/protocol';
 import { buildPipeRef, type PipeInputContract } from './contracts';
 import { formatsForKind } from './file-formats';
 import type { RunField, RunFieldCommon } from './descriptor';
-import { ownProp } from './own-property';
+import { hasOwnProp, ownProp } from './own-property';
+import { storedValueKeyOf } from './stored-value';
 import { collectSchemaDefs, resolveSchemaNode, type JsonSchema } from './schema-utils';
 
 /**
@@ -72,6 +76,29 @@ function scalarWrapperKey(schema: JsonSchema | undefined): string | undefined {
   const props = schema?.properties as Record<string, JsonSchema> | undefined;
   const keys = props ? Object.keys(props) : [];
   return keys.length === 1 ? keys[0] : undefined;
+}
+
+/**
+ * The property a text node's value sits inside on the wire.
+ *
+ * A text whose value may live in storage (`native.Text`, `native.Markdown`, a
+ * concept refining either) is `{text}` inline and `{url, size, mime_type,
+ * preview}` stored, so its schema declares five properties and
+ * `scalarWrapperKey` has nothing to count. Its concept names the property
+ * instead, read off the descriptor's `concept_ref` and `refines`, and the schema
+ * must declare it: a structure's member that happens to name `native.Text` but
+ * is a bare string on the wire keeps no key, and a missing schema degrades to
+ * none, as it always has. Every other text answers as before.
+ */
+function textContentKey(node: InputFormItem, schema: JsonSchema | undefined): string | undefined {
+  const props = schema?.properties as Record<string, JsonSchema> | undefined;
+  const stored = storedValueKeyOf({
+    kind: node.kind,
+    conceptRef: node.concept_ref,
+    refines: node.refines,
+  });
+  if (stored !== undefined && props && hasOwnProp(props, stored)) return stored;
+  return scalarWrapperKey(schema);
 }
 
 function numOrUndef(v: unknown): number | undefined {
@@ -140,7 +167,7 @@ function mapNode(
     case 'prose':
       return {
         ...common,
-        contentKey: scalarWrapperKey(schema),
+        contentKey: textContentKey(node, schema),
         kind: node.kind,
         minLength: node.min_length,
         maxLength: node.max_length,
@@ -296,6 +323,11 @@ export function buildResultField(
   // its content model, and a structured concept that happens to declare exactly
   // one field would otherwise be mistaken for a wrapper. The kind comes from the
   // descriptor, so this is a read of what the field is, not a guess at it.
+  //
+  // A text whose value may be stored is no longer such a wrapper: its content
+  // model declares the reference's members beside `text`, so nothing unwraps
+  // here and the node is walked against the whole model, where `mapNode` reads
+  // the property off its concept (`textContentKey`).
   const wrapperKey = node.kind === 'object' ? undefined : scalarWrapperKey(schema as JsonSchema);
   const inner =
     wrapperKey === undefined
