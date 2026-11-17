@@ -1,6 +1,6 @@
 # The upload seam
 
-The package never uploads anything. A file control takes a file from the user and hands it to the host; the host stores it and writes the resulting value back. That seam is `FieldEnv`'s `onDropFile`, `uploadingIds`, `uploadErrors`, `onRemoveItem`, `rowMoves`, `resolveUrl` and `allowUrl`, and one rule about identity, and everything below is what each side owes the other.
+The package never uploads anything. A file control takes a file from the user and hands it to the host; the host stores it and writes the resulting value back. That seam is `FieldEnv`'s `onDropFile`, `uploadingIds`, `uploadErrors`, `onPreparingFile`, `onRemoveItem`, `rowMoves`, `resolveUrl` and `allowUrl`, and one rule about identity, and everything below is what each side owes the other.
 
 ```ts
 <FieldRenderer
@@ -22,6 +22,7 @@ The package never uploads anything. A file control takes a file from the user an
     rowMoves,              // optional: every move the host made to a list's rows, for the list to replay
     resolveUrl,            // a stored URI -> something a browser can render
     allowUrl: true,        // the default: a link may be pasted instead
+    onPreparingFile,       // optional: (id) => release, while the camera makes a file
     disabled: running,
   }}
 />
@@ -39,6 +40,7 @@ Each way into a file value is offered exactly when the host can honour it, and e
 - **A link**, offered unless the host sets `allowUrl` to `false`.
 - **A stored file**, offered exactly when the form has a file source (`FieldEnv.fileSource`, [sources.md](sources.md)): "Choose from your team's files", a row under whatever else the empty field shows. It changes nothing about the upload or the link beside it.
 - **Several files at once**, on a list of files, offered exactly when the host supplies `onDropFile`: a drop area of the list's own, under its rows, which hands each file to the host as if it had been dropped on its row ([below](#a-list-of-files-takes-several-files-at-once)). It is the upload, taken several files at a time: a host whose `onDropFile` returns its upload owes nothing more, and one whose `onDropFile` returns nothing reports `uploadingIds`, as it already must for the preview.
+- **A photo**, on a touch screen, offered exactly when the host supplies `onDropFile` and the input takes photos (a document input accepting PDF, an image input accepting JPEG): "Take photo" under the dropzone, which photographs a document page by page into one PDF, or an image input's one photo, and stores the file through `onDropFile` like a dropped one. It is the upload again, with a file the control made; a host owes it nothing more, and may supply `onPreparingFile` ([below](#a-file-being-made-is-an-upload-in-flight)). See [camera.md](camera.md).
 
 | `onDropFile` | `allowUrl` | What the control renders | With a `fileSource` as well |
 | --- | --- | --- | --- |
@@ -117,6 +119,16 @@ The rule holds whoever the host is, one that follows rows through `onRemoveItem`
 **Add stays available during an upload, on purpose.** Appending leaves every existing index where it is, so an in-flight write-back is unaffected, and freezing it would make filling a list of files needlessly serial.
 
 **So does a list's drop area for several files**, for the same reason: it appends rows or fills rows that are free, and a row whose file is still arriving is never free ([below](#a-list-of-files-takes-several-files-at-once)). A person can drop a second batch while the first is still uploading. Every upload a list of files hands the host and the host returns pins the list's rows as the host's `uploadingIds` do, until it answers, whether the area placed the file or the person dropped it on a row, so the remove buttons stay shut over it even for a host that reports no `uploadingIds`.
+
+## A file being made is an upload in flight
+
+The camera makes its file in the browser before it hands it to `onDropFile`: each photo is read into a page, and the pages are bound into a PDF ([camera.md](camera.md)). Until the hand-off, the value is about to change, and a run started meanwhile would send the file the field held before the last photo. `FieldEnv.onPreparingFile(id)` is how the field says so: it calls it when a photo is taken or a page removed, and calls the function it returned, the report's release, once it has handed the file to `onDropFile`, or once it gives up (the photo could not be read, the file could not be made, the pages were discarded, the field unmounted). From the hand-off on, the upload is the host's own, reported as any upload is.
+
+**The release ends one report, not an id.** A report outlives the id it was made at: a row moved while its file is made changes its id, and a row removed takes its field, which unmounts and releases. Ending the report by naming the id again would end whatever stands at that id by then, which after a removal is the row moved into the removed one's place, or, after a reset, the remounted field's own report. So a host keeps each report apart, as it keeps an upload in flight apart by the drop that started it: it follows the report with its row's moves, drops it with a removed row or a reset, and has the release end that report alone, if it is still there. `useMethodForm` does exactly that. Calling a release twice is harmless.
+
+A host treats a preparing id as it treats an uploading one: its run waits for it. `useMethodForm` keeps them in `preparingIds` and counts them in `uploading`, `ready` and `touched`, and `MethodForm` hands its fields the seam itself ([method-form.md](method-form.md)). A list passes a row's report on to the host under the row's id, and treats the row as busy until its release, as it treats a row whose upload it is waiting on: its remove buttons stay shut, and its drop area for several files does not count the row as free. The list tracks those rows only when the host supplies the seam.
+
+**A host without the seam gets the stricter fallback.** A field with no `onPreparingFile` writes its value empty, through `onChange`, the moment its pages change, and the file made from the new pages fills it again once the upload lands. A run started in between is refused by the gate for a missing input, or runs without the optional one, rather than sending a file the person has since changed.
 
 ## A failed upload is shown on the field that took the file
 

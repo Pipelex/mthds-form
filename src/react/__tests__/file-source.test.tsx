@@ -495,7 +495,9 @@ describe('a file written into a row whose own upload failed', () => {
     const [addAttachment] = screen.getAllByRole('button', { name: S.addItem });
     if (!addAttachment) throw new Error('No Add item');
     await user.click(addAttachment);
-    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    const input = container.querySelector<HTMLInputElement>(
+      'input[type="file"]:not([data-camera-input])',
+    );
     if (!input) throw new Error('No file input in the row');
     await user.upload(input, new File(['%PDF-1.4'], 'mine.pdf', { type: 'application/pdf' }));
     await screen.findByText(S.uploadFailed);

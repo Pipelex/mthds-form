@@ -178,7 +178,10 @@ async function expectEveryFocusOutlined(canvasElement: HTMLElement) {
   for (const block of all) {
     const pill = block.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]');
     const toggle = block.querySelector<HTMLElement>('[role="switch"]');
-    const fileInputs = [...block.querySelectorAll<HTMLInputElement>('input[type="file"]')];
+    // The camera's input is out of the tab order: its "Take photo" button draws its focus.
+    const fileInputs = [
+      ...block.querySelectorAll<HTMLInputElement>('input[type="file"]:not([data-camera-input])'),
+    ];
     await expect(pill, `${where(block)}: an enum pill`).not.toBeNull();
     await expect(toggle, `${where(block)}: a switch`).not.toBeNull();
     await expect(fileInputs.length, `${where(block)}: the drop targets`).toBeGreaterThan(1);

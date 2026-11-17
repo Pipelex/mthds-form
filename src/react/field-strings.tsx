@@ -270,6 +270,47 @@ export interface FieldStrings {
   /** What a file field says when the host's `uploadFile` rejected its file. */
   uploadFailed: string;
 
+  // The camera (docs/camera.md): a touch screen's way to photograph a paper
+  // document page by page into a document or image input.
+  /** The button under an empty input's dropzone that opens the back camera. */
+  takePhoto: string;
+  /**
+   * That button's accessible name, given the field's label as the form shows
+   * it, so each input's button says which input it fills. It must contain the
+   * button's visible words, which a voice-control user says to press it.
+   */
+  takePhotoAria: (label: string) => string;
+  /** The tile after a document's pages that takes one more. */
+  addPage: string;
+  /** A document's page, by its place in the order taken: "Page 3". */
+  photoPage: (number: number) => string;
+  /**
+   * An image input's one photo, which is not numbered, and the name of the
+   * file an unlabelled image input's photo makes (a list's row shows no label).
+   */
+  photoImage: string;
+  /** The name of the file an unlabelled document input's pages make, and of its chip. */
+  photoDocument: string;
+  /** A page's menu: take it again, in its place, or take it out. */
+  retakePhoto: string;
+  removePhoto: string;
+  /** Said by a page that is still being read, for a screen reader. */
+  readingPhoto: string;
+  /**
+   * A photo the browser could not decode: it never became a page. The photo
+   * came from the camera, so the remedy is a setting of the camera's or a file.
+   */
+  photoUndecodable: string;
+  /** A photo whose read failed on our side: it never became a page. */
+  photoNotKept: string;
+  /**
+   * What the stored file the pages made is called on its chip, given the
+   * input's label and the number of pages: "Purchase order · 3 pages".
+   */
+  photoPagesChip: (name: string, count: number) => string;
+  /** The same for an image input's one photo: "Receipt · photo". */
+  photoChip: (name: string) => string;
+
   // The file source (docs/sources.md): the row under a file field's controls
   // and the sheet it opens.
   /** The row under a file field's own controls that opens the team's files. */

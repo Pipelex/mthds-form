@@ -277,7 +277,10 @@ export const UploadOnly: Story = {
   args: { pipeCode: 'one_document', allowUrl: false },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvasElement.querySelectorAll('input[type="file"]')).toHaveLength(2);
+    // The dropzone's input in each pane; the camera's, beside it, is the upload too.
+    await expect(
+      canvasElement.querySelectorAll('input[type="file"]:not([data-camera-input])'),
+    ).toHaveLength(2);
     await expect(canvas.queryAllByRole('button', { name: 'Paste a link instead' })).toHaveLength(0);
     await expect(canvas.queryAllByRole('textbox')).toHaveLength(0);
   },

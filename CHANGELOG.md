@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.38.0] - 2026-11-17
+
+### Added
+
+- **The file control takes photos on a touch screen**: when the host supplies `onDropFile`, an empty document input accepting PDF or image input accepting JPEG shows "Take photo" under its dropzone on a touch screen (`(hover: none)`), which opens the back camera. A document is photographed page by page, with a strip of numbered pages offering Add page, Retake and Remove, and stored as one PDF named after the input's label, bound in the browser by `jspdf` through `import()`; an image input keeps one photo as a JPEG. The file goes through `onDropFile` like a dropped one, whenever the pages change, and any other value written to the field discards the pages. A photo that cannot be read is refused in the field's alert slot and blocks nothing. A list of documents or images offers the camera on each row. See `docs/camera.md`.
+- **`FieldEnv.onPreparingFile(id)`**: a file field reports the file its camera is making, from the photo to the hand-off to `onDropFile`, so a host's run waits for it, and ends the report by calling the release the call returned, which ends that one report wherever its row has moved. A host that does not supply it gets the stricter fallback: the field empties its value whenever its pages change, until the new file lands. See `docs/upload-seam.md`.
+- **`useMethodForm` returns `preparingIds` and `preparingFile`**: the ids of the fields making a file, which follow `removeItem`, `moveItem` and `reset` as the uploads in flight do, and the seam `MethodForm` hands its fields as `onPreparingFile`.
+- **`takesPhotos(field)` in the core entry**: whether a file field is offered the camera.
+- **`FieldStrings` gains the camera's copy**, in English and French: `takePhoto`, `takePhotoAria`, `addPage`, `photoPage`, `photoImage`, `retakePhoto`, `removePhoto`, `readingPhoto`, `photoDocument`, `photoUndecodable`, `photoNotKept`, `photoPagesChip` and `photoChip`, which a host spelling the whole set must supply.
+
+### Changed
+
+- **`useMethodForm`'s `uploading`, `ready` and `touched` count a file being made**: while a field's camera is reading a photo or binding its pages, `uploading` is `true`, `ready` is `false` and `touched` is `true`, as for an upload in flight.
+
 ## [v0.37.0] - 2026-11-16
 
 ### Added

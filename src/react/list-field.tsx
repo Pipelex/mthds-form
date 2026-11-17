@@ -96,6 +96,13 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // whose row the host removed, whose write-back the host has cancelled.
   const rowMoves = env?.rowMoves;
   const arriving = useMemo(() => arrivingRows(pending, rowMoves), [pending, rowMoves]);
+  // The rows whose file field is making a file from its camera's photos and
+  // has not handed it to the host yet, followed through the host's row moves
+  // as the uploads above are. Known only through a host that takes
+  // `onPreparingFile`, which `rowEnv` passes each report on to. See `rowEnv`.
+  const [preparing, setPreparing] = useState<ReadonlyMap<number, PendingUpload>>(NO_UPLOADS);
+  const nextPreparing = useRef(0);
+  const preparingRows = useMemo(() => arrivingRows(preparing, rowMoves), [preparing, rowMoves]);
 
   const setItem = (index: number, itemValue: unknown) => {
     const next = items.slice();
@@ -136,8 +143,9 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // The host says which files are arriving through `uploadingIds`, and a list
   // of files adds the uploads it handed over itself, until each answers or the
   // host removes its row, so a host that reports no `uploadingIds` still has
-  // those rows pinned.
-  const busy = listIsBusy(id, env?.uploadingIds) || arriving.size > 0;
+  // those rows pinned. A row whose camera is still making its file pins them
+  // too: its file is on its way, only not yet handed over.
+  const busy = listIsBusy(id, env?.uploadingIds) || arriving.size > 0 || preparingRows.size > 0;
 
   // An upload failure is keyed by position like everything else here, and it
   // outlives its upload, so the busy rule above cannot cover it: removing a row
@@ -169,8 +177,9 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     field.item.kind === 'document' || field.item.kind === 'image' ? field.item : null;
   const tracksUploads = fileItem !== null;
   const rowEnv = useMemo<FieldEnv | undefined>(() => {
-    if (!env || (staleErrors.size === 0 && !tracksUploads)) return env;
+    if (!env || (staleErrors.size === 0 && !tracksUploads && !env.onPreparingFile)) return env;
     const drop = env.onDropFile;
+    const prepare = env.onPreparingFile;
     const uploadErrors =
       staleErrors.size === 0
         ? env.uploadErrors
@@ -203,6 +212,25 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               void Promise.resolve(upload).then(answered, answered);
             }
             return upload;
+          }
+        : undefined,
+      // A row's camera making its file: recorded under the id it reports, with
+      // the move logged then, so it follows the row through the host's moves as
+      // an upload does, and let go by its own release, wherever its row is by
+      // then. Passed on to the host, whose release it calls in turn.
+      onPreparingFile: prepare
+        ? (rowId) => {
+            const token = nextPreparing.current++;
+            const seq = env.rowMoves?.[env.rowMoves.length - 1]?.seq ?? 0;
+            setPreparing((prev) => new Map(prev).set(token, { id: rowId, seq }));
+            const release = prepare(rowId);
+            let released = false;
+            return () => {
+              if (released) return;
+              released = true;
+              setPreparing((prev) => withoutUpload(prev, token));
+              release();
+            };
           }
         : undefined,
     };
@@ -241,7 +269,10 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const isFreeRow = (index: number) => {
     const rowId = `${id}.${index}`;
     return (
-      !arriving.has(rowId) && !env?.uploadingIds?.has(rowId) && !rowEnv?.uploadErrors?.has(rowId)
+      !arriving.has(rowId) &&
+      !preparingRows.has(rowId) &&
+      !env?.uploadingIds?.has(rowId) &&
+      !rowEnv?.uploadErrors?.has(rowId)
     );
   };
   const dropRoom = dropOffered ? roomForDroppedFiles(items, field.maxItemCount, isFreeRow) : 0;
@@ -564,14 +595,20 @@ function arrivingRows(
   if (uploads.size === 0) return NO_IDS;
   const rows = new Set<string>();
   for (const upload of uploads.values()) {
-    let at: string | undefined = upload.id;
-    for (const move of moves ?? []) {
-      if (at === undefined) break;
-      if (move.seq > upload.seq) at = movedId(at, move.listId, destinationOf(move.order));
-    }
+    const at = rowNow(upload, moves);
     if (at !== undefined) rows.add(at);
   }
   return rows;
+}
+
+/** The id a pending entry's row has now, or `undefined` once a move removed it. */
+function rowNow(entry: PendingUpload, moves: readonly RowMove[] | undefined): string | undefined {
+  let at: string | undefined = entry.id;
+  for (const move of moves ?? []) {
+    if (at === undefined) break;
+    if (move.seq > entry.seq) at = movedId(at, move.listId, destinationOf(move.order));
+  }
+  return at;
 }
 
 /**
