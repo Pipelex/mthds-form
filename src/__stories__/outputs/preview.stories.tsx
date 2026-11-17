@@ -14,7 +14,7 @@ import {
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
 import { expectTouchTarget, pinnedTo, VIEWPORTS } from '../touch-target';
-import { PDF_URL, pdfViewer, REPORT, REVIEW_PACKET } from './media-payloads';
+import { PDF_URL, pdfViewer, REPORT, REVIEW_PACKET, servedAt, servedFiles } from './media-payloads';
 
 /**
  * Results carrying FILES, and what it takes to show them.
@@ -35,13 +35,14 @@ import { PDF_URL, pdfViewer, REPORT, REVIEW_PACKET } from './media-payloads';
  * Markup goes through a sandbox because injecting it into the host's document
  * would run it ON the host's origin, with the host's cookies. A URL in an
  * `<iframe>` is a separate document at its own origin — the browser's own
- * boundary, not one this package has to build. That holds only for a scheme
- * that CARRIES an origin, which is why `frameableUrl` admits `http:` and
- * `https:` from anyone and a same-origin path only from the host's own
- * resolver: a `data:` document inherits the embedder's origin instead of
- * getting one of its own, and so does a path. So a PDF is framed the
- * way every document viewer on the web frames one, with `no-referrer` because a
- * result view has no business telling a third party where it was opened from.
+ * boundary, not one this package has to build. It is still a page drawn inside
+ * the host's, so `frameableUrl` frames only what the host's own resolver
+ * answered on the page's own origin: a third party's document, which a payload
+ * can name, is linked instead, and a `data:` document, which inherits the
+ * embedder's origin, is never framed. Every story here that frames the served
+ * PDF passes `servedFiles`, the resolver of a host that serves it. The frame
+ * carries `no-referrer`, because a result view has no business telling a third
+ * party where it was opened from.
  *
  * The button appears only when the browser can both **frame** the URL and
  * **render** it unaided, or when the host answers a PDF of the document. A
@@ -72,7 +73,7 @@ function Preview({
   return (
     <div style={{ maxWidth: 640 }}>
       <FieldPresentationProvider presentation={presentation}>
-        <ResultEnvProvider resolveDocumentPdf={resolveDocumentPdf}>
+        <ResultEnvProvider resolveUrl={servedFiles} resolveDocumentPdf={resolveDocumentPdf}>
           <StuffViewer field={document} value={value} />
         </ResultEnvProvider>
       </FieldPresentationProvider>
@@ -131,6 +132,38 @@ export const AStorageReference: Story = {
   },
 };
 
+/**
+ * **A third party's PDF: a link, never a frame.** A run's document URL is the
+ * method's to write, so a method someone else wrote can name any page on the
+ * web. Framed, it would be drawn inside the host's page, under the host's
+ * address bar; linked, it opens in a tab of its own. The host here serves
+ * nothing on that origin, so even the document a run delivered in an app opens
+ * nothing by itself and offers no preview.
+ */
+export const AThirdPartyPdf: Story = {
+  name: 'A third party’s PDF → a link',
+  args: {
+    value: {
+      url: 'https://example.invalid/invoice.pdf',
+      filename: 'invoice.pdf',
+      mime_type: 'application/pdf',
+      title: 'Invoice',
+    },
+    presentation: 'app',
+  },
+  beforeEach: pdfViewer(true),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvasElement.querySelectorAll('iframe')).toHaveLength(0);
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
+    for (const link of canvas.getAllByRole('link', { name: 'invoice.pdf' })) {
+      await expect(link.getAttribute('href')).toBe('https://example.invalid/invoice.pdf');
+    }
+  },
+};
+
 /** A Word document, which a browser fetches and cannot render. */
 const WORD_DOCUMENT = {
   url: 'https://example.com/contract.docx',
@@ -180,6 +213,7 @@ export const ANestedReport: StoryObj<typeof ResultView> = {
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
+    resolveUrl: servedFiles,
     outputForm: OUTPUT_FORM,
     domain: 'results',
     pipeCode: 'nested_media_result',
@@ -211,7 +245,7 @@ const SOLAR_SYSTEM = {
 /** The frames showing the served PDF, one in each theme pane. */
 function pdfFrames(canvasElement: HTMLElement): HTMLIFrameElement[] {
   return [...canvasElement.querySelectorAll<HTMLIFrameElement>('iframe')].filter(
-    (frame) => frame.getAttribute('src') === PDF_URL,
+    (frame) => servedAt(frame.getAttribute('src')) === PDF_URL,
   );
 }
 
@@ -298,6 +332,7 @@ export const AReportWithItsPdf: StoryObj<typeof ResultView> = {
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
+    resolveUrl: servedFiles,
     outputForm: OUTPUT_FORM,
     domain: 'results',
     pipeCode: 'nested_media_result',
@@ -328,6 +363,7 @@ export const AReportWithTwoDocuments: StoryObj<typeof ResultView> = {
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
+    resolveUrl: servedFiles,
     outputForm: OUTPUT_FORM,
     domain: 'results',
     pipeCode: 'two_documents_result',
@@ -375,7 +411,7 @@ export const NoPdfViewer: Story = {
     await expect(canvasElement.querySelectorAll('iframe')).toHaveLength(0);
     await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(2);
     for (const link of canvas.getAllByRole('link', { name: DEFAULT_FIELD_STRINGS.openInNewTab })) {
-      await expect(link.getAttribute('href')).toBe(PDF_URL);
+      await expect(servedAt(link.getAttribute('href'))).toBe(PDF_URL);
       await expect(link.getAttribute('target')).toBe('_blank');
     }
     // The link and the download, in each theme.
@@ -412,6 +448,7 @@ export const NoPdfViewerNested: StoryObj<typeof ResultView> = {
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
+    resolveUrl: servedFiles,
     outputForm: OUTPUT_FORM,
     domain: 'results',
     pipeCode: 'nested_media_result',

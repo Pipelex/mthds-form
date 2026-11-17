@@ -7,7 +7,7 @@ import { PAYLOADS as RESULT_RUNS } from '../_generated/results.payloads';
 import { DEFAULT_FIELD_STRINGS as S, JsonView } from '../../react';
 import { ResultView } from '../result-view';
 import { atWidth, expectTouchTarget, pinnedTo } from '../touch-target';
-import { pdfViewer, REPORT } from './media-payloads';
+import { pdfViewer, REPORT, servedFiles } from './media-payloads';
 
 /**
  * The result view's controls on a phone, and the same controls on a desktop.
@@ -33,6 +33,8 @@ const meta = {
     domain: 'results',
     tableLayout: 'stack',
     presentation: 'app',
+    // The host serves the report's files, so its document is framed.
+    resolveUrl: servedFiles,
   },
 } satisfies Meta<typeof ResultView>;
 
