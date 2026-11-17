@@ -80,6 +80,7 @@ import {
 import { ConceptPill } from './concept-pill';
 import { useDocumentPdf } from './document-pdf';
 import { FocusFrame } from './focus-frame';
+import { usePageOrigin } from './page-origin';
 import { usePdfViewer } from './pdf-viewer';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
@@ -856,40 +857,68 @@ const PREVIEWABLE_MIME_RE = /^(application\/pdf|image\/)/i;
 
 /**
  * The URL a document may be FRAMED at, which is stricter than the one it may be
- * painted or linked at.
+ * painted or linked at: **only a URL the host's resolver produced, on the page's
+ * own origin.**
  *
- * A frame is the one sink that turns a URL into a document with a DOM, so the
- * scheme has to be one that carries its own origin. `http:` and `https:` do.
- * `data:` does not: a `data:` document inherits the embedder's origin, which is
- * exactly how a payload's `data:text/html` reached an unsandboxed frame with the
- * host's cookies. `blob:` is excluded too — a payload cannot mint one, so
- * admitting it here would widen the sink for nothing.
+ * A frame is the one sink that turns a URL into a document with a DOM drawn
+ * inside the host's page, so who chose the URL decides whether it may be
+ * framed, and the scheme alone does not.
  *
- * **A root-relative path carries no origin of its own either, and that is why it
- * is admitted only from the RESOLVER.** It is the embedding page's origin by
- * construction, which is exactly what the resolver case (`/api/assets/…`) wants
- * and exactly what a payload must not be handed: a payload naming
- * `/api/assets/anything.svg` got a document with a DOM on the host's origin, and
- * the type gate below admits `image/` — SVG included — so the scheme rule that
- * bans a `data:` SVG was being paid around one function later. A payload member
- * must be `http:` or `https:` to be framed; a host that resolves to a path is
- * choosing its own origin, which it is entitled to do.
+ * **A payload's URL is never framed.** A run's document URL is written by the
+ * method's code or by a model's structured output, so a method someone else
+ * wrote (a shared catalog method, a published one, a showcase every reader
+ * opens) chooses it. It used to be framed whenever it was `http:` or `https:`,
+ * on the argument that a cross-origin document cannot read the host's data. It
+ * cannot, and it can still draw its own page inside the host's: a sign-in form,
+ * pop-ups, a top navigation after a click, all under the host's address bar,
+ * with nothing between it and the reader but a `frame-src` policy that a host
+ * may only be reporting. So a third-party document is shown as its link, which
+ * opens it in a tab of its own under its own address. Framing it sandboxed is
+ * not the alternative it looks like: every `sandbox` token set blanks a PDF in
+ * Chrome, and the one Firefox needs is `allow-scripts` (`DocumentPreview`).
  *
- * That is also the residual risk the resolver contract names: a stored object
- * served on the host's origin is a document on the host's origin, so serve it
- * with its real content type or with `Content-Disposition: attachment`. See
+ * **A resolver's answer is framed only on the page's own origin.** A
+ * root-relative path is that origin by construction, which is exactly what the
+ * resolver case (`/api/assets/…`) wants; an absolute `http(s)` URL is framed
+ * when its origin is `origin`, the page's (`usePageOrigin`, `undefined` until
+ * the browser has been asked, which frames nothing absolute). A resolver that
+ * answers a URL on another origin (a CDN, a presigned storage URL) or hands a
+ * payload's `https:` URL back unchanged gets the link, as the payload would:
+ * the resolver is trusted to know where the host's objects live, not to vouch
+ * for a third party's page. A host that wants its documents previewed resolves
+ * them onto its own origin.
+ *
+ * Every other scheme stays refused. `data:` carries no origin of its own and
+ * inherits the embedder's, which is how a payload's `data:text/html` once
+ * reached an unsandboxed frame with the host's cookies; `blob:` is never what a
+ * resolver answers. A root-relative path from the PAYLOAD is refused too: it is
+ * the host's origin chosen by the payload, and the type gate below admits
+ * `image/`, SVG included, so `/api/assets/anything.svg` would be a document with
+ * a DOM on the host's origin.
+ *
+ * What a host's origin serves is the host's to make safe: a stored object
+ * served there is a document on the host's origin, so serve it with its real
+ * content type or with `Content-Disposition: attachment`. See
  * [../../docs/upload-seam.md].
  *
- * A refused scheme costs nothing a reader wanted: a raster `data:` URL is
- * painted by the image arm, and a run does not return an inline PDF.
+ * A refused URL costs the reader nothing but the inline view: the document's
+ * link opens it, and a raster `data:` URL is painted by the image arm.
  */
-function frameableUrl(candidate: PaintableUrl | undefined): string | undefined {
-  if (!candidate) return undefined;
+function frameableUrl(
+  candidate: PaintableUrl | undefined,
+  origin: string | undefined,
+): string | undefined {
+  if (!candidate?.fromResolver) return undefined;
   // Safe as a prefix test only because `viewableUrl` normalised the string: an
   // accepted path starts with exactly one slash, `//host` and `/\host` having
   // been rejected as protocol-relative.
-  if (/^https?:/.test(candidate.url)) return candidate.url;
-  return candidate.fromResolver && candidate.url.startsWith('/') ? candidate.url : undefined;
+  if (candidate.url.startsWith('/')) return candidate.url;
+  if (!origin || !/^https?:/.test(candidate.url)) return undefined;
+  try {
+    return new URL(candidate.url).origin === origin ? candidate.url : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Whether a browser renders this document with nothing installed, `url` naming it when its filename does not. */
@@ -903,8 +932,9 @@ function browserRenders(content: DocumentContentView, url: string): boolean {
  * Whether a document can be shown here as it is, rather than only linked to.
  *
  * Two conditions, and both are necessary: the browser must be able to FRAME the
- * URL (`frameableUrl` — a `pipelex-storage://` reference resolves nowhere
- * without the host's resolver, and a `data:` document is not framed at all) and
+ * URL (`frameableUrl` — only the host's resolver's answer on the page's own
+ * origin is framed, so a third party's document is linked instead, and a
+ * `pipelex-storage://` reference resolves nowhere without that resolver) and
  * to RENDER it with nothing installed. A `.docx` satisfies the first and not the
  * second, and offering a preview that opens onto a download prompt is worse than
  * offering none; such a document is shown only as a PDF its host makes of it
@@ -916,8 +946,12 @@ function browserRenders(content: DocumentContentView, url: string): boolean {
  * no longer do is admit a URL: `{url: "data:text/html,…", filename: "report.pdf"}`
  * used to be framed on the strength of its own filename.
  */
-function previewableUrl(content: DocumentContentView, resolve?: ResolveUrl): string | undefined {
-  const url = frameableUrl(paintable(content, resolve));
+function previewableUrl(
+  content: DocumentContentView,
+  resolve: ResolveUrl | undefined,
+  origin: string | undefined,
+): string | undefined {
+  const url = frameableUrl(paintable(content, resolve), origin);
   return url && browserRenders(content, url) ? url : undefined;
 }
 
@@ -944,10 +978,12 @@ function isPdfDocument(content: DocumentContentView, url: string): boolean {
  * **That argument is sound and it used to be applied to a URL nobody had
  * checked.** A `data:` document does NOT get an origin of its own: it inherits
  * the embedder's, so `{url: "data:text/html,<script>…", filename: "report.pdf"}`
- * was framed with the host's cookies on the strength of its own filename. The
- * fix is upstream of this component — `frameableUrl` admits `http:`, `https:`
- * and a same-origin path and nothing else — because it is the SCHEME that
- * decides whether the origin boundary exists at all.
+ * was framed with the host's cookies on the strength of its own filename. And
+ * a document at its own origin is still a page drawn inside the host's: a
+ * third party's sign-in form under the host's address bar. The fix for both is
+ * upstream of this component — `frameableUrl` admits the host's resolver's
+ * answer on the page's own origin and nothing else, so the only documents
+ * framed here are ones the host serves.
  *
  * **There is deliberately no `sandbox` attribute, and the reason is a platform
  * constraint rather than a judgement.** Measured against a same-origin PDF on
@@ -965,8 +1001,10 @@ function isPdfDocument(content: DocumentContentView, url: string): boolean {
  * token Firefox needs is `allow-scripts`, and a frame sandboxed to allow only
  * script execution is worse than a frame with no sandbox attribute. So a
  * sandbox here would not harden the preview; it would delete it, or cost the
- * one token that matters to buy nothing. `frameableUrl` above is what makes the
- * frame safe. See [../../docs/result-view.md] for the whole policy.
+ * one token that matters to buy nothing. That is also why a third party's
+ * document is linked rather than framed sandboxed: the sandbox that would
+ * contain it is the one that blanks its pages. `frameableUrl` above is what
+ * makes the frame safe. See [../../docs/result-view.md] for the whole policy.
  *
  * `no-referrer` stays: a result view has no business telling a third party where
  * it was opened from.
@@ -1092,8 +1130,8 @@ function PdfUnavailable({
  * makes of it, for as long as the preview is open.
  *
  * The answer is the host's, so it goes through the same two gates as a
- * resolver's: `viewableUrl`, and `frameableUrl`, where a root-relative path is
- * the host's own choice of origin. Once framed, it is a PDF like any other, and
+ * resolver's: `viewableUrl`, and `frameableUrl`, which frames it only on the
+ * page's own origin. Once framed, it is a PDF like any other, and
  * a browser with no PDF viewer gets the same card: there, its link opens the
  * PDF, because the link is the reader's way to the pages, and its download
  * saves the original, because that is the file the result holds.
@@ -1117,6 +1155,7 @@ function ConvertedDocumentPreview({
 }) {
   const s = useFieldStrings();
   const { answer, retry } = useDocumentPdf(ask);
+  const origin = usePageOrigin();
   const size = whole ? WHOLE_RESULT_FRAME : NESTED_FRAME;
   // The button a reader presses to try again is gone once the retry renders, so
   // focus lands on the region that replaced it rather than on the page's body.
@@ -1177,7 +1216,7 @@ function ConvertedDocumentPreview({
     );
   }
   const gated = answer.state === 'ready' ? viewableUrl(answer.url) : undefined;
-  const url = gated && frameableUrl({ url: gated, fromResolver: true });
+  const url = gated && frameableUrl({ url: gated, fromResolver: true }, origin);
   if (url) return <DocumentPreview url={url} name={name} pdf file={file} whole={whole} />;
   return (
     <p
@@ -1246,6 +1285,7 @@ function DocumentValue({
   // missing a URL.
   const resolve = useResolveUrl();
   const resolveDocumentPdf = useResolveDocumentPdf();
+  const origin = usePageOrigin();
   const isApp = useFieldPresentation() === 'app';
   // Decided from the descriptor alone, so a server render and the hydration
   // after it start from the same state.
@@ -1261,7 +1301,7 @@ function DocumentValue({
   const title = content.title?.trim();
   const heading = title && title !== label ? title : undefined;
   const name = title || label;
-  const preview = previewableUrl(content, resolve);
+  const preview = previewableUrl(content, resolve, origin);
   const pdf = preview !== undefined && isPdfDocument(content, preview);
   // Only a document the browser cannot render is asked about: a PDF that cannot
   // be framed is still a PDF, and a PDF of it would change nothing.

@@ -10,25 +10,37 @@
  * corpus's own, generated like every other.
  *
  * Beside them, `pdfViewer` pins what the browser says of its PDF viewer, which
- * decides whether an opened PDF is a frame or a card.
+ * decides whether an opened PDF is a frame or a card, and `servedFiles` is the
+ * resolver of a host that serves these files, without which none is framed.
  */
+import type { ResolveUrl } from '../../react';
 
 /**
  * The served PDF, as an ABSOLUTE url.
  *
- * The gate would PAINT `/solar_system.pdf` — a root-relative path is viewable,
- * because that is what a host's URL resolver hands back. It would not FRAME one
- * from a payload, though, and this story frames it: a path is the embedding
- * page's own origin, so only a resolver may choose one. Absolute is also what
- * the fixture should say either way — the standard says a `native.Document`'s
- * `url` is a storage URI, an HTTP(S) URL or a base64 data URL, and a path is
- * none of those. Resolving it against the origin costs one line and keeps the
- * fixture honest about its provenance.
+ * The standard says a `native.Document`'s `url` is a storage URI, an HTTP(S)
+ * URL or a base64 data URL, and a path is none of those, so the fixture names
+ * the file absolutely. The view frames it only because the story's host says it
+ * serves it (`servedFiles`): a payload's URL alone is never framed.
  */
 export const PDF_URL =
   typeof window === 'undefined'
     ? 'https://example.invalid/solar_system.pdf'
     : new URL('/solar_system.pdf', window.location.origin).href;
+
+/**
+ * The resolver of a host that serves the files these payloads name: a URL on
+ * the page's own origin is answered as it is, and anything else is not the
+ * host's to answer.
+ *
+ * The result view frames a document only when the host's resolver answered it
+ * on the page's own origin, never on the strength of a payload's URL, so a story
+ * that frames one of these files passes this. It is also the one place an
+ * ABSOLUTE same-origin answer is framed in a real browser; the unit suites
+ * resolve to a path.
+ */
+export const servedFiles: ResolveUrl = (url) =>
+  typeof window !== 'undefined' && url.startsWith(`${window.location.origin}/`) ? url : undefined;
 
 /**
  * The served files, absolute for the same reason `PDF_URL` is.

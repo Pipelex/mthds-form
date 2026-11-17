@@ -33,8 +33,10 @@ import { FocusFrame } from '../focus-frame';
 import { MethodForm, useMethodForm } from '../method-form';
 import { focusOutlineClass, focusOutlineInsetClass, frameFocusOutlineClass } from '../role-tokens';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
+import { ResultEnvProvider } from '../result-env';
 import { StuffViewer } from '../stuff-viewer';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/structured';
+import { hostFiles, stored } from './host-files';
 import { unringed } from './unringed';
 
 beforeAll(() => {
@@ -233,7 +235,7 @@ describe('the result view', () => {
   const value = {
     summary:
       'See [the report](https://example.com/report) and ![a chart](https://example.com/c.png).',
-    source: { url: 'https://cdn.example/q3.pdf', filename: 'q3.pdf' },
+    source: { url: stored('q3.pdf'), filename: 'q3.pdf' },
     chart: { url: 'https://cdn.example/chart.png' },
     lines: [
       { label: 'Desk', quantity: 1, unit_price: 300, note: 'Oak' },
@@ -261,7 +263,12 @@ describe('the result view', () => {
 
   it('draws a document preview’s focus in --ring', async () => {
     const user = userEvent.setup();
-    const { container } = render(<StuffViewer field={report} value={value} />);
+    // Served by its host on the page's own origin, the only document framed.
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={hostFiles}>
+        <StuffViewer field={report} value={value} />
+      </ResultEnvProvider>,
+    );
     await user.click(screen.getByRole('button', { name: S.preview }));
     expect(screen.getByTitle('q3.pdf').tagName).toBe('IFRAME');
     expect(unringed(container)).toEqual([]);
@@ -292,11 +299,15 @@ describe('a frame in the result view', () => {
     required: true,
     formats: DOCUMENT_FORMATS,
   };
-  const value = { url: 'https://cdn.example/q3.pdf', filename: 'q3.pdf' };
+  const value = { url: stored('q3.pdf'), filename: 'q3.pdf' };
 
   async function openPreview() {
     const user = userEvent.setup();
-    render(<StuffViewer field={document_} value={value} />);
+    render(
+      <ResultEnvProvider resolveUrl={hostFiles}>
+        <StuffViewer field={document_} value={value} />
+      </ResultEnvProvider>,
+    );
     const toggle = screen.getByRole('button', { name: S.preview });
     await user.click(toggle);
     return { toggle, frame: screen.getByTitle('q3.pdf') };

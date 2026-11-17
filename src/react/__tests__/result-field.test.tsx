@@ -36,6 +36,7 @@ import { FieldPresentationProvider } from '../field-presentation';
 import { DEFAULT_FIELD_STRINGS } from '../field-strings';
 import { ResultField } from '../result-field';
 import { ResultEnvProvider } from '../result-env';
+import { hostFiles, served, stored } from './host-files';
 
 const text = (name: string, contentKey?: string): TextRunField => ({
   kind: 'text',
@@ -343,15 +344,17 @@ describe('the URL policy', () => {
     it('and its preview by its filename, when its title is blank', async () => {
       // A blank title used to name the frame, whose accessible name was then blank.
       const { container } = render(
-        <ResultField
-          field={file('output', 'document')}
-          value={{
-            url: 'https://example.com/files/deck.pdf',
-            filename: 'deck.pdf',
-            mime_type: 'application/pdf',
-            title: '   ',
-          }}
-        />,
+        <ResultEnvProvider resolveUrl={hostFiles}>
+          <ResultField
+            field={file('output', 'document')}
+            value={{
+              url: stored('deck.pdf'),
+              filename: 'deck.pdf',
+              mime_type: 'application/pdf',
+              title: '   ',
+            }}
+          />
+        </ResultEnvProvider>,
       );
       await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
       expect(container.querySelector('iframe')?.getAttribute('title')).toBe('deck.pdf');
@@ -425,12 +428,14 @@ describe('the URL policy', () => {
     expect(screen.getByRole('img')).toBeTruthy();
   });
 
-  it('frames an https PDF, with no referrer', async () => {
+  it('frames the host’s PDF, with no referrer', async () => {
     const { container } = render(
-      <ResultField
-        field={file('output', 'document')}
-        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
-      />,
+      <ResultEnvProvider resolveUrl={hostFiles}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: stored('a.pdf'), mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
     );
     await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
     const frame = container.querySelector('iframe');
@@ -438,8 +443,9 @@ describe('the URL policy', () => {
     expect(frame?.getAttribute('referrerpolicy')).toBe('no-referrer');
     // Deliberately NOT sandboxed: the attribute sets the sandboxed-plugins flag
     // unconditionally and no token unsets it, so a sandbox here deletes the PDF
-    // preview in Chrome rather than hardening it. The scheme gate above is what
-    // makes the frame safe. See DocumentPreview's comment.
+    // preview in Chrome rather than hardening it. The frame rule, which frames
+    // only the host's own origin, is what makes the frame safe. See
+    // DocumentPreview's comment.
     expect(frame?.hasAttribute('sandbox')).toBe(false);
   });
 
@@ -489,7 +495,7 @@ describe('the URL policy', () => {
   });
 });
 
-describe('a frame takes a same-origin path only from the resolver', () => {
+describe('a frame takes only the host resolver’s answer, on the page’s own origin', () => {
   const pdfPath = { url: '/api/assets/report.pdf', mime_type: 'application/pdf' };
 
   it('refuses to frame a path the PAYLOAD named', () => {
@@ -520,14 +526,86 @@ describe('a frame takes a same-origin path only from the resolver', () => {
     expect(container.querySelector('iframe')?.getAttribute('src')).toBe('/api/assets/report.pdf');
   });
 
-  it('still frames an https document the payload named', () => {
-    render(
+  it('links a third party’s PDF the payload named, and frames nothing', async () => {
+    // A run's document URL is the method's to write, and a method someone else
+    // wrote can name any page. Framed, that page is drawn inside the host's, a
+    // sign-in form under the host's address bar, whatever the host's
+    // `frame-src` says if it only reports. So it is a link, which opens it in a
+    // tab of its own, and no preview is offered at all.
+    const url = 'https://attacker.example/invoice.pdf';
+    for (const presentation of ['studio', 'app'] as const) {
+      const { container, unmount } = render(
+        <FieldPresentationProvider presentation={presentation}>
+          <ResultEnvProvider resolveUrl={hostFiles}>
+            <ResultField
+              field={file('output', 'document')}
+              value={{ url, filename: 'invoice.pdf', mime_type: 'application/pdf' }}
+            />
+          </ResultEnvProvider>
+        </FieldPresentationProvider>,
+      );
+      expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+      expect(container.querySelector('iframe')).toBeNull();
+      expect(screen.getByRole('link', { name: 'invoice.pdf' }).getAttribute('href')).toBe(url);
+      unmount();
+    }
+  });
+
+  it('links a third party’s PDF named by `public_url` the same way', () => {
+    const { container } = render(
       <ResultField
         field={file('output', 'document')}
-        value={{ url: 'https://cdn.example/a.pdf', mime_type: 'application/pdf' }}
+        value={{
+          url: 'pipelex-storage://org/invoice.pdf',
+          public_url: 'https://attacker.example/invoice.pdf',
+          mime_type: 'application/pdf',
+        }}
       />,
     );
-    expect(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('links a third party’s PDF a resolver hands back unchanged', () => {
+    // A resolver is trusted to know where the host's objects live, not to vouch
+    // for a page it passes through.
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={(url) => url}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: 'https://attacker.example/invoice.pdf', mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('links what a resolver answers on another origin', () => {
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={() => 'https://bucket.storage.example/report.pdf?sig=1'}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: stored('report.pdf'), mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
+    );
+    expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('frames what a resolver answers as an absolute URL on the page’s own origin', async () => {
+    const own = new URL(served('report.pdf'), window.location.origin).href;
+    const { container } = render(
+      <ResultEnvProvider resolveUrl={() => own}>
+        <ResultField
+          field={file('output', 'document')}
+          value={{ url: stored('report.pdf'), mime_type: 'application/pdf' }}
+        />
+      </ResultEnvProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(own);
   });
 
   it('never frames a blob: URL, which the paint gate does accept', () => {
