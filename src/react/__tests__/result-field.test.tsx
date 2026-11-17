@@ -581,6 +581,26 @@ describe('a frame takes only the host resolver’s answer, on the page’s own o
     expect(container.querySelector('iframe')).toBeNull();
   });
 
+  it('links a payload’s own path or same-origin URL that a resolver hands back unchanged', () => {
+    // A pass-through resolver added nothing, so the URL is still the payload's
+    // choice, on the host's own origin this time: an SVG there would be a
+    // document with a DOM running as the host.
+    const ownOrigin = new URL('/api/assets/report.pdf', window.location.origin).href;
+    for (const value of [
+      { url: '/api/assets/x.svg', mime_type: 'image/svg+xml' },
+      { url: ownOrigin, mime_type: 'application/pdf' },
+    ]) {
+      const { container, unmount } = render(
+        <ResultEnvProvider resolveUrl={(url) => url}>
+          <ResultField field={file('output', 'document')} value={value} />
+        </ResultEnvProvider>,
+      );
+      expect(screen.queryByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })).toBeNull();
+      expect(container.querySelector('iframe')).toBeNull();
+      unmount();
+    }
+  });
+
   it('links what a resolver answers on another origin', () => {
     const { container } = render(
       <ResultEnvProvider resolveUrl={() => 'https://bucket.storage.example/report.pdf?sig=1'}>

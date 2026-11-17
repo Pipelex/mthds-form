@@ -824,18 +824,25 @@ function paintable(
   // carrying a leading space parses as `https:` for a host that validated it and
   // failed a prefix match here, so the two used to act on different URLs.
   const resolved = viewableUrl(resolve?.(content.url));
-  if (resolved) return { url: resolved, fromResolver: true };
-  const stated = viewableUrl(content.publicUrl) ?? viewableUrl(content.url);
+  const own = viewableUrl(content.url);
+  // A resolver that hands the payload's own member back unchanged has added
+  // nothing, so what it returns is still the payload's choice: a pass-through
+  // resolver (`(u) => map.get(u) ?? u`) must not turn a payload's
+  // `/api/assets/x.svg` into a document the host chose to frame.
+  if (resolved) return { url: resolved, fromResolver: resolved !== own };
+  const stated = viewableUrl(content.publicUrl) ?? own;
   return stated ? { url: stated, fromResolver: false } : undefined;
 }
 
 /**
  * A URL the gate accepted, and WHO produced the candidate it accepted.
  *
- * Provenance is not decoration: a root-relative path is the embedding page's own
- * origin, so who chose the path decides whether it may be framed. The gate
- * cannot tell a resolver's answer from a payload member — both are strings — but
- * this function knows, because it asked them in order. See {@link frameableUrl}.
+ * Provenance is not decoration: only a document the host chose is framed, so
+ * who chose the URL decides whether it may be. The gate cannot tell a
+ * resolver's answer from a payload member — both are strings — but `paintable`
+ * knows, because it asked them in order, and it counts a resolver's answer that
+ * merely repeats the payload's member as the payload's. See
+ * {@link frameableUrl}.
  */
 interface PaintableUrl {
   url: string;

@@ -14,7 +14,7 @@ import {
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { ResultView } from '../result-view';
 import { expectTouchTarget, pinnedTo, VIEWPORTS } from '../touch-target';
-import { PDF_URL, pdfViewer, REPORT, REVIEW_PACKET, servedFiles } from './media-payloads';
+import { PDF_URL, pdfViewer, REPORT, REVIEW_PACKET, servedAt, servedFiles } from './media-payloads';
 
 /**
  * Results carrying FILES, and what it takes to show them.
@@ -245,7 +245,7 @@ const SOLAR_SYSTEM = {
 /** The frames showing the served PDF, one in each theme pane. */
 function pdfFrames(canvasElement: HTMLElement): HTMLIFrameElement[] {
   return [...canvasElement.querySelectorAll<HTMLIFrameElement>('iframe')].filter(
-    (frame) => frame.getAttribute('src') === PDF_URL,
+    (frame) => servedAt(frame.getAttribute('src')) === PDF_URL,
   );
 }
 
@@ -411,7 +411,7 @@ export const NoPdfViewer: Story = {
     await expect(canvasElement.querySelectorAll('iframe')).toHaveLength(0);
     await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.pdfViewerUnavailable)).toHaveLength(2);
     for (const link of canvas.getAllByRole('link', { name: DEFAULT_FIELD_STRINGS.openInNewTab })) {
-      await expect(link.getAttribute('href')).toBe(PDF_URL);
+      await expect(servedAt(link.getAttribute('href'))).toBe(PDF_URL);
       await expect(link.getAttribute('target')).toBe('_blank');
     }
     // The link and the download, in each theme.

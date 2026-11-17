@@ -30,17 +30,25 @@ export const PDF_URL =
 
 /**
  * The resolver of a host that serves the files these payloads name: a URL on
- * the page's own origin is answered as it is, and anything else is not the
- * host's to answer.
+ * the page's own origin is answered as the path it serves it at, and anything
+ * else is not the host's to answer.
  *
  * The result view frames a document only when the host's resolver answered it
  * on the page's own origin, never on the strength of a payload's URL, so a story
- * that frames one of these files passes this. It is also the one place an
- * ABSOLUTE same-origin answer is framed in a real browser; the unit suites
- * resolve to a path.
+ * that frames one of these files passes this. It answers a PATH rather than the
+ * URL it was given because a resolver that hands the payload's own member back
+ * unchanged has added nothing, and the view counts such an answer as the
+ * payload's. Compare a frame's `src` with `servedAt`.
  */
-export const servedFiles: ResolveUrl = (url) =>
-  typeof window !== 'undefined' && url.startsWith(`${window.location.origin}/`) ? url : undefined;
+export const servedFiles: ResolveUrl = (url) => {
+  if (typeof window === 'undefined') return undefined;
+  const origin = window.location.origin;
+  return url.startsWith(`${origin}/`) ? url.slice(origin.length) : undefined;
+};
+
+/** A URL as an absolute one on the page's origin, to compare a frame's `src` with a payload's URL. */
+export const servedAt = (url: string | null) =>
+  url === null ? null : new URL(url, window.location.origin).href;
 
 /**
  * The served files, absolute for the same reason `PDF_URL` is.
