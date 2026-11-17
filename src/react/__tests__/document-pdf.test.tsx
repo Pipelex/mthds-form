@@ -24,6 +24,7 @@ import {
   type ResolveDocumentPdf,
 } from '../result-env';
 import { StuffViewer } from '../stuff-viewer';
+import { hostFiles, served, stored } from './host-files';
 
 const document = (name: string): FileRunField => ({
   kind: 'document',
@@ -54,7 +55,7 @@ const DOCX = {
   title: 'Supply agreement',
 };
 const PDF = {
-  url: 'https://cdn.example/report.pdf',
+  url: stored('report.pdf'),
   filename: 'report.pdf',
   mime_type: 'application/pdf',
   title: 'Quarterly report',
@@ -66,7 +67,8 @@ const PPTX = {
   mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   title: 'Quarterly review',
 };
-const READY: DocumentPdfAnswer = { state: 'ready', url: 'https://cdn.example/contract.pdf' };
+/** The host's PDF of a document, served on its own origin, the only place a frame is drawn from. */
+const READY: DocumentPdfAnswer = { state: 'ready', url: served('contract.pdf') };
 
 function setPdfViewer(enabled: boolean) {
   Object.defineProperty(window.navigator, 'pdfViewerEnabled', {
@@ -88,7 +90,7 @@ function viewer(
 ) {
   return inPresentation(
     presentation,
-    <ResultEnvProvider resolveDocumentPdf={resolveDocumentPdf}>
+    <ResultEnvProvider resolveUrl={hostFiles} resolveDocumentPdf={resolveDocumentPdf}>
       <StuffViewer field={field} value={value} />
     </ResultEnvProvider>,
   );
@@ -168,7 +170,7 @@ describe('a viewer whose host does not answer behaves as today', () => {
     const { container } = render(viewer(resolve, PDF, 'app'));
     expect(resolve).not.toHaveBeenCalled();
     expect(ask).not.toHaveBeenCalled();
-    expect(frame(container)?.getAttribute('src')).toBe(PDF.url);
+    expect(frame(container)?.getAttribute('src')).toBe(served('report.pdf'));
   });
 
   it('never asks about a PDF it cannot frame, which a PDF of it would not help', () => {
@@ -225,7 +227,7 @@ describe('a host that answers a PDF', () => {
     await elapse();
     expect(ask).toHaveBeenCalledTimes(1);
     const shown = frame(container);
-    expect(shown?.getAttribute('src')).toBe('https://cdn.example/contract.pdf');
+    expect(shown?.getAttribute('src')).toBe(served('contract.pdf'));
     expect(shown?.getAttribute('title')).toBe(DOCX.title);
     expect(shown?.getAttribute('referrerpolicy')).toBe('no-referrer');
     expect(shown?.hasAttribute('sandbox')).toBe(false);
@@ -256,14 +258,14 @@ describe('a host that answers a PDF', () => {
     const { container } = render(viewer(resolve, { title: 'Q3', source: DOCX }, 'studio', report));
     fireEvent.click(previewToggle()!);
     await elapse();
-    expect(frame(container)?.getAttribute('src')).toBe('https://cdn.example/contract.pdf');
+    expect(frame(container)?.getAttribute('src')).toBe(served('contract.pdf'));
   });
 
   it('keeps the original file for the copy control and every download', async () => {
     const { resolve } = answering(READY);
     const saveFiles: SaveFiles = vi.fn(async () => ({ failed: [] }));
     render(
-      <ResultEnvProvider resolveDocumentPdf={resolve} saveFiles={saveFiles}>
+      <ResultEnvProvider resolveUrl={hostFiles} resolveDocumentPdf={resolve} saveFiles={saveFiles}>
         <StuffViewer field={document('output')} value={DOCX} />
       </ResultEnvProvider>,
     );
@@ -287,7 +289,7 @@ describe('a host that answers a PDF', () => {
     expect(screen.getByText(S.pdfViewerUnavailable)).toBeTruthy();
     // The link is the way to the pages; the download is the file the result holds.
     const link = screen.getByRole('link', { name: S.openInNewTab });
-    expect(link.getAttribute('href')).toBe('https://cdn.example/contract.pdf');
+    expect(link.getAttribute('href')).toBe(served('contract.pdf'));
     expect(
       within(link.parentElement!).getByRole('button', { name: S.downloadFile('contract.docx') }),
     ).toBeTruthy();
@@ -306,7 +308,7 @@ describe('while the host prepares the PDF', () => {
 
     await elapse(1_500);
     expect(ask).toHaveBeenCalledTimes(2);
-    expect(frame(container)?.getAttribute('src')).toBe('https://cdn.example/contract.pdf');
+    expect(frame(container)?.getAttribute('src')).toBe(served('contract.pdf'));
     expect(screen.queryByText(S.documentPdfPreparing)).toBeNull();
   });
 
@@ -368,16 +370,16 @@ describe('while the host prepares the PDF', () => {
     const resolve: ResolveDocumentPdf = (url) =>
       url === DOCX.url
         ? () => first
-        : () => Promise.resolve({ state: 'ready', url: 'https://cdn.example/second.pdf' });
+        : () => Promise.resolve({ state: 'ready', url: served('second.pdf') });
     const second = { ...DOCX, url: 'pipelex-storage://org/second.docx', public_url: undefined };
     const { container, rerender } = render(viewer(resolve));
     fireEvent.click(previewToggle()!);
     await elapse();
     rerender(viewer(resolve, second));
     await elapse();
-    answerFirst({ state: 'ready', url: 'https://cdn.example/first.pdf' });
+    answerFirst({ state: 'ready', url: served('first.pdf') });
     await elapse();
-    expect(frame(container)?.getAttribute('src')).toBe('https://cdn.example/second.pdf');
+    expect(frame(container)?.getAttribute('src')).toBe(served('second.pdf'));
   });
 });
 
@@ -511,7 +513,14 @@ describe('when the host has no PDF to offer', () => {
   });
 
   it('frames nothing the URL policy refuses, and reads it the same way', async () => {
-    for (const url of ['javascript:alert(1)', 'data:application/pdf;base64,JVBERi0=']) {
+    // A PDF on another origin is a page the host does not serve: the frame
+    // rule holds the host's answer to the page's origin, as it holds a
+    // resolver's.
+    for (const url of [
+      'javascript:alert(1)',
+      'data:application/pdf;base64,JVBERi0=',
+      'https://attacker.example/contract.pdf',
+    ]) {
       const { resolve } = answering({ state: 'ready', url });
       const { container, unmount } = render(viewer(resolve));
       fireEvent.click(previewToggle()!);
@@ -536,7 +545,7 @@ describe('the document the run delivered, in app', () => {
     await elapse(1_500);
     expect(ask).toHaveBeenCalledTimes(2);
     const shown = frame(container);
-    expect(shown?.getAttribute('src')).toBe('https://cdn.example/contract.pdf');
+    expect(shown?.getAttribute('src')).toBe(served('contract.pdf'));
     expect(shown?.getAttribute('title')).toBe(PPTX.title);
     expect(sizeOf(shown)).toBe('page');
     expect(previewToggle()).toBeNull();

@@ -128,9 +128,11 @@ export interface DocumentPdfRequest {
  * Where the PDF of a document stands, in the host's answer.
  *
  * - `ready`: `url` is where the PDF is read. It is the URL of a document the
- *   view will frame, so it passes the same gate as any resolver's answer: an
- *   `http(s):` URL, or a root-relative path on the host's own origin. An answer
- *   the gate refuses reads as `unavailable`.
+ *   view will frame, so it passes the same gate and the same frame rule as any
+ *   resolver's answer: a root-relative path, or an absolute `http(s):` URL on
+ *   the page's own origin. An answer on another origin (a CDN, a presigned
+ *   storage URL), or one the gate refuses, reads as `unavailable`: serve the
+ *   PDF on your own origin.
  * - `preparing`: the host is making the PDF. The view says so and asks again.
  * - `failed`: the host could not make the PDF. `message`, when the host can
  *   say why (a file protected by a password), is shown to the reader as it

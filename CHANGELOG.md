@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.39.0] - 2026-11-17
+
+### Security
+
+- **A document is framed only from the host's own origin (Breaking)**: the result view now previews a document in a frame only when the host's `resolveUrl` (or `resolveDocumentPdf`) answered it on the page's own origin, as a root-relative path or an absolute URL there. A URL the payload names, a third party's `https:` PDF included, and a resolver's answer on another origin, such as a CDN or a presigned storage URL, are shown as the document's link, with no Preview, so a method can no longer draw someone else's page inside the host's. A host that wants its documents previewed serves them on its own origin. See `docs/result-view.md`.
+
 ## [v0.38.0] - 2026-11-17
 
 ### Added

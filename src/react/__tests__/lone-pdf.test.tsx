@@ -15,6 +15,9 @@
  * and its download. The answer is the browser's, so it is never read on a
  * server, and a page rendered on one never draws a frame that hydration then
  * takes away.
+ *
+ * Every document here is stored and served by its host on the page's own
+ * origin (`./host-files`), because that is the only document the view frames.
  */
 import { act, type ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -35,6 +38,7 @@ import { FR_FIELD_STRINGS } from '../locales/fr';
 import { ResultEnvProvider } from '../result-env';
 import { ResultField } from '../result-field';
 import { StuffViewer } from '../stuff-viewer';
+import { hostFiles, served, stored } from './host-files';
 
 const document = (name: string): FileRunField => ({
   kind: 'document',
@@ -87,11 +91,13 @@ const listOf = (name: string, item: FileRunField): ListRunField => ({
 });
 
 const PDF = {
-  url: 'https://cdn.example/report.pdf',
+  url: stored('report.pdf'),
   filename: 'report.pdf',
   mime_type: 'application/pdf',
   title: 'Quarterly report',
 };
+/** Where the host serves the PDF, which is what its frame and its card link to. */
+const SERVED_PDF = served('report.pdf');
 
 /** Whether this browser says it draws PDFs: `undefined` leaves the property out, as jsdom does. */
 function setPdfViewer(enabled: boolean | undefined, getter = () => enabled) {
@@ -105,8 +111,13 @@ afterEach(() => {
   delete (window.navigator as { pdfViewerEnabled?: boolean }).pdfViewerEnabled;
 });
 
+/** `node` in `presentation`, under a host that serves its stored files. */
 function inPresentation(presentation: FieldPresentation, node: ReactNode) {
-  return <FieldPresentationProvider presentation={presentation}>{node}</FieldPresentationProvider>;
+  return (
+    <FieldPresentationProvider presentation={presentation}>
+      <ResultEnvProvider resolveUrl={hostFiles}>{node}</ResultEnvProvider>
+    </FieldPresentationProvider>
+  );
 }
 
 const previewToggle = () => screen.queryByRole('button', { name: S.preview });
@@ -126,7 +137,7 @@ describe('a PDF that is the whole result', () => {
       inPresentation('app', <StuffViewer field={document('output')} value={PDF} />),
     );
     const frame = container.querySelector('iframe');
-    expect(frame?.getAttribute('src')).toBe(PDF.url);
+    expect(frame?.getAttribute('src')).toBe(SERVED_PDF);
     expect(frame?.getAttribute('title')).toBe(PDF.title);
     expect(frame?.getAttribute('referrerpolicy')).toBe('no-referrer');
     // The policy is unchanged: no `sandbox`, which deletes Chrome's PDF viewer.
@@ -151,13 +162,11 @@ describe('a PDF that is the whole result', () => {
         'app',
         <StuffViewer
           field={document('output')}
-          value={{ url: 'https://cdn.example/a.pdf?sig=1', filename: 'a.pdf' }}
+          value={{ url: stored('a.pdf?sig=1'), filename: 'a.pdf' }}
         />,
       ),
     );
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(
-      'https://cdn.example/a.pdf?sig=1',
-    );
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(served('a.pdf?sig=1'));
   });
 
   it('keeps its toggle, closed, in studio', () => {
@@ -176,12 +185,12 @@ describe('a PDF that is the whole result', () => {
         'app',
         <StuffViewer
           field={document('output')}
-          value={{ url: 'https://cdn.example/scan.png', mime_type: 'image/png' }}
+          value={{ url: stored('scan.png'), mime_type: 'image/png' }}
         />,
       ),
     );
     const frame = container.querySelector('iframe');
-    expect(frame?.getAttribute('src')).toBe('https://cdn.example/scan.png');
+    expect(frame?.getAttribute('src')).toBe(served('scan.png'));
     expect(sizeOf(frame)).toBe('page');
     expect(previewToggle()).toBeNull();
   });
@@ -193,7 +202,7 @@ describe('a PDF that is the whole result', () => {
         'studio',
         <StuffViewer
           field={document('output')}
-          value={{ url: 'https://cdn.example/scan.png', mime_type: 'image/png' }}
+          value={{ url: stored('scan.png'), mime_type: 'image/png' }}
         />,
       ),
     );
@@ -260,13 +269,13 @@ describe('the lone document of a record that is the whole result', () => {
     const toggle = previewToggle();
     expect(toggle?.getAttribute('aria-expanded')).toBe('true');
     const frame = container.querySelector('iframe');
-    expect(frame?.getAttribute('src')).toBe(PDF.url);
+    expect(frame?.getAttribute('src')).toBe(SERVED_PDF);
     expect(sizeOf(frame)).toBe('nested');
     fireEvent.click(toggle!);
     expect(toggle?.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelector('iframe')).toBeNull();
     fireEvent.click(toggle!);
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(SERVED_PDF);
   });
 
   it('opens beside a picture, which does not count against it', () => {
@@ -286,7 +295,7 @@ describe('the lone document of a record that is the whole result', () => {
       ),
     );
     expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(SERVED_PDF);
   });
 
   it('keeps its toggle, closed, in studio', () => {
@@ -326,7 +335,7 @@ describe('a PDF inside a larger result keeps its toggle, closed', () => {
     ]);
     expect(container.querySelector('iframe')).toBeNull();
     fireEvent.click(toggles[0]!);
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(SERVED_PDF);
   });
 
   it('in a record holding one document beside a list of documents', () => {
@@ -397,7 +406,7 @@ describe('where the browser draws no PDF', () => {
     const card = cardActions().parentElement!;
     expect(within(card).getByText(PDF.title)).toBeTruthy();
     const link = screen.getByRole('link', { name: S.openInNewTab });
-    expect(link.getAttribute('href')).toBe(PDF.url);
+    expect(link.getAttribute('href')).toBe(SERVED_PDF);
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toContain('noreferrer');
     const download = within(cardActions()).getByRole('button', {
@@ -421,7 +430,9 @@ describe('where the browser draws no PDF', () => {
     expect(toggle?.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('iframe')).toBeNull();
     expect(screen.getByText(S.pdfViewerUnavailable)).toBeTruthy();
-    expect(screen.getByRole('link', { name: S.openInNewTab }).getAttribute('href')).toBe(PDF.url);
+    expect(screen.getByRole('link', { name: S.openInNewTab }).getAttribute('href')).toBe(
+      SERVED_PDF,
+    );
   });
 
   it('shows the card under a record’s lone document, opened', () => {
@@ -451,15 +462,13 @@ describe('where the browser draws no PDF', () => {
         'app',
         <StuffViewer
           field={document('output')}
-          value={{ url: 'https://cdn.example/scan.png', mime_type: 'image/png' }}
+          value={{ url: stored('scan.png'), mime_type: 'image/png' }}
         />,
       ),
     );
     // A picture that is the whole result opens by itself, in `app`.
     expect(previewToggle()).toBeNull();
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(
-      'https://cdn.example/scan.png',
-    );
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(served('scan.png'));
     expect(screen.queryByText(S.pdfViewerUnavailable)).toBeNull();
   });
 
@@ -469,7 +478,7 @@ describe('where the browser draws no PDF', () => {
     render(
       inPresentation(
         'app',
-        <ResultEnvProvider saveFiles={saveFiles}>
+        <ResultEnvProvider resolveUrl={hostFiles} saveFiles={saveFiles}>
           <StuffViewer field={document('output')} value={PDF} />
         </ResultEnvProvider>,
       ),
@@ -479,7 +488,10 @@ describe('where the browser draws no PDF', () => {
     );
     await waitFor(() => expect(saveFiles).toHaveBeenCalledTimes(1));
     const [files] = vi.mocked(saveFiles).mock.calls[0]!;
-    expect(files.map((file) => [file.name, file.url])).toEqual([['report.pdf', PDF.url]]);
+    // The host's answer, made absolute so a save outside this page can fetch it.
+    expect(files.map((file) => [file.name, file.url])).toEqual([
+      ['report.pdf', new URL(SERVED_PDF, window.location.origin).href],
+    ]);
   });
 
   it('offers the link alone when the host hides the file buttons', () => {
@@ -487,7 +499,7 @@ describe('where the browser draws no PDF', () => {
     render(
       inPresentation(
         'app',
-        <ResultEnvProvider downloads={{ files: false }}>
+        <ResultEnvProvider resolveUrl={hostFiles} downloads={{ files: false }}>
           <StuffViewer field={document('output')} value={PDF} />
         </ResultEnvProvider>,
       ),
@@ -578,8 +590,28 @@ describe('a page rendered on a server', () => {
     setPdfViewer(true);
     const { container, mismatches, done } = await hydrate(html);
     expect(mismatches).toEqual([]);
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(SERVED_PDF);
     expect(within(container).queryByText(S.pdfViewerUnavailable)).toBeNull();
+    done();
+  });
+
+  it('frames an absolute URL on the page’s own origin only once hydrated, with no mismatch', async () => {
+    // The page's origin is the browser's to say, so the server frames nothing
+    // absolute, and hydration agrees with it before the frame arrives.
+    const own = new URL(SERVED_PDF, window.location.origin).href;
+    const tree = (
+      <FieldPresentationProvider presentation="app">
+        <ResultEnvProvider resolveUrl={() => own}>
+          <StuffViewer field={document('output')} value={PDF} />
+        </ResultEnvProvider>
+      </FieldPresentationProvider>
+    );
+    const html = renderToString(tree);
+    expect(html).not.toContain('<iframe');
+    setPdfViewer(true);
+    const { container, mismatches, done } = await hydrate(html, tree);
+    expect(mismatches).toEqual([]);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(own);
     done();
   });
 
@@ -602,7 +634,7 @@ describe('a page rendered on a server', () => {
     setPdfViewer(true);
     const { container, mismatches, done } = await hydrate(html, reportWithItsPdf());
     expect(mismatches).toEqual([]);
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(PDF.url);
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe(SERVED_PDF);
     expect(
       within(container).getByRole('button', { name: S.preview }).getAttribute('aria-expanded'),
     ).toBe('true');
