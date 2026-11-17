@@ -284,8 +284,13 @@ export interface FieldStrings {
   addPage: string;
   /** A document's page, by its place in the order taken: "Page 3". */
   photoPage: (number: number) => string;
-  /** An image input's one photo, which is not numbered. */
+  /**
+   * An image input's one photo, which is not numbered, and the name of the
+   * file an unlabelled image input's photo makes (a list's row shows no label).
+   */
   photoImage: string;
+  /** The name of the file an unlabelled document input's pages make, and of its chip. */
+  photoDocument: string;
   /** A page's menu: take it again, in its place, or take it out. */
   retakePhoto: string;
   removePhoto: string;

@@ -16,7 +16,6 @@ import {
   isAcceptedFile,
   type FileFormat,
 } from '../core/file-formats';
-import { humanizeFieldName } from '../core/humanize';
 import { viewableUrl } from '../core/native-content';
 import { takesPhotos } from '../core/photo-file';
 import { sourceFileValue } from '../core/sources';
@@ -420,10 +419,14 @@ function FileField({
   // they make is stored through `storeFile` whenever they settle, so the value
   // is always an ordinary stored file. See docs/camera.md.
   const camera = canUpload && takesPhotos(field);
-  const photoLabel = field.title ?? humanizeFieldName(field.name);
+  // One label for the camera's button, the page strip, the file it makes, the
+  // PDF's title and the chip: the field's, as the form shows it. A list's row
+  // shows none, so its file is named for what it is.
+  const label = fieldLabel(field.title, field.name, presentation);
+  const photoName = label || (field.kind === 'document' ? s.photoDocument : s.photoImage);
   const photos = usePhotoPages({
     field,
-    label: photoLabel,
+    label: photoName,
     valueUrl: value?.url || undefined,
     uploadFailure: failure,
     store: storeFile,
@@ -765,12 +768,7 @@ function FileField({
       {photos.held ? (
         // The pages in place of the dropzone, and under them the file they
         // made once it is stored, or its upload while it is on its way.
-        <div
-          role="group"
-          aria-label={photoLabel || undefined}
-          className="space-y-2"
-          data-photo-pages=""
-        >
+        <div role="group" aria-label={label || undefined} className="space-y-2" data-photo-pages="">
           <PhotoPageStrip
             kind={field.kind}
             pages={photos.pages}
@@ -790,8 +788,8 @@ function FileField({
                 url: value?.url,
                 filename:
                   field.kind === 'image'
-                    ? s.photoChip(photoLabel || s.photoImage)
-                    : s.photoPagesChip(photoLabel || s.photoImage, photos.pages.length),
+                    ? s.photoChip(photoName)
+                    : s.photoPagesChip(photoName, photos.pages.length),
               }}
               formats={formats}
               presentation={presentation}
@@ -909,11 +907,7 @@ function FileField({
       {/* "Take photo", under the dropzone and before the team's files, while
           the input is empty: on a touch screen only, which CSS decides. */}
       {camera && !photos.held && !hasFile && (
-        <TakePhotoButton
-          label={fieldLabel(field.title, field.name, presentation)}
-          disabled={busy}
-          onTake={() => openCamera(null)}
-        />
+        <TakePhotoButton label={label} disabled={busy} onTake={() => openCamera(null)} />
       )}
       {camera && <CameraInput ref={cameraRef} disabled={disabled} onPhoto={takePhoto} />}
 

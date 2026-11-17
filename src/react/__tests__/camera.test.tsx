@@ -918,3 +918,43 @@ describe('a field that unmounts while it makes its file', () => {
     expect(readPhotoMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('one label names the camera, the pages and the file', () => {
+  const unnamed: FileRunField = { ...orderForm, title: undefined };
+
+  it('reads the field’s label as the form shows it, in every place', async () => {
+    const user = userEvent.setup();
+    const { stored, onDropFile } = storingHost();
+    // The default presentation, `studio`, shows the identifier verbatim.
+    render(<UploadHost field={unnamed} onDropFile={onDropFile} />);
+    expect(takePhotoButton('purchase_order')).toBeInTheDocument();
+    await take(user, 'first');
+    await screen.findByText(S.photoPagesChip('purchase_order', 1));
+    expect(stored[0]?.name).toBe('purchase_order.pdf');
+    expect(pagesToPdfMock).toHaveBeenLastCalledWith([expect.anything()], {
+      title: 'purchase_order',
+    });
+    expect(screen.getByRole('group', { name: 'purchase_order' })).toBeInTheDocument();
+  });
+
+  it('names a list row’s document a document, not a photo', async () => {
+    const user = userEvent.setup();
+    const list: ListRunField = {
+      kind: 'list',
+      name: 'pages',
+      title: 'Pages',
+      conceptRef: 'native.Document[]',
+      required: true,
+      item: orderForm,
+    };
+    const { stored, onDropFile } = storingHost();
+    const env: FieldEnv = {
+      onDropFile: (id, file) => onDropFile(id, file),
+    };
+    render(<Host field={list} env={env} initial={[undefined]} />);
+    expect(screen.getByRole('button', { name: S.takePhoto })).toBeInTheDocument();
+    await take(user, 'first');
+    await vi.waitFor(() => expect(stored).toHaveLength(1));
+    expect(stored[0]?.name).toBe(`${S.photoDocument}.pdf`);
+  });
+});

@@ -140,6 +140,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   addPage: 'Add page',
   photoPage: (number) => `Page ${number}`,
   photoImage: 'Photo',
+  photoDocument: 'Document',
   retakePhoto: 'Retake',
   removePhoto: 'Remove',
   readingPhoto: 'Reading the photo…',

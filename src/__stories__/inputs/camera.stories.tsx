@@ -311,9 +311,9 @@ export const AListRowWithPages: Story = {
         expect(row.querySelectorAll('[data-photo-pages] li img')).toHaveLength(page),
       );
     }
-    // A row is named by its number alone, so its file is called a photo.
+    // A row shows no label, so its file is named for what it is.
     await waitFor(
-      () => expect(within(row).getByText(S.photoPagesChip(S.photoImage, 2))).toBeVisible(),
+      () => expect(within(row).getByText(S.photoPagesChip(S.photoDocument, 2))).toBeVisible(),
       STORED,
     );
   },
