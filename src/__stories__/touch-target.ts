@@ -185,3 +185,59 @@ export async function expectEveryTouchTarget(root: Element): Promise<void> {
   await expect(controls.length, 'controls drawn').toBeGreaterThan(0);
   for (const control of controls) await expectTouchTarget(control);
 }
+
+/** Every style rule under `rule`, through nested groups such as `@layer` and `@media`. */
+function* styleRules(rule: CSSRule, media: string[]): Generator<[CSSStyleRule, string[]]> {
+  if (rule instanceof CSSStyleRule) yield [rule, media];
+  if (rule instanceof CSSGroupingRule) {
+    const inner = rule instanceof CSSMediaRule ? [...media, rule.conditionText] : media;
+    for (const child of rule.cssRules) yield* styleRules(child, inner);
+  }
+}
+
+/**
+ * The declarations the page's style sheets give `element` only on a touch
+ * screen: every rule matching it inside `@media (hover: none)`. A story cannot
+ * make the browser answer that query as a touch screen does without leaking
+ * into the stories running beside it: Chromium's media emulation does not
+ * cover `hover`, and its touch emulation turns the mouse events of every story
+ * file sharing the browser page into touches, which hangs their clicks and
+ * wheel gestures. So a story reads the rule instead, which proves the variant
+ * compiled and reaches the element, and applies it to measure what a touch
+ * screen draws (`asOnATouchScreen`).
+ */
+export function touchScreenRules(element: Element): CSSStyleDeclaration[] {
+  const found: CSSStyleDeclaration[] = [];
+  for (const sheet of document.styleSheets) {
+    for (const top of sheet.cssRules) {
+      for (const [rule, media] of styleRules(top, [])) {
+        if (!media.some((condition) => /\(hover:\s*none\)/.test(condition))) continue;
+        if (element.matches(rule.selectorText)) found.push(rule.style);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Run `check` with `element` drawn as on a touch screen: its
+ * `touchScreenRules` written on it inline, then taken off again, even when
+ * `check` fails.
+ */
+export async function asOnATouchScreen(
+  element: HTMLElement,
+  check: () => Promise<void>,
+): Promise<void> {
+  const rules = touchScreenRules(element);
+  const before = element.getAttribute('style');
+  for (const rule of rules) {
+    for (const property of rule)
+      element.style.setProperty(property, rule.getPropertyValue(property));
+  }
+  try {
+    await check();
+  } finally {
+    if (before === null) element.removeAttribute('style');
+    else element.setAttribute('style', before);
+  }
+}
