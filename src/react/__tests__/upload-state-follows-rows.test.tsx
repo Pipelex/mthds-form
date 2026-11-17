@@ -120,7 +120,9 @@ const removeRow = (user: User, row: number) => press(user, S.removeItemAria(row)
 const rows = (container: HTMLElement) =>
   [...container.querySelectorAll('[data-list-row]')] as HTMLElement[];
 const fileInputs = (container: HTMLElement) =>
-  [...container.querySelectorAll('input[type="file"]')] as HTMLInputElement[];
+  [
+    ...container.querySelectorAll('input[type="file"]:not([data-camera-input])'),
+  ] as HTMLInputElement[];
 /** Which rows show the upload failure, by position. */
 const failedRows = (container: HTMLElement) =>
   rows(container).flatMap((row, index) => (within(row).queryByText(S.uploadFailed) ? [index] : []));

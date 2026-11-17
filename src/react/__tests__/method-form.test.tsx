@@ -77,7 +77,7 @@ function Harness({ formProps, ...options }: HarnessProps) {
 
 const state = () => JSON.parse(screen.getByTestId('state').textContent ?? '{}');
 const fileInput = (container: HTMLElement) =>
-  container.querySelector('input[type="file"]') as HTMLInputElement;
+  container.querySelector('input[type="file"]:not([data-camera-input])') as HTMLInputElement;
 
 beforeAll(() => {
   URL.createObjectURL = vi.fn(() => 'blob:local-preview');

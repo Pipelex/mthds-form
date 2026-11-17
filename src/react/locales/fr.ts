@@ -183,6 +183,19 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   incompleteField: 'Incomplet\u00a0: remplissez ses champs obligatoires',
   runWaitsFor: (names, more) => `Remplissez ${someNames(names, more)} pour lancer`,
   uploadFailed: 'Ce fichier n’a pas pu être envoyé. Réessayez.',
+  takePhoto: 'Prendre une photo',
+  takePhotoAria: (label) => (label ? `Prendre une photo pour ${label}` : 'Prendre une photo'),
+  addPage: 'Ajouter une page',
+  photoPage: (number) => `Page ${number}`,
+  photoImage: 'Photo',
+  retakePhoto: 'Reprendre',
+  removePhoto: 'Retirer',
+  readingPhoto: 'Lecture de la photo…',
+  photoUndecodable:
+    'Le format de cette photo n’est pas utilisable ici. Prenez-la plutôt avec le bouton Prendre une photo.',
+  photoNotKept: 'Cette photo n’a pas pu être gardée. Reprenez-la ou retirez-la.',
+  photoPagesChip: (name, count) => `${name} · ${count} ${plural(count, 'page', 'pages')}`,
+  photoChip: (name) => `${name} · photo`,
   chooseFromSource: 'Choisir parmi les fichiers de l’équipe',
   chooseFromSourceAria: (label) =>
     label

@@ -83,7 +83,7 @@ describe('a failed upload shows on the field that took the file', () => {
         }
       />,
     );
-    const inputs = container.querySelectorAll('input[type="file"]');
+    const inputs = container.querySelectorAll('input[type="file"]:not([data-camera-input])');
     const cvAlert = screen.getByText('The CV could not be stored.');
     const offerAlert = screen.getByText('The job offer could not be stored.');
     expect(cvAlert).toHaveAttribute('role', 'alert');
@@ -101,7 +101,7 @@ describe('a failed upload shows on the field that took the file', () => {
       />,
     );
     expect(alerts()).toHaveLength(1);
-    const inputs = container.querySelectorAll('input[type="file"]');
+    const inputs = container.querySelectorAll('input[type="file"]:not([data-camera-input])');
     expect(shellOf(screen.getByText('Row two failed.'))).toContainElement(inputs[1] as HTMLElement);
   });
 
@@ -157,7 +157,7 @@ function Uploader({
 }
 
 const fileInput = (container: HTMLElement) =>
-  container.querySelector('input[type="file"]') as HTMLInputElement;
+  container.querySelector('input[type="file"]:not([data-camera-input])') as HTMLInputElement;
 
 describe('a new attempt shows its own outcome', () => {
   it('hides the failure once a host removes it on the next drop', async () => {

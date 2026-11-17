@@ -16,7 +16,9 @@ import {
   isAcceptedFile,
   type FileFormat,
 } from '../core/file-formats';
+import { humanizeFieldName } from '../core/humanize';
 import { viewableUrl } from '../core/native-content';
+import { takesPhotos } from '../core/photo-file';
 import { sourceFileValue } from '../core/sources';
 import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
@@ -26,6 +28,9 @@ import { fieldControlClass, smallPrintClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
+import { CameraInput, TakePhotoButton } from './photo-camera';
+import { PhotoPageStrip } from './photo-page-strip';
+import { usePhotoPages } from './photo-pages';
 
 /**
  * What the control refused: a file of a type the slot does not accept, or a
@@ -71,6 +76,15 @@ interface FileFieldProps {
    * which values are valid. With no `onDropFile` either, the control throws.
    */
   allowUrl?: boolean;
+  /**
+   * Told `true` while the field makes a file from photos it has not yet handed
+   * to `onDropFile`, and `false` once it has, or once nothing is left to make:
+   * the field holds pages its value does not reflect yet, and a run started
+   * then would send a stale file. A host counts it as an upload in flight.
+   * Absent, the field writes its value empty the moment its pages change. See
+   * docs/camera.md and docs/upload-seam.md.
+   */
+  onPreparingFile?: (preparing: boolean) => void;
   /** Manual URL paste / clear flows through here too. */
   onChange: (value: FileValue | undefined) => void;
   id: string;
@@ -229,6 +243,7 @@ function FileField({
   value,
   onDropFile,
   allowUrl = true,
+  onPreparingFile,
   onChange,
   id,
   uploading,
@@ -384,24 +399,71 @@ function FileField({
     [setLocal],
   );
 
-  const handleFile = useCallback(
-    (file: File) => {
+  // Hands a file to the host and answers its upload: a file dropped or picked
+  // here, and the file the camera's pages make, which goes the same way so
+  // that its format check, its upload's tracking and its failure are every
+  // other file's.
+  const storeFile = useCallback(
+    (file: File): unknown => {
       // Unreachable while the dropzone is disabled below, and kept so that a
       // file can never be taken with nowhere to go - the bug this guards is a
       // picked file handed to a callback that did nothing, in silence.
-      if (!onDropFile) return;
+      if (!onDropFile) return undefined;
       if (!isAcceptedFile(formats, file)) {
         // Refuse BEFORE the object URL and before `onDropFile`: a host's
         // uploader is a network call and often a billed one, and a file the
         // runtime cannot decode has no business reaching it.
         setRejected({ kind: 'type', name: file.name, over: value?.url });
-        return;
+        return undefined;
       }
       setRejected(null);
       setDismissedUploadError(null);
-      track(file, onDropFile(file), value?.url);
+      const upload = onDropFile(file);
+      track(file, upload, value?.url);
+      return upload;
     },
     [formats, onDropFile, track, value?.url],
+  );
+
+  // The camera: a touch screen's way to photograph a paper document page by
+  // page into this input, offered exactly when the host stores files and the
+  // input accepts the file the photos make. The pages live here, and the file
+  // they make is stored through `storeFile` whenever they settle, so the value
+  // is always an ordinary stored file. See docs/camera.md.
+  const camera = canUpload && takesPhotos(field);
+  const photoLabel = field.title ?? humanizeFieldName(field.name);
+  const photos = usePhotoPages({
+    field,
+    label: photoLabel,
+    valueUrl: value?.url || undefined,
+    uploadFailure: failure,
+    store: storeFile,
+    clear: () => onChange(undefined),
+    onPreparing: onPreparingFile,
+  });
+  const cameraRef = useRef<HTMLInputElement>(null);
+  // The page the camera is open for, or `null` for a new one.
+  const retakeOf = useRef<string | null>(null);
+  const openCamera = useCallback((replaces: string | null) => {
+    retakeOf.current = replaces;
+    cameraRef.current?.click();
+  }, []);
+  const takePhoto = (photo: File) => {
+    const replaces = retakeOf.current;
+    retakeOf.current = null;
+    setRejected(null);
+    photos.take(photo, replaces);
+  };
+
+  // A file the person drops or picks here: the latest action on the input, so a
+  // photo it refused before is no longer what the alert slot is about.
+  const { forgetRefusal: forgetPhotoRefusal } = photos;
+  const handleFile = useCallback(
+    (file: File) => {
+      forgetPhotoRefusal();
+      storeFile(file);
+    },
+    [forgetPhotoRefusal, storeFile],
   );
 
   // A file the list's drop area placed in this row: handed to the host by the
@@ -467,27 +529,30 @@ function FileField({
     },
   });
 
+  const { discard: discardPhotos } = photos;
   const clear = useCallback(() => {
+    discardPhotos();
     setLocal(null);
     setResolved(null);
     setPreviewOpen(false);
     setRejected(null);
     dismissUploadError();
     onChange(undefined);
-  }, [setLocal, onChange, dismissUploadError]);
+  }, [discardPhotos, setLocal, onChange, dismissUploadError]);
 
   // A file chosen from the host's files is written as an upload's result is,
   // and like a typed link it leaves any earlier upload behind: the preview of a
   // dropped file, a refusal, a failure on screen.
   const chooseFromSource = useCallback(
     (file: Parameters<typeof sourceFileValue>[0]) => {
+      forgetPhotoRefusal();
       setLocal(null);
       setResolved(null);
       setRejected(null);
       dismissUploadError();
       onChange(sourceFileValue(file));
     },
-    [setLocal, onChange, dismissUploadError],
+    [forgetPhotoRefusal, setLocal, onChange, dismissUploadError],
   );
 
   // Whether the local preview still describes the value on screen. Computed in
@@ -708,7 +773,53 @@ function FileField({
       // and the input's accessible name computes to the empty string.
       htmlFor={domId}
     >
-      {hasFile && !uploading ? (
+      {photos.held ? (
+        // The pages in place of the dropzone, and under them the file they
+        // made once it is stored, or its upload while it is on its way.
+        <div
+          role="group"
+          aria-label={photoLabel || undefined}
+          className="space-y-2"
+          data-photo-pages=""
+        >
+          <PhotoPageStrip
+            kind={field.kind}
+            pages={photos.pages}
+            reading={photos.reading}
+            disabled={disabled}
+            canRemoveLast={!uploading}
+            onAddPage={() => openCamera(null)}
+            onRetake={openCamera}
+            onRemove={(pageId) => {
+              setRejected(null);
+              photos.remove(pageId);
+            }}
+          />
+          {photos.handedOver && hasFile && !uploading ? (
+            <FileChip
+              value={{
+                url: value?.url,
+                filename:
+                  field.kind === 'image'
+                    ? s.photoChip(photoLabel || s.photoImage)
+                    : s.photoPagesChip(photoLabel || s.photoImage, photos.pages.length),
+              }}
+              formats={formats}
+              presentation={presentation}
+              disabled={disabled}
+              onClear={clear}
+            />
+          ) : (
+            (uploading ||
+              (photos.reading.length === 0 && !photos.handedOver && photos.refusal === null)) && (
+              <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                {s.uploading}
+              </p>
+            )
+          )}
+        </div>
+      ) : hasFile && !uploading ? (
         <div ref={cardRef} tabIndex={-1} className="space-y-2 outline-none">
           <FileChip
             value={value}
@@ -806,6 +917,17 @@ function FileField({
         </div>
       )}
 
+      {/* "Take photo", under the dropzone and before the team's files, while
+          the input is empty: on a touch screen only, which CSS decides. */}
+      {camera && !photos.held && !hasFile && (
+        <TakePhotoButton
+          label={fieldLabel(field.title, field.name, presentation)}
+          disabled={busy}
+          onTake={() => openCamera(null)}
+        />
+      )}
+      {camera && <CameraInput ref={cameraRef} disabled={disabled} onPhoto={takePhoto} />}
+
       {/* The refusal, or the host's upload failure: one slot, holding whichever
           came from the user's latest action. `role="alert"` because it appears
           in response to something the user just did and is the only feedback
@@ -813,7 +935,14 @@ function FileField({
           otherwise gets silence. A refusal names the file so the message is
           about the thing they picked, not a generic complaint; a failure is the
           host's own words, shown on the field that took the file. */}
-      {!busy &&
+      {photos.refusal ? (
+        // A photo that never became a page. It blocks nothing: the pages
+        // already held, and the file they made, stand.
+        <p role="alert" className="text-[12px] text-destructive">
+          {photos.refusal === 'undecodable' ? s.photoUndecodable : s.photoNotKept}
+        </p>
+      ) : (
+        !busy &&
         (refusal ? (
           <p role="alert" className="text-[12px] text-destructive">
             {refusal.kind === 'type' ? (
@@ -835,7 +964,8 @@ function FileField({
               {failure}
             </p>
           )
-        ))}
+        ))
+      )}
 
       {/* URL escape hatch - collapsed by default to keep the happy path clean.
           It reads `busy`, not `disabled`: an upload is a door into this value
@@ -866,6 +996,7 @@ function FileField({
           aria-invalid={canUpload ? undefined : !!error}
           placeholder={s.urlPlaceholder}
           onChange={(e) => {
+            forgetPhotoRefusal();
             setLocal(null);
             // A link typed after a failed upload is the user moving past it.
             dismissUploadError();
@@ -908,7 +1039,7 @@ function FileField({
       {/* The host's files: a way in beside the upload and the link, offered
           while the field holds no file, as the dropzone is, and shut while a
           file is arriving, as every other way in is. */}
-      {fileSource && !hasFile && (
+      {fileSource && !hasFile && !photos.held && (
         <FilePickerEntry
           ref={pickerEntryRef}
           id={choosingOnly ? domId : undefined}

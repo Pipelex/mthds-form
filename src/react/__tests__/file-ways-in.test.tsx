@@ -106,7 +106,8 @@ function Host({
   );
 }
 
-const fileInputs = (container: HTMLElement) => container.querySelectorAll('input[type="file"]');
+const fileInputs = (container: HTMLElement) =>
+  container.querySelectorAll('input[type="file"]:not([data-camera-input])');
 const linkInputs = () =>
   screen.queryAllByRole('textbox', { name: /^Link to the file/ }) as HTMLInputElement[];
 

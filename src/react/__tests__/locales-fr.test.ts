@@ -65,6 +65,11 @@ describe('FR_FIELD_STRINGS', () => {
       s.imagePosition(3, 6),
       s.storedTextsNotLoaded(1),
       s.storedTextsNotLoaded(3),
+      s.takePhotoAria('Bon de commande'),
+      s.takePhotoAria(''),
+      s.photoPage(3),
+      s.photoPagesChip('Bon de commande', 3),
+      s.photoChip('Reçu'),
     ];
     for (const answer of answers) expect(answer.trim()).not.toBe('');
   });
@@ -81,6 +86,8 @@ describe('FR_FIELD_STRINGS', () => {
     expect(s.optionalFieldsCount(3)).toBe('3 champs facultatifs');
     expect(s.optionalInputsCount(1)).toBe('1 entrée facultative');
     expect(s.optionalInputsCount(2)).toBe('2 entrées facultatives');
+    expect(s.photoPagesChip('Bon de commande', 1)).toBe('Bon de commande · 1 page');
+    expect(s.photoPagesChip('Bon de commande', 3)).toBe('Bon de commande · 3 pages');
   });
 
   it('writes a size the French way', () => {
