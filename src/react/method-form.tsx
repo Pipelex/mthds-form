@@ -225,9 +225,12 @@ export interface MethodFormController extends MethodFormState {
   /**
    * The seam a file field reports a file being made through: `MethodForm`
    * hands it to its fields as `FieldEnv.onPreparingFile`, and a host rendering
-   * its own fields passes it the same way.
+   * its own fields passes it the same way. It adds `id` to `preparingIds` and
+   * returns the release that ends this one report, wherever its row has moved
+   * by then; a report whose row was removed, or that a reset forgot, is gone
+   * already, and its release changes nothing.
    */
-  preparingFile: (id: string, preparing: boolean) => void;
+  preparingFile: (id: string) => () => void;
   /**
    * Ids whose last upload failed, and whose file nothing has replaced since:
    * an upload marks its id only if its place still holds the file it was
@@ -303,8 +306,11 @@ interface HeldState {
   failed: ReadonlySet<string>;
   /** The uploads in flight, by the id each one writes back to. */
   uploads: ReadonlyMap<string, InFlight>;
-  /** The ids whose file field is making a file it has not handed over yet. */
-  preparing: ReadonlySet<string>;
+  /**
+   * The reports of a file field making a file it has not handed over yet, by
+   * the token of each report, at the id its row has now.
+   */
+  preparing: ReadonlyMap<number, string>;
   /**
    * The rows moved since the last reset, oldest first: what the lists replay
    * on the identities of their rows, so they agree with the ids above.
@@ -314,11 +320,12 @@ interface HeldState {
 
 const NO_UPLOADS: ReadonlyMap<string, InFlight> = new Map();
 const NO_MOVES: readonly RowMove[] = [];
+const NO_PREPARING: ReadonlyMap<number, string> = new Map();
 const NOTHING_HELD: HeldState = {
   edited: null,
   failed: EMPTY_IDS,
   uploads: NO_UPLOADS,
-  preparing: EMPTY_IDS,
+  preparing: NO_PREPARING,
   moves: NO_MOVES,
 };
 
@@ -497,10 +504,10 @@ function rowsMoved(
     const moved = movedId(id, listId, destination);
     if (moved !== undefined) uploads.set(moved, upload);
   }
-  const preparing = new Set<string>();
-  for (const id of held.preparing) {
+  const preparing = new Map<number, string>();
+  for (const [token, id] of held.preparing) {
     const moved = movedId(id, listId, destination);
-    if (moved !== undefined) preparing.add(moved);
+    if (moved !== undefined) preparing.set(token, moved);
   }
   const moves = [...held.moves, { seq, listId, order: sources }];
   return { edited: after, failed, uploads, preparing, moves };
@@ -594,7 +601,10 @@ export function useMethodForm({
     () => (held.uploads.size === 0 ? EMPTY_IDS : new Set(held.uploads.keys())),
     [held.uploads],
   );
-  const preparingIds = held.preparing;
+  const preparingIds = useMemo<ReadonlySet<string>>(
+    () => (held.preparing.size === 0 ? EMPTY_IDS : new Set(held.preparing.values())),
+    [held.preparing],
+  );
 
   // What the person's edits are measured against: the values of the last
   // `reset`, or the initial values as they stood at the first edit since.
@@ -605,6 +615,9 @@ export function useMethodForm({
   const [attempted, setAttempted] = useState(false);
   const [resets, setResets] = useState(0);
   const uploadCounter = useRef(0);
+  // Numbers the reports of a file being made, and is never reset either: a
+  // field mounted before a reset must not end a report made after it.
+  const preparingCounter = useRef(0);
   // Numbers the row moves, and is never reset: a list mounted before a reset
   // must not mistake a move made after it for one it has already replayed.
   const moveCounter = useRef(0);
@@ -649,7 +662,7 @@ export function useMethodForm({
         edited: next ?? null,
         failed: EMPTY_IDS,
         uploads: NO_UPLOADS,
-        preparing: EMPTY_IDS,
+        preparing: NO_PREPARING,
         moves: NO_MOVES,
       });
       setGiven(next ?? null);
@@ -702,12 +715,25 @@ export function useMethodForm({
   }, [uploadFile, initial, commit]);
 
   // A file field's camera says it is making a file, at the id it renders under
-  // now: a row it is in that moved has carried the id along (`rowsMoved`).
+  // now. The report is told apart by its token, as an upload in flight is by
+  // its drop's, because its row may move or go before the field is done:
+  // `rowsMoved` carries it along with its row and drops it with a removed one,
+  // and the release ends this report alone, so a field unmounting with its
+  // removed row never ends the report of the row moved into its place.
   const preparingFile = useCallback<MethodFormController['preparingFile']>(
-    (id, preparing) => {
+    (id) => {
+      const token = ++preparingCounter.current;
       const held = store.current;
-      const next = preparing ? withId(held.preparing, id) : withoutId(held.preparing, id);
-      if (next !== held.preparing) commit({ ...held, preparing: next });
+      const preparing = new Map(held.preparing);
+      preparing.set(token, id);
+      commit({ ...held, preparing });
+      return () => {
+        const current = store.current;
+        if (!current.preparing.has(token)) return;
+        const rest = new Map(current.preparing);
+        rest.delete(token);
+        commit({ ...current, preparing: rest });
+      };
     },
     [commit],
   );

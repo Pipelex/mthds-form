@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
 import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
-import { cn, isThenable } from './utils';
+import { cn, isThenable, storedUrlOf } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
@@ -77,14 +77,15 @@ interface FileFieldProps {
    */
   allowUrl?: boolean;
   /**
-   * Told `true` while the field makes a file from photos it has not yet handed
-   * to `onDropFile`, and `false` once it has, or once nothing is left to make:
-   * the field holds pages its value does not reflect yet, and a run started
-   * then would send a stale file. A host counts it as an upload in flight.
-   * Absent, the field writes its value empty the moment its pages change. See
+   * Called when the field starts making a file from photos it has not yet
+   * handed to `onDropFile`, and the function it returns is called once it has,
+   * once nothing is left to make, or when the field unmounts: meanwhile the
+   * field holds pages its value does not reflect yet, and a run started then
+   * would send a stale file. A host counts it as an upload in flight. Absent,
+   * the field writes its value empty the moment its pages change. See
    * docs/camera.md and docs/upload-seam.md.
    */
-  onPreparingFile?: (preparing: boolean) => void;
+  onPreparingFile?: () => () => void;
   /** Manual URL paste / clear flows through here too. */
   onChange: (value: FileValue | undefined) => void;
   id: string;
@@ -159,18 +160,6 @@ function isReadableLink(url: string): boolean {
 /** The MIME type a `data:` URL declares, which is the only type it carries. */
 function dataUrlMime(url: string): string | undefined {
   return DATA_URL_MIME_RE.exec(url)?.[1]?.toLowerCase();
-}
-
-/**
- * The URL an upload's answer names, or `undefined` when it names none: read
- * defensively, because a host's `onDropFile` is typed loosely enough to hand
- * back a promise of anything, and only a URL can be matched to the value.
- */
-function storedUrlOf(stored: unknown): string | undefined {
-  if (typeof stored === 'string') return stored === '' ? undefined : stored;
-  if (stored === null || typeof stored !== 'object') return undefined;
-  const url = (stored as { url?: unknown }).url;
-  return typeof url === 'string' && url !== '' ? url : undefined;
 }
 
 /**

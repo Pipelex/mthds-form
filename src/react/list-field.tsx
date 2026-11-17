@@ -214,20 +214,23 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             return upload;
           }
         : undefined,
-      // A row's camera making its file: recorded under the id it reports, and
-      // the move logged then, so its report that it is done finds it at the
-      // row's id as it is by then. Passed on to the host either way.
+      // A row's camera making its file: recorded under the id it reports, with
+      // the move logged then, so it follows the row through the host's moves as
+      // an upload does, and let go by its own release, wherever its row is by
+      // then. Passed on to the host, whose release it calls in turn.
       onPreparingFile: prepare
-        ? (rowId, isPreparing) => {
-            const moves = env.rowMoves;
-            if (isPreparing) {
-              const token = nextPreparing.current++;
-              const seq = moves?.[moves.length - 1]?.seq ?? 0;
-              setPreparing((prev) => new Map(prev).set(token, { id: rowId, seq }));
-            } else {
-              setPreparing((prev) => withoutRow(prev, rowId, moves));
-            }
-            prepare(rowId, isPreparing);
+        ? (rowId) => {
+            const token = nextPreparing.current++;
+            const seq = env.rowMoves?.[env.rowMoves.length - 1]?.seq ?? 0;
+            setPreparing((prev) => new Map(prev).set(token, { id: rowId, seq }));
+            const release = prepare(rowId);
+            let released = false;
+            return () => {
+              if (released) return;
+              released = true;
+              setPreparing((prev) => withoutUpload(prev, token));
+              release();
+            };
           }
         : undefined,
     };
@@ -606,19 +609,6 @@ function rowNow(entry: PendingUpload, moves: readonly RowMove[] | undefined): st
     if (move.seq > entry.seq) at = movedId(at, move.listId, destinationOf(move.order));
   }
   return at;
-}
-
-/** `entries` without those whose row is `rowId` now, the same map when there were none. */
-function withoutRow(
-  entries: ReadonlyMap<number, PendingUpload>,
-  rowId: string,
-  moves: readonly RowMove[] | undefined,
-): ReadonlyMap<number, PendingUpload> {
-  const gone = [...entries].filter(([, entry]) => rowNow(entry, moves) === rowId);
-  if (gone.length === 0) return entries;
-  const next = new Map(entries);
-  for (const [token] of gone) next.delete(token);
-  return next;
 }
 
 /**

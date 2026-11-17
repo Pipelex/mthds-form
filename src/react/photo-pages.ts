@@ -5,7 +5,7 @@ import type { FileRunField } from '../core';
 import { PHOTO_FILE, photoFileName } from '../core/photo-file';
 import { readPhoto, UndecodablePhotoError, type JpegImage } from './photo-reading';
 import { loadJsPdf, pagesToPdf } from './photos-pdf';
-import { isThenable } from './utils';
+import { isThenable, storedUrlOf } from './utils';
 
 /**
  * The pages a runner photographs into one file input, held by its file
@@ -63,14 +63,24 @@ const NO_PHOTOS: PhotoState = { pages: [], reading: [], refusal: null, madeKey: 
 
 /** The made file handed to the host last, and what its upload has said. */
 interface Handed {
+  /** Its own, from a counter that only grows: no later hand-off shares it. */
+  token: number;
   /** Which pages it was made of (`pagesKey`). */
   key: string;
-  token: number;
-  /** Whether the host handed back its upload, and it has not answered yet. */
-  awaiting: boolean;
   /**
-   * Whether the value this hand-off wrote has been seen: for an upload that
-   * gives no answer, the first value to land after it is its own.
+   * Whether the value is, or is about to be, this file. The control wrote the
+   * field empty over it when its pages changed for a host without the seam,
+   * and the pages it was made of must then be stored again even unchanged.
+   */
+  standing: boolean;
+  /**
+   * What its upload answered: nothing yet, the URL it stored at, or nothing
+   * to match (a host that hands back no upload, or one that names no URL).
+   */
+  answer: 'pending' | 'url' | 'none';
+  /**
+   * For an answer naming no URL: whether a value has been taken as its own,
+   * which is the first one to land after it that nothing else claims.
    */
   adopted: boolean;
 }
@@ -88,13 +98,14 @@ export interface PhotoPagesOptions {
   /** Writes the field empty. */
   clear: () => void;
   /**
-   * The host's `FieldEnv.onPreparingFile`, bound to the field's id: told
-   * `true` from a photo taken, retaken or a page removed until the made file
-   * is handed to `store`, or nothing is left to make. Absent, the field writes
-   * itself empty the moment its pages change, so its value is never a stale
-   * file while the next one is made.
+   * The host's `FieldEnv.onPreparingFile`, bound to the field's id: called
+   * when a photo is taken, retaken or a page removed, and the function it
+   * returns is called once the made file is handed to `store`, nothing is
+   * left to make, or the field unmounts. Absent, the field writes itself
+   * empty the moment its pages change, so its value is never a stale file
+   * while the next one is made.
    */
-  onPreparing?: (preparing: boolean) => void;
+  onPreparing?: () => () => void;
 }
 
 export interface PhotoPages {
@@ -140,14 +151,6 @@ function withPage(
   return pages.map((held) => (held.id === replaces ? page : held));
 }
 
-/** The URL an upload's answer names, or `undefined` when it names none. */
-function storedUrlOf(stored: unknown): string | undefined {
-  if (typeof stored === 'string') return stored === '' ? undefined : stored;
-  if (stored === null || typeof stored !== 'object') return undefined;
-  const url = (stored as { url?: unknown }).url;
-  return typeof url === 'string' && url !== '' ? url : undefined;
-}
-
 /** The file the pages make: one PDF of them for a document, the photo's JPEG for an image. */
 async function makeFile(
   pages: readonly PhotoPage[],
@@ -173,41 +176,71 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
   // The state as of now, for the reads and the uploads, which run between
   // renders: the rendered one lags a render behind.
   const held = useRef(state);
-  const commit = useCallback((next: PhotoState) => {
-    held.current = next;
-    setState(next);
-  }, []);
   // Read when a step runs, so the callbacks stay put across renders.
   const latest = useRef(options);
   latest.current = options;
 
+  /**
+   * Whether the control is still mounted. A read, a made file or an upload's
+   * answer arriving after it unmounted changes nothing and tells the host
+   * nothing: what it would act on is gone, and its id may be another
+   * control's by then.
+   */
+  const alive = useRef(true);
+  const commit = useCallback((next: PhotoState) => {
+    if (!alive.current) return;
+    held.current = next;
+    setState(next);
+  }, []);
+
   /** The photos being read, one after another. Each link catches its own failure. */
   const queue = useRef<Promise<void>>(Promise.resolve());
   const counter = useRef(0);
-  /** The latest file handed to the host, or `null` while the value holds no file of these pages. */
+  /** The latest file handed to the host, or `null` while none of these pages' is. */
   const handed = useRef<Handed | null>(null);
-  /** The URLs the uploads of the made files answered they stored at. */
-  const ownUrls = useRef(new Set<string>());
+  /** Counts the hand-offs, so each has a token no other ever shares. */
+  const handOffs = useRef(0);
+  /** The hand-offs whose upload has not answered yet, by token. */
+  const awaiting = useRef(new Set<number>());
+  /** The URLs the uploads of the made files stored at, each with the pages it was made of. */
+  const ownUrls = useRef(new Map<string, string>());
+  /** Counts each discard: an answer to an upload of pages since discarded is no one's. */
+  const epoch = useRef(0);
   /** The control wrote the value empty itself, and the change to come is its own. */
   const ownClear = useRef(false);
   /** Counts each settling, so a file made for pages since changed is not stored. */
   const making = useRef(0);
-  /** What the host was last told about preparing. */
-  const preparing = useRef(false);
+  /** The host's release of the report that a file is being made, while it is. */
+  const preparing = useRef<{ release: (() => void) | undefined } | null>(null);
 
   const setPreparing = useCallback((next: boolean) => {
-    if (preparing.current === next) return;
-    preparing.current = next;
-    latest.current.onPreparing?.(next);
+    if (!alive.current || (preparing.current !== null) === next) return;
+    if (next) {
+      preparing.current = { release: latest.current.onPreparing?.() };
+      return;
+    }
+    const { release } = preparing.current ?? {};
+    preparing.current = null;
+    release?.();
   }, []);
 
-  /** The value is written empty by the control, and its next change read as its own. */
-  const clearOwn = useCallback(() => {
-    handed.current = null;
+  /** Writes the value empty, and reads the change to come as the control's own. */
+  const writeEmpty = useCallback(() => {
     if (latest.current.valueUrl === undefined) return;
     ownClear.current = true;
     latest.current.clear();
   }, []);
+
+  /**
+   * The value is no longer the latest made file's: written empty, and the
+   * pages it was made of stored again even unchanged. Its upload is still
+   * followed, so the value it writes when it lands is known as the pages'.
+   */
+  const withdraw = useCallback(() => {
+    const last = handed.current;
+    if (last) handed.current = { ...last, standing: false };
+    writeEmpty();
+  }, [writeEmpty]);
 
   const revoke = useCallback((pages: readonly PhotoPage[]) => {
     for (const page of pages) URL.revokeObjectURL(page.thumbnail);
@@ -217,46 +250,99 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
     revoke(held.current.pages);
     if (held.current !== NO_PHOTOS) commit(NO_PHOTOS);
     handed.current = null;
+    awaiting.current.clear();
     ownUrls.current.clear();
+    epoch.current += 1;
     making.current += 1;
     setPreparing(false);
   }, [commit, revoke, setPreparing]);
 
-  // A remount loses the pages, so their object URLs go with the control, and a
-  // host told the field was preparing is told it no longer is.
-  useEffect(
-    () => () => {
-      revoke(held.current.pages);
+  // A remount loses the pages, so their object URLs go with the control, the
+  // host's report that a file is being made is let go, and nothing still on
+  // its way acts on anything any more: a read still running, the photos
+  // queued behind it, a file being made and every upload's answer.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      const { release } = preparing.current ?? {};
+      preparing.current = null;
+      alive.current = false;
       making.current += 1;
-      if (preparing.current) latest.current.onPreparing?.(false);
-    },
-    [revoke],
-  );
+      revoke(held.current.pages);
+      release?.();
+    };
+  }, [revoke]);
 
   /**
    * The pages are about to change. A host following the seam is told a file is
-   * being made; one that does not has its value taken out now when it holds an
-   * earlier set's file, so it never runs on a stale one.
+   * being made; one that does not has its value taken out now when it holds,
+   * or is about to hold, an earlier set's file, so it never runs on a stale one.
    */
   const changing = useCallback(() => {
     setPreparing(true);
-    if (!latest.current.onPreparing && handed.current !== null) clearOwn();
-  }, [clearOwn, setPreparing]);
+    if (!latest.current.onPreparing && handed.current?.standing) withdraw();
+  }, [setPreparing, withdraw]);
+
+  /**
+   * Whether a file of the pages as they are now is still to come: a photo is
+   * being read, the latest file handed over is of other pages, or its upload
+   * has not answered.
+   */
+  const newerToCome = useCallback((): boolean => {
+    const current = held.current;
+    const last = handed.current;
+    if (current.reading.length > 0 || last === null) return true;
+    return last.key !== pagesKey(current.pages) || awaiting.current.has(last.token);
+  }, []);
+
+  /**
+   * Whose the value is, judged against what the uploads have answered. The
+   * value an upload answered with is the pages' own; a host without the seam
+   * has a stale one, of earlier pages, written empty while a newer is on its
+   * way. Any other value is someone else's and discards the pages, once no
+   * upload still to answer might name it; the first value to land after a
+   * hand-off whose upload names no URL is taken as its own.
+   */
+  const judge = useCallback(() => {
+    if (!alive.current) return;
+    const current = held.current;
+    if (current.pages.length === 0 && current.reading.length === 0) return;
+    const url = latest.current.valueUrl;
+    if (url === undefined) return;
+    const madeOf = ownUrls.current.get(url);
+    if (madeOf !== undefined) {
+      const stale = madeOf !== pagesKey(current.pages);
+      if (stale && !latest.current.onPreparing && newerToCome()) writeEmpty();
+      return;
+    }
+    if (awaiting.current.size > 0) return;
+    const last = handed.current;
+    if (last && last.answer === 'none' && !last.adopted) {
+      ownUrls.current.set(url, last.key);
+      handed.current = { ...last, adopted: true };
+      return;
+    }
+    discard();
+  }, [discard, newerToCome, writeEmpty]);
 
   /** One photo read into a page, when its read is still wanted once it is done. */
   const readOne = useCallback(
     async (marker: PhotoRead, photo: File): Promise<void> => {
+      // Unmounted, or discarded meanwhile: the photo is not read at all.
+      if (!alive.current) return;
+      if (!held.current.reading.some((candidate) => candidate.id === marker.id)) return;
       let read: Awaited<ReturnType<typeof readPhoto>> | null = null;
       let refusal: PhotoRefusal | null = null;
       try {
         read = await readPhoto(photo);
       } catch (error: unknown) {
         refusal = error instanceof UndecodablePhotoError ? 'undecodable' : 'notKept';
-        if (refusal === 'notKept') {
+        if (refusal === 'notKept' && alive.current) {
           // eslint-disable-next-line no-console -- a failure of ours, reported where a host looks.
           console.error('[mthds-form] could not read a photo:', error);
         }
       }
+      if (!alive.current) return;
       // Its own marker, as it is now: gone when its page was removed or the
       // pages discarded meanwhile, and naming the page it retakes as it is now.
       const current = held.current;
@@ -331,9 +417,68 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
     if (held.current.refusal !== null) commit({ ...held.current, refusal: null });
   }, [commit]);
 
+  /**
+   * Hands the made file to the host and follows its upload. A host whose
+   * `onDropFile` throws has failed the upload as one whose upload rejects has:
+   * the pages go, and the person is told the photos were not kept, since such
+   * a host has no upload whose failure it could report on the field.
+   */
+  const handOver = useCallback(
+    (file: File, key: string) => {
+      let upload: unknown;
+      try {
+        upload = latest.current.store(file);
+      } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- a host's failure, reported where it looks.
+        console.error('[mthds-form] could not store the file of the photos:', error);
+        discard();
+        commit({ ...held.current, refusal: 'notKept' });
+        return;
+      }
+      const token = ++handOffs.current;
+      const thenable = isThenable(upload);
+      handed.current = {
+        token,
+        key,
+        standing: true,
+        answer: thenable ? 'pending' : 'none',
+        adopted: false,
+      };
+      commit({ ...held.current, madeKey: key });
+      setPreparing(false);
+      if (!thenable) return;
+      awaiting.current.add(token);
+      const since = epoch.current;
+      const answered = (url: string | undefined) => {
+        awaiting.current.delete(token);
+        if (!alive.current || epoch.current !== since) return;
+        if (url !== undefined) ownUrls.current.set(url, key);
+        const last = handed.current;
+        if (last?.token === token) {
+          handed.current = { ...last, answer: url === undefined ? 'none' : 'url' };
+        }
+        judge();
+      };
+      Promise.resolve(upload).then(
+        (stored) => answered(storedUrlOf(stored)),
+        () => {
+          // The upload stored nothing: the value is as it was, and the pages
+          // are no file's any more. One superseded by a newer set is not this.
+          if (alive.current && epoch.current === since && handed.current?.token === token) {
+            discard();
+            return;
+          }
+          awaiting.current.delete(token);
+          if (alive.current && epoch.current === since) judge();
+        },
+      );
+    },
+    [commit, discard, judge, setPreparing],
+  );
+
   // The pages settled: no photo is still being read. Store the file they make,
-  // unless it is the one already handed over; with no page left, the input
-  // holds nothing.
+  // unless it is the one already handed over and still standing; with no page
+  // left, the input holds nothing.
   useEffect(() => {
     // Counted on every change, so a file still being made for the pages as
     // they were is not stored once a photo has been taken since.
@@ -342,64 +487,38 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
     if (state.reading.length > 0) return;
     if (state.pages.length === 0) {
       if (handed.current !== null) {
-        clearOwn();
+        writeEmpty();
+        handed.current = null;
         ownUrls.current.clear();
       }
       setPreparing(false);
       return;
     }
     const key = pagesKey(state.pages);
-    if (handed.current?.key === key) {
+    if (handed.current?.key === key && handed.current.standing) {
       setPreparing(false);
       return;
     }
     const { kind } = latest.current.field;
     makeFile(state.pages, kind, latest.current.label).then(
       (file) => {
-        if (making.current !== generation) return;
-        const upload = latest.current.store(file);
-        const token = (handed.current?.token ?? 0) + 1;
-        const awaiting = isThenable(upload);
-        handed.current = { key, token, awaiting, adopted: false };
-        commit({ ...held.current, madeKey: key });
-        setPreparing(false);
-        if (!awaiting) return;
-        Promise.resolve(upload).then(
-          (stored) => {
-            if (handed.current?.token !== token) return;
-            const url = storedUrlOf(stored);
-            if (url !== undefined) ownUrls.current.add(url);
-            // An answer naming its URL is how its value is known; one naming
-            // none leaves the first value to land as its own.
-            handed.current = {
-              ...handed.current,
-              awaiting: false,
-              adopted: handed.current.adopted || url !== undefined,
-            };
-          },
-          () => {
-            // The upload stored nothing: the value is as it was, and the pages
-            // are no file's any more. One superseded by a newer set is not this.
-            if (handed.current?.token === token) discard();
-          },
-        );
+        if (alive.current && making.current === generation) handOver(file, key);
       },
       (error: unknown) => {
-        if (making.current !== generation) return;
+        if (!alive.current || making.current !== generation) return;
         // eslint-disable-next-line no-console -- a failure of ours, reported where a host looks.
         console.error('[mthds-form] could not make the file of the photos:', error);
         // The value must not stand for pages it no longer is the file of.
-        clearOwn();
+        withdraw();
         commit({ ...held.current, refusal: 'notKept' });
         setPreparing(false);
       },
     );
-  }, [state.pages, state.reading, clearOwn, commit, discard, setPreparing]);
+  }, [state.pages, state.reading, commit, handOver, setPreparing, withdraw, writeEmpty]);
 
   // A value written by anyone else discards the pages: a cleared input, a
-  // dropped or chosen file, an example, a reset. The value the uploads of the
-  // made files answered with is the pages' own, and so is the first value to
-  // land after a hand-off whose upload gives no answer, or has not yet.
+  // dropped or chosen file, an example, a reset. What is anyone else's is
+  // decided by `judge`, against the URLs the uploads answered with.
   const { valueUrl, uploadFailure } = options;
   const lastUrl = useRef(valueUrl);
   useEffect(() => {
@@ -413,15 +532,8 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
       if (!wasOwnClear) discard();
       return;
     }
-    if (ownUrls.current.has(valueUrl)) return;
-    const last = handed.current;
-    if (last && (last.awaiting || !last.adopted)) {
-      ownUrls.current.add(valueUrl);
-      handed.current = { ...last, adopted: true };
-      return;
-    }
-    discard();
-  }, [valueUrl, discard]);
+    judge();
+  }, [valueUrl, discard, judge]);
 
   // A host that hands back no upload says it failed through its message.
   useEffect(() => {

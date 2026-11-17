@@ -88,19 +88,28 @@ export interface FieldEnv {
   rowMoves?: readonly RowMove[];
   /**
    * A file field says it is making a file it has not yet handed to
-   * `onDropFile`: `true` from the moment a photo is taken, retaken or a page
-   * removed, `false` once the made file is handed over (whose own upload then
-   * counts as in flight) or nothing is left to make. Until then the field holds
-   * pages its value does not reflect yet, so a host counts the id as an upload
-   * in flight and starts no run. `useMethodForm`'s `preparingFile` is this
-   * callback, folded into its `uploading` and `ready`.
+   * `onDropFile`: called at `id` the moment a photo is taken, retaken or a page
+   * removed, and the function it returns is called once the made file is handed
+   * over (whose own upload then counts as in flight), nothing is left to make,
+   * or the field unmounts. Until then the field holds pages its value does not
+   * reflect yet, so a host counts the id as an upload in flight and starts no
+   * run. `useMethodForm`'s `preparingFile` is this callback, folded into its
+   * `uploading` and `ready`.
+   *
+   * The release, rather than a second call naming the id, is how the report is
+   * ended, because the report outlives its id: a row moved or removed while its
+   * file is made changes the id, and a host following its rows moves the report
+   * with the row (as `useMethodForm` does) or drops it with a removed one. The
+   * release then ends exactly the report it was handed for, wherever that is,
+   * and never another row's at the id the field once had. Calling it twice is
+   * harmless.
    *
    * Optional. A host that does not supply it never sends a stale file either:
    * the field then writes its value empty the moment its pages change, so the
    * worst case is the host's own refusal of a required input until the new
    * file is stored. See docs/camera.md and docs/upload-seam.md.
    */
-  onPreparingFile?: (id: string, preparing: boolean) => void;
+  onPreparingFile?: (id: string) => () => void;
   /** Ids currently mid-upload. */
   uploadingIds?: ReadonlySet<string>;
   /**
@@ -258,7 +267,7 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           value={value as FileValue | undefined}
           onChange={onChange}
           onDropFile={drop ? (file) => drop(id, file) : undefined}
-          onPreparingFile={preparing ? (state) => preparing(id, state) : undefined}
+          onPreparingFile={preparing ? () => preparing(id) : undefined}
           allowUrl={env?.allowUrl}
           uploading={env?.uploadingIds?.has(id)}
           uploadError={env?.uploadErrors?.get(id)}
@@ -276,7 +285,7 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           value={value as FileValue | undefined}
           onChange={onChange}
           onDropFile={drop ? (file) => drop(id, file) : undefined}
-          onPreparingFile={preparing ? (state) => preparing(id, state) : undefined}
+          onPreparingFile={preparing ? () => preparing(id) : undefined}
           allowUrl={env?.allowUrl}
           uploading={env?.uploadingIds?.has(id)}
           uploadError={env?.uploadErrors?.get(id)}

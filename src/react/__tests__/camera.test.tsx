@@ -158,7 +158,7 @@ function UploadHost({
 }: {
   field: RunField;
   onDropFile: (id: string, file: File) => Promise<UploadedFile>;
-  onPreparingFile?: (id: string, preparing: boolean) => void;
+  onPreparingFile?: (id: string) => () => void;
   onChange?: (value: unknown) => void;
 }) {
   const [value, setValue] = useState<unknown>(undefined);
@@ -441,8 +441,9 @@ describe('a file being made counts as an upload in flight', () => {
       events.push(`drop ${id} ${file.name}`);
       return { url: 'pipelex-storage://org/1', filename: file.name };
     });
-    const onPreparingFile = vi.fn((id: string, preparing: boolean) => {
-      events.push(`preparing ${id} ${preparing}`);
+    const onPreparingFile = vi.fn((id: string) => {
+      events.push(`preparing ${id} true`);
+      return () => events.push(`preparing ${id} false`);
     });
     render(
       <UploadHost field={orderForm} onDropFile={onDropFile} onPreparingFile={onPreparingFile} />,
@@ -462,7 +463,7 @@ describe('a file being made counts as an upload in flight', () => {
   it('tells the host it is done when the only photo could not be read', async () => {
     const user = userEvent.setup();
     readPhotoMock.mockRejectedValueOnce(new UndecodablePhotoError());
-    const onPreparingFile = vi.fn();
+    const { events, onPreparingFile } = preparingLog();
     render(
       <UploadHost
         field={orderForm}
@@ -472,12 +473,8 @@ describe('a file being made counts as an upload in flight', () => {
     );
     await take(user, 'bad');
     await vi.waitFor(() =>
-      expect(onPreparingFile).toHaveBeenLastCalledWith('purchase_order', false),
+      expect(events).toEqual(['preparing purchase_order', 'done purchase_order']),
     );
-    expect(onPreparingFile.mock.calls).toEqual([
-      ['purchase_order', true],
-      ['purchase_order', false],
-    ]);
   });
 
   it('without the seam, writes the value empty the moment the pages change', async () => {
@@ -517,7 +514,9 @@ describe('a photo that cannot be read', () => {
   it('is refused at once, and leaves the pages and their stored file', async () => {
     const user = userEvent.setup();
     const { stored, onDropFile } = storingHost();
-    render(<UploadHost field={orderForm} onDropFile={onDropFile} onPreparingFile={vi.fn()} />);
+    render(
+      <UploadHost field={orderForm} onDropFile={onDropFile} onPreparingFile={() => () => {}} />,
+    );
     await take(user, 'first');
     await screen.findByText(S.photoPagesChip('Purchase order', 1));
     readPhotoMock.mockRejectedValueOnce(new UndecodablePhotoError());
@@ -546,7 +545,9 @@ describe('a photo that cannot be read', () => {
   it('leaves the page a failed retake was to replace', async () => {
     const user = userEvent.setup();
     const { onDropFile } = storingHost();
-    render(<UploadHost field={orderForm} onDropFile={onDropFile} onPreparingFile={vi.fn()} />);
+    render(
+      <UploadHost field={orderForm} onDropFile={onDropFile} onPreparingFile={() => () => {}} />,
+    );
     await take(user, 'first');
     await screen.findByText(S.photoPagesChip('Purchase order', 1));
     readPhotoMock.mockRejectedValueOnce(new UndecodablePhotoError());
@@ -660,7 +661,7 @@ describe("MethodForm's controller while a file is being made", () => {
         initialValues: (seed) => ({ ...seed, attachments: [undefined, undefined, undefined] }),
       }),
     );
-    act(() => result.current.preparingFile('attachments.2', true));
+    act(() => void result.current.preparingFile('attachments.2'));
     expect([...result.current.preparingIds]).toEqual(['attachments.2']);
     expect(result.current.uploading).toBe(true);
     act(() => result.current.moveItem('attachments', 2, 0));
@@ -672,7 +673,7 @@ describe("MethodForm's controller while a file is being made", () => {
 
   it('forgets every preparing id on a reset', () => {
     const { result } = renderHook(() => useMethodForm(oneDocument));
-    act(() => result.current.preparingFile('attachment', true));
+    act(() => void result.current.preparingFile('attachment'));
     expect(result.current.uploading).toBe(true);
     act(() => result.current.reset());
     expect([...result.current.preparingIds]).toEqual([]);
@@ -721,5 +722,199 @@ describe("MethodForm's controller while a file is being made", () => {
     await vi.waitFor(() =>
       expect(screen.getByRole('button', { name: S.removeItemAria(1) })).toBeEnabled(),
     );
+  });
+});
+
+// What review round 1 found: the hand-off's identity, a host that throws, and
+// a field that unmounts while it is making its file.
+
+/**
+ * An upload host whose uploads land only when the test says so, each through
+ * `land(index, url)`, and whose `UploadHost` then writes the URL back.
+ */
+function landingHost() {
+  const landings: Array<{ resolve: (stored: UploadedFile) => void; file: File }> = [];
+  const onDropFile = vi.fn(
+    (_id: string, file: File) =>
+      new Promise<UploadedFile>((resolve) => {
+        landings.push({ resolve, file });
+      }),
+  );
+  const land = async (index: number, url: string) => {
+    const landing = landings[index];
+    if (!landing) throw new Error(`No upload ${index}`);
+    await act(async () => landing.resolve({ url, filename: landing.file.name }));
+  };
+  return { landings, onDropFile, land };
+}
+
+/** A host's `onPreparingFile` that records each raise and each release, in order. */
+function preparingLog() {
+  const events: string[] = [];
+  const onPreparingFile = vi.fn((id: string) => {
+    events.push(`preparing ${id}`);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      events.push(`done ${id}`);
+    };
+  });
+  return { events, onPreparingFile };
+}
+
+describe('a host whose onDropFile throws', () => {
+  it('is a failed upload: the pages go, the field says the photos were not kept, and it is done preparing', async () => {
+    const user = userEvent.setup();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { events, onPreparingFile } = preparingLog();
+    const throwing = vi.fn((): Promise<UploadedFile> => {
+      throw new Error('no storage configured');
+    });
+    render(
+      <UploadHost field={orderForm} onDropFile={throwing} onPreparingFile={onPreparingFile} />,
+    );
+    await take(user, 'first');
+    await vi.waitFor(() => expect(throwing).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(events).toEqual(['preparing purchase_order', 'done purchase_order']),
+    );
+    expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(S.photoNotKept);
+    expect(screen.queryByText(S.readingPhoto)).not.toBeInTheDocument();
+    expect(valueOf()).toBeNull();
+    expect(error).toHaveBeenCalled();
+  });
+});
+
+describe('the hand-off the pages are waiting on keeps its identity', () => {
+  it('without the seam, keeps the pages when an earlier set lands after a page is added, and ends on the whole document', async () => {
+    const user = userEvent.setup();
+    const { onDropFile, land } = landingHost();
+    render(<UploadHost field={orderForm} onDropFile={onDropFile} />);
+    await take(user, 'first');
+    await vi.waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    // The first page's file is still arriving when the second page is taken.
+    await user.click(screen.getByRole('button', { name: S.addPage }));
+    await take(user, 'second');
+    await vi.waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(2));
+    await land(0, 'pipelex-storage://org/one-page');
+    expect(screen.getAllByRole('button', { name: /^Page / })).toHaveLength(2);
+    // The one-page file is stale while the two-page one is on its way.
+    await vi.waitFor(() => expect(valueOf()).toBeNull());
+    await land(1, 'pipelex-storage://org/two-pages');
+    await screen.findByText(S.photoPagesChip('Purchase order', 2));
+    expect(screen.getAllByRole('button', { name: /^Page / })).toHaveLength(2);
+    expect(valueOf().url).toBe('pipelex-storage://org/two-pages');
+  });
+
+  it('knows the upload’s own value by the URL it answers, and discards the pages for any other written meanwhile', async () => {
+    const user = userEvent.setup();
+    let land: (stored: UploadedFile) => void = () => {};
+    // A host whose upload does not write: the test writes the values.
+    const onDropFile = vi.fn(
+      () =>
+        new Promise<UploadedFile>((resolve) => {
+          land = resolve;
+        }),
+    );
+    render(<Host field={orderForm} env={{ onDropFile, onPreparingFile: () => () => {} }} />);
+    await take(user, 'first');
+    await vi.waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    // Someone else's file, written while the upload is in flight.
+    await user.click(screen.getByRole('button', { name: 'Another writer' }));
+    await act(async () => land({ url: 'pipelex-storage://org/po.pdf' }));
+    expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument();
+    expect(screen.getByText('other.pdf')).toBeInTheDocument();
+  });
+});
+
+describe('a field that unmounts while it makes its file', () => {
+  it('releases only its own report: a row removed by the form leaves the row moved into its place preparing', () => {
+    const { result } = renderHook(() =>
+      useMethodForm({
+        ...manyFiles,
+        initialValues: (seed) => ({ ...seed, attachments: [undefined, undefined] }),
+      }),
+    );
+    let first: () => void = () => {};
+    let second: () => void = () => {};
+    act(() => {
+      first = result.current.preparingFile('attachments.0');
+      second = result.current.preparingFile('attachments.1');
+    });
+    expect([...result.current.preparingIds].sort()).toEqual(['attachments.0', 'attachments.1']);
+    act(() => result.current.removeItem('attachments', 0));
+    expect([...result.current.preparingIds]).toEqual(['attachments.0']);
+    // The removed row's field unmounts and lets go of its report: the row now
+    // at its id is still making its file.
+    act(() => first());
+    expect([...result.current.preparingIds]).toEqual(['attachments.0']);
+    expect(result.current.uploading).toBe(true);
+    act(() => second());
+    expect([...result.current.preparingIds]).toEqual([]);
+  });
+
+  it('after a reset, the remounted field’s report survives the old field’s late upload', async () => {
+    const user = userEvent.setup();
+    const landings: Array<(stored: UploadedFile) => void> = [];
+    const uploadFile = vi.fn(
+      () =>
+        new Promise<UploadedFile>((resolve) => {
+          landings.push(resolve);
+        }),
+    );
+    function ResetHarness() {
+      const form = useMethodForm({ ...oneDocument, uploadFile });
+      return (
+        <>
+          <MethodForm form={form} presentation="app" />
+          <button type="button" onClick={() => form.reset()}>
+            Reset
+          </button>
+          <output data-testid="form">
+            {JSON.stringify({ uploading: form.uploading, preparing: [...form.preparingIds] })}
+          </output>
+        </>
+      );
+    }
+    render(<ResetHarness />);
+    await take(user, 'first');
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    // The old field is preparing a second page when the form is reset.
+    readPhotoMock.mockImplementationOnce(() => new Promise<ReadPhoto>(() => {}));
+    await user.click(screen.getByRole('button', { name: S.addPage }));
+    await take(user, 'second');
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(formState()).toEqual({ uploading: false, preparing: [] });
+    // The remounted field makes a file of its own.
+    readPhotoMock.mockImplementationOnce(() => new Promise<ReadPhoto>(() => {}));
+    await take(user, 'new');
+    expect(formState()).toEqual({ uploading: true, preparing: ['attachment'] });
+    // The old field's upload answers late, and is rejected for the reset.
+    await act(async () => landings[0]?.({ url: 'pipelex-storage://org/old.pdf' }));
+    expect(formState()).toEqual({ uploading: true, preparing: ['attachment'] });
+  });
+
+  it('stops reading its photos, and makes no object URL nobody will give back', async () => {
+    const user = userEvent.setup();
+    let finish: (read: ReadPhoto) => void = () => {};
+    readPhotoMock.mockImplementationOnce(
+      () =>
+        new Promise<ReadPhoto>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { onDropFile } = storingHost();
+    const { unmount } = render(<UploadHost field={orderForm} onDropFile={onDropFile} />);
+    const input = cameraInput();
+    if (!input) throw new Error('No camera input');
+    await user.upload(input, photo('first'));
+    await user.upload(input, photo('second'));
+    expect(readPhotoMock).toHaveBeenCalledTimes(1);
+    unmount();
+    await act(async () => finish(readOf(photo('first'))));
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(readPhotoMock).toHaveBeenCalledTimes(1);
   });
 });
