@@ -22,7 +22,7 @@ The package never uploads anything. A file control takes a file from the user an
     rowMoves,              // optional: every move the host made to a list's rows, for the list to replay
     resolveUrl,            // a stored URI -> something a browser can render
     allowUrl: true,        // the default: a link may be pasted instead
-    onPreparingFile,       // optional: (id, preparing) while the camera makes a file
+    onPreparingFile,       // optional: (id) => release, while the camera makes a file
     disabled: running,
   }}
 />
@@ -122,9 +122,11 @@ The rule holds whoever the host is, one that follows rows through `onRemoveItem`
 
 ## A file being made is an upload in flight
 
-The camera makes its file in the browser before it hands it to `onDropFile`: each photo is read into a page, and the pages are bound into a PDF ([camera.md](camera.md)). Until the hand-off, the value is about to change, and a run started meanwhile would send the file the field held before the last photo. `FieldEnv.onPreparingFile(id, preparing)` is how the field says so: it calls it with `true` when a photo is taken or a page removed, and with `false` once it has handed the file to `onDropFile`, or once it gives up (the photo could not be read, the file could not be made, the pages were discarded, the field unmounted). From the hand-off on, the upload is the host's own, reported as any upload is.
+The camera makes its file in the browser before it hands it to `onDropFile`: each photo is read into a page, and the pages are bound into a PDF ([camera.md](camera.md)). Until the hand-off, the value is about to change, and a run started meanwhile would send the file the field held before the last photo. `FieldEnv.onPreparingFile(id)` is how the field says so: it calls it when a photo is taken or a page removed, and calls the function it returned, the report's release, once it has handed the file to `onDropFile`, or once it gives up (the photo could not be read, the file could not be made, the pages were discarded, the field unmounted). From the hand-off on, the upload is the host's own, reported as any upload is.
 
-A host treats a preparing id as it treats an uploading one: its run waits for it. `useMethodForm` keeps them in `preparingIds` and counts them in `uploading`, `ready` and `touched`, and `MethodForm` hands its fields the seam itself ([method-form.md](method-form.md)). A list reports a row preparing its file to the host under the row's id, and treats the row as busy meanwhile, as it treats a row whose upload it is waiting on: its remove buttons stay shut, and its drop area for several files does not count the row as free. The list tracks those rows only when the host supplies the seam.
+**The release ends one report, not an id.** A report outlives the id it was made at: a row moved while its file is made changes its id, and a row removed takes its field, which unmounts and releases. Ending the report by naming the id again would end whatever stands at that id by then, which after a removal is the row moved into the removed one's place, or, after a reset, the remounted field's own report. So a host keeps each report apart, as it keeps an upload in flight apart by the drop that started it: it follows the report with its row's moves, drops it with a removed row or a reset, and has the release end that report alone, if it is still there. `useMethodForm` does exactly that. Calling a release twice is harmless.
+
+A host treats a preparing id as it treats an uploading one: its run waits for it. `useMethodForm` keeps them in `preparingIds` and counts them in `uploading`, `ready` and `touched`, and `MethodForm` hands its fields the seam itself ([method-form.md](method-form.md)). A list passes a row's report on to the host under the row's id, and treats the row as busy until its release, as it treats a row whose upload it is waiting on: its remove buttons stay shut, and its drop area for several files does not count the row as free. The list tracks those rows only when the host supplies the seam.
 
 **A host without the seam gets the stricter fallback.** A field with no `onPreparingFile` writes its value empty, through `onChange`, the moment its pages change, and the file made from the new pages fills it again once the upload lands. A run started in between is refused by the gate for a missing input, or runs without the optional one, rather than sending a file the person has since changed.
 
