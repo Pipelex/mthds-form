@@ -35,3 +35,15 @@ export function isThenable(answer: unknown): answer is PromiseLike<unknown> {
     typeof (answer as { then?: unknown }).then === 'function'
   );
 }
+
+/**
+ * The URL an upload's answer names, or `undefined` when it names none: read
+ * defensively, because a host's `onDropFile` is typed loosely enough to hand
+ * back a promise of anything, and only a URL can be matched to the value.
+ */
+export function storedUrlOf(stored: unknown): string | undefined {
+  if (typeof stored === 'string') return stored === '' ? undefined : stored;
+  if (stored === null || typeof stored !== 'object') return undefined;
+  const url = (stored as { url?: unknown }).url;
+  return typeof url === 'string' && url !== '' ? url : undefined;
+}

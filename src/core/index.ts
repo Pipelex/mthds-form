@@ -86,6 +86,10 @@ export {
   isAcceptedFile,
 } from './file-formats';
 export { narrowFileFormats } from './narrow-file-formats';
+// Which file inputs the file control offers its camera on: a document or an
+// image input whose formats accept the file its photos make. See ./photo-file
+// and docs/camera.md.
+export { takesPhotos } from './photo-file';
 
 // ...and how to READ what one comes back as. The result side's twin of that
 // table: the pinned content models of `native.Document`, `native.Image`,

@@ -468,7 +468,9 @@ describe('a file input the page delegates to the kernel', () => {
         scope={{ inputs: [CV], env: { disabled: false } }}
       />,
     );
-    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(0);
+    expect(container.querySelectorAll('input[type="file"]:not([data-camera-input])')).toHaveLength(
+      0,
+    );
     // `Cv`, not `cv`: a produced page renders the kernel's fields in `app`.
     expect(screen.getByLabelText('Cv')).toHaveAccessibleDescription(
       DEFAULT_FIELD_STRINGS.uploadUnavailable,
@@ -535,7 +537,9 @@ describe('a file input the page delegates to the kernel', () => {
         scope={{ inputs: [CV], env: { onDropFile: () => {} } }}
       />,
     );
-    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
+    expect(container.querySelectorAll('input[type="file"]:not([data-camera-input])')).toHaveLength(
+      1,
+    );
     expect(screen.queryByText(DEFAULT_FIELD_STRINGS.uploadUnavailable)).not.toBeInTheDocument();
   });
 });

@@ -128,16 +128,20 @@ export interface MethodFormState {
   inputs: Record<string, unknown>;
   /** How many of the inputs that gate a run are filled, and which are not. */
   readiness: Readiness;
-  /** Whether a file upload is still in flight. */
+  /**
+   * Whether a file upload is still in flight, or a file field is still making
+   * a file it has not handed over yet (`preparingIds`): either way, the values
+   * do not yet hold the file the person gave.
+   */
   uploading: boolean;
-  /** Whether a run may start: every gating input filled and no upload in flight. */
+  /** Whether a run may start: every gating input filled and no upload in flight or file being made. */
   ready: boolean;
   /** Whether `attempt` has been called since the last reset: required marks show. */
   attempted: boolean;
   /**
    * Whether the form holds work of the person's own: a value that sends a
    * different run from the one it was given (its initial values as they stood
-   * at the first edit, or the last `reset`), or a file still arriving. A value typed and erased again, or an
+   * at the first edit, or the last `reset`), or a file still arriving or being made. A value typed and erased again, or an
    * optional structure opened and left empty, sends the same run and does not
    * count. "Fill with an example" asks before replacing a touched form.
    */
@@ -209,6 +213,24 @@ export interface MethodFormController extends MethodFormState {
    * by `MethodForm`.
    */
   uploadingIds: ReadonlySet<string>;
+  /**
+   * Ids (value paths) whose file field is making a file it has not handed to
+   * `dropFile` yet: photos taken on its camera, being read into pages or made
+   * into one PDF (docs/camera.md). Counted in `uploading`, so `ready` is false
+   * while it is not empty, and in `touched`. Each is at its row's id as it is
+   * now, as an upload in flight is: `removeItem` and `moveItem` carry it along
+   * with its row and drop it with a removed one, and a reset empties it.
+   */
+  preparingIds: ReadonlySet<string>;
+  /**
+   * The seam a file field reports a file being made through: `MethodForm`
+   * hands it to its fields as `FieldEnv.onPreparingFile`, and a host rendering
+   * its own fields passes it the same way. It adds `id` to `preparingIds` and
+   * returns the release that ends this one report, wherever its row has moved
+   * by then; a report whose row was removed, or that a reset forgot, is gone
+   * already, and its release changes nothing.
+   */
+  preparingFile: (id: string) => () => void;
   /**
    * Ids whose last upload failed, and whose file nothing has replaced since:
    * an upload marks its id only if its place still holds the file it was
@@ -285,6 +307,11 @@ interface HeldState {
   /** The uploads in flight, by the id each one writes back to. */
   uploads: ReadonlyMap<string, InFlight>;
   /**
+   * The reports of a file field making a file it has not handed over yet, by
+   * the token of each report, at the id its row has now.
+   */
+  preparing: ReadonlyMap<number, string>;
+  /**
    * The rows moved since the last reset, oldest first: what the lists replay
    * on the identities of their rows, so they agree with the ids above.
    */
@@ -293,10 +320,12 @@ interface HeldState {
 
 const NO_UPLOADS: ReadonlyMap<string, InFlight> = new Map();
 const NO_MOVES: readonly RowMove[] = [];
+const NO_PREPARING: ReadonlyMap<number, string> = new Map();
 const NOTHING_HELD: HeldState = {
   edited: null,
   failed: EMPTY_IDS,
   uploads: NO_UPLOADS,
+  preparing: NO_PREPARING,
   moves: NO_MOVES,
 };
 
@@ -475,8 +504,13 @@ function rowsMoved(
     const moved = movedId(id, listId, destination);
     if (moved !== undefined) uploads.set(moved, upload);
   }
+  const preparing = new Map<number, string>();
+  for (const [token, id] of held.preparing) {
+    const moved = movedId(id, listId, destination);
+    if (moved !== undefined) preparing.set(token, moved);
+  }
   const moves = [...held.moves, { seq, listId, order: sources }];
-  return { edited: after, failed, uploads, moves };
+  return { edited: after, failed, uploads, preparing, moves };
 }
 
 /** Whether `index` names a row of `rows`. */
@@ -567,6 +601,10 @@ export function useMethodForm({
     () => (held.uploads.size === 0 ? EMPTY_IDS : new Set(held.uploads.keys())),
     [held.uploads],
   );
+  const preparingIds = useMemo<ReadonlySet<string>>(
+    () => (held.preparing.size === 0 ? EMPTY_IDS : new Set(held.preparing.values())),
+    [held.preparing],
+  );
 
   // What the person's edits are measured against: the values of the last
   // `reset`, or the initial values as they stood at the first edit since.
@@ -577,6 +615,9 @@ export function useMethodForm({
   const [attempted, setAttempted] = useState(false);
   const [resets, setResets] = useState(0);
   const uploadCounter = useRef(0);
+  // Numbers the reports of a file being made, and is never reset either: a
+  // field mounted before a reset must not end a report made after it.
+  const preparingCounter = useRef(0);
   // Numbers the row moves, and is never reset: a list mounted before a reset
   // must not mistake a move made after it for one it has already replayed.
   const moveCounter = useRef(0);
@@ -617,7 +658,13 @@ export function useMethodForm({
 
   const reset = useCallback<MethodFormController['reset']>(
     (next) => {
-      commit({ edited: next ?? null, failed: EMPTY_IDS, uploads: NO_UPLOADS, moves: NO_MOVES });
+      commit({
+        edited: next ?? null,
+        failed: EMPTY_IDS,
+        uploads: NO_UPLOADS,
+        preparing: NO_PREPARING,
+        moves: NO_MOVES,
+      });
       setGiven(next ?? null);
       setAttempted(false);
       setResets((count) => count + 1);
@@ -667,12 +714,36 @@ export function useMethodForm({
     };
   }, [uploadFile, initial, commit]);
 
+  // A file field's camera says it is making a file, at the id it renders under
+  // now. The report is told apart by its token, as an upload in flight is by
+  // its drop's, because its row may move or go before the field is done:
+  // `rowsMoved` carries it along with its row and drops it with a removed one,
+  // and the release ends this report alone, so a field unmounting with its
+  // removed row never ends the report of the row moved into its place.
+  const preparingFile = useCallback<MethodFormController['preparingFile']>(
+    (id) => {
+      const token = ++preparingCounter.current;
+      const held = store.current;
+      const preparing = new Map(held.preparing);
+      preparing.set(token, id);
+      commit({ ...held, preparing });
+      return () => {
+        const current = store.current;
+        if (!current.preparing.has(token)) return;
+        const rest = new Map(current.preparing);
+        rest.delete(token);
+        commit({ ...current, preparing: rest });
+      };
+    },
+    [commit],
+  );
+
   const readiness = useMemo(() => computeReadiness(fields, values), [fields, values]);
   const inputs = useMemo(
     () => apiInputsFromRunValues(values, fields, contract.inputs),
     [values, fields, contract.inputs],
   );
-  const uploading = uploadingIds.size > 0;
+  const uploading = uploadingIds.size > 0 || preparingIds.size > 0;
   const ready = readiness.ready === readiness.total && !uploading;
   const touched = useMemo(
     () => uploading || (edited !== null && given !== null && !sameRunValues(edited, given, fields)),
@@ -701,6 +772,8 @@ export function useMethodForm({
     attempt,
     resets,
     uploadingIds,
+    preparingIds,
+    preparingFile,
     failedUploadIds,
     dropFile,
     fileSource,
@@ -828,6 +901,7 @@ function MethodFormFields({
     touched,
     resets,
     uploadingIds,
+    preparingFile,
     failedUploadIds,
     dropFile,
     fileSource,
@@ -842,6 +916,7 @@ function MethodFormFields({
     () => ({
       disabled,
       onDropFile: dropFile,
+      onPreparingFile: preparingFile,
       uploadingIds,
       uploadErrors,
       // A list's remove button goes through the form, which carries a failed
@@ -858,6 +933,7 @@ function MethodFormFields({
     [
       disabled,
       dropFile,
+      preparingFile,
       uploadingIds,
       uploadErrors,
       removeItem,

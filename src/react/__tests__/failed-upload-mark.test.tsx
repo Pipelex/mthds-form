@@ -97,7 +97,7 @@ function Harness(options: HarnessProps) {
 const state = () => JSON.parse(screen.getByTestId('state').textContent ?? '{}');
 const failed = (): string[] => state().failed;
 const fileInput = (container: HTMLElement) =>
-  container.querySelector('input[type="file"]') as HTMLInputElement;
+  container.querySelector('input[type="file"]:not([data-camera-input])') as HTMLInputElement;
 type User = ReturnType<typeof userEvent.setup>;
 const mountAgain = (user: User) => user.click(screen.getByRole('button', { name: 'Mount again' }));
 const press = (user: User, name: string) => user.click(screen.getByRole('button', { name }));

@@ -1030,7 +1030,9 @@ describe('an example filled over a file of the person’s own', () => {
   const paintsLocalPreview = (container: HTMLElement) =>
     container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
   const drop = async (user: ReturnType<typeof userEvent.setup>, container: HTMLElement) => {
-    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    const input = container.querySelector<HTMLInputElement>(
+      'input[type="file"]:not([data-camera-input])',
+    );
     if (!input) throw new Error('No file input');
     await user.upload(input, new File(['%PDF-1.4'], 'mine.pdf', { type: 'application/pdf' }));
   };
