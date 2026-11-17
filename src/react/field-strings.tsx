@@ -296,7 +296,10 @@ export interface FieldStrings {
   removePhoto: string;
   /** Said by a page that is still being read, for a screen reader. */
   readingPhoto: string;
-  /** A photo the browser could not decode: it never became a page. */
+  /**
+   * A photo the browser could not decode: it never became a page. The photo
+   * came from the camera, so the remedy is a setting of the camera's or a file.
+   */
   photoUndecodable: string;
   /** A photo whose read failed on our side: it never became a page. */
   photoNotKept: string;

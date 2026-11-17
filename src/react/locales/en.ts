@@ -145,7 +145,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   removePhoto: 'Remove',
   readingPhoto: 'Reading the photo…',
   photoUndecodable:
-    "This photo's format can't be used here. Take it with the camera button instead.",
+    "This photo's format can't be read here. Set your camera to save photos as JPEG, or choose a file instead.",
   photoNotKept: "This photo couldn't be kept. Take it again or remove it.",
   photoPagesChip: (name, count) => `${name} · ${count === 1 ? '1 page' : `${count} pages`}`,
   photoChip: (name) => `${name} · photo`,

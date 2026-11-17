@@ -193,7 +193,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   removePhoto: 'Retirer',
   readingPhoto: 'Lecture de la photo…',
   photoUndecodable:
-    'Le format de cette photo n’est pas utilisable ici. Prenez-la plutôt avec le bouton Prendre une photo.',
+    'Le format de cette photo ne peut pas être lu ici. Réglez votre appareil photo pour enregistrer en JPEG, ou choisissez plutôt un fichier.',
   photoNotKept: 'Cette photo n’a pas pu être gardée. Reprenez-la ou retirez-la.',
   photoPagesChip: (name, count) => `${name} · ${count} ${plural(count, 'page', 'pages')}`,
   photoChip: (name) => `${name} · photo`,
