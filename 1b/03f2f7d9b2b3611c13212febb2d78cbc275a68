@@ -1,0 +1,21 @@
+src/react/result-env.tsx
+  s_20466492cd539d::t_aea82811c2b28f 204
+  s_20466492cd539d::t_25f21e0ed95856 154-158
+  s_20466492cd539d::t_231e6ea6da75e3 186-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1b03f2f7d9b2b3611c13212febb2d78cbc275a68",
+  "prompts": {},
+  "sessions": {
+    "s_20466492cd539d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4243fe99-6b2a-49af-ba95-8c0fb1e4dc61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
