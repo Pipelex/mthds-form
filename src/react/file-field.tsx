@@ -1155,7 +1155,9 @@ function FileField({
             const file = files[0];
             if (file) chooseFromSource(file);
           }}
-          onUpload={canUpload ? openFileDialog : undefined}
+          // With a file attached the drop zone and its input are unmounted, so
+          // only the one-off input can open a file dialog from here.
+          onUpload={canUpload ? (hasFile ? chooseFromDevice : openFileDialog) : undefined}
           disabled={busy}
           returnFocusTo={hasFile ? replaceRef : pickerEntryRef}
           // The row that opened the sheet is gone once a file is chosen, so
