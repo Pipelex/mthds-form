@@ -1,0 +1,58 @@
+src/react/__tests__/list-file-drop.test.tsx
+  s_20466492cd539d::t_718655cff6ee67 431
+  s_20466492cd539d::t_6583f6e4308c2f 430
+  s_20466492cd539d::t_ce091b6e44fd50 382-383,428-429
+src/react/__tests__/result-field.test.tsx
+  s_20466492cd539d::t_6583f6e4308c2f 361-363,448-450,539-541,647-649
+  s_20466492cd539d::t_68f49ae97e7312 359-360,364-365,446-447,451-452,537-538,542-543,645-646,650-651
+docs/upload-seam.md
+  s_20466492cd539d::t_d9b7116d1b0bfc 215
+  s_20466492cd539d::t_239688a32add05 197
+src/react/__tests__/failed-upload-mark.test.tsx
+  s_20466492cd539d::t_7dafdaae279a84 277,291
+src/react/__tests__/document-pdf.test.tsx
+  s_20466492cd539d::t_e1137eef9ce0cc 432,434
+  s_20466492cd539d::t_c806520664d343 4,6-11,191,194-200,203,249,252,254,325,421,426-427,522,569,584,591,593-597,600,607-611,616,619,638-640
+src/react/__tests__/file-field.test.tsx
+  s_20466492cd539d::t_7cd8a20a8437ab 443,460,472,507,615,647,675,704,971,989,1001
+  s_20466492cd539d::t_b4239cf70166db 571-594
+src/react/file-field.tsx
+  s_20466492cd539d::t_230f9390b28620 252-254,275-276
+  s_20466492cd539d::t_49665c50c60de1 530-531
+src/__stories__/outputs/preview.stories.tsx
+  s_20466492cd539d::t_ed06079c366ae2 88,90,106-107,237,325-328,331,357-359,362,379-380,382-384,443-445,448,478-479,484,488-491,494,501,536,549,566,622-625,628,638-643
+src/react/__tests__/lone-pdf.test.tsx
+  s_20466492cd539d::t_70d40945546e68 5-9,171,176-179,199,210-211,264-265,282,302,307-308,321,332-333,336,338,348-349,351,354,363-364,372-373,376,381-382,390-391,418,427-431,434-435,438,448,453,618,622,632,644
+  s_20466492cd539d::t_6583f6e4308c2f 331
+src/react/__tests__/focus-ring.test.tsx
+  s_20466492cd539d::t_15e39ef8432f20 265,272-273,304,306,313-314
+src/react/__tests__/upload-preview.test.tsx
+  s_20466492cd539d::t_ce091b6e44fd50 116-117,133,145,157,168,181,196,208,220,232,244,255,265,275
+  s_20466492cd539d::t_7dafdaae279a84 118
+src/react/result-field.tsx
+  s_20466492cd539d::t_230f9390b28620 1242-1247,1249-1252,1276-1278,4047,4264-4265
+  s_20466492cd539d::t_ea3519b5545fa6 4260-4261
+docs/storybook.md
+  s_20466492cd539d::t_239688a32add05 94
+docs/result-view.md
+  s_20466492cd539d::t_d9b7116d1b0bfc 339
+  s_20466492cd539d::t_239688a32add05 278,288,290,292,294,296,298,302,324,330,332,335
+CHANGELOG.md
+  s_20466492cd539d::t_33f367df1effb8 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "06ebaf73cd80ab481f7aafdf5b575da44e859a0f",
+  "prompts": {},
+  "sessions": {
+    "s_20466492cd539d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4243fe99-6b2a-49af-ba95-8c0fb1e4dc61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
