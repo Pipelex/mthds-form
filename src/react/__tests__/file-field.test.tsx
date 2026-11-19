@@ -436,12 +436,11 @@ describe('a preview that needs no resolver does not wait for one', () => {
   const placeholder = (container: HTMLElement) => container.querySelector('.lucide-image-off');
 
   it('renders a data URL directly when the host supplies no resolveUrl', async () => {
-    const user = userEvent.setup();
     const { container } = renderField({
       value: { filename: 'sample.pdf', url: 'data:application/pdf;base64,QUFB' },
     });
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
 
     expect(spinner(container)).toBeNull();
     expect(container.querySelector('object')?.getAttribute('data')).toBe(
@@ -454,25 +453,23 @@ describe('a preview that needs no resolver does not wait for one', () => {
     // nothing is on its way - and the preview counted it pending anyway, because
     // it asked whether an answer had landed without asking whether one could.
     // A host had to pass an identity resolver to get the placeholder.
-    const user = userEvent.setup();
     const { container } = renderField({
       value: { filename: 'sample.pdf', url: 'pipelex-storage://bucket/abc123' },
     });
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
 
     expect(spinner(container)).toBeNull();
     expect(placeholder(container)).not.toBeNull();
   });
 
   it('still waits on a URI only the host can resolve while its resolver answers', async () => {
-    const user = userEvent.setup();
     const { container } = renderField({
       value: { filename: 'sample.pdf', url: 'pipelex-storage://bucket/abc123' },
       resolveUrl: () => new Promise<string>(noop),
     });
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
 
     expect(spinner(container)).not.toBeNull();
     expect(placeholder(container)).toBeNull();
@@ -507,7 +504,7 @@ describe('the local preview belongs to the value it was made for', () => {
     // The host's upload lands: the control adopts this URL as the one its
     // object URL is the preview of.
     await user.click(screen.getByRole('button', { name: 'host writes A' }));
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     expect(container.querySelector('object')?.getAttribute('data')).toBe(
       'blob:local-preview#view=FitH',
     );
@@ -571,6 +568,30 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
   const previewSrc = (container: HTMLElement) =>
     container.querySelector('object')?.getAttribute('data');
 
+  it('opens as it mounts and asks the resolver, folds away on Preview, and asks again as it reopens', async () => {
+    // Every preview starts open, so a stored file is resolved without a click.
+    // Folding it away paints nothing and asks nothing more; opening it again
+    // asks afresh, since a presigned URL may have expired meanwhile.
+    const user = userEvent.setup();
+    const resolveUrl = vi.fn(() => Promise.resolve('https://signed/a.pdf'));
+
+    const { container } = render(
+      <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
+    );
+
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    expect(resolveUrl).toHaveBeenCalledTimes(1);
+    expect(resolveUrl).toHaveBeenCalledWith(URI_A);
+
+    await user.click(previewButton() as HTMLElement);
+    expect(previewSrc(container)).toBeUndefined();
+    expect(resolveUrl).toHaveBeenCalledTimes(1);
+
+    await user.click(previewButton() as HTMLElement);
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    expect(resolveUrl).toHaveBeenCalledTimes(2);
+  });
+
   it('stops showing the previous file the moment the value moves on', async () => {
     // `resolvedSrc` was a bare string with no record of which URI produced it,
     // and it is the last fallback the preview reaches for - so between the
@@ -591,7 +612,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
       <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
     );
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
 
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
@@ -623,7 +644,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
       <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
     );
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     await waitFor(() =>
       expect(previewSrc(container)).toBe('https://signed/a.pdf?expires=soon#view=FitH'),
     );
@@ -651,7 +672,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
       <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
     );
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
 
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
@@ -680,7 +701,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
       <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
     );
 
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     await waitFor(() => expect(placeholder(container)).not.toBeNull());
 
     await user.click(previewButton() as HTMLElement);
@@ -938,7 +959,6 @@ describe('the input control reads the same URL gate as the result view', () => {
   const image = (c: HTMLElement) => c.querySelector('img');
 
   it('paints an allow-listed data: image, with no referrer', async () => {
-    const user = userEvent.setup();
     const { container } = render(
       <ImageField
         field={{ ...field, kind: 'image', conceptRef: 'native.Image' }}
@@ -948,7 +968,7 @@ describe('the input control reads the same URL gate as the result view', () => {
         id="cv"
       />,
     );
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     expect(image(container)?.getAttribute('referrerpolicy')).toBe('no-referrer');
   });
 
@@ -957,7 +977,6 @@ describe('the input control reads the same URL gate as the result view', () => {
     // fails it, and routing "the gate said no" to the storage resolver turned an
     // allow-list miss into a spinner that could never stop, because no resolver
     // can resolve bytes a value carries inline.
-    const user = userEvent.setup();
     const { container } = render(
       <ImageField
         field={{ ...field, kind: 'image', conceptRef: 'native.Image' }}
@@ -967,7 +986,7 @@ describe('the input control reads the same URL gate as the result view', () => {
         id="cv"
       />,
     );
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     expect(spinner(container)).toBeNull();
     expect(image(container)).toBeNull();
   });
@@ -975,12 +994,11 @@ describe('the input control reads the same URL gate as the result view', () => {
   it('judges what the host resolver answers, like every other sink', async () => {
     // A resolver is trusted to know where a host's objects live, not to be a way
     // past the URL policy - and this is the sink the seam's contract documents.
-    const user = userEvent.setup();
     const { container } = renderField({
       value: { filename: 'sample.pdf', url: 'pipelex-storage://bucket/abc' },
       resolveUrl: async () => '//attacker.example/collect.png',
     });
-    await user.click(previewButton() as HTMLElement);
+    // The preview is open from the start: nothing is clicked to see it.
     await waitFor(() => expect(spinner(container)).toBeNull());
     expect(container.querySelector('object')).toBeNull();
     expect(image(container)).toBeNull();

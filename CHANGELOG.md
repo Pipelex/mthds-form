@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.39.1] - 2026-11-19
+
+### Changed
+
+- **Every document and image preview starts open**: in a file field and in a result, in both `app` and `studio`, a preview is open as it mounts, and its Preview button folds it away and opens it again; the whole result in `app` is still framed at a page's size with no toggle. A host therefore sees its `resolveUrl` called for a stored file, and its `resolveDocumentPdf` ask called for a Word, Excel or PowerPoint document, as the preview mounts rather than on a click, for every document shown, and folding a preview away stops those calls. A fold lasts only for the file it folded: another file or document in the same place starts open again. A file field draws no preview frame, and resolves no URL, for a file it cannot paint, such as a Word file. The special case that opened only the lone document of a whole-result record is gone, since every document now opens. No export and nothing on the wire changes. See [docs/result-view.md](docs/result-view.md#every-preview-starts-open).
+
 ## [v0.39.0] - 2026-11-17
 
 ### Security

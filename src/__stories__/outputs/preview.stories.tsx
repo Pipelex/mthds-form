@@ -85,9 +85,9 @@ const meta = { title: 'Outputs/Media', component: Preview } satisfies Meta<typeo
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A real PDF, previewable in place. Click **Preview**. */
+/** A real PDF, open in place from the start. Click **Preview** to fold it away. */
 export const APdf: Story = {
-  name: 'A PDF → previewable',
+  name: 'A PDF → open, with its toggle',
   args: {
     value: {
       url: PDF_URL,
@@ -102,8 +102,9 @@ export const APdf: Story = {
     // Named, not indexed: every file reference now carries a copy control beside
     // it, so "the first button" stopped meaning "the preview".
     const [preview] = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
-    await userEvent.click(preview!);
     await expect(preview!.getAttribute('aria-expanded')).toBe('true');
+    await userEvent.click(preview!);
+    await expect(preview!.getAttribute('aria-expanded')).toBe('false');
   },
 };
 
@@ -233,7 +234,7 @@ export const ANestedReport: StoryObj<typeof ResultView> = {
 
 // ─── A PDF that is the whole result ──────────────────────────────────────────
 
-/** The served PDF as the whole result, as `A PDF → previewable` names it. */
+/** The served PDF as the whole result, as `A PDF → open, with its toggle` names it. */
 const SOLAR_SYSTEM = {
   url: PDF_URL,
   filename: 'solar_system.pdf',
@@ -321,14 +322,13 @@ export const ALonePdfTablet = lonePdfOn('tablet');
 export const ALonePdfDesktop = lonePdfOn('desktop');
 
 /**
- * **A report with its one PDF, in an app: open, with its toggle.** The report
- * is the whole result and its source is its only document, so the document is
- * the deliverable the report captions: it opens under the other fields at the
- * size a toggle gives a nested preview, and its toggle stays, pressed, so a
- * reader can fold it away and read the rest.
+ * **A report with its PDF, in an app: open, with its toggle.** Every preview
+ * starts open, so the report's source opens under the other fields at the size
+ * a toggle gives a nested preview, and its toggle stays, pressed, so a reader
+ * can fold it away and read the rest.
  */
 export const AReportWithItsPdf: StoryObj<typeof ResultView> = {
-  name: 'A report with its one PDF, in an app → open with its toggle',
+  name: 'A report with its PDF, in an app → open with its toggle',
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
@@ -354,12 +354,12 @@ export const AReportWithItsPdf: StoryObj<typeof ResultView> = {
 };
 
 /**
- * **A report with two documents keeps both toggles, closed.** With two, opening
- * one would read as a bug and opening both would push the rest of the result
- * below the first screen, so each opens on its click.
+ * **A report with two documents opens both, each with its toggle.** Every
+ * preview starts open, and each toggle folds its own document away without
+ * touching the other.
  */
 export const AReportWithTwoDocuments: StoryObj<typeof ResultView> = {
-  name: 'A report with two documents, in an app → toggles',
+  name: 'A report with two documents, in an app → both open, each with its toggle',
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
@@ -376,11 +376,12 @@ export const AReportWithTwoDocuments: StoryObj<typeof ResultView> = {
     const canvas = within(canvasElement);
     const toggles = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
     await expect(toggles).toHaveLength(2 * 2);
-    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    await expect(pdfFrames(canvasElement)).toHaveLength(0);
+    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    await expect(pdfFrames(canvasElement)).toHaveLength(2 * 2);
     await userEvent.click(toggles[0]!);
-    await expect(toggles[0]!.getAttribute('aria-expanded')).toBe('true');
-    await expect(pdfFrames(canvasElement)).toHaveLength(1);
+    await expect(toggles[0]!.getAttribute('aria-expanded')).toBe('false');
+    await expect(toggles[1]!.getAttribute('aria-expanded')).toBe('true');
+    await expect(pdfFrames(canvasElement)).toHaveLength(2 * 2 - 1);
   },
 };
 
@@ -439,12 +440,12 @@ export const NoPdfViewerPhone: Story = {
 };
 
 /**
- * **The same card under a report's one PDF.** In a browser with no viewer, the
- * report's lone document opens onto the card rather than a blank frame, and
- * keeps its toggle, pressed.
+ * **The same card under a report's PDF.** In a browser with no viewer, the
+ * report's document opens onto the card rather than a blank frame, and keeps
+ * its toggle, pressed.
  */
 export const NoPdfViewerNested: StoryObj<typeof ResultView> = {
-  name: 'No PDF viewer, a report’s one PDF → the same card',
+  name: 'No PDF viewer, a report’s PDF → the same card',
   render: (args) => <ResultView {...args} />,
   args: {
     contracts: CONTRACTS,
@@ -474,31 +475,30 @@ function hostAnswering(answer: DocumentPdfAnswer): ResolveDocumentPdf {
   return () => () => Promise.resolve(answer);
 }
 
-/** Opens the Preview toggle of the document in each theme pane. */
-async function openPreviews(canvasElement: HTMLElement) {
+/** Asserts the Preview toggle of the document in each theme pane is pressed from the start. */
+async function expectPreviewsOpen(canvasElement: HTMLElement) {
   const toggles = within(canvasElement).getAllByRole('button', {
     name: DEFAULT_FIELD_STRINGS.preview,
   });
   await expect(toggles).toHaveLength(2);
-  for (const toggle of toggles) await userEvent.click(toggle);
+  for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('true');
 }
 
 /**
- * **A host that answers a PDF: the document's pages, on the Preview toggle.**
- * Nothing is asked of the host until a reader opens the preview, and the frame
- * is the PDF's, while the document's own line and download stay the original's.
- * The viewer is pinned on, as on a desktop browser.
+ * **A host that answers a PDF: the document's pages, as it mounts.** The
+ * preview starts open, so the host is asked at once; the frame is the PDF's,
+ * while the document's own line and download stay the original's. The Preview
+ * toggle folds it away. The viewer is pinned on, as on a desktop browser.
  */
 export const AWordDocumentAsAPdf: Story = {
-  name: 'A .docx whose host answers a PDF → its pages',
+  name: 'A .docx whose host answers a PDF → its pages, open',
   args: {
     value: WORD_DOCUMENT,
     resolveDocumentPdf: hostAnswering({ state: 'ready', url: PDF_URL }),
   },
   beforeEach: pdfViewer(true),
   play: async ({ canvasElement }) => {
-    await expect(pdfFrames(canvasElement)).toHaveLength(0);
-    await openPreviews(canvasElement);
+    await expectPreviewsOpen(canvasElement);
     await waitFor(() => expect(pdfFrames(canvasElement)).toHaveLength(2));
     for (const frame of pdfFrames(canvasElement)) {
       await expect(frame.getAttribute('title')).toBe(WORD_DOCUMENT.title);
@@ -533,7 +533,7 @@ export const AWordDocumentPreparing: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await openPreviews(canvasElement);
+    await expectPreviewsOpen(canvasElement);
     await expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing)).toHaveLength(2);
     await waitFor(() => expect(pdfFrames(canvasElement)).toHaveLength(2), { timeout: 5_000 });
     await expect(canvas.queryAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing)).toHaveLength(0);
@@ -546,7 +546,7 @@ export const AWordDocumentFailed: Story = {
   args: { value: WORD_DOCUMENT, resolveDocumentPdf: hostAnswering({ state: 'failed' }) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await openPreviews(canvasElement);
+    await expectPreviewsOpen(canvasElement);
     await waitFor(() =>
       expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfFailed)).toHaveLength(2),
     );
@@ -563,7 +563,7 @@ export const AWordDocumentUnavailable: Story = {
   args: { value: WORD_DOCUMENT, resolveDocumentPdf: hostAnswering({ state: 'unavailable' }) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await openPreviews(canvasElement);
+    await expectPreviewsOpen(canvasElement);
     await waitFor(() =>
       expect(canvas.getAllByText(DEFAULT_FIELD_STRINGS.documentPdfUnavailable)).toHaveLength(2),
     );
@@ -619,12 +619,13 @@ export const ALoneDeck: Story = {
 };
 
 /**
- * **The same deck in studio: its toggle, closed, and nothing converted.** The
- * builder's presentation opens nothing by itself, so the host is asked only
- * when the builder opens the preview.
+ * **The same deck in studio: open, with its toggle pressed.** Every preview
+ * starts open in the builder's presentation too, so the host is asked as the
+ * deck mounts, at the size a toggle gives a nested preview, and the toggle
+ * folds it away.
  */
 export const ALoneDeckStudio: Story = {
-  name: 'The same deck in studio → toggle',
+  name: 'The same deck in studio → open, with its toggle',
   args: { value: DECK, presentation: 'studio', resolveDocumentPdf: convertingForAMoment },
   beforeEach: () => {
     firstAsked = undefined;
@@ -634,10 +635,12 @@ export const ALoneDeckStudio: Story = {
     const canvas = within(canvasElement);
     const toggles = canvas.getAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview });
     await expect(toggles).toHaveLength(2);
-    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    await expect(canvas.queryAllByText(DEFAULT_FIELD_STRINGS.documentPdfPreparing)).toHaveLength(0);
-    await expect(firstAsked).toBeUndefined();
-    await expect(pdfFrames(canvasElement)).toHaveLength(0);
+    for (const toggle of toggles) await expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    await expect(firstAsked).toBeDefined();
+    await waitFor(() => expect(pdfFrames(canvasElement)).toHaveLength(2), { timeout: 5_000 });
+    await userEvent.click(toggles[0]!);
+    await expect(toggles[0]!.getAttribute('aria-expanded')).toBe('false');
+    await expect(pdfFrames(canvasElement)).toHaveLength(1);
   },
 };
 

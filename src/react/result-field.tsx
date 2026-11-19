@@ -1239,35 +1239,17 @@ function ConvertedDocumentPreview({
  * A document: its name, its reference and snippet, and a preview where the
  * browser can both frame and render it, or where its host answers a PDF of it.
  *
- * **A preview opens on its toggle, and the host is asked when it opens.** The
- * host's function is called on every render, and says only whether it has a
- * way to a PDF of this document; the question that starts the work is asked
- * when the preview opens, so a result full of documents converts only the ones
- * somebody looks at.
+ * **Every preview starts open, and the host is asked as it mounts.** A reader
+ * opening a result came to see what is in it, and a toggle in front of every
+ * document hid the answer behind a small button. The host's function is called
+ * on every render, and says only whether it has a way to a PDF of this
+ * document; the question that starts the work is asked while the preview is
+ * open, so a reader who folds a document away stops the asking.
  *
- * **In `app`, the document the run delivered opens without a click**, because
- * the reader came for it. Two places count, both decided by the panel and the
- * descriptor, never by the value:
- *
- * - **The whole result** (`whole`, the panel's own word: `PanelResult`), when it
- *   has any preview: a PDF or a picture the browser frames, or the host's PDF
- *   of a Word, Excel or PowerPoint file, which is then asked for as it mounts.
- *   It is framed at a page's size and has no toggle, since closing the only
- *   thing the result holds would leave it empty.
- * - **The lone document of a whole-result record** (`startsOpen`, said by the
- *   record: `DeliveredDocumentContext`). It opens at the size a toggle gives a
- *   nested preview and keeps its toggle, pressed, so a reader can fold it away
- *   and read the rest of the record.
- *
- * Everything else keeps its toggle, closed: a document in a list (a list of one
- * included), in a record with several, in a nested record or a composite, or in
- * a part a generative layout delegates.
- *
- * `studio` keeps every toggle closed. It is the builder's presentation and the
- * default, also mounted in a graph's node panel that a builder moves through
- * node after node; opening every document there would fetch or convert each
- * one and fill a narrow panel before anyone asked, and the builder's first
- * question is usually what came back rather than what it looks like.
+ * **The whole result** (`whole`, the panel's own word: `PanelResult`) in `app`,
+ * when it has any preview, is framed at a page's size and has no toggle, since
+ * closing the only thing the result holds would leave it empty. Every other
+ * document keeps its toggle, pressed, so a reader can fold it away.
  *
  * **The file is named once.** The link's label is the file's name (`fileLabel`:
  * its filename, else what a `data:` URL holds, else its URL's last segment), so
@@ -1278,13 +1260,10 @@ function ConvertedDocumentPreview({
 function DocumentValue({
   value,
   whole = false,
-  startsOpen = false,
 }: {
   value: unknown;
   /** The whole result a panel shows, in any presentation: see {@link PanelResult}. */
   whole?: boolean;
-  /** The lone document of a whole-result record in `app`: see `DeliveredDocumentContext`. */
-  startsOpen?: boolean;
 }) {
   const s = useFieldStrings();
   // Above the early return: a hook after one runs conditionally, which React
@@ -1294,9 +1273,17 @@ function DocumentValue({
   const resolveDocumentPdf = useResolveDocumentPdf();
   const origin = usePageOrigin();
   const isApp = useFieldPresentation() === 'app';
-  // Decided from the descriptor alone, so a server render and the hydration
-  // after it start from the same state.
-  const [open, setOpen] = useState(startsOpen);
+  // Open from the first render, on the server and in the browser alike, so the
+  // hydration starts from the server's state.
+  const [open, setOpen] = useState(true);
+  // A fold belongs to the document it folded: another document rendered here
+  // opens again, adjusted during render so it never paints a frame closed.
+  const documentKey = readDocumentContent(value)?.url ?? null;
+  const [openFor, setOpenFor] = useState(documentKey);
+  if (openFor !== documentKey) {
+    setOpenFor(documentKey);
+    setOpen(true);
+  }
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
@@ -3756,42 +3743,6 @@ export function PanelResult({
 }
 
 /**
- * Said by a record that is the whole result, in `app`, around the one member
- * that is its lone document: that member is the deliverable the record
- * captions, so its preview starts open (`DocumentValue`'s `startsOpen`).
- *
- * A context rather than a prop, for the reason `PanelResult` is one: the
- * record reaches its member through `ResultField`, whose props are the public
- * API, and a prop there would let any host or layout open any document. It is
- * set around that member's `ResultField` alone, and a document is a leaf, so no
- * node beneath it reads it.
- *
- * What counts as lone is read from the descriptor (`loneDocumentMember`), as
- * every layout decision here is, so a server render and the hydration after it
- * agree.
- */
-const DeliveredDocumentContext = createContext(false);
-
-/**
- * The name of a record's lone document member: exactly one direct member of
- * kind `document`, and no direct member that is a list of documents. A picture
- * does not count against it, since a picture already shows inline; a member of
- * a nested record counts neither way, since the rule reads one level so a
- * reader can predict it from the record they see. `undefined` when there is
- * none, or when there are several, where choosing one would read as a bug.
- */
-function loneDocumentMember(field: ObjectRunField): string | undefined {
-  let lone: string | undefined;
-  for (const child of field.fields) {
-    if (child.kind === 'list' && child.item.kind === 'document') return undefined;
-    if (child.kind !== 'document') continue;
-    if (lone !== undefined) return undefined;
-    lone = child.name;
-  }
-  return lone;
-}
-
-/**
  * The single dispatch point, mirroring `FieldRenderer` on the input side.
  *
  * The outermost one also marks the root of the result, when no panel above it
@@ -3838,7 +3789,6 @@ function ResultNode({
   const pdfShown = usePdfSaveShown();
   const location = useResultLocation();
   const isApp = useFieldPresentation() === 'app';
-  const delivered = use(DeliveredDocumentContext);
 
   // The description rides the label's `title`, at every depth including this
   // one.
@@ -4025,9 +3975,6 @@ function ResultNode({
       const sharesALine = (child: RunField) =>
         isInlineColumn(child) &&
         !(isApp && child.kind === 'text' && isLongText(unwrap(child, memberValue(child))));
-      // The record the run delivered, in `app`, opens its lone document: the
-      // deliverable it captions (see `DeliveredDocumentContext`).
-      const lone = whole && isApp ? loneDocumentMember(field) : undefined;
       return (
         <div className="space-y-2">
           {header}
@@ -4105,13 +4052,7 @@ function ResultNode({
               ) : (
                 <div key={child.name} className="col-span-2 min-w-0">
                   <ResultAt segment={child.name}>
-                    {child.name === lone ? (
-                      <DeliveredDocumentContext value>
-                        <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
-                      </DeliveredDocumentContext>
-                    ) : (
-                      <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
-                    )}
+                    <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
                   </ResultAt>
                 </div>
               ),
@@ -4324,13 +4265,12 @@ function ResultNode({
               `prose` value, as `LeafValue` would set it, and a long `text`
               value in `app`, typeset as the prose it is (see `isLongText`),
               where a chip and a cell keep it plain. So is a document that is
-              the whole result a panel shows, or the lone document of a record
-              that is, which is told so: in `app` its preview opens without a
-              click (see `DocumentValue`). */}
+              the whole result a panel shows, which is told so: in `app` its
+              preview fills the result with no toggle (see `DocumentValue`). */}
           {typeset !== undefined ? (
             <Markdown text={typeset} />
-          ) : field.kind === 'document' && (whole || delivered) ? (
-            <DocumentValue value={unwrapped} whole={whole} startsOpen={delivered} />
+          ) : field.kind === 'document' && whole ? (
+            <DocumentValue value={unwrapped} whole />
           ) : (
             <LeafValue field={field} value={value} />
           )}

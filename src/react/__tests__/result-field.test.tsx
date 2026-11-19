@@ -356,7 +356,13 @@ describe('the URL policy', () => {
           />
         </ResultEnvProvider>,
       );
-      await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+      // Open from the start: the toggle is pressed and the frame lands unasked.
+      expect(
+        screen
+          .getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })
+          .getAttribute('aria-expanded'),
+      ).toBe('true');
+      await waitFor(() => expect(container.querySelector('iframe')).not.toBeNull());
       expect(container.querySelector('iframe')?.getAttribute('title')).toBe('deck.pdf');
     });
 
@@ -437,7 +443,13 @@ describe('the URL policy', () => {
         />
       </ResultEnvProvider>,
     );
-    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    // Open from the start: the toggle is pressed and the frame lands unasked.
+    expect(
+      screen
+        .getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
+    await waitFor(() => expect(container.querySelector('iframe')).not.toBeNull());
     const frame = container.querySelector('iframe');
     expect(frame).toBeTruthy();
     expect(frame?.getAttribute('referrerpolicy')).toBe('no-referrer');
@@ -522,7 +534,13 @@ describe('a frame takes only the host resolver’s answer, on the page’s own o
         />
       </ResultEnvProvider>,
     );
-    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    // Open from the start: the toggle is pressed and the frame lands unasked.
+    expect(
+      screen
+        .getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
+    await waitFor(() => expect(container.querySelector('iframe')).not.toBeNull());
     expect(container.querySelector('iframe')?.getAttribute('src')).toBe('/api/assets/report.pdf');
   });
 
@@ -624,7 +642,13 @@ describe('a frame takes only the host resolver’s answer, on the page’s own o
         />
       </ResultEnvProvider>,
     );
-    await userEvent.click(screen.getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }));
+    // Open from the start: the toggle is pressed and the frame lands unasked.
+    expect(
+      screen
+        .getByRole('button', { name: DEFAULT_FIELD_STRINGS.preview })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
+    await waitFor(() => expect(container.querySelector('iframe')).not.toBeNull());
     expect(container.querySelector('iframe')?.getAttribute('src')).toBe(own);
   });
 
