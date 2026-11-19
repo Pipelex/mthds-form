@@ -97,7 +97,7 @@ export interface UseMethodFormOptions {
   /**
    * Where a file field can take a file the host already stores. Its presence
    * is the capability, as `uploadFile`'s is: every empty file field then offers
-   * "Choose from your team's files", and a list of files offers it for several
+   * "Pick from your team's files" in its drop zone, and a list of files offers it for several
    * at once. The choice is written as `{ url, filename }`, as an upload's
    * result is. Its `renderGlyph`, when given, draws each row's glyph in the
    * sheet. See docs/sources.md.

@@ -143,7 +143,7 @@ export interface FieldEnv {
   /**
    * Where a file field can take a file the host already stores. Its presence
    * is the capability, as `onDropFile`'s is: every empty file field then
-   * offers "Choose from your team's files", and a list of files offers it for
+   * offers "Pick from your team's files", and a list of files offers it for
    * several at once. The choice is written as `{ url, filename }`, exactly as
    * an upload's result is. Its `renderGlyph`, when given, draws each row's
    * glyph in the sheet. See docs/sources.md.

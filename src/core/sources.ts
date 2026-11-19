@@ -87,15 +87,43 @@ export interface FileSourcePage {
 }
 
 /**
+ * What a file field asks a source's `recent` for: the few files it offers as
+ * one-click chips in its empty drop zone, before anyone opens the picker.
+ */
+export interface FileSourceRecentQuery {
+  /** Which of Mine and Everyone the picker would open on: the source's `initialScope`. */
+  scope: FileSourceScope;
+  /**
+   * The MIME types the field accepts, as `FileSourceQuery.mediaTypes`: the
+   * answer must hold only files of these types.
+   */
+  mediaTypes: readonly string[];
+  /** The most files the field shows; an answer holding more is cut to it. */
+  limit: number;
+  /** Aborted when the answer is no longer wanted: the field filled or unmounted. */
+  signal: AbortSignal;
+}
+
+/**
  * Where a file field can take a file the host already stores. When a form has
- * one, every file field offers "Choose from your team's files", and a list of
- * files offers it for several at once.
+ * one, every empty file field offers "Pick from your team's files", and a list
+ * of files offers it for several at once.
  */
 export interface FileSource {
   /** Lists one page of files for a query. Rejecting shows the failure with Try again. */
   list: (query: FileSourceQuery) => Promise<FileSourcePage>;
   /** Which of Mine and Everyone the picker opens on. */
   initialScope: FileSourceScope;
+  /**
+   * The person's most recent files of the field's types, newest first, which
+   * an empty single file field offers as one-click chips in its drop zone.
+   * Optional, and read once per empty field as it shows, so a host gives it
+   * only where that read is cheap; without it the zone offers the picker
+   * alone. Rejecting, or answering nothing, shows no chips and says nothing:
+   * the picker is still there. Declared as a method, as `./react`'s
+   * `renderGlyph` is, so a source typed over its own rows is accepted.
+   */
+  recent?(query: FileSourceRecentQuery): Promise<readonly SourceFile[]>;
 }
 
 /** One example of a method: a name and the inputs a run of it sends. */

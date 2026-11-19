@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`FileSource.recent` and recent files in the drop zone**: a file source may answer `recent({ scope, mediaTypes, limit, signal })` with the person's newest files of the field's types, and an empty single file field that can upload then offers up to three of them as one-click chips inside its drop zone, writing a chip's file as a pick from the sheet does. Optional: without it, or when it rejects or answers nothing, the zone offers the picker alone. `FilePickerSource<F>` declares it over the host's own rows, and the core entry exports `FileSourceRecentQuery`. See `docs/sources.md`.
+- **Replace on an attached file's card, and the file's size**: the card says the file's type and size when the control knows them (a file it took itself, or one chosen from a source row that carried a size), and offers Replace, a menu of "Upload a new file" and the team's files when the field has both, or the one way it has. Replace's device dialog is a one-off input that never enters the page, so a field holds one file input, and only while it is empty. See `docs/upload-seam.md`.
+- **`FieldStrings` gains `recentFiles`, `recentFileAria`, `replaceFile`, `replaceFileAria` and `replaceWithUpload` (Breaking)**: in English and French; a host spelling the whole set must supply them.
+
+### Changed
+
+- **One drop zone for an empty file field (Breaking)**: a field that can upload shows a single dashed zone that says "Drop a file here or click to choose one", names its formats and, when the form has a file source, holds "Pick from your team's files" as a link inside it, in place of the full-width row under the zone. A field that cannot upload keeps the row. `dropOrBrowse`, `chooseFromSource`, `chooseFromSourceAria` and `filePickerTakes` are reworded in both locales.
+- **A single field's team-files sheet picks on a click (Breaking)**: a row is a button that writes its file and closes the sheet, the arrow keys walk the rows from the search or a row and Enter picks, and the primary button at the foot is kept only for a list's sheet, whose rows are still check boxes. The sheet's search and its Mine and Everyone switch are compact and share one line, and a row is the file's name over a short line (size, who, when), with the type said to assistive technology instead of on the line.
+
 ## [v0.39.0] - 2026-11-17
 
 ### Security

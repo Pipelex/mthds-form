@@ -152,11 +152,14 @@ export const PillWithBrand: Story = {
   },
 };
 
-/** A single document field offering the team's files. */
+/**
+ * A list of files offering the team's files: a list's sheet is the one whose
+ * rows are chosen and stay chosen, since a single field's row picks and closes.
+ */
 function TeamFilesForm() {
-  const contract = getPipeIOContract(FILES_CONTRACTS, 'files', 'one_document');
-  const descriptor = getPipeInputForm(FILES_INPUT_FORM, 'files', 'one_document');
-  if (!contract || !descriptor) throw new Error('No fixture entry for files.one_document.');
+  const contract = getPipeIOContract(FILES_CONTRACTS, 'files', 'many_files');
+  const descriptor = getPipeInputForm(FILES_INPUT_FORM, 'files', 'many_files');
+  if (!contract || !descriptor) throw new Error('No fixture entry for files.many_files.');
   const form = useMethodForm({
     descriptor,
     contract,
@@ -178,18 +181,18 @@ async function eachChosenRow(
   const canvas = within(canvasElement);
   const page = within(canvasElement.ownerDocument.body);
   const opener = () =>
-    canvas.getAllByRole('button', { name: S.chooseFromSourceAria('Attachment') });
+    canvas.getAllByRole('button', { name: S.chooseFromSourceAria('Attachments') });
   expect(opener()).toHaveLength(2);
   for (let index = 0; index < 2; index++) {
     await userEvent.click(opener()[index]!);
     const sheet = within(await page.findByRole('dialog', { name: S.filePickerTitle }));
-    const row = await sheet.findByRole('radio', { name: /INV-2291\.pdf/ });
+    const row = await sheet.findByRole('checkbox', { name: /INV-2291\.pdf/ });
     await userEvent.click(row);
     expect(row).toHaveAttribute('aria-checked', 'true');
     // `transition-colors` eases the row into its fill, and a computed style
     // read mid-transition is the colour it started from.
     await Promise.all(row.getAnimations({ subtree: true }).map((animation) => animation.finished));
-    const secondLine = row.querySelector<HTMLElement>('span.min-w-0 > span:nth-child(2)')!;
+    const secondLine = row.querySelector<HTMLElement>('[data-file-row-meta]')!;
     expect(secondLine.textContent).toContain('Uploaded by you');
     check(row, secondLine);
     await userEvent.keyboard('{Escape}');

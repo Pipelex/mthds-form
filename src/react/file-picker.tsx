@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
   type Ref,
@@ -17,6 +18,7 @@ import type {
   FileSource,
   FileSourcePage,
   FileSourceQuery,
+  FileSourceRecentQuery,
   FileSourceScope,
   SourceFile,
 } from '../core';
@@ -84,6 +86,12 @@ export interface FilePickerSource<F extends SourceFile = SourceFile> extends Fil
    * condition that is a count is the host's to turn into a boolean.
    */
   renderGlyph?(file: F): ReactNode;
+  /**
+   * The kernel's `FileSource.recent`, answering the host's own rows, which the
+   * drop zone's chips hand back to `renderGlyph` exactly as returned. A method,
+   * for the reason `renderGlyph` is one.
+   */
+  recent?(query: FileSourceRecentQuery): Promise<readonly F[]>;
 }
 
 export interface FilePickerEntryProps {
@@ -99,8 +107,10 @@ export interface FilePickerEntryProps {
 }
 
 /**
- * "Choose from your team's files": a full-width row with a folder icon, under
- * the field's own controls.
+ * "Pick from your team's files" as a full-width row with a folder icon: under
+ * a list of files, and under a field whose host stores no upload. An empty
+ * single field that can upload offers it as a link inside its drop zone
+ * instead (`./file-field`).
  */
 export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePickerEntryProps) {
   const s = useFieldStrings();
@@ -169,12 +179,15 @@ export interface FilePickerProps {
 
 /**
  * "Your team's files": a bottom sheet below 1280px and a dialog from 1280px,
- * with the field's formats named under its title, the search, the Mine and
- * Everyone switch, the rows newest first, and one primary button at the foot.
+ * with the field's formats named under its title, a compact search and a
+ * small Mine and Everyone switch on one line, and the rows newest first. A
+ * single field's row is picked by a click, or by Enter once the arrow keys
+ * reach it, which writes it and closes the sheet; a list's rows are checked,
+ * and one primary button at the foot uses them.
  *
  * Closing it, by its close button, Escape, the backdrop or a swipe down, leaves
- * the field as it was: only Use writes. The sheet's state lives in its body,
- * which mounts when it opens, so it always opens on a fresh choice.
+ * the field as it was: only a pick or Use writes. The sheet's state lives in
+ * its body, which mounts when it opens, so it always opens on a fresh choice.
  */
 export function FilePicker({
   open,
@@ -242,8 +255,9 @@ function FilePickerBody({
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<FileSourceScope>(source.initialScope);
-  // Kept by row id across every search and both scopes, in the order chosen:
-  // a choice survives a search, and Use counts what is chosen, shown or not.
+  // A list's choice, kept by row id across every search and both scopes, in
+  // the order chosen: it survives a search, and Use counts what is chosen,
+  // shown or not. A single field's sheet keeps none: a press picks.
   const [chosen, setChosen] = useState<ReadonlyMap<string, SourceFile>>(new Map());
 
   useEffect(() => {
@@ -266,7 +280,6 @@ function FilePickerBody({
     maxChoices === undefined || chosenFilesAdded(held, files) <= maxChoices;
   const toggle = (file: SourceFile) =>
     setChosen((previous) => {
-      if (!multiple) return previous.has(file.id) ? previous : new Map([[file.id, file]]);
       const next = new Map(previous);
       if (next.has(file.id)) next.delete(file.id);
       else if (fits([...next.values(), file])) next.set(file.id, file);
@@ -286,20 +299,44 @@ function FilePickerBody({
 
   const status = pickerStatus(s, pages, query, scope, labels);
 
+  // A single field's row is a pick: it writes the file and closes the sheet.
+  const pick = (file: SourceFile) => {
+    onUse([file]);
+    onClose();
+  };
+
+  // The arrow keys walk the rows, from the search or from anywhere else in the
+  // sheet that does not take them itself (the switch moves between its two
+  // choices with them, and marks the key as handled). Enter on a row is the
+  // row's own button press.
+  const rowsRef = useRef<HTMLDivElement>(null);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented) return;
+    const rows = [
+      ...(rowsRef.current?.querySelectorAll<HTMLButtonElement>('[data-file-row]:enabled') ?? []),
+    ];
+    if (rows.length === 0) return;
+    const at = rows.indexOf(event.target as HTMLButtonElement);
+    const next = nextRow(event.key, at, rows.length);
+    if (next === null) return;
+    event.preventDefault();
+    rows[next]?.focus();
+  };
+
   return (
-    <>
+    <div className="contents" onKeyDown={onKeyDown}>
       <SheetHeader onDrag={onDrag} onClose={onClose}>
-        <DialogTitle className="text-[20px]">{s.filePickerTitle}</DialogTitle>
+        <DialogTitle className="text-[18px]">{s.filePickerTitle}</DialogTitle>
         <DialogDescription>{s.filePickerTakes(labels)}</DialogDescription>
       </SheetHeader>
 
-      <div className="space-y-2 px-4 pb-3">
-        <div className="relative">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+        <div className="relative min-w-48 flex-1">
           <label htmlFor={searchId} className="sr-only">
             {s.filePickerSearch}
           </label>
           <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
           />
           <input
@@ -314,8 +351,10 @@ function FilePickerBody({
             }}
             placeholder={s.filePickerSearchPlaceholder}
             autoComplete="off"
+            // 16px on a phone, below which a phone's browser zooms the page
+            // into the field as it takes focus.
             className={cn(
-              'h-11 w-full rounded-md border border-border bg-input pr-3 pl-9 text-[16px] text-foreground placeholder:text-muted-foreground',
+              'h-11 w-full rounded-md border border-border bg-input pr-3 pl-8 text-[16px] text-foreground placeholder:text-muted-foreground sm:h-9 sm:text-[14px]',
               focusOutlineClass,
             )}
           />
@@ -329,12 +368,18 @@ function FilePickerBody({
             if (value === 'mine' || value === 'everyone') setScope(value);
           }}
           aria-label={s.filePickerScope}
-          className="grid grid-cols-2 gap-1 rounded-md border border-border p-1"
+          className="flex shrink-0 gap-0.5 rounded-md border border-border p-0.5"
         >
-          <ToggleGroupItem value="mine" className="h-11 w-full text-[15px]">
+          <ToggleGroupItem
+            value="mine"
+            className="h-10 min-w-0 px-3 text-[13px] sm:h-[30px] sm:px-2.5"
+          >
             {s.filePickerMine}
           </ToggleGroupItem>
-          <ToggleGroupItem value="everyone" className="h-11 w-full text-[15px]">
+          <ToggleGroupItem
+            value="everyone"
+            className="h-10 min-w-0 px-3 text-[13px] sm:h-[30px] sm:px-2.5"
+          >
             {s.filePickerEveryone}
           </ToggleGroupItem>
         </ToggleGroup>
@@ -379,7 +424,8 @@ function FilePickerBody({
           <>
             {pages.items.length > 0 && (
               <div
-                role={multiple ? 'group' : 'radiogroup'}
+                ref={rowsRef}
+                role="group"
                 aria-label={s.filePickerTitle}
                 className="divide-y divide-border"
               >
@@ -391,10 +437,14 @@ function FilePickerBody({
                       file={file}
                       formats={formats}
                       glyph={source.renderGlyph?.(file)}
-                      role={multiple ? 'checkbox' : 'radio'}
-                      chosen={isChosen}
-                      disabled={!isChosen && !fits([...choices, file])}
-                      onToggle={() => toggle(file)}
+                      {...(multiple
+                        ? {
+                            mode: 'check' as const,
+                            chosen: isChosen,
+                            disabled: !isChosen && !fits([...choices, file]),
+                            onPress: () => toggle(file),
+                          }
+                        : { mode: 'pick' as const, onPress: () => pick(file) })}
                     />
                   );
                 })}
@@ -405,21 +455,45 @@ function FilePickerBody({
         )}
       </div>
 
-      <div className="border-t border-border px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={use}
-          disabled={choices.length === 0}
-          className={cn(
-            'flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-[16px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50',
-            focusOutlineClass,
-          )}
-        >
-          <span className="truncate">{s.filePickerUse(choices.length, choices[0]?.name)}</span>
-        </button>
-      </div>
-    </>
+      {multiple && (
+        <div className="border-t border-border px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={use}
+            disabled={choices.length === 0}
+            className={cn(
+              'flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-[16px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-[14px]',
+              focusOutlineClass,
+            )}
+          >
+            <span className="truncate">{s.filePickerUse(choices.length, choices[0]?.name)}</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
+}
+
+/**
+ * Where an arrow key moves focus among `count` rows from the row at `at` (`-1`
+ * when focus is outside the rows), or `null` for a key the rows do not take.
+ * Down from outside the rows goes to the first; up from outside them does
+ * nothing, so the search's own caret keys are left alone.
+ */
+export function nextRow(key: string, at: number, count: number): number | null {
+  const last = count - 1;
+  switch (key) {
+    case 'ArrowDown':
+      return at < 0 ? 0 : Math.min(at + 1, last);
+    case 'ArrowUp':
+      return at < 0 ? null : Math.max(at - 1, 0);
+    case 'Home':
+      return at < 0 ? null : 0;
+    case 'End':
+      return at < 0 ? null : last;
+    default:
+      return null;
+  }
 }
 
 /** What the sheet's one status line announces about the list. */
@@ -485,7 +559,7 @@ function SheetHeader({
 
   return (
     <div
-      className="touch-none px-4 pt-2 pb-3 select-none"
+      className="touch-none px-4 pt-2 pb-2 select-none"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
@@ -496,11 +570,11 @@ function SheetHeader({
         className="mx-auto mb-2 block h-1.5 w-12 rounded-full bg-muted-foreground/40 xl:hidden"
       />
       <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1 space-y-1 pt-1">{children}</div>
+        <div className="min-w-0 flex-1 space-y-0.5 pt-1">{children}</div>
         <DialogClose
           aria-label={s.close}
           className={cn(
-            'flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+            'flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-9',
             focusOutlineClass,
           )}
         >
@@ -518,14 +592,13 @@ function rowFormat(file: SourceFile, formats: readonly FileFormat[]): FileFormat
 }
 
 /**
- * The row's second line: "Test file" first for a test file, then the type (the
- * host's word for it, else the format's label), the size, where the file came
- * from and when, each part only when known.
+ * The row's second line, kept short: "Test file" first for a test file, then
+ * the size, where the file came from and when, each part only when known. The
+ * type is the glyph's to show, and is said to assistive technology on its own
+ * (`rowType`), so it does not lengthen the line a person reads.
  */
-function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefined): string {
+function rowMeta(s: FieldStrings, file: SourceFile): string {
   const parts: string[] = [];
-  const type = file.typeLabel || format?.label;
-  if (type) parts.push(type);
   if (file.size !== undefined) parts.push(s.fileSize(file.size));
   if (file.origin) parts.push(file.origin);
   if (file.createdAt) {
@@ -535,62 +608,72 @@ function rowMeta(s: FieldStrings, file: SourceFile, format: FileFormat | undefin
   return parts.join(' · ');
 }
 
+/** The row's type in words: the host's word for it, else the format's label. */
+function rowType(file: SourceFile, format: FileFormat | undefined): string | undefined {
+  return file.typeLabel || format?.label || undefined;
+}
+
+/** What a row does when pressed: picks its file, or checks it in a list's sheet. */
+type FileRowAction =
+  | { mode: 'pick'; onPress: () => void }
+  | { mode: 'check'; chosen: boolean; disabled: boolean; onPress: () => void };
+
 /**
- * One file: a tap target of at least 64px holding the file's glyph, its name
- * and its second line. The glyph is the host's when its source draws one
- * (`glyph`), wrapped so it keeps its own size and stays decorative, and
- * otherwise the kernel's outline of a picture or a document, chosen by the
- * row's format. A chosen row shows the kernel's selected fill
- * (`--selected`) and a check, and says so with `aria-checked`, so the choice is
- * never shown by the fill alone. The fill, the check and the second line all
- * key on that one attribute (the row is the `group` its children read), so
- * none of them can disagree with what the row says: the fill outranks the
- * neutral hover fill and stays under the pointer that chose it, and the second
- * line turns to `--foreground` on it, as a pressed toggle's text does, where
- * `--muted-foreground` would fall below 4.5:1.
+ * One file: a tap target of at least 64px on a phone and 56px from `sm`,
+ * holding the file's glyph, its name, prominent, and its short second line.
+ * The glyph is the host's when its source draws one (`glyph`), wrapped so it
+ * keeps its own size and stays decorative, and otherwise the kernel's outline
+ * of a picture or a document, chosen by the row's format; the type is said to
+ * assistive technology in words, since the glyph is hidden from it.
+ *
+ * In a single field's sheet the row is a button that picks its file. In a
+ * list's sheet it is a check box: a chosen row shows the kernel's selected
+ * fill (`--selected`) and a check, and says so with `aria-checked`, so the
+ * choice is never shown by the fill alone. The fill, the check and the second
+ * line all key on that one attribute (the row is the `group` its children
+ * read), so none of them can disagree with what the row says, and the second
+ * line turns to `--foreground` on it, where `--muted-foreground` would fall
+ * below 4.5:1.
  */
 function FileRow({
   file,
   formats,
   glyph,
-  role,
-  chosen,
-  disabled,
-  onToggle,
+  ...action
 }: {
   file: SourceFile;
   formats: readonly FileFormat[];
   /** What the host's `renderGlyph` drew for the row; what draws nothing keeps the kernel's glyph. */
   glyph: ReactNode;
-  role: 'radio' | 'checkbox';
-  chosen: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}) {
+} & FileRowAction) {
   const s = useFieldStrings();
   const format = rowFormat(file, formats);
   const isImage = format?.mimeType.startsWith('image/') ?? false;
-  const meta = rowMeta(s, file, format);
+  const meta = rowMeta(s, file);
+  const type = rowType(file, format);
   const Glyph = isImage ? ImageIcon : FileText;
+  const checking = action.mode === 'check';
   return (
     <button
       type="button"
-      role={role}
-      aria-checked={chosen}
-      disabled={disabled}
-      onClick={onToggle}
+      data-file-row=""
+      {...(checking
+        ? { role: 'checkbox', 'aria-checked': action.chosen, disabled: action.disabled }
+        : {})}
+      onClick={action.onPress}
       className={cn(
-        'group flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50',
+        'group flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-14',
         focusOutlineInsetClass,
         selectedCheckedFillClass,
       )}
     >
       {drawsNothing(glyph) ? (
-        <Glyph
-          className="size-6 shrink-0 text-muted-foreground"
-          strokeWidth={1.5}
+        <span
           aria-hidden="true"
-        />
+          className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"
+        >
+          <Glyph className="size-5 text-muted-foreground" strokeWidth={1.5} />
+        </span>
       ) : (
         // `flex` so an inline glyph sits on no text baseline, `shrink-0` so a
         // long name never narrows it; the size is the glyph's own.
@@ -599,9 +682,21 @@ function FileRow({
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] font-medium text-foreground">{file.name}</span>
+        <span className="block truncate text-[15px] font-medium text-foreground">
+          {file.name}
+          {/* The type in words, for assistive technology, which the glyph is
+              hidden from: inside the name's line, so the name reads "INV.pdf,
+              PDF" with no break before the comma, and ended by one when the
+              second line follows. */}
+          {type && (
+            <span className="sr-only">{`, ${type}${meta || file.kind === 'test' ? ',' : ''}`}</span>
+          )}
+        </span>{' '}
         {(file.kind === 'test' || meta) && (
-          <span className="block truncate text-[13px] text-muted-foreground group-aria-checked:text-foreground">
+          <span
+            data-file-row-meta=""
+            className="block truncate text-[12px] text-muted-foreground group-aria-checked:text-foreground"
+          >
             {file.kind === 'test' && (
               <span className="text-foreground">
                 {s.testFile}
@@ -612,10 +707,12 @@ function FileRow({
           </span>
         )}
       </span>
-      <Check
-        className="invisible size-5 shrink-0 text-foreground group-aria-checked:visible"
-        aria-hidden="true"
-      />
+      {checking && (
+        <Check
+          className="invisible size-5 shrink-0 text-foreground group-aria-checked:visible"
+          aria-hidden="true"
+        />
+      )}
     </button>
   );
 }

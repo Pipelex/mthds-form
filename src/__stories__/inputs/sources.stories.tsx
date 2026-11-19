@@ -27,11 +27,11 @@ import {
   type FilesAnswer,
   type TeamFile,
 } from '../host-sources';
-import { atWidth, pinnedTo } from '../touch-target';
+import { atWidth, expectEveryTouchTarget, pinnedTo } from '../touch-target';
 
 /**
  * The two host seams beside the upload: a team's files, which every empty file
- * field offers under "Choose from your team's files", and a method's examples,
+ * field offers in its drop zone as "Pick from your team's files", and a method's examples,
  * which the form offers as "Fill with an example". Each story names the one
  * state it shows.
  *
@@ -50,6 +50,8 @@ interface SourcesStoryProps {
   files?: FilesAnswer;
   /** Where the file source opens. */
   initialScope?: 'mine' | 'everyone';
+  /** Whether the file source reads its recent files, which an empty field offers as chips. */
+  recent?: boolean;
   /** The media types a host narrows the form's files to. */
   narrowTo?: string[];
   /**
@@ -128,6 +130,7 @@ function SourcesStory({
   pipeCode,
   files,
   initialScope = 'everyone',
+  recent = false,
   narrowTo,
   rows = 'kernel',
   examples,
@@ -150,7 +153,7 @@ function SourcesStory({
       : undefined,
     fileSource: files
       ? {
-          ...fileSourceOf(files, initialScope, rows),
+          ...fileSourceOf(files, initialScope, rows, recent),
           renderGlyph:
             rows === 'host' ? (file: TeamFile) => <HostGlyph format={file.format} /> : undefined,
         }
@@ -238,60 +241,181 @@ async function openExamples(canvasElement: HTMLElement) {
   });
 }
 
+/** Every theme pane's demo, light first: a story that acts in both, so both show the result. */
+function panes(canvasElement: HTMLElement) {
+  return [...canvasElement.querySelectorAll<HTMLElement>('[data-sources-demo]')].map((demo) =>
+    within(demo),
+  );
+}
+
 /**
- * **A file field with the team's files.** Under the dropzone and the link,
- * "Choose from your team's files" is a full-width row. Without a file source
- * the row is not there at all: `Inputs/Files/Document` is the same field
- * without one.
+ * **An empty field: one drop zone.** The zone says to drop a file or click,
+ * names the formats, and holds the link to the team's files under a dashed
+ * rule, inside the same area; there is no second button under it. Without a
+ * file source the link is not there at all: `Inputs/Files/Document` is the
+ * same field without one.
  */
 export const FileFieldWithTeamFiles: Story = {
-  name: 'A file field with the team’s files',
+  name: 'An empty field, one drop zone',
   args: { pipeCode: 'one_document', files: 'team' },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    // Two of each: two theme panes.
-    await expect(
-      canvas.getAllByRole('button', { name: S.chooseFromSourceAria('Attachment') }),
-    ).toHaveLength(2);
+    for (const demo of panes(canvasElement)) {
+      const link = demo.getByRole('button', { name: S.chooseFromSourceAria('Attachment') });
+      await expect(link).toHaveTextContent(S.chooseFromSource);
+      const zone = demo.getByText(S.dropOrBrowse).closest('.border-dashed');
+      await expect(zone).toContainElement(link);
+    }
   },
 };
 
 /**
- * **The team's files, open on a PDF-only field, one file chosen.** The line
- * under the title names what the field takes, so the list holds no image. The
- * chosen row has the selected fill and a check, and the button names the file.
- * Left open so the accessibility check reads the sheet.
+ * **Recent files as chips.** A source that reads its recent files gives an
+ * empty field's zone its newest three of the field's types as one-click
+ * chips, above the link to all of them. On a PDF-only field the team's
+ * pictures are not offered.
+ */
+export const RecentFiles: Story = {
+  name: 'An empty field with recent files',
+  args: {
+    pipeCode: 'one_document',
+    files: 'team',
+    recent: true,
+    narrowTo: ['application/pdf'],
+  },
+  play: async ({ canvasElement }) => {
+    for (const demo of panes(canvasElement)) {
+      const group = await demo.findByRole('group', { name: S.recentFiles });
+      const chips = within(group).getAllByRole('button');
+      await expect(chips.map((chip) => chip.textContent)).toEqual([
+        'INV-2291.pdf',
+        'contract-acme-draft.pdf',
+        'summary-q3.pdf',
+      ]);
+    }
+  },
+};
+
+/**
+ * **Recent files on a phone.** The zone's words wrap, the chips wrap under
+ * "Recent", and every chip and the link give a finger 44 by 44 pixels.
+ */
+export const RecentFilesOnAPhone: Story = {
+  name: 'An empty field with recent files, phone',
+  ...pinnedTo('phone'),
+  args: {
+    pipeCode: 'one_document',
+    files: 'team',
+    recent: true,
+    narrowTo: ['application/pdf'],
+  },
+  play: async ({ canvasElement }) => {
+    await atWidth('phone');
+    for (const demo of panes(canvasElement)) {
+      await demo.findByRole('group', { name: S.recentFiles });
+    }
+    for (const root of canvasElement.querySelectorAll('[data-sources-demo]')) {
+      await expectEveryTouchTarget(root);
+    }
+  },
+};
+
+/**
+ * **A file chosen**, here by a chip, in both panes: the zone gives way to the
+ * file's card, which says its name, its type and size, and offers Preview,
+ * Replace (a menu of the device and the team's files, since the field has
+ * both) and Remove.
+ */
+export const FileChosen: Story = {
+  name: 'A file chosen, with Replace and Remove',
+  args: {
+    pipeCode: 'one_document',
+    files: 'team',
+    recent: true,
+    narrowTo: ['application/pdf'],
+  },
+  play: async ({ canvasElement }) => {
+    for (const demo of panes(canvasElement)) {
+      await userEvent.click(
+        await demo.findByRole('button', { name: S.recentFileAria('INV-2291.pdf', 'Attachment') }),
+      );
+      await expect(await demo.findByText('PDF · 340 KB')).toBeVisible();
+      await expect(
+        demo.getByRole('button', { name: S.replaceFileAria('Attachment') }),
+      ).toBeVisible();
+      await expect(demo.getByRole('button', { name: S.removeFileAria })).toBeVisible();
+    }
+  },
+};
+
+/**
+ * **The team's files, on Mine.** A runner's sheet opens on their own files:
+ * the title, a short line naming the field's formats, then the compact search
+ * and the small Mine and Everyone switch on one line, and the rows, newest
+ * first, each the file's name over a short line (size, who, when). There is
+ * no button at the foot: a click on a row picks it. Left open so the
+ * accessibility check reads the sheet.
  */
 export const TeamFilesOpen: Story = {
-  name: 'The team’s files, one chosen',
-  args: { pipeCode: 'one_document', files: 'team', narrowTo: ['application/pdf'] },
+  name: 'The team’s files, Mine',
+  args: {
+    pipeCode: 'one_document',
+    files: 'team',
+    initialScope: 'mine',
+    narrowTo: ['application/pdf'],
+  },
   play: async ({ canvasElement }) => {
     const dialog = within(await openTeamFiles(canvasElement, 'Attachment'));
     await expect(dialog.getByText(S.filePickerTakes(['PDF']))).toBeVisible();
-    const row = await dialog.findByRole('radio', { name: /INV-2291\.pdf/ });
-    await expect(dialog.queryByText('receipt-scan.png')).toBeNull();
-    await userEvent.click(row);
-    await expect(row).toHaveAttribute('aria-checked', 'true');
-    await expect(dialog.getByRole('button', { name: 'Use INV-2291.pdf' })).toBeEnabled();
+    await expect(dialog.getByRole('radio', { name: S.filePickerMine })).toHaveAttribute(
+      'data-state',
+      'on',
+    );
+    const row = await dialog.findByRole('button', { name: /^INV-2291\.pdf/ });
+    await expect(row).toHaveTextContent('340 KB · Uploaded by you');
+    await expect(dialog.queryByText('INV-2288.pdf')).toBeNull();
+    await expect(dialog.queryByRole('button', { name: S.filePickerUse(0, undefined) })).toBeNull();
   },
 };
 
 /**
- * **The team's files in the host's words and glyphs.** The host says each
- * row's type in its own words (`typeLabel`: "PDF document", "Picture") where
- * the kernel says the format's label, and draws each row's glyph
- * (`renderGlyph`) as its own list of files does, a 40px tile, where the kernel
- * draws a 24px outline. The glyph is hidden from assistive technology, so a
- * row is still named by its file. Left open so the accessibility check reads
- * the sheet.
+ * **The team's files, on Everyone.** The switch moved: the whole team's files
+ * of the field's formats, Ana's among them. Left open so the accessibility
+ * check reads the sheet.
+ */
+export const TeamFilesEveryone: Story = {
+  name: 'The team’s files, Everyone',
+  args: {
+    pipeCode: 'one_document',
+    files: 'team',
+    initialScope: 'mine',
+    narrowTo: ['application/pdf'],
+  },
+  play: async ({ canvasElement }) => {
+    const dialog = within(await openTeamFiles(canvasElement, 'Attachment'));
+    await dialog.findByRole('button', { name: /^INV-2291\.pdf/ });
+    await userEvent.click(dialog.getByRole('radio', { name: S.filePickerEveryone }));
+    await expect(await dialog.findByRole('button', { name: /^INV-2288\.pdf/ })).toHaveTextContent(
+      'Uploaded by Ana',
+    );
+  },
+};
+
+/**
+ * **The team's files in the host's words and glyphs.** The host draws each
+ * row's glyph (`renderGlyph`) as its own list of files does, a 40px tile,
+ * where the kernel draws a document's or a picture's outline on a 36px tile,
+ * and says each row's type in its own words (`typeLabel`: "PDF document") to
+ * assistive technology, where the kernel says the format's label. The glyph
+ * is hidden from assistive technology, so a row is still named by its file.
+ * Left open so the accessibility check reads the sheet.
  */
 export const TeamFilesInTheHostsLook: Story = {
   name: 'The team’s files, in the host’s words and glyphs',
   args: { pipeCode: 'one_document', files: 'team', narrowTo: ['application/pdf'], rows: 'host' },
   play: async ({ canvasElement }) => {
     const dialog = within(await openTeamFiles(canvasElement, 'Attachment'));
-    const row = await dialog.findByRole('radio', { name: /^INV-2291\.pdf/ });
-    await expect(row).toHaveTextContent('PDF document · 340 KB');
+    const row = await dialog.findByRole('button', { name: /^INV-2291\.pdf\s?, PDF document/ });
+    await expect(row).toHaveTextContent('340 KB');
     const glyph = row.querySelector<HTMLElement>('[data-host-glyph]');
     await expect(glyph).not.toBeNull();
     await expect(Math.round(glyph?.getBoundingClientRect().width ?? 0)).toBe(40);
@@ -299,17 +423,16 @@ export const TeamFilesInTheHostsLook: Story = {
 };
 
 /**
- * **Using a file.** The sheet closes and the field holds the file, written as
- * `{url, filename}` exactly as an upload writes it; the row goes with the
- * empty state, as the dropzone does.
+ * **Picking a file.** A click on a row writes it and closes the sheet; the
+ * field holds the file, written as `{url, filename}` exactly as an upload
+ * writes it, and the zone goes with the empty state.
  */
 export const UseATeamFile: Story = {
-  name: 'Use a team file',
+  name: 'Pick a team file',
   args: { pipeCode: 'one_document', files: 'team' },
   play: async ({ canvasElement }) => {
     const dialog = within(await openTeamFiles(canvasElement, 'Attachment'));
-    await userEvent.click(await dialog.findByRole('radio', { name: /contract-acme-draft\.pdf/ }));
-    await userEvent.click(dialog.getByRole('button', { name: 'Use contract-acme-draft.pdf' }));
+    await userEvent.click(await dialog.findByRole('button', { name: /^contract-acme-draft\.pdf/ }));
     await waitFor(() =>
       expect(pane(canvasElement).getByTestId('sources-values').textContent).toContain(
         'pipelex-storage://team/assets/contract-acme-draft.pdf',
@@ -373,7 +496,7 @@ export const NoMatch: Story = {
   args: { pipeCode: 'one_document', files: 'team' },
   play: async ({ canvasElement }) => {
     const dialog = within(await openTeamFiles(canvasElement, 'Attachment'));
-    await dialog.findByRole('radio', { name: /INV-2291\.pdf/ });
+    await dialog.findByRole('button', { name: /^INV-2291\.pdf/ });
     await userEvent.type(dialog.getByLabelText(S.filePickerSearch), 'zzz');
     await expect(
       await dialog.findByRole('button', { name: S.filePickerClearSearch }),

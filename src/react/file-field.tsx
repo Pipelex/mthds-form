@@ -1,10 +1,22 @@
 'use client';
 
 import { shownAsOptional } from '../core/readiness';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
-import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
+import {
+  ChevronDown,
+  Eye,
+  EyeOff,
+  FileText,
+  Folder,
+  ImageIcon,
+  ImageOff,
+  Link2,
+  Loader2,
+  Upload,
+  X,
+} from 'lucide-react';
+import { focusOutlineClass, focusWithinOutlineClass, linkTextClass } from './role-tokens';
 import { cn, isThenable, storedUrlOf } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
@@ -18,7 +30,7 @@ import {
 } from '../core/file-formats';
 import { viewableUrl } from '../core/native-content';
 import { takesPhotos } from '../core/photo-file';
-import { sourceFileValue } from '../core/sources';
+import { sourceFileValue, type SourceFile } from '../core/sources';
 import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
 import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
@@ -28,6 +40,13 @@ import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
 import { CameraInput, TakePhotoButton } from './photo-camera';
+import { RecentFileChips, useRecentFiles } from './recent-files';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import { PhotoPageStrip } from './photo-page-strip';
 import { usePhotoPages } from './photo-pages';
 
@@ -101,9 +120,10 @@ interface FileFieldProps {
   resolveUrl?: (uri: string) => Promise<string | null>;
   /**
    * Where the field can take a file the host already stores. When given, the
-   * empty field offers "Choose from your team's files" under its own controls,
-   * and the chosen file is written through `onChange` as `{ url, filename }`,
-   * the value an upload writes. See docs/sources.md.
+   * empty field's drop zone offers "Pick from your team's files", and its
+   * recent files as chips when the source reads them (`recent`), and the
+   * chosen file is written through `onChange` as `{ url, filename }`, the
+   * value an upload writes. See docs/sources.md.
    */
   fileSource?: FilePickerSource;
   error?: string;
@@ -175,6 +195,8 @@ function dataUrlMime(url: string): string | undefined {
 interface LocalPreview {
   objectUrl: string;
   type: string;
+  /** The dropped file's size in bytes, which the attached file's card says. */
+  size: number;
   /**
    * Whether the host's `onDropFile` handed back its upload and that promise
    * has not settled yet. While it has not, the control waits for its answer
@@ -281,9 +303,16 @@ function FileField({
   const localUrlRef = useRef<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   // The attached file's card, where focus goes after a file is chosen, and the
-  // row that opened the sheet, where it goes back otherwise.
+  // control that opened the sheet, where it goes back otherwise: the zone's
+  // link or the row under the field while it is empty, Replace once it holds
+  // a file.
   const cardRef = useRef<HTMLDivElement>(null);
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
+  const replaceRef = useRef<HTMLButtonElement>(null);
+  // What the file a person chose from the host's files is known to weigh, by
+  // the address it was written at: a value holds no size, so the card says
+  // one only for the file it was chosen as, never for another written later.
+  const [chosenSize, setChosenSize] = useState<{ url: string; size: number } | null>(null);
 
   const setLocal = useCallback((next: LocalPreview | null) => {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
@@ -361,7 +390,12 @@ function FileField({
   const track = useCallback(
     (file: File, upload: unknown, heldUrl: string | undefined) => {
       const awaitingUpload = isThenable(upload);
-      setLocal({ objectUrl: URL.createObjectURL(file), type: file.type, awaitingUpload });
+      setLocal({
+        objectUrl: URL.createObjectURL(file),
+        type: file.type,
+        size: file.size,
+        awaitingUpload,
+      });
       urlInFlight.current = heldUrl;
       flightSeen.current = false;
       if (!awaitingUpload) return;
@@ -521,6 +555,29 @@ function FileField({
     },
   });
 
+  // Replace's way to the device's own file dialog. The zone's input is gone
+  // with the empty state, so a one-off input is made for the press and never
+  // enters the page: the field keeps one file input, and only while it is
+  // empty. It is clicked inside the press that asked for it, which is what a
+  // browser requires of a file dialog, and what it takes goes the way of a
+  // dropped file, refused when it is of another type.
+  const chooseFromDevice = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = Object.entries(accept)
+      .flatMap(([mimeType, extensions]) => [mimeType, ...extensions])
+      .join(',');
+    input.addEventListener(
+      'change',
+      () => {
+        const file = input.files?.[0];
+        if (file) handleFile(file);
+      },
+      { once: true },
+    );
+    input.click();
+  }, [accept, handleFile]);
+
   const { discard: discardPhotos } = photos;
   const clear = useCallback(() => {
     discardPhotos();
@@ -536,12 +593,13 @@ function FileField({
   // and like a typed link it leaves any earlier upload behind: the preview of a
   // dropped file, a refusal, a failure on screen.
   const chooseFromSource = useCallback(
-    (file: Parameters<typeof sourceFileValue>[0]) => {
+    (file: SourceFile) => {
       forgetPhotoRefusal();
       setLocal(null);
       setResolved(null);
       setRejected(null);
       dismissUploadError();
+      setChosenSize(file.size === undefined ? null : { url: file.url, size: file.size });
       onChange(sourceFileValue(file));
     },
     [forgetPhotoRefusal, setLocal, onChange, dismissUploadError],
@@ -618,6 +676,16 @@ function FileField({
 
   const hasFile = !!value?.url;
   const localType = localIsCurrent ? localPreview?.type : undefined;
+  // What the attached file weighs, when this control knows it: the file it
+  // took itself, or the one chosen from the host's files.
+  const fileSize = localIsCurrent
+    ? localPreview?.size
+    : chosenSize !== null && chosenSize.url === value?.url
+      ? chosenSize.size
+      : undefined;
+  // The host's recent files of this field's formats, offered as chips in the
+  // empty drop zone, read while the zone shows and the field can upload.
+  const recentFiles = useRecentFiles(fileSource, formats, canUpload && !hasFile && !photos.held);
   // Sniffed SEPARATELY, because they used to be concatenated into one string
   // and tested with `/\.pdf(\?|$)/i` - so a filename's extension was always
   // followed by a space and could never match. Only a URL that carried its own
@@ -817,6 +885,16 @@ function FileField({
             canPreview={canPreview}
             previewOpen={previewOpen}
             onTogglePreview={togglePreview}
+            size={fileSize}
+            replace={
+              <ReplaceControl
+                ref={replaceRef}
+                label={label}
+                disabled={busy}
+                onUpload={canUpload ? chooseFromDevice : undefined}
+                onPick={canChoose ? () => setPickerOpen(true) : undefined}
+              />
+            }
           />
           {previewOpen &&
             (previewSrc && isImage ? (
@@ -894,11 +972,46 @@ function FileField({
             <>
               <Upload className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />
               <div className="space-y-0.5">
-                <p className="text-[13px] text-foreground">
+                <p className="text-[14px] text-foreground">
                   {isDragActive ? s.dropToUpload : s.dropOrBrowse}
                 </p>
                 {hint && <p className={smallPrintClass(isApp)}>{hint}</p>}
               </div>
+              {/* The host's files, inside the same zone: its recent ones as
+                  one-click chips, and the link that opens all of them. Each
+                  is a button that keeps its press, so the device's file
+                  dialog behind it does not open too. */}
+              {fileSource && !isDragActive && (
+                <div className="mt-1 flex w-full flex-col items-center gap-2 border-t border-dashed border-border pt-3">
+                  <RecentFileChips
+                    files={recentFiles}
+                    formats={formats}
+                    label={label}
+                    disabled={busy}
+                    onPick={chooseFromSource}
+                  />
+                  <button
+                    ref={pickerEntryRef}
+                    type="button"
+                    disabled={busy}
+                    aria-haspopup="dialog"
+                    aria-label={s.chooseFromSourceAria(label)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPickerOpen(true);
+                    }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-sm text-[13px] font-medium underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11',
+                      linkTextClass,
+                      focusOutlineClass,
+                      'focus-visible:outline-offset-2',
+                    )}
+                  >
+                    <Folder className="size-3.5 shrink-0" aria-hidden="true" />
+                    {s.chooseFromSource}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1019,10 +1132,11 @@ function FileField({
         )
       )}
 
-      {/* The host's files: a way in beside the upload and the link, offered
-          while the field holds no file, as the dropzone is, and shut while a
-          file is arriving, as every other way in is. */}
-      {fileSource && !hasFile && !photos.held && (
+      {/* The host's files, for a field with no drop zone to offer them in:
+          a way in beside the link, or the only one. Offered while the field
+          holds no file, and shut while a file is arriving, as every other way
+          in is. A field that can upload offers them inside its zone. */}
+      {fileSource && !canUpload && !hasFile && !photos.held && (
         <FilePickerEntry
           ref={pickerEntryRef}
           id={choosingOnly ? domId : undefined}
@@ -1043,7 +1157,7 @@ function FileField({
           }}
           onUpload={canUpload ? openFileDialog : undefined}
           disabled={busy}
-          returnFocusTo={pickerEntryRef}
+          returnFocusTo={hasFile ? replaceRef : pickerEntryRef}
           // The row that opened the sheet is gone once a file is chosen, so
           // focus lands on the card that replaced it rather than on nothing.
           onCloseAutoFocus={(event) => {
@@ -1113,9 +1227,10 @@ function PdfPreview({ src }: { src: string }) {
  *   them as it is (`isReadableLink`).
  * - Any other reference - a `pipelex-storage://` URI above all - is an address
  *   only the host can resolve. In `app` it is replaced by the format the
- *   filename's extension names, when that is one of the slot's formats, and by
- *   nothing otherwise: the person who just chose the file has no use for its
- *   storage address, and printing it is how one reached an end user's screen.
+ *   filename's extension names, when that is one of the slot's formats, and
+ *   the file's size when the control knows it, and by nothing otherwise: the
+ *   person who just chose the file has no use for its storage address, and
+ *   printing it is how one reached an end user's screen.
  * - In `studio` that reference stays printed, because a builder may need it.
  */
 function fileChipSubtitle(
@@ -1124,12 +1239,17 @@ function fileChipSubtitle(
   formats: readonly FileFormat[],
   presentation: FieldPresentation,
   strings: FieldStrings,
+  size: number | undefined,
 ): string | undefined {
   if (url === undefined) return undefined;
   const summary = encodedFileSummary(url, strings);
   if (summary !== undefined) return summary;
   if (presentation === 'studio' || isReadableLink(url)) return url;
-  return filename ? formatOfFilename(formats, filename)?.label : undefined;
+  const parts = [
+    filename ? formatOfFilename(formats, filename)?.label : undefined,
+    size === undefined ? undefined : strings.fileSize(size),
+  ].filter((part): part is string => !!part);
+  return parts.length > 0 ? parts.join(' · ') : undefined;
 }
 
 function FileChip({
@@ -1141,6 +1261,8 @@ function FileChip({
   canPreview,
   previewOpen,
   onTogglePreview,
+  size,
+  replace,
 }: {
   value: FileValue | undefined;
   formats: readonly FileFormat[];
@@ -1150,6 +1272,10 @@ function FileChip({
   canPreview?: boolean;
   previewOpen?: boolean;
   onTogglePreview?: () => void;
+  /** The file's size in bytes, when the control knows it. */
+  size?: number;
+  /** The card's Replace, when the field has a way to take another file. */
+  replace?: ReactNode;
 }) {
   const s = useFieldStrings();
   const url = value?.url;
@@ -1157,8 +1283,8 @@ function FileChip({
   // Memoised because a `data:` URL's summary counts the whole payload, and the
   // chip re-renders on every keystroke elsewhere in the form.
   const subtitle = useMemo(
-    () => fileChipSubtitle(url, filename, formats, presentation, s),
-    [url, filename, formats, presentation, s],
+    () => fileChipSubtitle(url, filename, formats, presentation, s, size),
+    [url, filename, formats, presentation, s, size],
   );
   // The name keeps a readable share of a narrow card. Its block never shrinks
   // below `basis-32` (about eighteen characters before the ellipsis); when the
@@ -1169,11 +1295,18 @@ function FileChip({
   // On a desktop the row holds all of it, and nothing moves.
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-input px-3 py-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
-        <FileText className="h-4 w-4 text-muted-foreground" />
+      <span
+        aria-hidden="true"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted"
+      >
+        {formatOfFilename(formats, filename ?? '')?.mimeType.startsWith('image/') ? (
+          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <FileText className="h-4 w-4 text-muted-foreground" />
+        )}
       </span>
       <div className="min-w-0 flex-1 basis-32 [contain:inline-size]">
-        <p className="truncate text-[13px] font-medium text-foreground">
+        <p className="truncate text-[14px] font-medium text-foreground">
           {value?.filename ?? s.uploadedFile}
         </p>
         {subtitle && (
@@ -1187,13 +1320,14 @@ function FileChip({
           </p>
         )}
       </div>
-      <div className="ml-auto flex shrink-0 items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {canPreview && (
           <button
             type="button"
             onClick={onTogglePreview}
             className={cn(
-              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:size-11 max-sm:justify-center max-sm:px-0',
+              cardButtonClass,
+              'max-sm:size-11 max-sm:justify-center max-sm:px-0',
               focusOutlineClass,
             )}
           >
@@ -1203,9 +1337,82 @@ function FileChip({
             <span className="max-sm:sr-only">{s.preview}</span>
           </button>
         )}
+        {replace}
         <ClearButton disabled={disabled} onClick={onClear} />
       </div>
     </div>
+  );
+}
+
+/** The look the card's Preview and Replace share: a small outlined button. */
+const cardButtonClass =
+  'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground transition-colors enabled:hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-11';
+
+/**
+ * Replace on an attached file's card: another file in this one's place, by
+ * whichever ways in the field has. With both the device's file dialog and
+ * the team's files, it is a menu of the two; with one, it is that one; with
+ * neither, it is not drawn. The file is replaced only once another is
+ * written, so a dialog or a sheet closed on nothing leaves the card as it was.
+ */
+function ReplaceControl({
+  ref,
+  label,
+  disabled,
+  onUpload,
+  onPick,
+}: {
+  ref: Ref<HTMLButtonElement>;
+  label: string;
+  disabled?: boolean;
+  onUpload?: () => void;
+  onPick?: () => void;
+}) {
+  const s = useFieldStrings();
+  // The menu hands focus back to Replace as it closes, and a sheet opened
+  // from it takes focus first, so the menu leaves focus to the sheet.
+  const pickedSheet = useRef(false);
+  if (!onUpload && !onPick) return null;
+  const trigger = (props: { onClick?: () => void; menu: boolean }) => (
+    <button
+      ref={ref}
+      type="button"
+      disabled={disabled}
+      onClick={props.onClick}
+      aria-label={s.replaceFileAria(label)}
+      className={cn(cardButtonClass, focusOutlineClass)}
+    >
+      {s.replaceFile}
+      {props.menu && <ChevronDown className="h-3 w-3" aria-hidden="true" />}
+    </button>
+  );
+  if (!onUpload || !onPick) return trigger({ onClick: onUpload ?? onPick, menu: false });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger({ menu: true })}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(event) => {
+          if (!pickedSheet.current) return;
+          pickedSheet.current = false;
+          event.preventDefault();
+        }}
+      >
+        <DropdownMenuItem onSelect={onUpload}>
+          <Upload className="size-4 text-muted-foreground" aria-hidden="true" />
+          {s.replaceWithUpload}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            pickedSheet.current = true;
+            onPick();
+          }}
+        >
+          <Folder className="size-4 text-muted-foreground" aria-hidden="true" />
+          {s.chooseFromSource}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

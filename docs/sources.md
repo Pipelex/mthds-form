@@ -2,7 +2,7 @@
 
 Beside the upload ([upload-seam.md](upload-seam.md)), a form has two more optional ways to take a value from its host, and like the upload the package performs neither itself:
 
-- **A file source** lists files the host already stores. Every empty file field then offers "Choose from your team's files", and the file chosen is written into the field exactly as an upload's result is.
+- **A file source** lists files the host already stores. Every empty file field then offers "Pick from your team's files", with the host's recent files as one-click chips when the source reads them, and the file chosen is written into the field exactly as an upload's result is.
 - **An example source** lists saved examples of the method. The form then offers "Fill with an example", which sets every value at once and never starts a run.
 
 The kernel states the shapes (`src/core/sources.ts`, exported from `.` and re-exported as types from `./react`) and applies the answers; the controls are `./react`'s, and so are `FilePickerSource`, a file source with the glyph its rows draw, and `ExamplePickerSource`, an example source with the line its rows draw under each example's name, since a rendering has no place in the headless core. Neither knows any platform's routes, records or permissions: a host maps its own lists onto these shapes. A host that gives neither seam gets the form it had before, with nothing added.
@@ -57,6 +57,7 @@ Both are read on every render, so a host may build them inline. A file source's 
 interface FileSource {
   list: (query: FileSourceQuery) => Promise<FileSourcePage>;
   initialScope: 'mine' | 'everyone';
+  recent?(query: FileSourceRecentQuery): Promise<readonly SourceFile[]>;
 }
 ```
 
@@ -88,14 +89,29 @@ A page is `{ files, nextCursor }`, the files newest first. `nextCursor` absent o
 | `createdAt` | An ISO 8601 timestamp, shown as a date ("Today, 10:42", "Yesterday", "17 Oct", or with the year when it is not this one). |
 | `origin` | Where the file came from, in the host's words ("Uploaded by Ana", "Made by Invoice check"), shown as it is. |
 
-The row's second line joins what is known, in that order: "Test file · PDF · 340 KB · Uploaded by Ana · 14 Mar 2025", where "PDF" is the host's `typeLabel` when it gives one. A rejected `list` shows the failure with Try again.
+A row is the file's name, prominent, over a short second line that joins what is known, in that order: "Test file · 340 KB · Uploaded by Ana · 14 Mar 2025". The type is not on it: the glyph shows it, and the row's accessible name says it in words ("INV-2291.pdf, PDF, 340 KB · …", with the host's `typeLabel` when it gives one). A host keeps the line short by wording `origin` shortly ("You", "Ana"). A rejected `list` shows the failure with Try again.
+
+### Recent files in the drop zone
+
+`recent` is optional. Given it, an empty single file field that can upload reads it once as its drop zone shows, and again each time the field is emptied, and offers what it answers as chips inside the zone, above "Pick from your team's files": the common case, the file the person used last, then takes one click and no sheet. A chip is the file's outline and its name, cut short when it is long; its accessible name is `recentFileAria` ("Use INV-2291.pdf for Invoice"), and a press on it writes the file exactly as a pick from the sheet does.
+
+| Query field | What it is |
+| --- | --- |
+| `scope` | The source's `initialScope`, the side the sheet would open on, so the chips are the files the sheet would show first. |
+| `mediaTypes` | The field's MIME types, as in `list`: **the answer must hold only files of these types.** |
+| `limit` | The most chips the zone shows (three). An answer holding more is cut to it. |
+| `signal` | Aborted when the answer is no longer wanted: the field filled or unmounted. |
+
+The answer is the files, newest first, in the rows `list` answers with. A rejection, or an empty answer, leaves the zone without chips and says nothing, since the link to the sheet is still there. The read happens on the page's load for every empty file field, so a host gives `recent` only where that read is cheap (one request the fields share, a cache), and leaves it out otherwise: the zone then offers the link alone. The source is read through a reference, so a host that builds it inline is not asked again on every render. A list of files and a field whose host cannot upload show no chips.
+
+`FilePickerSource<F>` declares `recent` over the host's own row, as a method, for the reason `renderGlyph` is one.
 
 ### A row in the host's words and glyph
 
-By default a row says the file's type with the label of the field's format ("PNG", "JPEG") and draws a 24px outline of a picture or a document. A host whose own list of files says and draws a type differently can make the picker's rows read the same way, with two seams that change nothing when left out:
+By default a row says the file's type with the label of the field's format ("PNG", "JPEG"), to assistive technology beside the file's name, and draws an outline of a picture or a document on a 36px tile. A host whose own list of files says and draws a type differently can make the picker's rows read the same way, with two seams that change nothing when left out:
 
-- **The type word is data on the row.** `typeLabel` is the host's word for the file's type, said where the format's label would be, exactly as `origin` is the host's word for where the file came from. It belongs on the row rather than among the `FieldStrings`, because a host words its own notion of a type (a format key its records carry), which the row's media type cannot always recover, and a host's server can answer with it.
-- **The glyph is a rendering, so it is the control set's.** `FilePickerSource`, exported from `./react`, is the kernel's `FileSource` with an optional `renderGlyph(file)`, which returns the row's glyph as a React node. What it returns replaces the kernel's outline at the row's start, at the glyph's own size: the row is at least 64px tall, so a 40px tile fits without growing it, and a larger glyph grows the row. The kernel wraps it in an element hidden from assistive technology, so the row stays named by its file and its second line, which says the type in words; a glyph that spells the format ("PDF") is therefore not read twice. A row it returns what React renders nothing for keeps the kernel's outline: `null`, `undefined`, `true`, `false` or an empty string, or an array of nothing but those, an empty or a nested one included, so a `cond && <Tile />` whose condition is false, or a `.map()` over an empty list, falls back rather than leaving an empty slot. A number is drawn, `0` included, because React draws it as text, so a host whose condition is a count turns it into a boolean first.
+- **The type word is data on the row.** `typeLabel` is the host's word for the file's type, said where the format's label would be (to assistive technology, beside the name: the visible second line is kept short and leaves the type to the glyph), exactly as `origin` is the host's word for where the file came from. It belongs on the row rather than among the `FieldStrings`, because a host words its own notion of a type (a format key its records carry), which the row's media type cannot always recover, and a host's server can answer with it.
+- **The glyph is a rendering, so it is the control set's.** `FilePickerSource`, exported from `./react`, is the kernel's `FileSource` with an optional `renderGlyph(file)`, which returns the row's glyph as a React node. What it returns replaces the kernel's tile at the row's start, at the glyph's own size: the row is at least 64px tall on a phone and 56px from 640px, so a 40px tile or a real thumbnail of the file fits without growing it, and a larger glyph grows the row. The kernel wraps it in an element hidden from assistive technology, so the row stays named by its file and its second line, which says the type in words; a glyph that spells the format ("PDF") is therefore not read twice. A row it returns what React renders nothing for keeps the kernel's outline: `null`, `undefined`, `true`, `false` or an empty string, or an array of nothing but those, an empty or a nested one included, so a `cond && <Tile />` whose condition is false, or a `.map()` over an empty list, falls back rather than leaving an empty slot. A number is drawn, `0` included, because React draws it as text, so a host whose condition is a count turns it into a boolean first.
 
 Every `FileSource` is a `FilePickerSource`, so a host that draws nothing passes its source as it is, and `useMethodForm`, `FieldEnv.fileSource` and `FilePicker`'s `source` all take one. `renderGlyph` receives each row exactly as `list` returned it, and `FilePickerSource<F>` is typed over the host's own row, so a host can carry the key its glyphs are chosen by on the rows it answers with and read it back without a cast:
 
@@ -128,18 +144,22 @@ A source typed over its own row is accepted wherever a `FilePickerSource` is bec
 
 ### Where the form offers it
 
-- **An empty file field** shows "Choose from your team's files" as a full-width row under its own controls, the dropzone and the link. Like the dropzone it is there only while the field holds no file, and it is shut while a file is arriving. Its accessible name carries the field's label.
+- **An empty file field that can upload** shows "Pick from your team's files" as a link inside its one drop zone, under a dashed rule, with the recent files' chips above it when the source reads them ([upload-seam.md](upload-seam.md#one-drop-zone-and-the-attached-files-card)). Like the zone it is there only while the field holds no file, and it is shut while a file is arriving. Its accessible name carries the field's label. A press on it opens the sheet and not the device's file dialog behind it.
+- **An empty file field that cannot upload** has no zone, and shows the same words as a full-width row under its other controls.
+- **A field holding a file** offers the team's files again through Replace on its card, beside the device's dialog when it can upload.
 - **A field whose only way in is the team's files.** A file source is a way into a file value of its own, so a host may offer only the files it stores: no `onDropFile` and `allowUrl` set to `false`. The field then shows its format hint and the row, which its label names, and nothing about uploading or pasting. Without a file source, that configuration is still a host's error, and the field throws ([upload-seam.md](upload-seam.md)).
 - **A list of files** (a list whose item is a document or an image) also shows the row under Add item, and its sheet takes several files at once. The files fill the rows the person added and left empty first, then follow the last row, so a bounded list's room is its bound less the files it holds (`roomForChosenFiles`), not less its rows. A choice spends that room only on the files it adds (`chosenFilesAdded`): a file the list already holds, chosen again, takes none, and neither does a second row naming a file already chosen. The row is shut while a file is arriving anywhere in the list, as the remove buttons are, since the row that file will be written back to is still empty. Each empty row of the list still offers its own, which fills that row with whatever is chosen: the duplicate check belongs to the list's sheet, so a row's own sheet may put in a file the list already holds, as dropping or pasting the same file twice may. A list of structures that hold files has no list-level row, because a file is not a structure: each nested file field offers its own. When the host can upload, a list of files also offers a drop area for several files from the person's device, beside this row ([upload-seam.md](upload-seam.md#a-list-of-files-takes-several-files-at-once)). The area stays open while a file is arriving, because it fills only the empty rows no upload is waiting on, while this row stays shut, because the sheet cannot tell those rows apart.
 - **Upload a file**, offered when the person has no file of the field's formats, closes the sheet and opens the field's own file dialog. It is offered only where the field can upload, so the list-level sheet, which has no single field to upload into, never offers it.
 
 ### The sheet
 
-"Your team's files" is a bottom sheet below 1280px (full width, rising from the bottom edge, with a handle a touch can swipe it down by) and a dialog from 1280px, centred and at most 560px wide. Under its title a line names what the field takes ("Showing PDF files, which this input takes"), then come the search, the Mine and Everyone switch, the rows, and one primary button at the foot.
+"Your team's files" is a bottom sheet below 1280px (full width, rising from the bottom edge, with a handle a touch can swipe it down by) and a dialog from 1280px, centred and at most 560px wide. Under its title a short line names what the field takes ("PDF files"), then one line holds a compact search and a small Mine and Everyone switch, and the rows follow, newest first.
 
-A row is chosen by a tap: a single field's rows are radio buttons, a list's are check boxes. A chosen row shows the kernel's selected fill (`--selected`, [theming.md](theming.md#link-selected-and-focus)) and a check and says so with `aria-checked`. The choice is kept across searches and across the switch, so a person can search for one file, then another, and use both. The button is disabled until something is chosen, and names what it will do: "Use INV-2291.pdf", or "Use 3 files".
+**A single field's row is picked by a click.** It writes the file and closes the sheet at once; there is no button to confirm with. The arrow keys walk the rows, from the search (Down goes to the first row) or from a row (Up and Down, Home and End, without wrapping), and Enter on a row picks it, as a click does. Escape closes the sheet.
 
-Use writes the choice and closes the sheet. Closing it any other way (the close button, Escape, the backdrop, a swipe) changes nothing, and each opening starts on a fresh choice. Focus goes back to the row that opened the sheet, which `FilePicker` takes as `returnFocusTo` (without it, to whatever held focus as the sheet opened). After a file is used in a single field, focus moves to the file's card instead, since the row is gone with the empty state.
+**A list's rows are check boxes.** A chosen row shows the kernel's selected fill (`--selected`, [theming.md](theming.md#link-selected-and-focus)) and a check and says so with `aria-checked`. The choice is kept across searches and across the switch, so a person can search for one file, then another, and use both. One primary button at the foot is disabled until something is chosen, and names what it will do: "Use INV-2291.pdf", or "Use 3 files". The arrow keys walk these rows too, and Space or Enter checks one.
+
+A pick or Use writes and closes the sheet. Closing it any other way (the close button, Escape, the backdrop, a swipe) changes nothing, and each opening starts on a fresh choice. Focus goes back to what opened the sheet, which `FilePicker` takes as `returnFocusTo` (without it, to whatever held focus as the sheet opened): the zone's link, the row under a list, or Replace. After a file is written in a single field, focus moves to the file's card instead, since the empty state is gone.
 
 ### What a choice writes
 
@@ -221,7 +241,7 @@ Each list has one polite status line (`role="status"`) that announces what it sh
 
 - **`FieldEnv.fileSource`** carries the file source, a `FilePickerSource` with its glyphs when the host draws them, to every file field and list `FieldRenderer` renders, as `onDropFile` carries the upload.
 - **`<FillWithExample source fields touched onFill />`** is the example control on its own, its `source` an `ExamplePickerSource` when the host draws a line under each name. `onFill(values, example)` receives the example's values already in the controls' shape; the host sets its values to them, and passes `touched` from its own comparison (`!sameRunValues(values, lastGiven, fields)`).
-- **`FilePicker` and `FilePickerEntry`** are the sheet and its row, for a host drawing a file control of its own.
+- **`FilePicker` and `FilePickerEntry`** are the sheet and the full-width row that opens it, for a host drawing a file control of its own; the drop zone's link and chips are the file field's own.
 
 ## What stays the host's
 

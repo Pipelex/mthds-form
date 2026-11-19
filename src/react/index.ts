@@ -50,6 +50,7 @@ export type {
   FileSource,
   FileSourcePage,
   FileSourceQuery,
+  FileSourceRecentQuery,
   FileSourceScope,
   FormExample,
   SourceFile,
