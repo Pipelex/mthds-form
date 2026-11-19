@@ -313,7 +313,10 @@ export interface FieldStrings {
 
   // The file source (docs/sources.md): the row under a file field's controls
   // and the sheet it opens.
-  /** The row under a file field's own controls that opens the team's files. */
+  /**
+   * The link in an empty file field's drop zone that opens the team's files,
+   * and the row under a list of files that does the same for several.
+   */
   chooseFromSource: string;
   /**
    * That row's accessible name, given the field's label as the form shows it,
@@ -321,9 +324,27 @@ export interface FieldStrings {
    * row's visible words, which a voice-control user says to press it.
    */
   chooseFromSourceAria: (label: string) => string;
+  /** What names the row of recent files in an empty field's drop zone: "Recent". */
+  recentFiles: string;
+  /**
+   * A recent file's chip's accessible name, given the file's name and the
+   * field's label as the form shows it (empty in a list's row): "Use
+   * INV-2291.pdf for Invoice". It must contain the file's name, the chip's
+   * visible words.
+   */
+  recentFileAria: (name: string, label: string) => string;
+  /** The button on an attached file's card that puts another file in its place. */
+  replaceFile: string;
+  /**
+   * Its accessible name, given the field's label as the form shows it (empty
+   * in a list's row). It must contain `replaceFile`.
+   */
+  replaceFileAria: (label: string) => string;
+  /** Replace's choice, beside the team's files, that opens the device's own file dialog. */
+  replaceWithUpload: string;
   /** The sheet's title. */
   filePickerTitle: string;
-  /** The line under the title, given the field's formats as the hint names them (`PDF`, `JPG`). */
+  /** The short line under the title, given the field's formats as the hint names them (`PDF`, `JPG`). */
   filePickerTakes: (formats: readonly string[]) => string;
   /** The search's visually hidden label, and its placeholder. */
   filePickerSearch: string;
@@ -333,9 +354,10 @@ export interface FieldStrings {
   filePickerMine: string;
   filePickerEveryone: string;
   /**
-   * The sheet's one primary button, given how many files are chosen and, when
-   * one is, its name: "Use INV-2291.pdf", "Use 3 files", and with none chosen,
-   * the words it shows while it is disabled.
+   * A list's sheet's one primary button, given how many files are chosen and,
+   * when one is, its name: "Use INV-2291.pdf", "Use 3 files", and with none
+   * chosen, the words it shows while it is disabled. A single field's sheet
+   * has no button: a click on a row picks it.
    */
   filePickerUse: (count: number, name: string | undefined) => string;
   /** Announced while the first page is read. */

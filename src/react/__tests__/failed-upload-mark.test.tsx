@@ -142,8 +142,7 @@ describe('a file put in place of a failed upload ends its failure in the form', 
 
     await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachment') }));
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
-    await user.click(await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ }));
-    await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
+    await user.click(await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ }));
     expect(state().values.attachment).toEqual({ url: INVOICE.url, filename: 'INV-2291.pdf' });
     expect(failed()).toEqual([]);
 

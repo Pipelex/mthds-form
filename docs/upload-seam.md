@@ -30,7 +30,7 @@ The package never uploads anything. A file control takes a file from the user an
 
 A host rendering a method's whole form with `MethodForm` writes none of this by hand: it hands `useMethodForm` an `uploadFile` that stores a file and resolves to its URL, and the hook supplies `onDropFile`, tracks `uploadingIds` and `uploadErrors`, writes the result back at the field's path, and removes a list's rows itself, carrying both along with the rows. See [method-form.md](method-form.md).
 
-A third way into a file value sits beside these two: a file the host already stores, chosen from its list through `FieldEnv.fileSource` and written exactly as an upload's result is. It is optional, it is offered under the field's own controls while the field is empty, and [sources.md](sources.md) is its contract.
+A third way into a file value sits beside these two: a file the host already stores, chosen from its list through `FieldEnv.fileSource` and written exactly as an upload's result is. It is optional, it is offered inside the empty field's drop zone (or under the field, where there is no zone), and [sources.md](sources.md) is its contract.
 
 ## Which ways into a file value a host offers
 
@@ -38,14 +38,14 @@ Each way into a file value is offered exactly when the host can honour it, and e
 
 - **An upload**, offered exactly when the host supplies `onDropFile`. The presence of the callback is the capability; there is no second flag to keep in agreement with it.
 - **A link**, offered unless the host sets `allowUrl` to `false`.
-- **A stored file**, offered exactly when the form has a file source (`FieldEnv.fileSource`, [sources.md](sources.md)): "Choose from your team's files", a row under whatever else the empty field shows. It changes nothing about the upload or the link beside it.
+- **A stored file**, offered exactly when the form has a file source (`FieldEnv.fileSource`, [sources.md](sources.md)): "Pick from your team's files", a link inside the empty field's drop zone, with the host's recent files as one-click chips above it when the source reads them, or a row under the field when the host cannot upload and there is no zone. It changes nothing about the upload or the link beside it.
 - **Several files at once**, on a list of files, offered exactly when the host supplies `onDropFile`: a drop area of the list's own, under its rows, which hands each file to the host as if it had been dropped on its row ([below](#a-list-of-files-takes-several-files-at-once)). It is the upload, taken several files at a time: a host whose `onDropFile` returns its upload owes nothing more, and one whose `onDropFile` returns nothing reports `uploadingIds`, as it already must for the preview.
 - **A photo**, on a touch screen, offered exactly when the host supplies `onDropFile` and the input takes photos (a document input accepting PDF, an image input accepting JPEG): "Take photo" under the dropzone, which photographs a document page by page into one PDF, or an image input's one photo, and stores the file through `onDropFile` like a dropped one. It is the upload again, with a file the control made; a host owes it nothing more, and may supply `onPreparingFile` ([below](#a-file-being-made-is-an-upload-in-flight)). See [camera.md](camera.md).
 
 | `onDropFile` | `allowUrl` | What the control renders | With a `fileSource` as well |
 | --- | --- | --- | --- |
-| supplied | absent or `true` | The dropzone, and the "Paste a link instead" toggle under it. | The same, and the team's files under them. |
-| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. | The dropzone, and the team's files under it. |
+| supplied | absent or `true` | The dropzone, and the "Paste a link instead" toggle under it. | The same, with the team's files inside the dropzone. |
+| supplied | `false` | The dropzone alone. No toggle and no link input, ever, including while a file is attached. | The dropzone, with the team's files inside it. |
 | absent | absent or `true` | **Link only.** No dropzone and no file picker. The link input is already open, above it one line saying a file cannot be uploaded here and a link to it can be pasted instead (`uploadUnavailable`), and under that line the slot's format hint, because the link still has to point at a file the runtime can read. | The same, and the team's files under them. |
 | absent | `false` | **A host's configuration error**: the control throws while rendering, naming the field's id path. | **The team's files only**, the one way in left, which is not an error. |
 
@@ -248,6 +248,14 @@ Timing alone could not be made exact, which is why the upload's answer is part o
 A reset that writes a file while an upload is still in flight is, for an upload that returns nothing, the one case the field cannot tell from that upload's success, so `MethodForm` remounts its fields on every reset ([method-form.md](method-form.md)), and a host rendering its own fields keys them by `resets` the same way.
 
 Without that binding the object URL won unconditionally and was cleared only by the control's own clear button, so a host writing a different file at the same path (a "use this sample" shortcut, a reset, a value restored from elsewhere) got a chip naming the new file over a preview showing the old one. The upload's answer is what makes the adoption exact, and `uploadingIds` what makes it close without one; a host that reports neither falls back to "the first URL to appear", which for an empty field dropped into is the same moment.
+
+## One drop zone, and the attached file's card
+
+An empty field that can upload shows one dashed zone, and everything that puts a file into the field from there is inside it: what to do in plain words ("Drop a file here or click to choose one"), the formats it takes, and, under a dashed rule, the host's recent files as chips and "Pick from your team's files" when the form has a file source. A press anywhere in the zone opens the device's file dialog, as a drop on it uploads, except on a chip or the link, which keep their press: a chip writes its file, the link opens the team's files. There is no second full-width button under the zone competing with it.
+
+Once the field holds a file, the zone gives way to the file's card: its name, then its type and its size when the control knows it (a file it took itself, or one chosen from the host's files, whose row carried a size; a value holds no size, so a file another writer put there shows its type alone), and Preview, Replace and Remove. Replace offers whichever other ways in the field has: the device's file dialog and the team's files as a small menu when it has both, the one it has as a plain button otherwise, and nothing when a link is the only way in, where the link input already replaces the file. The file is replaced only when another is written, so a dialog or a sheet closed on nothing leaves the card as it was.
+
+Replace's dialog is opened through a one-off `<input type="file">` made for the press and never added to the page, clicked inside that press as a browser requires of a file dialog. So a field holds one file input, the zone's, and only while it is empty: a host or a test that counts a form's file inputs as its empty file fields keeps that meaning. What the dialog takes goes the way a dropped file goes, refused when it is of another type.
 
 ## Accessibility of the dropzone
 

@@ -89,7 +89,7 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   fieldsCount: (count) => `${count} ${plural(count, 'champ', 'champs')}`,
   uploading: 'Envoi en cours…',
   dropToUpload: 'Déposez pour envoyer',
-  dropOrBrowse: 'Choisissez un fichier ou déposez-le ici',
+  dropOrBrowse: 'Déposez un fichier ici ou cliquez pour en choisir un',
   pasteUrlInstead: 'Collez plutôt un lien',
   uploadUnavailable: 'Impossible d’envoyer un fichier ici. Collez plutôt un lien vers le fichier.',
   urlPlaceholder: 'https://…',
@@ -197,14 +197,18 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   photoNotKept: 'Cette photo n’a pas pu être gardée. Reprenez-la ou retirez-la.',
   photoPagesChip: (name, count) => `${name} · ${count} ${plural(count, 'page', 'pages')}`,
   photoChip: (name) => `${name} · photo`,
-  chooseFromSource: 'Choisir parmi les fichiers de l’équipe',
+  chooseFromSource: 'Choisir dans les fichiers de l’équipe',
   chooseFromSourceAria: (label) =>
     label
-      ? `Choisir parmi les fichiers de l’équipe pour ${label}`
-      : 'Choisir parmi les fichiers de l’équipe',
+      ? `Choisir dans les fichiers de l’équipe pour ${label}`
+      : 'Choisir dans les fichiers de l’équipe',
+  recentFiles: 'Récents',
+  recentFileAria: (name, label) => (label ? `Utiliser ${name} pour ${label}` : `Utiliser ${name}`),
+  replaceFile: 'Remplacer',
+  replaceFileAria: (label) => (label ? `Remplacer le fichier de ${label}` : 'Remplacer le fichier'),
+  replaceWithUpload: 'Envoyer un nouveau fichier',
   filePickerTitle: 'Les fichiers de l’équipe',
-  filePickerTakes: (formats) =>
-    `Fichiers ${AND.format(formats)} uniquement, ceux que cette entrée accepte`,
+  filePickerTakes: (formats) => `Fichiers ${OR.format(formats)}`,
   filePickerSearch: 'Rechercher des fichiers',
   filePickerSearchPlaceholder: 'Rechercher par nom',
   filePickerScope: 'Quels fichiers',

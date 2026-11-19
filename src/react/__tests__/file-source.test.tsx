@@ -111,7 +111,7 @@ const openPicker = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 describe('no source, no row', () => {
-  it('offers no "Choose from your team\'s files" when the host gives no file source', () => {
+  it('offers no "Pick from your team\'s files" when the host gives no file source', () => {
     render(<Harness {...ONE_DOCUMENT} />);
     expect(screen.queryByText(S.chooseFromSource)).not.toBeInTheDocument();
   });
@@ -141,17 +141,17 @@ describe('the sheet over a single file field', () => {
     expect(source.queries[0]?.cursor).toBeUndefined();
   });
 
-  it('writes the chosen file as {url, filename}, exactly as an upload writes it', async () => {
+  it('writes the file a click picks as {url, filename}, exactly as an upload writes it, and closes', async () => {
     const user = userEvent.setup();
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([INVOICE, OLDER])} />);
     const dialog = await openPicker(user);
-    const use = within(dialog).getByRole('button', { name: S.filePickerUse(0, undefined) });
-    expect(use).toBeDisabled();
-    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
-    expect(row).toHaveAttribute('aria-checked', 'false');
+    const row = await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
+    // A single field's sheet has no button to confirm with: the row is the choice.
+    expect(
+      within(dialog).queryByRole('button', { name: S.filePickerUse(0, undefined) }),
+    ).toBeNull();
+    expect(row).not.toHaveAttribute('aria-checked');
     await user.click(row);
-    expect(row).toHaveAttribute('aria-checked', 'true');
-    await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(values().attachment).toEqual({ url: INVOICE.url, filename: 'INV-2291.pdf' });
     // The field shows the file as after an upload, and the row is gone with the empty state.
@@ -163,16 +163,13 @@ describe('the sheet over a single file field', () => {
     const user = userEvent.setup();
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([INVOICE])} />);
     let dialog = await openPicker(user);
-    await user.click(await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ }));
+    await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
     await user.click(within(dialog).getByRole('button', { name: S.close }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(values().attachment).toBeUndefined();
 
     dialog = await openPicker(user);
-    // It opens on a fresh choice: the closed sheet's choice went with it.
-    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
-    expect(row).toHaveAttribute('aria-checked', 'false');
-    await user.click(row);
+    await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(values().attachment).toBeUndefined();
@@ -182,10 +179,13 @@ describe('the sheet over a single file field', () => {
     const user = userEvent.setup();
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([INVOICE, DRAFT])} />);
     const dialog = await openPicker(user);
-    const draft = await within(dialog).findByRole('radio', { name: /contract-acme-draft\.pdf/ });
-    expect(draft).toHaveTextContent('Test file · PDF · Made by the build assistant');
-    const invoice = within(dialog).getByRole('radio', { name: /INV-2291\.pdf/ });
-    expect(invoice).toHaveTextContent('PDF · 340 KB · Uploaded by Ana · 14 Mar 2001');
+    const draft = await within(dialog).findByRole('button', { name: /^contract-acme-draft\.pdf/ });
+    expect(draft).toHaveTextContent('Test file · Made by the build assistant');
+    const invoice = within(dialog).getByRole('button', { name: /^INV-2291\.pdf/ });
+    // The line is short: the size, who and when. The type is the glyph's,
+    // and is said to assistive technology in words beside the name.
+    expect(invoice).toHaveTextContent('340 KB · Uploaded by Ana · 14 Mar 2001');
+    expect(invoice).toHaveAccessibleName(/^INV-2291\.pdf, PDF, 340 KB/);
     expect(invoice).not.toHaveTextContent(S.testFile);
   });
 
@@ -381,8 +381,7 @@ describe('a field whose only way in is the team’s files', () => {
     expect(screen.queryByText(S.uploadUnavailable)).toBeNull();
     expect(screen.queryByRole('textbox')).toBeNull();
     const dialog = await openPicker(user);
-    await user.click(await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ }));
-    await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
+    await user.click(await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ }));
     expect(values().attachment).toEqual({ url: INVOICE.url, filename: 'INV-2291.pdf' });
   });
 });
@@ -520,7 +519,7 @@ describe('a form held shut while the sheet is open', () => {
     const source = sourceOf([INVOICE]);
     const { rerender } = render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
     const dialog = await openPicker(user);
-    await user.click(await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ }));
+    await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
     rerender(<Harness {...ONE_DOCUMENT} fileSource={source} disabled />);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(values().attachment).toBeUndefined();
@@ -634,8 +633,10 @@ describe('a row in the host’s words and glyph', () => {
     const user = userEvent.setup();
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([INVOICE])} />);
     const dialog = await openPicker(user);
-    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
-    expect(row).toHaveTextContent('PDF · 340 KB · Uploaded by Ana · 14 Mar 2001');
+    const row = await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
+    expect(row).toHaveAccessibleName(
+      /^INV-2291\.pdf, PDF, 340 KB · Uploaded by Ana · 14 Mar 2001$/,
+    );
     expect(row.querySelector('svg.lucide-file-text')).not.toBeNull();
     expect(row.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
   });
@@ -647,10 +648,10 @@ describe('a row in the host’s words and glyph', () => {
     const unworded: SourceFile = { ...OLDER, size: 301_056, typeLabel: '' };
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([worded, unworded])} />);
     const dialog = await openPicker(user);
-    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
-    expect(row).toHaveTextContent('PDF document · 340 KB · Uploaded by Ana · 14 Mar 2001');
-    expect(within(dialog).getByRole('radio', { name: /INV-2288\.pdf/ })).toHaveTextContent(
-      'PDF · 294 KB',
+    const row = await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
+    expect(row).toHaveAccessibleName(/^INV-2291\.pdf, PDF document, 340 KB/);
+    expect(within(dialog).getByRole('button', { name: /^INV-2288\.pdf/ })).toHaveAccessibleName(
+      /^INV-2288\.pdf, PDF, 294 KB$/,
     );
   });
 
@@ -664,7 +665,7 @@ describe('a row in the host’s words and glyph', () => {
     const source = hostSource([pdf, scan, draft, note, count]);
     render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
     const dialog = await openPicker(user);
-    const row = await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
+    const row = await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
     const glyph = within(row).getByTestId('glyph-fl_1');
     // Its own size, inside a wrapper that sets none, and hidden from assistive
     // technology: the row is still named by its file, not by the tile's "PDF".
@@ -675,13 +676,13 @@ describe('a row in the host’s words and glyph', () => {
     expect(source.drawn).toContain(pdf);
     // A row the host draws nothing for keeps the kernel's glyph, whatever the
     // nothing is: `null`, the `false` of a `cond && <Tile />`, or `''`.
-    for (const name of [/INV-2288\.pdf/, /contract-acme-draft\.pdf/, /notes\.pdf/]) {
-      const other = within(dialog).getByRole('radio', { name });
+    for (const name of [/^INV-2288\.pdf/, /^contract-acme-draft\.pdf/, /^notes\.pdf/]) {
+      const other = within(dialog).getByRole('button', { name });
       expect(other.querySelector('svg.lucide-file-text')).not.toBeNull();
       expect(other.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
     }
     // `0` is drawn, as React draws it, so it is the host's glyph and not a fallback.
-    const tally = within(dialog).getByRole('radio', { name: /tally\.pdf/ });
+    const tally = within(dialog).getByRole('button', { name: /tally\.pdf/ });
     expect(tally.querySelector('[data-slot="file-row-glyph"]')).toHaveTextContent('0');
     expect(tally.querySelector('svg.lucide-file-text')).toBeNull();
   });
@@ -704,13 +705,13 @@ describe('a row in the host’s words and glyph', () => {
     };
     render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
     const dialog = await openPicker(user);
-    await within(dialog).findByRole('radio', { name: /INV-2291\.pdf/ });
-    for (const name of [/INV-2291\.pdf/, /INV-2288\.pdf/, /contract-acme-draft\.pdf/]) {
-      const row = within(dialog).getByRole('radio', { name });
+    await within(dialog).findByRole('button', { name: /^INV-2291\.pdf/ });
+    for (const name of [/^INV-2291\.pdf/, /^INV-2288\.pdf/, /^contract-acme-draft\.pdf/]) {
+      const row = within(dialog).getByRole('button', { name });
       expect(row.querySelector('svg.lucide-file-text')).not.toBeNull();
       expect(row.querySelector('[data-slot="file-row-glyph"]')).toBeNull();
     }
-    const drawn = within(dialog).getByRole('radio', { name: /tally\.pdf/ });
+    const drawn = within(dialog).getByRole('button', { name: /tally\.pdf/ });
     expect(drawn.querySelector('[data-slot="file-row-glyph"]')).toHaveTextContent('0');
     expect(drawn.querySelector('svg.lucide-file-text')).toBeNull();
   });

@@ -133,29 +133,51 @@ const TYPE_WORDS: Record<TeamFile['format'], string> = {
   image: 'Picture',
 };
 
+/** The team's files of `mediaTypes` on `scope`'s side, newest first, named by `search`. */
+function teamFilesFor(
+  answer: FilesAnswer,
+  scope: 'mine' | 'everyone',
+  mediaTypes: readonly string[],
+  search: string,
+): TeamFile[] {
+  const needle = search.toLowerCase();
+  return (answer === 'team' ? TEAM_FILES : []).filter(
+    (file) =>
+      (scope === 'everyone' || file.mine) &&
+      (mediaTypes.length === 0 || mediaTypes.includes(file.mediaType ?? '')) &&
+      file.name.toLowerCase().includes(needle),
+  );
+}
+
 /**
  * The team's files as a source answers with them. `words` is whose words say
  * a row's type: the kernel's (the format's label, "PDF") or the host's own
- * (`typeLabel`, "PDF document"). The glyph a host draws is a rendering, so a
- * story adds `renderGlyph` itself.
+ * (`typeLabel`, "PDF document"). `recent` gives the source the read an empty
+ * field's drop zone offers its chips from: the newest files on the source's
+ * own side of the switch. The glyph a host draws is a rendering, so a story
+ * adds `renderGlyph` itself.
  */
 export function fileSourceOf(
   answer: FilesAnswer,
   initialScope: 'mine' | 'everyone',
   words: 'kernel' | 'host' = 'kernel',
+  recent = false,
 ): FilePickerSource<TeamFile> {
   return {
     initialScope,
+    ...(recent
+      ? {
+          recent: async ({ scope, mediaTypes, limit }) => {
+            if (answer === 'waiting') return new Promise<never>(() => undefined);
+            if (answer === 'failure') throw new Error('The host could not list its files.');
+            return teamFilesFor(answer, scope, mediaTypes, '').slice(0, limit);
+          },
+        }
+      : {}),
     list: async ({ search, scope, mediaTypes, cursor }) => {
       if (answer === 'waiting') return new Promise(() => undefined);
       if (answer === 'failure') throw new Error('The host could not list its files.');
-      const needle = search.toLowerCase();
-      const matching = (answer === 'team' ? TEAM_FILES : []).filter(
-        (file) =>
-          (scope === 'everyone' || file.mine) &&
-          (mediaTypes.length === 0 || mediaTypes.includes(file.mediaType ?? '')) &&
-          file.name.toLowerCase().includes(needle),
-      );
+      const matching = teamFilesFor(answer, scope, mediaTypes, search);
       const start = cursor === undefined ? 0 : Number(cursor);
       const end = start + PAGE_SIZE;
       const page = matching.slice(start, end);
