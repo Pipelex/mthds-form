@@ -1276,6 +1276,14 @@ function DocumentValue({
   // Open from the first render, on the server and in the browser alike, so the
   // hydration starts from the server's state.
   const [open, setOpen] = useState(true);
+  // A fold belongs to the document it folded: another document rendered here
+  // opens again, adjusted during render so it never paints a frame closed.
+  const documentKey = readDocumentContent(value)?.url ?? null;
+  const [openFor, setOpenFor] = useState(documentKey);
+  if (openFor !== documentKey) {
+    setOpenFor(documentKey);
+    setOpen(true);
+  }
   const file = useStuffFile('document', value);
   const content = readDocumentContent(value);
   if (!content) return <Absent />;
