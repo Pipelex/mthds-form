@@ -1,0 +1,47 @@
+src/react/file-name-dialog.tsx
+  s_05a530b5d83b6b::t_4e6458b2042014 1-205
+  s_05a530b5d83b6b::t_1ef0669d6de92b 206-207
+src/react/__tests__/file-name-dialog.test.tsx
+  s_05a530b5d83b6b::t_00b8549fc0bcfa 1-301
+  s_05a530b5d83b6b::t_ee08b76689951c 302-316
+CHANGELOG.md
+  s_05a530b5d83b6b::t_88c85db2dd6c82 7,17
+docs/result-view.md
+  s_05a530b5d83b6b::t_e45e0b5fb293dd 239,245-260
+src/__stories__/outputs/downloads.stories.tsx
+  s_05a530b5d83b6b::t_c4c1cb60da280c 168-221
+src/core/__tests__/save-plan.test.ts
+  s_05a530b5d83b6b::t_9fa9638fb8a786 4,324-356
+src/core/save-plan.ts
+  s_05a530b5d83b6b::t_53c06a91d2a342 322-328,334-378
+src/react/field-strings.tsx
+  s_05a530b5d83b6b::t_fded3f3cfb5279 138-145
+src/react/locales/en.ts
+  s_05a530b5d83b6b::t_7e4d6a4c1ae240 58-60
+src/react/locales/fr.ts
+  s_05a530b5d83b6b::t_eb6ad27ed53221 97-99
+src/react/pdf-download-button.tsx
+  s_05a530b5d83b6b::t_dfb6c693ffedc6 7,54,58-63,70,76-82,123
+src/react/result-env.tsx
+  s_05a530b5d83b6b::t_581218a2794afe 118-129,207,210,218,221,305-309
+src/react/result-field.tsx
+  s_05a530b5d83b6b::t_78a0ec38c17c0a 21,52,611,642-648,651-655,679
+src/react/stuff-viewer.tsx
+  s_05a530b5d83b6b::t_5ee4c11cc1a5b9 8,24,353,362-385,408,448
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bd09633b3282a78c929682136a06d98ede2718c7",
+  "prompts": {},
+  "sessions": {
+    "s_05a530b5d83b6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a8010b7-8d27-4d36-9005-09d2ad4a427c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

@@ -1,0 +1,65 @@
+src/react/object-field.tsx
+  s_7b61f68dac8b45::t_6deeb574f71c14 7-13,16,20,25-26,36-43,51-53,64,68-73,77-82,84,93-105,113-129,131-140
+src/core/__tests__/presence-switch.test.ts
+  s_7b61f68dac8b45::t_276415f257fbe0 1-168
+  s_7b61f68dac8b45::t_47727eac71762e 169
+src/core/seed.ts
+  s_7b61f68dac8b45::t_fe0168ebaa3dcb 1-58
+src/react/__tests__/presence-switch.test.tsx
+  s_7b61f68dac8b45::t_3fe156b7365e28 1-138
+  s_7b61f68dac8b45::t_c36479968108de 139-147
+CHANGELOG.md
+  s_7b61f68dac8b45::t_b7387fdee2737a 3-17
+data/structures/structured.mthds
+  s_7b61f68dac8b45::t_e17d97b88ceb29 44-58
+data/structures/structured.slots.json
+  s_7b61f68dac8b45::t_359b3ec5caba0a 54-67
+docs/architecture.md
+  s_7b61f68dac8b45::t_2188e16c623e04 41-42,109-116
+docs/generative-ui.md
+  s_7b61f68dac8b45::t_4d42f1c4d9d2dd 91,122
+src/__stories__/__tests__/generative.test.ts
+  s_7b61f68dac8b45::t_210b7b1c359e20 25-26
+src/__stories__/_generated/structured.ts
+  s_7b61f68dac8b45::t_398f0f4abf5b65 18,781-920,1410-1490,1545-1553,1573-1574
+src/__stories__/inputs/nesting.stories.tsx
+  s_7b61f68dac8b45::t_7dd3a8fb7905dc 77-99
+src/core/__tests__/gate-agreement.test.ts
+  s_7b61f68dac8b45::t_2d72394eae5026 223-290,480-489,659-732
+src/core/index.ts
+  s_7b61f68dac8b45::t_72ccbb433c8a64 136-137,140,144-150
+src/core/readiness.ts
+  s_7b61f68dac8b45::t_823d4325eb0d93 6,121-134,250-293
+src/generative/__tests__/brief.test.ts
+  s_7b61f68dac8b45::t_94259c60f6e4ce 5,132-140,152-156
+src/generative/brief.ts
+  s_7b61f68dac8b45::t_6a637ac564f4df 188-189,235-240
+src/generative/index.ts
+  s_7b61f68dac8b45::t_85f2b56642a9e1 96-99
+src/react/__tests__/object-field.test.tsx
+  s_7b61f68dac8b45::t_df092b3eaf3f03 56
+src/react/field-strings.tsx
+  s_7b61f68dac8b45::t_6a5e90c9480b43 146-151
+src/react/list-field.tsx
+  s_7b61f68dac8b45::t_36a2a37f9337a1 180-189
+src/react/locales/en.ts
+  s_7b61f68dac8b45::t_77e972b8b39662 66
+src/react/locales/fr.ts
+  s_7b61f68dac8b45::t_7a84f4eef863e5 107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "49f2283ea8744aa68ed69950d88c40fc3581b9cb",
+  "prompts": {},
+  "sessions": {
+    "s_7b61f68dac8b45": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01cbf814-d9bf-403a-82ea-cc89f8ec84f8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

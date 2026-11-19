@@ -1,0 +1,45 @@
+src/react/markup-storage.ts
+  s_05a530b5d83b6b::t_f8382915b5ff19 1-374
+  s_05a530b5d83b6b::t_7ac359b39e1b4d 375-391
+src/react/__tests__/markup-storage.test.tsx
+  s_05a530b5d83b6b::t_8b47de441aafe1 1-268
+  s_05a530b5d83b6b::t_450fd102879fe4 269-272
+CHANGELOG.md
+  s_05a530b5d83b6b::t_e0a2071af2acd3 7,18
+docs/result-view.md
+  s_05a530b5d83b6b::t_eac76d4f1e82f7 205,364-389,404
+docs/upload-seam.md
+  s_05a530b5d83b6b::t_47291274979474 137-138
+src/__stories__/outputs/html-page.stories.tsx
+  s_05a530b5d83b6b::t_22df8e8fa4249c 8,10,496-578
+src/react/field-strings.tsx
+  s_05a530b5d83b6b::t_2b5267868ed6af 133-137
+src/react/html-preview.tsx
+  s_05a530b5d83b6b::t_1f30e7078d1674 3-4,6,14-23,160,163-172,183,194,200,246-257,291-354
+src/react/index.ts
+  s_05a530b5d83b6b::t_6ad28eb4b6d9a5 52-58,80-84
+src/react/locales/en.ts
+  s_05a530b5d83b6b::t_0e44b3e8cafe8f 57
+src/react/locales/fr.ts
+  s_05a530b5d83b6b::t_ed7d15ec5935d3 96
+src/react/pdf-download-button.tsx
+  s_05a530b5d83b6b::t_99bd6f2ff5ef55 9-10,34-36,53,73-78
+src/react/result-env.tsx
+  s_05a530b5d83b6b::t_55117d6986fd7a 7,10-11,137-157,201,210-219,278-286,304-306,310-311,314-324
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "647361ddf10f36208cf2622a1edaee4ea8ecd67a",
+  "prompts": {},
+  "sessions": {
+    "s_05a530b5d83b6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a8010b7-8d27-4d36-9005-09d2ad4a427c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

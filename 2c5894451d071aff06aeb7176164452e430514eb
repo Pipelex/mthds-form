@@ -1,0 +1,26 @@
+src/core/__tests__/values.test.ts
+  s_05a530b5d83b6b::t_9106fae5577795 600-703
+src/core/values.ts
+  s_05a530b5d83b6b::t_a2521deeddc671 148-153
+  s_05a530b5d83b6b::t_64ec105780c366 23,154
+CHANGELOG.md
+  s_05a530b5d83b6b::t_a92922f8c3d2e0 20
+docs/architecture.md
+  s_05a530b5d83b6b::t_a92922f8c3d2e0 119-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2c5894451d071aff06aeb7176164452e430514eb",
+  "prompts": {},
+  "sessions": {
+    "s_05a530b5d83b6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a8010b7-8d27-4d36-9005-09d2ad4a427c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}

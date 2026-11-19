@@ -1,0 +1,41 @@
+CHANGELOG.md
+  s_19015810651d9c::t_37ccf3b0e3112a 7,12
+docs/architecture.md
+  s_7b61f68dac8b45::t_5441e804a7afac 113
+docs/generative-ui.md
+  s_19015810651d9c::t_0ed0865ca990bc 91,122
+src/core/__tests__/presence-switch.test.ts
+  s_7b61f68dac8b45::t_35609fd97f769d 52-55,58-67,69-77,107-108,111-117
+src/core/seed.ts
+  s_7b61f68dac8b45::t_391dd1150453c9 23-28,35-36,50-51
+src/generative/__tests__/brief.test.ts
+  s_7b61f68dac8b45::t_20e13f99eabb07 132-134,153,155
+src/generative/brief.ts
+  s_19015810651d9c::t_cdb9b56ced97b2 188,234
+src/react/__tests__/presence-switch.test.tsx
+  s_19015810651d9c::t_d43a41793a9e58 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "155b14adaa6cf285f058a68cab66a32446133270",
+  "prompts": {},
+  "sessions": {
+    "s_19015810651d9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7c8fe5d-9da1-4ed6-80d4-812084259a9f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    },
+    "s_7b61f68dac8b45": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01cbf814-d9bf-403a-82ea-cc89f8ec84f8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+README.md
+  s_4233f74ffb8da3::t_ed22867835aa43 61,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "90d0cfd96c61939105573308352d075690c51e91",
+  "prompts": {},
+  "sessions": {
+    "s_4233f74ffb8da3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd6031ed-45ff-4580-a468-dd77621e2581",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

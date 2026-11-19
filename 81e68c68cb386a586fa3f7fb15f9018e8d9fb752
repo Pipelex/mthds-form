@@ -1,0 +1,67 @@
+src/react/list-field.tsx
+  s_b36cf49ef24ded::t_39215f638692cc 80-85
+src/core/descriptor.ts
+  s_b36cf49ef24ded::t_6f78392e5241bb 115-116,122-127,131-140
+src/react/file-field.tsx
+  s_b36cf49ef24ded::t_c895ff9e126e2a 148
+  s_b36cf49ef24ded::t_60c7edfa16edda 107-111
+  s_b36cf49ef24ded::t_cec1ef670f6cd3 201-210,217-222,225
+CHANGELOG.md
+  s_b36cf49ef24ded::t_599e21c51337c8 19-21,33-35,43,52-53,59
+src/react/__tests__/file-field.test.tsx
+  s_b36cf49ef24ded::t_199d6ace089a8d 214
+  s_b36cf49ef24ded::t_eaeff8cee54e94 12,252,256-257,262,279,283
+  s_b36cf49ef24ded::t_73910c8d0d1b8c 196-213,215-251,253-255,258-261,263-278,280-282,284-286
+src/core/derive.ts
+  s_b36cf49ef24ded::t_585a4769d7c0fe 114-118,120-127
+src/core/readiness.ts
+  s_b36cf49ef24ded::t_347680a07afb9f 119-126
+docs/run-gate.md
+  s_b36cf49ef24ded::t_e1e550ed5e6abf 40,59-60
+docs/contract-mirror.md
+  s_b36cf49ef24ded::t_c589dbbbda8d46 46-48
+src/react/object-field.tsx
+  s_b36cf49ef24ded::t_084fd0d42ea81a 6,38-43,46,80
+src/core/__tests__/gate-agreement.test.ts
+  s_b36cf49ef24ded::t_947563b5968967 282-298
+  s_b36cf49ef24ded::t_b1de50de391fba 339,346-350
+  s_b36cf49ef24ded::t_ba355bc7961465 340-345
+  s_b36cf49ef24ded::t_a74f77c8fdc140 114-140
+  s_b36cf49ef24ded::t_da6fc0fd99f153 170-172
+src/core/__tests__/gate.test.ts
+  s_b36cf49ef24ded::t_a6104d4d8aa4ca 266-282,287-291,293,300-302,304-314
+  s_b36cf49ef24ded::t_96f8e770ed09f9 625-627,630,634
+  s_b36cf49ef24ded::t_9e8e6e6e73decb 283-286,292,294-299,303
+src/react/__tests__/object-field.test.tsx
+  s_b36cf49ef24ded::t_a7c1ef1b88ae70 1-87
+src/core/gate.ts
+  s_b36cf49ef24ded::t_e3f5afd9b514be 285-296,298
+src/react/__tests__/list-field.test.tsx
+  s_b36cf49ef24ded::t_14219d1542eb88 137-146
+  s_b36cf49ef24ded::t_b10c6fd3f44c02 121,127
+  s_b36cf49ef24ded::t_648dfdbc1eabe6 41-43
+wip/pr-6-review-notes.md
+  s_b36cf49ef24ded::t_490e142bfdc142 1-38
+src/core/__tests__/field-model.test.ts
+  s_b36cf49ef24ded::t_ed5604eb36690c 161-205
+docs/architecture.md
+  s_b36cf49ef24ded::t_ca0d1671ce6fed 87
+docs/upload-seam.md
+  s_b36cf49ef24ded::t_ca0d1671ce6fed 54-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "81e68c68cb386a586fa3f7fb15f9018e8d9fb752",
+  "prompts": {},
+  "sessions": {
+    "s_b36cf49ef24ded": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a628fee2-34e6-4f68-bf8a-de4037c935ec",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}

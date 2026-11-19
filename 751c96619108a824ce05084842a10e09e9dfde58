@@ -1,0 +1,21 @@
+docs/run-gate.md
+  s_d996192af55abe::t_112281c1ede0f9 58
+docs/architecture.md
+  s_d996192af55abe::t_112281c1ede0f9 81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "751c96619108a824ce05084842a10e09e9dfde58",
+  "prompts": {},
+  "sessions": {
+    "s_d996192af55abe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0a1d3bd-c9b8-4aa9-9625-ff794ad11387",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}
