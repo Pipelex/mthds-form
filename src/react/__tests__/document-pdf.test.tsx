@@ -1,13 +1,14 @@
 /**
  * A document the browser cannot render, shown as the PDF its host makes of it.
  *
- * The first half is the promise to every other host: a viewer whose host does
+ * The first part is the promise to every other host: a viewer whose host does
  * not answer draws exactly what it drew before the seam existed. The second is
- * the seam itself: the toggle, the question asked when the preview opens, and
- * each state the host can answer. The preview opens on the reader's click
- * everywhere but one place, which is the third half: the document the run
- * delivered, in `app` (the whole result, or a whole-result record's only
- * document), whose preview opens at once, so it is asked for as it mounts.
+ * the seam itself: the toggle, the question asked while the preview is open,
+ * and each state the host can answer. Every preview starts open, so the
+ * question is asked as the document mounts, and folding the preview away stops
+ * the asking. The third part is where that holds: the whole result in `app`,
+ * framed at a page's size with no toggle, and every other document, in a
+ * record, a list or `studio`, with its toggle pressed.
  */
 import { act, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -187,13 +188,19 @@ describe('a viewer whose host does not answer behaves as today', () => {
 });
 
 describe('a host that answers a PDF', () => {
-  it('offers a toggle, closed, and asks nothing until a reader opens it', async () => {
+  it('offers a toggle, pressed, and asks as it mounts; folded away, it asks nothing more', async () => {
     const { ask, resolve } = answering(READY);
     const { container } = render(viewer(resolve));
-    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    const toggle = previewToggle();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(frame(container)?.getAttribute('src')).toBe(served('contract.pdf'));
+    fireEvent.click(toggle!);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
     expect(frame(container)).toBeNull();
     await elapse(60_000);
-    expect(ask).not.toHaveBeenCalled();
+    expect(ask).toHaveBeenCalledTimes(1);
   });
 
   it('asks with the document’s own reference and what the payload declares', () => {
@@ -223,7 +230,6 @@ describe('a host that answers a PDF', () => {
   it('opens onto the PDF, framed with no referrer and no sandbox', async () => {
     const { ask, resolve } = answering(READY);
     const { container } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(ask).toHaveBeenCalledTimes(1);
     const shown = frame(container);
@@ -236,27 +242,22 @@ describe('a host that answers a PDF', () => {
   it('frames a path the host chose, as it does for a resolver', async () => {
     const { resolve } = answering({ state: 'ready', url: '/api/assets/contract.pdf' });
     const { container } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(frame(container)?.getAttribute('src')).toBe('/api/assets/contract.pdf');
   });
 
-  it('keeps the toggle on a whole result in studio, so nothing converts unasked', async () => {
+  it('opens a whole result in studio with its toggle pressed, at a toggle’s size', async () => {
     const { ask, resolve } = answering(READY);
     const { container } = render(viewer(resolve, PPTX, 'studio'));
-    await elapse(60_000);
-    expect(ask).not.toHaveBeenCalled();
-    expect(frame(container)).toBeNull();
-    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(previewToggle()!);
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
     await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
     expect(sizeOf(frame(container))).toBe('nested');
   });
 
   it('works on a document inside a larger result', async () => {
     const { resolve } = answering(READY);
     const { container } = render(viewer(resolve, { title: 'Q3', source: DOCX }, 'studio', report));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(frame(container)?.getAttribute('src')).toBe(served('contract.pdf'));
   });
@@ -269,7 +270,6 @@ describe('a host that answers a PDF', () => {
         <StuffViewer field={document('output')} value={DOCX} />
       </ResultEnvProvider>,
     );
-    fireEvent.click(previewToggle()!);
     await elapse();
     fireEvent.click(screen.getByRole('button', { name: S.downloadFile('contract.docx') }));
     await elapse();
@@ -283,7 +283,6 @@ describe('a host that answers a PDF', () => {
     setPdfViewer(false);
     const { resolve } = answering(READY);
     const { container } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(frame(container)).toBeNull();
     expect(screen.getByText(S.pdfViewerUnavailable)).toBeTruthy();
@@ -300,7 +299,6 @@ describe('while the host prepares the PDF', () => {
   it('says so at once, asks again, and frames the PDF when it is ready', async () => {
     const { ask, resolve } = answering({ state: 'preparing' }, READY);
     const { container } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(ask).toHaveBeenCalledTimes(1);
     expect(statusSaying(S.documentPdfPreparing)).toBeTruthy();
@@ -315,7 +313,6 @@ describe('while the host prepares the PDF', () => {
   it('asks less often as the wait goes on', async () => {
     const { ask, resolve } = answering({ state: 'preparing' });
     render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     await elapse(1_500);
     expect(ask).toHaveBeenCalledTimes(2);
@@ -325,10 +322,9 @@ describe('while the host prepares the PDF', () => {
     expect(ask).toHaveBeenCalledTimes(3);
   });
 
-  it('stops asking when the reader closes the preview, and asks anew when it reopens', async () => {
+  it('stops asking when the reader folds the preview away, and asks anew when it reopens', async () => {
     const { ask, resolve } = answering({ state: 'preparing' });
     render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(ask).toHaveBeenCalledTimes(1);
     fireEvent.click(previewToggle()!);
@@ -342,7 +338,6 @@ describe('while the host prepares the PDF', () => {
   it('does not restart the asking when a host hands over a new function', async () => {
     const { ask, resolve } = answering({ state: 'preparing' });
     const { rerender } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(ask).toHaveBeenCalledTimes(1);
     rerender(viewer((...args) => resolve(...args)));
@@ -353,7 +348,6 @@ describe('while the host prepares the PDF', () => {
   it('gives up after the limit, and lets the reader try again', async () => {
     const { ask, resolve } = answering({ state: 'preparing' });
     render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse(DOCUMENT_PDF_PREPARING_LIMIT_MS + 1_000);
     expect(screen.getByRole('alert').textContent).toBe(S.documentPdfFailed);
     const asked = ask.mock.calls.length;
@@ -373,7 +367,6 @@ describe('while the host prepares the PDF', () => {
         : () => Promise.resolve({ state: 'ready', url: served('second.pdf') });
     const second = { ...DOCX, url: 'pipelex-storage://org/second.docx', public_url: undefined };
     const { container, rerender } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     rerender(viewer(resolve, second));
     await elapse();
@@ -387,7 +380,6 @@ describe('when the host cannot make the PDF', () => {
   it('says so, and asks from the start on Try again', async () => {
     const { ask, resolve } = answering({ state: 'failed' }, READY);
     const { container } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(screen.getByRole('alert').textContent).toBe(S.documentPdfFailed);
     expect(frame(container)).toBeNull();
@@ -403,7 +395,6 @@ describe('when the host cannot make the PDF', () => {
   it('moves the focus to the preparing region on Try again, as the button goes away', async () => {
     const { resolve } = answering({ state: 'failed' }, { state: 'preparing' });
     render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     const tryAgain = screen.getByRole('button', { name: S.tryAgain });
     tryAgain.focus();
@@ -416,7 +407,6 @@ describe('when the host cannot make the PDF', () => {
     const { ask, resolve } = answering({ state: 'failed' }, { state: 'preparing' });
     render(viewer(resolve));
     const toggle = previewToggle()!;
-    fireEvent.click(toggle);
     await elapse();
     fireEvent.click(screen.getByRole('button', { name: S.tryAgain }));
     await elapse();
@@ -428,17 +418,20 @@ describe('when the host cannot make the PDF', () => {
     expect(focused()).toBe(toggle);
   });
 
-  it('takes the focus neither when the preview opens nor on a poll', async () => {
+  it('takes the focus neither when the preview reopens nor on a poll', async () => {
     const { ask, resolve } = answering({ state: 'preparing' });
     render(viewer(resolve));
     const toggle = previewToggle()!;
     toggle.focus();
+    // Folded away and opened again, as a reader does from the toggle.
+    fireEvent.click(toggle);
     fireEvent.click(toggle);
     await elapse();
     expect(statusSaying(S.documentPdfPreparing)).toBeTruthy();
     expect(focused()).toBe(toggle);
+    // Asked as it mounted and again as it reopened, then once more on a poll.
     await elapse(1_500);
-    expect(ask).toHaveBeenCalledTimes(2);
+    expect(ask).toHaveBeenCalledTimes(3);
     expect(focused()).toBe(toggle);
   });
 
@@ -448,7 +441,6 @@ describe('when the host cannot make the PDF', () => {
       message: 'This file is protected by a password.',
     });
     render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(screen.getByRole('alert').textContent).toBe('This file is protected by a password.');
   });
@@ -464,7 +456,6 @@ describe('when the host cannot make the PDF', () => {
     ];
     for (const ask of asks) {
       const { unmount } = render(viewer(() => ask));
-      fireEvent.click(previewToggle()!);
       await elapse();
       expect(screen.getByRole('alert').textContent).toBe(S.documentPdfFailed);
       unmount();
@@ -481,7 +472,6 @@ describe('when the host cannot make the PDF', () => {
     ['no URL', { state: 'ready' }],
   ])('says it in the package’s own words for %s', async (_, answer) => {
     const { container } = render(viewer(() => () => Promise.resolve(answer as DocumentPdfAnswer)));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(screen.getByRole('alert').textContent).toBe(S.documentPdfFailed);
     expect(screen.getByRole('button', { name: S.tryAgain })).toBeTruthy();
@@ -491,7 +481,6 @@ describe('when the host cannot make the PDF', () => {
   it('reads an ask that never answers as a failure', async () => {
     const resolve: ResolveDocumentPdf = () => () => new Promise<DocumentPdfAnswer>(() => {});
     render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse(DOCUMENT_PDF_ASK_TIMEOUT_MS - 1);
     expect(screen.queryByRole('alert')).toBeNull();
     await elapse(1);
@@ -503,7 +492,6 @@ describe('when the host has no PDF to offer', () => {
   it('says there is no preview, with nothing to try again', async () => {
     const { ask, resolve } = answering({ state: 'unavailable' });
     const { container } = render(viewer(resolve));
-    fireEvent.click(previewToggle()!);
     await elapse();
     expect(statusSaying(S.documentPdfUnavailable)).toBeTruthy();
     expect(frame(container)).toBeNull();
@@ -523,7 +511,6 @@ describe('when the host has no PDF to offer', () => {
     ]) {
       const { resolve } = answering({ state: 'ready', url });
       const { container, unmount } = render(viewer(resolve));
-      fireEvent.click(previewToggle()!);
       await elapse();
       expect(frame(container)).toBeNull();
       expect(statusSaying(S.documentPdfUnavailable)).toBeTruthy();
@@ -532,7 +519,7 @@ describe('when the host has no PDF to offer', () => {
   });
 });
 
-describe('the document the run delivered, in app', () => {
+describe('every document opens and asks as it mounts', () => {
   it('asks for the PDF of a whole-result deck as it mounts, with no toggle', async () => {
     const { ask, resolve } = answering({ state: 'preparing' }, READY);
     const { container } = render(viewer(resolve, PPTX, 'app'));
@@ -579,7 +566,7 @@ describe('the document the run delivered, in app', () => {
     expect(statusSaying(S.documentPdfPreparing)).toBeTruthy();
   });
 
-  it('asks for the PDF of a record’s lone document as it mounts, its toggle pressed', async () => {
+  it('asks for the PDF of a record’s document as it mounts, its toggle pressed', async () => {
     const { ask, resolve } = answering({ state: 'preparing' });
     render(viewer(resolve, { title: 'Q3', source: DOCX }, 'app', report));
     const toggle = previewToggle();
@@ -594,38 +581,42 @@ describe('the document the run delivered, in app', () => {
     expect(ask).toHaveBeenCalledTimes(1);
   });
 
-  it('frames a record’s lone document at a toggle’s size once ready', async () => {
+  it('frames a record’s document at a toggle’s size once ready', async () => {
     const { resolve } = answering(READY);
     const { container } = render(viewer(resolve, { title: 'Q3', source: DOCX }, 'app', report));
     await elapse();
     expect(sizeOf(frame(container))).toBe('nested');
   });
 
-  it('asks nothing of a record’s lone document in studio', async () => {
+  it('asks for the PDF of a record’s document in studio too', async () => {
     const { ask, resolve } = answering(READY);
-    render(viewer(resolve, { title: 'Q3', source: DOCX }, 'studio', report));
-    await elapse(60_000);
-    expect(ask).not.toHaveBeenCalled();
-    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    const { container } = render(viewer(resolve, { title: 'Q3', source: DOCX }, 'studio', report));
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
+    await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(frame(container)?.getAttribute('src')).toBe(served('contract.pdf'));
   });
 
-  it('asks nothing of a record holding two documents', async () => {
+  it('asks for the PDF of each document a record holds', async () => {
     const { ask, resolve } = answering(READY);
     const twoDocuments: ObjectRunField = {
       ...report,
       fields: [text('title'), document('source'), document('annex')],
     };
     render(viewer(resolve, { title: 'Q3', source: DOCX, annex: PPTX }, 'app', twoDocuments));
-    await elapse(60_000);
-    expect(ask).not.toHaveBeenCalled();
+    await elapse();
+    expect(resolve.mock.calls.map(([url]) => url)).toEqual(
+      expect.arrayContaining([DOCX.url, PPTX.url]),
+    );
+    expect(ask).toHaveBeenCalledTimes(2);
     expect(
       screen
         .getAllByRole('button', { name: S.preview })
         .map((toggle) => toggle.getAttribute('aria-expanded')),
-    ).toEqual(['false', 'false']);
+    ).toEqual(['true', 'true']);
   });
 
-  it('asks nothing of a list of one deck', async () => {
+  it('asks for the PDF of a list of one deck, its toggle pressed', async () => {
     const { ask, resolve } = answering(READY);
     render(
       inPresentation(
@@ -644,8 +635,8 @@ describe('the document the run delivered, in app', () => {
         </ResultEnvProvider>,
       ),
     );
-    await elapse(60_000);
-    expect(ask).not.toHaveBeenCalled();
-    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('false');
+    await elapse();
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(previewToggle()?.getAttribute('aria-expanded')).toBe('true');
   });
 });

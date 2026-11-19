@@ -249,8 +249,18 @@ function FileField({
   const [showUrl, setShowUrl] = useState(false);
   // The last text the link input itself wrote into the value. See `urlText`.
   const [typedUrl, setTypedUrl] = useState<string | null>(null);
-  // The preview is collapsed by default - opened on demand via a "Preview" button.
-  const [previewOpen, setPreviewOpen] = useState(false);
+  // The preview is open by default: a reader who attached a file wants to see it.
+  // The "Preview" button folds it away and opens it again.
+  const [previewOpen, setPreviewOpen] = useState(true);
+  // A fold belongs to the file it folded. Another file reaching the field, from
+  // the picker, a clear, or a host's write, opens again, adjusted during render
+  // so the new file never paints a frame closed.
+  const fileKey = value?.url ?? null;
+  const [previewFileKey, setPreviewFileKey] = useState(fileKey);
+  if (previewFileKey !== fileKey) {
+    setPreviewFileKey(fileKey);
+    setPreviewOpen(true);
+  }
   const [localPreview, setLocalPreview] = useState<LocalPreview | null>(null);
   // How a preview whose upload gave no answer (`storedUrl`) tells the upload's
   // own result from another writer's file: by when the value lands. This is the
@@ -271,8 +281,8 @@ function FileField({
   // an upload's answer that arrives after its preview was replaced, cleared or
   // retired is about a preview that no longer exists, and touches nothing.
   const localGeneration = useRef(0);
-  // Resolved lazily, only when the user opens the preview, so a closed field
-  // never fetches a presigned URL. Keyed by the URI it was resolved FROM, the
+  // Resolved while the preview is open, which it is from the start, so a field
+  // its reader folded away fetches no presigned URL. Keyed by the URI it was resolved FROM, the
   // way `LocalPreview` is bound to the value it is the preview OF - a cached
   // source with no record of its provenance is painted under whatever name the
   // value carries next. A `src` of `null` is the resolver's answer that it has
@@ -526,7 +536,6 @@ function FileField({
     discardPhotos();
     setLocal(null);
     setResolved(null);
-    setPreviewOpen(false);
     setRejected(null);
     dismissUploadError();
     onChange(undefined);
@@ -651,7 +660,9 @@ function FileField({
   // note above the `data:` arm says was fixed.
   const storageUri = value?.url && !directSrc && urlMime === undefined ? value.url : null;
   useEffect(() => {
-    if (!previewOpen || !storageUri || localIsCurrent || !resolveUrl) return;
+    // Only a file the control can paint is resolved: a signed URL for a Word
+    // file would be asked for and never used.
+    if (!previewOpen || !canPreview || !storageUri || localIsCurrent || !resolveUrl) return;
     let cancelled = false;
     void resolveUrl(storageUri)
       .then((src) => {
@@ -673,7 +684,7 @@ function FileField({
     return () => {
       cancelled = true;
     };
-  }, [previewOpen, storageUri, localIsCurrent, resolveUrl]);
+  }, [previewOpen, canPreview, storageUri, localIsCurrent, resolveUrl]);
 
   // A browser-viewable source: the local object URL, a directly-viewable URL, or
   // a resolved presigned URL for a stored file. The resolution counts only while
@@ -818,7 +829,10 @@ function FileField({
             previewOpen={previewOpen}
             onTogglePreview={togglePreview}
           />
+          {/* No frame for a file the control cannot paint: it has no Preview
+              button either, so a placeholder there could never be folded. */}
           {previewOpen &&
+            canPreview &&
             (previewSrc && isImage ? (
               <ImagePreview src={previewSrc} filename={value?.filename} />
             ) : previewSrc && isPdf ? (

@@ -274,7 +274,7 @@ describe('an upload whose place another file took while it was in flight', () =>
     expect(state().values.attachment).toEqual(HOST_FILE);
     expect(failed()).toEqual([]);
     expect(screen.queryByText(S.uploadFailed)).toBeNull();
-    await user.click(screen.getByRole('button', { name: S.preview }));
+    // The preview is open from the start, so what it paints is on the page.
     expect(paintsLocalPreview(container)).toBe(false);
   });
 
@@ -288,7 +288,7 @@ describe('an upload whose place another file took while it was in flight', () =>
 
     expect(state().values.attachment).toEqual({ url: 'stored://mine', filename: 'mine.pdf' });
     expect(failed()).toEqual([]);
-    await user.click(screen.getByRole('button', { name: S.preview }));
+    // The preview is open from the start, so what it paints is on the page.
     expect(paintsLocalPreview(container)).toBe(true);
   });
 
