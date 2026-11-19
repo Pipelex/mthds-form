@@ -113,9 +113,9 @@ const drop = (user: User) =>
     screen.getByLabelText('cv') as HTMLInputElement,
     new File(['%PDF-1.4'], 'mine.pdf', { type: 'application/pdf' }),
   );
-/** Opens the card's preview and answers whether it paints the dropped file. */
-async function paintsLocalPreview(user: User, container: HTMLElement): Promise<boolean> {
-  await user.click(screen.getByRole('button', { name: /^preview$/i }));
+/** Answers whether the card's preview, open from the start, paints the dropped file. */
+function paintsLocalPreview(container: HTMLElement): boolean {
+  expect(screen.getByRole('button', { name: /^preview$/i })).toBeInTheDocument();
   return container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
 }
 
@@ -130,7 +130,7 @@ describe('a host whose onDropFile returns the upload keeps its preview in any or
     await act(async () => upload.resolve(STORED));
 
     expect(screen.getByText('mine.pdf')).toBeInTheDocument();
-    expect(await paintsLocalPreview(user, container)).toBe(true);
+    expect(paintsLocalPreview(container)).toBe(true);
   });
 
   it('keeps it when the value is written one render after the flight ends', async () => {
@@ -142,7 +142,7 @@ describe('a host whose onDropFile returns the upload keeps its preview in any or
     await press(user, 'write the upload’s file');
     await act(async () => upload.resolve(STORED));
 
-    expect(await paintsLocalPreview(user, container)).toBe(true);
+    expect(paintsLocalPreview(container)).toBe(true);
   });
 
   it('keeps it when the upload answers before the host writes anything', async () => {
@@ -154,7 +154,7 @@ describe('a host whose onDropFile returns the upload keeps its preview in any or
     await press(user, 'end the flight');
     await press(user, 'write the upload’s file');
 
-    expect(await paintsLocalPreview(user, container)).toBe(true);
+    expect(paintsLocalPreview(container)).toBe(true);
   });
 
   it('keeps it when both land in one render, as before', async () => {
@@ -165,7 +165,7 @@ describe('a host whose onDropFile returns the upload keeps its preview in any or
     await act(async () => upload.resolve(STORED));
     await press(user, 'write the upload’s file and end the flight');
 
-    expect(await paintsLocalPreview(user, container)).toBe(true);
+    expect(paintsLocalPreview(container)).toBe(true);
   });
 
   it('keeps it when its file is written over one written while it was in flight', async () => {
@@ -178,7 +178,7 @@ describe('a host whose onDropFile returns the upload keeps its preview in any or
     await press(user, 'end the flight');
     await act(async () => upload.resolve(STORED));
 
-    expect(await paintsLocalPreview(user, container)).toBe(true);
+    expect(paintsLocalPreview(container)).toBe(true);
   });
 });
 
@@ -193,7 +193,7 @@ describe('a host whose onDropFile returns the upload paints no other file with i
     await act(async () => upload.reject(new Error('storage is down')));
 
     expect(screen.getByText('other.pdf')).toBeInTheDocument();
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 
   it('paints none over that file when the flight ends before the failure arrives', async () => {
@@ -205,7 +205,7 @@ describe('a host whose onDropFile returns the upload paints no other file with i
     await press(user, 'write another file');
     await act(async () => upload.reject(new Error('storage is down')));
 
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 
   it('paints none over a file the host keeps in place of the one its upload stored', async () => {
@@ -217,7 +217,7 @@ describe('a host whose onDropFile returns the upload paints no other file with i
     await press(user, 'end the flight');
     await act(async () => upload.resolve(STORED));
 
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 
   it('paints none over the next file written after it failed', async () => {
@@ -229,7 +229,7 @@ describe('a host whose onDropFile returns the upload paints no other file with i
     await act(async () => upload.reject(new Error('storage is down')));
     await press(user, 'write another file');
 
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 
   it('retires it once the value moves on from the file it stored', async () => {
@@ -241,7 +241,7 @@ describe('a host whose onDropFile returns the upload paints no other file with i
     await press(user, 'write the upload’s file and end the flight');
     await press(user, 'write another file');
 
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 });
 
@@ -252,7 +252,7 @@ describe('a host whose onDropFile returns nothing is judged by when the value la
     await drop(user);
     await press(user, 'write the upload’s file and end the flight');
 
-    expect(await paintsLocalPreview(user, container)).toBe(true);
+    expect(paintsLocalPreview(container)).toBe(true);
   });
 
   it('paints none over a file written while the upload was in flight', async () => {
@@ -262,7 +262,7 @@ describe('a host whose onDropFile returns nothing is judged by when the value la
     await press(user, 'write another file');
     await press(user, 'end the flight');
 
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 
   it('paints none over the next file written after the upload stopped with nothing', async () => {
@@ -272,7 +272,7 @@ describe('a host whose onDropFile returns nothing is judged by when the value la
     await press(user, 'end the flight');
     await press(user, 'write another file');
 
-    expect(await paintsLocalPreview(user, container)).toBe(false);
+    expect(paintsLocalPreview(container)).toBe(false);
   });
 });
 

@@ -372,7 +372,6 @@ function settledUpload() {
 
 describe('a row the drop area fills takes the file as its own', () => {
   it('paints the dropped file in its preview, as a file dropped on the row does', async () => {
-    const user = userEvent.setup();
     const upload = settledUpload();
     const { container } = render(
       <UploadingHost field={listOf(imageItem)} upload={upload.promise} />,
@@ -380,7 +379,8 @@ describe('a row the drop area fills takes the file as its own', () => {
     dropOnZone([png('a.png')]);
     await act(async () => upload.resolve());
     expect(await screen.findByText('a.png')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^preview$/i }));
+    // The preview is open from the start: the dropped file is painted unasked.
+    expect(screen.getByRole('button', { name: /^preview$/i })).toBeInTheDocument();
     expect(container.querySelector('[src^="blob:"]')).not.toBeNull();
   });
 
@@ -421,15 +421,14 @@ function WritingHost({ field, initial }: { field: ListRunField; initial: unknown
 
 describe('a row the area fills, under a host that writes as it is handed the file', () => {
   it('keeps the local preview, in a row the person left empty and in a new one', async () => {
-    const user = userEvent.setup();
     const { container } = render(<WritingHost field={listOf(imageItem)} initial={[undefined]} />);
     dropOnZone([png('a.png'), png('b.png')]);
     expect(await screen.findByText('a.png')).toBeInTheDocument();
     expect(screen.getByText('b.png')).toBeInTheDocument();
-    for (const button of screen.getAllByRole('button', { name: /^preview$/i })) {
-      await user.click(button);
-    }
-    expect(container.querySelectorAll('[src^="blob:"]')).toHaveLength(2);
+    // Each row's preview is open from the start.
+    expect(screen.getAllByRole('button', { name: /^preview$/i })).toHaveLength(2);
+    // The row takes the area's file in an effect, a render after the value lands.
+    await waitFor(() => expect(container.querySelectorAll('[src^="blob:"]')).toHaveLength(2));
   });
 });
 

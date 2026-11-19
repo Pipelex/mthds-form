@@ -262,15 +262,15 @@ describe('the result view', () => {
   });
 
   it('draws a document preview’s focus in --ring', async () => {
-    const user = userEvent.setup();
+    userEvent.setup();
     // Served by its host on the page's own origin, the only document framed.
     const { container } = render(
       <ResultEnvProvider resolveUrl={hostFiles}>
         <StuffViewer field={report} value={value} />
       </ResultEnvProvider>,
     );
-    await user.click(screen.getByRole('button', { name: S.preview }));
-    expect(screen.getByTitle('q3.pdf').tagName).toBe('IFRAME');
+    // Open from the start, so the frame lands once the resolver answers.
+    expect((await screen.findByTitle('q3.pdf')).tagName).toBe('IFRAME');
     expect(unringed(container)).toEqual([]);
   });
 
@@ -301,16 +301,17 @@ describe('a frame in the result view', () => {
   };
   const value = { url: stored('q3.pdf'), filename: 'q3.pdf' };
 
+  /** Mounts the document, whose preview is open from the start, and waits for its frame. */
   async function openPreview() {
-    const user = userEvent.setup();
+    userEvent.setup();
     render(
       <ResultEnvProvider resolveUrl={hostFiles}>
         <StuffViewer field={document_} value={value} />
       </ResultEnvProvider>,
     );
     const toggle = screen.getByRole('button', { name: S.preview });
-    await user.click(toggle);
-    return { toggle, frame: screen.getByTitle('q3.pdf') };
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    return { toggle, frame: await screen.findByTitle('q3.pdf') };
   }
 
   function enter(frame: HTMLElement) {
