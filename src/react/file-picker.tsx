@@ -21,7 +21,7 @@ import type {
   SourceFile,
 } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
-// barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
+// barrel reaches the gate and the gate reaches its validator. See docs/dependency-budget.md.
 import {
   formatLabels,
   formatOfFile,

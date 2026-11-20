@@ -20,7 +20,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileRunField, ListRunField, RunField } from '../../core';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
-// drags the gate and ajv into a suite that tests the control set.
+// drags the gate and its validator into a suite that tests the control set.
 import { getPipeIOContract } from '../../core/contracts';
 import { getPipeInputForm } from '../../core/derive';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';

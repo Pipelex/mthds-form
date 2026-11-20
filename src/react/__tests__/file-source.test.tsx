@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
-// drags the gate and ajv into a suite that tests the control set.
+// drags the gate and its validator into a suite that tests the control set.
 import { getPipeIOContract } from '../../core/contracts';
 import { getPipeInputForm } from '../../core/derive';
 import { narrowFileFormats } from '../../core/narrow-file-formats';

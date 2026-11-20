@@ -20,7 +20,16 @@ const BUDGET_PATTERNS = [
   },
   {
     group: ['@rjsf/*'],
-    message: 'The kernel is RJSF-free: the gate validates through its own ajv instance.',
+    message: "The kernel is RJSF-free: the gate validates through its own interpreter (src/core/schema-validator.ts).",
+  },
+  {
+    // The run gate runs in browsers whose Content Security Policy refuses
+    // `eval` and the `Function` constructor, and these validators compile
+    // every schema into code with one or the other. The gate's own interpreter
+    // generates none - see docs/run-gate.md before reaching for one.
+    group: ['ajv', 'ajv/*', 'ajv-formats', 'ajv-formats/*', '@exodus/schemasafe', 'is-my-json-valid'],
+    message:
+      "These validators generate code, which a CSP without 'unsafe-eval' refuses - the gate validates through src/core/schema-validator.ts. See docs/run-gate.md.",
   },
   {
     group: ['zustand', 'zustand/*'],
@@ -97,7 +106,7 @@ const GENERATIVE_PATTERNS = [
  */
 const BRAND_PATTERNS = [
   {
-    group: ['@json-render/*', 'ajv', 'ajv-formats', 'ajv/*'],
+    group: ['@json-render/*'],
     message: '`./brand` depends on zod alone. See docs/dependency-budget.md.',
   },
   {
@@ -135,9 +144,6 @@ const HEADLESS_GENERATIVE_PATTERNS = [
       'clsx',
       'tailwind-merge',
       'marked',
-      'ajv',
-      'ajv/*',
-      'ajv-formats',
     ],
     message:
       'This module is in the half of the generative layer that renders nothing, which `./generative/headless` exports to a host\'s server: React, the rendering half\'s dependencies and the run gate\'s validator stay out of it. See docs/dependency-budget.md.',
@@ -190,8 +196,8 @@ function valueSpecifiers(file) {
 /** The packages that render, which the half that renders nothing reaches at no depth. */
 const RENDERING_PACKAGE =
   /^(?:react|react-dom|@json-render\/react|lucide-react|@radix-ui\/[^/]+|react-dropzone|class-variance-authority|clsx|tailwind-merge|marked)(?:\/|$)/;
-/** The run gate's validator and its formats. */
-const AJV_PACKAGE = /^ajv(?:-formats)?(?:\/|$)/;
+/** The run gate's validator, which only the `.` entry carries. */
+const GATE_VALIDATOR = path.join(dirname, 'src', 'core', 'schema-validator.ts');
 
 /** What a module that renders is, in words, or nothing for one that does not. */
 function rendererKind(file) {
@@ -204,7 +210,8 @@ function rendererKind(file) {
 /**
  * The first thing the half that renders nothing must not carry that `start`
  * reaches through value imports, at any depth, with the modules it is reached
- * through, or nothing: a module that renders, a package that renders, or ajv.
+ * through, or nothing: a module that renders, a package that renders, or the
+ * run gate's validator.
  * Walked breadth-first afresh for each import, so the nearest is named; no
  * verdict is kept between walks, since one recorded while a cycle was still
  * open answered "reaches nothing" for a module that did.
@@ -216,9 +223,9 @@ function firstForbidden(start) {
     const { file, through } = queue.shift();
     const kind = rendererKind(file);
     if (kind !== undefined) return { messageId: 'renders', what: `${kind}, ${relative(file)}`, through };
+    if (file === GATE_VALIDATOR) return { messageId: 'validator', what: relative(file), through };
     const onward = [...through, file];
     for (const specifier of valueSpecifiers(file)) {
-      if (AJV_PACKAGE.test(specifier)) return { messageId: 'ajv', what: specifier, through: onward };
       if (RENDERING_PACKAGE.test(specifier)) {
         return { messageId: 'renders', what: `\`${specifier}\``, through: onward };
       }
@@ -242,7 +249,8 @@ function relative(file) {
  * module a relative import RESOLVES to rather than by how its specifier is
  * spelt, and followed through every value import beyond it: a `.tsx`
  * renderer, the client entry (`src/generative/index.ts`, however its
- * directory is named), the control set, a package that renders, or ajv. A list
+ * directory is named), the control set, a package that renders, or the run
+ * gate's validator. A list
  * of renderer names went stale with each renderer added and missed a barrel
  * imported by its directory, and a check of the first hop alone missed a
  * kernel module that imports a renderer. A type import is erased and stays
@@ -256,7 +264,8 @@ const headlessImportsRule = {
     messages: {
       renders:
         'A value import of `{{specifier}}` reaches {{what}}{{via}}, which drags React into `./generative/headless`, which a host\'s server imports. See docs/dependency-budget.md.',
-      ajv: 'A value import of `{{specifier}}` reaches `{{what}}`{{via}}, which `./generative/headless` does not carry: import the specific module that does not. See docs/dependency-budget.md.',
+      validator:
+        "A value import of `{{specifier}}` reaches the run gate's validator, {{what}}{{via}}, which `./generative/headless` does not carry: import the specific module that does not. See docs/dependency-budget.md.",
     },
   },
   create(context) {
@@ -306,25 +315,25 @@ const REACT_PATTERNS = [
 ];
 
 /**
- * The `.` barrel statically imports the run gate, and the run gate imports ajv.
- * So a VALUE import of it from a control puts ajv in the shared chunk esbuild
- * emits for the two entries, and every host that renders a control ships the
- * validator - measured once at +131 KB gzip. A TYPE import is erased and costs
- * nothing, so it stays allowed. Reach for the specific module instead
+ * The `.` barrel statically imports the run gate, and with it the gate's
+ * validator. So a VALUE import of it from a control puts the validator in the
+ * shared chunk esbuild emits for the two entries, and every host that renders a
+ * control ships it - measured once, when the validator was ajv, at +131 KB
+ * gzip. A TYPE import is erased and costs nothing, so it stays allowed. Reach for the specific module instead
  * (`../core/readiness`, `../core/date-format`); `scripts/assert-bundle.mjs`
  * checks the built graph, which is the backstop this rule cannot be.
  */
 const CORE_BARREL_PATTERN = {
   // Anchored: the BARREL only. `../core/readiness` is the fix, not the breach,
   // and a gitignore-style glob would match it as a path under `../core`. Both
-  // spellings of the barrel count and both arrive at the same ajv-bearing
+  // spellings of the barrel count and both arrive at the same validator-bearing
   // module, so `/index` is matched explicitly and the `../` prefix repeats -
   // a rule that read only `../core` let `../core/index` and any deeper nesting
   // walk straight past it.
   regex: '^(?:\\.\\./)+core(?:/index)?$',
   allowTypeImports: true,
   message:
-    'Import the core module directly (e.g. ../core/readiness) - a value import of the barrel drags ajv into the client bundle. See docs/dependency-budget.md.',
+    "Import the core module directly (e.g. ../core/readiness) - a value import of the barrel drags the run gate's validator into the client bundle. See docs/dependency-budget.md.",
 };
 
 export default tseslint.config(
@@ -392,9 +401,9 @@ export default tseslint.config(
     /**
      * The generative layer renders, so React is allowed - but the barrel rule
      * holds for the same reason it holds in `src/react/`: a value import of
-     * `../core` puts ajv in the chunk this entry shares with the controls, and
-     * a host that renders a produced layout ships the validator it never asked
-     * for. The specific module is the fix (`../core/native-content`).
+     * `../core` puts the gate's validator in the chunk this entry shares with
+     * the controls, and a host that renders a produced layout ships the
+     * validator it never asked for. The specific module is the fix (`../core/native-content`).
      */
     files: ['src/generative/**/*.ts', 'src/generative/**/*.tsx'],
     rules: {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The run gate runs under a Content Security Policy without `'unsafe-eval'`**: `gateRunInputs` and `validateRunInputs` now validate through the package's own JSON Schema interpreter, which generates no code, instead of ajv, which compiled every schema with the `Function` constructor, so a host whose policy refuses `eval` no longer has every run refused with one bare error. Verdicts are unchanged: every error is still reported, with the same keywords, paths, params and messages in the same order, values are still coerced in place, and the `date`, `date-time`, `data-url` and `color` formats read as before. These limits differ: a schema carrying `$id` below its root is refused, and a value nested through a self-referencing concept past a few hundred levels is refused with `the inputs are nested too deeply to validate` rather than past a few thousand. `ajv` and `ajv-formats` are no longer dependencies. See [docs/run-gate.md](docs/run-gate.md#the-validator-generates-no-code).
+
 ## [v0.39.2] - 2026-11-20
 
 ### Added

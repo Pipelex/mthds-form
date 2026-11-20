@@ -26,7 +26,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 // Deep imports, not the `../../core` barrel: a value import of the barrel drags
-// ajv into the client bundle. See docs/dependency-budget.md.
+// the gate's validator into the client bundle. See docs/dependency-budget.md.
 import { getPipeIOContract } from '../../core/contracts';
 import type { ObjectRunField, RunField, UnknownRunField } from '../../core/descriptor';
 import { buildResultField } from '../../core/derive';

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload } from 'lucide-react';
 // Value imports come from the specific module, never the `../core` barrel - the
-// barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
+// barrel reaches the gate and the gate reaches its validator. See docs/dependency-budget.md.
 import { acceptLabel, acceptMap, isAcceptedFile, type FileFormat } from '../core/file-formats';
 import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';

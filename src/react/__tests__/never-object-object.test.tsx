@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 // Deep imports, not the `../../core` barrel: a VALUE import of the barrel drags
-// ajv into the client bundle, and the rule that says so does not except tests -
+// the gate's validator into the client bundle, and the rule that says so does not except tests -
 // a test importing differently from the code it tests is a test of something
 // else. See docs/dependency-budget.md.
 import type { PipeIOContracts } from '../../core/contracts';

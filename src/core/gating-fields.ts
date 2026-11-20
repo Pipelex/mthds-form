@@ -12,7 +12,7 @@
  * So the gate walks the contract's `json_schema` into the MINIMAL tree the
  * emptiness predicates read: `object` nodes with their required children,
  * `list` nodes with their declared bounds, and opaque leaves. This is not a
- * revival of the deleted heuristics - it reads exactly the keywords ajv itself
+ * revival of the deleted heuristics - it reads exactly the keywords the validator itself
  * enforces (`type`, `properties`, `required`, `items`, `minItems`, `maxItems`)
  * and decides nothing about what a field IS. No kind here ever reaches a
  * renderer: the tree exists for one call inside `gateRunInputs` and is not
@@ -53,8 +53,8 @@ function gatingNode(
   // instead of overflowing the stack - the gate returns a verdict, never a
   // throw. Open on this path, not seen anywhere: two siblings referencing one
   // definition are ordinary composition and both expand in full. The degrade
-  // is OPEN, and deliberately so: ajv - which resolves recursion natively,
-  // bounded by the data - has already enforced PRESENCE of required children
+  // is OPEN, and deliberately so: the validator - which resolves recursion by
+  // following the data, as deep as the call stack allows - has already enforced PRESENCE of required children
   // at every depth, but presence is all it enforces, so a required scalar
   // that is present-but-blank below the cycle point is caught by neither
   // side. That residual leniency is a recorded follow-up, not a safety
