@@ -11,7 +11,7 @@
  * randomly mutated payloads; this table is the part of that check that stays.
  */
 import { describe, expect, it } from 'vitest';
-import { validateWithSchema } from '../schema-validator';
+import { InvalidSchemaError, validateWithSchema } from '../schema-validator';
 import { AJV_REFUSALS, AJV_VERDICTS } from './ajv-verdicts';
 
 function strip(errors: ReturnType<typeof validateWithSchema>) {
@@ -137,5 +137,76 @@ describe('an $id below the root', () => {
         message: 'must be number',
       },
     ]);
+  });
+});
+
+describe('a reference written against the root $id', () => {
+  const schema = (ref: string) => ({
+    $id: 'https://example.com/root.json',
+    type: 'object',
+    definitions: { n: { type: 'integer' } },
+    properties: { x: { $ref: ref } },
+  });
+
+  it('resolves inside this document, as ajv resolved it', () => {
+    expect(
+      strip(
+        validateWithSchema(schema('https://example.com/root.json#/definitions/n'), { x: 'abc' }),
+      ),
+    ).toEqual([
+      {
+        keyword: 'type',
+        instancePath: '/x',
+        schemaPath: 'https://example.com/root.json#/definitions/n/type',
+        params: { type: 'integer' },
+        message: 'must be integer',
+      },
+    ]);
+  });
+
+  it('names the root when it is the id alone', () => {
+    const errors = strip(validateWithSchema(schema('https://example.com/root.json'), { x: 'abc' }));
+    expect(errors.map((e) => [e.instancePath, e.schemaPath, e.message])).toEqual([
+      ['/x', '#/type', 'must be object'],
+    ]);
+  });
+});
+
+describe('a reference that only refers back to itself', () => {
+  it('is refused as a malformed schema, whatever the data', () => {
+    const loop = { a: { $ref: '#/definitions/b' }, b: { $ref: '#/definitions/a' } };
+    for (const schema of [
+      { definitions: loop, $ref: '#/definitions/a' },
+      { definitions: loop, properties: { x: { $ref: '#/definitions/a' } } },
+    ]) {
+      expect(() => validateWithSchema(schema, {})).toThrow('it only refers back to itself');
+    }
+  });
+});
+
+describe('a stack overflow while checking a schema', () => {
+  it('refuses the schema this time without remembering it, since it measured the caller', () => {
+    const build = () => {
+      let schema: Record<string, unknown> = { type: 'string' };
+      for (let depth = 0; depth < 200; depth++)
+        schema = { type: 'object', properties: { a: schema } };
+      return schema;
+    };
+    const deep = (frames: number, schema: object): unknown =>
+      frames === 0 ? validateWithSchema(schema, {}) : deep(frames - 1, schema);
+    // Each attempt checks a fresh schema object from a deeper stack, until the
+    // CHECK is what runs out of stack - the refusal names a schema, not a frame.
+    let refused: object | undefined;
+    for (let frames = 0; frames < 20_000 && refused === undefined; frames += 250) {
+      const schema = build();
+      try {
+        deep(frames, schema);
+      } catch (err) {
+        if (err instanceof InvalidSchemaError) refused = schema;
+        else break;
+      }
+    }
+    expect(refused).toBeDefined();
+    expect(validateWithSchema(refused!, {})).toEqual([]);
   });
 });

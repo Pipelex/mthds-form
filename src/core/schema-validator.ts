@@ -41,13 +41,13 @@
  *   draft-07 meta-schema and its keywords' value types before any data is
  *   judged, and a schema that fails produces one verdict-less error.
  *
- * What it leaves out is what the gate never used: `$data`, `$id`-based and
- * remote references, `unevaluated*`, `discriminator`, ajv-formats'
+ * What it leaves out is what the gate never used: `$data`, remote references
+ * and an `$id` below the root (refused - see `checkReachable`), `unevaluated*`, `discriminator`, ajv-formats'
  * `formatMinimum` family, and the warnings ajv logged for unknown formats.
  *
  * ## Short-circuiting
  *
- * Two keywords judge a subschema without reporting its errors: `not` and `if`.
+ * The keywords `not` and `if` judge a subschema without reporting its errors.
  * ajv evaluates those with `allErrors: false`, stopping at the first failure,
  * and since coercion is a side effect of evaluation, stopping early also
  * decides which values get coerced. The interpreter stops at the same keyword
@@ -418,6 +418,19 @@ function isRootRef(ref: string): boolean {
 }
 
 /**
+ * A reference as this document reads it: one written against the root's own
+ * `$id` (`https://example.com/root.json#/definitions/n`, or the id alone)
+ * becomes the fragment it names, as ajv resolved it. Any other reference is
+ * returned unchanged, to be resolved as a fragment or refused as remote.
+ */
+function localRef(root: AnySchema, ref: string): string {
+  if (ref[0] === '#' || typeof root === 'boolean' || typeof root.$id !== 'string') return ref;
+  const id = root.$id.replace(/#$/, '');
+  if (id === '' || (ref !== id && !ref.startsWith(`${id}#`))) return ref;
+  return ref.slice(id.length) || '#';
+}
+
+/**
  * Resolve a local `$ref` (`#/$defs/Name`, `#/definitions/x`, any JSON pointer)
  * against the root schema, following a target that is itself only a `$ref` the
  * way ajv does. `undefined` when the pointer leads nowhere.
@@ -427,6 +440,8 @@ function resolveRef(
   ref: string,
   chased = new Set<string>(),
 ): AnySchema | undefined {
+  ref = localRef(root, ref);
+  if (isRootRef(ref)) return root;
   if (ref[0] !== '#') return undefined;
   const fragment = ref.slice(1);
   if (fragment[0] !== '/') return undefined;
@@ -441,7 +456,7 @@ function resolveRef(
   if (typeof target !== 'boolean' && !isSchemaObject(target)) return undefined;
   if (isSchemaObject(target) && typeof target.$ref === 'string' && !hasRulesButRef(target)) {
     const next = target.$ref;
-    if (isRootRef(next) || chased.has(next)) return target;
+    if (isRootRef(localRef(root, next)) || chased.has(next)) return target;
     chased.add(ref);
     return resolveRef(root, next, chased) ?? target;
   }
@@ -527,13 +542,35 @@ function checkReachable(root: AnySchema): void {
     }
   };
   const visitRef = (ref: string): void => {
-    if (isRootRef(ref)) return;
+    if (isRootRef(localRef(root, ref))) return;
     const target = resolveRef(root, ref);
     if (target === undefined)
       throw new InvalidSchemaError(`can't resolve reference ${ref} from id #`);
+    // `resolveRef` stops on a chain of bare references that returns to one it
+    // already followed, handing back a node that is only a reference. Applying
+    // it would recurse forever on any value, so the schema is refused, as
+    // ajv's compile was (it overflowed). A chain back to the ROOT is ordinary
+    // recursion and is judged as the data allows.
+    if (
+      isSchemaObject(target) &&
+      typeof target.$ref === 'string' &&
+      !hasRulesButRef(target) &&
+      !isRootRef(localRef(root, target.$ref)) &&
+      resolveRef(root, target.$ref) !== undefined
+    ) {
+      throw new InvalidSchemaError(`can't resolve reference ${ref}: it only refers back to itself`);
+    }
     visit(target);
   };
   visit(root);
+}
+
+/**
+ * Whether `err` is the engine running out of call stack: a `RangeError` in V8
+ * and JavaScriptCore, an `InternalError` ("too much recursion") in Firefox.
+ */
+export function isStackOverflow(err: unknown): boolean {
+  return err instanceof RangeError || (err instanceof Error && err.name === 'InternalError');
 }
 
 /** Ids a validated schema is checked by; `null` records a schema found sound. */
@@ -580,6 +617,10 @@ export function assertValidSchema(schema: unknown): void {
     checkReachable(schema as AnySchema);
     CHECKED.set(schema, null);
   } catch (err) {
+    // A stack overflow says how deep the CALLER's stack was, not what the
+    // schema is: refused this time, as ajv's compile was, and never remembered,
+    // as ajv never kept a failed compile.
+    if (isStackOverflow(err)) throw new InvalidSchemaError((err as Error).message);
     const error =
       err instanceof InvalidSchemaError
         ? err
@@ -1069,10 +1110,11 @@ class Interpreter {
   }
 
   private ref(ref: string, cell: Cell, loc: Location): boolean {
-    const target = isRootRef(ref) ? this.root : resolveRef(this.root, ref);
+    const toRoot = isRootRef(localRef(this.root, ref));
+    const target = toRoot ? this.root : resolveRef(this.root, ref);
     if (target === undefined)
       throw new InvalidSchemaError(`can't resolve reference ${ref} from id #`);
-    if (!isRootRef(ref) && !containsRef(target)) {
+    if (!toRoot && !containsRef(target)) {
       // ajv inlines a target with no reference inside: same data, same mode.
       const outcome = this.apply(target, cell.data, this.same(loc, ref));
       cell.data = outcome.data;

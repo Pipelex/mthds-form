@@ -194,3 +194,14 @@ describe('a value nested past what the validator can walk', () => {
     expect(data['n']).toBe(1);
   });
 });
+
+describe("Firefox's stack overflow", () => {
+  it('reads as one too, so the gate refuses rather than throws there', async () => {
+    const { isStackOverflow } = await import('../schema-validator');
+    const internal = new Error('too much recursion');
+    internal.name = 'InternalError';
+    expect(isStackOverflow(internal)).toBe(true);
+    expect(isStackOverflow(new RangeError('Maximum call stack size exceeded'))).toBe(true);
+    expect(isStackOverflow(new TypeError('x is undefined'))).toBe(false);
+  });
+});

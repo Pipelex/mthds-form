@@ -27,7 +27,12 @@
  * forms render; this package labels a field by its identifier instead, so the
  * substitution named something the user could not find. See `toRunInputError`.
  */
-import { InvalidSchemaError, validateWithSchema, type SchemaError } from './schema-validator';
+import {
+  InvalidSchemaError,
+  isStackOverflow,
+  validateWithSchema,
+  type SchemaError,
+} from './schema-validator';
 
 /**
  * One validation error, in the shape hosts read (`property`, `message`,
@@ -68,7 +73,7 @@ export function validateRunInputsSchema(data: unknown, schema: object): RunInput
     // A value nested deeper than the call stack can walk (several hundred
     // levels of a self-referencing concept) is refused rather than thrown,
     // since the gate returns a verdict. Anything else is a bug, and surfaces.
-    if (err instanceof RangeError) return [{ stack: NESTED_TOO_DEEPLY }];
+    if (isStackOverflow(err)) return [{ stack: NESTED_TOO_DEEPLY }];
     throw err;
   }
   return errors.map(toRunInputError);

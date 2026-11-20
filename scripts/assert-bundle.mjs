@@ -274,7 +274,11 @@ for (const { entry, match, why } of BANNED) {
       console.log(`ok  ${entry}/index.js does not carry the run gate's validator`);
     }
   }
-  const CODEGEN = /\bnew\s+Function\s*\(|(?<![\w$.])Function\s*\(|(?<![\w$.])eval\s*\(|\.constructor\s*\(/;
+  // Any mention of either name at all, property access and aliases included
+  // (`globalThis.Function`, `const F = Function`, `(0, eval)`), plus the
+  // constructor reached through a function: the core graph names neither, so
+  // a hit is worth a look even when it turns out to be a string.
+  const CODEGEN = /\bFunction\b|\beval\b|\.constructor\s*\(/;
   const generating = coreFiles.filter((file) => CODEGEN.test(readFileSync(file, 'utf8')));
   if (generating.length > 0) {
     failures.push(
