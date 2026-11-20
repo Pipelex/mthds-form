@@ -139,7 +139,7 @@ describe('a file field with no upload path offers a link, and nothing else', () 
         expect(screen.getByLabelText('cv')).toHaveAccessibleDescription(LINE);
         // The format hint the dropzone showed stays: the link still has to point
         // at a file the runtime can read.
-        expect(screen.getByText('PDF, JPG, PNG')).toBeInTheDocument();
+        expect(screen.getByText('PDF, Word, Excel, PowerPoint, CSV, JPG, PNG')).toBeInTheDocument();
       });
 
       it('does not move focus on mount', () => {

@@ -4,36 +4,74 @@ import {
   IMAGE_FORMATS,
   acceptLabel,
   acceptMap,
+  formatLabels,
+  formatOfFile,
   formatOfFilename,
   formatsForKind,
   isAcceptedFile,
 } from '../file-formats';
 
 /**
- * The format table mirrors a runtime fact that was MEASURED - see the header of
- * `../file-formats` for the runs and the model-deck derivation behind it.
+ * The format table mirrors a runtime fact - see the header of `../file-formats`
+ * for where each format comes from and what reads it.
  *
  * The membership assertions are deliberately literal. Their job is to fail
- * loudly if someone widens the table from a plausible-looking source, which is
- * exactly how DOCX and PPTX got in: off an enum the runtime never reads.
+ * loudly when someone widens or narrows the table, so that the change is made
+ * on purpose and against the runtime, never off a plausible-looking enum.
  */
 
+const WORD = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const EXCEL = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const POWERPOINT = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+/** Every document format, by the extension a file of it carries and its canonical type. */
+const DOCUMENT_FILES: readonly [extension: string, type: string][] = [
+  ['.pdf', 'application/pdf'],
+  ['.docx', WORD],
+  ['.doc', 'application/msword'],
+  ['.xlsx', EXCEL],
+  ['.xls', 'application/vnd.ms-excel'],
+  ['.pptx', POWERPOINT],
+  ['.ppt', 'application/vnd.ms-powerpoint'],
+  ['.csv', 'text/csv'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.png', 'image/png'],
+];
+
+/** Every other spelling a browser gives a document format, with the extension it rides. */
+const ALIASES: readonly [extension: string, type: string][] = [
+  ['.docx', 'application/zip'],
+  ['.docx', 'application/x-zip-compressed'],
+  ['.xlsx', 'application/zip'],
+  ['.xlsx', 'application/x-zip-compressed'],
+  ['.pptx', 'application/zip'],
+  ['.pptx', 'application/x-zip-compressed'],
+  ['.csv', 'application/vnd.ms-excel'],
+  ['.csv', 'text/plain'],
+  ['.csv', 'application/csv'],
+  ['.csv', 'text/x-csv'],
+];
+
 describe('the accepted formats', () => {
-  it('is PDF, JPG, PNG for a document - the extract model reads an image as one page', () => {
-    expect(DOCUMENT_FORMATS.map((f) => f.label)).toEqual(['PDF', 'JPG', 'PNG']);
-    expect(acceptLabel(formatsForKind('document'))).toBe('PDF, JPG, PNG');
+  it('is PDF, the Office formats, CSV, JPG and PNG for a document, named by family', () => {
+    expect(DOCUMENT_FORMATS.map((f) => f.label)).toEqual([
+      'PDF',
+      'Word',
+      'Word',
+      'Excel',
+      'Excel',
+      'PowerPoint',
+      'PowerPoint',
+      'CSV',
+      'JPG',
+      'PNG',
+    ]);
   });
 
-  it('excludes DOCX and PPTX, which every path refuses', () => {
-    // Both were in this table once. A run proves the refusal: the LLM path
-    // answers "does not support docx documents", and the extract gateway
-    // answers with its own list.
-    const mimes = DOCUMENT_FORMATS.map((f) => f.mimeType);
-    expect(mimes).not.toContain(
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    );
-    expect(mimes).not.toContain(
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  it('names each family once in the hint', () => {
+    expect(acceptLabel(formatsForKind('document'))).toBe(
+      'PDF, Word, Excel, PowerPoint, CSV, JPG, PNG',
     );
   });
 
@@ -52,14 +90,124 @@ describe('the accepted formats', () => {
     expect(mimes).not.toContain('image/tiff');
   });
 
-  it('carries the MIME types the gateway named in its own refusal', () => {
-    // "Supported formats: application/pdf, image/jpeg, image/png"
+  it('carries the canonical type the runtime gives each format, in the table order', () => {
+    // These are the types a store gives the files, so a team-file picker
+    // filtering on them finds the stored files.
     expect(DOCUMENT_FORMATS.map((f) => f.mimeType)).toEqual([
       'application/pdf',
+      WORD,
+      'application/msword',
+      EXCEL,
+      'application/vnd.ms-excel',
+      POWERPOINT,
+      'application/vnd.ms-powerpoint',
+      'text/csv',
       'image/jpeg',
       'image/png',
     ]);
     expect(IMAGE_FORMATS.map((f) => f.mimeType)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
+  });
+
+  it('leaves the OpenDocument formats out', () => {
+    const mimes = DOCUMENT_FORMATS.map((f) => f.mimeType);
+    expect(mimes.some((mime) => mime.includes('opendocument'))).toBe(false);
+    for (const ext of ['.odt', '.ods', '.odp']) {
+      expect(formatOfFilename(DOCUMENT_FORMATS, `file${ext}`)).toBeUndefined();
+    }
+  });
+});
+
+describe('every document format is accepted', () => {
+  it.each(DOCUMENT_FILES)('a %s file reported as %s', (extension, type) => {
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: `file${extension}`, type })).toBe(true);
+  });
+
+  it.each(DOCUMENT_FILES)('a %s file reported with no type', (extension) => {
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: `file${extension}`, type: '' })).toBe(true);
+  });
+});
+
+describe("a browser's other spellings of a format", () => {
+  it.each(ALIASES)('accepts a %s file reported as %s', (extension, type) => {
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: `file${extension}`, type })).toBe(true);
+  });
+
+  it.each(ALIASES)(
+    'takes a %s file reported as %s for what its extension says',
+    (extension, type) => {
+      expect(formatOfFile(DOCUMENT_FORMATS, { name: `file${extension}`, type })).toBe(
+        formatOfFilename(DOCUMENT_FORMATS, `file${extension}`),
+      );
+    },
+  );
+
+  it('refuses a file reported as a zip alias when its extension is no document', () => {
+    // An alias alone accepts nothing: a zip archive is no document, however a
+    // `.docx` sometimes gets reported.
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'a.zip', type: 'application/zip' })).toBe(
+      false,
+    );
+    expect(
+      isAcceptedFile(DOCUMENT_FORMATS, { name: 'a.zip', type: 'application/x-zip-compressed' }),
+    ).toBe(false);
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'report', type: 'application/zip' })).toBe(
+      false,
+    );
+  });
+
+  it('refuses a file reported as a CSV alias when its extension is not .csv', () => {
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'notes.txt', type: 'text/plain' })).toBe(false);
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'rows.tsv', type: 'text/x-csv' })).toBe(false);
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'rows', type: 'application/csv' })).toBe(false);
+  });
+
+  it('does not lend one format an alias of another', () => {
+    // `application/zip` is an alias of the zip-based Office formats only, and
+    // `text/plain` of CSV only.
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'old.doc', type: 'application/zip' })).toBe(
+      false,
+    );
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'report.pdf', type: 'text/plain' })).toBe(
+      false,
+    );
+  });
+
+  it('reads a .csv reported as the legacy Excel type as the CSV it is', () => {
+    // `application/vnd.ms-excel` is both the canonical type of a `.xls` and
+    // what Windows with Excel installed reports for a `.csv`. The extension
+    // tells the two apart; the type alone names the legacy workbook.
+    const csv = { name: 'rows.csv', type: 'application/vnd.ms-excel' };
+    expect(isAcceptedFile(DOCUMENT_FORMATS, csv)).toBe(true);
+    expect(formatOfFile(DOCUMENT_FORMATS, csv)?.mimeType).toBe('text/csv');
+    const xls = { name: 'book.xls', type: 'application/vnd.ms-excel' };
+    expect(formatOfFile(DOCUMENT_FORMATS, xls)?.mimeType).toBe('application/vnd.ms-excel');
+  });
+
+  it('honours an alias only on a list that holds its format', () => {
+    // A slot a host narrowed to PDF takes no `.docx`, whatever it is reported as.
+    const pdfOnly = DOCUMENT_FORMATS.filter((format) => format.label === 'PDF');
+    expect(isAcceptedFile(pdfOnly, { name: 'r.docx', type: 'application/zip' })).toBe(false);
+    expect(isAcceptedFile(pdfOnly, { name: 'r.csv', type: 'text/plain' })).toBe(false);
+  });
+});
+
+describe('application/octet-stream says nothing, so the extension decides', () => {
+  const octet = 'application/octet-stream';
+
+  it.each(DOCUMENT_FILES)('accepts a %s file reported as application/octet-stream', (extension) => {
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: `file${extension}`, type: octet })).toBe(true);
+  });
+
+  it('refuses a file reported as application/octet-stream whose extension is no format', () => {
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'a.zip', type: octet })).toBe(false);
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'blob', type: octet })).toBe(false);
+    expect(isAcceptedFile(IMAGE_FORMATS, { name: 'report.pdf', type: octet })).toBe(false);
+  });
+
+  it('reads the type without its parameters and case', () => {
+    expect(
+      isAcceptedFile(DOCUMENT_FORMATS, { name: 'r.docx', type: 'Application/Octet-Stream; x=1' }),
+    ).toBe(true);
   });
 });
 
@@ -72,24 +220,8 @@ describe('isAcceptedFile', () => {
   });
 
   it('refuses a file whose MIME type is not', () => {
-    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'a.zip', type: 'application/zip' })).toBe(
-      false,
-    );
+    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'clip.mp4', type: 'video/mp4' })).toBe(false);
     expect(isAcceptedFile(IMAGE_FORMATS, { name: 'clip.mp4', type: 'video/mp4' })).toBe(false);
-  });
-
-  it('refuses the office formats a run proves fail', () => {
-    expect(
-      isAcceptedFile(DOCUMENT_FORMATS, {
-        name: 'report.docx',
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      }),
-    ).toBe(false);
-    // A PPTX is detected as a zip upstream, so both spellings must be refused.
-    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'deck.pptx', type: 'application/zip' })).toBe(
-      false,
-    );
-    expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'deck.pptx', type: '' })).toBe(false);
   });
 
   it('refuses a PDF on an image slot', () => {
@@ -104,7 +236,7 @@ describe('isAcceptedFile', () => {
   });
 
   it('refuses a WEBP in a document slot, though an image slot takes it', () => {
-    // The asymmetry is real: the extract gateway names only PDF, JPEG and PNG.
+    // The asymmetry is real: the extract model declares JPEG and PNG, not WEBP.
     expect(isAcceptedFile(DOCUMENT_FORMATS, { name: 'scan.webp', type: 'image/webp' })).toBe(false);
     expect(isAcceptedFile(IMAGE_FORMATS, { name: 'scan.webp', type: 'image/webp' })).toBe(true);
   });
@@ -161,6 +293,16 @@ describe('the helpers read the list they are given, not the kind', () => {
     });
   });
 
+  it('names a family once, and only the families the list keeps', () => {
+    const wordOnly = DOCUMENT_FORMATS.filter((format) => format.label === 'Word');
+    expect(acceptLabel(wordOnly)).toBe('Word');
+    expect(formatLabels(wordOnly)).toEqual(['Word']);
+    const legacyExcelAndPdf = DOCUMENT_FORMATS.filter((format) =>
+      ['application/pdf', 'application/vnd.ms-excel'].includes(format.mimeType),
+    );
+    expect(acceptLabel(legacyExcelAndPdf)).toBe('PDF, Excel');
+  });
+
   it('names nothing and accepts nothing over an empty list', () => {
     expect(acceptLabel([])).toBe('');
     expect(acceptMap([])).toEqual({});
@@ -172,6 +314,13 @@ describe('formatOfFilename', () => {
   it('finds the format an extension names, whatever its case or spelling', () => {
     expect(formatOfFilename(IMAGE_FORMATS, 'PHOTO.PNG')?.label).toBe('PNG');
     expect(formatOfFilename(IMAGE_FORMATS, 'photo.jpeg')?.label).toBe('JPG');
+  });
+
+  it('names a stored Office file by its family', () => {
+    expect(formatOfFilename(DOCUMENT_FORMATS, 'contract.docx')?.label).toBe('Word');
+    expect(formatOfFilename(DOCUMENT_FORMATS, 'LEDGER.XLS')?.label).toBe('Excel');
+    expect(formatOfFilename(DOCUMENT_FORMATS, 'deck.ppt')?.label).toBe('PowerPoint');
+    expect(formatOfFilename(DOCUMENT_FORMATS, 'rows.csv')?.label).toBe('CSV');
   });
 
   it('finds nothing for an extension outside the list, or no extension at all', () => {
@@ -189,9 +338,28 @@ describe('acceptMap', () => {
     });
     expect(acceptMap(DOCUMENT_FORMATS)).toEqual({
       'application/pdf': ['.pdf'],
+      [WORD]: ['.docx'],
+      'application/msword': ['.doc'],
+      [EXCEL]: ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls'],
+      [POWERPOINT]: ['.pptx'],
+      'application/vnd.ms-powerpoint': ['.ppt'],
+      'text/csv': ['.csv'],
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/png': ['.png'],
     });
+  });
+
+  it("carries no browser's other spelling of a format", () => {
+    // react-dropzone takes a file whose name ends with a listed extension, so a
+    // `.docx` reported as a zip already reaches the check. Listing the aliases
+    // would open the OS picker to every `.zip` and `.txt` on the machine.
+    const types = Object.keys(acceptMap(DOCUMENT_FORMATS));
+    for (const [, alias] of ALIASES) {
+      if (alias === 'application/vnd.ms-excel') continue; // the `.xls` format's own type
+      expect(types).not.toContain(alias);
+    }
+    expect(acceptMap(DOCUMENT_FORMATS)['application/vnd.ms-excel']).toEqual(['.xls']);
   });
 
   it('returns a fresh object each call, so a caller cannot mutate the table', () => {

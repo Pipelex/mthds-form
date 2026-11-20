@@ -68,27 +68,45 @@ The details of the link-only control are where its accessibility is decided:
 
 ## What a slot accepts is one list, and a host narrows it once
 
-Every `document` and `image` field carries `formats`, the list of formats that slot accepts. `buildRunFields` stamps it from the kind's table in `file-formats.ts`, which holds everything the runtime can decode for that kind and records how it was measured ([storybook.md](storybook.md#what-a-file-slot-accepts) has the table). The wire says nothing about it, because which bytes a runtime can decode is a property of the runtime and not of the method.
+Every `document` and `image` field carries `formats`, the list of formats that slot accepts. `buildRunFields` stamps it from the kind's table in `file-formats.ts`, which holds everything the hosted runtime reads for that kind and says where each format comes from ([storybook.md](storybook.md#what-a-file-slot-accepts) has the table). The wire says nothing about it, because which bytes a runtime can read is a property of the runtime and not of the method.
+
+A document slot takes PDF, Word, Excel and PowerPoint files in their current and 97-2003 formats, CSV, JPG and PNG, and its hint names each family once: "PDF, Word, Excel, PowerPoint, CSV, JPG, PNG". The hosted runtime reads an Office file in its original form by extraction and through a PDF copy its converter makes when a model needs one, and reads an Excel workbook or a CSV file as rows in `PipeStructure`; the set it converts is `CONVERTIBLE_FORMAT_KEYS` in `pipelex`. The form does not judge which step consumes a slot, because the descriptor does not say: a CSV handed to a model step is let through here and refused by the runtime's own check before the run starts, which is where every other unreadable pairing is refused.
+
+**A browser's other spellings of a format are accepted with its extension.** A browser does not always report a file's canonical type: a machine with no Office registered reports a `.docx`, `.xlsx` or `.pptx` as `application/zip` or `application/x-zip-compressed`, and Windows with Excel installed reports a `.csv` as `application/vnd.ms-excel`, while others say `text/plain`, `application/csv` or `text/x-csv`. Each format lists these as `alsoReportedAs`, and a file reported as one of them is accepted only when its extension is that format's too, so a `.zip` reported as `application/zip` and a `.txt` reported as `text/plain` stay refused. `application/octet-stream`, which says nothing, is read as no type at all, so the extension decides, as it does when a browser reports no type. `narrowFileFormats` and the picker's filter read the canonical type alone: the picker lists every extension beside its type, and react-dropzone takes a file whose name ends with a listed extension, so a file a browser misreports already reaches the check, and listing the other spellings there would offer every zip archive and text file on the machine. The consequence for a host's server is below: it checks an upload with `isAcceptedFile`, never by comparing the reported type with its list, because the form accepts files whose reported type is in no such list.
+
+**A host whose runtime has no converter narrows the list.** The table is the widest a runtime reads, which is the hosted plane's. A runtime configured with `[runtime.document_conversion] backend = "none"`, the default of a local install, cannot hand a model an Office file, so a host running methods on one narrows its fields as below, to the types it can read.
 
 The file control reads that one list in three places: the hint under the dropzone, the filter it hands the operating system's file picker, and the check a picked or dropped file must pass before `onDropFile` is called. When a file is refused, the message names the same list. The three used to be computed apart, the hint from a label on the field and the other two from the kind's table, so a host that rewrote the label moved the hint alone and the picker went on offering files its own server would refuse after the upload had been asked for.
 
-**A host whose upload path takes less than the runtime can decode narrows the field tree once**, with the same list its server checks uploads against:
+**A host whose upload path or runtime takes less than the table narrows the field tree once**, with the list of canonical MIME types it takes, and its server checks each upload with the form's own check over the narrowed formats:
 
 ```ts
 import { buildRunFields, narrowFileFormats } from '@pipelex/mthds-form';
 
-// The one list: the form is narrowed with it, and the server's upload check reads it too.
+// The one list: the form is narrowed with it, and the server narrows the same tree with it.
 export const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 
 const fields = narrowFileFormats(buildRunFields(descriptor, contract.inputs), ALLOWED_MIME_TYPES);
 ```
 
-- **One list serves every slot.** It is intersected with each slot's own formats, so the list above leaves a document slot with PDF, JPG and PNG and an image slot with PNG and JPG. A host never writes a list per slot, and narrowing never widens one: a MIME type the slot's kind cannot take is not in the intersection. Each slot keeps its table's order, and MIME types are compared without parameters and case-insensitively, as the check compares them.
+On the server, the upload is checked against the field it is for, with the name and the type the upload declared:
+
+```ts
+import { isAcceptedFile } from '@pipelex/mthds-form';
+
+// `field` is the narrowed file field the upload is for; `name` and `type` are
+// what the upload declared: its filename and the type the browser reported.
+if (!isAcceptedFile(field.formats, { name, type })) refuse();
+```
+
+**Check with `isAcceptedFile`, not by comparing the reported type with the list.** The form takes a file a browser misreports when its extension is right: a `.docx` reported as `application/zip`, a `.csv` reported as `text/plain`, any listed format reported as `application/octet-stream` or with no type. A server that compares the declared `Content-Type` with `ALLOWED_MIME_TYPES` refuses those files after the form accepted them and the upload was asked for, which is the disagreement narrowing exists to prevent. `isAcceptedFile` takes a plain `{ name, type }`, not a browser `File`, so a server calls it with the declared filename and type as they are.
+
+- **One list serves every slot.** It is intersected with each slot's own formats, so the list above leaves a document slot with PDF, JPG and PNG and an image slot with PNG and JPG. A host never writes a list per slot, and narrowing never widens one: a MIME type the slot's kind cannot take is not in the intersection. Each slot keeps its table's order. The list is read against each format's canonical type alone, without parameters and case-insensitively; a format's `alsoReportedAs` types are not names a host allows, so listing `application/zip` allows no format. Those types are the check's business: `isAcceptedFile` takes a file reported as one of them when its extension is the format's, and reads `application/octet-stream` as no type.
 - **It walks the whole tree**, into records and list items, so a file three levels down is narrowed like one at the top.
 - **It throws when a slot would be left accepting nothing**, naming the field by its path (`cvs[].portrait`). A dropzone that refuses every file is a host's configuration error, and the form should fail where the host can see it rather than render a control that cannot be used. A file field left with no way in at all, with no `onDropFile`, `allowUrl` set to `false` and no file source, is the other configuration error a host can make with a file field, and it is reported the same way (see above).
 - **It never mutates what it is given.** File slots, records and lists come back as copies, and every other field as the same object.
 
-It lives in the core entry rather than on `FieldEnv` so that a host's server, which renders no control, can import the list's one definition and hold the same answer as its form. A server that has the narrowed field can apply the control's exact check with `isAcceptedFile(field.formats, file)`. It reads `RunField`, the kernel's own output, and never touches JSON Schema, so the two schema walks [architecture.md](architecture.md) allows stay the only two. Nothing on the wire changes, and neither does the value a file field holds.
+It lives in the core entry rather than on `FieldEnv` so that a host's server, which renders no control, can import the list's one definition and hold the same answer as its form. A server that has the narrowed field applies the control's exact check with `isAcceptedFile(field.formats, { name, type })`, as above; one that cannot tell which field an upload is for checks it against every format its list keeps, `[...DOCUMENT_FORMATS, ...IMAGE_FORMATS].filter((format) => ALLOWED_MIME_TYPES.includes(format.mimeType))`, which is looser than a slot's check by the formats one kind takes and the other does not. It reads `RunField`, the kernel's own output, and never touches JSON Schema, so the two schema walks [architecture.md](architecture.md) allows stay the only two. Nothing on the wire changes, and neither does the value a file field holds.
 
 ## The ID is a path, and that is the contract
 
@@ -224,7 +242,7 @@ Once a file is attached, the control shows a card: the filename as its title, or
 
 - **A `data:` URL** is the file itself, so the subtitle names its format and decoded size (`PDF · 36 KB`) rather than printing the base64.
 - **An `http` or `https` URL, or text with no scheme at all** (`example.com/brief.pdf`), is a link the person can read, usually one they typed or pasted, so it is shown back to them as it is.
-- **Any other reference in `app`**, a `pipelex-storage://` URI above all, is an address only the host can resolve. The subtitle shows the format the filename's extension names when that is one of the slot's `formats`, and nothing otherwise. The person who just chose the file has no use for its storage address, and printing it is how one reached an end user's screen under every photo they uploaded.
+- **Any other reference in `app`**, a `pipelex-storage://` URI above all, is an address only the host can resolve. The subtitle shows the format the filename's extension names when that is one of the slot's `formats`, by its family (a stored `.docx` reads "Word"), and nothing otherwise. The person who just chose the file has no use for its storage address, and printing it is how one reached an end user's screen under every photo they uploaded.
 - **Any other reference in `studio`** stays printed, because a builder may need the address itself.
 
 The presentation comes from `FieldPresentationProvider`, the same switch the labels follow. The result view's file reference is unaffected: it already names a file by its filename and keeps the reference in its tooltip and behind its copy control ([result-view.md](result-view.md)).
