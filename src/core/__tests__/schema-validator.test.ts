@@ -63,3 +63,79 @@ describe('the parent schema an error carries', () => {
     expect(error?.parentSchema).toBe(date);
   });
 });
+
+/**
+ * The `$schema` a schema declares, as ajv@8 read it - checked against the real
+ * ajv in review: an absent or empty value, draft-07's id with or without a
+ * trailing `#` or `#/`, and the `http://json-schema.org/schema` alias are
+ * draft-07 and checked against its meta-schema; every other dialect is refused,
+ * so a schema is never judged by keywords other than the ones it was written in.
+ */
+describe('the dialect a schema declares', () => {
+  const malformed = { type: 'object', required: ['a', 'a'] };
+
+  for (const declared of [
+    '',
+    'http://json-schema.org/draft-07/schema',
+    'http://json-schema.org/draft-07/schema#',
+    'http://json-schema.org/draft-07/schema#/',
+    'http://json-schema.org/schema',
+    'http://json-schema.org/schema#',
+  ]) {
+    it(`reads ${JSON.stringify(declared)} as draft-07 and checks the schema against it`, () => {
+      expect(() => validateWithSchema({ $schema: declared, ...malformed }, {})).toThrow(
+        'schema is invalid: data/required must NOT have duplicate items (items ## 1 and 0 are identical)',
+      );
+      expect(validateWithSchema({ $schema: declared, type: 'object' }, {})).toEqual([]);
+    });
+  }
+
+  for (const declared of [
+    'https://json-schema.org/draft-07/schema',
+    'https://json-schema.org/draft/2020-12/schema',
+    'https://json-schema.org/draft/2019-09/schema',
+    'http://json-schema.org/draft-04/schema#',
+    'http://example.com/unknown',
+  ]) {
+    it(`refuses ${declared}, whose keywords it does not know`, () => {
+      expect(() => validateWithSchema({ $schema: declared, type: 'object' }, {})).toThrow(
+        `no schema with key or ref "${declared}"`,
+      );
+    });
+  }
+});
+
+describe('an $id below the root', () => {
+  it('is refused, since a reference inside it would resolve against the wrong base', () => {
+    const schema = {
+      definitions: { x: { type: 'string' } },
+      properties: {
+        a: {
+          $id: 'http://example.com/sub.json',
+          definitions: { x: { type: 'number' } },
+          properties: { b: { $ref: '#/definitions/x' } },
+        },
+      },
+    };
+    expect(() => validateWithSchema(schema, { a: { b: 'hello' } })).toThrow(
+      'NOT SUPPORTED: "$id" below the root schema',
+    );
+  });
+
+  it('is allowed at the root, where references resolve against the root anyway', () => {
+    const schema = {
+      $id: 'http://example.com/root.json',
+      definitions: { n: { type: 'number' } },
+      properties: { a: { $ref: '#/definitions/n' } },
+    };
+    expect(strip(validateWithSchema(schema, { a: 'x' }))).toEqual([
+      {
+        keyword: 'type',
+        instancePath: '/a',
+        schemaPath: '#/definitions/n/type',
+        params: { type: 'number' },
+        message: 'must be number',
+      },
+    ]);
+  });
+});

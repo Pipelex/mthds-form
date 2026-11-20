@@ -247,7 +247,8 @@ for (const { entry, match, why } of BANNED) {
  *
  * And the core entry generates no code. The gate runs in browsers whose
  * Content Security Policy refuses `eval` and the `Function` constructor
- * (docs/run-gate.md), so nothing the `.` entry reaches may call either - the
+ * (docs/run-gate.md), so nothing the `.` entry reaches may call either, by name
+ * or through a function's `.constructor` - the
  * built-graph half of `src/core/__tests__/gate-no-codegen.test.ts`, which
  * catches a dependency that would generate code only on a path that test does
  * not walk.
@@ -273,7 +274,7 @@ for (const { entry, match, why } of BANNED) {
       console.log(`ok  ${entry}/index.js does not carry the run gate's validator`);
     }
   }
-  const CODEGEN = /\bnew\s+Function\s*\(|(?<![\w$.])Function\s*\(|(?<![\w$.])eval\s*\(/;
+  const CODEGEN = /\bnew\s+Function\s*\(|(?<![\w$.])Function\s*\(|(?<![\w$.])eval\s*\(|\.constructor\s*\(/;
   const generating = coreFiles.filter((file) => CODEGEN.test(readFileSync(file, 'utf8')));
   if (generating.length > 0) {
     failures.push(

@@ -17,6 +17,18 @@ import { PLAIN_SINGLE, SINGLE_OUTPUT } from './contract-fixtures';
 
 const realFunction = globalThis.Function;
 const realEval = globalThis.eval;
+// The constructors a strict policy also refuses, which code reaches without
+// naming them: `(function () {}).constructor`, and the async and generator
+// function constructors, which no global names at all.
+const CONSTRUCTED = [
+  realFunction.prototype,
+  Object.getPrototypeOf(async function () {}),
+  Object.getPrototypeOf(function* () {}),
+  Object.getPrototypeOf(async function* () {}),
+] as const;
+const realConstructors = CONSTRUCTED.map((prototype) =>
+  Object.getOwnPropertyDescriptor(prototype, 'constructor'),
+);
 
 function refused(): never {
   throw new EvalError('Refused to evaluate a string as JavaScript (no unsafe-eval)');
@@ -30,11 +42,21 @@ beforeEach(() => {
     construct: refused,
   }) as FunctionConstructor;
   globalThis.eval = refused as typeof eval;
+  for (const prototype of CONSTRUCTED) {
+    Object.defineProperty(prototype, 'constructor', {
+      value: refused,
+      configurable: true,
+      writable: true,
+    });
+  }
 });
 
 afterEach(() => {
   globalThis.Function = realFunction;
   globalThis.eval = realEval;
+  CONSTRUCTED.forEach((prototype, i) => {
+    Object.defineProperty(prototype, 'constructor', realConstructors[i]!);
+  });
 });
 
 const QUOTE_SCHEMA = {
@@ -70,6 +92,12 @@ describe('the run gate under a policy without unsafe-eval', () => {
     expect(() => new Function('return 1')).toThrow(EvalError);
     expect(() => Function('return 1')).toThrow(EvalError);
     expect(() => globalThis.eval('1')).toThrow(EvalError);
+    const viaPrototype = function () {}.constructor as FunctionConstructor;
+    expect(() => viaPrototype('return 1')).toThrow(EvalError);
+    const asyncConstructor = async function () {}.constructor as FunctionConstructor;
+    expect(() => asyncConstructor('return 1')).toThrow(EvalError);
+    const generatorConstructor = function* () {}.constructor as FunctionConstructor;
+    expect(() => generatorConstructor('yield 1')).toThrow(EvalError);
   });
 
   it('accepts a valid run, coercing what pydantic would coerce', () => {
@@ -126,5 +154,43 @@ describe('the run gate under a policy without unsafe-eval', () => {
       { type: 'object', properties: { a: { $ref: '#/nowhere' } } },
     );
     expect(errors).toEqual([{ stack: "can't resolve reference #/nowhere from id #" }]);
+  });
+});
+
+describe('a value nested past what the validator can walk', () => {
+  it('is refused with one verdict-less error, never thrown', () => {
+    const schema = {
+      $defs: {
+        Node: {
+          type: 'object',
+          properties: { children: { type: 'array', items: { $ref: '#/$defs/Node' } } },
+        },
+      },
+      $ref: '#/$defs/Node',
+    };
+    let data: Record<string, unknown> = {};
+    for (let depth = 0; depth < 20_000; depth++) data = { children: [data] };
+    expect(validateRunInputsSchema(data, schema)).toEqual([
+      { stack: 'the inputs are nested too deeply to validate' },
+    ]);
+  });
+
+  it('is judged in full at any depth a form produces', () => {
+    const schema = {
+      $defs: {
+        Node: {
+          type: 'object',
+          properties: {
+            n: { type: 'integer' },
+            children: { type: 'array', items: { $ref: '#/$defs/Node' } },
+          },
+        },
+      },
+      $ref: '#/$defs/Node',
+    };
+    let data: Record<string, unknown> = { n: '1' };
+    for (let depth = 0; depth < 100; depth++) data = { n: '1', children: [data] };
+    expect(validateRunInputsSchema(data, schema)).toEqual([]);
+    expect(data['n']).toBe(1);
   });
 });

@@ -27,7 +27,7 @@
  * forms render; this package labels a field by its identifier instead, so the
  * substitution named something the user could not find. See `toRunInputError`.
  */
-import { validateWithSchema, type SchemaError } from './schema-validator';
+import { InvalidSchemaError, validateWithSchema, type SchemaError } from './schema-validator';
 
 /**
  * One validation error, in the shape hosts read (`property`, `message`,
@@ -49,6 +49,9 @@ export interface RunInputError {
   schemaPath?: string;
 }
 
+/** The verdict-less refusal for a value nested past what the validator can walk. */
+export const NESTED_TOO_DEEPLY = 'the inputs are nested too deeply to validate';
+
 /**
  * Validate `data` against `schema`, returning mapped errors (empty = valid).
  * MUTATES `data` where it coerces (`"20"` → `20`), as ajv did - deliberate and relied on:
@@ -61,7 +64,12 @@ export function validateRunInputsSchema(data: unknown, schema: object): RunInput
   } catch (err) {
     // A malformed schema produces a verdict-less failure, same as RJSF's
     // `validationError` path: one bare-stack error, nothing to pin on a field.
-    return [{ stack: err instanceof Error ? err.message : String(err) }];
+    if (err instanceof InvalidSchemaError) return [{ stack: err.message }];
+    // A value nested deeper than the call stack can walk (several hundred
+    // levels of a self-referencing concept) is refused rather than thrown,
+    // since the gate returns a verdict. Anything else is a bug, and surfaces.
+    if (err instanceof RangeError) return [{ stack: NESTED_TOO_DEEPLY }];
+    throw err;
   }
   return errors.map(toRunInputError);
 }

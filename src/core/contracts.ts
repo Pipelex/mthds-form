@@ -147,7 +147,7 @@ export function isFixedCountInput(input: PipeInputContract): boolean {
  * Emptiness is all this predicate answers for - WHETHER a slot gates, never how
  * much it needs. A fixed-count list that holds fewer items than it declares
  * gates here and is refused by `fieldFilled`, which reads the declared count off
- * the descriptor's `itemCount`, and by the gate's ajv pass on the schema's
+ * the descriptor's `itemCount`, and by the gate's schema pass on the schema's
  * `minItems`. All three read the one number the method stated.
  */
 export function inputMustBeFilled(input: PipeInputContract): boolean {

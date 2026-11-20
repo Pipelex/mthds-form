@@ -200,6 +200,9 @@ const LOOP_THRESHOLD = 200;
 const MULTIPLE_OF_PRECISION = 1e-8;
 const DRAFT_07_ID = 'http://json-schema.org/draft-07/schema';
 
+/** The `$schema` values ajv resolved to its draft-07 meta-schema: its id and the alias it registers. */
+const DRAFT_07_KEYS = new Set([DRAFT_07_ID, 'http://json-schema.org/schema']);
+
 const LIMIT_NUMBER: Readonly<
   Record<string, { okStr: string; fails: (data: number, limit: number) => boolean }>
 > = {
@@ -465,6 +468,16 @@ function checkReachable(root: AnySchema): void {
   const visit = (schema: unknown): void => {
     if (!isSchemaObject(schema) || seen.has(schema)) return;
     seen.add(schema);
+    // A subschema's `$id` moves the base its references resolve against, and
+    // names an anchor a `#name` reference can reach. This validator resolves
+    // every reference against the root, so it refuses such a schema rather
+    // than resolving one of its references to the wrong place - a wrong
+    // verdict, where a refusal is only a missing one. No contract carries one.
+    if (schema !== root && schema.$id !== undefined) {
+      throw new InvalidSchemaError(
+        'NOT SUPPORTED: "$id" below the root schema - references resolve against the root only',
+      );
+    }
     if (!hasRules(schema)) return;
     schemaTypes(schema);
 
@@ -548,9 +561,16 @@ export function assertValidSchema(schema: unknown): void {
     if (declared !== undefined && typeof declared !== 'string') {
       throw new InvalidSchemaError('$schema must be a string');
     }
-    // ajv knows the draft-07 meta-schema only; a schema declaring another
-    // dialect was compiled unchecked, so it is here too.
-    if (declared === undefined || declared.replace(/#\/?$/, '') === DRAFT_07_ID) {
+    // ajv knew the draft-07 meta-schema only, under its id and one alias, and
+    // read an absent or empty `$schema` as it. Any other dialect it refused
+    // outright, which is what keeps a 2020-12 schema from being judged by
+    // draft-07's keywords and passing what its own would refuse. A bare `#`
+    // named no meta-schema at all, and ajv compiled that schema unchecked.
+    const key = (declared || DRAFT_07_ID).replace(/#\/?$/, '');
+    if (key !== '' && !DRAFT_07_KEYS.has(key)) {
+      throw new InvalidSchemaError(`no schema with key or ref "${declared}"`);
+    }
+    if (key !== '') {
       const metaErrors = validateAgainstSchema(DRAFT_07_META_SCHEMA, schema, false);
       if (metaErrors.length) {
         const text = metaErrors.map((e) => `data${e.instancePath} ${e.message}`).join(', ');
@@ -597,7 +617,7 @@ class Interpreter {
 
   constructor(
     private readonly root: AnySchema,
-    /** `false` for the meta-schema check: ajv never coerces a schema it checks. */
+    /** `false` for the meta-schema check: ajv neither coerced a schema it checked nor read its formats. */
     private readonly coerce: boolean,
   ) {}
 
@@ -939,6 +959,10 @@ class Interpreter {
         return true;
 
       case 'format': {
+        // ajv checked a schema against the meta-schema with no format at all,
+        // so a `$schema`, `$id`, `$ref` or `pattern` that is not a well-formed
+        // URI or regex never failed there (a bad `pattern` fails as a regex).
+        if (!this.coerce) return true;
         const format = FORMATS[value as string];
         // An unknown format is ignored (`strict: false`); `true` is a hint.
         if (format === undefined || format === true || format.type !== ruleType) return true;
@@ -1400,6 +1424,11 @@ function validateAgainstSchema(schema: AnySchema, data: unknown, coerce = true):
  * Check `schema`, then validate `data` against it. Throws `InvalidSchemaError`
  * for a schema ajv's `compile` would have refused; otherwise returns every
  * error (empty = valid), having coerced `data` in place.
+ *
+ * The interpreter recurses once per schema it applies, so a value nested
+ * through a self-referencing schema overflows the call stack at a few hundred
+ * levels (ajv's compiled code reached a few thousand): that surfaces as the
+ * engine's `RangeError`, which a caller that must return a verdict catches.
  */
 export function validateWithSchema(schema: object | boolean, data: unknown): SchemaError[] {
   assertValidSchema(schema);

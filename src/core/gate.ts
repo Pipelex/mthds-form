@@ -47,7 +47,7 @@ type Dict = Record<string, unknown>;
  * not block the form (see `inputMustBeFilled`).
  *
  * The per-input schema travels verbatim, which is how a fixed-count (`[N]`)
- * list's declared count reaches ajv: pipelex states it as `minItems`/`maxItems`
+ * list's declared count reaches the validator: pipelex states it as `minItems`/`maxItems`
  * on the array wrapper, so the count is enforced here without the kernel
  * restating it.
  */
@@ -69,7 +69,7 @@ export function buildRunInputsSchema(inputs: Record<string, PipeInputContract>):
 }
 
 /**
- * Last-gate repair, in two passes against the exact schema ajv validates.
+ * Last-gate repair, in two passes against the exact schema the validator judges.
  *
  * 1. **HEAL** - persisted `inputData` may still carry the legacy double-wrapped
  *    `{ text: { text } }` shape (or a form's state may lag a store fix).
@@ -105,7 +105,7 @@ export interface RunInputsVerdict {
  * is never undiagnosable.
  *
  * `preparedData` is `unknown` for the same reason `gateRunInputs`' `data` is: on
- * a public endpoint the body is whatever was sent, and ajv must be shown that
+ * a public endpoint the body is whatever was sent, and the validator must be shown that
  * rather than a repair of it, or `must be object` is a verdict no caller can
  * ever receive. The name-the-variable scan below needs something indexable, so
  * a body that is not a record scans against nothing and names every input the
@@ -255,7 +255,7 @@ function schemaForContract(contract: PipeIOContract): Dict {
  * throw *after* ajv had already reported `must be object` and before any
  * verdict came back.
  *
- * So the two uses are separated rather than collapsed into one repair. **ajv
+ * So the two uses are separated rather than collapsed into one repair. **The validator
  * judges the value the caller actually sent**, which is what makes `must be
  * object` the verdict for a body that is not one; the indexing that follows
  * uses a safe `{}` stand-in, which is what keeps the gate from throwing. Repair
@@ -265,7 +265,7 @@ function schemaForContract(contract: PipeIOContract): Dict {
  * came back `ok: true` on a body the caller never meant as a run. Fail-closed
  * costs a malformed caller an error it earned; the other direction bills a run.
  *
- * **The schema alone is not the rule.** ajv's `required` asserts only that a
+ * **The schema alone is not the rule.** The schema's `required` asserts only that a
  * key is PRESENT, and a content model carries no `minLength` - so a required
  * input that arrived empty (`{document: {url: ""}}`, `{text: {text: ""}}`)
  * satisfies the schema. That is the natural payload, not a contrived one:
@@ -290,7 +290,7 @@ export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInput
   const schema = schemaForContract(contract);
   const preparedData = prepareRunInputs(payload, schema);
 
-  // The value ajv is shown is the caller's, not the stand-in - see above.
+  // The value the validator is shown is the caller's, not the stand-in - see above.
   const verdict = validateRunInputs(isRecord ? preparedData : data, contract.inputs, schema);
   if (!verdict.isValid) {
     return {
@@ -308,14 +308,14 @@ export function gateRunInputs(contract: PipeIOContract, data: unknown): RunInput
   // declares. Filtering on `mustBeFilled` alone dropped the second kind, so a
   // half-filled optional struct was refused by the button and accepted here.
   //
-  // ajv cannot cover for it: a required child that is a plain string arrives as
+  // The validator cannot cover for it: a required child that is a plain string arrives as
   // `''`, which satisfies `required`. And the payload builder below then SENDS
   // that input, because `isFilled` is exactly what it tests. Which is the rule
   // stated properly: the gate holds to its concept precisely the inputs it is
   // about to put on the wire, and nothing it will omit.
   //
   // The tree the predicates run over is the gate's own, walked structurally
-  // from the same `json_schema` ajv just validated - NOT the render tree, which
+  // from the same `json_schema` the validator just judged - NOT the render tree, which
   // is built from the input-form descriptor. A server validating a payload must
   // never need that presentation artifact; see `gating-fields.ts`.
   const missingInputs = gatingFieldsFromInputs(contract.inputs)
