@@ -178,6 +178,23 @@ describe('a stored reference never reaches an end user', () => {
     expect(container.textContent).not.toContain('pipelex-storage');
   });
 
+  it('names a stored Word file by its family, in app', () => {
+    // A value read in from a stored example or an earlier run is a reference
+    // and a filename, never a `File`: the chip reads the extension.
+    const { container } = renderIn('app', { filename: 'contract.docx', url: STORED });
+    expect(screen.getByText('contract.docx')).toBeInTheDocument();
+    expect(screen.getByText('Word')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('pipelex-storage');
+  });
+
+  it('names the legacy and spreadsheet formats by their family too, in app', () => {
+    const { unmount } = renderIn('app', { filename: 'ledger.xls', url: STORED });
+    expect(screen.getByText('Excel')).toBeInTheDocument();
+    unmount();
+    renderIn('app', { filename: 'rows.csv', url: STORED });
+    expect(screen.getByText('CSV')).toBeInTheDocument();
+  });
+
   it('shows nothing under the name, in app, when the filename names none of them', () => {
     const { container } = renderIn('app', { filename: 'contract', url: STORED });
     expect(screen.getByText('contract')).toBeInTheDocument();
@@ -720,7 +737,8 @@ describe('a file the slot cannot accept never reaches the host', () => {
    * The point is the ORDER, not the message. A host's `onDropFile` is a network
    * call and usually a billed one, so a file the runtime cannot decode has to be
    * refused before it is handed over - not uploaded and then complained about,
-   * and not (as it was) accepted in silence under a label reading PDF, DOCX, TXT.
+   * and not (as it once was) accepted in silence under a label that named
+   * formats the runtime could not read.
    *
    * These go through a DROP rather than the file input, and that is forced
    * rather than stylistic: the input now carries an `accept` attribute, so a
@@ -754,7 +772,9 @@ describe('a file the slot cannot accept never reaches the host', () => {
     drop(zip());
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('archive.zip');
-    expect(alert).toHaveTextContent('Accepted formats: PDF, JPG, PNG.');
+    expect(alert).toHaveTextContent(
+      'Accepted formats: PDF, Word, Excel, PowerPoint, CSV, JPG, PNG.',
+    );
   });
 
   /**
@@ -794,10 +814,39 @@ describe('a file the slot cannot accept never reaches the host', () => {
     // Both have to be right, and only this one is visible in the DOM.
     expect(fileInput().accept).toContain('application/pdf');
     expect(fileInput().accept).toContain('image/png');
+    expect(fileInput().accept).toContain('wordprocessingml');
+    expect(fileInput().accept).toContain('.xlsx');
+    expect(fileInput().accept).toContain('.csv');
+    // A browser's other spellings of a format stay out of the picker: they
+    // would offer every zip archive and text file on the machine, and a file
+    // reported as one already passes on its extension.
     expect(fileInput().accept).not.toContain('text/plain');
-    // The two that a run proves fail, and that this table used to advertise.
-    expect(fileInput().accept).not.toContain('wordprocessingml');
-    expect(fileInput().accept).not.toContain('presentationml');
+    expect(fileInput().accept).not.toContain('application/zip');
+  });
+
+  it('takes a .docx a browser reports as a zip, and a .csv it reports as text', async () => {
+    // A machine with no Office registered reports a `.docx` as a zip archive.
+    // react-dropzone lets it through on its extension, and the check reads the
+    // extension beside the type.
+    const onDropFile = vi.fn();
+    const { unmount } = renderField({ onDropFile });
+    drop(new File(['zip'], 'brief.docx', { type: 'application/zip' }));
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alert')).toBeNull();
+    unmount();
+
+    const again = vi.fn();
+    renderField({ onDropFile: again });
+    drop(new File(['a,b'], 'rows.csv', { type: 'text/plain' }));
+    await waitFor(() => expect(again).toHaveBeenCalledTimes(1));
+  });
+
+  it('still refuses a zip archive reported as a zip', async () => {
+    const onDropFile = vi.fn();
+    renderField({ onDropFile });
+    drop(zip());
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(onDropFile).not.toHaveBeenCalled();
   });
 });
 

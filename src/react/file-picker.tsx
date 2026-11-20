@@ -22,7 +22,12 @@ import type {
 } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
 // barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
-import { formatOfFilename, normalizeMimeType, type FileFormat } from '../core/file-formats';
+import {
+  formatLabels,
+  formatOfFile,
+  formatOfFilename,
+  type FileFormat,
+} from '../core/file-formats';
 import { chosenFilesAdded } from '../core/sources';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import { rowActionClass } from './field-styles';
@@ -254,7 +259,8 @@ function FilePickerBody({
   }, [search, query]);
 
   const mediaTypes = useMemo(() => formats.map((format) => format.mimeType), [formats]);
-  const labels = useMemo(() => formats.map((format) => format.label), [formats]);
+  // Each family once: `.doc` and `.docx` are both Word.
+  const labels = useMemo(() => formatLabels(formats), [formats]);
   const load: LoadSourcePage<SourceFile> = (cursor, signal) =>
     source
       .list({ search: query, scope, mediaTypes, cursor, signal })
@@ -511,10 +517,16 @@ function SheetHeader({
   );
 }
 
-/** The format a row's file is, named the way the field's hint names it. */
+/**
+ * The format a row's file is, named the way the field's hint names it: as the
+ * field's check would take it, so a `.csv` stored as `application/vnd.ms-excel`
+ * reads CSV, and else by its extension alone.
+ */
 function rowFormat(file: SourceFile, formats: readonly FileFormat[]): FileFormat | undefined {
-  const type = file.mediaType ? normalizeMimeType(file.mediaType) : '';
-  return formats.find((format) => format.mimeType === type) ?? formatOfFilename(formats, file.name);
+  return (
+    formatOfFile(formats, { name: file.name, type: file.mediaType ?? '' }) ??
+    formatOfFilename(formats, file.name)
+  );
 }
 
 /**

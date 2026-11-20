@@ -105,14 +105,25 @@ describe('the render path follows the wire: Date and Html are their structures',
       }),
       { page: input('native.Page', { type: 'object', properties: { url: { type: 'string' } } }) },
     );
-    // `formats` comes from `formatsForKind`, whose table was measured against
-    // the runtime rather than copied off an enum. Updating this expectation is
-    // right where updating a WIRE expectation would not be: `formats` is a
-    // renderer affordance the descriptor never states, so this pins a
-    // presentation default, not the standard.
+    // `formats` comes from `formatsForKind`, whose table mirrors what the
+    // runtime reads rather than an enum. Updating this expectation is right
+    // where updating a WIRE expectation would not be: `formats` is a renderer
+    // affordance the descriptor never states, so this pins a presentation
+    // default, not the standard.
     expect(field).toMatchObject({
       kind: 'document',
-      formats: [{ label: 'PDF' }, { label: 'JPG' }, { label: 'PNG' }],
+      formats: [
+        { label: 'PDF' },
+        { label: 'Word' },
+        { label: 'Word' },
+        { label: 'Excel' },
+        { label: 'Excel' },
+        { label: 'PowerPoint' },
+        { label: 'PowerPoint' },
+        { label: 'CSV' },
+        { label: 'JPG' },
+        { label: 'PNG' },
+      ],
     });
   });
 });
