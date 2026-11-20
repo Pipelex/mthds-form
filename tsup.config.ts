@@ -22,15 +22,16 @@ import { defineConfig } from "tsup";
  * load-bearing rather than tidy. esbuild emits a shared chunk for whatever two
  * or more entries reach, and it chunks at MODULE granularity - so with a single
  * core entry the whole core collapses into one module, `dist/core/index.js`
- * carries real code alongside a top-level `import Ajv from 'ajv'`, and a
+ * carries real code alongside the gate's validator, and a
  * consumer's bundler cannot separate the two: importing `isFilled` from a
- * client component ships the validator, measured once at +131 KB gzip.
+ * client component ships the validator, measured once (when it was ajv) at
+ * +131 KB gzip.
  *
  * Naming every core module as an entry gives each its own chunk, which leaves
  * `dist/core/index.js` a PURE re-export barrel - no inline code, one
  * `export ... from` per chunk. That is the shape a consumer's bundler can tree-
  * shake: it keeps the chunks behind the exports the host actually uses and
- * drops the rest, so ajv follows the gate exports and nothing else. It works
+ * drops the rest, so the validator follows the gate exports and nothing else. It works
  * because `package.json` declares `sideEffects` as CSS-only; widening that
  * would silently switch this off. `scripts/assert-bundle.mjs` guards the half
  * of the property that is local to this build.

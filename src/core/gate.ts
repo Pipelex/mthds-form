@@ -11,7 +11,7 @@
  *      is `inputMustBeFilled` (optional `?` and variable-plural `[]` never
  *      block; a fixed-count `[N]` list does).
  *   2. `prepareRunInputs` - heal legacy wrappers, then prune empty optionals.
- *   3. `validateRunInputs` - ajv, plus the missing-input scan that names the
+ *   3. `validateRunInputs` - the schema pass, plus the missing-input scan that names the
  *      VARIABLE at fault.
  *   4. `apiInputsFromSchemaData` - the `{concept, content}` payload, built from
  *      the PREPARED data so the pruning reaches the wire too.
@@ -87,7 +87,7 @@ export interface RunInputsVerdict {
   isValid: boolean;
   /** Variable names the scan could pin a missing required field on. */
   missingInputs: string[];
-  /** Raw ajv errors, for when the scan cannot name anything. */
+  /** Raw schema errors, for when the scan cannot name anything. */
   errors: RunInputError[];
 }
 
@@ -207,7 +207,7 @@ export type RunInputsGateResult =
       ok: false;
       /** Variable names the caller left empty or short. */
       missingInputs: string[];
-      /** Raw ajv errors, for when the scan cannot name anything. */
+      /** Raw schema errors, for when the scan cannot name anything. */
       errors: RunInputError[];
       /** The repaired data the verdict was reached on - what
        *  `describeValidationError` needs to quote the value it received. */
@@ -218,17 +218,16 @@ export type RunInputsGateResult =
  * One schema object per contract, for the lifetime of the process.
  *
  * `buildRunInputsSchema` is a pure function of the contract, so rebuilding it is
- * *semantically* free - but validation runs through a module-level ajv whose
- * compiled-schema cache is keyed on **schema object identity** and is never
- * evicted. A fresh object per call therefore misses every time and retains
- * another compiled validator. On a publicly callable server endpoint that is
- * unbounded growth driven by the cheapest request there is: an empty body,
- * rejected in a fraction of a millisecond, costing nothing to send.
+ * *semantically* free - but the validator remembers, per schema object, the
+ * verdict of checking that schema against the meta-schema
+ * (`schema-validator.ts`). A fresh object per call would repeat that check on
+ * every request, on a publicly callable server endpoint where the cheapest
+ * request there is - an empty body, rejected in a fraction of a millisecond -
+ * would pay for it each time. (When the validator was ajv, a fresh object also
+ * retained another compiled validator in a cache that was never evicted.)
  *
- * Weakly keyed so the map never pins a contract that goes out of scope. The
- * schema a run has been gated against is pinned for the process lifetime anyway
- * by ajv's own cache; the point is that the NUMBER of them is bounded by the
- * number of distinct contracts rather than by traffic.
+ * Weakly keyed, like the validator's own memo, so neither pins a contract or a
+ * schema that goes out of scope.
  */
 const SCHEMA_CACHE = new WeakMap<PipeIOContract, Dict>();
 

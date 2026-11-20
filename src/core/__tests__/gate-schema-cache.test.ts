@@ -1,11 +1,12 @@
 /**
- * The gate compiles one schema per contract, and this file is where that is
+ * The gate builds one schema per contract, and this file is where that is
  * actually observed.
  *
- * ajv keys its compiled-schema cache on schema object IDENTITY and never
- * evicts, so a gate that rebuilt `buildRunInputsSchema` per call would retain a
- * compiled validator per REQUEST - on a public endpoint, unbounded growth
- * driven by the cheapest possible body. The claim is therefore about object
+ * The validator remembers its meta-schema verdict per schema object IDENTITY
+ * (and ajv, before it, kept a compiled validator per object and never evicted
+ * one), so a gate that rebuilt `buildRunInputsSchema` per call would redo that
+ * work per REQUEST - on a public endpoint, driven by the cheapest possible
+ * body. The claim is therefore about object
  * identity, not about verdicts: gating fifty times and asserting fifty correct
  * answers passes just as happily against a per-request implementation, which is
  * exactly what the case that used to stand here did.

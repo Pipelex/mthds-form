@@ -8,7 +8,7 @@ import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
 import { cn, isThenable, storedUrlOf } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
-// barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
+// barrel reaches the gate and the gate reaches its validator. See docs/dependency-budget.md.
 import {
   acceptLabel,
   acceptMap,

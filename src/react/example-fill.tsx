@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import { ClipboardPaste, MoreHorizontal, X } from 'lucide-react';
 import type { ExampleSource, FormExample, RunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
-// barrel reaches the gate and the gate reaches ajv. See docs/dependency-budget.md.
+// barrel reaches the gate and the gate reaches its validator. See docs/dependency-budget.md.
 import { runValuesFromInputs } from '../core/values';
 import { useFieldStrings } from './field-strings';
 import { followingFocusable } from './focus';

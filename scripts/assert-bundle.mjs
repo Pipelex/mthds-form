@@ -48,7 +48,7 @@ const specifierOf = (entry) => (entry === 'core' ? '.' : `./${entry}`);
  * `import(...)` is read too, and it is not decoration. A dynamic import is a
  * real edge of the chunk graph - a bundler splits at it rather than dropping it
  * - so a walk that followed only static edges would stop at the chunk boundary
- * and report a clean graph for an entry that loads ajv one `import()` away. The
+ * and report a clean graph for an entry that loads a banned package one `import()` away. The
  * expression form (`import(someVariable)`) is unreadable from here by
  * construction; only a literal specifier is matched, which is what tsup emits.
  */
@@ -100,11 +100,6 @@ const BANNED = [
     entry: `${DIST}/${entry}/index.js`,
     match: /^react($|\/)|^react-dom($|\/)/,
     why: `The \`${specifierOf(entry)}\` entry is isomorphic and must stay importable from a server component and a node script.`,
-  })),
-  ...['react', 'generative', 'brand'].map((entry) => ({
-    entry: `${DIST}/${entry}/index.js`,
-    match: /^ajv($|-|\/)/,
-    why: `The \`./${entry}\` entry must not drag the run gate's validator into a client bundle.`,
   })),
   // json-render and zod are the generative layer's own, and a host that only
   // renders a form must not pay for them. Neither entry below imports either in
@@ -243,6 +238,53 @@ for (const { entry, match, why } of BANNED) {
 }
 
 /**
+ * The run gate's validator, which is the package's own code rather than a
+ * dependency, so no specifier names it: its chunk is found by a sentence only
+ * it writes. It belongs to the core entry and to no other - `./react` and
+ * `./generative` must not drag it into a client bundle, and the entries that
+ * render nothing have no gate to run. Fail-closed: the core entry must reach
+ * it, or the sentence went stale and every other line here compared nothing.
+ *
+ * And the core entry generates no code. The gate runs in browsers whose
+ * Content Security Policy refuses `eval` and the `Function` constructor
+ * (docs/run-gate.md), so nothing the `.` entry reaches may call either - the
+ * built-graph half of `src/core/__tests__/gate-no-codegen.test.ts`, which
+ * catches a dependency that would generate code only on a path that test does
+ * not walk.
+ */
+{
+  const VALIDATOR_SENTINEL = 'must match a schema in anyOf';
+  const carriesValidator = (file) => readFileSync(file, 'utf8').includes(VALIDATOR_SENTINEL);
+  const coreFiles = [...graphOf(`${DIST}/core/index.js`).files];
+  if (!coreFiles.some(carriesValidator)) {
+    failures.push(
+      `core/index.js reaches no chunk containing "${VALIDATOR_SENTINEL}", so the validator checks below compared nothing - update the sentence to one src/core/schema-validator.ts still writes.`,
+    );
+  } else {
+    console.log("ok  core/index.js reaches the run gate's validator");
+  }
+  for (const entry of ['react', 'generative', 'generative/headless', 'brand']) {
+    const carrying = [...graphOf(`${DIST}/${entry}/index.js`).files].filter(carriesValidator);
+    if (carrying.length > 0) {
+      failures.push(
+        `${entry}/index.js reaches the run gate's validator (${carrying.map((file) => relative(DIST, file)).join(', ')}) - it belongs to the \`.\` entry alone. See docs/dependency-budget.md.`,
+      );
+    } else {
+      console.log(`ok  ${entry}/index.js does not carry the run gate's validator`);
+    }
+  }
+  const CODEGEN = /\bnew\s+Function\s*\(|(?<![\w$.])Function\s*\(|(?<![\w$.])eval\s*\(/;
+  const generating = coreFiles.filter((file) => CODEGEN.test(readFileSync(file, 'utf8')));
+  if (generating.length > 0) {
+    failures.push(
+      `core/index.js reaches code that evaluates a string (${generating.map((file) => relative(DIST, file)).join(', ')}) - a Content Security Policy without 'unsafe-eval' refuses it, and the run gate must run under one. See docs/run-gate.md.`,
+    );
+  } else {
+    console.log('ok  core/index.js reaches no eval and no Function constructor');
+  }
+}
+
+/**
  * The generative layer's server entry has an allow-list too: json-render's
  * core, which compiles a layout's JSONL and checks its structure, and zod,
  * which its catalog is written in - and nothing else. No React, no renderer,
@@ -304,10 +346,11 @@ for (const { entry, match, why } of BANNED) {
 // The `.` barrel must stay a PURE re-export: no inline code, one `export ...
 // from` per chunk. That shape is what lets a consumer's bundler keep the chunks
 // behind the exports they use and drop the rest - which is the only reason
-// importing `isFilled` from a client component does not ship ajv. It regresses
-// the moment `tsup.config.ts` stops naming every core module as an entry, and
-// nothing else here would notice: the graph checks above still pass, because
-// the barrel legitimately reaches ajv either way.
+// importing `isFilled` from a client component does not ship the gate's
+// validator. It regresses the moment `tsup.config.ts` stops naming every core
+// module as an entry, and nothing else here would notice: the graph checks
+// above still pass, because the barrel legitimately reaches the validator
+// either way.
 /**
  * Split bundled JS into top-level statements.
  *
@@ -390,8 +433,8 @@ const coreBarrel = readFileSync(`${DIST}/core/index.js`, 'utf8');
 // re-export (`own-property`, `native-concepts`), and a side-effect import IS
 // something a bundler must keep. Banning it fails this package's own correct
 // output. What makes it harmless is the check above, not this one - the graph
-// walk follows those same specifiers, so a chunk that ever began dragging ajv
-// or React in would fail there. This check owns one narrower claim: that the
+// walk follows those same specifiers, so a chunk that ever began dragging the
+// validator or React in would fail there. This check owns one narrower claim: that the
 // barrel holds no CODE, which is what a narrowed entry glob breaks and what
 // the graph walk cannot see.
 const inlineCode = statementsOf(coreBarrel).filter(
@@ -405,7 +448,7 @@ if (inlineCode.length === 0) {
   console.log('ok  core/index.js is a pure re-export barrel');
 } else {
   failures.push(
-    `core/index.js carries ${inlineCode.length} statement(s) that are not re-exports, so it is no longer tree-shakeable - a consumer importing any core value will ship ajv. Check the entry glob in tsup.config.ts.\n    first: ${inlineCode[0].replace(/\s+/g, ' ').slice(0, 80)}`,
+    `core/index.js carries ${inlineCode.length} statement(s) that are not re-exports, so it is no longer tree-shakeable - a consumer importing any core value will ship the run gate's validator. Check the entry glob in tsup.config.ts.\n    first: ${inlineCode[0].replace(/\s+/g, ' ').slice(0, 80)}`,
   );
 }
 
