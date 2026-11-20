@@ -612,7 +612,7 @@ Same reason `file-formats.ts` does: a host that renders a result its own way nee
 
 - **Resolve a `pipelex-storage://` URL.** That is the host's seam ([upload-seam.md](upload-seam.md)). With no resolver the reference is shown as what it is, rather than as a dead link or a broken image — which is what a host without a resolver genuinely sees. Inside an HTML page the view finds the references and asks the host's resolvers, but the answer is still the host's ([Stored pictures inside a page](#stored-pictures-inside-a-page)).
 - **Make a smaller copy of a picture.** The view holds a reference and the host holds the file, so a gallery's tiles are drawn from the host's copies only when the host supplies them ([Smaller copies](#smaller-copies-the-hosts-resolverendition)).
-- **Validate the result against its schema.** Inputs need ajv because a user types them. A runtime produced the output; re-validating it client-side asserts distrust of the engine and buys nothing.
+- **Validate the result against its schema.** Inputs need the gate's validator because a user types them. A runtime produced the output; re-validating it client-side asserts distrust of the engine and buys nothing.
 - **Render `working_memory`.** A run's intermediate stuffs are a debugging surface, not a result surface — different consumer, different artifact.
 
 ## Fixtures

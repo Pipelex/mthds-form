@@ -1,18 +1,21 @@
 /**
- * The run gate's OWN validator - ajv direct, no RJSF.
+ * The run gate's OWN validator - no RJSF, no ajv, and no generated code.
  *
  * Until the form-kernel extraction the gate validated through
  * `@rjsf/validator-ajv8` (`rjsf-validator.ts`), which is an RJSF `ValidatorType`
- * wrapper around exactly this: an ajv instance plus an error-shape transform.
- * The kernel must not depend on RJSF, so this module owns both halves directly,
- * configured to reproduce its output but for one deliberate divergence:
+ * wrapper around an ajv instance plus an error-shape transform. The kernel must
+ * not depend on RJSF, so this module took over both halves; and since ajv
+ * compiles every schema with `new Function(...)`, which a Content Security
+ * Policy without `'unsafe-eval'` refuses, the validator half is now the
+ * kernel's own interpreter (`schema-validator.ts`), which reproduces exactly
+ * the ajv instance this gate always ran:
  *
- * - the ajv OPTIONS are `@rjsf/validator-ajv8`'s `AJV_CONFIG` plus the same
- *   `coerceTypes: true` override this gate has always run with (pydantic runs in
- *   lax mode - `"20"` is a number, `"5"` an int - and rejecting client-side what
- *   the runner accepts blocks valid work; see `rjsf-validator.ts`);
+ * - `@rjsf/validator-ajv8`'s `AJV_CONFIG` plus the same `coerceTypes: true`
+ *   override this gate has always run with (pydantic runs in lax mode - `"20"`
+ *   is a number, `"5"` an int - and rejecting client-side what the runner
+ *   accepts blocks valid work; see `rjsf-validator.ts`);
  * - the `date` / `date-time` formats are the pydantic-parity predicates from
- *   `date-format.ts`, same as before;
+ *   `date-format.ts`, same as before (`schema-formats.ts`);
  * - `toRunInputError` reproduces RJSF's `transformRJSFValidationErrors` for the
  *   no-uiSchema case the gate is: `property` is the dotted instance path (plus
  *   the missing property name for `required` errors), and `stack` quotes the
@@ -24,9 +27,12 @@
  * forms render; this package labels a field by its identifier instead, so the
  * substitution named something the user could not find. See `toRunInputError`.
  */
-import Ajv, { type ErrorObject } from 'ajv';
-import addFormats from 'ajv-formats';
-import { isAcceptableDate, isAcceptableDateTime } from './date-format';
+import {
+  InvalidSchemaError,
+  isStackOverflow,
+  validateWithSchema,
+  type SchemaError,
+} from './schema-validator';
 
 /**
  * One validation error, in the shape hosts read (`property`, `message`,
@@ -35,7 +41,7 @@ import { isAcceptableDate, isAcceptableDateTime } from './date-format';
  * (an RJSF-based inputs panel) can hand them to the same message renderer.
  */
 export interface RunInputError {
-  /** The ajv keyword that failed (`required`, `format`, `type`, …). */
+  /** The JSON Schema keyword that failed (`required`, `format`, `type`, …). */
   name?: string;
   /** Dotted path into the form data (`.quote_date.date`); for a `required`
    *  error the missing property name is appended (top-level: no leading dot). */
@@ -48,55 +54,36 @@ export interface RunInputError {
   schemaPath?: string;
 }
 
-// The exact instance `@rjsf/validator-ajv8` builds (its AJV_CONFIG + the
-// standard ajv-formats + its two custom formats), plus our two overrides.
-const ajv = new Ajv({
-  allErrors: true,
-  multipleOfPrecision: 8,
-  strict: false,
-  verbose: true,
-  discriminator: false,
-  coerceTypes: true,
-});
-addFormats(ajv);
-ajv.addFormat('data-url', /^data:([a-z]+\/[a-z0-9-+.]+)?;(?:name=(.*);)?base64,(.*)$/);
-ajv.addFormat(
-  'color',
-  /^(#?([0-9A-Fa-f]{3}){1,2}\b|aqua|black|blue|fuchsia|gray|green|lime|maroon|navy|olive|orange|purple|red|silver|teal|white|yellow|(rgb\(\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*,\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*,\s*\b([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b\s*\))|(rgb\(\s*(\d?\d%|100%)+\s*,\s*(\d?\d%|100%)+\s*,\s*(\d?\d%|100%)+\s*\)))$/,
-);
-// Pydantic-parity leniency, replacing ajv-formats' spec-strict versions: a
-// midnight-padded timestamp IS a date, a bare day IS a date-time. Measured
-// against pydantic in `date-format.ts` - keep in step with the runtime, not
-// with the JSON Schema spec.
-ajv.addFormat('date', isAcceptableDate);
-ajv.addFormat('date-time', isAcceptableDateTime);
+/** The verdict-less refusal for a value nested past what the validator can walk. */
+export const NESTED_TOO_DEEPLY = 'the inputs are nested too deeply to validate';
 
 /**
  * Validate `data` against `schema`, returning mapped errors (empty = valid).
- * MUTATES `data` where ajv coerces (`"20"` → `20`) - deliberate and relied on:
+ * MUTATES `data` where it coerces (`"20"` → `20`), as ajv did - deliberate and relied on:
  * the string the user typed is stored as a number going forward.
  */
 export function validateRunInputsSchema(data: unknown, schema: object): RunInputError[] {
-  let validate;
+  let errors: SchemaError[];
   try {
-    validate = ajv.compile(schema);
+    errors = validateWithSchema(schema, data);
   } catch (err) {
     // A malformed schema produces a verdict-less failure, same as RJSF's
     // `validationError` path: one bare-stack error, nothing to pin on a field.
-    return [{ stack: err instanceof Error ? err.message : String(err) }];
+    if (err instanceof InvalidSchemaError) return [{ stack: err.message }];
+    // A value nested deeper than the call stack can walk (several hundred
+    // levels of a self-referencing concept) is refused rather than thrown,
+    // since the gate returns a verdict. Anything else is a bug, and surfaces.
+    if (isStackOverflow(err)) return [{ stack: NESTED_TOO_DEEPLY }];
+    throw err;
   }
-  validate(data);
-  const errors = (validate.errors ?? []).map(toRunInputError);
-  validate.errors = null;
-  return errors;
+  return errors.map(toRunInputError);
 }
 
 /** RJSF's `transformRJSFValidationErrors`, minus the uiSchema lookups the gate
  *  never had (it passes no uiSchema). */
-function toRunInputError(e: ErrorObject): RunInputError {
+function toRunInputError(e: SchemaError): RunInputError {
   const { instancePath, keyword, schemaPath, parentSchema } = e;
-  const params = e.params as Record<string, unknown>;
-  const message = e.message ?? '';
+  const { params, message } = e;
   let property = instancePath.replace(/\//g, '.');
   let stack = `${property} ${message}`.trim();
 
@@ -107,7 +94,7 @@ function toRunInputError(e: ErrorObject): RunInputError {
   ].some((item) => typeof item === 'string' && item.length > 0);
 
   if (namesAProperty) {
-    // ajv already quotes the property NAME, and that is the name kept - the ONE
+    // The message already quotes the property NAME, and that is the name kept - the ONE
     // deliberate divergence from RJSF, which substitutes the parent schema's
     // `properties[name].title` here. That substitution is right in an RJSF form,
     // where the title IS the rendered label; it is wrong for this package, whose

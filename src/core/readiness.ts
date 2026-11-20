@@ -14,7 +14,7 @@ import { readStoredReference } from './stored-value';
  * The walk is over CALLER-SUPPLIED data - a request body on a public run
  * endpoint, or a form's state - so its depth is whatever the caller sent, and
  * the schema is no bound on it: `pruneEmptyOptionals` copies a property the
- * schema does not declare straight through, so a key ajv never walks reaches
+ * schema does not declare straight through, so a key the validator never walks reaches
  * this function unwalked. Unbounded, a value a few thousand levels deep threw
  * `RangeError` out of the middle of a host's server gate - a gate whose whole
  * contract is that it returns a verdict instead of throwing.
@@ -158,7 +158,7 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
     // many items, each of them filled. Answering it by `isFilled` alone - "is
     // there anything in the array?" - left the button live on a `[3]` slot
     // holding two, and the gate then refused it on the very count the method
-    // declared. `itemCount` comes off the same `minItems` ajv reads, so the two
+    // declared. `itemCount` comes off the same `minItems` the validator reads, so the two
     // halves phrase one rule.
     if (field.itemCount !== undefined) {
       if (!Array.isArray(value) || value.length < field.itemCount) return false;
@@ -198,7 +198,7 @@ export interface Readiness {
  * slot - there the method HAS ruled the empty form out.
  *
  * **For a field this package built, the answer comes from `inputMustBeFilled`**
- * (`contracts.ts`) - the SAME predicate the method viewer's Run button, its ajv
+ * (`contracts.ts`) - the SAME predicate the method viewer's Run button, its schema's
  * `required` list and its missing-inputs toast all read. `buildRunFields`
  * stamps it onto `gating`. This used to be re-derived here as
  * `required && kind !== 'list'`: the same rule expressed against the MAPPED

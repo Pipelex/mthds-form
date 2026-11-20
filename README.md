@@ -14,7 +14,7 @@ import { layoutCheckProblems } from '@pipelex/mthds-form/generative/headless'; /
 import { assembleBrand } from '@pipelex/mthds-form/brand'; // a brand, held to the theme contract
 ```
 
-`.` is the kernel: no React, no design system, no framework. Its only runtime dependency is `ajv`, which the gate validates through. It runs in a browser, in Node, in a worker.
+`.` is the kernel: no React, no design system, no framework. It has no runtime dependency to speak of: the gate validates through the kernel's own JSON Schema interpreter, which generates no code, so it runs in a browser under a Content Security Policy without `'unsafe-eval'`, in Node and in a worker.
 
 `./react` is the control set — one control per field kind behind a single dispatch point, styled with Tailwind classes over standard shadcn/ui tokens. `react` and `react-dom` are optional peer dependencies, so a consumer that only wants the kernel never installs them.
 
