@@ -104,6 +104,9 @@ function sourceOf(
   };
 }
 
+/** A document field's formats as the sheet names them: each family once. */
+const DOCUMENT_LABELS = ['PDF', 'Word', 'Excel', 'PowerPoint', 'CSV', 'JPG', 'PNG'];
+
 /** Opens the single document field's sheet and answers it. */
 const openPicker = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachment') }));
@@ -139,6 +142,21 @@ describe('the sheet over a single file field', () => {
       mediaTypes: ['application/pdf'],
     });
     expect(source.queries[0]?.cursor).toBeUndefined();
+  });
+
+  it('names a family once, and asks for every type in it', async () => {
+    // `.doc` and `.docx` are both Word: the line under the title says Word
+    // once, and the query still asks for both types, so both kinds of file
+    // are listed.
+    const user = userEvent.setup();
+    const source = sourceOf([INVOICE]);
+    render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
+    const dialog = await openPicker(user);
+    expect(within(dialog).getByText(S.filePickerTakes(DOCUMENT_LABELS))).toBeInTheDocument();
+    await within(dialog).findByText('INV-2291.pdf');
+    expect(source.queries[0]?.mediaTypes).toEqual(
+      expect.arrayContaining(['application/msword', 'text/csv', 'application/vnd.ms-excel']),
+    );
   });
 
   it('writes the chosen file as {url, filename}, exactly as an upload writes it', async () => {
@@ -272,7 +290,7 @@ describe('the list’s states', () => {
     );
     const dialog = await openPicker(user);
     expect(
-      await within(dialog).findByText(S.filePickerNoneTeam(['PDF', 'JPG', 'PNG']), SHOWN),
+      await within(dialog).findByText(S.filePickerNoneTeam(DOCUMENT_LABELS), SHOWN),
     ).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: S.filePickerUpload })).toBeInTheDocument();
   });
@@ -281,7 +299,7 @@ describe('the list’s states', () => {
     const user = userEvent.setup();
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([])} />);
     const dialog = await openPicker(user);
-    await within(dialog).findByText(S.filePickerNoneTeam(['PDF', 'JPG', 'PNG']), SHOWN);
+    await within(dialog).findByText(S.filePickerNoneTeam(DOCUMENT_LABELS), SHOWN);
     expect(within(dialog).queryByRole('button', { name: S.filePickerUpload })).toBeNull();
   });
 
@@ -290,7 +308,7 @@ describe('the list’s states', () => {
     const source = sourceOf([], { initialScope: 'mine' });
     render(<Harness {...ONE_DOCUMENT} fileSource={source} />);
     const dialog = await openPicker(user);
-    await within(dialog).findByText(S.filePickerNoneMine(['PDF', 'JPG', 'PNG']), SHOWN);
+    await within(dialog).findByText(S.filePickerNoneMine(DOCUMENT_LABELS), SHOWN);
     await user.click(within(dialog).getByRole('button', { name: S.filePickerShowEveryone }));
     await waitFor(() => expect(source.queries.at(-1)?.scope).toBe('everyone'));
   });
@@ -368,9 +386,7 @@ describe('the list’s states', () => {
     const dialog = await openPicker(user);
     await within(dialog).findByText('INV-2288.pdf');
     expect(list).toHaveBeenCalledTimes(3);
-    expect(
-      within(dialog).queryByText(S.filePickerNoneTeam(['PDF', 'JPG', 'PNG']), SHOWN),
-    ).toBeNull();
+    expect(within(dialog).queryByText(S.filePickerNoneTeam(DOCUMENT_LABELS), SHOWN)).toBeNull();
   });
 });
 
@@ -431,7 +447,7 @@ describe('a host whose cursors go round in a circle', () => {
     });
     render(<Harness {...ONE_DOCUMENT} fileSource={sourceOf([], { list })} />);
     const dialog = await openPicker(user);
-    await within(dialog).findByText(S.filePickerNoneTeam(['PDF', 'JPG', 'PNG']), SHOWN);
+    await within(dialog).findByText(S.filePickerNoneTeam(DOCUMENT_LABELS), SHOWN);
     expect(list).toHaveBeenCalledTimes(3);
   });
 });

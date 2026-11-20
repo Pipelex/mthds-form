@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`FileFormat.alsoReportedAs`**: a format lists the other types a browser reports for it, and `isAcceptedFile` accepts a file reported as one of them only when its extension is that format's, so a `.docx` reported as `application/zip` and a `.csv` reported as `text/plain` or `application/vnd.ms-excel` are taken while a `.zip` or a `.txt` is still refused. `acceptMap` and `narrowFileFormats` read the canonical type alone.
+
+### Changed
+
+- **A document slot takes Word, Excel, PowerPoint and CSV files**: `DOCUMENT_FORMATS` adds `.docx`, `.doc`, `.xlsx`, `.xls`, `.pptx`, `.ppt` and `.csv` beside PDF, JPG and PNG, the formats the hosted runtime reads, each labelled by its family. `acceptLabel` names a repeated label once, so the dropzone's hint, its refusal and the file picker read "PDF, Word, Excel, PowerPoint, CSV, JPG, PNG", and a stored `.docx` file's card reads "Word". A host whose runtime has no document converter narrows the list with `narrowFileFormats`.
+- **`isAcceptedFile` reads `application/octet-stream` as no type**: a file reported with it is judged by its extension, as one reported with no type is.
+
 ## [v0.39.1] - 2026-11-19
 
 ### Changed

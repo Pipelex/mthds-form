@@ -135,16 +135,16 @@ Neither harness used to supply one. Every file story was therefore painting the 
 
 ## What a file slot accepts
 
-Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, `buildRunFields` stamps it on each file field as `formats`, and the hint under a dropzone, the filter it hands the picker and the check it enforces all read that one list, so they cannot disagree. A host whose upload path takes less narrows the list with `narrowFileFormats`, and the `Inputs/Files` stories show a narrowed slot beside a plain one ([upload-seam.md](upload-seam.md)).
+Not a wire fact. The descriptor states the kind is `document` or `image` and stops there, because which bytes a runtime can decode is a property of the runtime, not of the method. `src/core/file-formats.ts` holds the answer, `buildRunFields` stamps it on each file field as `formats`, and the hint under a dropzone, the filter it hands the picker and the check it enforces all read that one list, so they cannot disagree. A host whose upload path or runtime takes less, such as a runtime with no document converter, narrows the list with `narrowFileFormats`, and the `Inputs/Files` stories show a narrowed slot beside a plain one ([upload-seam.md](upload-seam.md)).
 
-| Slot       | Accepts                                                           |
-| ---------- | ----------------------------------------------------------------- |
-| `document` | PDF, JPG, PNG — the extract model reads an image as a single page |
-| `image`    | PNG, JPG, WEBP                                                    |
+| Slot       | Accepts                                                                                                                                  |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `document` | PDF, Word, Excel, PowerPoint (each in its current and 97-2003 format), CSV, JPG, PNG — the extract model reads an image as a single page |
+| `image`    | PNG, JPG, WEBP                                                                                                                           |
 
-The asymmetry is real rather than an oversight: WEBP passes as an image and is refused as a document, which is what the extract gateway answers.
+The asymmetry is real rather than an oversight: WEBP passes as an image and is refused as a document, because the extract model does not read it. The hint names each family once, so a document dropzone reads "PDF, Word, Excel, PowerPoint, CSV, JPG, PNG", and the `Inputs/Files` stories show it, a `.docx` a browser reports as a zip archive taken on its extension, and a stored Word file's card naming its family.
 
-**The list was measured, not read off an enum**, and that distinction is the whole lesson of how it got wrong twice. There is no single list in the runtime to copy: what a slot accepts is `{"pdf","docx","pptx"} & set(model.inputs)` per model, and no shipped model declares `docx` or `pptx`. The header of `file-formats.ts` records the runs. A stale entry there is worse than none — it refuses a file the runtime would have taken.
+**The document list is what the hosted runtime reads, and the image list was measured.** The document list used to be a measurement too, taken before the runtime converted Office files, when Word and PowerPoint files failed on every path; it was superseded on 2026-11-20, once the hosted runtime read them through its converter and by extraction. The header of `file-formats.ts` says where each format comes from. A stale entry there is worse than none: it refuses a file the runtime would have taken, or advertises one it cannot.
 
 ## What the corpus cannot reach
 

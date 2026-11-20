@@ -182,6 +182,35 @@ export const StoredFileApp: Story = {
 };
 
 /**
+ * A stored Word file, the way a value read in from a stored example or an
+ * earlier run arrives: a storage reference and a filename, never a `File`. The
+ * address is illustrative; what the story is about is the filename.
+ */
+const storedWordFile = {
+  attachment: {
+    url: 'pipelex-storage://team/assets/supplier-contract.docx',
+    filename: 'supplier-contract.docx',
+  },
+};
+
+/**
+ * **A stored Word file, in `app`**, against `StoredFileApp` above: the same
+ * card on a document slot. The subtitle names the file's family, Word, read
+ * off its extension among the slot's formats, and prints no reference. Before
+ * the slot took Office files, this card had no subtitle at all, because the
+ * extension named none of its formats.
+ */
+export const StoredWordFile: Story = {
+  args: { pipeCode: 'one_document', initialValues: storedWordFile, presentation: 'app' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText('supplier-contract.docx')).toHaveLength(2);
+    await expect(canvas.getAllByText('Word')).toHaveLength(2);
+    await expect(canvasElement.textContent).not.toContain('pipelex-storage');
+  },
+};
+
+/**
  * **The link a person may paste instead**, opened. The input asks for a web
  * link and nothing else, and it carries a name of its own: the field's label
  * is bound to the file input, so this one used to be announced by its
@@ -291,27 +320,51 @@ export const UploadOnly: Story = {
  *
  * The accepted formats are not a wire fact: the descriptor says the kind is
  * `document` or `image` and stops there, because which bytes a runtime can
- * decode is a property of the runtime. `core/file-formats.ts` holds the table,
+ * read is a property of the runtime. `core/file-formats.ts` holds the table,
  * `buildRunFields` stamps it on the field as `formats`, and the label under the
  * dropzone, the picker's filter and the check all read that one list.
  *
- * A **document** takes PDF, JPG and PNG — the extract model reads an image as a
- * single page. An **image** takes PNG, JPG and WEBP. Note the asymmetry: WEBP is
- * fine as an image and refused as a document, which is not an oversight but what
- * the extract gateway answers.
- *
- * Both lists were measured by running each format end to end, after two earlier
- * versions of this table were wrong in opposite directions — first a hard-coded
- * `PDF, DOCX, TXT`, then `PDF, DOCX, PPTX` taken off an enum the runtime never
- * reads. DOCX and PPTX fail on every path. And until recently the label was only
- * a label: the dropzone carried no filter at all, so any file was accepted in
- * silence and failed much later, mid-run.
+ * A **document** takes PDF, Word, Excel and PowerPoint (current and 97-2003),
+ * CSV, JPG and PNG — what the hosted runtime runs, the Office files through its
+ * converter. An **image** takes PNG, JPG and WEBP. Note the asymmetry: WEBP is
+ * fine as an image and refused as a document, because the extract model does
+ * not read it.
  *
  * Drop a `.zip` on this to see the refusal. It is not reproducible as a static
  * story - a rejection is a response to an action - so this one is here to be
  * used by hand; the automated coverage is `src/react/__tests__/file-field.test.tsx`.
  */
 export const TryAWrongFileType: Story = { args: { pipeCode: 'one_document' } };
+
+/** The hint under every document dropzone: each family once, `.doc` and `.docx` both Word. */
+const DOCUMENT_HINT = 'PDF, Word, Excel, PowerPoint, CSV, JPG, PNG';
+
+/**
+ * **A document slot takes Office files and CSV**, against `Document` above,
+ * which is the same slot left alone. The hint names the families, the OS
+ * picker is offered the Office and CSV extensions, and a `.docx` that a
+ * machine with no Office reports as a zip archive is taken on its extension
+ * and fills the field, where a real `.zip` would be refused.
+ */
+export const DocumentTakesOfficeFiles: Story = {
+  args: { pipeCode: 'one_document' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText(DOCUMENT_HINT)).toHaveLength(2);
+    const pickers = canvasElement.querySelectorAll('input[type="file"]:not([data-camera-input])');
+    await expect(pickers).toHaveLength(2);
+    for (const picker of pickers) {
+      for (const extension of ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.csv']) {
+        await expect(picker.getAttribute('accept')).toContain(extension);
+      }
+    }
+    for (const zone of canvasElement.querySelectorAll('[role="presentation"]')) {
+      dropFiles(zone, [new File(['zip'], 'supplier-contract.docx', { type: 'application/zip' })]);
+    }
+    await waitFor(() => expect(canvas.getAllByText('supplier-contract.docx')).toHaveLength(2));
+    await expect(canvas.queryAllByRole('alert')).toHaveLength(0);
+  },
+};
 
 /**
  * **A host's upload that failed**, shown on the field that took the file rather

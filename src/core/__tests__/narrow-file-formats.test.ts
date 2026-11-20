@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  acceptLabel,
   buildRunFields,
   formatsForKind,
+  isAcceptedFile,
   narrowFileFormats,
   type FileRunField,
   type ListRunField,
@@ -60,6 +62,27 @@ describe('one list, intersected with each slot', () => {
     // document slot exactly where the rest of the list puts it.
     const [contract] = narrowFileFormats([file('contract', 'document')], [PDF, WEBP]);
     expect(labels(contract)).toEqual(['PDF']);
+  });
+
+  it('narrows a document slot to an Office type, and the hint follows', () => {
+    const [contract] = narrowFileFormats(
+      [file('contract', 'document')],
+      ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', PDF],
+    );
+    expect(labels(contract)).toEqual(['PDF', 'Word']);
+    if (contract?.kind !== 'document') throw new Error('expected a document field');
+    expect(acceptLabel(contract.formats)).toBe('PDF, Word');
+    expect(isAcceptedFile(contract.formats, { name: 'brief.docx', type: '' })).toBe(true);
+    // The legacy Word format shares the family, and was not in the list.
+    expect(isAcceptedFile(contract.formats, { name: 'brief.doc', type: '' })).toBe(false);
+  });
+
+  it('narrows on the canonical type alone: an alias names no format', () => {
+    // `application/zip` is how some browsers report a `.docx`, not a format a
+    // host can allow; listed alone it leaves a document slot nothing.
+    expect(() => narrowFileFormats([file('contract', 'document')], ['application/zip'])).toThrow(
+      /would accept no format/,
+    );
   });
 
   it("keeps the slot's own order, whatever order the list is in", () => {
@@ -224,6 +247,17 @@ describe('the input tree is left untouched', () => {
     expect(narrowed[1]).not.toBe(record);
     expect(labels(photo)).toEqual(['PNG', 'JPG', 'WEBP']);
     expect(formatsForKind('image').map((format) => format.label)).toEqual(['PNG', 'JPG', 'WEBP']);
-    expect(formatsForKind('document').map((format) => format.label)).toEqual(['PDF', 'JPG', 'PNG']);
+    expect(formatsForKind('document').map((format) => format.label)).toEqual([
+      'PDF',
+      'Word',
+      'Word',
+      'Excel',
+      'Excel',
+      'PowerPoint',
+      'PowerPoint',
+      'CSV',
+      'JPG',
+      'PNG',
+    ]);
   });
 });
