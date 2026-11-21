@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.40.0] - 2026-11-21
+
+### Fixed
+
+- **A description-only concept is sent as a text**: an input whose concept declares only a description (`Topic = "A subject to write about"`), a concept refining one, and one under a `label` intent now take `contentKey: "text"`, so the form sends what a person typed as `{text: "…"}` and the run gate passes it, where it used to send the bare string and refuse every value with `'topic' must be object`. `storedValueKeyOf` answers `text` for a `text` or `prose` node whose concept chain names no native, so such a value read back from a run, and a result of such a concept, may also be a stored reference, kept and shown as one. See [docs/stored-values.md](docs/stored-values.md).
+
 ## [v0.39.3] - 2026-11-20
 
 ### Fixed

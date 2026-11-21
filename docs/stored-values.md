@@ -1,6 +1,6 @@
 # Stored values
 
-A `Text`, `Markdown`, `Html` or `JSON` value may live in the run's storage rather than in the payload. A runtime stores such a value by itself once it passes a size threshold, wherever it is produced or received: a run's inputs when it starts, a model's text, the pages an extraction returns. The value then travels as a reference, exactly as an image or a document does, and the form and the result view have to read both forms. A concept that refines one of these natives behaves the same.
+A `Text`, `Markdown`, `Html` or `JSON` value may live in the run's storage rather than in the payload. A runtime stores such a value by itself once it passes a size threshold, wherever it is produced or received: a run's inputs when it starts, a model's text, the pages an extraction returns. The value then travels as a reference, exactly as an image or a document does, and the form and the result view have to read both forms. A concept that refines one of these natives behaves the same, and so does a description-only concept, which the runtime backs with the text's content model.
 
 ## The two forms
 
@@ -19,9 +19,11 @@ The schemas say so. Each of these content models declares the value property and
 
 `src/core/stored-value.ts` is the one place that knows these natives. `storedValueKeyOf(node)` reads the node's `concept_ref` and `refines`, as every native predicate in `native-content.ts` does, and answers the property the value sits in, or `undefined` for every other concept; a `list` node answers no and its `item` answers for itself. `readStoredReference(node, value)` then reads the documented stored form off a value of that concept, `{url, size, mimeType, preview}`, and answers `undefined` for an inline value. A value holding both forms is read as inline, the form a reader can show without loading anything.
 
+A description-only concept is the one text whose concept names no native. `Topic = "A subject to write about"` declares neither a structure nor a refinement, and the language makes it text-valued, so the runtime backs it with the text's content model and its schema declares `text` beside the reference's members. The standard puts its text-valuedness on the wire as the node's `kind`, `prose` (or `text` under a `label` intent), and deliberately never as a `native.Text` link in `refines`, since nobody authored one. So `storedValueKeyOf` also answers `text` for a `text` or `prose` node that states a concept when neither that concept nor anything in its `refines` is a native: a concept refining a description-only one is covered by the same rule, a structure's string member states no concept and stays inline, and `native.Time`, a native whose node is a `text` holding a time, keeps no key.
+
 That order is the point. The concept says what the value is, and only then is the stored form read: asking the value which form it holds before knowing what it is would be the shape sniffing [derivation-swap.md](derivation-swap.md) records deleting, and the MTHDS standard rules the same way, telling a stored text from a file by the concept the contract names at that path, never by its URL or its MIME type.
 
-The same concept gives a text field its `contentKey`. `buildRunFields` and `buildResultField` read the property off the concept and keep it only when the field's schema declares it, so a structure's member that names `native.Text` but is a bare string on the wire keeps no key; every other text, number and yes-or-no still takes the single property its schema declares.
+The same concept gives a text field its `contentKey`. `buildRunFields` and `buildResultField` read the property off the concept and keep it only when the field's schema declares it, so a structure's member that names `native.Text` but is a bare string on the wire keeps no key, and a description-only concept wraps its text as `{text}` like `native.Text` does; every other text, number and yes-or-no still takes the single property its schema declares.
 
 ## The host's loader
 
