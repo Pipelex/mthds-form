@@ -19,7 +19,8 @@
  *   the contract's `json_schema` because it is a fact about the PAYLOAD shape,
  *   which is the schema's job - the descriptor describes the form, never the
  *   payload. A text whose value may be stored (`native.Text`,
- *   `native.Markdown`, or a concept refining one) is the exception: its schema
+ *   `native.Markdown`, a concept refining one, or a description-only concept)
+ *   is the exception: its schema
  *   declares the reference's members beside the value, so the CONCEPT names the
  *   property (`./stored-value`) and the schema only confirms it declares it.
  * - **Nested list bounds** - the wire puts `item_count` only on a top-level
@@ -82,10 +83,12 @@ function scalarWrapperKey(schema: JsonSchema | undefined): string | undefined {
  * The property a text node's value sits inside on the wire.
  *
  * A text whose value may live in storage (`native.Text`, `native.Markdown`, a
- * concept refining either) is `{text}` inline and `{url, size, mime_type,
- * preview}` stored, so its schema declares five properties and
- * `scalarWrapperKey` has nothing to count. Its concept names the property
- * instead, read off the descriptor's `concept_ref` and `refines`, and the schema
+ * concept refining either, a description-only concept) is `{text}` inline and
+ * `{url, size, mime_type, preview}` stored, so its schema declares five
+ * properties and `scalarWrapperKey` has nothing to count. Its concept names the
+ * property instead, read off the descriptor's `kind`, `concept_ref` and
+ * `refines` (`storedValueKeyOf`; a description-only concept names no native and
+ * is known by its text-valued kind), and the schema
  * must declare it: a structure's member that happens to name `native.Text` but
  * is a bare string on the wire keeps no key, and a missing schema degrades to
  * none, as it always has. Every other text answers as before.
