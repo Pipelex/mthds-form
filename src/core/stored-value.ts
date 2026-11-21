@@ -16,7 +16,9 @@
  * `preview`, which is always the true start of the value. A runtime stores a
  * value past a size threshold by itself, so any of these values, input or
  * result, may arrive in either form. A concept refining one of them behaves the
- * same, and an HTML page keeps its `css_class` inline in both forms.
+ * same, and an HTML page keeps its `css_class` inline in both forms. So does a
+ * description-only concept, which the runtime backs with the text's content
+ * model although the wire names no native ancestor for it.
  *
  * ## Why by concept
  *
@@ -71,10 +73,37 @@ interface StoredValueNode {
   refines?: readonly string[];
 }
 
+/** The domain every native concept's ref is namespaced under. */
+const NATIVE_DOMAIN_PREFIX = 'native.';
+
+function isNativeRef(ref: string): boolean {
+  return ref.startsWith(NATIVE_DOMAIN_PREFIX);
+}
+
+/**
+ * Whether a node is a description-only text: a concept that declares neither a
+ * structure nor a native ancestor, which the language makes text-valued.
+ *
+ * The standard puts that on the wire as the node's `kind` (`prose`, or `text`
+ * under a `label` intent) and never as a `native.Text` link in `refines`, since
+ * nobody authored one, so the concept table above cannot see it. Its kind
+ * says it is text-valued, its concept says it is a concept rather than a
+ * structure's string member (which states none), and its chain naming no
+ * native says it is not a native with a text-like kind of its own
+ * (`native.Time`). The runtime backs such a concept with the text's own content
+ * model, so its value holds `text` inline or a stored reference.
+ */
+function isDescriptionOnlyText(node: StoredValueNode): boolean {
+  if (node.kind !== 'text' && node.kind !== 'prose') return false;
+  if (node.conceptRef === undefined || isNativeRef(node.conceptRef)) return false;
+  return !(node.refines ?? []).some(isNativeRef);
+}
+
 /**
  * The property a node's value sits in when held inline, when its concept is one
  * whose value may be stored (or refines one): `text`, `inner_html` or
- * `json_obj`. `undefined` for every other concept.
+ * `json_obj`. A description-only concept, and one refining it, answers `text`
+ * (`isDescriptionOnlyText`). `undefined` for every other concept.
  *
  * A list answers no and its `item` answers for itself, as the native predicates
  * do: plurality is not on the concept, so a `native.Text[]` node's concept
@@ -88,7 +117,7 @@ export function storedValueKeyOf(node: StoredValueNode): string | undefined {
     const refined = STORED_VALUE_KEYS.get(ref);
     if (refined !== undefined) return refined;
   }
-  return undefined;
+  return isDescriptionOnlyText(node) ? 'text' : undefined;
 }
 
 /** Whether a node's value may arrive stored rather than inline. */
