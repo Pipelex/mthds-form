@@ -7,6 +7,10 @@
 - **The result view draws a PDF it cannot frame**: a PDF the frame rule refuses, such as one a host resolves to a presigned link on a storage bucket, is drawn page by page with pdf.js (through `react-pdf`, a new dependency loaded with `import()` in the browser only) when the host supplies `ResultEnvProvider`'s new `loadBytes`, which answers the document's bytes, and `pdfWorker`, which names pdf.js's worker (`workerSrc` or `workerPort`, an optional `version` checked against pdf.js's, and the optional `cMapUrl`, `standardFontDataUrl`, `wasmUrl` and `iccUrl`). The pages stack in the frame's place at its size with selectable text and live links, a document over `PDF_PAGES_MAX_BYTES` (32 MiB) or one that cannot be drawn keeps its link, `renderForms` and XFA stay off, images are bounded by `PDF_PAGES_MAX_IMAGE_PIXELS`, and the new optional `openExternal` routes the PDF's links through the host, which otherwise open in a new tab with `noopener noreferrer`.
 - **`@pipelex/mthds-form/pdf-layers.css`**: the drawn pages' text and annotation layer styles, already folded into `styles.css`, shipped on their own for a host that compiles the package's utilities with its own Tailwind build. Every rule is scoped under the renderer's frame except one on `body`, which sets the two marker properties react-pdf reads there and styles nothing.
 
+### Changed
+
+- **The package needs Node.js 22.13 or later (Breaking)**: `engines.node` is `>=22.13`, the floor of the `pdfjs-dist` that `react-pdf` brings, which also installs the optional native `@napi-rs/canvas` by default; the package never loads it.
+
 ## [v0.40.0] - 2026-11-21
 
 ### Fixed
