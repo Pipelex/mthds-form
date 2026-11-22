@@ -14,9 +14,12 @@
  *    host runs. The exception is the `body` rule below, which sets two private
  *    markers and styles nothing.
  *  - The custom properties the originals set on `:root` are set on that frame
- *    instead, and every one read that the frame does not set (the scale pdf.js
- *    writes on each page, inline) carries a fallback, so a declaration is never
- *    discarded for want of a value (`make assert-bundle` holds this).
+ *    instead, and every read carries a fallback, those the frame does not set
+ *    (the scale pdf.js writes on each page, inline) included, so a declaration
+ *    is never discarded for want of a value. `make assert-bundle` holds every
+ *    read in a rule under the frame to a non-empty fallback, in this file and
+ *    in both sheets that ship it, since its check on design tokens exempts the
+ *    properties a sheet sets itself.
  *  - The form-widget rules are left out: the renderer pins `renderForms` to
  *    `false`, so pdf.js never draws a field as an `<input>` and they would
  *    style nothing.

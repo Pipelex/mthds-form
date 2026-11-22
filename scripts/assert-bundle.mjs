@@ -913,6 +913,75 @@ function blocksOf(css, head) {
 }
 
 /**
+ * The bodies of every block, at any depth, whose head (its selector or at-rule
+ * prelude) passes `test`, brace-counted and quote-aware. A block whose head
+ * does not pass is searched inside, so a rule under `@media` or `@layer` is
+ * found; a block whose head passes is returned whole, nested rules included.
+ * Run it over comment-stripped CSS. A backslash escapes the next character
+ * outside a string too, since a built sheet's selectors carry escaped quotes
+ * and braces (`.content-\[\'\'\]`).
+ */
+function blocksScopedUnder(css, test) {
+  const bodies = [];
+  let unterminated = false;
+  const walk = (start, end) => {
+    let i = start;
+    let headStart = start;
+    let quote = null;
+    while (i < end && !unterminated) {
+      const ch = css[i];
+      if (quote !== null) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+        i++;
+        continue;
+      }
+      if (ch === '\\') {
+        i += 2;
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        i++;
+        continue;
+      }
+      if (ch === ';' || ch === '}') {
+        headStart = i + 1;
+        i++;
+        continue;
+      }
+      if (ch !== '{') {
+        i++;
+        continue;
+      }
+      let depth = 1;
+      let j = i + 1;
+      let inner = null;
+      while (j < end && depth > 0) {
+        const c = css[j];
+        if (c === '\\') j++;
+        else if (inner !== null) {
+          if (c === inner) inner = null;
+        } else if (c === '"' || c === "'") inner = c;
+        else if (c === '{') depth += 1;
+        else if (c === '}') depth -= 1;
+        j++;
+      }
+      if (depth > 0) {
+        unterminated = true;
+        return;
+      }
+      if (test(css.slice(headStart, i).trim())) bodies.push(css.slice(i + 1, j - 1));
+      else walk(i + 1, j - 1);
+      i = j;
+      headStart = j;
+    }
+  };
+  walk(0, css.length);
+  return { bodies, unterminated };
+}
+
+/**
  * The one block a named rule is allowed to have, or `null` with the reason
  * already recorded as a failure.
  */
@@ -1245,6 +1314,53 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
     );
   } else {
     failures.push(`${optionalProblems.join('; ')}. See OPTIONAL_TOKENS in scripts/assert-bundle.mjs.`);
+  }
+}
+
+// 2d. The PDF layer rules read pdf.js's own custom properties, which the
+//     renderer's frame or pdf.js sets (the page scale, inline, on each page),
+//     never a design token, so the shipped-sheet check below exempts them as
+//     self-defined - by NAME, over the whole sheet. A read among them with no
+//     fallback would discard its declaration wherever the value is not set, as
+//     an unset token does. So every read inside a rule scoped under the
+//     renderer's frame is held here to a non-empty fallback, in the source and
+//     in both sheets that ship the rules. The rules are found by counting
+//     braces over comment-stripped CSS, never by a regex, and a sheet in which
+//     none was found fails rather than passing on nothing.
+{
+  const PDF_SCOPE = '.mthds-pdf-pages';
+  const sheets = [
+    ['src/styles/pdf-layers.css', resolve(ROOT, 'src/styles/pdf-layers.css')],
+    ['dist/pdf-layers.css', `${DIST}/pdf-layers.css`],
+    ['dist/styles.css', `${DIST}/styles.css`],
+  ];
+  for (const [where, path] of sheets) {
+    if (!existsSync(path)) {
+      failures.push(`${where} is missing, so the fallbacks of the PDF layer rules in it could not be checked.`);
+      continue;
+    }
+    const { bodies, unterminated } = blocksScopedUnder(
+      withoutComments(readFileSync(path, 'utf8')),
+      (head) => head.includes(PDF_SCOPE),
+    );
+    if (unterminated) {
+      failures.push(`${where} has an unterminated block - a brace is missing, so its PDF layer rules could not be read.`);
+      continue;
+    }
+    const reads = bodies.flatMap((body) => readsOf(body, `${where}'s PDF layer rules`));
+    // `!fallback` rather than `=== null`: `var(--x,)` fails as no fallback does.
+    const bare = [...new Set(reads.filter(({ fallback }) => !fallback).map(({ name }) => name))].sort();
+    if (reads.length === 0) {
+      failures.push(
+        `${where} has no \`var()\` read in a rule under \`${PDF_SCOPE}\`, so the PDF layer fallback check compared nothing - the layer rules were dropped, moved off the renderer's frame, or no longer parse. See src/styles/pdf-layers.css.`,
+      );
+    } else if (bare.length > 0) {
+      failures.push(
+        `${where}'s PDF layer rules read ${bare.join(', ')} with no fallback, so wherever pdf.js or the frame has not set it the declaration is discarded. Give each read a fallback - see src/styles/pdf-layers.css.`,
+      );
+    } else {
+      console.log(`ok  ${where}'s PDF layer rules read ${reads.length} custom properties, each with a fallback`);
+    }
   }
 }
 
