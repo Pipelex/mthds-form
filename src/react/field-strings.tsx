@@ -90,6 +90,13 @@ export interface FieldStrings {
   documentPdfFailed: string;
   /** Said in a document's preview when the host has no PDF of it to offer. */
   documentPdfUnavailable: string;
+  /** Said in place of one page of a PDF the view draws itself, when that page could not be drawn. */
+  pdfPageNotDrawn: string;
+  /**
+   * Said below the last page of a PDF the view draws itself, when the document has more pages
+   * than the view lays out; the document's link follows it.
+   */
+  pdfPagesContinue: (shown: number, total: number) => string;
   /**
    * What a result slot the run resolved as an absence SHOWS — a dash, not a
    * sentence. Beside forty values in a grid, "not provided" repeated is louder

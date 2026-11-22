@@ -122,7 +122,7 @@ export {
 
 // The bounds of a PDF the view draws itself: the largest file it draws, and the
 // largest image pdf.js decodes on a page. See docs/result-view.md.
-export { PDF_PAGES_MAX_BYTES, PDF_PAGES_MAX_IMAGE_PIXELS } from './pdf-pages';
+export { PDF_PAGES_MAX_BYTES, PDF_PAGES_MAX_IMAGE_PIXELS, PDF_PAGES_MAX_PAGES } from './pdf-pages';
 
 // The markup arm of the result view, exported on its own for a host that renders
 // a `native.Html` value outside a result tree. It is a sandboxed frame rather

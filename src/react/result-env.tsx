@@ -213,14 +213,22 @@ export type ResolveDocumentPdf = (
 
 /**
  * What the view tells the host when it asks for a document's bytes.
- *
- * `maxBytes` is the ceiling the view draws under (`PDF_PAGES_MAX_BYTES`): a
- * document larger than this keeps its link whatever the host answers, so a
- * host that can tell the size before it downloads (a `Content-Length`, a size
- * it stored) may reject at once rather than fetch bytes the view will not draw.
  */
 export interface BytesRequest {
+  /**
+   * The ceiling the view draws under (`PDF_PAGES_MAX_BYTES`): a document larger
+   * than this keeps its link whatever the host answers, so a host that can tell
+   * the size before it downloads (a `Content-Length`, a size it stored) may
+   * reject at once rather than fetch bytes the view will not draw.
+   */
   maxBytes: number;
+  /**
+   * Aborted when the view no longer wants the bytes: the reader folded the
+   * preview away, the document left the page, or the view gave up waiting. A
+   * host passes it to its `fetch` (`fetch(url, { signal })`), so a download
+   * nobody will see stops rather than running to its end.
+   */
+  signal: AbortSignal;
 }
 
 /**
@@ -241,10 +249,20 @@ export interface BytesRequest {
  *
  * Called with the document's own `url` member, exactly as `resolveRendition`
  * and `resolveDocumentPdf` are, and the {@link BytesRequest}. Resolve to the
- * file's bytes; reject for a document this host will not or cannot read (a
- * reference that is not its own, a file past the ceiling, a failed fetch), and
- * the document keeps its link. It is asked when the preview opens, which is as
- * the document mounts, and again each time a reader unfolds it.
+ * file's bytes, as a `Uint8Array` or an `ArrayBuffer`. It is asked when the
+ * preview opens, which is as the document mounts, and the document keeps its
+ * link whatever happens:
+ *
+ * - **A failure that may pass** (a rejection, a throw, no answer within a
+ *   minute, such as a failed fetch) folds the preview away and keeps its
+ *   toggle, and the seam is asked again when the reader unfolds it.
+ * - **An answer the view will not draw** (anything but bytes, which is also
+ *   reported with `console.error`; no bytes; more than `maxBytes`; a file
+ *   pdf.js cannot parse) is final: the toggle goes, and the view does not ask
+ *   again while the document stays mounted.
+ *
+ * Pass `request.signal` to the download: it is aborted when the view stops
+ * waiting, so a download nobody will see does not run to its end.
  *
  * The view copies what it is handed before pdf.js takes it (pdf.js transfers the
  * buffer to its worker, which empties the caller's copy), so a host may cache
@@ -253,21 +271,27 @@ export interface BytesRequest {
  * Optional, and only useful together with `pdfWorker`. See `docs/result-view.md`,
  * "A PDF the view draws itself".
  */
-export type LoadBytes = (url: string, request: BytesRequest) => Promise<Uint8Array>;
+export type LoadBytes = (url: string, request: BytesRequest) => Promise<Uint8Array | ArrayBuffer>;
 
 /** The pdf.js worker, as a script URL or as a worker the host already started. */
 export type PdfWorkerSource =
   | {
       /**
-       * The URL of pdf.js's worker module (`pdf.worker.min.mjs`). pdf.js wraps a
-       * cross-origin URL in a `blob:` module that imports it, so it may be on
-       * another origin, served with `Access-Control-Allow-Origin`.
+       * The URL of pdf.js's worker module (`pdf.worker.min.mjs`). The renderer
+       * starts one worker from it per document drawn and stops it when the
+       * document leaves, and wraps a cross-origin URL in a `blob:` module that
+       * imports it, as pdf.js itself does, so it may be on another origin,
+       * served with `Access-Control-Allow-Origin`.
        */
       workerSrc: string;
       workerPort?: undefined;
     }
   | {
-      /** A worker running pdf.js's worker module, started by the host. */
+      /**
+       * A worker running pdf.js's worker module, started by the host, which
+       * stays the host's: the renderer talks to it through pdf.js and never
+       * terminates it.
+       */
       workerPort: Worker;
       workerSrc?: undefined;
     };

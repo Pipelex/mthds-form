@@ -1280,9 +1280,13 @@ function DocumentValue({
   const openExternal = useOpenExternal();
   const origin = usePageOrigin();
   const isApp = useFieldPresentation() === 'app';
-  // The document whose pages could not be drawn, which keeps its link from
-  // then on: a renderer that failed must never leave a blank frame behind.
+  // The document whose pages will not be drawn, which keeps its link alone
+  // from then on: a renderer that failed must never leave a blank frame behind.
   const [pagesRefusedFor, setPagesRefusedFor] = useState<string | null>(null);
+  // The document whose pages failed in a way that may pass (a download that
+  // failed or never came): its preview folds away with its toggle kept, even
+  // as the whole result in `app`, and unfolding it tries again.
+  const [pagesFailedFor, setPagesFailedFor] = useState<string | null>(null);
   // Open from the first render, on the server and in the browser alike, so the
   // hydration starts from the server's state.
   const [open, setOpen] = useState(true);
@@ -1324,7 +1328,11 @@ function DocumentValue({
     hasPdfWorker(pdfWorker) &&
     pagesRefusedFor !== content.url &&
     isPdfDocument(content, content.url);
-  const opened = whole && isApp && (preview !== undefined || askPdf !== undefined || drawPages);
+  const pagesFailed = drawPages && pagesFailedFor === content.url;
+  const opened =
+    whole &&
+    isApp &&
+    (preview !== undefined || askPdf !== undefined || (drawPages && !pagesFailed));
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -1356,7 +1364,10 @@ function DocumentValue({
         {(preview || askPdf || drawPages) && !opened && (
           <button
             type="button"
-            onClick={() => setOpen((current) => !current)}
+            onClick={() => {
+              setOpen((current) => !current);
+              if (pagesFailed) setPagesFailedFor(null);
+            }}
             aria-expanded={open}
             className={cn(
               'flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground max-sm:min-h-11 max-sm:px-3',
@@ -1389,11 +1400,19 @@ function DocumentValue({
           key={content.url}
           url={content.url}
           name={name}
+          href={viewableUrl(paintableUrl(content, resolve) ?? content.url)}
           sizeClass={opened ? WHOLE_RESULT_FRAME : NESTED_FRAME}
           loadBytes={loadBytes}
           worker={pdfWorker}
           openExternal={openExternal}
-          onUnavailable={() => setPagesRefusedFor(content.url)}
+          onUnavailable={(failure) => {
+            if (failure === 'final') {
+              setPagesRefusedFor(content.url);
+            } else {
+              setPagesFailedFor(content.url);
+              setOpen(false);
+            }
+          }}
         />
       )}
     </div>

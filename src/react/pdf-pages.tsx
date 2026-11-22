@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { Loader2 } from 'lucide-react';
 import { useFieldStrings } from './field-strings';
 import type { LoadBytes, OpenExternal, PdfWorkerConfig } from './result-env';
@@ -35,8 +43,22 @@ import { cn } from './utils';
  * - **XFA.** `enableXfa` is pinned to `false`, its default.
  *
  * Beside them, the bytes are copied before pdf.js takes them (pdf.js transfers
- * the buffer to its worker, which would empty the host's copy), and
- * `maxImageSize` bounds what a small file can expand into.
+ * the buffer to its worker, which would empty the host's copy),
+ * `maxImageSize` bounds what a small file can expand into, and at most
+ * {@link PDF_PAGES_MAX_PAGES} pages are laid out.
+ *
+ * ## A worker per document, and no global
+ *
+ * Each document gets its own pdf.js worker, handed to pdf.js as the document's
+ * `worker` option, so the renderer writes nothing into pdf.js's process-wide
+ * `GlobalWorkerOptions`, which a host running pdf.js itself also reads. From a
+ * host's `workerSrc` the renderer starts the worker itself, exactly as pdf.js
+ * would (a cross-origin URL is wrapped in a `blob:` module that imports it,
+ * which a sandboxed frame admits where it refuses the URL itself), and stops it
+ * when the document leaves. A host's `workerPort` is the host's, and is never
+ * stopped. react-pdf's own module still sets `GlobalWorkerOptions.workerSrc` to
+ * a relative `pdf.worker.mjs` as it loads, which is react-pdf's doing and which
+ * nothing here reads.
  *
  * ## Client only
  *
@@ -66,13 +88,35 @@ export const PDF_PAGES_MAX_BYTES = 32 * 1024 * 1024;
 export const PDF_PAGES_MAX_IMAGE_PIXELS = 40_000_000;
 
 /**
+ * The most pages the view lays out for one document: 500. Each page is a place
+ * in the stack, observed for whether it is near the visible part of the frame,
+ * so a document claiming a million pages would otherwise cost a million of
+ * them before one was drawn. A longer document shows its first pages, then a
+ * line saying it continues, with its link.
+ */
+export const PDF_PAGES_MAX_PAGES = 500;
+
+/**
  * How long the bytes, pdf.js and the document's first parse may take before the
  * document falls back to its link, so a seam that never answers or a worker
  * that never starts costs the reader a minute rather than a spinner for good.
  */
 const LOAD_TIMEOUT_MS = 60_000;
 
+/**
+ * Why the pages could not be drawn, which decides whether the view tries again.
+ *
+ * - `transient`: something that may pass (the seam rejected or threw, react-pdf
+ *   could not be loaded, the minute ran out). The preview folds away and keeps
+ *   its toggle, and unfolding it tries again.
+ * - `final`: an answer that would be the same next time (not bytes, no bytes,
+ *   over the ceiling, a worker of another version or one that would not start,
+ *   a document pdf.js cannot parse). The document keeps its link alone.
+ */
+export type PdfPagesFailure = 'transient' | 'final';
+
 type ReactPdf = typeof import('react-pdf');
+type PdfJsWorker = InstanceType<ReactPdf['pdfjs']['PDFWorker']>;
 
 let reactPdf: Promise<ReactPdf> | undefined;
 
@@ -95,47 +139,152 @@ export function hasPdfWorker(config: PdfWorkerConfig | undefined): config is Pdf
   return typeof config.workerSrc === 'string' && config.workerSrc.trim() !== '';
 }
 
-/** A `Uint8Array` from any realm: `instanceof` fails across frames. */
-function isBytes(value: unknown): value is Uint8Array {
-  return Object.prototype.toString.call(value) === '[object Uint8Array]';
+/** The tag `Object.prototype.toString` gives a value, which holds across frames where `instanceof` does not. */
+function tagOf(value: unknown): string {
+  return Object.prototype.toString.call(value);
 }
 
 /**
- * Point pdf.js at the host's worker. Always, because react-pdf sets `workerSrc`
- * to a relative `pdf.worker.mjs` when it loads, which resolves on whatever
- * origin the view runs on and is wrong in a sandboxed host. The renderer source
- * (`rendererSrc`, `rendererPorts`) is left as pdf.js has it.
+ * The seam's answer as bytes: a `Uint8Array`, or an `ArrayBuffer` viewed as
+ * one, from any realm. `undefined` for anything else.
+ */
+function asBytes(value: unknown): Uint8Array | undefined {
+  const tag = tagOf(value);
+  if (tag === '[object Uint8Array]') return value as Uint8Array;
+  if (tag === '[object ArrayBuffer]') return new Uint8Array(value as ArrayBuffer);
+  return undefined;
+}
+
+/** What the seam answered instead of bytes, named for the report. */
+function describeAnswer(value: unknown): string {
+  if (value === null) return 'null';
+  if (typeof value !== 'object') return `a ${typeof value}`;
+  return tagOf(value).slice('[object '.length, -1);
+}
+
+/**
+ * Whether a URL is on the page's own origin, as pdf.js's own `isSameOrigin`
+ * decides it: a page whose origin is opaque (`null`, a sandboxed frame's) has
+ * no URL on its origin.
+ */
+function onPageOrigin(src: string): boolean {
+  const base = new URL(window.location.href);
+  if (!base.origin || base.origin === 'null') return false;
+  return new URL(src, base).origin === base.origin;
+}
+
+/**
+ * Start pdf.js's worker module from a URL, as pdf.js itself does in
+ * `PDFWorker` (`getWorkerSrc` in `pdfjs-dist/build/pdf.mjs`): a URL on the
+ * page's origin directly, and any other wrapped in a `blob:` module that
+ * imports it, since a page may start a worker only from its own origin, and a
+ * sandboxed frame, whose origin is opaque, admits a `blob:` worker where it
+ * refuses every URL.
+ */
+function moduleWorker(src: string): { worker: Worker; stop: () => void } {
+  let script = src;
+  let blob: string | undefined;
+  if (!onPageOrigin(src)) {
+    const wrapper = `await import(${JSON.stringify(new URL(src, window.location.href).href)});`;
+    blob = URL.createObjectURL(new Blob([wrapper], { type: 'text/javascript' }));
+    script = blob;
+  }
+  const revoke = () => {
+    if (blob) URL.revokeObjectURL(blob);
+  };
+  try {
+    const worker = new Worker(script, { type: 'module' });
+    return {
+      worker,
+      stop: () => {
+        worker.terminate();
+        revoke();
+      },
+    };
+  } catch (error) {
+    revoke();
+    throw error;
+  }
+}
+
+/** The document's own pdf.js worker, and how to let it go when the document leaves. */
+interface StartedWorker {
+  worker: PdfJsWorker;
+  /** Stops a worker the renderer started; leaves a host's alone. */
+  release: () => void;
+}
+
+/**
+ * The worker this document is parsed in, handed to pdf.js as its `worker`
+ * option rather than through `GlobalWorkerOptions`, which is process-wide.
  *
  * A stated worker version that is not the version of the pdf.js the renderer
  * runs is a second copy of `pdfjs-dist` in the host's build. pdf.js would
  * refuse it later with a message in a console nobody opens, so it is refused
  * here, out loud.
+ *
+ * `onStartFailure` is called if a worker the renderer started from `workerSrc`
+ * fails before it says anything (a URL that does not load, a policy that
+ * refuses it), which pdf.js, handed a started worker, would never notice.
  */
-function startWorker({ pdfjs }: ReactPdf, worker: PdfWorkerConfig): boolean {
-  if (worker.version !== undefined && worker.version !== pdfjs.version) {
+function startWorker(
+  { pdfjs }: ReactPdf,
+  config: PdfWorkerConfig,
+  onStartFailure: () => void,
+): StartedWorker | undefined {
+  if (config.version !== undefined && config.version !== pdfjs.version) {
     report(
-      `[mthds-form] The pdf.js worker the host supplies is version ${worker.version}, and the PDF renderer runs pdf.js ${pdfjs.version}. ` +
+      `[mthds-form] The pdf.js worker the host supplies is version ${config.version}, and the PDF renderer runs pdf.js ${pdfjs.version}. ` +
         'They must be the same build, so the document is shown as its link. Serve the worker from the pdfjs-dist that react-pdf resolves.',
     );
-    return false;
+    return undefined;
   }
   try {
-    if (worker.workerPort) {
-      pdfjs.GlobalWorkerOptions.workerPort = worker.workerPort;
-    } else {
-      pdfjs.GlobalWorkerOptions.workerPort = null;
-      pdfjs.GlobalWorkerOptions.workerSrc = worker.workerSrc ?? '';
+    if (config.workerPort) {
+      // pdf.js keeps one `PDFWorker` per port and hands it back on the next
+      // call, so documents drawn from the host's worker share it; it is never
+      // destroyed here, which would also stop pdf.js listening to the port.
+      return { worker: pdfjs.PDFWorker.create({ port: config.workerPort }), release: () => {} };
     }
-    return true;
+    const own = moduleWorker(config.workerSrc ?? '');
+    const listening = new AbortController();
+    const failed = () => {
+      listening.abort();
+      report(
+        `[mthds-form] The pdf.js worker at ${config.workerSrc} did not start, so the document is shown as its link. ` +
+          'Check that the URL serves pdf.worker.min.mjs, with Access-Control-Allow-Origin when it is on another origin, and that the page admits blob: workers.',
+      );
+      onStartFailure();
+    };
+    own.worker.addEventListener('error', failed, { signal: listening.signal });
+    // pdf.js's worker speaks first, once it is running.
+    own.worker.addEventListener('message', () => listening.abort(), { signal: listening.signal });
+    let worker: PdfJsWorker;
+    try {
+      worker = pdfjs.PDFWorker.create({ port: own.worker });
+    } catch (error) {
+      listening.abort();
+      own.stop();
+      throw error;
+    }
+    return {
+      worker,
+      release: () => {
+        listening.abort();
+        worker.destroy();
+        own.stop();
+      },
+    };
   } catch (error) {
-    report('[mthds-form] The pdf.js worker the host supplies was refused by pdf.js:', error);
-    return false;
+    report('[mthds-form] The pdf.js worker the host supplies could not be started:', error);
+    return undefined;
   }
 }
 
-/** The options pdf.js parses the document with: the host's data files, and the bounds. */
-function documentOptions(worker: PdfWorkerConfig) {
+/** The options pdf.js parses the document with: its worker, the host's data files, and the bounds. */
+function documentOptions(worker: PdfWorkerConfig, started: PdfJsWorker) {
   return {
+    worker: started,
     ...(worker.cMapUrl ? { cMapUrl: worker.cMapUrl, cMapPacked: true } : {}),
     ...(worker.standardFontDataUrl ? { standardFontDataUrl: worker.standardFontDataUrl } : {}),
     ...(worker.wasmUrl ? { wasmUrl: worker.wasmUrl } : {}),
@@ -168,22 +317,27 @@ interface Ready {
   options: ReturnType<typeof documentOptions>;
 }
 
+/** The parsed document, as react-pdf hands it to `onLoadSuccess`. */
+type LoadedPdf = Parameters<NonNullable<ComponentProps<ReactPdf['Document']>['onLoadSuccess']>>[0];
+
 export interface PdfPagesProps {
   /** The document's own `url` member, as the host's `loadBytes` is asked with it. */
   url: string;
   /** What the pages are named for assistive technology: the document's title or file name. */
   name: string;
+  /** The document's link, offered below the last page when the document has more pages than the view lays out. */
+  href: string | undefined;
   /** The frame's size classes, the ones the document's frame would have had. */
   sizeClass: string;
   loadBytes: LoadBytes;
   worker: PdfWorkerConfig;
   openExternal: OpenExternal | undefined;
   /**
-   * Called once when the pages cannot be drawn (no bytes, too many, no pdf.js,
-   * a worker of another version, a document pdf.js cannot parse), so the
-   * document falls back to its link rather than a blank frame.
+   * Called once when the pages cannot be drawn, with whether it may pass
+   * ({@link PdfPagesFailure}), so the document falls back to its link rather
+   * than a blank frame.
    */
-  onUnavailable: () => void;
+  onUnavailable: (failure: PdfPagesFailure) => void;
 }
 
 /**
@@ -194,6 +348,7 @@ export interface PdfPagesProps {
 export function PdfPages({
   url,
   name,
+  href,
   sizeClass,
   loadBytes,
   worker,
@@ -206,6 +361,8 @@ export function PdfPages({
   const [ratio, setRatio] = useState(Math.SQRT2);
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const width = useContentWidth(frame);
+  const [watch] = useState(() => new PageWatch());
+  useEffect(() => (frame ? watch.connect(frame) : undefined), [frame, watch]);
 
   // The host's functions are read when they are needed rather than restarting
   // the load whenever a host passes a new inline function.
@@ -216,60 +373,119 @@ export function PdfPages({
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const settled = useRef(false);
-  const refuse = useCallback(() => {
+  const loaded = useRef<LoadedPdf | undefined>(undefined);
+  const refuse = useCallback((failure: PdfPagesFailure) => {
     if (settled.current) return;
     settled.current = true;
     clearTimeout(timer.current);
-    latest.current.onUnavailable();
+    latest.current.onUnavailable(failure);
   }, []);
 
   useEffect(() => {
     let live = true;
+    let started: StartedWorker | undefined;
     settled.current = false;
-    const give = () => {
-      if (live) refuse();
+    const download = new AbortController();
+    const give = (failure: PdfPagesFailure) => {
+      if (!live) return;
+      download.abort();
+      refuse(failure);
     };
-    timer.current = setTimeout(give, LOAD_TIMEOUT_MS);
+    timer.current = setTimeout(() => give('transient'), LOAD_TIMEOUT_MS);
     const { loadBytes: load, worker: config } = latest.current;
     Promise.all([
-      Promise.resolve().then(() => load(url, { maxBytes: PDF_PAGES_MAX_BYTES })),
+      Promise.resolve().then(() =>
+        load(url, { maxBytes: PDF_PAGES_MAX_BYTES, signal: download.signal }),
+      ),
       loadReactPdf(),
     ]).then(
-      ([bytes, lib]) => {
+      ([answer, lib]) => {
         if (!live) return;
-        if (!isBytes(bytes) || bytes.byteLength === 0 || bytes.byteLength > PDF_PAGES_MAX_BYTES) {
-          give();
+        const bytes = asBytes(answer);
+        if (!bytes) {
+          report(
+            `[mthds-form] loadBytes answered ${describeAnswer(answer)} for ${url}, where a Uint8Array or an ArrayBuffer was expected, so the document is shown as its link.`,
+          );
+          give('final');
           return;
         }
-        if (!startWorker(lib, config)) {
-          give();
+        if (bytes.byteLength === 0 || bytes.byteLength > PDF_PAGES_MAX_BYTES) {
+          give('final');
           return;
         }
-        setReady({ lib, file: { data: bytes.slice() }, options: documentOptions(config) });
+        started = startWorker(lib, config, () => give('final'));
+        if (!started) {
+          give('final');
+          return;
+        }
+        setReady({
+          lib,
+          file: { data: bytes.slice() },
+          options: documentOptions(config, started.worker),
+        });
       },
-      () => give(),
+      () => give('transient'),
     );
     return () => {
       live = false;
       clearTimeout(timer.current);
+      download.abort();
+      const own = started;
+      const doc = loaded.current;
+      loaded.current = undefined;
+      if (own) {
+        // The document is let go before its worker, so pdf.js's goodbye to the
+        // worker is answered rather than left waiting on a stopped one.
+        void Promise.resolve()
+          .then(() => doc?.loadingTask.destroy())
+          .catch(() => {})
+          .finally(own.release);
+      }
     };
   }, [url, refuse]);
 
   // A click on a link the PDF holds, routed through the host when it offers a
-  // way out. Internal links (`#…`) are pdf.js's own, and scroll the frame.
+  // way out. Internal links (`#…`) are pdf.js's own, and scroll the frame. Of
+  // the other buttons, only the middle one opens a link.
   const route = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.type === 'auxclick' && event.button !== 1) return;
     const open = latest.current.openExternal;
     if (!open || !(event.target instanceof Element)) return;
     const link = event.target.closest('a[href]');
     if (!link || !link.closest('.annotationLayer')) return;
-    const href = link.getAttribute('href') ?? '';
-    if (href === '' || href.startsWith('#')) return;
+    const target = link.getAttribute('href') ?? '';
+    if (target === '' || target.startsWith('#')) return;
     event.preventDefault();
-    if (EXTERNAL_LINK_RE.test(href)) open(href);
+    if (EXTERNAL_LINK_RE.test(target)) open(target);
   };
+
+  // An internal link to a page: react-pdf scrolls only to a page it has drawn,
+  // so a link to a page far from the view would do nothing. The page's place
+  // is drawn and scrolled to within the frame, never the host's own page.
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    frameRef.current = frame;
+  }, [frame]);
+  const goToPage = useCallback(
+    ({ pageNumber }: { pageNumber: number }) => {
+      const element = frameRef.current;
+      if (!element) return;
+      const place = watch.find(pageNumber);
+      if (!place) {
+        // A page past the ones laid out: the line that says the document continues.
+        element.scrollTop = element.scrollHeight;
+        return;
+      }
+      place.reveal();
+      element.scrollTop +=
+        place.element.getBoundingClientRect().top - element.getBoundingClientRect().top;
+    },
+    [watch],
+  );
 
   if (!ready) return <PagesLoading sizeClass={sizeClass} label={s.documentPdfPreparing} />;
   const { Document } = ready.lib;
+  const laidOut = pageCount === undefined ? 0 : Math.min(pageCount, PDF_PAGES_MAX_PAGES);
   return (
     <div
       ref={setFrame}
@@ -294,8 +510,10 @@ export function PdfPages({
         error={null}
         noData={null}
         className="flex flex-col items-center gap-2"
+        onItemClick={goToPage}
         onLoadSuccess={(pdf) => {
           clearTimeout(timer.current);
+          loaded.current = pdf;
           setPageCount(pdf.numPages);
           pdf
             .getPage(1)
@@ -313,26 +531,75 @@ export function PdfPages({
               `[mthds-form] pdf.js refused the host's worker: ${error.message} The document is shown as its link.`,
             );
           }
-          refuse();
+          refuse('final');
         }}
-        onSourceError={() => refuse()}
+        onSourceError={() => refuse('final')}
       >
-        {pageCount !== undefined &&
-          Array.from({ length: pageCount }, (_, index) => (
-            <PageSlot
-              key={index + 1}
-              lib={ready.lib}
-              pageNumber={index + 1}
-              width={width}
-              ratio={ratio}
-              root={frame}
-            />
-          ))}
+        {Array.from({ length: laidOut }, (_, index) => (
+          <PageSlot
+            key={index + 1}
+            lib={ready.lib}
+            pageNumber={index + 1}
+            width={width}
+            ratio={ratio}
+            watch={watch}
+          />
+        ))}
+        {pageCount !== undefined && pageCount > laidOut && (
+          <MorePages
+            shown={laidOut}
+            total={pageCount}
+            href={href}
+            openExternal={latest.current.openExternal}
+          />
+        )}
       </Document>
     </div>
   );
 }
 
+/**
+ * The line below the last page laid out, for a document with more pages than
+ * {@link PDF_PAGES_MAX_PAGES}: it says so, and offers the document's link.
+ */
+function MorePages({
+  shown,
+  total,
+  href,
+  openExternal,
+}: {
+  shown: number;
+  total: number;
+  href: string | undefined;
+  openExternal: OpenExternal | undefined;
+}) {
+  const s = useFieldStrings();
+  return (
+    <p className="px-2 py-3 text-center text-[12px] text-muted-foreground">
+      {s.pdfPagesContinue(shown, total)}
+      {href && (
+        <>
+          {' '}
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn('rounded-sm underline underline-offset-2', focusOutlineClass)}
+            onClick={(event) => {
+              // The resolved URL, as the browser would open it.
+              const resolved = event.currentTarget.href;
+              if (!openExternal || !EXTERNAL_LINK_RE.test(resolved)) return;
+              event.preventDefault();
+              openExternal(resolved);
+            }}
+          >
+            {s.openInNewTab}
+          </a>
+        </>
+      )}
+    </p>
+  );
+}
 /** The frame-sized box shown while the bytes and pdf.js load. */
 function PagesLoading({ sizeClass, label }: { sizeClass: string; label: string }) {
   return (
@@ -388,70 +655,127 @@ function useContentWidth(element: HTMLElement | null): number | undefined {
 }
 
 /**
+ * Which pages' places are near the visible part of the frame, read by ONE
+ * `IntersectionObserver` for the whole stack rather than one per place. A
+ * place is near while it is within one frame's height of the visible part.
+ * Places register as they mount, before or after the frame is connected.
+ */
+class PageWatch {
+  private observer: IntersectionObserver | undefined;
+  private readonly places = new Map<Element, (near: boolean) => void>();
+  private readonly pages = new Map<number, { element: HTMLElement; reveal: () => void }>();
+
+  /** Starts watching within the frame; returns the disconnect. */
+  connect(root: HTMLElement): (() => void) | undefined {
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) this.places.get(entry.target)?.(entry.isIntersecting);
+      },
+      { root, rootMargin: '100% 0px' },
+    );
+    this.observer = observer;
+    for (const element of this.places.keys()) observer.observe(element);
+    return () => {
+      observer.disconnect();
+      if (this.observer === observer) this.observer = undefined;
+    };
+  }
+
+  /** Registers one page's place; returns the unregister. */
+  watch(pageNumber: number, element: HTMLElement, setNear: (near: boolean) => void): () => void {
+    this.places.set(element, setNear);
+    this.pages.set(pageNumber, { element, reveal: () => setNear(true) });
+    this.observer?.observe(element);
+    return () => {
+      this.places.delete(element);
+      if (this.pages.get(pageNumber)?.element === element) this.pages.delete(pageNumber);
+      this.observer?.unobserve(element);
+    };
+  }
+
+  /** A page's place, when it is laid out. */
+  find(pageNumber: number): { element: HTMLElement; reveal: () => void } | undefined {
+    return this.pages.get(pageNumber);
+  }
+}
+
+/**
  * One page's place in the stack. The page is drawn while its place is within
  * one frame's height of the visible part of the frame, and let go beyond it,
  * so a long document holds a few canvases at a time; a place not drawn keeps
  * the height its page last had at this width, or the first page's shape, so
  * the scroll does not jump. Where the browser has no `IntersectionObserver`,
- * every page is drawn.
+ * every page is drawn. A page pdf.js cannot load or draw is replaced by a line
+ * that says so, and reported, rather than left blank.
  */
 function PageSlot({
   lib,
   pageNumber,
   width,
   ratio,
-  root,
+  watch,
 }: {
   lib: ReactPdf;
   pageNumber: number;
   width: number | undefined;
   ratio: number;
-  root: HTMLElement | null;
+  watch: PageWatch;
 }) {
+  const s = useFieldStrings();
   const place = useRef<HTMLDivElement>(null);
   const [near, setNear] = useState(() => typeof IntersectionObserver === 'undefined');
+  const [failed, setFailed] = useState(false);
   const [measured, setMeasured] = useState<{ width: number | undefined; height: number }>();
   useEffect(() => {
     const element = place.current;
-    if (!element || !root || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry) setNear(entry.isIntersecting);
-      },
-      { root, rootMargin: '100% 0px' },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [root]);
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    return watch.watch(pageNumber, element, setNear);
+  }, [watch, pageNumber]);
   const height =
     measured && measured.width === width
       ? measured.height
       : width !== undefined
         ? Math.round(width * ratio)
         : undefined;
+  const fail = (what: string) => (error: Error) => {
+    report(`[mthds-form] Page ${pageNumber} of the PDF could not be ${what}:`, error);
+    setFailed(true);
+  };
   const { Page } = lib;
   return (
     <div
       ref={place}
       data-page-number={pageNumber}
       className="flex w-full justify-center"
-      style={near || height === undefined ? undefined : { height }}
+      style={(near && !failed) || height === undefined ? undefined : { height }}
     >
-      {near && (
-        <Page
-          pageNumber={pageNumber}
-          width={width}
-          renderForms={false}
-          renderTextLayer
-          renderAnnotationLayer
-          loading={<div style={height === undefined ? undefined : { height, width }} />}
-          error={null}
-          className="shadow-sm"
-          onRenderSuccess={() => {
-            const box = place.current?.getBoundingClientRect();
-            if (box && box.height > 0) setMeasured({ width, height: box.height });
-          }}
-        />
+      {failed ? (
+        <div
+          className="flex size-full min-h-16 items-center justify-center rounded-sm border border-dashed border-border bg-card px-3 text-center text-[12px] text-muted-foreground"
+          style={width === undefined ? undefined : { width }}
+        >
+          {s.pdfPageNotDrawn}
+        </div>
+      ) : (
+        near && (
+          <Page
+            pageNumber={pageNumber}
+            width={width}
+            renderForms={false}
+            renderTextLayer
+            renderAnnotationLayer
+            loading={<div style={height === undefined ? undefined : { height, width }} />}
+            error={null}
+            className="shadow-sm"
+            onLoadError={fail('loaded')}
+            onRenderError={fail('drawn')}
+            onRenderSuccess={() => {
+              const box = place.current?.getBoundingClientRect();
+              if (box && box.height > 0) setMeasured({ width, height: box.height });
+            }}
+          />
+        )
       )}
     </div>
   );
