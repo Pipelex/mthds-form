@@ -74,6 +74,17 @@ const BUDGET_PATTERNS = [
     message:
       'jspdf and modern-screenshot are loaded with import() on first use only. See docs/dependency-budget.md.',
   },
+  {
+    // The PDF renderer's library, loaded with `import()` in an effect in
+    // `src/react/pdf-pages.tsx`, so only a browser showing a PDF it draws ever
+    // loads it. A static import would put pdf.js in every form's chunk, and
+    // would break a server render: react-pdf's link service imports pdf.js's
+    // viewer module, which reads `document` at its top level.
+    group: ['react-pdf', 'react-pdf/*', 'pdfjs-dist', 'pdfjs-dist/*'],
+    allowTypeImports: true,
+    message:
+      'react-pdf and pdfjs-dist are loaded with import() in the browser only. See docs/dependency-budget.md.',
+  },
 ];
 
 /**

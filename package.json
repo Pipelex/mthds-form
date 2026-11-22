@@ -1,6 +1,6 @@
 {
   "name": "@pipelex/mthds-form",
-  "version": "0.40.0",
+  "version": "0.41.0",
   "description": "Headless form kernel and control set for MTHDS method inputs",
   "license": "MIT",
   "repository": {
@@ -15,7 +15,7 @@
     "**/*.css"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "main": "./dist/core/index.js",
   "types": "./dist/core/index.d.ts",
@@ -42,6 +42,7 @@
     },
     "./styles.css": "./dist/styles.css",
     "./theme.css": "./dist/theme.css",
+    "./pdf-layers.css": "./dist/pdf-layers.css",
     "./layout-design.mthds": "./dist/layout-design.mthds",
     "./layout-sample.mthds": "./dist/layout-sample.mthds"
   },
@@ -51,7 +52,7 @@
   "scripts": {
     "prepare": "npm run build",
     "build": "tsup && npm run build:css",
-    "build:css": "tailwindcss -i src/styles/tailwind-entry.css -o dist/styles.css --minify && cp src/styles/theme.css dist/theme.css",
+    "build:css": "tailwindcss -i src/styles/tailwind-entry.css -o dist/styles.css --minify && cp src/styles/theme.css dist/theme.css && cp src/styles/pdf-layers.css dist/pdf-layers.css",
     "lint": "eslint src/ \"scripts/**/*.ts\"",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \".storybook/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \".storybook/**/*.{ts,tsx,css}\"",
@@ -84,6 +85,7 @@
     "modern-screenshot": "^4.7.0",
     "mthds": "^0.33.0",
     "react-dropzone": "^14.3.8",
+    "react-pdf": "^11.1.0",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.5.4"
   },

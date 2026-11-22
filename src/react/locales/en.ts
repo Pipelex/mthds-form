@@ -70,6 +70,9 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   documentPdfPreparing: 'Preparing the preview…',
   documentPdfFailed: 'Couldn’t prepare a preview.',
   documentPdfUnavailable: 'No preview for this file.',
+  pdfPageNotDrawn: 'This page could not be drawn',
+  pdfPagesContinue: (shown, total) =>
+    `The document continues past these first ${shown} of its ${total} pages.`,
   // U+002D HYPHEN-MINUS, deliberately: not an en dash, not an em dash.
   resultAbsent: '-',
   resultAbsentDescription: 'Not provided',

@@ -27,9 +27,17 @@ const config: StorybookConfig = {
   // link a face root-relative, as a host's quote template links its own
   // (`/fonts/house-sans-regular.woff2`). The faces are Nunito Sans, under the OFL;
   // a proprietary face cannot be redistributed in an open-source repository.
+  //
+  // pdf.js's worker and its data files are served under `/pdfjs/`, as a host
+  // that draws PDFs serves them from its own build: the package does not ship
+  // the worker, and the `Outputs/PDF pages` stories hand its URL over through
+  // `pdfWorker`, as a host does.
   staticDirs: [
     '../data/inputs',
     { from: '../node_modules/storybook/assets/browser', to: '/fonts' },
+    { from: '../node_modules/pdfjs-dist/build', to: '/pdfjs/build' },
+    { from: '../node_modules/pdfjs-dist/cmaps', to: '/pdfjs/cmaps' },
+    { from: '../node_modules/pdfjs-dist/standard_fonts', to: '/pdfjs/standard_fonts' },
   ],
   addons: ['@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-vitest'],
   framework: '@storybook/react-vite',
@@ -85,6 +93,8 @@ const config: StorybookConfig = {
         'jspdf',
         'lucide-react',
         'modern-screenshot',
+        // Loaded with `import()` when a PDF the view draws itself is shown.
+        'react-pdf',
         'react-dropzone',
         'tailwind-merge',
         'zod',

@@ -51,6 +51,14 @@
 /* The select popover's and tooltip's enter and exit transitions. */
 @import 'tw-animate-css';
 
+/*
+ * The text and annotation layers of a PDF the result view draws itself. Plain
+ * CSS rather than utilities, since pdf.js names its own elements, so it is also
+ * shipped on its own as `dist/pdf-layers.css` for a Tailwind host, which loads
+ * no prebuilt sheet. See docs/result-view.md, "A PDF the view draws itself".
+ */
+@import './pdf-layers.css';
+
 /* Dark mode is the `.dark` class convention, matching `theme.css`. */
 @custom-variant dark (&:is(.dark *));
 

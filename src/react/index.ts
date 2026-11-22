@@ -79,12 +79,19 @@ export { saveInBrowser } from './save-in-browser';
 // host's own PDF maker for an HTML page. `resolveRendition` is the host's
 // smaller copy of a picture, for a gallery's tiles and a cell's thumbnail, and
 // `resolveDocumentPdf` the host's PDF of a document the browser cannot render.
+// `loadBytes` and `pdfWorker` let the view draw a PDF it cannot frame itself,
+// with pdf.js, and `openExternal` is how the links inside it leave the view.
 export type {
   AskDocumentPdf,
+  BytesRequest,
   DocumentPdfAnswer,
   DocumentPdfRequest,
   DownloadDisplay,
+  LoadBytes,
+  OpenExternal,
   PdfPage,
+  PdfWorkerConfig,
+  PdfWorkerSource,
   ProseImages,
   RenderPdf,
   RenditionRequest,
@@ -101,7 +108,10 @@ export type {
 export type { LoadText, StoredReferenceView } from '../core';
 export {
   ResultEnvProvider,
+  useLoadBytes,
   useLoadText,
+  useOpenExternal,
+  usePdfWorker,
   useProseImages,
   useResolveDocumentPdf,
   useResolveRendition,
@@ -109,6 +119,10 @@ export {
   useResolveUrl,
   useResolvedUrl,
 } from './result-env';
+
+// The bounds of a PDF the view draws itself: the largest file it draws, and the
+// largest image pdf.js decodes on a page. See docs/result-view.md.
+export { PDF_PAGES_MAX_BYTES, PDF_PAGES_MAX_IMAGE_PIXELS, PDF_PAGES_MAX_PAGES } from './pdf-pages';
 
 // The markup arm of the result view, exported on its own for a host that renders
 // a `native.Html` value outside a result tree. It is a sandboxed frame rather
