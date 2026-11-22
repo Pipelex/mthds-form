@@ -1,6 +1,6 @@
 /**
  * Payloads of files a browser can fetch, shared by the result stories that need
- * one: `Outputs/Media` and `Outputs/Downloads`.
+ * one: `Outputs/Media`, `Outputs/Downloads` and `Outputs/PDF pages`.
  *
  * **Hand-built, and they have to be.** Every other result story renders what a
  * run produced, but a run's file-bearing results carry `pipelex-storage://`
@@ -114,6 +114,18 @@ export const REVIEW_PACKET = {
     mime_type: 'application/pdf',
     title: 'Site survey',
   },
+};
+
+/**
+ * A payload for a `native.Document` result that is the served PDF under its
+ * own name, which `Outputs/PDF pages` hands a host that cannot frame it, so the
+ * view draws its pages. Hand-built for the reason `REPORT` is.
+ */
+export const DRAWN_PDF = {
+  url: PDF_URL,
+  filename: 'solar_system.pdf',
+  mime_type: 'application/pdf',
+  title: 'The Solar System: An Overview',
 };
 
 /**

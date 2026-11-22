@@ -11,7 +11,7 @@ import {
   type LoadBytes,
   type PdfWorkerConfig,
 } from '../../react';
-import { PDF_URL } from './media-payloads';
+import { DRAWN_PDF, PDF_URL } from './media-payloads';
 
 /**
  * A PDF the view draws itself, page by page, with pdf.js.
@@ -27,9 +27,9 @@ import { PDF_URL } from './media-payloads';
  * text selectable, in the frame the iframe would have had.
  *
  * The PDF is the corpus's own extraction input, the one `Outputs/Media`
- * frames; the document value naming it is built the same way, by hand, since a
- * run's file-bearing result carries a storage reference no browser can fetch
- * (`media-payloads.ts`).
+ * frames; the document value naming it (`DRAWN_PDF`) is built the same way, by
+ * hand, beside that story's, since a run's file-bearing result carries a
+ * storage reference no browser can fetch (`media-payloads.ts`).
  */
 
 const document: FileRunField = {
@@ -41,9 +41,14 @@ const document: FileRunField = {
   formats: DOCUMENT_FORMATS,
 };
 
-/** The host's bytes seam: a fetch of the file, as a host fetches its presigned link. */
-const loadBytes: LoadBytes = async (url) => {
-  const response = await fetch(url);
+/**
+ * The host's bytes seam: a fetch of the file, as a host fetches its presigned
+ * link. The URL is the method's choice, so a host reads only the references it
+ * stores itself; this one reads the one file it serves, and refuses any other.
+ */
+const loadBytes: LoadBytes = async (url, { signal }) => {
+  if (url !== PDF_URL) throw new Error(`Not a file this host serves: ${url}`);
+  const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`The file answered ${response.status}`);
   return new Uint8Array(await response.arrayBuffer());
 };
@@ -55,19 +60,12 @@ const pdfWorker: PdfWorkerConfig = {
   standardFontDataUrl: '/pdfjs/standard_fonts/',
 };
 
-const VALUE = {
-  url: PDF_URL,
-  filename: 'solar_system.pdf',
-  mime_type: 'application/pdf',
-  title: 'The Solar System: An Overview',
-};
-
 function DrawnPdf({ presentation }: { presentation: FieldPresentation }) {
   return (
     <div style={{ maxWidth: 640 }}>
       <FieldPresentationProvider presentation={presentation}>
         <ResultEnvProvider loadBytes={loadBytes} pdfWorker={pdfWorker}>
-          <StuffViewer field={document} value={VALUE} />
+          <StuffViewer field={document} value={DRAWN_PDF} />
         </ResultEnvProvider>
       </FieldPresentationProvider>
     </div>
@@ -84,7 +82,7 @@ async function expectPagesDrawn(canvasElement: HTMLElement) {
   // One per theme pane.
   const regions = await waitFor(
     () => {
-      const found = canvas.getAllByRole('group', { name: VALUE.title });
+      const found = canvas.getAllByRole('group', { name: DRAWN_PDF.title });
       expect(found).toHaveLength(2);
       return found;
     },
