@@ -435,7 +435,9 @@ describe('a PDF the frame rule refuses, under a host that answers its bytes', ()
     const [worker] = started;
     expect(worker!.options).toEqual({ type: 'module' });
     expect(worker!.script).toMatch(/^blob:/);
-    expect(await blobs.get(worker!.script)!.text()).toBe(`await import("${WORKER.workerSrc}");`);
+    expect(await blobs.get(worker!.script)!.text()).toContain(
+      `await import(${JSON.stringify(WORKER.workerSrc)});`,
+    );
     // Handed to pdf.js as this document's own worker.
     expect(pdf.pdfWorkers).toHaveLength(1);
     expect(pdf.pdfWorkers[0]!.port).toBe(worker);
@@ -449,6 +451,53 @@ describe('a PDF the frame rule refuses, under a host that answers its bytes', ()
     await waitFor(() => expect(worker!.terminated).toBe(true));
     expect(pdf.released).toEqual(['document', 'pdf-worker', 'worker']);
     expect(revoked).toEqual([worker!.script]);
+  });
+
+  it('holds the messages that arrive while the blob: module imports, and hands them on once, in order', async () => {
+    render(
+      host({
+        loadBytes: async () => BYTES,
+        children: <ResultField field={documentField('report')} value={PDF} />,
+      }),
+    );
+    await screen.findByRole('group', { name: 'Quarterly report' });
+    const source = await blobs.get(started[0]!.script)!.text();
+    // The module run against a stand-in worker scope, its import held open as
+    // a cross-origin fetch holds it: the test's stand-in installs pdf.js's
+    // listener during the import, as evaluating pdf.js's worker module does.
+    expect(source.match(/\bimport\(/g)).toHaveLength(1);
+    const scope = new EventTarget();
+    const seen: unknown[] = [];
+    let finish!: () => void;
+    const imported = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const listen = () =>
+      scope.addEventListener('message', (event) => seen.push((event as MessageEvent).data));
+    const run = new Function(
+      'self',
+      'MessageEvent',
+      '__import',
+      `return (async () => {\n${source.replace('import(', '__import(')}\n})();`,
+    ) as (
+      self: EventTarget,
+      event: typeof MessageEvent,
+      load: () => Promise<void>,
+    ) => Promise<void>;
+    const running = run(scope, MessageEvent, () => imported);
+    const post = (data: string) => scope.dispatchEvent(new MessageEvent('message', { data }));
+    post('configure');
+    post('GetDocRequest');
+    listen();
+    // Even with pdf.js listening, nothing reaches it before the import has finished.
+    post('late');
+    expect(seen).toEqual([]);
+    finish();
+    await running;
+    expect(seen).toEqual(['configure', 'GetDocRequest', 'late']);
+    // Once handed on, the scope's messages reach pdf.js directly.
+    post('after');
+    expect(seen).toEqual(['configure', 'GetDocRequest', 'late', 'after']);
   });
 
   it('starts a worker on the page’s own origin from its URL, with no blob', async () => {
