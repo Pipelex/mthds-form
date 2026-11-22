@@ -275,7 +275,7 @@ A table of records draws its own rounded hairline box, which is what says where 
 
 ## Files
 
-**A document offers a preview when the browser can both frame and render it, or when its host answers a PDF of it.** The browser's way takes two conditions, both necessary: `frameableUrl` (only the host's resolver's answer on the page's own origin is framed, so a third party's document is a link and a `pipelex-storage://` reference with no resolver behind it is neither — see [The URL policy](#the-url-policy)) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none, so a `.docx` offers a preview only through its host ([A document the browser cannot render](#a-document-the-browser-cannot-render-the-hosts-pdf)). Every preview starts open, and its toggle folds it away, except for the whole result in `app`, which is framed at a page's size with no toggle ([Every preview starts open](#every-preview-starts-open)). Which formats are worth framing is read from the payload's declared type, and that is the right source: whether a preview is worth OFFERING is a usability question, and the producer is the one that knows. What the declared type may not do is admit a URL.
+**A document offers a preview when the browser can both frame and render it, when its host answers a PDF of it, or when it is a PDF whose host hands the view its bytes.** The browser's way takes two conditions, both necessary: `frameableUrl` (only the host's resolver's answer on the page's own origin is framed, so a third party's document is a link and a `pipelex-storage://` reference with no resolver behind it is neither — see [The URL policy](#the-url-policy)) and a format a browser renders unaided. A `.docx` satisfies the first and not the second, and a preview that opens onto a download prompt is worse than none, so a `.docx` offers a preview only through its host ([A document the browser cannot render](#a-document-the-browser-cannot-render-the-hosts-pdf)). A PDF the frame rule refuses is drawn by the view itself, page by page, when its host supplies the bytes and pdf.js's worker ([A PDF the view draws itself](#a-pdf-the-view-draws-itself)). Every preview starts open, and its toggle folds it away, except for the whole result in `app`, which is framed at a page's size with no toggle ([Every preview starts open](#every-preview-starts-open)). Which formats are worth framing is read from the payload's declared type, and that is the right source: whether a preview is worth OFFERING is a usability question, and the producer is the one that knows. What the declared type may not do is admit a URL.
 
 **A file always exposes its URL, three ways.** A picture is a _preview_ of a file, not a replacement for it — once the image painted, the URL used to vanish entirely, leaving a result you could look at and could not use. So a painted image opens in a viewer that offers the file it previews in a tab of its own, its reference is printed beneath it, and the reference carries a copy control and, beside it, a button that saves the file ([A file's own download button](#a-files-own-download-button)). A gallery's tile in `app` is the one place the line under the picture is left out, and there the same three are in the viewer ([What a tile says](#what-a-tile-says-in-each-presentation)).
 
@@ -337,6 +337,75 @@ type DocumentPdfAnswer =
 **It only ever shows pages.** The PDF is the frame's `src`, or the link on the card shown where the browser has no PDF viewer, because that link is a reader's way to the pages. Everything else keeps the original: the document's name, its link, its copy control and every download, so a reader who saves a Word result gets the Word file.
 
 `Outputs/Media` shows a Word document with a host answering a PDF, one whose PDF is prepared for a moment first, one that failed and one with no PDF to offer, beside "A .docx → link, no preview", which is the host that does not answer, and a deck that is the whole result in `app` and in `studio`; `document-pdf.test.tsx` pins each state, the asking and the gates, and the asking on mount, in every place a document is shown.
+
+### A PDF the view draws itself
+
+**A host whose view cannot frame its documents hands the view their bytes, and the view draws a PDF's pages itself.** The frame rule admits only a document the host's resolver answered on the page's own origin ([The URL policy](#the-url-policy)). A host whose view runs in a chat host's sandboxed frame has no route on that origin: its view runs on an origin the chat host owns, its documents are presigned links on a storage bucket's host, and neither chat host shows a PDF in a frame anyway. So every PDF it had was a name and a link. With two optional settings on `ResultEnvProvider`, the view draws such a PDF onto canvases with pdf.js, through react-pdf, and frames nothing:
+
+```ts
+type LoadBytes = (url: string, request: BytesRequest) => Promise<Uint8Array>;
+interface BytesRequest {
+  maxBytes: number;
+}
+type PdfWorkerConfig = ({ workerSrc: string } | { workerPort: Worker }) & {
+  version?: string;
+  cMapUrl?: string;
+  standardFontDataUrl?: string;
+  wasmUrl?: string;
+  iccUrl?: string;
+};
+type OpenExternal = (url: string) => void;
+```
+
+```tsx
+<ResultEnvProvider
+  resolveUrl={resolveUrl}
+  loadBytes={readStoredBytes}
+  pdfWorker={{ workerSrc: pdfWorkerUrl, version: pdfjsVersion }}
+  openExternal={openLinkThroughHost}
+>
+  …
+</ResultEnvProvider>
+```
+
+**Where it applies.** A document is drawn when all of these hold: it is a PDF (its declared type is `application/pdf`, or with none its name ends in `.pdf`, read as the frame reads it); the frame rule refused it, so a host that frames on its own origin keeps its frame and need not supply anything; the host supplies `loadBytes`; and the host supplies a `pdfWorker` naming a worker. It is drawn where the frame would have been, at the frame's size ([The frame is the size of a page](#every-preview-starts-open)): a page's size with no toggle as the whole result in `app`, and a nested preview's size with its toggle pressed everywhere else. The document's name, its link, its copy control and its download stay beside it, unchanged. A Word, Excel or PowerPoint file is not drawn: what is drawn is the file the result holds, and only a PDF is one pdf.js reads.
+
+**`loadBytes`, the bytes seam.** It is an asynchronous sibling of `loadText`, asked with the document's own `url` member as `resolveRendition` and `resolveDocumentPdf` are, and the `maxBytes` the view draws under. It resolves to the file's bytes, and rejects for a document the host will not or cannot read. It is asked as the preview opens, which is as the document mounts, and again each time a reader unfolds it; the view keeps no cache of its own, since what it holds is a whole file. The view copies what it is handed before pdf.js takes it (pdf.js transfers the buffer of the array it is given to its worker, which empties the caller's copy), so a host may cache and answer the same array again.
+
+**`pdfWorker`, the worker the host serves.** The package does not ship pdf.js's worker: it is about 1.3 MB, every consumer would copy it, and it must match the pdf.js the renderer runs exactly. The host passes `workerSrc`, the URL of `pdf.worker.min.mjs` from the same `pdfjs-dist` react-pdf resolves (a Vite build's `pdfjs-dist/build/pdf.worker.min.mjs?url`), or `workerPort`, a worker it started itself. pdf.js wraps a cross-origin `workerSrc` in a `blob:` module that imports it, so the worker may be served from another origin with `Access-Control-Allow-Origin`, provided the page's policy admits `blob:` workers. With no worker named, the renderer is off and the document keeps its link. The renderer always sets pdf.js's `GlobalWorkerOptions.workerSrc` or `workerPort` from this setting, because react-pdf sets `workerSrc` to a relative `pdf.worker.mjs` as it loads, which resolves on whatever origin the view runs on; it leaves pdf.js's renderer source (`rendererSrc`, `rendererPorts`) as pdf.js has it.
+
+**`version` catches a second copy of pdf.js.** The worker must be the build of the pdf.js the renderer runs. A host that states the worker's version (`version` imported from the `pdfjs-dist` its worker URL came from) has it compared with `pdfjs.version` before anything loads, and a mismatch is reported with `console.error` and leaves the document its link. The comparison is cheap and exact, but only as reliable as the host's statement, which is why it is optional: pdf.js itself refuses a worker of another version when the document loads ("The API version … does not match the Worker version …"), and the renderer reports that with `console.error` too, so a mismatch is loud either way. Stating the version moves the report before the download.
+
+**The ceiling, `PDF_PAGES_MAX_BYTES`: 32 MiB.** The view downloads what it draws and pdf.js holds it in memory while it is shown, inside a frame a host may have sized for a chat. A document over the ceiling keeps its link. The check is on the length of the bytes the seam answers, which needs nothing from the payload (a `native.Document` states no size); the ceiling is also handed to the seam as `maxBytes`, so a host that knows a file's size before it downloads (a `Content-Length`, a size it stored) can reject at once rather than fetch bytes the view will not draw.
+
+**The image bound, `PDF_PAGES_MAX_IMAGE_PIXELS`: 40 million pixels.** The byte ceiling does not bound what a small file can expand into: a few kilobytes can describe an image of billions of pixels. pdf.js's `maxImageSize` is set to this bound, which admits a whole A4 or Letter page scanned at 600 dpi (about 35 million pixels) and holds one decoded image to about 160 MB; a larger image is left out of its page and the rest of the page is drawn. pdf.js's own canvas limits apply beside it.
+
+**Every way it cannot be drawn falls back to the link, never to a blank frame.** While the bytes and pdf.js load, the frame-sized box says so (`documentPdfPreparing`). Then the document is shown as its name, its link, its copy control and its download, with no preview and no toggle, as a document with no preview is, when: the seam is absent, or no worker is named (decided as the view renders, so no box is shown); the seam rejects, throws, or answers anything but a non-empty `Uint8Array`; the bytes are over the ceiling; react-pdf cannot be loaded; the stated worker version is not pdf.js's; pdf.js cannot parse the document, or refuses the worker; or the bytes, pdf.js and the document's first parse take more than a minute together. The fallback belongs to that document: the view does not try it again while it stays mounted.
+
+**Why this does not lower security.** The method chooses the bytes, never a page: nothing it wrote is framed, on any origin, or run as a document, so the third party's page the frame rule keeps out stays out, and the frame rule itself is untouched. A presigned credential stays out of every `src`, since the host reads the bytes itself. Three of react-pdf's defaults would reopen that threat, and the renderer overrides each:
+
+- **Links inside the PDF.** The annotation layer draws a PDF's links as anchors, and react-pdf's link service gives an external one an empty `target`, so a click would navigate the view's own frame to a page the method chose. The renderer passes `externalLinkTarget="_blank"` and `externalLinkRel="noopener noreferrer"`, so with nothing else a link opens in a new tab with no opener and no referrer. When the host supplies `openExternal`, a click (or a middle click) on an external link is taken from the browser and handed to the host instead, for a view whose frame cannot open a tab itself; `http:`, `https:` and `mailto:` links are handed over, and any other scheme pdf.js admits (`ftp:`, `tel:`) is kept from navigating and handed nowhere. A link to a place in the same document (`#…`) stays pdf.js's own and scrolls the frame.
+- **Forms.** `renderForms` is pinned to `false`. With it on, a PDF's form fields become live `<input>` elements in the host's page, a working fake form; off, pdf.js draws each field's appearance onto the page.
+- **XFA.** `enableXfa` is pinned to `false`, its default, so an XFA form is never laid out as HTML.
+
+What remains is pdf.js parsing hostile bytes, which is contained as any viewer's is: react-pdf 11.1.0 pins `pdfjs-dist` 6.5.438, far past CVE-2024-4367 (fixed in 4.2.67), whose font path no longer compiles code at all. A pdf.js security fix therefore reaches this package through a react-pdf release.
+
+**Fonts, colour and exotic images: what a host loses without pdf.js's data files.** The optional `cMapUrl`, `standardFontDataUrl`, `wasmUrl` and `iccUrl` are handed to pdf.js as they are; each is a directory URL with a trailing slash, typically `pdfjs-dist`'s `cmaps/`, `standard_fonts/`, `wasm/` and `iccs/` served beside the worker. pdf.js fetches them with `fetch`, from the worker when the first three are all given as `http(s)` URLs and from the view otherwise, so the page's `connect-src` must admit where they are served. Without each:
+
+- **`cMapUrl`**: a font that relies on one of the predefined CMaps (CID-keyed fonts, which most Chinese, Japanese and Korean text uses when its font is not embedded with its own encoding) is drawn with missing or wrong glyphs, and its text in the text layer is wrong, so copying it gives the wrong characters.
+- **`standardFontDataUrl`**: a document that uses one of the fourteen standard fonts without embedding it (Helvetica, Times, Courier, Symbol, ZapfDingbats) is drawn in a system font, with different shapes and widths, and Symbol and ZapfDingbats characters can come out wrong.
+- **`wasmUrl`**: JPEG 2000 and JBIG2 images (common in scanned documents) are not decoded and are left out of their pages, and ICC colour profiles are not applied, so such colours fall back to an approximation; the profiles need the worker to fetch, which needs all of `cMapUrl`, `standardFontDataUrl` and `wasmUrl`.
+- **`iccUrl`**: CMYK colour is converted to the screen's colours by pdf.js's built-in approximation rather than through a CMYK profile.
+
+Ordinary documents, with embedded fonts and JPEG or PNG images, lose nothing.
+
+**Only the pages near what the reader sees are drawn.** The pages are stacked in the frame, each fitted to the frame's width (followed as the frame resizes, so a phone's width fits a page whole and pinch zoom is the browser's), with a text layer, so text can be selected and copied, and an annotation layer, so links work. A page is drawn while its place is within one frame's height of the visible part of the frame, and let go beyond it, so a long document holds a few canvases at a time; a place not drawn keeps the height its page last had, or the first page's shape, so the scroll does not jump. A browser with no `IntersectionObserver` draws every page. There is no toolbar: search and printing are one click away, through the link that opens the document in a tab of its own, and the download beside it.
+
+**Client only.** react-pdf's link service imports pdf.js's viewer module, which reads `document` at its top level, so the renderer imports react-pdf with `import()` in an effect, in the browser, and only once the preview is open with both settings present. A server render reaches neither: it renders the document's link and the frame-sized loading box, and the browser's first render, which hydrates it, renders the same. `make assert-bundle` imports the built `./react` entry in a plain node process and server-renders a result holding such a PDF under both settings, and refuses a static edge to `react-pdf` or `pdfjs-dist` from any entry ([dependency-budget.md](dependency-budget.md)).
+
+**The layers' styles ship with the package.** Without pdf.js's text and annotation layer styles the text layer is drawn visibly, out of place, over the page. They are folded, scoped under the renderer's frame and with a fallback on every custom property they read, into `styles.css`, and shipped on their own as `@pipelex/mthds-form/pdf-layers.css` for a host that compiles the package's utilities with its own Tailwind build and loads no prebuilt sheet ([theming.md](theming.md#host-setup)).
+
+`pdf-pages.test.tsx` pins the seam, the ceiling, every fallback, the security settings handed to react-pdf, the worker, the data files, the copy of the bytes, the lazy pages and the links' routing, with react-pdf replaced at its module boundary since jsdom has no canvas; `pdf-pages-server.test.tsx` pins the server render. `Outputs/PDF pages` draws the corpus's real PDF in Chromium, as the whole result in `app` and in `studio`.
 
 ## A picture opens in a viewer
 
@@ -508,7 +577,7 @@ The path arm settles four spellings. `//host/x` is protocol-relative and points 
 | the host's resolver               | a URL on any other origin                      | no: linked                            |
 | the payload (`url`, `public_url`) | anything, `https:` included                    | no: linked                            |
 
-A refused document loses nothing but its inline view: its name is the link that opens it in a tab of its own, under its own address, with its copy and download controls beside it, and no Preview is offered. It used to be framed whenever its URL was `http:` or `https:`, on the strength of the origin boundary alone, which left a host whose `frame-src` policy only reports with a third party's page inside its own.
+A refused document loses nothing but its inline view: its name is the link that opens it in a tab of its own, under its own address, with its copy and download controls beside it, and no Preview is offered. A refused PDF keeps its inline view when the host hands the view its bytes, because the view then draws the pages itself and frames nothing ([A PDF the view draws itself](#a-pdf-the-view-draws-itself)). It used to be framed whenever its URL was `http:` or `https:`, on the strength of the origin boundary alone, which left a host whose `frame-src` policy only reports with a third party's page inside its own.
 
 **The page's origin is the browser's answer** (`usePageOrigin`). A server render has none, so it frames nothing absolute; hydration renders with the same answer and frames it straight after, so the two never disagree. A root-relative path needs no answer, being that origin by construction, which is why a resolver that answers paths (`/api/assets/…`) frames from the first render.
 

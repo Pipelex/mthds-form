@@ -45,7 +45,10 @@ import {
 } from '../core/stored-value';
 import {
   useFileDownloadShown,
+  useLoadBytes,
   useLoadText,
+  useOpenExternal,
+  usePdfWorker,
   usePdfSaveShown,
   useResolveDocumentPdf,
   useResolveRendition,
@@ -81,6 +84,7 @@ import { ConceptPill } from './concept-pill';
 import { useDocumentPdf } from './document-pdf';
 import { FocusFrame } from './focus-frame';
 import { usePageOrigin } from './page-origin';
+import { hasPdfWorker, PdfPages } from './pdf-pages';
 import { usePdfViewer } from './pdf-viewer';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
@@ -1271,8 +1275,14 @@ function DocumentValue({
   // missing a URL.
   const resolve = useResolveUrl();
   const resolveDocumentPdf = useResolveDocumentPdf();
+  const loadBytes = useLoadBytes();
+  const pdfWorker = usePdfWorker();
+  const openExternal = useOpenExternal();
   const origin = usePageOrigin();
   const isApp = useFieldPresentation() === 'app';
+  // The document whose pages could not be drawn, which keeps its link from
+  // then on: a renderer that failed must never leave a blank frame behind.
+  const [pagesRefusedFor, setPagesRefusedFor] = useState<string | null>(null);
   // Open from the first render, on the server and in the browser alike, so the
   // hydration starts from the server's state.
   const [open, setOpen] = useState(true);
@@ -1306,7 +1316,15 @@ function DocumentValue({
           mimeType: content.mimeType,
         })
       : undefined;
-  const opened = whole && isApp && (preview !== undefined || askPdf !== undefined);
+  // A PDF the frame rule refused is drawn by the view itself when the host
+  // answers its bytes and supplies pdf.js's worker (`PdfPages`).
+  const drawPages =
+    preview === undefined &&
+    loadBytes !== undefined &&
+    hasPdfWorker(pdfWorker) &&
+    pagesRefusedFor !== content.url &&
+    isPdfDocument(content, content.url);
+  const opened = whole && isApp && (preview !== undefined || askPdf !== undefined || drawPages);
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -1335,7 +1353,7 @@ function DocumentValue({
             </p>
           )}
         </div>
-        {(preview || askPdf) && !opened && (
+        {(preview || askPdf || drawPages) && !opened && (
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
@@ -1364,6 +1382,18 @@ function DocumentValue({
           name={name}
           file={file}
           whole={opened}
+        />
+      )}
+      {drawPages && loadBytes && pdfWorker && (opened || open) && (
+        <PdfPages
+          key={content.url}
+          url={content.url}
+          name={name}
+          sizeClass={opened ? WHOLE_RESULT_FRAME : NESTED_FRAME}
+          loadBytes={loadBytes}
+          worker={pdfWorker}
+          openExternal={openExternal}
+          onUnavailable={() => setPagesRefusedFor(content.url)}
         />
       )}
     </div>

@@ -212,6 +212,105 @@ export type ResolveDocumentPdf = (
 ) => AskDocumentPdf | undefined;
 
 /**
+ * What the view tells the host when it asks for a document's bytes.
+ *
+ * `maxBytes` is the ceiling the view draws under (`PDF_PAGES_MAX_BYTES`): a
+ * document larger than this keeps its link whatever the host answers, so a
+ * host that can tell the size before it downloads (a `Content-Length`, a size
+ * it stored) may reject at once rather than fetch bytes the view will not draw.
+ */
+export interface BytesRequest {
+  maxBytes: number;
+}
+
+/**
+ * The host's seam for a stored document's BYTES, which the view hands to the
+ * PDF renderer when it cannot frame the document.
+ *
+ * ## Why a result view needs one
+ *
+ * The view frames a document only when the host's resolver answered it on the
+ * page's own origin (`frameableUrl`). A host whose view runs in a chat host's
+ * sandboxed frame has no route on that origin: its documents are presigned
+ * links on a storage bucket's host, which the frame rule refuses, so every PDF
+ * was shown as its name and a link. With this seam the view draws the pages
+ * itself, from bytes, onto canvases, and frames nothing: the method chooses the
+ * bytes, never a page.
+ *
+ * ## The contract
+ *
+ * Called with the document's own `url` member, exactly as `resolveRendition`
+ * and `resolveDocumentPdf` are, and the {@link BytesRequest}. Resolve to the
+ * file's bytes; reject for a document this host will not or cannot read (a
+ * reference that is not its own, a file past the ceiling, a failed fetch), and
+ * the document keeps its link. It is asked when the preview opens, which is as
+ * the document mounts, and again each time a reader unfolds it.
+ *
+ * The view copies what it is handed before pdf.js takes it (pdf.js transfers the
+ * buffer to its worker, which empties the caller's copy), so a host may cache
+ * and answer the same array again.
+ *
+ * Optional, and only useful together with `pdfWorker`. See `docs/result-view.md`,
+ * "A PDF the view draws itself".
+ */
+export type LoadBytes = (url: string, request: BytesRequest) => Promise<Uint8Array>;
+
+/** The pdf.js worker, as a script URL or as a worker the host already started. */
+export type PdfWorkerSource =
+  | {
+      /**
+       * The URL of pdf.js's worker module (`pdf.worker.min.mjs`). pdf.js wraps a
+       * cross-origin URL in a `blob:` module that imports it, so it may be on
+       * another origin, served with `Access-Control-Allow-Origin`.
+       */
+      workerSrc: string;
+      workerPort?: undefined;
+    }
+  | {
+      /** A worker running pdf.js's worker module, started by the host. */
+      workerPort: Worker;
+      workerSrc?: undefined;
+    };
+
+/**
+ * How the PDF renderer starts pdf.js's worker, and where it reads pdf.js's
+ * optional data files. Supplied by the host, because this package does not
+ * ship the worker: it is about 1.3 MB, every consumer would copy it, and it
+ * must match the pdf.js the renderer runs exactly.
+ *
+ * Without one the renderer is off, and a PDF the view cannot frame keeps its
+ * link. The data files are optional; what a host loses without each is in
+ * `docs/result-view.md`.
+ */
+export type PdfWorkerConfig = PdfWorkerSource & {
+  /**
+   * The pdf.js version the worker was built from, typically `version` imported
+   * from the same `pdfjs-dist` the worker's URL came from. When stated and
+   * different from the pdf.js the renderer runs, the renderer reports it with
+   * `console.error` and the document keeps its link, rather than pdf.js failing
+   * later with a message nobody sees.
+   */
+  version?: string;
+  /** Where pdf.js's packed CMaps are (`pdfjs-dist/cmaps/`), with a trailing slash. */
+  cMapUrl?: string;
+  /** Where pdf.js's standard fonts are (`pdfjs-dist/standard_fonts/`), with a trailing slash. */
+  standardFontDataUrl?: string;
+  /** Where pdf.js's WebAssembly decoders are (`pdfjs-dist/wasm/`), with a trailing slash. */
+  wasmUrl?: string;
+  /** Where pdf.js's ICC profiles are (`pdfjs-dist/iccs/`), with a trailing slash. */
+  iccUrl?: string;
+};
+
+/**
+ * How the host opens a link to another page, for a view whose own frame cannot
+ * (a chat host's sandboxed frame, where a new tab is the host's to open). Called
+ * with an `http:`, `https:` or `mailto:` URL the reader clicked. Optional;
+ * unset, such a link opens in a new tab with `noopener noreferrer`. Today the
+ * links inside a PDF the view draws itself go through it.
+ */
+export type OpenExternal = (url: string) => void;
+
+/**
  * How a stored reference becomes a URL that works OUTSIDE this page — pasted
  * into another tab, another app, a colleague's message.
  *
@@ -392,6 +491,18 @@ interface ResultEnv {
    * {@link ResolveDocumentPdf}.
    */
   resolveDocumentPdf?: ResolveDocumentPdf;
+  /**
+   * A stored document's bytes, from which the view draws a PDF it cannot frame.
+   * Optional; it takes effect only with `pdfWorker`. See {@link LoadBytes}.
+   */
+  loadBytes?: LoadBytes;
+  /**
+   * The pdf.js worker the PDF renderer runs, and pdf.js's optional data files.
+   * Optional; unset, the renderer is off. See {@link PdfWorkerConfig}.
+   */
+  pdfWorker?: PdfWorkerConfig;
+  /** How the host opens a link to another page. See {@link OpenExternal}. */
+  openExternal?: OpenExternal;
   resolveShareUrl?: ResolveShareUrl;
   proseImages?: ProseImages;
   /**
@@ -459,6 +570,9 @@ export function ResultEnvProvider({
   resolveUrls,
   resolveRendition,
   resolveDocumentPdf,
+  loadBytes,
+  pdfWorker,
+  openExternal,
   resolveShareUrl,
   proseImages,
   tableColumns,
@@ -496,6 +610,9 @@ export function ResultEnvProvider({
       resolveUrls,
       resolveRendition,
       resolveDocumentPdf,
+      loadBytes,
+      pdfWorker,
+      openExternal,
       resolveShareUrl,
       proseImages,
       tableColumns,
@@ -511,6 +628,9 @@ export function ResultEnvProvider({
       resolveUrls,
       resolveRendition,
       resolveDocumentPdf,
+      loadBytes,
+      pdfWorker,
+      openExternal,
       resolveShareUrl,
       proseImages,
       tableColumns,
@@ -636,6 +756,21 @@ export function useResolveRendition(): ResolveRendition | undefined {
 /** The host's way to a PDF of a document the browser cannot render, when it supplies one. */
 export function useResolveDocumentPdf(): ResolveDocumentPdf | undefined {
   return use(ResultEnvContext).resolveDocumentPdf;
+}
+
+/** The host's way to a stored document's bytes, when it supplies one. */
+export function useLoadBytes(): LoadBytes | undefined {
+  return use(ResultEnvContext).loadBytes;
+}
+
+/** The pdf.js worker the host supplies, when it supplies one. */
+export function usePdfWorker(): PdfWorkerConfig | undefined {
+  return use(ResultEnvContext).pdfWorker;
+}
+
+/** The host's way to open a link to another page, when it supplies one. */
+export function useOpenExternal(): OpenExternal | undefined {
+  return use(ResultEnvContext).openExternal;
 }
 
 /** The share-URL minter, when the host supplies one. */

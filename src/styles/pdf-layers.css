@@ -1,0 +1,376 @@
+/*
+ * The text and annotation layers of a PDF the result view draws itself
+ * (`src/react/pdf-pages.tsx`), folded in from react-pdf 11.1.0's
+ * `Page/TextLayer.css` and `Page/AnnotationLayer.css`, which carry pdf.js's
+ * own layer styles (Copyright 2014 and 2015 Mozilla Foundation, Apache License
+ * 2.0). Without them the text layer is drawn visibly, out of place, over the
+ * page: selection and copy depend on transparent text laid exactly over the
+ * canvas.
+ *
+ * Three changes from the originals, each for this package's own rules:
+ *
+ *  - Every rule is scoped under `.mthds-pdf-pages`, the renderer's frame, so
+ *    nothing here reaches a host's own pages or a pdf.js viewer the host runs.
+ *  - The custom properties the originals set on `:root` are set on that frame
+ *    instead, and every one read that the frame does not set (the scale pdf.js
+ *    writes on each page, inline) carries a fallback, so a declaration is never
+ *    discarded for want of a value (`make assert-bundle` holds this).
+ *  - The form-widget rules are left out: the renderer pins `renderForms` to
+ *    `false`, so pdf.js never draws a field as an `<input>` and they would
+ *    style nothing.
+ *
+ * `body` carries react-pdf's two marker properties, which it reads to warn,
+ * during development, that the layer styles are missing. They are private
+ * names, not design tokens, and compete with nothing.
+ */
+
+body {
+  --react-pdf-text-layer: 1;
+  --react-pdf-annotation-layer: 1;
+}
+
+.mthds-pdf-pages {
+  --link-outline: none;
+  /* react-pdf writes the real value on each page, inline, which this default
+   * on the frame never outranks. It is declared so the sheet defines every
+   * name it reads. */
+  --total-scale-factor: 1;
+}
+
+@media screen and (forced-colors: active) {
+  .mthds-pdf-pages {
+    --link-outline: 1.5px solid LinkText;
+  }
+
+  .mthds-pdf-pages .annotationLayer .linkAnnotation:hover {
+    backdrop-filter: invert(100%);
+  }
+}
+
+.mthds-pdf-pages [data-main-rotation='90'] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.mthds-pdf-pages [data-main-rotation='180'] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.mthds-pdf-pages [data-main-rotation='270'] {
+  transform: rotate(270deg) translateX(-100%);
+}
+
+/* The text layer: transparent text over the canvas, for selection and copy. */
+
+.mthds-pdf-pages .textLayer {
+  color-scheme: only light;
+
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+
+  /* The font size is multiplied by --min-font-size and the text scaled back
+   * by its inverse, which sidesteps the minimum font size a browser enforces,
+   * so the layer's spans always match the size of the text on the canvas. */
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size, 1));
+  --min-font-size-inv: calc(1 / var(--min-font-size, 1));
+}
+
+.mthds-pdf-pages .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  margin: 0;
+  transform-origin: 0 0;
+}
+
+.mthds-pdf-pages .textLayer > :not(.markedContent),
+.mthds-pdf-pages .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+
+  --font-height: 0; /* set by pdf.js's text layer */
+  font-size: calc(var(--text-scale-factor, 1) * var(--font-height, 0));
+
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1))
+    scale(var(--min-font-size-inv, 1));
+}
+
+.mthds-pdf-pages .textLayer .markedContent {
+  display: contents;
+}
+
+.mthds-pdf-pages .textLayer span[role='img'] {
+  user-select: none;
+  cursor: default;
+}
+
+.mthds-pdf-pages .textLayer .highlight {
+  --highlight-bg-color: rgb(180 0 170 / 0.25);
+  --highlight-selected-bg-color: rgb(0 100 0 / 0.25);
+  --highlight-backdrop-filter: none;
+  --highlight-selected-backdrop-filter: none;
+
+  margin: -1px;
+  padding: 1px;
+  background-color: var(--highlight-bg-color, rgb(180 0 170 / 0.25));
+  backdrop-filter: var(--highlight-backdrop-filter, none);
+  border-radius: 4px;
+}
+
+@media screen and (forced-colors: active) {
+  .mthds-pdf-pages .textLayer .highlight {
+    --highlight-bg-color: Highlight;
+    --highlight-selected-bg-color: ButtonText;
+  }
+}
+
+.mthds-pdf-pages .textLayer .highlight.appended {
+  position: initial;
+}
+
+.mthds-pdf-pages .textLayer .highlight.begin {
+  border-radius: 4px 0 0 4px;
+}
+
+.mthds-pdf-pages .textLayer .highlight.end {
+  border-radius: 0 4px 4px 0;
+}
+
+.mthds-pdf-pages .textLayer .highlight.middle {
+  border-radius: 0;
+}
+
+.mthds-pdf-pages .textLayer .highlight.selected {
+  background-color: var(--highlight-selected-bg-color, rgb(0 100 0 / 0.25));
+  backdrop-filter: var(--highlight-selected-backdrop-filter, none);
+}
+
+.mthds-pdf-pages .textLayer ::selection {
+  background: rgba(0 0 255 / 0.25);
+}
+
+@supports (background: color-mix(in srgb, AccentColor, transparent 75%)) {
+  .mthds-pdf-pages .textLayer ::selection {
+    background: color-mix(in srgb, AccentColor, transparent 75%);
+  }
+}
+
+/* Avoids https://github.com/mozilla/pdf.js/issues/13840 in Chrome */
+.mthds-pdf-pages .textLayer br::selection {
+  background: transparent;
+}
+
+.mthds-pdf-pages .textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.mthds-pdf-pages .textLayer.selecting .endOfContent {
+  top: 0;
+}
+
+.mthds-pdf-pages .hiddenCanvasElement {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* The annotation layer: a PDF's links, notes and markup, over the canvas. */
+
+.mthds-pdf-pages .annotationLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  z-index: 3;
+}
+
+.mthds-pdf-pages .annotationLayer[data-main-rotation='90'] .norotate {
+  transform: rotate(270deg);
+}
+.mthds-pdf-pages .annotationLayer[data-main-rotation='90'] .norotate.popupAnnotation {
+  transform: rotate(270deg) translateX(-100%);
+}
+.mthds-pdf-pages .annotationLayer[data-main-rotation='180'] .norotate {
+  transform: rotate(180deg);
+}
+.mthds-pdf-pages .annotationLayer[data-main-rotation='180'] .norotate.popupAnnotation {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.mthds-pdf-pages .annotationLayer[data-main-rotation='270'] .norotate {
+  transform: rotate(90deg);
+}
+.mthds-pdf-pages .annotationLayer[data-main-rotation='270'] .norotate.popupAnnotation {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.mthds-pdf-pages .annotationLayer canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.mthds-pdf-pages .annotationLayer section {
+  position: absolute;
+  text-align: initial;
+  pointer-events: auto;
+  box-sizing: border-box;
+  margin: 0;
+  transform-origin: 0 0;
+}
+
+.mthds-pdf-pages .annotationLayer section .overlaidText {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.mthds-pdf-pages .annotationLayer .linkAnnotation {
+  outline: var(--link-outline, none);
+}
+
+.mthds-pdf-pages .textLayer.selecting ~ .annotationLayer section {
+  pointer-events: none;
+}
+
+.mthds-pdf-pages .annotationLayer .linkAnnotation > a {
+  position: absolute;
+  font-size: 1em;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mthds-pdf-pages .annotationLayer .linkAnnotation > a:hover {
+  opacity: 0.2;
+  background: rgba(255, 255, 0, 1);
+  box-shadow: 0 2px 10px rgba(255, 255, 0, 1);
+}
+
+.mthds-pdf-pages .annotationLayer .textAnnotation img {
+  position: absolute;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+
+.mthds-pdf-pages .annotationLayer .popupTriggerArea {
+  height: 100%;
+  width: 100%;
+}
+
+.mthds-pdf-pages .annotationLayer .fileAttachmentAnnotation .popupTriggerArea {
+  position: absolute;
+}
+
+.mthds-pdf-pages .annotationLayer .popupWrapper {
+  position: absolute;
+  font-size: calc(9px * var(--total-scale-factor, 1));
+  width: 100%;
+  min-width: calc(180px * var(--total-scale-factor, 1));
+  pointer-events: none;
+}
+
+.mthds-pdf-pages .annotationLayer .popup {
+  position: absolute;
+  max-width: calc(180px * var(--total-scale-factor, 1));
+  background-color: rgba(255, 255, 153, 1);
+  box-shadow: 0 calc(2px * var(--total-scale-factor, 1)) calc(5px * var(--total-scale-factor, 1))
+    rgba(136, 136, 136, 1);
+  border-radius: calc(2px * var(--total-scale-factor, 1));
+  padding: calc(6px * var(--total-scale-factor, 1));
+  margin-left: calc(5px * var(--total-scale-factor, 1));
+  cursor: pointer;
+  font: message-box;
+  white-space: normal;
+  word-wrap: break-word;
+  pointer-events: auto;
+}
+
+.mthds-pdf-pages .annotationLayer .popup > * {
+  font-size: calc(9px * var(--total-scale-factor, 1));
+}
+
+.mthds-pdf-pages .annotationLayer .popup h1 {
+  display: inline-block;
+}
+
+.mthds-pdf-pages .annotationLayer .popupDate {
+  display: inline-block;
+  margin-left: calc(5px * var(--total-scale-factor, 1));
+}
+
+.mthds-pdf-pages .annotationLayer .popupContent {
+  border-top: 1px solid rgba(51, 51, 51, 1);
+  margin-top: calc(2px * var(--total-scale-factor, 1));
+  padding-top: calc(2px * var(--total-scale-factor, 1));
+}
+
+.mthds-pdf-pages .annotationLayer .richText > * {
+  white-space: pre-wrap;
+  font-size: calc(9px * var(--total-scale-factor, 1));
+}
+
+.mthds-pdf-pages .annotationLayer .highlightAnnotation,
+.mthds-pdf-pages .annotationLayer .underlineAnnotation,
+.mthds-pdf-pages .annotationLayer .squigglyAnnotation,
+.mthds-pdf-pages .annotationLayer .strikeoutAnnotation,
+.mthds-pdf-pages .annotationLayer .freeTextAnnotation,
+.mthds-pdf-pages .annotationLayer .lineAnnotation svg line,
+.mthds-pdf-pages .annotationLayer .squareAnnotation svg rect,
+.mthds-pdf-pages .annotationLayer .circleAnnotation svg ellipse,
+.mthds-pdf-pages .annotationLayer .polylineAnnotation svg polyline,
+.mthds-pdf-pages .annotationLayer .polygonAnnotation svg polygon,
+.mthds-pdf-pages .annotationLayer .caretAnnotation,
+.mthds-pdf-pages .annotationLayer .inkAnnotation svg polyline,
+.mthds-pdf-pages .annotationLayer .stampAnnotation,
+.mthds-pdf-pages .annotationLayer .fileAttachmentAnnotation {
+  cursor: pointer;
+}
+
+.mthds-pdf-pages .annotationLayer section svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+
+.mthds-pdf-pages .annotationLayer .annotationTextContent {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  color: transparent;
+  user-select: none;
+  pointer-events: none;
+}
+
+.mthds-pdf-pages .annotationLayer .annotationTextContent span {
+  width: 100%;
+  display: inline-block;
+}

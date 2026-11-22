@@ -148,18 +148,25 @@ const BANNED = [
 const failures = [];
 
 /**
- * The PDF download's two libraries, loaded on the first click and never with
- * an entry. `./react` (and `./generative`, which reaches it) may reach them
- * only through a dynamic `import()`, which a consumer's bundler splits into a
- * chunk of its own that a host that never makes a PDF never loads; a STATIC
- * edge to either would put them in the chunk every form ships. The core entry
- * may not reach them at all.
+ * The libraries loaded on first use and never with an entry: the PDF
+ * download's two (`jspdf`, `modern-screenshot`), loaded on the first click, and
+ * the PDF renderer's (`react-pdf`, and `pdfjs-dist` beneath it), loaded in the
+ * browser when a PDF the view draws itself is shown. `./react` (and
+ * `./generative`, which reaches it) may reach them only through a dynamic
+ * `import()`, which a consumer's bundler splits into a chunk of its own that a
+ * host that never uses them never loads; a STATIC edge to one would put it in
+ * the chunk every form ships, and for the renderer would break a server
+ * render, since pdf.js's viewer module reads `document` at its top level. The
+ * entries that render nothing may not reach them at all.
  *
  * Fail-closed in both directions: the check also requires `./react` to reach
- * both dynamically, because a graph that reached neither would pass the static
- * half while the PDF control had quietly stopped working.
+ * each one it imports through `import()`, because a graph that reached none
+ * would pass the static half while the control had quietly stopped working.
+ * `pdfjs-dist` is not in that list: the renderer reaches it through
+ * react-pdf's own `pdfjs` export, so the package's graph never names it.
  */
-const LAZY = /^jspdf($|\/)|^modern-screenshot($|\/)/;
+const LAZY = /^jspdf($|\/)|^modern-screenshot($|\/)|^react-pdf($|\/)|^pdfjs-dist($|\/)/;
+const LAZY_LOADED = ['jspdf', 'modern-screenshot', 'react-pdf'];
 
 /** Like `graphOf`, but the bare specifiers split by how they are reached. */
 function staticGraphOf(entry) {
@@ -200,26 +207,26 @@ for (const entry of ENTRIES) {
       `${entry}/index.js reaches ${reached.join(', ')} through a static import - the PDF libraries load with import() on first use. See docs/dependency-budget.md.`,
     );
   } else {
-    console.log(`ok  ${entry}/index.js has no static edge to jspdf or modern-screenshot`);
+    console.log(`ok  ${entry}/index.js has no static edge to jspdf, modern-screenshot, react-pdf or pdfjs-dist`);
   }
 }
 {
   for (const entry of ISOMORPHIC_ENTRIES) {
     const reached = [...graphOf(`${DIST}/${entry}/index.js`).externals].filter((s) => LAZY.test(s));
     if (reached.length > 0) {
-      failures.push(`${entry}/index.js reaches ${reached.join(', ')} - an entry that renders nothing makes no PDF.`);
+      failures.push(`${entry}/index.js reaches ${reached.join(', ')} - an entry that renders nothing makes and draws no PDF.`);
     } else {
-      console.log(`ok  ${entry}/index.js reaches neither PDF library, even dynamically`);
+      console.log(`ok  ${entry}/index.js reaches no PDF library, even dynamically`);
     }
   }
   const { dynamics } = staticGraphOf(`${DIST}/react/index.js`);
-  const missing = ['jspdf', 'modern-screenshot'].filter((name) => !dynamics.has(name));
+  const missing = LAZY_LOADED.filter((name) => !dynamics.has(name));
   if (missing.length > 0) {
     failures.push(
-      `react/index.js does not load ${missing.join(', ')} through import() - the PDF download would fail at run time, or a static import replaced it.`,
+      `react/index.js does not load ${missing.join(', ')} through import() - the PDF download or the PDF renderer would fail at run time, or a static import replaced it.`,
     );
   } else {
-    console.log('ok  react/index.js loads jspdf and modern-screenshot through import() only');
+    console.log(`ok  react/index.js loads ${LAZY_LOADED.join(', ')} through import() only`);
   }
 }
 
@@ -539,6 +546,73 @@ for (const entry of RENDERING_ENTRIES) {
   } else {
     failures.push(
       `./generative/headless did not import and run under node --conditions=react-server: ${result.error ? result.error.message : `exit ${result.status}`}, ${(result.stderr || result.stdout || '').trim().split('\n').slice(0, 3).join(' / ')}`,
+    );
+  }
+}
+
+// The PDF renderer stays off the server path. The built `./react` entry,
+// imported through the package's own `exports` map in a plain node process (no
+// DOM at all), server-renders a result holding a PDF the frame rule refuses,
+// under a host that supplies the bytes seam and a worker: exactly the case in
+// which the browser draws the pages. react-pdf's link service imports pdf.js's
+// viewer module, which reads `document` at its top level, so an import of it
+// anywhere on this path throws here. The render must succeed, must still give
+// the document its link, and must draw no frame and no canvas, the pages being
+// the browser's to draw after mount.
+{
+  const probe = [
+    "const React = await import('react');",
+    "const { renderToString } = await import('react-dom/server');",
+    "const m = await import('@pipelex/mthds-form/react');",
+    "const field = { kind: 'document', name: 'output', conceptRef: 'native.Document', required: true, formats: [] };",
+    "const value = { url: 'pipelex-storage://run/report.pdf', filename: 'report.pdf', mime_type: 'application/pdf' };",
+    "const env = {",
+    "  resolveUrl: () => 'https://bucket.example.invalid/report.pdf?signature=1',",
+    "  loadBytes: async () => new Uint8Array([37, 80, 68, 70]),",
+    "  pdfWorker: { workerSrc: 'https://assets.example.invalid/pdf.worker.min.mjs' },",
+    "};",
+    "const html = renderToString(React.createElement(m.ResultEnvProvider, env, React.createElement(m.ResultField, { field, value })));",
+    "console.log(JSON.stringify({ link: html.includes('href=\"https://bucket.example.invalid/report.pdf?signature=1\"'), frame: html.includes('<iframe'), canvas: html.includes('<canvas'), hasDocument: typeof document !== 'undefined' }));",
+  ].join('\n');
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  let answer;
+  try {
+    answer = JSON.parse(result.stdout.trim().split('\n').pop() ?? '');
+  } catch {
+    answer = undefined;
+  }
+  if (result.status === 0 && answer && answer.link && !answer.frame && !answer.canvas && !answer.hasDocument) {
+    console.log('ok  ./react server-renders a PDF the view would draw, as its link, with no DOM and no pdf.js');
+  } else {
+    failures.push(
+      `./react did not server-render a PDF under the bytes seam as its link: ${result.error ? result.error.message : `exit ${result.status}`}, ${(result.stderr || result.stdout || '').trim().split('\n').slice(0, 3).join(' / ')}. The PDF renderer must import react-pdf after mount, in the browser only.`,
+    );
+  }
+}
+
+// The PDF renderer's text and annotation layers ship twice: folded into
+// `styles.css` for a host with no Tailwind build, and on their own as
+// `pdf-layers.css` for one that compiles the utilities itself and loads no
+// prebuilt sheet. Without them the text layer is drawn visibly out of place.
+{
+  const LAYER_SELECTOR = '.mthds-pdf-pages .textLayer';
+  const stylesSheet = existsSync(`${DIST}/styles.css`) ? readFileSync(`${DIST}/styles.css`, 'utf8') : '';
+  const layersSheet = existsSync(`${DIST}/pdf-layers.css`) ? readFileSync(`${DIST}/pdf-layers.css`, 'utf8') : '';
+  const missing = [
+    ...(stylesSheet.includes(LAYER_SELECTOR) ? [] : ['dist/styles.css']),
+    ...(layersSheet.includes(LAYER_SELECTOR) && layersSheet.includes('.mthds-pdf-pages .annotationLayer')
+      ? []
+      : ['dist/pdf-layers.css']),
+  ];
+  if (missing.length === 0) {
+    console.log('ok  the PDF text and annotation layers ship in styles.css and as pdf-layers.css');
+  } else {
+    failures.push(
+      `${missing.join(' and ')} ${missing.length > 1 ? 'carry' : 'carries'} no PDF layer styles - see src/styles/pdf-layers.css and the build:css script.`,
     );
   }
 }
