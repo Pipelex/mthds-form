@@ -53,18 +53,45 @@ const loadBytes: LoadBytes = async (url, { signal }) => {
   return new Uint8Array(await response.arrayBuffer());
 };
 
-/** pdf.js's worker and its data files, as this Storybook serves them. */
-const pdfWorker: PdfWorkerConfig = {
-  workerSrc: '/pdfjs/build/pdf.worker.min.mjs',
-  cMapUrl: '/pdfjs/cmaps/',
-  standardFontDataUrl: '/pdfjs/standard_fonts/',
-};
+/** pdf.js's worker module, as this Storybook serves it. */
+const WORKER_SRC = '/pdfjs/build/pdf.worker.min.mjs';
 
-function DrawnPdf({ presentation }: { presentation: FieldPresentation }) {
+/** pdf.js's worker and its data files, as this Storybook serves them, the worker at `workerSrc`. */
+function pdfWorker(workerSrc: string): PdfWorkerConfig {
+  return { workerSrc, cMapUrl: '/pdfjs/cmaps/', standardFontDataUrl: '/pdfjs/standard_fonts/' };
+}
+
+/**
+ * The same worker, named on a second origin: `localhost` for a page served on
+ * `127.0.0.1`, which the browser holds to be another origin while it reaches
+ * the same server. The story test project pins its server to `127.0.0.1`
+ * (`vitest.config.ts`), and Vite answers a loopback origin's request with
+ * `Access-Control-Allow-Origin`, as a host's asset origin does, so the worker
+ * module loads across the origins exactly as it does for a host whose view runs
+ * in a chat host's frame. `undefined` on any other page.
+ */
+function crossOriginWorkerSrc(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const page = new URL(window.location.href);
+  if (page.hostname !== '127.0.0.1') return undefined;
+  const worker = new URL(WORKER_SRC, page);
+  worker.hostname = 'localhost';
+  return worker.href;
+}
+
+function DrawnPdf({
+  presentation,
+  workerOrigin = 'page',
+}: {
+  presentation: FieldPresentation;
+  /** Where the worker is served: the page's own origin, or a second one. */
+  workerOrigin?: 'page' | 'second';
+}) {
+  const worker = pdfWorker((workerOrigin === 'second' && crossOriginWorkerSrc()) || WORKER_SRC);
   return (
     <div style={{ maxWidth: 640 }}>
       <FieldPresentationProvider presentation={presentation}>
-        <ResultEnvProvider loadBytes={loadBytes} pdfWorker={pdfWorker}>
+        <ResultEnvProvider loadBytes={loadBytes} pdfWorker={worker}>
           <StuffViewer field={document} value={DRAWN_PDF} />
         </ResultEnvProvider>
       </FieldPresentationProvider>
@@ -76,8 +103,11 @@ const meta = { title: 'Outputs/PDF pages', component: DrawnPdf } satisfies Meta<
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The pages drawn, one canvas each, with a text layer the reader can select. */
-async function expectPagesDrawn(canvasElement: HTMLElement) {
+/**
+ * The pages drawn, one canvas each, with a text layer the reader can select,
+ * within `timeout` milliseconds for each step.
+ */
+async function expectPagesDrawn(canvasElement: HTMLElement, timeout = 15_000) {
   const canvas = within(canvasElement);
   // One per theme pane.
   const regions = await waitFor(
@@ -86,7 +116,7 @@ async function expectPagesDrawn(canvasElement: HTMLElement) {
       expect(found).toHaveLength(2);
       return found;
     },
-    { timeout: 15_000 },
+    { timeout },
   );
   for (const region of regions) {
     await waitFor(
@@ -94,7 +124,7 @@ async function expectPagesDrawn(canvasElement: HTMLElement) {
         expect(region.querySelector('canvas')).not.toBeNull();
         expect(region.querySelector('.textLayer')?.textContent ?? '').toMatch(/Solar System/);
       },
-      { timeout: 15_000 },
+      { timeout },
     );
   }
   // Nothing is framed: the method chose the bytes, never a page.
@@ -128,5 +158,36 @@ export const InStudio: Story = {
     })) {
       await expect(toggle.getAttribute('aria-expanded')).toBe('true');
     }
+  },
+};
+
+/**
+ * The worker served from a second origin, which the renderer starts through a
+ * `blob:` module that imports it: the path a host whose view runs in a chat
+ * host's frame always takes, since its worker sits on its own asset origin.
+ *
+ * pdf.js posts its first messages to the worker the moment it is handed it,
+ * while the wrapper is still importing the module across the origins; pdf.js's
+ * worker listens only once that import has finished. A wrapper that did not
+ * hold those messages lost them, and the document waited out the minute's
+ * parse timer before folding to its link. The pages must be drawn well inside
+ * that minute.
+ *
+ * A test, kept out of the Storybook sidebar (`!dev`): Storybook's own server
+ * sends no `Access-Control-Allow-Origin` with its static files, so there the
+ * worker would be refused across the origins and the document would keep its
+ * link. The story test project serves the same files through Vite, which does.
+ */
+export const CrossOriginWorker: Story = {
+  name: 'The same PDF with its worker on a second origin → its pages',
+  tags: ['!dev'],
+  args: { presentation: 'app', workerOrigin: 'second' },
+  play: async ({ canvasElement }) => {
+    const workerSrc = crossOriginWorkerSrc();
+    // Only the story test project's page, on `127.0.0.1`, has a second origin to name.
+    await expect(workerSrc).toBeDefined();
+    await expect(new URL(workerSrc!).origin).not.toBe(window.location.origin);
+    // Ten seconds, a sixth of the parse timer, inside the test's own deadline.
+    await expectPagesDrawn(canvasElement, 10_000);
   },
 };

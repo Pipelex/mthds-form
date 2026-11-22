@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A PDF draws with its worker on another origin**: a document whose `pdfWorker.workerSrc` names another origin, as a host whose view runs in a chat host's frame names its asset origin, now loads and draws its pages, where it used to wait out the minute's parse timer and fold to its link every time. The `blob:` module that wraps such a worker now holds the messages pdf.js posts while it imports the worker module, and hands them on in order once the import has finished, where they used to arrive with nothing listening and be lost. A host's own `workerPort` must already be listening when it is handed over, since pdf.js posts to it at once. See [docs/result-view.md](docs/result-view.md#a-pdf-the-view-draws-itself).
+
 ## [v0.41.0] - 2026-11-22
 
 ### Added
