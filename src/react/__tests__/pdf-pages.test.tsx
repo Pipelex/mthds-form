@@ -17,6 +17,8 @@
 import { act, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import type { FileRunField } from '../../core';
 import { formatsForKind } from '../../core/file-formats';
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
@@ -50,7 +52,9 @@ const pdf = vi.hoisted(() => ({
   tasks: [] as { destroy: () => Promise<void>; destroyed: boolean }[],
   /** The order things were let go in. */
   released: [] as string[],
-  load: 'success' as 'success' | 'failure' | 'mismatch',
+  load: 'success' as 'success' | 'failure' | 'mismatch' | 'password' | 'never',
+  /** What the renderer answered pdf.js's request for a password with. */
+  passwordAnswers: [] as unknown[],
   numPages: 2,
   /** A page that fails, and how. */
   pageFailure: undefined as undefined | { page: number; at: 'load' | 'render' },
@@ -62,6 +66,7 @@ vi.mock('react-pdf', async () => {
     children?: ReactNode;
     onLoadSuccess?: (document: unknown) => void;
     onLoadError?: (error: Error) => void;
+    onPassword?: (answer: (password: unknown) => void, reason: number) => void;
   }) {
     pdf.documents.push(props);
     useEffect(() => {
@@ -79,6 +84,20 @@ vi.mock('react-pdf', async () => {
           loadingTask: task,
           getPage: async () => ({ getViewport: () => ({ width: 100, height: 141 }) }),
         });
+      } else if (pdf.load === 'password') {
+        // An encrypted document: pdf.js asks for its password, through
+        // react-pdf's default (`window.prompt`) when none is given, and an
+        // Error for an answer fails the load with its PasswordException.
+        const ask =
+          props.onPassword ??
+          ((answer: (password: unknown) => void) =>
+            answer(window.prompt('Enter the password to open this PDF file.')));
+        ask((answer) => {
+          pdf.passwordAnswers.push(answer);
+          if (answer instanceof Error) props.onLoadError?.(new Error('No password given.'));
+        }, 1);
+      } else if (pdf.load === 'never') {
+        // A worker that never answers: the document never loads.
       } else if (pdf.load === 'mismatch') {
         props.onLoadError?.(
           new Error('The API version "6.5.438" does not match the Worker version "6.4.0".'),
@@ -247,6 +266,7 @@ beforeEach(() => {
   pdf.tasks.length = 0;
   pdf.released.length = 0;
   pdf.load = 'success';
+  pdf.passwordAnswers.length = 0;
   pdf.numPages = 2;
   pdf.pageFailure = undefined;
   pdf.workerOptions.workerSrc = 'pdf.worker.mjs';
@@ -576,19 +596,34 @@ describe('only the pages near the visible part of the frame are drawn', () => {
   beforeEach(() => {
     observers = 0;
     observed = [];
+    // The pages' observer, rooted at the frame, is driven by the test; the
+    // documents' own, rooted at the viewport, finds every document near.
     class StubObserver {
-      constructor(callback: IntersectionObserverCallback) {
+      private readonly frame: boolean;
+      constructor(
+        private readonly callback: IntersectionObserverCallback,
+        options?: IntersectionObserverInit,
+      ) {
+        this.frame = Boolean(options?.root);
+        if (!this.frame) return;
         observers += 1;
         notify = callback;
       }
       observe(target: Element) {
+        if (!this.frame) {
+          this.callback(
+            [{ target, isIntersecting: true } as IntersectionObserverEntry],
+            this as unknown as IntersectionObserver,
+          );
+          return;
+        }
         observed.push(target);
       }
       unobserve(target: Element) {
-        observed = observed.filter((element) => element !== target);
+        if (this.frame) observed = observed.filter((element) => element !== target);
       }
       disconnect() {
-        observed = [];
+        if (this.frame) observed = [];
       }
     }
     vi.stubGlobal('IntersectionObserver', StubObserver);
@@ -643,6 +678,25 @@ describe('only the pages near the visible part of the frame are drawn', () => {
     // Through the host, like the PDF's own links.
     expect(fireEvent.click(link)).toBe(false);
     expect(openExternal).toHaveBeenCalledWith(BUCKET);
+  });
+
+  it('sends the line’s link through the host’s current way out, not the first one', async () => {
+    pdf.numPages = PDF_PAGES_MAX_PAGES + 1;
+    const first = vi.fn<OpenExternal>();
+    const second = vi.fn<OpenExternal>();
+    const tree = (openExternal: OpenExternal) =>
+      host({
+        loadBytes: async () => BYTES,
+        openExternal,
+        children: <ResultField field={documentField('report')} value={PDF} />,
+      });
+    const { rerender } = render(tree(first));
+    const region = await screen.findByRole('group', { name: 'Quarterly report' });
+    await waitFor(() => expect(observed).toHaveLength(PDF_PAGES_MAX_PAGES));
+    rerender(tree(second));
+    fireEvent.click(within(region).getByRole('link', { name: S.openInNewTab }));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith(BUCKET);
   });
 
   it('draws and scrolls to the page an internal link names, however far it is', async () => {
@@ -888,19 +942,24 @@ describe('every way it cannot be drawn falls back to the link', () => {
     );
   });
 
-  it('when the bytes never arrive, folded with its toggle', async () => {
+  it('when pdf.js has not parsed it a minute after the bytes arrived, folded with its toggle', async () => {
     vi.useFakeTimers();
+    pdf.load = 'never';
     render(
       host({
-        loadBytes: () => new Promise<Uint8Array>(() => {}),
+        loadBytes: async () => BYTES,
         children: <ResultField field={documentField('report')} value={PDF} />,
       }),
     );
-    expect(screen.getByText(S.documentPdfPreparing).closest('[role="status"]')).not.toBeNull();
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      await vi.advanceTimersByTimeAsync(59_000);
     });
-    expect(screen.queryByText(S.documentPdfPreparing)).toBeNull();
+    expect(pdf.documents.length).toBeGreaterThan(0);
+    expect(screen.getByRole('group', { name: 'Quarterly report' })).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(screen.queryByRole('group', { name: 'Quarterly report' })).toBeNull();
     expect(screen.getByRole('button', { name: S.preview })).toHaveAttribute(
       'aria-expanded',
       'false',
@@ -908,26 +967,48 @@ describe('every way it cannot be drawn falls back to the link', () => {
     expectLink();
   });
 
-  it('when the bytes never arrive, giving up aborts the download', async () => {
+  it('when it is encrypted, for good, and never asks the reader for a password', async () => {
+    pdf.load = 'password';
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue(null);
+    render(
+      host({
+        loadBytes: async () => BYTES,
+        children: <ResultField field={documentField('report')} value={PDF} />,
+      }),
+    );
+    await expectLinkOnly();
+    expect(prompt).not.toHaveBeenCalled();
+    expect(pdf.passwordAnswers).toHaveLength(1);
+    expect(pdf.passwordAnswers[0]).toBeInstanceOf(Error);
+  });
+});
+
+describe('the download has no deadline of the view’s', () => {
+  it('draws a large file however long it takes to arrive', async () => {
     vi.useFakeTimers();
     let signal: AbortSignal | undefined;
     render(
       host({
         loadBytes: (_url, request) => {
           signal = request.signal;
-          return new Promise<Uint8Array>(() => {});
+          return new Promise<Uint8Array>((resolve) =>
+            setTimeout(() => resolve(BYTES), 10 * 60_000),
+          );
         },
         children: <ResultField field={documentField('report')} value={PDF} />,
       }),
     );
     await act(async () => {
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(10 * 60_000 - 1);
     });
     expect(signal?.aborted).toBe(false);
+    expect(screen.getByText(S.documentPdfPreparing).closest('[role="status"]')).not.toBeNull();
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      await vi.advanceTimersByTimeAsync(1);
     });
-    expect(signal?.aborted).toBe(true);
+    expect(screen.getByRole('group', { name: 'Quarterly report' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('pdf-page')).toHaveLength(2);
+    expect(signal?.aborted).toBe(false);
   });
 });
 
@@ -1001,5 +1082,127 @@ describe('where the renderer does not apply', () => {
     await waitFor(() => expect(screen.queryByText(S.documentPdfPreparing)).toBeNull());
     expect(loadBytes).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: S.preview })).toBeNull();
+  });
+});
+
+describe('a document waits until it nears the view', () => {
+  const many = Array.from({ length: 6 }, (_, index) => ({
+    url: stored(`report-${index + 1}.pdf`),
+    filename: `report-${index + 1}.pdf`,
+    mime_type: 'application/pdf',
+  }));
+  const list = (
+    <ResultField
+      field={{
+        kind: 'list',
+        name: 'reports',
+        conceptRef: 'native.Document',
+        required: true,
+        item: documentField('item'),
+      }}
+      value={many}
+    />
+  );
+  /** Each document's frame-sized placeholder, in the list's order. */
+  const placeholders = () =>
+    screen
+      .getAllByText(S.documentPdfPreparing)
+      .map((label) => label.closest('[role="status"]')!.parentElement!);
+
+  it('asks for the bytes of only the documents whose placeholder nears the view, under one observer', async () => {
+    let viewportObservers = 0;
+    let watched: Element[] = [];
+    let report: IntersectionObserverCallback = () => {};
+    class StubObserver {
+      private readonly frame: boolean;
+      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+        // The pages' own observer, rooted at a document's frame, is not this test's.
+        this.frame = Boolean(options?.root);
+        if (this.frame) return;
+        viewportObservers += 1;
+        report = callback;
+      }
+      observe(target: Element) {
+        if (!this.frame) watched.push(target);
+      }
+      unobserve(target: Element) {
+        if (!this.frame) watched = watched.filter((element) => element !== target);
+      }
+      disconnect() {
+        if (!this.frame) watched = [];
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', StubObserver);
+    const loadBytes = vi.fn<LoadBytes>(async () => BYTES);
+    const { unmount } = render(host({ loadBytes, children: list }));
+    await waitFor(() => expect(watched).toHaveLength(many.length));
+    expect(viewportObservers).toBe(1);
+    const boxes = placeholders();
+    expect(watched).toEqual(boxes);
+    await act(async () => {
+      report(
+        [
+          { target: boxes[0]!, isIntersecting: false },
+          { target: boxes[1]!, isIntersecting: true },
+          { target: boxes[4]!, isIntersecting: true },
+        ] as unknown as IntersectionObserverEntry[],
+        {} as IntersectionObserver,
+      );
+    });
+    await waitFor(() => expect(loadBytes).toHaveBeenCalledTimes(2));
+    expect(loadBytes.mock.calls.map(([url]) => url)).toEqual([many[1]!.url, many[4]!.url]);
+    // The two that started are let go; the others still wait.
+    expect(watched).toHaveLength(many.length - 2);
+    expect(started).toHaveLength(2);
+    unmount();
+    expect(watched).toHaveLength(0);
+  });
+
+  it('asks for every one at once where the browser has no IntersectionObserver', async () => {
+    expect(typeof IntersectionObserver).toBe('undefined');
+    const loadBytes = vi.fn<LoadBytes>(async () => BYTES);
+    render(host({ loadBytes, children: list }));
+    await waitFor(() => expect(loadBytes).toHaveBeenCalledTimes(many.length));
+  });
+});
+
+describe('hydrating a PDF the host serves at an absolute URL on the page’s own origin', () => {
+  it('frames it, and never starts the renderer while the origin is unknown', async () => {
+    const sameOrigin: ResolveUrl = (url) =>
+      url.startsWith('pipelex-storage://')
+        ? `${window.location.origin}/api/assets/report.pdf`
+        : undefined;
+    const loadBytes = vi.fn<LoadBytes>(async () => BYTES);
+    Object.defineProperty(window.navigator, 'pdfViewerEnabled', {
+      configurable: true,
+      get: () => true,
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const tree = () =>
+      host({
+        resolveUrl: sameOrigin,
+        loadBytes,
+        children: <ResultField field={documentField('report')} value={PDF} />,
+      });
+    try {
+      // The server knows no origin, so it can frame nothing absolute and must
+      // not decide the document is one to draw either.
+      const html = renderToString(tree());
+      expect(html).not.toContain(S.documentPdfPreparing);
+      container.innerHTML = html;
+      let root: ReturnType<typeof hydrateRoot> | undefined;
+      await act(async () => {
+        root = hydrateRoot(container, tree());
+      });
+      await waitFor(() => expect(container.querySelector('iframe')).not.toBeNull());
+      expect(loadBytes).not.toHaveBeenCalled();
+      expect(started).toHaveLength(0);
+      expect(pdf.documents).toHaveLength(0);
+      act(() => root?.unmount());
+    } finally {
+      container.remove();
+      delete (window.navigator as { pdfViewerEnabled?: boolean }).pdfViewerEnabled;
+    }
   });
 });

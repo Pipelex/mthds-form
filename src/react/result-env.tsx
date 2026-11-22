@@ -224,9 +224,10 @@ export interface BytesRequest {
   maxBytes: number;
   /**
    * Aborted when the view no longer wants the bytes: the reader folded the
-   * preview away, the document left the page, or the view gave up waiting. A
-   * host passes it to its `fetch` (`fetch(url, { signal })`), so a download
-   * nobody will see stops rather than running to its end.
+   * preview away or the document left the page. A host passes it to its
+   * `fetch` (`fetch(url, { signal })`), so a download nobody will see stops
+   * rather than running to its end. The view sets no deadline on the download
+   * itself; see {@link LoadBytes}.
    */
   signal: AbortSignal;
 }
@@ -249,20 +250,41 @@ export interface BytesRequest {
  *
  * Called with the document's own `url` member, exactly as `resolveRendition`
  * and `resolveDocumentPdf` are, and the {@link BytesRequest}. Resolve to the
- * file's bytes, as a `Uint8Array` or an `ArrayBuffer`. It is asked when the
- * preview opens, which is as the document mounts, and the document keeps its
- * link whatever happens:
+ * file's bytes, as a `Uint8Array` or an `ArrayBuffer`. It is asked once the
+ * open preview's frame-sized placeholder comes within a viewport's height of
+ * the visible part of the page (at once where the browser has no
+ * `IntersectionObserver`), so a result holding many PDFs asks only for those a
+ * reader comes near, and the document keeps its link whatever happens:
  *
- * - **A failure that may pass** (a rejection, a throw, no answer within a
- *   minute, such as a failed fetch) folds the preview away and keeps its
- *   toggle, and the seam is asked again when the reader unfolds it.
+ * - **A failure that may pass** (a rejection or a throw, such as a failed
+ *   fetch; or pdf.js not having parsed the document a minute after the bytes
+ *   arrived) folds the preview away and keeps its toggle, and the seam is
+ *   asked again when the reader unfolds it.
  * - **An answer the view will not draw** (anything but bytes, which is also
  *   reported with `console.error`; no bytes; more than `maxBytes`; a file
- *   pdf.js cannot parse) is final: the toggle goes, and the view does not ask
- *   again while the document stays mounted.
+ *   pdf.js cannot parse, or an encrypted one) is final: the toggle goes, and
+ *   the view does not ask again while the document stays mounted.
  *
- * Pass `request.signal` to the download: it is aborted when the view stops
- * waiting, so a download nobody will see does not run to its end.
+ * ## The URL is the method's
+ *
+ * `url` is the payload's, and the method chose it: it may be the host's own
+ * stored reference, or any URL at all. Read only references the host stores
+ * itself (its own storage's links, resolved as `resolveUrl` resolves them) and
+ * reject everything else. Never fetch an arbitrary URL with the reader's
+ * credentials or the host's, and never through the host's own server, which
+ * would hand a method a request from inside the host's network (server-side
+ * request forgery).
+ *
+ * ## The download's deadline is the host's
+ *
+ * Pass `request.signal` to the download: it is aborted when the reader folds
+ * the preview away or the document leaves, so a download nobody will see does
+ * not run to its end. The view itself sets no deadline on the download, since
+ * only the host can tell a large file arriving slowly from a connection that
+ * stalled, and a deadline on the whole download would fail the same file on
+ * the same slow link at every retry. Bound it by inactivity (abort when no
+ * data has arrived for a while) and reject, which folds the preview with its
+ * toggle kept.
  *
  * The view copies what it is handed before pdf.js takes it (pdf.js transfers the
  * buffer to its worker, which empties the caller's copy), so a host may cache

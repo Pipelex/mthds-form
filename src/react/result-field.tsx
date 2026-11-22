@@ -1321,8 +1321,13 @@ function DocumentValue({
         })
       : undefined;
   // A PDF the frame rule refused is drawn by the view itself when the host
-  // answers its bytes and supplies pdf.js's worker (`PdfPages`).
+  // answers its bytes and supplies pdf.js's worker (`PdfPages`). Only once the
+  // page's origin is known: until then (a server render, and the hydration
+  // that follows it) a document the host serves on this origin at an absolute
+  // URL looks refused, and would start the renderer for one render before the
+  // frame took its place.
   const drawPages =
+    origin !== undefined &&
     preview === undefined &&
     loadBytes !== undefined &&
     hasPdfWorker(pdfWorker) &&

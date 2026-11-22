@@ -30,7 +30,7 @@ import { cn } from './utils';
  * chooses the bytes, never a page. See `docs/result-view.md`, "A PDF the view
  * draws itself".
  *
- * ## The three overrides, each closing what a react-pdf default would open
+ * ## The four overrides, each closing what a react-pdf default would open
  *
  * - **Links inside the PDF.** The annotation layer draws a PDF's links as
  *   anchors, and react-pdf gives an external one an empty `target`, so a click
@@ -41,6 +41,11 @@ import { cn } from './utils';
  *   fields become live `<input>` elements in the host's page, a working fake
  *   form.
  * - **XFA.** `enableXfa` is pinned to `false`, its default.
+ * - **Encrypted PDFs.** react-pdf's default `onPassword` asks for the password
+ *   with `window.prompt`, and again after every wrong answer: a modal in the
+ *   host's page asking the reader for a secret, on a document the method chose,
+ *   for as long as they keep answering. Here every request is refused, so an
+ *   encrypted PDF fails to load and keeps its link, and nothing is prompted.
  *
  * Beside them, the bytes are copied before pdf.js takes them (pdf.js transfers
  * the buffer to its worker, which would empty the host's copy),
@@ -60,13 +65,24 @@ import { cn } from './utils';
  * a relative `pdf.worker.mjs` as it loads, which is react-pdf's doing and which
  * nothing here reads.
  *
+ * ## Nothing loads until the document is near the view
+ *
+ * Every preview starts open, so a result holding a list of PDFs would download
+ * every one, copy every one and start a worker for every one as it mounts.
+ * Instead each document's frame-sized placeholder waits until it comes within a
+ * viewport's height of the visible part of the page, watched by ONE
+ * `IntersectionObserver` shared by every document on the page
+ * (`NearViewport`), and only then asks the host for the bytes and imports
+ * react-pdf. Where the browser has no `IntersectionObserver`, it loads at once.
+ *
  * ## Client only
  *
  * react-pdf's link service imports pdf.js's viewer module, which reads
  * `document` at its top level, so react-pdf is imported here with `import()`,
- * in an effect: only in a browser, only once the preview is open, and never on
- * a server, where effects do not run. `scripts/assert-bundle.mjs` refuses a
- * static edge to `react-pdf` or `pdfjs-dist` from any entry.
+ * in an effect: only in a browser, only once the preview is open and near the
+ * view, and never on a server, where effects do not run.
+ * `scripts/assert-bundle.mjs` refuses a static edge to `react-pdf` or
+ * `pdfjs-dist` from any entry.
  */
 
 /**
@@ -97,21 +113,31 @@ export const PDF_PAGES_MAX_IMAGE_PIXELS = 40_000_000;
 export const PDF_PAGES_MAX_PAGES = 500;
 
 /**
- * How long the bytes, pdf.js and the document's first parse may take before the
- * document falls back to its link, so a seam that never answers or a worker
- * that never starts costs the reader a minute rather than a spinner for good.
+ * How long pdf.js may take, once the bytes have arrived, to load, start its
+ * worker and parse the document before the preview folds away with its toggle
+ * kept, so a worker that never starts costs the reader a minute rather than a
+ * spinner for good.
+ *
+ * The download has no deadline here, deliberately: only the host can tell a
+ * large file arriving slowly from a connection that stalled, and a deadline on
+ * the whole download would fail the same large file on the same slow link at
+ * every retry. The host bounds its own download (typically by aborting when no
+ * data has arrived for a while) and rejects, which folds the preview the same
+ * way; the view aborts the request's signal when the reader folds the preview
+ * or the document leaves.
  */
-const LOAD_TIMEOUT_MS = 60_000;
+const PARSE_TIMEOUT_MS = 60_000;
 
 /**
  * Why the pages could not be drawn, which decides whether the view tries again.
  *
  * - `transient`: something that may pass (the seam rejected or threw, react-pdf
- *   could not be loaded, the minute ran out). The preview folds away and keeps
- *   its toggle, and unfolding it tries again.
+ *   could not be loaded, the minute after the bytes arrived ran out). The
+ *   preview folds away and keeps its toggle, and unfolding it tries again.
  * - `final`: an answer that would be the same next time (not bytes, no bytes,
  *   over the ceiling, a worker of another version or one that would not start,
- *   a document pdf.js cannot parse). The document keeps its link alone.
+ *   a document pdf.js cannot parse or that is encrypted). The document keeps
+ *   its link alone.
  */
 export type PdfPagesFailure = 'transient' | 'final';
 
@@ -310,6 +336,66 @@ const VERSION_MISMATCH_RE = /does not match the Worker version/i;
 /** The schemes a link inside a PDF may hand to the host. */
 const EXTERNAL_LINK_RE = /^(https?|mailto):/i;
 
+/**
+ * pdf.js's request for an encrypted document's password, refused: react-pdf's
+ * default would ask the reader with `window.prompt`, again after every wrong
+ * answer. pdf.js's `updatePassword` (its `PasswordRequest` handler in
+ * `pdfjs-dist/build/pdf.mjs`) rejects the request when it is handed an
+ * `Error`, and its worker then fails the load with the `PasswordException`,
+ * which reaches `onLoadError` as a final refusal. react-pdf types the answer as
+ * a password, which an `Error` is not, hence the cast.
+ */
+function refusePassword(answer: (password: string | null) => void): void {
+  answer(
+    new Error(
+      'The PDF is encrypted, and the view asks no one for its password.',
+    ) as unknown as string,
+  );
+}
+
+/**
+ * Which documents' placeholders are near the visible part of the page, read by
+ * ONE `IntersectionObserver` for every document rather than one each. A
+ * placeholder is near once it is within a viewport's height of the visible
+ * part, and is let go as soon as it is: a document that started loading keeps
+ * loading wherever the reader scrolls. The observer is made with the first
+ * placeholder and dropped with the last, so nothing is held once no document
+ * waits. Only asked where the browser has an `IntersectionObserver`.
+ */
+class NearViewport {
+  private observer: IntersectionObserver | undefined;
+  private readonly waiting = new Map<Element, () => void>();
+
+  /** Calls `onNear` once, when `element` nears the view; returns the cancel. */
+  watch(element: Element, onNear: () => void): () => void {
+    this.observer ??= new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const near = entry.isIntersecting && this.waiting.get(entry.target);
+          if (!near) continue;
+          this.forget(entry.target);
+          near();
+        }
+      },
+      { rootMargin: '100% 0px' },
+    );
+    this.waiting.set(element, onNear);
+    this.observer.observe(element);
+    return () => this.forget(element);
+  }
+
+  private forget(element: Element): void {
+    if (!this.waiting.delete(element)) return;
+    this.observer?.unobserve(element);
+    if (this.waiting.size === 0) {
+      this.observer?.disconnect();
+      this.observer = undefined;
+    }
+  }
+}
+
+const nearViewport = new NearViewport();
+
 interface Ready {
   lib: ReactPdf;
   /** What pdf.js is handed: a copy of the host's bytes, never the host's own array. */
@@ -343,7 +429,9 @@ export interface PdfPagesProps {
 /**
  * The pages, stacked in the frame the document's iframe would have had, each
  * fitted to its width; only the pages near the visible part of the frame are
- * drawn, so a long document holds a few canvases at a time.
+ * drawn, so a long document holds a few canvases at a time. Nothing is
+ * downloaded or imported until the frame-sized placeholder nears the view
+ * (`NearViewport`).
  */
 export function PdfPages({
   url,
@@ -363,6 +451,13 @@ export function PdfPages({
   const width = useContentWidth(frame);
   const [watch] = useState(() => new PageWatch());
   useEffect(() => (frame ? watch.connect(frame) : undefined), [frame, watch]);
+  // Whether the placeholder has come near the view, which starts the load.
+  const [near, setNear] = useState(() => typeof IntersectionObserver === 'undefined');
+  const [placeholder, setPlaceholder] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (near || !placeholder) return;
+    return nearViewport.watch(placeholder, () => setNear(true));
+  }, [near, placeholder]);
 
   // The host's functions are read when they are needed rather than restarting
   // the load whenever a host passes a new inline function.
@@ -382,6 +477,7 @@ export function PdfPages({
   }, []);
 
   useEffect(() => {
+    if (!near) return;
     let live = true;
     let started: StartedWorker | undefined;
     settled.current = false;
@@ -391,14 +487,23 @@ export function PdfPages({
       download.abort();
       refuse(failure);
     };
-    timer.current = setTimeout(() => give('transient'), LOAD_TIMEOUT_MS);
     const { loadBytes: load, worker: config } = latest.current;
-    Promise.all([
-      Promise.resolve().then(() =>
-        load(url, { maxBytes: PDF_PAGES_MAX_BYTES, signal: download.signal }),
-      ),
-      loadReactPdf(),
-    ]).then(
+    const bytes = Promise.resolve().then(() => {
+      // A document that left before this turn is not asked about at all.
+      download.signal.throwIfAborted();
+      return load(url, { maxBytes: PDF_PAGES_MAX_BYTES, signal: download.signal });
+    });
+    // The minute starts once the bytes are here: the download is the host's to
+    // bound (`PARSE_TIMEOUT_MS`).
+    bytes.then(
+      () => {
+        if (live && !settled.current) {
+          timer.current = setTimeout(() => give('transient'), PARSE_TIMEOUT_MS);
+        }
+      },
+      () => {},
+    );
+    Promise.all([bytes, loadReactPdf()]).then(
       ([answer, lib]) => {
         if (!live) return;
         const bytes = asBytes(answer);
@@ -442,7 +547,7 @@ export function PdfPages({
           .finally(own.release);
       }
     };
-  }, [url, refuse]);
+  }, [url, refuse, near]);
 
   // A click on a link the PDF holds, routed through the host when it offers a
   // way out. Internal links (`#…`) are pdf.js's own, and scroll the frame. Of
@@ -483,7 +588,11 @@ export function PdfPages({
     [watch],
   );
 
-  if (!ready) return <PagesLoading sizeClass={sizeClass} label={s.documentPdfPreparing} />;
+  if (!ready) {
+    return (
+      <PagesLoading boxRef={setPlaceholder} sizeClass={sizeClass} label={s.documentPdfPreparing} />
+    );
+  }
   const { Document } = ready.lib;
   const laidOut = pageCount === undefined ? 0 : Math.min(pageCount, PDF_PAGES_MAX_PAGES);
   return (
@@ -511,6 +620,7 @@ export function PdfPages({
         noData={null}
         className="flex flex-col items-center gap-2"
         onItemClick={goToPage}
+        onPassword={refusePassword}
         onLoadSuccess={(pdf) => {
           clearTimeout(timer.current);
           loaded.current = pdf;
@@ -546,12 +656,7 @@ export function PdfPages({
           />
         ))}
         {pageCount !== undefined && pageCount > laidOut && (
-          <MorePages
-            shown={laidOut}
-            total={pageCount}
-            href={href}
-            openExternal={latest.current.openExternal}
-          />
+          <MorePages shown={laidOut} total={pageCount} href={href} openExternal={openExternal} />
         )}
       </Document>
     </div>
@@ -600,10 +705,20 @@ function MorePages({
     </p>
   );
 }
-/** The frame-sized box shown while the bytes and pdf.js load. */
-function PagesLoading({ sizeClass, label }: { sizeClass: string; label: string }) {
+
+/** The frame-sized box shown until the document nears the view, and while the bytes and pdf.js load. */
+function PagesLoading({
+  boxRef,
+  sizeClass,
+  label,
+}: {
+  boxRef: (element: HTMLDivElement | null) => void;
+  sizeClass: string;
+  label: string;
+}) {
   return (
     <div
+      ref={boxRef}
       className={cn(
         sizeClass,
         'flex items-center justify-center rounded-lg border border-border bg-card/40',
