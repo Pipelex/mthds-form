@@ -9,8 +9,10 @@
  *
  * Three changes from the originals, each for this package's own rules:
  *
- *  - Every rule is scoped under `.mthds-pdf-pages`, the renderer's frame, so
- *    nothing here reaches a host's own pages or a pdf.js viewer the host runs.
+ *  - Every rule but one is scoped under `.mthds-pdf-pages`, the renderer's
+ *    frame, so nothing here styles a host's own pages or a pdf.js viewer the
+ *    host runs. The exception is the `body` rule below, which sets two private
+ *    markers and styles nothing.
  *  - The custom properties the originals set on `:root` are set on that frame
  *    instead, and every one read that the frame does not set (the scale pdf.js
  *    writes on each page, inline) carries a fallback, so a declaration is never
@@ -19,9 +21,13 @@
  *    `false`, so pdf.js never draws a field as an `<input>` and they would
  *    style nothing.
  *
- * `body` carries react-pdf's two marker properties, which it reads to warn,
- * during development, that the layer styles are missing. They are private
- * names, not design tokens, and compete with nothing.
+ * The one unscoped rule: `body` carries react-pdf's two marker properties,
+ * which react-pdf reads to warn, during development, that the layer styles are
+ * missing. It reads them from `document.body` itself
+ * (`getComputedStyle(document.body)` in its `Page/TextLayer.js` and
+ * `Page/AnnotationLayer.js`), so they cannot move onto the frame, which is
+ * inside the body. They are private names, not design tokens, style nothing,
+ * and compete with nothing.
  */
 
 body {
