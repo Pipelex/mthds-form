@@ -104,6 +104,9 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   documentPdfPreparing: 'Préparation de l’aperçu…',
   documentPdfFailed: 'Impossible de préparer un aperçu.',
   documentPdfUnavailable: 'Aucun aperçu pour ce fichier.',
+  pdfPageNotDrawn: 'Cette page n’a pas pu être affichée',
+  pdfPagesContinue: (shown, total) =>
+    `Le document continue au-delà de ces ${shown} premières pages sur ${total}.`,
   // U+002D HYPHEN-MINUS, as in the English defaults.
   resultAbsent: '-',
   resultAbsentDescription: 'Non renseigné',
