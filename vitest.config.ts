@@ -123,6 +123,11 @@ export default defineConfig({
             headless: true,
             provider: playwright({}),
             instances: [{ browser: 'chromium' }],
+            // Pinned to IPv4 loopback, so `localhost` is a second origin that
+            // reaches the same server: `Outputs/PDF pages` serves pdf.js's
+            // worker across the two. Left to resolve `localhost`, the server
+            // may bind `::1` alone, and `127.0.0.1` would then reach nothing.
+            api: { host: '127.0.0.1' },
           },
         },
       },

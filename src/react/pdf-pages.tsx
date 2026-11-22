@@ -59,10 +59,12 @@ import { cn } from './utils';
  * `GlobalWorkerOptions`, which a host running pdf.js itself also reads. From a
  * host's `workerSrc` the renderer starts the worker itself, exactly as pdf.js
  * would (a cross-origin URL is wrapped in a `blob:` module that imports it,
- * which a sandboxed frame admits where it refuses the URL itself), and stops it
- * when the document leaves. A host's `workerPort` is the host's, and is never
- * stopped. react-pdf's own module still sets `GlobalWorkerOptions.workerSrc` to
- * a relative `pdf.worker.mjs` as it loads, which is react-pdf's doing and which
+ * which a sandboxed frame admits where it refuses the URL itself, and which
+ * holds the messages pdf.js posts while the import is under way), and stops it
+ * when the document leaves. A host's `workerPort` is the host's, is never
+ * stopped, and must already be listening, since pdf.js posts to it at once.
+ * react-pdf's own module still sets `GlobalWorkerOptions.workerSrc` to a
+ * relative `pdf.worker.mjs` as it loads, which is react-pdf's doing and which
  * nothing here reads.
  *
  * ## Nothing loads until the document is near the view
@@ -200,18 +202,67 @@ function onPageOrigin(src: string): boolean {
 }
 
 /**
+ * The body of the `blob:` module that starts a worker whose URL is not on the
+ * page's own origin.
+ *
+ * pdf.js, handed a started worker, posts its first messages to it at once
+ * (`configure`, then the document's `GetDocRequest`) and waits for no
+ * handshake (`#initializeFromPort` in `pdfjs-dist/build/pdf.mjs`). pdf.js's
+ * worker module starts listening only once it has been evaluated, which inside
+ * the wrapper is once the import of it across the origins has finished. The
+ * browser delivers the messages while the wrapper's top-level `await` is still
+ * pending, so with nobody listening they were lost, and the document waited
+ * out the parse timer before falling back to its link. The wrapper therefore
+ * holds every message that arrives during the import and dispatches each again
+ * once the import has finished, with its data and its ports, in the order it
+ * came, to the listener pdf.js's worker installed in the meantime. The holding
+ * listener is the first installed, and keeps a held message from every listener
+ * after it, so a message is never seen twice, even one that arrived after
+ * pdf.js's worker started listening and before the import's `await` resumed. A
+ * worker started from the URL directly has no such window, since nothing runs
+ * before the module itself.
+ *
+ * The import stays dynamic: a static `import` of the URL is a fetch the page's
+ * `worker-src` judges, and a chat host's frame admits `blob:` workers alone.
+ * The URL is embedded as a JSON string, which is a valid JavaScript string
+ * literal for any URL.
+ */
+function wrapperSource(url: string): string {
+  return [
+    'const held = [];',
+    'const hold = (event) => {',
+    '  event.stopImmediatePropagation();',
+    '  held.push(event);',
+    '};',
+    'self.addEventListener("message", hold);',
+    'try {',
+    `  await import(${JSON.stringify(url)});`,
+    '} finally {',
+    '  self.removeEventListener("message", hold);',
+    '}',
+    'for (const event of held) {',
+    '  self.dispatchEvent(new MessageEvent("message", { data: event.data, ports: [...event.ports] }));',
+    '}',
+    '',
+  ].join('\n');
+}
+
+/**
  * Start pdf.js's worker module from a URL, as pdf.js itself does in
  * `PDFWorker` (`getWorkerSrc` in `pdfjs-dist/build/pdf.mjs`): a URL on the
  * page's origin directly, and any other wrapped in a `blob:` module that
  * imports it, since a page may start a worker only from its own origin, and a
  * sandboxed frame, whose origin is opaque, admits a `blob:` worker where it
  * refuses every URL.
+ *
+ * The wrapper holds the messages that arrive while it imports, and dispatches
+ * them again, in order, once the import has finished ({@link wrapperSource}).
  */
 function moduleWorker(src: string): { worker: Worker; stop: () => void } {
   let script = src;
   let blob: string | undefined;
   if (!onPageOrigin(src)) {
-    const wrapper = `await import(${JSON.stringify(new URL(src, window.location.href).href)});`;
+    const wrapper = wrapperSource(new URL(src, window.location.href).href);
     blob = URL.createObjectURL(new Blob([wrapper], { type: 'text/javascript' }));
     script = blob;
   }
