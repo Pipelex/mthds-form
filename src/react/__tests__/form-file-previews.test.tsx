@@ -17,7 +17,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField } from '../../core';
 import { getPipeIOContract } from '../../core/contracts';
@@ -38,10 +38,15 @@ const pdf = vi.hoisted(() => ({
 }));
 
 // The decoder, watched, so a test can tell a `data:` URL refused by its counted
-// size from one decoded first and refused after.
+// size from one decoded first and refused after; and a picture's preview, read
+// for real and watched, so a test can hold one back and land it late.
 vi.mock('../local-file-preview', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../local-file-preview')>();
-  return { ...actual, dataUrlBytes: vi.fn(actual.dataUrlBytes) };
+  return {
+    ...actual,
+    dataUrlBytes: vi.fn(actual.dataUrlBytes),
+    imagePreviewDataUrl: vi.fn(actual.imagePreviewDataUrl),
+  };
 });
 
 vi.mock('react-pdf', async () => {
@@ -106,6 +111,7 @@ const pngFile = () => new File(['png-bytes'], 'face.png', { type: 'image/png' })
 beforeEach(() => {
   pdf.files.length = 0;
   pdf.load = 'success';
+  vi.mocked(imagePreviewDataUrl).mockReset();
 });
 
 afterEach(() => {
@@ -475,6 +481,106 @@ describe('a picture dropped into the form', () => {
     );
     expect(resolveUrl).toHaveBeenCalledWith(STORED_PICTURE);
     expect(container.querySelector('[data-local-preview]')).toBeNull();
+  });
+});
+
+/**
+ * Holds back the next picture's preview: it is read as ever, and handed to the
+ * field only on `land()`, outside `act`, as a `FileReader`'s answer is.
+ * `answered` is the very promise the field awaits, so a test that awaits it
+ * after `land()` runs after the field's own continuation.
+ */
+function heldPreview() {
+  let land: () => void = () => {};
+  const landed = new Promise<void>((resolve) => {
+    land = resolve;
+  });
+  // Boxed, since a promise resolved with a promise would wait on it.
+  let asked: (box: { answer: Promise<string | null> }) => void = () => {};
+  const requested = new Promise<{ answer: Promise<string | null> }>((resolve) => {
+    asked = resolve;
+  });
+  vi.mocked(imagePreviewDataUrl).mockImplementationOnce((file) => {
+    const answer = (async () => {
+      const actual =
+        await vi.importActual<typeof import('../local-file-preview')>('../local-file-preview');
+      const url = await actual.imagePreviewDataUrl(file);
+      await landed;
+      return url;
+    })();
+    asked({ answer });
+    return answer;
+  });
+  return {
+    requested: requested.then(() => undefined),
+    answered: requested.then(({ answer }) => answer),
+    land: () => land(),
+  };
+}
+
+/** A host that stores each dropped picture at a URL of its own and writes it back. */
+function StoringImageField() {
+  const [value, setValue] = useState<FileValue | undefined>(undefined);
+  const [count, setCount] = useState(0);
+  return (
+    <ImageField
+      field={imageField}
+      value={value}
+      id="photo"
+      onChange={setValue}
+      onDropFile={async (file) => {
+        const url = `pipelex-storage://org/assets/${count + 1}-${file.name}`;
+        setCount((n) => n + 1);
+        setValue({ url, filename: file.name });
+        return url;
+      }}
+    />
+  );
+}
+
+const dataUrlOf = (text: string, type = 'image/png') => `data:${type};base64,${btoa(text)}`;
+const localPicture = (container: HTMLElement) =>
+  container.querySelector('[data-local-preview] img')?.getAttribute('src');
+
+describe("a picture's preview read after its file left the field paints nothing", () => {
+  it('when another picture took its place meanwhile', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<StoringImageField />);
+    const first = heldPreview();
+    await user.upload(screen.getByLabelText('photo'), pngFile());
+    await first.requested;
+    await screen.findByText('face.png');
+    // Removed, and another picture dropped in its place, read at once.
+    await user.click(screen.getByRole('button', { name: S.removeFileAria }));
+    const other = new File(['other-bytes'], 'other.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('photo'), other);
+    await screen.findByText('other.png');
+    await waitFor(() => expect(localPicture(container)).toBe(dataUrlOf('other-bytes')));
+    // The first picture's read lands last, outside any act.
+    first.land();
+    await act(async () => {
+      await first.answered;
+    });
+    expect(localPicture(container)).toBe(dataUrlOf('other-bytes'));
+    expect(container.innerHTML).not.toContain(dataUrlOf('png-bytes'));
+  });
+
+  it('when the file was removed meanwhile', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<StoringImageField />);
+    const first = heldPreview();
+    await user.upload(screen.getByLabelText('photo'), pngFile());
+    await first.requested;
+    await screen.findByText('face.png');
+    await user.click(screen.getByRole('button', { name: S.removeFileAria }));
+    expect(screen.queryByText('face.png')).not.toBeInTheDocument();
+    first.land();
+    await act(async () => {
+      await first.answered;
+    });
+    expect(container.querySelector('[data-local-preview]')).toBeNull();
+    expect(container.innerHTML).not.toContain(dataUrlOf('png-bytes'));
+    expect(screen.queryByText('face.png')).not.toBeInTheDocument();
   });
 });
 
