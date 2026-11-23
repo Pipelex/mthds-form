@@ -803,8 +803,12 @@ const OWN_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
  * `" https://cdn/x.png"` — `new URL()` reads it as `https:` and `/^https?:/`
  * does not — and a host that validated a member by parsing while this gate
  * prefix-matched would have judged a different string than the one painted.
+ *
+ * Exported for the input control, which reads a `data:` URL's declared type and
+ * its bytes off the string the gate judged, not the raw member beside it. Not
+ * part of the core entry.
  */
-function stripUrlWhitespace(candidate: string): string {
+export function stripUrlWhitespace(candidate: string): string {
   // Written out rather than as a character-class regex: the range IS the control
   // characters, which is exactly what a regex may not spell (`no-control-regex`).
   let start = 0;

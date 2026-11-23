@@ -108,9 +108,13 @@ describe('the frame policy', () => {
     ).toContain("font-src 'self';");
   });
 
-  it('keeps the frame sandboxed without scripts', () => {
+  it('keeps the frame sandboxed without scripts, granting only pop-ups beside same-origin', () => {
+    // Pop-ups are what a link's new tab needs, and with no scripts only a
+    // reader's own click can open one; see `frame-navigation.ts`.
     const { container } = render(<HtmlPreview content={{ innerHtml: QUOTE }} />);
-    expect(container.querySelector('iframe')!.getAttribute('sandbox')).toBe('allow-same-origin');
+    expect(container.querySelector('iframe')!.getAttribute('sandbox')).toBe(
+      'allow-same-origin allow-popups allow-popups-to-escape-sandbox',
+    );
   });
 
   it("declares no referrer in the frame's own head, a fragment's and a whole document's", () => {

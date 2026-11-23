@@ -31,9 +31,6 @@ if (!contract || !descriptor) throw new Error('No fixture for structured.flat_ob
 const FLAT = { contract, descriptor };
 
 beforeAll(() => {
-  // A dropped file's preview is an object URL, which jsdom does not make.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
   // The row menu's popper measures its content; jsdom has no ResizeObserver.
   globalThis.ResizeObserver ??= class {
     observe() {}
@@ -1028,7 +1025,7 @@ describe('an example filled over a file of the person’s own', () => {
     ),
   };
   const paintsLocalPreview = (container: HTMLElement) =>
-    container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
+    container.querySelector('[data-local-preview]') !== null;
   const drop = async (user: ReturnType<typeof userEvent.setup>, container: HTMLElement) => {
     const input = container.querySelector<HTMLInputElement>(
       'input[type="file"]:not([data-camera-input])',

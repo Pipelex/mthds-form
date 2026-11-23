@@ -151,6 +151,22 @@ async function jpegOf(source: ImageBitmap, maxEdge: number): Promise<JpegImage> 
 }
 
 /**
+ * A smaller copy of a picture, for its preview: decoded upright once, then
+ * encoded as a JPEG on white whose long edge is at most `maxEdge`. Throws
+ * `UndecodablePhotoError` for a picture the browser cannot decode this way.
+ * See `imagePreviewDataUrl` in `./local-file-preview`.
+ */
+export async function readPreview(picture: Blob, maxEdge: number): Promise<JpegImage> {
+  const full = await decode(picture);
+  try {
+    if (full.width === 0 || full.height === 0) throw new UndecodablePhotoError();
+    return await jpegOf(full, maxEdge);
+  } finally {
+    full.close();
+  }
+}
+
+/**
  * Read one photo into its page: decoded once, the page encoded with its long
  * edge at most `MAX_PAGE_EDGE`, and the thumbnail made from that page's bitmap
  * with its long edge at most `THUMBNAIL_EDGE`. The full-size bitmap is closed

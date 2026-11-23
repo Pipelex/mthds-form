@@ -1,4 +1,4 @@
-.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs prompt-hash brands assert-bundle clean pack
+.PHONY: all install build build-css lint format format-check typecheck codegen-check test t test-watch test-coverage test-navigation-browsers check c storybook st build-storybook fixtures fixtures-runs briefs fixtures-specs prompt-hash brands assert-bundle clean pack
 
 install:
 	npm install
@@ -39,6 +39,16 @@ test-watch:
 
 test-coverage:
 	npx vitest run --coverage
+
+# The navigation stories (Outputs/Html navigation) in Firefox and WebKit, the
+# engines `make test` leaves out: where a framed page's link goes is each
+# engine's own decision. Not part of `make test`, so a machine where an engine
+# will not start still runs the suite; CI runs both. Narrow it with
+# NAVIGATION_BROWSERS=webkit. See docs/storybook.md.
+NAVIGATION_BROWSERS ?= firefox,webkit
+
+test-navigation-browsers:
+	MTHDS_FORM_NAVIGATION_BROWSERS=$(NAVIGATION_BROWSERS) npx vitest run --project storybook-navigation src/__stories__/outputs/html-navigation.stories.tsx
 
 check: lint format-check typecheck codegen-check
 	@echo "All checks passed."

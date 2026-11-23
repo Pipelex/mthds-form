@@ -6,7 +6,7 @@
  * takes several files at once".
  */
 import { useState } from 'react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField, ObjectRunField } from '../../core';
@@ -43,12 +43,6 @@ const listOf = (item: ListRunField['item'], extra: Partial<ListRunField> = {}): 
 const png = (name: string) => new File(['png'], name, { type: 'image/png' });
 const zip = (name: string) => new File(['zip'], name, { type: 'application/zip' });
 const HELD = { url: 'https://example.com/held.png', filename: 'held.png' };
-
-beforeAll(() => {
-  // jsdom implements neither, and a row makes an object URL for each file placed in it.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
 
 /** The control is controlled; the host holds the array and records each change. */
 function Harness({
@@ -381,7 +375,11 @@ describe('a row the drop area fills takes the file as its own', () => {
     expect(await screen.findByText('a.png')).toBeInTheDocument();
     // The preview is open from the start: the dropped file is painted unasked.
     expect(screen.getByRole('button', { name: /^preview$/i })).toBeInTheDocument();
-    expect(container.querySelector('[src^="blob:"]')).not.toBeNull();
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-local-preview] img[src^="data:image/png"]'),
+      ).not.toBeNull(),
+    );
   });
 
   it('drops a refusal the row showed once the file placed in it lands', async () => {
@@ -428,7 +426,9 @@ describe('a row the area fills, under a host that writes as it is handed the fil
     // Each row's preview is open from the start.
     expect(screen.getAllByRole('button', { name: /^preview$/i })).toHaveLength(2);
     // The row takes the area's file in an effect, a render after the value lands.
-    await waitFor(() => expect(container.querySelectorAll('[src^="blob:"]')).toHaveLength(2));
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-local-preview] img[src^="data:"]')).toHaveLength(2),
+    );
   });
 });
 

@@ -1,4 +1,8 @@
 import type { HtmlContentView } from '../core/native-content';
+import { rewriteNavigation } from './frame-navigation';
+import { isWholeDocument } from './markup-parse';
+
+export { isWholeDocument };
 
 /**
  * The document a `native.Html` result is framed in: the on-screen preview's and
@@ -76,20 +80,16 @@ export function frameStyles({ color, mutedColor, borderColor, font }: FrameTypog
   `;
 }
 
-/**
- * Whether the markup is a whole document rather than a fragment: it opens, past
- * any whitespace and comments, on a doctype, an `<html>` or a `<head>`. A
- * method that renders a printable page (a quote, an invoice) usually writes the
- * whole document, with its own head, styles and print rules.
- */
-export function isWholeDocument(markup: string): boolean {
-  return /^\s*(?:<!--[\s\S]*?-->\s*)*<(?:!doctype\b|html[\s>]|head[\s>])/i.test(markup);
-}
-
 export interface FrameDocumentOptions {
   styles: string;
   imgSrc: string;
   fontSrc: string;
+  /**
+   * Where an in-page link (`#x`) goes: kept in the frame (`frame`, the
+   * default) or left as written for a page that prints (`document`). See
+   * `frame-navigation.ts`.
+   */
+  inPageLinks?: 'frame' | 'document';
 }
 
 /**
@@ -129,23 +129,37 @@ export interface FrameDocumentOptions {
  * the font's CORS answer reads. A page that declares its own referrer policy
  * later in its head replaces this one, as a second `<meta name="referrer">`
  * does.
+ *
+ * ## The page stays in its frame
+ *
+ * The markup's links are rewritten before it is framed (`frame-navigation.ts`):
+ * a link to anywhere opens in a new tab, an in-page link scrolls the frame,
+ * any other scheme loses its `href`, and a meta refresh is removed. It is done
+ * here, on the one road every page takes, so the preview, the PDF's layout copy
+ * and the document a host's `renderPdf` is handed cannot drift on it. The head
+ * also carries a `<base target="_blank">`, after the policy and the referrer
+ * metas, as a second line for any link the rewrite misses: the first `<base>`
+ * with a target is the one that counts, and ours comes before the page's own.
+ * `base-uri 'none'` does not refuse it, since it names no `href`.
  */
 export function frameDocument(
   content: HtmlContentView,
-  { styles, imgSrc, fontSrc }: FrameDocumentOptions,
+  { styles, imgSrc, fontSrc, inPageLinks = 'frame' }: FrameDocumentOptions,
 ): string {
   const head = [
     '<!doctype html><html><head><meta charset="utf-8">',
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${imgSrc}; font-src ${fontSrc}; base-uri 'none'; form-action 'none'">`,
     '<meta name="referrer" content="no-referrer">',
+    '<base target="_blank">',
     `<style>${styles}</style></head>`,
   ].join('');
-  if (isWholeDocument(content.innerHtml)) return head + content.innerHtml;
+  const markup = rewriteNavigation(content.innerHtml, { inPageLinks });
+  if (isWholeDocument(markup)) return head + markup;
   const body = content.cssClass
     ? // The class the value states, honoured the way the runtime's own HTML
       // rendering honours it: as a wrapper, not as something merged into ours.
-      `<div class="${escapeAttribute(content.cssClass)}">${content.innerHtml}</div>`
-    : content.innerHtml;
+      `<div class="${escapeAttribute(content.cssClass)}">${markup}</div>`
+    : markup;
   return `${head}<body>${body}</body></html>`;
 }
 
@@ -159,7 +173,8 @@ export const DEFAULT_PAGE_FONT = 'system-ui, sans-serif';
 
 /**
  * The frame document of a page as it prints: ink on paper in `fontFamily`, under the policy the
- * preview's frame holds. The in-browser PDF lays its copy out in it and a host's own `renderPdf`
+ * preview's frame holds, its links rewritten as the preview's are except that an in-page link
+ * stays as written. The in-browser PDF lays its copy out in it and a host's own `renderPdf`
  * is handed it, so the two cannot drift apart. An empty `fontFamily` reads as none.
  */
 export function pageDocument(
@@ -174,5 +189,7 @@ export function pageDocument(
     styles: frameStyles(pageTypography(fontFamily || DEFAULT_PAGE_FONT)),
     imgSrc,
     fontSrc: fontSrc ?? imgSrc,
+    // A printed page's in-page links are the PDF's own links to its headings.
+    inPageLinks: 'document',
   });
 }

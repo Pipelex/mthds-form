@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileRunField } from '../core';
 import { PHOTO_FILE, photoFileName } from '../core/photo-file';
+import { blobDataUrl } from './local-file-preview';
 import { readPhoto, UndecodablePhotoError, type JpegImage } from './photo-reading';
 import { loadJsPdf, pagesToPdf } from './photos-pdf';
 import { isThenable, storedUrlOf } from './utils';
@@ -21,15 +22,21 @@ import { isThenable, storedUrlOf } from './utils';
  *
  * The pages are an editing aid over that file, never the truth: they are kept
  * only while the value is the file they made or that file is on its way. Any
- * other value, written by anyone, discards them and gives back their object
- * URLs, and a remount loses them (the stored file stays). An upload of the
+ * other value, written by anyone, discards them, and a remount loses them
+ * (the stored file stays). An upload of the
  * made file that fails discards them too, leaving the value as it was.
  */
 
-/** One page: its own id, its thumbnail's object URL, and its encoded JPEG. */
+/** One page: its own id, its thumbnail as a `data:` URL, and its encoded JPEG. */
 export interface PhotoPage {
   /** Stable for the page's life: a retake makes a new page with a new id in its place. */
   id: string;
+  /**
+   * The thumbnail's JPEG as a `data:` URL, never a `blob:` one: a chat host's
+   * view frame admits `data:` images and refuses `blob:` ones, so an object
+   * URL drew the broken-image placeholder there. It is a few kilobytes
+   * (`THUMBNAIL_EDGE`), and needs no revoking.
+   */
   thumbnail: string;
   page: JpegImage;
 }
@@ -242,12 +249,7 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
     writeEmpty();
   }, [writeEmpty]);
 
-  const revoke = useCallback((pages: readonly PhotoPage[]) => {
-    for (const page of pages) URL.revokeObjectURL(page.thumbnail);
-  }, []);
-
   const discard = useCallback(() => {
-    revoke(held.current.pages);
     if (held.current !== NO_PHOTOS) commit(NO_PHOTOS);
     handed.current = null;
     awaiting.current.clear();
@@ -255,10 +257,9 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
     epoch.current += 1;
     making.current += 1;
     setPreparing(false);
-  }, [commit, revoke, setPreparing]);
+  }, [commit, setPreparing]);
 
-  // A remount loses the pages, so their object URLs go with the control, the
-  // host's report that a file is being made is let go, and nothing still on
+  // A remount loses the pages, the host's report that a file is being made is let go, and nothing still on
   // its way acts on anything any more: a read still running, the photos
   // queued behind it, a file being made and every upload's answer.
   useEffect(() => {
@@ -268,10 +269,9 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
       preparing.current = null;
       alive.current = false;
       making.current += 1;
-      revoke(held.current.pages);
       release?.();
     };
-  }, [revoke]);
+  }, []);
 
   /**
    * The pages are about to change. A host following the seam is told a file is
@@ -332,9 +332,11 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
       if (!alive.current) return;
       if (!held.current.reading.some((candidate) => candidate.id === marker.id)) return;
       let read: Awaited<ReturnType<typeof readPhoto>> | null = null;
+      let thumbnail = '';
       let refusal: PhotoRefusal | null = null;
       try {
         read = await readPhoto(photo);
+        thumbnail = await blobDataUrl(read.thumbnail.blob);
       } catch (error: unknown) {
         refusal = error instanceof UndecodablePhotoError ? 'undecodable' : 'notKept';
         if (refusal === 'notKept' && alive.current) {
@@ -349,23 +351,21 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
       const wanted = current.reading.find((candidate) => candidate.id === marker.id);
       if (!wanted) return;
       const reading = current.reading.filter((candidate) => candidate.id !== marker.id);
-      if (!read) {
+      if (!read || !thumbnail) {
         commit({ ...current, reading, refusal });
         return;
       }
       counter.current += 1;
       const page: PhotoPage = {
         id: `page-${counter.current}`,
-        thumbnail: URL.createObjectURL(read.thumbnail.blob),
+        thumbnail,
         page: read.page,
       };
       const pages = withPage(current.pages, latest.current.field.kind, wanted.replaces, page);
       if (!pages) {
-        URL.revokeObjectURL(page.thumbnail);
         commit({ ...current, reading });
         return;
       }
-      revoke(current.pages.filter((gone) => !pages.includes(gone)));
       // A later retake of the page this one replaced lands on this one's photo.
       const retargeted =
         wanted.replaces === null
@@ -377,7 +377,7 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
             );
       commit({ ...current, pages, reading: retargeted });
     },
-    [commit, revoke],
+    [commit],
   );
 
   const take = useCallback(
@@ -400,7 +400,6 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
       const current = held.current;
       const page = current.pages.find((candidate) => candidate.id === pageId);
       if (!page) return;
-      revoke([page]);
       commit({
         ...current,
         pages: current.pages.filter((candidate) => candidate.id !== pageId),
@@ -410,7 +409,7 @@ export function usePhotoPages(options: PhotoPagesOptions): PhotoPages {
       });
       changing();
     },
-    [changing, commit, revoke],
+    [changing, commit],
   );
 
   const forgetRefusal = useCallback(() => {
