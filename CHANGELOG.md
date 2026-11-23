@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.42.0] - 2026-11-23
 
 ### Added
 
@@ -10,7 +10,6 @@
 
 - **A PDF in the form never previews in an `<object>` (Breaking)**: a PDF whose pages are not drawn (no `pdfWorker`, no way to its bytes, or a file the renderer refuses) is a compact card with the dropped file's format and size, and the stored file's link, opened through `openExternal` when the host gives one, where it used to be an `<object>` of the browser's PDF viewer 78% of the viewport tall, which a host whose frame policy refuses `<object>` (`object-src 'none'`, both chat hosts' views) showed as an empty frame. A host that relied on the browser's viewer supplies `pdfWorker`.
 - **`FieldEnv.resolveUrl` takes either shape of resolver (Breaking)**: its type is the new `FormResolveUrl`, the result view's synchronous `ResolveUrl` or an asynchronous one answering a URL, `null` or `undefined`, so a host hands the form and the results one function. A host that typed its own resolver against the old `(uri) => Promise<string | null>` keeps working; one that read the type off `FieldEnv` gets the union.
-
 - **`FieldStrings` gains `pageLeftFrame` (Breaking)**: what an HTML result shows in place of a page whose frame was moved off it twice ("This page tried to leave its frame, so it is no longer shown here."). English and French are supplied; a host that supplies a complete `FieldStrings` rather than a partial override adds it.
 
 ### Fixed
