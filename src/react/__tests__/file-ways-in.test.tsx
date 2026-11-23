@@ -10,7 +10,7 @@
  * Every assertion below was, before the fix, its own opposite.
  */
 import { Component, useState, type ReactNode } from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
@@ -66,12 +66,6 @@ const application: ObjectRunField = {
 
 const LINE = DEFAULT_FIELD_STRINGS.uploadUnavailable;
 const DROPZONE_TEXT = DEFAULT_FIELD_STRINGS.dropOrBrowse;
-
-beforeAll(() => {
-  // jsdom implements neither, and the upload case makes an object URL per drop.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
 
 afterEach(() => {
   vi.restoreAllMocks();

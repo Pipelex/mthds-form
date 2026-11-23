@@ -5,13 +5,20 @@ import { readStoredReference, type LoadText } from '../core/stored-value';
 import { StoredValueField } from './stored-value-field';
 import { BooleanField } from './boolean-field';
 import { DateField } from './date-field';
-import { DocumentField, ImageField, type FileValue, type UploadedFile } from './file-field';
+import {
+  DocumentField,
+  ImageField,
+  type FileValue,
+  type FormResolveUrl,
+  type UploadedFile,
+} from './file-field';
 import type { FilePickerSource } from './file-picker';
 import { EnumField } from './enum-field';
 import { NumberField } from './number-field';
 import { ProseField, TextField } from './text-field';
 import { ObjectField } from './object-field';
 import { ListField } from './list-field';
+import type { LoadBytes, OpenExternal, PdfWorkerConfig } from './result-env';
 import type { RowMove } from './row-moves';
 import { UnknownField } from './unknown-field';
 
@@ -128,9 +135,37 @@ export interface FieldEnv {
    * `useMethodForm` does this for every write of its values.
    */
   uploadErrors?: ReadonlyMap<string, string>;
-  /** Resolve a `pipelex-storage://` URI to a browser-viewable URL (for previews
-   *  of already-stored files). */
-  resolveUrl?: (uri: string) => Promise<string | null>;
+  /**
+   * Resolves a stored reference (`pipelex-storage://…`) to a URL a preview can
+   * load, for a file the field holds as a reference: one chosen from the
+   * host's files, restored on a remount, or a dropped picture whose own bytes
+   * could not be shown. The result view's synchronous `ResolveUrl` is
+   * accepted as it is, so a host hands the form and the results one function,
+   * and so is an asynchronous one (`FormResolveUrl`). See
+   * docs/upload-seam.md.
+   */
+  resolveUrl?: FormResolveUrl;
+  /**
+   * A stored file's bytes, from which a stored PDF's pages are drawn with
+   * `pdfWorker`: the result view's `LoadBytes`, the same function a host hands
+   * `ResultEnvProvider`, under the same contract (read only references the
+   * host stores itself). A PDF just dropped is drawn from its own bytes and
+   * needs none. See docs/upload-seam.md, "What a file's preview paints from".
+   */
+  loadBytes?: LoadBytes;
+  /**
+   * pdf.js's worker, as the result view takes it. Given, a PDF a file field
+   * holds is drawn page by page onto canvases: a dropped one from its own
+   * bytes, a stored one from `loadBytes`. Without it, or where the pages
+   * cannot be drawn, the PDF's preview is a compact card.
+   */
+  pdfWorker?: PdfWorkerConfig;
+  /**
+   * How the host opens a link to another page, as the result view takes it:
+   * the links inside a drawn PDF and a PDF card's "Open in a new tab" go
+   * through it. Unset, they open in a new tab.
+   */
+  openExternal?: OpenExternal;
   /**
    * Reads a stored text, for an input holding a `Text`, `Markdown`, `Html` or
    * `JSON` value as its reference (`{url, size, mime_type, preview}`) rather
@@ -272,6 +307,9 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           uploading={env?.uploadingIds?.has(id)}
           uploadError={env?.uploadErrors?.get(id)}
           resolveUrl={env?.resolveUrl}
+          loadBytes={env?.loadBytes}
+          pdfWorker={env?.pdfWorker}
+          openExternal={env?.openExternal}
           fileSource={env?.fileSource}
           id={id}
           error={error}
@@ -290,6 +328,9 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           uploading={env?.uploadingIds?.has(id)}
           uploadError={env?.uploadErrors?.get(id)}
           resolveUrl={env?.resolveUrl}
+          loadBytes={env?.loadBytes}
+          pdfWorker={env?.pdfWorker}
+          openExternal={env?.openExternal}
           fileSource={env?.fileSource}
           id={id}
           error={error}

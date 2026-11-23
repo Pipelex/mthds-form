@@ -4,7 +4,7 @@
  * gate), the top-level optional disclosure, the required marks after an
  * attempt, and the upload seam it closes over a host's `uploadFile`.
  */
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
@@ -78,11 +78,6 @@ function Harness({ formProps, ...options }: HarnessProps) {
 const state = () => JSON.parse(screen.getByTestId('state').textContent ?? '{}');
 const fileInput = (container: HTMLElement) =>
   container.querySelector('input[type="file"]:not([data-camera-input])') as HTMLInputElement;
-
-beforeAll(() => {
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
 
 describe('what the form renders and reports', () => {
   it('renders every input of the method and seeds its authored defaults only', () => {

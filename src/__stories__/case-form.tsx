@@ -12,6 +12,7 @@ import {
   FieldRenderer,
   type FieldEnv,
   type FieldPresentation,
+  type PdfWorkerConfig,
 } from '../react';
 import { standInUpload } from './stand-in-upload';
 
@@ -83,6 +84,11 @@ export interface CaseFormProps {
   upload?: boolean;
   /** `FieldEnv.allowUrl`: `false` takes the "Paste a link instead" link away. */
   allowUrl?: boolean;
+  /**
+   * `FieldEnv.pdfWorker`: pdf.js's worker, which draws a PDF a file field holds
+   * page by page. Absent, a PDF's preview is its compact card.
+   */
+  pdfWorker?: PdfWorkerConfig;
 }
 
 export function deriveCaseFields(
@@ -115,6 +121,7 @@ export function CaseForm({
   presentation = 'studio',
   upload = true,
   allowUrl,
+  pdfWorker,
 }: CaseFormProps) {
   const fields = React.useMemo(() => {
     const derived = deriveCaseFields(contracts, inputForm, domain, pipeCode);
@@ -130,6 +137,7 @@ export function CaseForm({
       uploadingIds: uploadingIds ? new Set(uploadingIds) : undefined,
       uploadErrors: failures,
       allowUrl,
+      pdfWorker,
       // The id is `<pipeCode>-<path>`, and the path is what a host writes back
       // to (docs/upload-seam.md). The object URL is never revoked: a story's
       // page is short-lived, and the file card may still be showing it.
@@ -147,7 +155,7 @@ export function CaseForm({
           }
         : undefined,
     }),
-    [disabled, uploadingIds, failures, allowUrl, upload, pipeCode],
+    [disabled, uploadingIds, failures, allowUrl, pdfWorker, upload, pipeCode],
   );
 
   return (

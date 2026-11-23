@@ -27,9 +27,12 @@ import { fieldControlClass, smallPrintClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
+import { dataUrlBytes, imagePreviewDataUrl } from './local-file-preview';
+import { hasPdfWorker, PdfPages } from './pdf-pages';
 import { CameraInput, TakePhotoButton } from './photo-camera';
 import { PhotoPageStrip } from './photo-page-strip';
 import { usePhotoPages } from './photo-pages';
+import type { LoadBytes, OpenExternal, PdfWorkerConfig, ResolveUrl } from './result-env';
 
 /**
  * What the control refused: a file of a type the slot does not accept, or a
@@ -50,6 +53,18 @@ export interface FileValue {
 
 /** What a host's upload resolves to: the stored file's URL, or its URL and name. */
 export type UploadedFile = string | { url: string; filename?: string };
+
+/**
+ * How the form turns a stored reference into a URL a preview can load.
+ *
+ * Either the result view's own {@link ResolveUrl}, synchronous, so a host
+ * hands the form and the results one function, or an asynchronous one, for a
+ * host that presigns per file. Either answers `null` or `undefined` for a
+ * reference it cannot resolve, and an asynchronous one may reject. Its answer
+ * passes the URL gate before anything paints it. See docs/upload-seam.md,
+ * "`resolveUrl`, and when it is not needed".
+ */
+export type FormResolveUrl = ResolveUrl | ((uri: string) => PromiseLike<string | null | undefined>);
 
 interface FileFieldProps {
   field: FileRunField;
@@ -98,7 +113,22 @@ interface FileFieldProps {
    */
   uploadError?: string;
   /** Resolve a `pipelex-storage://` URI to a viewable URL (stored-file preview). */
-  resolveUrl?: (uri: string) => Promise<string | null>;
+  resolveUrl?: FormResolveUrl;
+  /**
+   * A stored file's bytes, from which a stored PDF's pages are drawn. The
+   * result view's own seam: the same function a host hands `ResultEnvProvider`.
+   * Takes effect only with `pdfWorker`. See docs/upload-seam.md, "What a
+   * file's preview paints from".
+   */
+  loadBytes?: LoadBytes;
+  /**
+   * pdf.js's worker, which turns the page renderer on: a PDF the field holds,
+   * dropped or stored, is then drawn page by page onto canvases. Without it a
+   * PDF's preview is a compact card. The result view's own setting.
+   */
+  pdfWorker?: PdfWorkerConfig;
+  /** How the host opens a link to another page, as in the result view. */
+  openExternal?: OpenExternal;
   /**
    * Where the field can take a file the host already stores. When given, the
    * empty field offers "Choose from your team's files" under its own controls,
@@ -165,16 +195,28 @@ function dataUrlMime(url: string): string | undefined {
  * A preview of the file this control's own dropzone just took, held until the
  * host writes the uploaded value back.
  *
- * The object URL is the only way to show a file the moment it is dropped: the
+ * The file itself is the only way to show it the moment it is dropped: the
  * value the host writes is a `pipelex-storage://` URI the browser cannot
- * render. What it must NOT do is outlive the value it belongs to, and that is
- * what `boundUrl` is for - it used to win over `value` unconditionally and was
- * cleared only by this control's own clear button, so a host writing a
- * different file at the same path got a chip naming B over a preview showing A.
+ * render. It is shown from its own bytes and never through a `blob:` URL,
+ * which a chat host's view frame refuses (`./local-file-preview`). What it
+ * must NOT do is outlive the value it belongs to, and that is what `boundUrl`
+ * is for - it used to win over `value` unconditionally and was cleared only by
+ * this control's own clear button, so a host writing a different file at the
+ * same path got a chip naming B over a preview showing A.
  */
 interface LocalPreview {
-  objectUrl: string;
+  /** The file, whose bytes a PDF's pages are drawn from. */
+  file: File;
+  /** Which drop this is, so a renderer keyed by it starts again for the next one. */
+  id: number;
   type: string;
+  /**
+   * A picture's `data:` URL, once read (`imagePreviewDataUrl`): `undefined`
+   * while it is being read and for a file that is not a picture, `null` when
+   * none could be had or it would not paint. A picture with none is shown as
+   * the stored file instead, once its upload has landed.
+   */
+  dataUrl?: string | null;
   /**
    * Whether the host's `onDropFile` handed back its upload and that promise
    * has not settled yet. While it has not, the control waits for its answer
@@ -237,6 +279,9 @@ function FileField({
   uploading,
   uploadError,
   resolveUrl,
+  loadBytes,
+  pdfWorker,
+  openExternal,
   fileSource,
   error,
   disabled,
@@ -288,7 +333,12 @@ function FileField({
   // value carries next. A `src` of `null` is the resolver's answer that it has
   // no URL for that URI - declined or failed - which is an answer, not a wait.
   const [resolved, setResolved] = useState<{ uri: string; src: string | null } | null>(null);
-  const localUrlRef = useRef<string | null>(null);
+  // Counts the drops, so each local preview has an id no other ever shares.
+  const localIds = useRef(0);
+  // The PDF whose pages will not be drawn, by the renderer's key, which shows
+  // the compact card from then on: a renderer that failed must never leave a
+  // blank frame behind.
+  const [pagesRefusedFor, setPagesRefusedFor] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   // The attached file's card, where focus goes after a file is chosen, and the
   // row that opened the sheet, where it goes back otherwise.
@@ -296,12 +346,9 @@ function FileField({
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
 
   const setLocal = useCallback((next: LocalPreview | null) => {
-    if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
-    localUrlRef.current = next?.objectUrl ?? null;
     localGeneration.current += 1;
     setLocalPreview(next);
   }, []);
-  useEffect(() => () => setLocal(null), [setLocal]);
 
   /**
    * What the control refused, held locally until the next pick: a file the slot
@@ -371,16 +418,26 @@ function FileField({
   const track = useCallback(
     (file: File, upload: unknown, heldUrl: string | undefined) => {
       const awaitingUpload = isThenable(upload);
-      setLocal({ objectUrl: URL.createObjectURL(file), type: file.type, awaitingUpload });
+      localIds.current += 1;
+      setLocal({ file, id: localIds.current, type: file.type, awaitingUpload });
       urlInFlight.current = heldUrl;
       flightSeen.current = false;
+      const generation = localGeneration.current;
+      // A picture is read into the `data:` URL its preview paints at once, so
+      // it is ready by the time the upload lands and the card shows.
+      if (category === 'image' || file.type.startsWith('image/') || IMAGE_EXT_RE.test(file.name)) {
+        const painted = (dataUrl: string | null) => {
+          if (localGeneration.current !== generation) return;
+          setLocalPreview((current) => (current ? { ...current, dataUrl } : current));
+        };
+        imagePreviewDataUrl(file).then(painted, () => painted(null));
+      }
       if (!awaitingUpload) return;
       // The upload's own word on what it stored, which is what tells its result
       // from another writer's file whichever render the host writes it in. A
       // rejection is an upload that will write nothing, so its preview goes
       // now, rather than waiting for a failure the host may never report: one
       // whose place another file took meanwhile is not marked as failed.
-      const generation = localGeneration.current;
       Promise.resolve(upload).then(
         (stored) => {
           if (localGeneration.current !== generation) return;
@@ -394,7 +451,7 @@ function FileField({
         },
       );
     },
-    [setLocal],
+    [category, setLocal],
   );
 
   // Hands a file to the host and answers its upload: a file dropped or picked
@@ -585,6 +642,11 @@ function FileField({
     setRejected(null);
   }, [value?.url, uploadError]);
 
+  // Binds the preview of drop `id` to the value at `url`, as an update of the
+  // preview as it is then, so a picture's read landing meanwhile is kept.
+  const bind = useCallback((id: number, url: string) => {
+    setLocalPreview((current) => (current?.id === id ? { ...current, boundUrl: url } : current));
+  }, []);
   useEffect(() => {
     if (!localPreview) return;
     if (localPreview.boundUrl !== undefined) {
@@ -600,9 +662,7 @@ function FileField({
     // in the same render, or after. Nothing else is adopted, and until it
     // lands the preview describes nothing on screen.
     if (localPreview.storedUrl !== undefined) {
-      if (value?.url === localPreview.storedUrl) {
-        setLocalPreview({ ...localPreview, boundUrl: localPreview.storedUrl });
-      }
+      if (value?.url === localPreview.storedUrl) bind(localPreview.id, localPreview.storedUrl);
       return;
     }
     // Still waiting: on the upload's answer, or on the host's write, for which
@@ -622,8 +682,8 @@ function FileField({
       setLocal(null);
       return;
     }
-    setLocalPreview({ ...localPreview, boundUrl: value.url });
-  }, [localPreview, value?.url, uploading, setLocal]);
+    bind(localPreview.id, value.url);
+  }, [localPreview, value?.url, uploading, setLocal, bind]);
 
   const hasFile = !!value?.url;
   const localType = localIsCurrent ? localPreview?.type : undefined;
@@ -659,12 +719,20 @@ function FileField({
   // an allow-list miss into the spinner that never stops - the exact failure the
   // note above the `data:` arm says was fixed.
   const storageUri = value?.url && !directSrc && urlMime === undefined ? value.url : null;
+  // The dropped file's preview, while it describes the value on screen and
+  // has something to show: a picture whose `data:` URL could not be had gives
+  // way to the stored file, resolved like any other.
+  const local = localIsCurrent && localPreview?.dataUrl !== null ? localPreview : null;
+  const hasLocal = local !== null;
   useEffect(() => {
     // Only a file the control can paint is resolved: a signed URL for a Word
     // file would be asked for and never used.
-    if (!previewOpen || !canPreview || !storageUri || localIsCurrent || !resolveUrl) return;
+    if (!previewOpen || !canPreview || !storageUri || hasLocal || !resolveUrl) return;
     let cancelled = false;
-    void resolveUrl(storageUri)
+    // Either shape of resolver: the result view's synchronous one, or one that
+    // answers later. A throw is a rejection, caught below.
+    void Promise.resolve()
+      .then(() => resolveUrl(storageUri))
       .then((src) => {
         // A resolver that ANSWERS with nothing is the same outcome as one that
         // rejects, and it has to be recorded as one. Skipping `setResolved` on
@@ -684,10 +752,11 @@ function FileField({
     return () => {
       cancelled = true;
     };
-  }, [previewOpen, canPreview, storageUri, localIsCurrent, resolveUrl]);
+  }, [previewOpen, canPreview, storageUri, hasLocal, resolveUrl]);
 
-  // A browser-viewable source: the local object URL, a directly-viewable URL, or
-  // a resolved presigned URL for a stored file. The resolution counts only while
+  // A browser-viewable source for a picture: a directly-viewable URL, or a
+  // resolved presigned URL for a stored file. The dropped file's own preview
+  // is painted apart, from its `data:` URL (`local`). The resolution counts only while
   // it still belongs to the value on screen, which is what makes staleness
   // impossible rather than merely brief: clearing it from an effect would still
   // paint one frame of the old file, exactly as `localIsCurrent` above is
@@ -699,8 +768,7 @@ function FileField({
   // it has to be the sink that keeps it.
   const resolvedSrc =
     resolved && resolved.uri === storageUri ? viewableUrl(resolved.src ?? undefined) : undefined;
-  const previewSrc =
-    (localIsCurrent ? localPreview?.objectUrl : undefined) ?? directSrc ?? resolvedSrc;
+  const previewSrc = directSrc ?? resolvedSrc;
   // Whether anything can still arrive: there is a reference to resolve, a
   // resolver to resolve it, and no answer has landed FOR IT yet. Without this
   // the "nothing to show" case and the "still waiting" case rendered the same
@@ -710,7 +778,35 @@ function FileField({
   // `resolvedSrc` is: an answer belonging to the previous value is not an answer
   // about this one.
   const previewPending =
-    !previewSrc && !!storageUri && !!resolveUrl && resolved?.uri !== storageUri;
+    !local && !previewSrc && !!storageUri && !!resolveUrl && resolved?.uri !== storageUri;
+
+  // Where a reader may open the file outside the form: a web link or the
+  // resolver's answer, never a `data:` URL, which a browser refuses to open
+  // as a page.
+  const openHref = [directSrc, resolvedSrc].find(
+    (candidate) => candidate !== undefined && !/^data:/i.test(candidate),
+  );
+
+  // Where a PDF's pages are drawn from, and the renderer's key for it: the
+  // dropped file's own bytes, a `data:` URL's, or the host's `loadBytes` for
+  // a stored file. The kernel fetches no URL itself: what a URL holds is the
+  // host's to read, under the contract `LoadBytes` states.
+  const pdfSource: { key: string; load: LoadBytes } | undefined = local
+    ? { key: `local-file:${local.id}`, load: () => local.file.arrayBuffer() }
+    : value?.url && urlMime !== undefined
+      ? { key: value.url, load: async () => encodedBytes(value.url ?? '') }
+      : value?.url && loadBytes
+        ? { key: value.url, load: loadBytes }
+        : undefined;
+  const drawPages =
+    isPdf &&
+    hasPdfWorker(pdfWorker) &&
+    pdfSource !== undefined &&
+    pagesRefusedFor !== pdfSource.key;
+  // What a PDF's card says over its line: the dropped file's format and
+  // size. A stored file's card above already names its format, and a `data:`
+  // URL's its size.
+  const pdfSummary = local ? s.encodedFileSummary('PDF', local.file.size) : undefined;
 
   const togglePreview = () => {
     // Opening the preview asks the resolver again, so a refusal it gave last
@@ -833,21 +929,64 @@ function FileField({
               button either, so a placeholder there could never be folded. */}
           {previewOpen &&
             canPreview &&
-            (previewSrc && isImage ? (
-              <ImagePreview src={previewSrc} filename={value?.filename} />
-            ) : previewSrc && isPdf ? (
-              <PdfPreview src={previewSrc} />
-            ) : previewPending ? (
-              <div className="flex h-24 items-center justify-center rounded-md border border-border bg-muted">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            (isImage ? (
+              local ? (
+                // The dropped picture, from its own bytes. A `data:` URL that
+                // does not paint (a format only the upload's server reads)
+                // gives way to the stored file.
+                <div data-local-preview="">
+                  {local.dataUrl ? (
+                    <ImagePreview
+                      key={local.id}
+                      src={local.dataUrl}
+                      filename={value?.filename}
+                      onBroken={() =>
+                        setLocalPreview((current) =>
+                          current?.id === local.id ? { ...current, dataUrl: null } : current,
+                        )
+                      }
+                    />
+                  ) : (
+                    <PreviewLoading />
+                  )}
+                </div>
+              ) : previewSrc ? (
+                <ImagePreview key={previewSrc} src={previewSrc} filename={value?.filename} />
+              ) : previewPending ? (
+                <PreviewLoading />
+              ) : (
+                // Nothing to show and nothing on its way: a reference the gate
+                // refuses, or a stored one with no resolver behind it. A spinner
+                // here said "loading" about something that was never going to
+                // load, which is the one thing a refusal must not look like.
+                <div className="flex h-24 items-center justify-center rounded-md border border-border bg-muted">
+                  <ImageOff className="h-5 w-5 text-muted-foreground" />
+                </div>
+              )
+            ) : drawPages && pdfSource && pdfWorker ? (
+              <div data-local-preview={local ? '' : undefined}>
+                <PdfPages
+                  key={pdfSource.key}
+                  url={pdfSource.key}
+                  name={value?.filename ?? s.uploadedFile}
+                  href={openHref}
+                  sizeClass={FORM_PDF_FRAME}
+                  loadBytes={pdfSource.load}
+                  worker={pdfWorker}
+                  openExternal={openExternal}
+                  onUnavailable={(failure) => {
+                    // A failure that may pass folds the preview, and opening it
+                    // again tries again; any other leaves the card for good.
+                    if (failure === 'final') setPagesRefusedFor(pdfSource.key);
+                    else setPreviewOpen(false);
+                  }}
+                />
               </div>
+            ) : previewPending ? (
+              <PreviewLoading />
             ) : (
-              // Nothing to show and nothing on its way: a reference the gate
-              // refuses, or a stored one with no resolver behind it. A spinner
-              // here said "loading" about something that was never going to
-              // load, which is the one thing a refusal must not look like.
-              <div className="flex h-24 items-center justify-center rounded-md border border-border bg-muted">
-                <ImageOff className="h-5 w-5 text-muted-foreground" />
+              <div data-local-preview={local ? '' : undefined}>
+                <PdfCard summary={pdfSummary} href={openHref} openExternal={openExternal} />
               </div>
             ))}
         </div>
@@ -1071,7 +1210,39 @@ function FileField({
   );
 }
 
-function ImagePreview({ src, filename }: { src: string; filename?: string }) {
+/**
+ * The height of a PDF's drawn pages in the form: a frame that scrolls through
+ * them, tall enough to recognise the file and short enough to leave the rest
+ * of the form in view, as a result nested in a record has.
+ */
+const FORM_PDF_FRAME = 'h-112 w-full';
+
+/** A `data:` URL's bytes, for the page renderer, or a rejection it reads as a failure. */
+function encodedBytes(url: string): Uint8Array {
+  const bytes = dataUrlBytes(url);
+  if (!bytes) throw new Error('The data: URL carries no bytes that can be read');
+  return bytes;
+}
+
+/** Where a preview is on its way: the dropped picture being read, a reference being resolved. */
+function PreviewLoading() {
+  return (
+    <div className="flex h-24 items-center justify-center rounded-md border border-border bg-muted">
+      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+function ImagePreview({
+  src,
+  filename,
+  onBroken,
+}: {
+  src: string;
+  filename?: string;
+  /** Called when the picture does not paint; without it, the field shows that it cannot. */
+  onBroken?: () => void;
+}) {
   const s = useFieldStrings();
   const [broken, setBroken] = useState(false);
   if (broken) {
@@ -1090,27 +1261,64 @@ function ImagePreview({ src, filename }: { src: string; filename?: string }) {
         // tells a third party which page it was painted on.
         referrerPolicy="no-referrer"
         className="h-auto w-full max-w-full object-contain"
-        onError={() => setBroken(true)}
+        onError={() => (onBroken ? onBroken() : setBroken(true))}
       />
     </div>
   );
 }
 
-function PdfPreview({ src }: { src: string }) {
+/** `http:`, `https:` or `mailto:`: a link the host's `openExternal` is handed. */
+const EXTERNAL_LINK_RE = /^(https?|mailto):/i;
+
+/**
+ * A PDF's preview where its pages are not drawn: the host supplies no
+ * `pdfWorker`, has no way to its bytes, or the renderer could not draw it. A
+ * compact card, never a frame: the browser's own PDF viewer in an `<object>`
+ * or a `blob:` frame is refused by a chat host's view frame (`object-src
+ * 'none'`), which left an empty frame most of a screen tall. It says the
+ * format and size when they are known, and offers the file in a new tab when
+ * there is a link a reader can open.
+ */
+function PdfCard({
+  summary,
+  href,
+  openExternal,
+}: {
+  summary: string | undefined;
+  href: string | undefined;
+  openExternal: OpenExternal | undefined;
+}) {
   const s = useFieldStrings();
-  // A tall viewport so the whole document is readable; the browser's native PDF
-  // viewer scrolls/paginates within it. `#view=FitH` fits the page width.
   return (
-    <object
-      data={`${src}#view=FitH`}
-      type="application/pdf"
-      className="h-[78vh] min-h-[520px] w-full rounded-md border border-border bg-muted"
-    >
-      <div className="flex h-28 flex-col items-center justify-center gap-1.5 text-center">
-        <FileText className="h-5 w-5 text-muted-foreground" />
-        <p className="text-[12px] text-muted-foreground">{s.previewUnavailablePdf}</p>
+    <div className="flex items-start gap-3 rounded-md border border-border bg-muted px-3 py-2.5">
+      <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1 space-y-0.5 text-[12px] text-muted-foreground">
+        {summary && <p className="text-foreground">{summary}</p>}
+        <p>
+          {href ? s.previewUnavailablePdf : s.documentPdfUnavailable}
+          {href && (
+            <>
+              {' '}
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn('rounded-sm underline underline-offset-2', focusOutlineClass)}
+                onClick={(event) => {
+                  // The resolved URL, as the browser would open it.
+                  const resolved = event.currentTarget.href;
+                  if (!openExternal || !EXTERNAL_LINK_RE.test(resolved)) return;
+                  event.preventDefault();
+                  openExternal(resolved);
+                }}
+              >
+                {s.openInNewTab}
+              </a>
+            </>
+          )}
+        </p>
       </div>
-    </object>
+    </div>
   );
 }
 

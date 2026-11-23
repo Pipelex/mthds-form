@@ -11,7 +11,10 @@ export { FieldRenderer } from './field-renderer';
 export { BooleanField } from './boolean-field';
 export { DateField } from './date-field';
 export { EnumField } from './enum-field';
-export type { FileValue, UploadedFile } from './file-field';
+// A file field takes the result view's file settings (`loadBytes`, `pdfWorker`,
+// `openExternal`, typed below with the result view's seam) and a resolver of
+// either shape (`FormResolveUrl`). See docs/upload-seam.md.
+export type { FileValue, FormResolveUrl, UploadedFile } from './file-field';
 export { DocumentField, ImageField } from './file-field';
 export { ListField } from './list-field';
 export { NumberField } from './number-field';
