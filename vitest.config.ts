@@ -3,8 +3,82 @@ import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
+import type { BrowserCommand } from 'vitest/node';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Browser commands for the stories that click a link inside an HTML result's
+ * frame (`src/__stories__/outputs/html-navigation.stories.tsx`).
+ *
+ * A story's `play` function runs inside the page under test, so it cannot see
+ * a tab the page opens: a new tab is a fact about the browser, not about the
+ * page. A command runs in Node, beside Playwright, so it can. The story
+ * projects below register these, and a story reaches them through
+ * `import('vitest/browser')`, which exists only when the stories
+ * run as tests; in the Storybook UI the story asserts the rewritten markup
+ * instead and leaves the tab to the test run.
+ *
+ * The click is Playwright's own, through the frame the story's page sits in
+ * and then the result's frame, because a reader's click is the only thing that
+ * may open a tab: a synthetic `click()` dispatched by the parent is a script's
+ * gesture, which a browser's pop-up rules may treat differently.
+ */
+
+/** A tab the click opened, read before it is closed. */
+interface OpenedPage {
+  url: string;
+  /** Whether the new tab's `window.opener` is anything but `null`. */
+  hasOpener: boolean;
+}
+
+/** How long a click waits for a tab to open before it decides none will. */
+const OPEN_WAIT_MS = 1500;
+
+/** After the first tab, how long a click waits for a second one. */
+const SETTLE_MS = 300;
+
+/**
+ * Click the first element matching `target` inside the first result frame
+ * matching `frame`, then report every tab the click opened and close them.
+ */
+const clickInResultFrame: BrowserCommand<[frame: string, target: string], OpenedPage[]> = async (
+  context,
+  frame,
+  target,
+) => {
+  const before = new Set(context.context.pages());
+  const opened = context.context
+    .waitForEvent('page', { timeout: OPEN_WAIT_MS })
+    .then(() => true)
+    .catch(() => false);
+  await context.iframe.locator(frame).first().contentFrame().locator(target).first().click();
+  if (await opened) await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+  const pages = context.context.pages().filter((page) => !before.has(page));
+  return Promise.all(
+    pages.map(async (page) => {
+      await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+      let hasOpener = (await page.opener()) !== null;
+      try {
+        hasOpener = hasOpener || (await page.evaluate(() => window.opener !== null));
+      } catch {
+        // A page still navigating has no context to ask; Playwright's own
+        // answer stands.
+      }
+      const url = page.url();
+      await page.close().catch(() => undefined);
+      return { url, hasOpener };
+    }),
+  );
+};
+
+const frameCommands = { clickInResultFrame };
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    clickInResultFrame: (frame: string, target: string) => Promise<OpenedPage[]>;
+  }
+}
 
 /**
  * One project per question, each in the environment that question needs.
@@ -128,9 +202,48 @@ export default defineConfig({
             // worker across the two. Left to resolve `localhost`, the server
             // may bind `::1` alone, and `127.0.0.1` would then reach nothing.
             api: { host: '127.0.0.1' },
+            commands: frameCommands,
           },
         },
       },
+      // The navigation stories again, in the other engines. Where a framed
+      // page's link goes is an engine's decision, measured to differ between
+      // them (a parent's click listener never fires inside a script-less
+      // frame in WebKit), so those stories are the one place the suite asks
+      // the same question of every engine. Only that file, and only when
+      // asked: `make test-navigation-browsers` sets the variable and names the
+      // file, so `make test` stays on Chromium and a machine where one engine
+      // will not start still runs the rest. See docs/storybook.md.
+      ...(process.env.MTHDS_FORM_NAVIGATION_BROWSERS
+        ? [
+            {
+              plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
+              test: {
+                name: 'storybook-navigation',
+                browser: {
+                  enabled: true,
+                  headless: true,
+                  provider: playwright({}),
+                  instances: navigationBrowsers(process.env.MTHDS_FORM_NAVIGATION_BROWSERS),
+                  api: { host: '127.0.0.1' },
+                  commands: frameCommands,
+                },
+              },
+            },
+          ]
+        : []),
     ],
   },
 });
+
+/** The engines a comma-separated list names, of the two the navigation project measures. */
+function navigationBrowsers(list: string): { browser: 'firefox' | 'webkit' }[] {
+  const named = list.split(',').map((name) => name.trim());
+  const unknown = named.filter((name) => name !== 'firefox' && name !== 'webkit');
+  if (unknown.length > 0) {
+    throw new Error(
+      `MTHDS_FORM_NAVIGATION_BROWSERS names no engine it measures: ${unknown.join(', ')}`,
+    );
+  }
+  return named.map((browser) => ({ browser: browser as 'firefox' | 'webkit' }));
+}
