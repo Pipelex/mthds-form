@@ -26,6 +26,7 @@ import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import { DEFAULT_FIELD_STRINGS as S } from '../field-strings';
 import { DocumentField, ImageField, type FileValue, type FormResolveUrl } from '../file-field';
 import { dataUrlBytes, imagePreviewDataUrl, PREVIEW_RAW_MAX_BYTES } from '../local-file-preview';
+import { PDF_PAGES_MAX_BYTES } from '../pdf-pages';
 import { MethodForm, useMethodForm } from '../method-form';
 import type { LoadBytes, OpenExternal, PdfWorkerConfig, ResolveUrl } from '../result-env';
 import { CONTRACTS, INPUT_FORM } from '../../__stories__/_generated/files';
@@ -35,6 +36,13 @@ const pdf = vi.hoisted(() => ({
   files: [] as { data: Uint8Array }[],
   load: 'success' as 'success' | 'failure',
 }));
+
+// The decoder, watched, so a test can tell a `data:` URL refused by its counted
+// size from one decoded first and refused after.
+vi.mock('../local-file-preview', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../local-file-preview')>();
+  return { ...actual, dataUrlBytes: vi.fn(actual.dataUrlBytes) };
+});
 
 vi.mock('react-pdf', async () => {
   const { useEffect } = await import('react');
@@ -288,6 +296,147 @@ describe('a stored PDF in the form', () => {
     await screen.findByRole('group', { name: 'inline.pdf' });
     await waitFor(() => expect(pdf.files.length).toBeGreaterThan(0));
     expect(decode(pdf.files.at(-1)!.data)).toBe('%PDF-1.7 inline');
+  });
+});
+
+describe('a PDF the renderer would refuse is not read whole', () => {
+  it('answers a dropped file over the ceiling with no bytes, before reading any', async () => {
+    const user = userEvent.setup();
+    const file = pdfFile();
+    // A small file that says it is a large one: had its bytes been read, the
+    // renderer would have drawn them.
+    Object.defineProperty(file, 'size', { value: PDF_PAGES_MAX_BYTES + 1 });
+    const arrayBuffer = vi.spyOn(file, 'arrayBuffer');
+    const { container } = render(
+      <UploadingField kind="document" url={STORED} pdfWorker={WORKER} />,
+    );
+    await user.upload(screen.getByLabelText('cv'), file);
+    await waitFor(() => expect(screen.getByText(S.documentPdfUnavailable)).toBeInTheDocument());
+    expect(container.querySelector('[data-local-preview]')).not.toBeNull();
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(pdf.files).toHaveLength(0);
+  });
+
+  it('answers a data: URL over the ceiling with no bytes, before decoding it', async () => {
+    const decoder = vi.mocked(dataUrlBytes);
+    decoder.mockClear();
+    // Counted, not decoded: three bytes for every four symbols.
+    const symbols = Math.ceil(((PDF_PAGES_MAX_BYTES + 1) * 4) / 3 / 4) * 4;
+    const url = `data:application/pdf;base64,${'A'.repeat(symbols)}`;
+    render(
+      <DocumentField
+        field={documentField}
+        value={{ url, filename: 'huge.pdf' }}
+        id="cv"
+        onChange={() => {}}
+        onDropFile={() => {}}
+        pdfWorker={WORKER}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText(S.documentPdfUnavailable)).toBeInTheDocument());
+    expect(decoder).not.toHaveBeenCalled();
+    expect(pdf.files).toHaveLength(0);
+  });
+});
+
+describe('a PDF link in the form', () => {
+  const WEB_PDF = 'https://example.com/report.pdf';
+
+  /** A host with no upload, where the link is the way in. */
+  function LinkHost({ loadBytes }: { loadBytes: LoadBytes }) {
+    const [value, setValue] = useState<FileValue | undefined>(undefined);
+    return (
+      <DocumentField
+        field={documentField}
+        value={value}
+        id="cv"
+        onChange={setValue}
+        pdfWorker={WORKER}
+        loadBytes={loadBytes}
+      />
+    );
+  }
+
+  it('is a card with its link when the host does not store it, at every reopen', async () => {
+    const user = userEvent.setup();
+    // The contract: a URL the host does not store is rejected.
+    const loadBytes = vi.fn<LoadBytes>(async () => {
+      throw new Error('not one of ours');
+    });
+    render(<LinkHost loadBytes={loadBytes} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: WEB_PDF } });
+    const link = await screen.findByRole('link', { name: S.openInNewTab });
+    expect(link).toHaveAttribute('href', WEB_PDF);
+    expect(loadBytes).toHaveBeenCalledWith(WEB_PDF, expect.anything());
+    expect(loadBytes).toHaveBeenCalledTimes(1);
+    // Folding and opening the preview asks again, and the card comes back.
+    const toggle = screen.getByRole('button', { name: /^preview$/i });
+    await user.click(toggle);
+    expect(screen.queryByRole('link', { name: S.openInNewTab })).toBeNull();
+    await user.click(toggle);
+    await waitFor(() => expect(loadBytes).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole('link', { name: S.openInNewTab })).toHaveAttribute(
+      'href',
+      WEB_PDF,
+    );
+  });
+
+  it('is drawn when the host does store it', async () => {
+    const loadBytes = vi.fn<LoadBytes>(async () => new TextEncoder().encode('%PDF-1.7 linked'));
+    render(<LinkHost loadBytes={loadBytes} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: WEB_PDF } });
+    await screen.findByRole('group', { name: S.uploadedFile });
+    await waitFor(() => expect(pdf.files.length).toBeGreaterThan(0));
+    expect(decode(pdf.files.at(-1)!.data)).toBe('%PDF-1.7 linked');
+  });
+});
+
+describe('a data: URL PDF', () => {
+  it.each([
+    ['no payload at all', 'data:application/pdf'],
+    ['a payload that is not base64', 'data:application/pdf;base64,!!!!'],
+  ])('that carries nothing readable (%s) is the card for good', async (_case, url) => {
+    const user = userEvent.setup();
+    render(
+      <DocumentField
+        field={documentField}
+        value={{ url, filename: 'broken.pdf' }}
+        id="cv"
+        onChange={() => {}}
+        onDropFile={() => {}}
+        pdfWorker={WORKER}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText(S.documentPdfUnavailable)).toBeInTheDocument());
+    expect(pdf.files).toHaveLength(0);
+    // Final, not a failure that may pass: reopening shows the same card, and the
+    // renderer is not started again.
+    await user.click(screen.getByRole('button', { name: /^preview$/i }));
+    await user.click(screen.getByRole('button', { name: /^preview$/i }));
+    expect(screen.getByText(S.documentPdfUnavailable)).toBeInTheDocument();
+    expect(screen.queryByText(S.documentPdfPreparing)).toBeNull();
+  });
+
+  it('is read off the string the URL gate judged, whitespace and all', async () => {
+    const loadBytes = vi.fn<LoadBytes>();
+    // No filename: that it is a PDF is the type the URL declares.
+    const url = ` \n data:application/pdf;base64,${btoa('%PDF-1.7 padded')}\t`;
+    render(
+      <DocumentField
+        field={documentField}
+        value={{ url }}
+        id="cv"
+        onChange={() => {}}
+        onDropFile={() => {}}
+        pdfWorker={WORKER}
+        loadBytes={loadBytes}
+      />,
+    );
+    await screen.findByRole('group', { name: S.uploadedFile });
+    await waitFor(() => expect(pdf.files.length).toBeGreaterThan(0));
+    expect(decode(pdf.files.at(-1)!.data)).toBe('%PDF-1.7 padded');
+    // Its bytes are its own: the host is not asked for them as a reference.
+    expect(loadBytes).not.toHaveBeenCalled();
   });
 });
 

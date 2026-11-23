@@ -16,7 +16,7 @@ import {
   isAcceptedFile,
   type FileFormat,
 } from '../core/file-formats';
-import { viewableUrl } from '../core/native-content';
+import { readDataUrl, stripUrlWhitespace, viewableUrl } from '../core/native-content';
 import { takesPhotos } from '../core/photo-file';
 import { sourceFileValue } from '../core/sources';
 import { FieldShell } from './field-shell';
@@ -32,7 +32,13 @@ import { hasPdfWorker, PdfPages } from './pdf-pages';
 import { CameraInput, TakePhotoButton } from './photo-camera';
 import { PhotoPageStrip } from './photo-page-strip';
 import { usePhotoPages } from './photo-pages';
-import type { LoadBytes, OpenExternal, PdfWorkerConfig, ResolveUrl } from './result-env';
+import type {
+  BytesRequest,
+  LoadBytes,
+  OpenExternal,
+  PdfWorkerConfig,
+  ResolveUrl,
+} from './result-env';
 
 /**
  * What the control refused: a file of a type the slot does not accept, or a
@@ -339,6 +345,10 @@ function FileField({
   // the compact card from then on: a renderer that failed must never leave a
   // blank frame behind.
   const [pagesRefusedFor, setPagesRefusedFor] = useState<string | null>(null);
+  // The PDF whose bytes did not come, in a way that may pass, while it has a
+  // link a reader can open: the card stands in with that link until the
+  // preview is opened again, which tries again.
+  const [pagesFailedFor, setPagesFailedFor] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   // The attached file's card, where focus goes after a file is chosen, and the
   // row that opened the sheet, where it goes back otherwise.
@@ -693,7 +703,12 @@ function FileField({
   // extension was ever previewable; a `data:` URL or an opaque storage id with
   // a perfectly good filename beside it was not offered a preview at all.
   const filename = value?.filename ?? '';
-  const url = value?.url ?? '';
+  // The value's URL as the gate reads it, stripped of what the URL parser
+  // strips, so the type a `data:` URL declares, the extension sniffed below and
+  // the bytes a `data:` PDF is drawn from are all read off the string
+  // `viewableUrl` judged. Read off the raw member, a `data:` URL with a leading
+  // space was painted by the gate and yet routed to the host as a reference.
+  const url = value?.url ? stripUrlWhitespace(value.url) : '';
   const urlMime = dataUrlMime(url);
 
   const isImage =
@@ -789,12 +804,18 @@ function FileField({
 
   // Where a PDF's pages are drawn from, and the renderer's key for it: the
   // dropped file's own bytes, a `data:` URL's, or the host's `loadBytes` for
-  // a stored file. The kernel fetches no URL itself: what a URL holds is the
-  // host's to read, under the contract `LoadBytes` states.
+  // any other URL - a stored reference or a pasted web link alike, since only
+  // the host knows which URLs it stores, and its contract is to reject the
+  // rest. The kernel fetches no URL itself: what a URL holds is the host's to
+  // read, under the contract `LoadBytes` states.
+  //
+  // The two the control reads itself honour the renderer's request as a host
+  // must: a file over `maxBytes` is answered with no bytes, which the renderer
+  // reads as final, before a byte of it is read into memory.
   const pdfSource: { key: string; load: LoadBytes } | undefined = local
-    ? { key: `local-file:${local.id}`, load: () => local.file.arrayBuffer() }
+    ? { key: `local-file:${local.id}`, load: (_url, request) => droppedBytes(local.file, request) }
     : value?.url && urlMime !== undefined
-      ? { key: value.url, load: async () => encodedBytes(value.url ?? '') }
+      ? { key: value.url, load: async (_url, request) => encodedBytes(url, request) }
       : value?.url && loadBytes
         ? { key: value.url, load: loadBytes }
         : undefined;
@@ -802,7 +823,8 @@ function FileField({
     isPdf &&
     hasPdfWorker(pdfWorker) &&
     pdfSource !== undefined &&
-    pagesRefusedFor !== pdfSource.key;
+    pagesRefusedFor !== pdfSource.key &&
+    pagesFailedFor !== pdfSource.key;
   // What a PDF's card says over its line: the dropped file's format and
   // size. A stored file's card above already names its format, and a `data:`
   // URL's its size.
@@ -814,6 +836,8 @@ function FileField({
     // the retry read as pending. A URL it gave is kept and painted until the
     // fresh one lands, as before.
     if (!previewOpen) setResolved((r) => (r?.src === null ? null : r));
+    // And a download that failed is asked for again.
+    if (!previewOpen) setPagesFailedFor(null);
     setPreviewOpen((v) => !v);
   };
 
@@ -975,9 +999,16 @@ function FileField({
                   worker={pdfWorker}
                   openExternal={openExternal}
                   onUnavailable={(failure) => {
-                    // A failure that may pass folds the preview, and opening it
-                    // again tries again; any other leaves the card for good.
+                    // A failure that may pass leaves the card with its link
+                    // when there is one a reader can open, and folds the
+                    // preview when there is none; opening it again tries
+                    // again. Folding with a link to offer hid the one way to
+                    // the file: a pasted web link the host does not store is
+                    // rejected by `loadBytes` on every attempt, so it folded
+                    // at every reopen and never showed "Open in a new tab".
+                    // Any other failure leaves the card for good.
                     if (failure === 'final') setPagesRefusedFor(pdfSource.key);
+                    else if (openHref) setPagesFailedFor(pdfSource.key);
                     else setPreviewOpen(false);
                   }}
                 />
@@ -1217,11 +1248,32 @@ function FileField({
  */
 const FORM_PDF_FRAME = 'h-112 w-full';
 
-/** A `data:` URL's bytes, for the page renderer, or a rejection it reads as a failure. */
-function encodedBytes(url: string): Uint8Array {
-  const bytes = dataUrlBytes(url);
-  if (!bytes) throw new Error('The data: URL carries no bytes that can be read');
-  return bytes;
+/** No bytes: what the page renderer reads as final, so the card stands for good. */
+const NO_BYTES = new Uint8Array(0);
+
+/**
+ * A dropped file's bytes, for the page renderer: none for a file over the
+ * renderer's ceiling, which is told from its size before anything is read, and
+ * none read for a renderer that no longer wants them.
+ */
+async function droppedBytes(file: Blob, request: BytesRequest): Promise<Uint8Array | ArrayBuffer> {
+  if (file.size > request.maxBytes) return NO_BYTES;
+  request.signal.throwIfAborted();
+  return file.arrayBuffer();
+}
+
+/**
+ * A `data:` URL's bytes, for the page renderer: none for a URL whose decoded
+ * size, counted without decoding, is over the renderer's ceiling, and none for
+ * one that carries nothing readable (no comma, a broken base64 payload). Both
+ * are final: the same URL carries the same bytes at every attempt, so a
+ * rejection, which the renderer reads as a failure that may pass, would fold
+ * the preview and fail again at every reopen.
+ */
+function encodedBytes(url: string, request: BytesRequest): Uint8Array {
+  const declared = readDataUrl(url);
+  if (declared && declared.bytes > request.maxBytes) return NO_BYTES;
+  return dataUrlBytes(url) ?? NO_BYTES;
 }
 
 /** Where a preview is on its way: the dropped picture being read, a reference being resolved. */
