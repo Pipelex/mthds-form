@@ -450,7 +450,6 @@ async function DIAG_escape(canvasElement: HTMLElement, first: HTMLIFrameElement)
   report.results = Object.fromEntries(results);
   for (const frame of canvasElement.querySelectorAll('iframe[data-diag]')) frame.remove();
   const text = JSON.stringify(report, null, 1);
-  console.log(`[DIAG load guard]\n${text}`);
   if (firefox) throw new Error(`[DIAG load guard] ${text}`);
 }
 
