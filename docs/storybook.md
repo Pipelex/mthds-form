@@ -97,6 +97,12 @@ The stories about a PDF pin `navigator.pdfViewerEnabled` for their own run, thro
 
 `Outputs/Pictures` needs no supplied payload: its pictures are the corpus's own runs (`results.image_result` and `lists.gallery`), and a story-host resolver maps each stored reference to one of the served pictures, as `Outputs/Composites` does for its one. It stands in for a host's smaller copies the same way, answering the served picture under a `?w=` query, which the static server ignores, so a story reads from each `src` whether it was given the copy or the whole picture. Its viewer stories pin a phone's, a tablet's and a desktop's viewport, the phone and the desktop as `pinnedTo` does, and hold the open viewer and its picture inside each.
 
+### Links inside an HTML result, in every engine
+
+`Outputs/Html navigation` clicks each kind of link a framed `native.Html` page can carry (to another site, relative, in-page, of another scheme) and waits out a meta refresh, then asserts the frame is still on its own document ([result-view.md](result-view.md#markup)). Its payloads are hand-built, and have to be: what is under test is the markup's links, and the "remote" page is `localhost` on the same test server, a second origin because the story project is pinned to `127.0.0.1`. A `play` function cannot see a tab the page opens, since a tab is a fact about the browser rather than the page, so the click goes through a Vitest browser command registered in `vitest.config.ts`, `clickInResultFrame`, which clicks with Playwright through the frames and reports each new tab and whether its `window.opener` is `null`. A story reaches it through `import('vitest/browser')`, which exists only when the stories run as tests; in the Storybook UI it asserts the rewritten markup and stops short of the click.
+
+Where a framed link goes is each engine's own decision, measured to differ between them, so this one file also runs in Firefox and WebKit, in a project of its own, `storybook-navigation`, that exists only when `MTHDS_FORM_NAVIGATION_BROWSERS` names the engines. `make test-navigation-browsers` sets it (both engines by default, `NAVIGATION_BROWSERS=webkit` for one) and names the file, so the rest of the suite stays on Chromium and `make test` never needs an engine that will not start on a given machine. CI installs all three engines and runs the target after `make test`.
+
 ### The three artifacts
 
 Sourced differently, and all three generated:

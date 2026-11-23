@@ -69,10 +69,28 @@ import { cn } from './utils';
  *   its own illustration belongs — to defend against an unusual one. A host that
  *   would rather pay that cost passes `imgSrc="data:"`, or names its own origin.
  *
- *   Everything else stays shut: no scripts, no fetch, no forms, no navigation.
+ *   Everything else stays shut: no scripts, no fetch, no forms.
  *
- * Navigation is not granted either (`allow-top-navigation` is absent and no
- * `allow-popups`), so a link cannot move the host anywhere.
+ * ## Where a link goes
+ *
+ * A sandboxed frame may still navigate ITSELF, and a `srcdoc` document's base
+ * URL is the host's, so a link once moved the frame: to another site, to the
+ * host's own page (same-origin, readable), or, for an in-page `#` link, to the
+ * host page itself. `frameDocument` now rewrites every page's links before it
+ * is framed (`frame-navigation.ts` says how): a link opens in a new tab with
+ * no opener and no referrer, an in-page link scrolls the frame, any other
+ * scheme loses its `href`, and a meta refresh is removed.
+ *
+ * - **`allow-popups allow-popups-to-escape-sandbox`** is granted for that new
+ *   tab, which without it never opens. With no `allow-scripts`, nothing in
+ *   the frame can call `window.open`, so a tab opens only from a reader's own
+ *   click on a link they can see; escaping the sandbox makes it an ordinary
+ *   tab rather than a script-less copy of this frame. `allow-top-navigation`
+ *   is still absent, so nothing moves the host itself.
+ * - **The load guard** (`onLoad`) is the last line: a load that leaves the
+ *   frame anywhere but its own document puts it back once, then replaces it
+ *   with a notice. It cannot undo a request already made, which is why it is
+ *   not the mechanism.
  *
  * **Chrome logs `Blocked script execution in 'about:srcdoc'` for every frame
  * here, and it is not a bug to chase.** It is reproducible with a bare
