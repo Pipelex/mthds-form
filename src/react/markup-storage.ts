@@ -1,6 +1,6 @@
 import { viewableUrl } from '../core/native-content';
 import { ownProp } from '../core/own-property';
-import { isWholeDocument } from './html-frame';
+import { parseMarkup } from './markup-parse';
 
 /**
  * The `pipelex-storage://` references inside an HTML page, exchanged for URLs a
@@ -16,14 +16,8 @@ import { isWholeDocument } from './html-frame';
  *
  * ## What is read, and how
  *
- * The markup is parsed with `DOMParser`, never searched with a pattern, because
- * an attribute value a regex finds may be inside a comment, a `<textarea>` or
- * another attribute, and an `<img>` it misses may be spelled with single
- * quotes, no quotes or an uppercase tag. A `DOMParser` document is inert: no
- * script runs and nothing is fetched while it is read. A whole document is
- * parsed as one; a fragment is parsed as a `<template>`'s content, which keeps
- * a leading `<style>` or `<meta>` where it was rather than moving it into a
- * head the fragment never had.
+ * The markup is parsed with `DOMParser` (`markup-parse.ts`, which says why),
+ * never searched with a pattern.
  *
  * The references read are the ones a page fetches as a picture: `src` and
  * `srcset` on `<img>` and `<source>`, a `<video>`'s `poster`, the legacy
@@ -82,29 +76,6 @@ export function mayHoldStorageRefs(markup: string): boolean {
 
 function isStorageRef(value: string): boolean {
   return value.trim().toLowerCase().startsWith(STORAGE_SCHEME);
-}
-
-/** The parsed markup, and how to write it back out. */
-interface ParsedMarkup {
-  root: ParentNode;
-  serialize: () => string;
-}
-
-function parseMarkup(markup: string): ParsedMarkup | undefined {
-  if (typeof DOMParser === 'undefined') return undefined;
-  const parser = new DOMParser();
-  if (isWholeDocument(markup)) {
-    const doc = parser.parseFromString(markup, 'text/html');
-    return {
-      root: doc,
-      serialize: () =>
-        (doc.doctype ? `<!DOCTYPE ${doc.doctype.name}>` : '') + doc.documentElement.outerHTML,
-    };
-  }
-  const doc = parser.parseFromString('<!doctype html><body></body>', 'text/html');
-  const template = doc.createElement('template');
-  template.innerHTML = markup;
-  return { root: template.content, serialize: () => template.innerHTML };
 }
 
 /** A CSS `url()` token: its quote, and what it holds. */

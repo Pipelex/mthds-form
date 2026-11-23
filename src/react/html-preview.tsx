@@ -69,10 +69,29 @@ import { cn } from './utils';
  *   its own illustration belongs — to defend against an unusual one. A host that
  *   would rather pay that cost passes `imgSrc="data:"`, or names its own origin.
  *
- *   Everything else stays shut: no scripts, no fetch, no forms, no navigation.
+ *   Everything else stays shut: no scripts, no fetch, no forms.
  *
- * Navigation is not granted either (`allow-top-navigation` is absent and no
- * `allow-popups`), so a link cannot move the host anywhere.
+ * ## Where a link goes
+ *
+ * A sandboxed frame may still navigate ITSELF, and a `srcdoc` document's base
+ * URL is the host's, so a link once moved the frame: to another site, to the
+ * host's own page (same-origin, readable), or, for an in-page `#` link, to the
+ * host page itself. `frameDocument` now rewrites every page's links before it
+ * is framed (`frame-navigation.ts` says how): a link opens in a new tab with
+ * no opener and no referrer, an in-page link scrolls the frame, any other
+ * scheme loses its `href`, and a meta refresh is removed.
+ *
+ * - **`allow-popups allow-popups-to-escape-sandbox`** is granted for that new
+ *   tab, which without it never opens. With no `allow-scripts`, nothing in
+ *   the frame can call `window.open`, so a tab opens only from a reader's own
+ *   click on a link they can see; escaping the sandbox makes it an ordinary
+ *   tab rather than a script-less copy of this frame. `allow-top-navigation`
+ *   is still absent, so nothing moves the host itself.
+ * - **The load guard** is the last line: a frame found anywhere but its own
+ *   document, on its `load` or on a half-second timer, is put back once, then
+ *   replaced with a notice. The timer is there because Firefox can move the
+ *   frame and fire no `load` at all. The guard cannot undo a request already
+ *   made, which is why it is not the mechanism.
  *
  * **Chrome logs `Blocked script execution in 'about:srcdoc'` for every frame
  * here, and it is not a bug to chase.** It is reproducible with a bare
@@ -155,6 +174,12 @@ export interface HtmlPreviewProps {
   fill?: boolean;
 }
 
+/**
+ * How often the load guard looks at where the frame is, besides on each of its
+ * `load` events, which a browser does not always fire (see the guard's timer).
+ */
+const ESCAPE_CHECK_MS = 500;
+
 /** The fragment preview's default height limit; a whole document has none. */
 const FRAGMENT_MAX_HEIGHT = 1400;
 
@@ -180,6 +205,10 @@ export function HtmlPreview({
   const s = useFieldStrings();
   const [doc, setDoc] = useState<string | null>(null);
   const [height, setHeight] = useState(0);
+  // How often the frame has left the document it was given, counted for that
+  // document alone: a new document (another result) starts again at none.
+  const [escaped, setEscaped] = useState<{ doc: string; count: number } | null>(null);
+  const escapes = doc !== null && escaped?.doc === doc ? escaped.count : 0;
   const resolvedHtml = useResolvedMarkup(content.innerHtml);
   const resolved = useMemo(
     () =>
@@ -231,11 +260,38 @@ export function HtmlPreview({
     setHeight(Math.max(body.scrollHeight, frameDoc.documentElement.scrollHeight));
   };
 
+  // The load guard, the last line behind the rewrite (`frame-navigation.ts`):
+  // a frame anywhere but its own document means something moved it. The
+  // first time, the frame is put back by remounting it on the same document;
+  // the second time it is replaced by a notice, rather than put back again and
+  // again. The request already made cannot be undone, which is why this is the
+  // last line and not the mechanism. A scroll to an in-page link stays on the
+  // frame's own document, so the guard never counts one. Setting the count
+  // from this render's `escapes` makes a second sighting of the same escape
+  // (the frame's `load` and the timer below both seeing it) count once.
+  const guard = (): boolean => {
+    if (!leftItsDocument(frameRef.current)) return false;
+    if (doc !== null) setEscaped({ doc, count: escapes + 1 });
+    return true;
+  };
+
   const onLoad = () => {
+    if (guard()) return;
     measure();
     // A linked font arrives after `load` and reflows the page, often taller.
     void frameRef.current?.contentDocument?.fonts?.ready.then(measure, () => undefined);
   };
+
+  useEffect(() => {
+    // The guard also looks on a timer, because a frame's `load` is not the
+    // only sign it left: Firefox moved the frame to another origin's error
+    // answer (the test server's 404) and fired no `load` on it at all, so a
+    // guard that waited for one never ran. Reading the frame's location is
+    // all a look costs.
+    if (doc === null || escapes >= 2) return;
+    const timer = setInterval(guard, ESCAPE_CHECK_MS);
+    return () => clearInterval(timer);
+  }, [doc, escapes]);
 
   useEffect(() => {
     // Re-measure on resize: the frame reflows with the column, and a table that
@@ -277,14 +333,24 @@ export function HtmlPreview({
           <Loader2 aria-hidden className="size-4 animate-spin" />
           <span>{s.pageLoading}</span>
         </div>
-      ) : doc === null ? null : (
-        // A tab stop, whose keyboard focus `FocusFrame` draws.
+      ) : doc === null ? null : escapes >= 2 ? (
+        <p
+          role="status"
+          data-html-left-frame
+          className="flex min-h-24 items-center justify-center px-3 text-center text-[12px] text-muted-foreground"
+        >
+          {s.pageLeftFrame}
+        </p>
+      ) : (
+        // A tab stop, whose keyboard focus `FocusFrame` draws. Its key is the
+        // load guard's count, so putting the frame back is a fresh element.
         <FocusFrame
+          key={escapes}
           ref={frameRef}
           title={content.cssClass ? `HTML result (${content.cssClass})` : 'HTML result'}
           srcDoc={doc}
           onLoad={onLoad}
-          sandbox="allow-same-origin"
+          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           style={{
             display: 'block',
             width: '100%',
@@ -319,6 +385,26 @@ export function HtmlPreview({
       {frameBox}
     </div>
   );
+}
+
+/**
+ * Whether the frame shows anything but the document it was given. A frame on
+ * another origin cannot be read at all, which says as much. `about:srcdoc` is
+ * its own document, with or without the fragment an in-page link adds;
+ * `about:blank` is the empty document a frame holds before its own arrives,
+ * which shows nothing and so has not left anywhere.
+ */
+function leftItsDocument(frame: HTMLIFrameElement | null): boolean {
+  if (!frame) return false;
+  let href: string | undefined;
+  try {
+    href = frame.contentWindow?.location.href;
+  } catch {
+    return true;
+  }
+  if (href === undefined) return false;
+  const page = href.split('#')[0];
+  return page !== 'about:srcdoc' && page !== 'about:blank';
 }
 
 /**

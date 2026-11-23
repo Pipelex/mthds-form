@@ -91,6 +91,7 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   downloadPdfBusy: 'Preparing the PDF…',
   downloadPdfFailed: 'The PDF could not be made',
   pageLoading: 'Loading the page…',
+  pageLeftFrame: 'This page tried to leave its frame, so it is no longer shown here.',
   downloadHtml: 'Download HTML',
   fileNameTitle: 'File name',
   fileNameCancel: 'Cancel',
