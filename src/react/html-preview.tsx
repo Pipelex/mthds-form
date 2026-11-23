@@ -87,10 +87,11 @@ import { cn } from './utils';
  *   click on a link they can see; escaping the sandbox makes it an ordinary
  *   tab rather than a script-less copy of this frame. `allow-top-navigation`
  *   is still absent, so nothing moves the host itself.
- * - **The load guard** (`onLoad`) is the last line: a load that leaves the
- *   frame anywhere but its own document puts it back once, then replaces it
- *   with a notice. It cannot undo a request already made, which is why it is
- *   not the mechanism.
+ * - **The load guard** is the last line: a frame found anywhere but its own
+ *   document, on its `load` or on a half-second timer, is put back once, then
+ *   replaced with a notice. The timer is there because Firefox can move the
+ *   frame and fire no `load` at all. The guard cannot undo a request already
+ *   made, which is why it is not the mechanism.
  *
  * **Chrome logs `Blocked script execution in 'about:srcdoc'` for every frame
  * here, and it is not a bug to chase.** It is reproducible with a bare
@@ -173,6 +174,12 @@ export interface HtmlPreviewProps {
   fill?: boolean;
 }
 
+/**
+ * How often the load guard looks at where the frame is, besides on each of its
+ * `load` events, which a browser does not always fire (see the guard's timer).
+ */
+const ESCAPE_CHECK_MS = 500;
+
 /** The fragment preview's default height limit; a whole document has none. */
 const FRAGMENT_MAX_HEIGHT = 1400;
 
@@ -253,22 +260,38 @@ export function HtmlPreview({
     setHeight(Math.max(body.scrollHeight, frameDoc.documentElement.scrollHeight));
   };
 
+  // The load guard, the last line behind the rewrite (`frame-navigation.ts`):
+  // a frame anywhere but its own document means something moved it. The
+  // first time, the frame is put back by remounting it on the same document;
+  // the second time it is replaced by a notice, rather than put back again and
+  // again. The request already made cannot be undone, which is why this is the
+  // last line and not the mechanism. A scroll to an in-page link stays on the
+  // frame's own document, so the guard never counts one. Setting the count
+  // from this render's `escapes` makes a second sighting of the same escape
+  // (the frame's `load` and the timer below both seeing it) count once.
+  const guard = (): boolean => {
+    if (!leftItsDocument(frameRef.current)) return false;
+    if (doc !== null) setEscaped({ doc, count: escapes + 1 });
+    return true;
+  };
+
   const onLoad = () => {
-    // The load guard, the last line behind the rewrite (`frame-navigation.ts`):
-    // a load that leaves the frame anywhere but its own document means
-    // something moved it. The first time, the frame is put back by remounting
-    // it on the same document; the second time it is replaced by a notice,
-    // rather than put back again and again. The request already made cannot
-    // be undone, which is why this is the last line and not the mechanism. A
-    // scroll to an in-page link fires no load, so the guard never sees one.
-    if (leftItsDocument(frameRef.current)) {
-      if (doc !== null) setEscaped({ doc, count: escapes + 1 });
-      return;
-    }
+    if (guard()) return;
     measure();
     // A linked font arrives after `load` and reflows the page, often taller.
     void frameRef.current?.contentDocument?.fonts?.ready.then(measure, () => undefined);
   };
+
+  useEffect(() => {
+    // The guard also looks on a timer, because a frame's `load` is not the
+    // only sign it left: Firefox moved the frame to another origin's error
+    // answer (the test server's 404) and fired no `load` on it at all, so a
+    // guard that waited for one never ran. Reading the frame's location is
+    // all a look costs.
+    if (doc === null || escapes >= 2) return;
+    const timer = setInterval(guard, ESCAPE_CHECK_MS);
+    return () => clearInterval(timer);
+  }, [doc, escapes]);
 
   useEffect(() => {
     // Re-measure on resize: the frame reflows with the column, and a table that
