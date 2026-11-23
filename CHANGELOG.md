@@ -9,6 +9,7 @@
 ### Fixed
 
 - **A link inside an HTML result no longer replaces the result**: a `native.Html` page's links are rewritten before it is framed, so a link to another site, and a relative one, which resolves against the host's page, open in a new tab with `noopener noreferrer`, an in-page `#` link (a report's table of contents) scrolls the frame, a link of any scheme but `http:`, `https:` and `mailto:` keeps its words without its `href`, and a `<meta http-equiv="refresh">` is removed, where a click used to load the other site, the host's own page or the host page itself inside the frame. The preview's frame is now sandboxed `allow-same-origin allow-popups allow-popups-to-escape-sandbox`, and a frame that is moved anyway is put back on its page once, then replaced by a notice. A host's own `renderPdf` receives the page with the same rewrite, its in-page links kept as written. See [docs/result-view.md](docs/result-view.md#markup).
+- **A saved HTML page keeps its original doctype**: a whole-document `native.Html` page whose stored pictures are resolved before it is saved now keeps its doctype as declared, public and system identifiers included, where it used to be rewritten as a bare `<!DOCTYPE html>`, so an HTML 4.01 Transitional page opened in standards mode rather than the quirks mode it was written for. See [docs/result-view.md](docs/result-view.md#stored-pictures-inside-a-page).
 
 ## [v0.41.1] - 2026-11-22
 

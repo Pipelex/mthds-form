@@ -38,12 +38,30 @@ export function parseMarkup(markup: string): ParsedMarkup | undefined {
     const doc = parser.parseFromString(markup, 'text/html');
     return {
       root: doc,
-      serialize: () =>
-        (doc.doctype ? `<!DOCTYPE ${doc.doctype.name}>` : '') + doc.documentElement.outerHTML,
+      serialize: () => serializeDoctype(doc.doctype) + doc.documentElement.outerHTML,
     };
   }
   const doc = parser.parseFromString('<!doctype html><body></body>', 'text/html');
   const template = doc.createElement('template');
   template.innerHTML = markup;
   return { root: template.content, serialize: () => template.innerHTML };
+}
+
+/**
+ * The document's doctype written back as it was declared, its public and
+ * system identifiers included, because they decide the rendering mode: an
+ * HTML 4.01 Transitional page rebuilt as a bare `<!DOCTYPE html>` would open
+ * in standards mode rather than the quirks mode it was written for. Empty
+ * where the document had no doctype. An identifier that holds a double quote
+ * (it can only have been written in single quotes) is written back in single
+ * quotes.
+ */
+function serializeDoctype(doctype: DocumentType | null): string {
+  if (!doctype) return '';
+  const { name, publicId, systemId } = doctype;
+  const quoted = (id: string) => (id.includes('"') ? `'${id}'` : `"${id}"`);
+  if (publicId)
+    return `<!DOCTYPE ${name} PUBLIC ${quoted(publicId)}${systemId ? ` ${quoted(systemId)}` : ''}>`;
+  if (systemId) return `<!DOCTYPE ${name} SYSTEM ${quoted(systemId)}>`;
+  return `<!DOCTYPE ${name}>`;
 }
