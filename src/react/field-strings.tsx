@@ -157,6 +157,11 @@ export interface FieldStrings {
    */
   pageLoading: string;
   /**
+   * Shown in place of an HTML page whose frame was moved off it twice: the
+   * page tried to leave its frame, and is not put back a second time.
+   */
+  pageLeftFrame: string;
+  /**
    * The page's own HTML download, beside "Download PDF" on a result that is
    * one page, where a bare "Download" would not say which of the two it saves.
    */

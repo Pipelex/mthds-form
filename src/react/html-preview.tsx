@@ -180,6 +180,10 @@ export function HtmlPreview({
   const s = useFieldStrings();
   const [doc, setDoc] = useState<string | null>(null);
   const [height, setHeight] = useState(0);
+  // How often the frame has left the document it was given, counted for that
+  // document alone: a new document (another result) starts again at none.
+  const [escaped, setEscaped] = useState<{ doc: string; count: number } | null>(null);
+  const escapes = doc !== null && escaped?.doc === doc ? escaped.count : 0;
   const resolvedHtml = useResolvedMarkup(content.innerHtml);
   const resolved = useMemo(
     () =>
@@ -232,6 +236,17 @@ export function HtmlPreview({
   };
 
   const onLoad = () => {
+    // The load guard, the last line behind the rewrite (`frame-navigation.ts`):
+    // a load that leaves the frame anywhere but its own document means
+    // something moved it. The first time, the frame is put back by remounting
+    // it on the same document; the second time it is replaced by a notice,
+    // rather than put back again and again. The request already made cannot
+    // be undone, which is why this is the last line and not the mechanism. A
+    // scroll to an in-page link fires no load, so the guard never sees one.
+    if (leftItsDocument(frameRef.current)) {
+      if (doc !== null) setEscaped({ doc, count: escapes + 1 });
+      return;
+    }
     measure();
     // A linked font arrives after `load` and reflows the page, often taller.
     void frameRef.current?.contentDocument?.fonts?.ready.then(measure, () => undefined);
@@ -277,14 +292,24 @@ export function HtmlPreview({
           <Loader2 aria-hidden className="size-4 animate-spin" />
           <span>{s.pageLoading}</span>
         </div>
-      ) : doc === null ? null : (
-        // A tab stop, whose keyboard focus `FocusFrame` draws.
+      ) : doc === null ? null : escapes >= 2 ? (
+        <p
+          role="status"
+          data-html-left-frame
+          className="flex min-h-24 items-center justify-center px-3 text-center text-[12px] text-muted-foreground"
+        >
+          {s.pageLeftFrame}
+        </p>
+      ) : (
+        // A tab stop, whose keyboard focus `FocusFrame` draws. Its key is the
+        // load guard's count, so putting the frame back is a fresh element.
         <FocusFrame
+          key={escapes}
           ref={frameRef}
           title={content.cssClass ? `HTML result (${content.cssClass})` : 'HTML result'}
           srcDoc={doc}
           onLoad={onLoad}
-          sandbox="allow-same-origin"
+          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           style={{
             display: 'block',
             width: '100%',
@@ -319,6 +344,26 @@ export function HtmlPreview({
       {frameBox}
     </div>
   );
+}
+
+/**
+ * Whether the frame shows anything but the document it was given. A frame on
+ * another origin cannot be read at all, which says as much. `about:srcdoc` is
+ * its own document, with or without the fragment an in-page link adds;
+ * `about:blank` is the empty document a frame holds before its own arrives,
+ * which shows nothing and so has not left anywhere.
+ */
+function leftItsDocument(frame: HTMLIFrameElement | null): boolean {
+  if (!frame) return false;
+  let href: string | undefined;
+  try {
+    href = frame.contentWindow?.location.href;
+  } catch {
+    return true;
+  }
+  if (href === undefined) return false;
+  const page = href.split('#')[0];
+  return page !== 'about:srcdoc' && page !== 'about:blank';
 }
 
 /**

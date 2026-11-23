@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
-import { StuffViewer } from '../../react';
+import { DEFAULT_FIELD_STRINGS, StuffViewer } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { resultFieldFor } from '../result-view';
 
@@ -267,4 +267,54 @@ export const RefreshInDocument: Story = {
     />
   ),
   play: async ({ canvasElement }) => stillOnPage(canvasElement, ['remote', 'relative']),
+};
+
+/**
+ * Move the frame the way a link the rewrite missed would: give the page's
+ * link back the `target="_self"` the rewrite replaced, through the parent's
+ * own access to the frame's document, and click it.
+ */
+function escapeFrom(frame: HTMLIFrameElement): void {
+  const link = frame.contentDocument!.querySelector<HTMLAnchorElement>('#link')!;
+  link.target = '_self';
+  link.click();
+}
+
+/**
+ * **The load guard.** Should anything move the frame off its document anyway,
+ * the frame is put back on it once; the second time, the page is replaced by
+ * a notice saying it tried to leave its frame, rather than put back again.
+ */
+export const LoadGuard: Story = {
+  name: 'A frame that leaves anyway',
+  args: {
+    markup: `<p>See <a id="link" href="${remoteUrl('/remote-page')}">the source</a>.</p>`,
+  },
+  play: async ({ canvasElement }) => {
+    const first = await loadedFrame(canvasElement, '#link');
+    escapeFrom(first);
+
+    // Put back: a fresh frame, on its own document again.
+    await waitFor(
+      () => {
+        const frame = canvasElement.querySelector<HTMLIFrameElement>(frameSelector());
+        expect(frame).not.toBe(first);
+        expect(frameLocation(frame!)).toBe('about:srcdoc');
+        expect(frame!.contentDocument!.querySelector('#link')).not.toBeNull();
+      },
+      { timeout: 5000 },
+    );
+
+    escapeFrom(canvasElement.querySelector<HTMLIFrameElement>(frameSelector())!);
+    await waitFor(
+      () => {
+        const demo = canvasElement.querySelector('[data-navigation-demo="page"]')!;
+        expect(demo.querySelector('iframe')).toBeNull();
+        expect(demo.querySelector('[data-html-left-frame]')?.textContent).toBe(
+          DEFAULT_FIELD_STRINGS.pageLeftFrame,
+        );
+      },
+      { timeout: 5000 },
+    );
+  },
 };

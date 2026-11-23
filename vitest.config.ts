@@ -28,8 +28,13 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 /** A tab the click opened, read before it is closed. */
 interface OpenedPage {
   url: string;
-  /** Whether the new tab's `window.opener` is anything but `null`. */
-  hasOpener: boolean;
+  /**
+   * Whether the new tab's `window.opener` is anything but `null`, asked of the
+   * tab itself; `null` when the tab could not be asked. Playwright's own
+   * `page.opener()` is not the question: it names the page that opened a tab
+   * even under `noopener`, which severs only the tab's handle.
+   */
+  hasOpener: boolean | null;
 }
 
 /** How long a click waits for a tab to open before it decides none will. */
@@ -58,12 +63,11 @@ const clickInResultFrame: BrowserCommand<[frame: string, target: string], Opened
   return Promise.all(
     pages.map(async (page) => {
       await page.waitForLoadState('domcontentloaded').catch(() => undefined);
-      let hasOpener = (await page.opener()) !== null;
+      let hasOpener: boolean | null = null;
       try {
-        hasOpener = hasOpener || (await page.evaluate(() => window.opener !== null));
+        hasOpener = await page.evaluate(() => window.opener !== null);
       } catch {
-        // A page still navigating has no context to ask; Playwright's own
-        // answer stands.
+        // A page still navigating has no context to ask, and says nothing.
       }
       const url = page.url();
       await page.close().catch(() => undefined);
