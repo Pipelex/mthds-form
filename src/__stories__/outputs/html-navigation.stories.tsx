@@ -112,7 +112,7 @@ function countLoads(frame: HTMLIFrameElement): { count: number } {
 }
 
 /**
- * The browser commands, when the stories run as tests (`.storybook/frame-commands.ts`).
+ * The browser commands, when the stories run as tests (`frameCommands` in `vitest.config.ts`).
  * Absent in the Storybook UI, where a story asserts the rewritten markup and
  * stops short of the click.
  */
