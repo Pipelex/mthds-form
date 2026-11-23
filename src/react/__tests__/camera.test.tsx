@@ -26,6 +26,7 @@ import { getPipeInputForm } from '../../core/derive';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import { FieldRenderer, type FieldEnv } from '../field-renderer';
 import type { UploadedFile } from '../file-field';
+import { blobDataUrl } from '../local-file-preview';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 import { MethodForm, useMethodForm, type UseMethodFormOptions } from '../method-form';
 import { readPhoto, UndecodablePhotoError, type ReadPhoto } from '../photo-reading';
@@ -36,6 +37,12 @@ vi.mock('../photo-reading', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../photo-reading')>()),
   readPhoto: vi.fn(),
 }));
+// The thumbnail's `data:` URL, read for real and watched, so a test can hold
+// one back and land it after whatever it is racing.
+vi.mock('../local-file-preview', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../local-file-preview')>();
+  return { ...actual, blobDataUrl: vi.fn(actual.blobDataUrl) };
+});
 vi.mock('../photos-pdf', () => ({
   loadJsPdf: vi.fn(() => Promise.resolve({})),
   pagesToPdf: vi.fn(async (pages: readonly unknown[]) => {
@@ -44,6 +51,7 @@ vi.mock('../photos-pdf', () => ({
 }));
 
 const readPhotoMock = vi.mocked(readPhoto);
+const blobDataUrlMock = vi.mocked(blobDataUrl);
 const pagesToPdfMock = vi.mocked(pagesToPdf);
 
 /** What a photo reads into: its page and thumbnail, named after the photo, so a page is traceable. */
@@ -65,12 +73,48 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn(() => 'blob:never');
   readPhotoMock.mockReset();
   readPhotoMock.mockImplementation(async (photo) => readOf(photo));
+  blobDataUrlMock.mockReset();
   pagesToPdfMock.mockClear();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+/**
+ * Holds back the next thumbnail's `data:` URL: it is read as ever, and handed
+ * to the camera only on `land()`, which runs outside `act`, as a `FileReader`'s
+ * answer does. `requested` resolves once the camera has asked for it, and
+ * `answered` is the very promise the camera awaits, so a test that awaits it
+ * after `land()` runs after the camera's own continuation.
+ */
+function heldThumbnail() {
+  let land: () => void = () => {};
+  // Boxed, since a promise resolved with a promise would wait on it.
+  let asked: (box: { answer: Promise<string> }) => void = () => {};
+  const requested = new Promise<{ answer: Promise<string> }>((resolve) => {
+    asked = resolve;
+  });
+  const landed = new Promise<void>((resolve) => {
+    land = resolve;
+  });
+  blobDataUrlMock.mockImplementationOnce((blob) => {
+    const answer = (async () => {
+      const { blobDataUrl: read } =
+        await vi.importActual<typeof import('../local-file-preview')>('../local-file-preview');
+      const url = await read(blob);
+      await landed;
+      return url;
+    })();
+    asked({ answer });
+    return answer;
+  });
+  return {
+    requested: requested.then(() => undefined),
+    answered: requested.then(({ answer }) => answer),
+    land: () => land(),
+  };
+}
 
 const photo = (name: string) => new File([`photo ${name}`], `${name}.heic`, { type: 'image/heic' });
 
@@ -630,8 +674,11 @@ describe("MethodForm's controller while a file is being made", () => {
     });
     await act(async () => finish(readOf(photo('first'))));
     await vi.waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
-    // Handed over: the upload in flight holds the run now.
-    expect(formState()).toMatchObject({ uploading: true, ready: false, preparing: [] });
+    // Handed over: the upload in flight holds the run now. The upload is
+    // called a render before the controller shows it, so that render is awaited.
+    await vi.waitFor(() =>
+      expect(formState()).toMatchObject({ uploading: true, ready: false, preparing: [] }),
+    );
     await act(async () =>
       land({ url: 'pipelex-storage://org/po.pdf', filename: 'Attachment.pdf' }),
     );
@@ -787,11 +834,107 @@ describe('a host whose onDropFile throws', () => {
     await vi.waitFor(() =>
       expect(events).toEqual(['preparing purchase_order', 'done purchase_order']),
     );
-    expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument();
+    // The host is told in the same tick the pages are dropped, a render before
+    // the screen shows it: the alert lands in that render, with the pages gone.
     expect(await screen.findByRole('alert')).toHaveTextContent(S.photoNotKept);
+    expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument();
     expect(screen.queryByText(S.readingPhoto)).not.toBeInTheDocument();
     expect(valueOf()).toBeNull();
     expect(error).toHaveBeenCalled();
+  });
+
+  it('with its thumbnail read last, outside any act, leaves no page once the screen catches up', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The release is the moment a host is told, which comes before the render
+    // that drops the pages: the field must be judged on the render after it.
+    let told: () => void = () => {};
+    const done = new Promise<void>((resolve) => {
+      told = resolve;
+    });
+    const onPreparingFile = vi.fn(() => () => told());
+    const throwing = vi.fn((): Promise<UploadedFile> => {
+      throw new Error('no storage configured');
+    });
+    const thumbnail = heldThumbnail();
+    render(
+      <UploadHost field={orderForm} onDropFile={throwing} onPreparingFile={onPreparingFile} />,
+    );
+    await take(user, 'first');
+    await thumbnail.requested;
+    expect(throwing).not.toHaveBeenCalled();
+    thumbnail.land();
+    await done;
+    expect(throwing).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(S.photoNotKept);
+    expect(valueOf()).toBeNull();
+  });
+});
+
+describe('a thumbnail read after its pages were discarded puts nothing back', () => {
+  it('when the upload of the earlier pages fails while it is being read', async () => {
+    const user = userEvent.setup();
+    const { events, onPreparingFile } = preparingLog();
+    const uploads: Array<(reason: Error) => void> = [];
+    const onDropFile = vi.fn(
+      () =>
+        new Promise<UploadedFile>((_resolve, reject) => {
+          uploads.push(reject);
+        }),
+    );
+    render(
+      <UploadHost field={orderForm} onDropFile={onDropFile} onPreparingFile={onPreparingFile} />,
+    );
+    await take(user, 'first');
+    await vi.waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(1));
+    // The second page's thumbnail is still being read when the first page's
+    // upload fails and discards the pages.
+    const thumbnail = heldThumbnail();
+    await user.click(screen.getByRole('button', { name: S.addPage }));
+    await take(user, 'second');
+    await thumbnail.requested;
+    await act(async () => uploads[0]?.(new Error('storage is down')));
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^Page / })).not.toBeInTheDocument(),
+    );
+    // Its answer lands last, outside any act, and finds nothing to add to.
+    thumbnail.land();
+    await act(async () => {
+      await thumbnail.answered;
+    });
+    expect(screen.queryByRole('button', { name: /^Page / })).not.toBeInTheDocument();
+    expect(screen.queryByText(S.readingPhoto)).not.toBeInTheDocument();
+    expect(screen.getByText(S.dropOrBrowse)).toBeInTheDocument();
+    expect(onDropFile).toHaveBeenCalledTimes(1);
+    expect(valueOf()).toBeNull();
+    expect(events).toEqual([
+      'preparing purchase_order',
+      'done purchase_order',
+      'preparing purchase_order',
+      'done purchase_order',
+    ]);
+  });
+
+  it('when another writer puts a file in while it is being read', async () => {
+    const user = userEvent.setup();
+    const { onDropFile } = storingHost();
+    render(<UploadHost field={orderForm} onDropFile={onDropFile} />);
+    const thumbnail = heldThumbnail();
+    await take(user, 'first');
+    await thumbnail.requested;
+    await user.click(screen.getByRole('button', { name: 'Another writer' }));
+    expect(screen.queryByText(S.readingPhoto)).not.toBeInTheDocument();
+    thumbnail.land();
+    await act(async () => {
+      await thumbnail.answered;
+    });
+    expect(screen.queryByRole('button', { name: /^Page / })).not.toBeInTheDocument();
+    expect(screen.getByText('other.pdf')).toBeInTheDocument();
+    expect(onDropFile).not.toHaveBeenCalled();
+    expect(valueOf().url).toBe('https://example.com/other.pdf');
   });
 });
 
