@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
-import type { BrowserCommand } from 'vitest/node';
+import type { Frame, Page } from 'playwright';
+import type { BrowserCommand, BrowserCommandContext } from 'vitest/node';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,38 +38,93 @@ interface OpenedPage {
   hasOpener: boolean | null;
 }
 
-/** How long a click waits for a tab to open before it decides none will. */
-const OPEN_WAIT_MS = 1500;
+/**
+ * How long a click waits for a tab to open before it decides none will, when
+ * the story expects none. A story that expects one passes a longer wait: the
+ * whole suite runs its files in parallel, and a tab can take seconds to open
+ * under that load.
+ */
+const NO_TAB_WAIT_MS = 1500;
 
 /** After the first tab, how long a click waits for a second one. */
 const SETTLE_MS = 300;
 
+/** How long a new tab is given to commit to the URL it was opened on. */
+const TAB_URL_MS = 5000;
+
+/**
+ * Whether the tab's `window.opener` is set, asked again for a moment while its
+ * document is being replaced (a context destroyed mid-question throws); `null`
+ * when it never answers.
+ */
+async function askOpener(page: Page): Promise<boolean | null> {
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    try {
+      return await page.evaluate(() => window.opener !== null);
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  return null;
+}
+
+/** How long a click looks for the story's frame before it gives up. */
+const FIND_FRAME_MS = 10_000;
+
+/**
+ * The frame of the page under test that holds `selector`. It is looked for in
+ * every frame of the session's page rather than through the tester frame's
+ * locator (`context.iframe`), because while the suite runs several story files
+ * at once that locator can name another file's frame, and a click through it
+ * then waits until that file is done.
+ */
+async function frameHolding(context: BrowserCommandContext, selector: string): Promise<Frame> {
+  const deadline = Date.now() + FIND_FRAME_MS;
+  while (Date.now() < deadline) {
+    for (const candidate of context.page.frames()) {
+      const count = await candidate
+        .locator(selector)
+        .count()
+        .catch(() => 0);
+      if (count > 0) return candidate;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`No frame of the page under test holds ${selector}`);
+}
+
 /**
  * Click the first element matching `target` inside the first result frame
  * matching `frame`, then report every tab the click opened and close them.
+ * `frame` should be unique to the story's run, since it is looked for across
+ * the whole page.
  */
-const clickInResultFrame: BrowserCommand<[frame: string, target: string], OpenedPage[]> = async (
-  context,
-  frame,
-  target,
-) => {
+const clickInResultFrame: BrowserCommand<
+  [frame: string, target: string, options?: { waitMs?: number }],
+  OpenedPage[]
+> = async (context, frame, target, { waitMs = NO_TAB_WAIT_MS } = {}) => {
+  const holder = await frameHolding(context, frame);
   const before = new Set(context.context.pages());
   const opened = context.context
-    .waitForEvent('page', { timeout: OPEN_WAIT_MS })
+    .waitForEvent('page', { timeout: waitMs })
     .then(() => true)
     .catch(() => false);
-  await context.iframe.locator(frame).first().contentFrame().locator(target).first().click();
+  await holder.locator(frame).first().contentFrame().locator(target).first().click();
   if (await opened) await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   const pages = context.context.pages().filter((page) => !before.has(page));
   return Promise.all(
     pages.map(async (page) => {
-      await page.waitForLoadState('domcontentloaded').catch(() => undefined);
-      let hasOpener: boolean | null = null;
-      try {
-        hasOpener = await page.evaluate(() => window.opener !== null);
-      } catch {
-        // A page still navigating has no context to ask, and says nothing.
-      }
+      // Only as far as the tab's own document is committed: waiting for it to
+      // load would wait on whatever the test server answers there, and the
+      // question is the tab's, not its document's.
+      await page
+        .waitForURL((url) => url.href !== 'about:blank', {
+          waitUntil: 'commit',
+          timeout: TAB_URL_MS,
+        })
+        .catch(() => undefined);
+      const hasOpener = await askOpener(page);
       const url = page.url();
       await page.close().catch(() => undefined);
       return { url, hasOpener };
@@ -78,9 +134,16 @@ const clickInResultFrame: BrowserCommand<[frame: string, target: string], Opened
 
 const frameCommands = { clickInResultFrame };
 
+/** How long a story run as a test may take; see the `storybook` project. */
+const STORY_TIMEOUT_MS = 30_000;
+
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    clickInResultFrame: (frame: string, target: string) => Promise<OpenedPage[]>;
+    clickInResultFrame: (
+      frame: string,
+      target: string,
+      options?: { waitMs?: number },
+    ) => Promise<OpenedPage[]>;
   }
 }
 
@@ -196,6 +259,11 @@ export default defineConfig({
         plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
         test: {
           name: 'storybook',
+          // Twice Vitest's browser default. A story that drives the browser
+          // through Playwright (a wheel, a click that opens a tab) waits on
+          // the page under test answering it, which on a machine running
+          // other suites at once has taken several seconds a step.
+          testTimeout: STORY_TIMEOUT_MS,
           browser: {
             enabled: true,
             headless: true,
@@ -224,6 +292,7 @@ export default defineConfig({
               plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
               test: {
                 name: 'storybook-navigation',
+                testTimeout: STORY_TIMEOUT_MS,
                 browser: {
                   enabled: true,
                   headless: true,

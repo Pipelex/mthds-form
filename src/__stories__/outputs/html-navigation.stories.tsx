@@ -84,6 +84,17 @@ async function loadedFrame(
 }
 
 /**
+ * A selector naming this one frame and no other on the page: the click command
+ * looks for it across every frame the suite has open, and several story files
+ * run at once.
+ */
+function uniqueSelector(frame: HTMLIFrameElement): string {
+  const token = crypto.randomUUID();
+  frame.setAttribute('data-click-run', token);
+  return `iframe[data-click-run="${token}"]`;
+}
+
+/**
  * Where the frame is. Reading it throws once the frame shows another origin's
  * page, which fails the assertion that reads it, as it should.
  */
@@ -115,6 +126,9 @@ async function browserCommands() {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** How long a click that should open a tab waits for it, under the whole suite's load. */
+const TAB_WAIT_MS = 10_000;
+
 /**
  * **A link to another site** opens in a new tab: exactly one, with no
  * `window.opener` handle back to the host, and the result stays on screen.
@@ -133,7 +147,9 @@ export const ExternalLink: Story = {
 
     const commands = await browserCommands();
     if (!commands) return;
-    const opened = await commands.clickInResultFrame(frameSelector(), '#link');
+    const opened = await commands.clickInResultFrame(uniqueSelector(frame), '#link', {
+      waitMs: TAB_WAIT_MS,
+    });
     await expect(opened).toHaveLength(1);
     await expect(opened[0]!.url).toBe(remoteUrl('/remote-page'));
     await expect(opened[0]!.hasOpener).toBe(false);
@@ -159,7 +175,9 @@ export const RelativeLink: Story = {
 
     const commands = await browserCommands();
     if (!commands) return;
-    const opened = await commands.clickInResultFrame(frameSelector(), '#link');
+    const opened = await commands.clickInResultFrame(uniqueSelector(frame), '#link', {
+      waitMs: TAB_WAIT_MS,
+    });
     await expect(opened).toHaveLength(1);
     await expect(opened[0]!.hasOpener).toBe(false);
     await expect(frameLocation(frame)).toBe('about:srcdoc');
@@ -190,7 +208,7 @@ export const InPageLink: Story = {
     const commands = await browserCommands();
     if (!commands) return;
     const loads = countLoads(frame);
-    const opened = await commands.clickInResultFrame(frameSelector(), '#toc');
+    const opened = await commands.clickInResultFrame(uniqueSelector(frame), '#toc');
     await expect(opened).toHaveLength(0);
     await expect(loads.count).toBe(0);
     await expect(frameLocation(frame)).toBe('about:srcdoc#findings');
