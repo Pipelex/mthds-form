@@ -1,10 +1,11 @@
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
-import type { Frame, Page } from 'playwright';
-import type { BrowserCommand, BrowserCommandContext } from 'vitest/node';
+import type { Page } from 'playwright';
+import type { BrowserCommand } from 'vitest/node';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -69,48 +70,24 @@ async function askOpener(page: Page): Promise<boolean | null> {
   return null;
 }
 
-/** How long a click looks for the story's frame before it gives up. */
-const FIND_FRAME_MS = 10_000;
-
-/**
- * The frame of the page under test that holds `selector`. It is looked for in
- * every frame of the session's page rather than through the tester frame's
- * locator (`context.iframe`), because while the suite runs several story files
- * at once that locator can name another file's frame, and a click through it
- * then waits until that file is done.
- */
-async function frameHolding(context: BrowserCommandContext, selector: string): Promise<Frame> {
-  const deadline = Date.now() + FIND_FRAME_MS;
-  while (Date.now() < deadline) {
-    for (const candidate of context.page.frames()) {
-      const count = await candidate
-        .locator(selector)
-        .count()
-        .catch(() => 0);
-      if (count > 0) return candidate;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`No frame of the page under test holds ${selector}`);
-}
-
 /**
  * Click the first element matching `target` inside the first result frame
  * matching `frame`, then report every tab the click opened and close them.
- * `frame` should be unique to the story's run, since it is looked for across
- * the whole page.
+ * The frame is looked for in the tester frame (`context.iframe`), which holds
+ * this story's file alone: Vitest gives each file running at the same time a
+ * page and a browser context of its own, so neither another file's frame nor
+ * another file's tab is ever in view here.
  */
 const clickInResultFrame: BrowserCommand<
   [frame: string, target: string, options?: { waitMs?: number }],
   OpenedPage[]
 > = async (context, frame, target, { waitMs = NO_TAB_WAIT_MS } = {}) => {
-  const holder = await frameHolding(context, frame);
   const before = new Set(context.context.pages());
   const opened = context.context
     .waitForEvent('page', { timeout: waitMs })
     .then(() => true)
     .catch(() => false);
-  await holder.locator(frame).first().contentFrame().locator(target).first().click();
+  await context.iframe.locator(frame).first().contentFrame().locator(target).first().click();
   if (await opened) await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   const pages = context.context.pages().filter((page) => !before.has(page));
   return Promise.all(
@@ -134,8 +111,25 @@ const clickInResultFrame: BrowserCommand<
 
 const frameCommands = { clickInResultFrame };
 
-/** How long a story run as a test may take; see the `storybook` project. */
-const STORY_TIMEOUT_MS = 30_000;
+/**
+ * How many story files run at once, each in a browser page of its own: Vitest's
+ * own default (one fewer than the cores, at most twelve), but never more than
+ * six.
+ *
+ * Every Playwright step of every page, and every event the browser reports to
+ * Playwright, crosses one connection to the browser, and a page loading a
+ * story file reports each of the hundreds of modules it requests. With twelve
+ * pages loading at once on a busy machine, that connection fell up to a minute
+ * behind: a browser-level `Browser.getVersion`, which touches no page, took
+ * 33 seconds to answer, so the first story to drive the browser through
+ * Playwright (`clickInResultFrame`, or a wheel through `vitest/browser`) timed
+ * out before its first step had run, while its own page sat idle. A worker a
+ * page starts waits, paused, for Playwright to resume it over the same
+ * connection, so `Outputs/PDF pages`, whose pages pdf.js draws in a worker,
+ * missed its deadline the same way. With six pages the same call answered in
+ * a twentieth of a second, and the suite finished sooner than with twelve.
+ */
+const STORY_SESSIONS = Math.max(1, Math.min(6, os.availableParallelism() - 1));
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -259,11 +253,12 @@ export default defineConfig({
         plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
         test: {
           name: 'storybook',
-          // Twice Vitest's browser default. A story that drives the browser
-          // through Playwright (a wheel, a click that opens a tab) waits on
-          // the page under test answering it, which on a machine running
-          // other suites at once has taken several seconds a step.
-          testTimeout: STORY_TIMEOUT_MS,
+          // See `STORY_SESSIONS`: more pages at once and a story's Playwright
+          // steps queue behind every page's module loading. Vitest runs
+          // projects of different `maxWorkers` in groups one after another,
+          // so the stories run once the Node and jsdom suites are done.
+          maxWorkers: STORY_SESSIONS,
+          sequence: { groupOrder: 1 },
           browser: {
             enabled: true,
             headless: true,
@@ -292,7 +287,6 @@ export default defineConfig({
               plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
               test: {
                 name: 'storybook-navigation',
-                testTimeout: STORY_TIMEOUT_MS,
                 browser: {
                   enabled: true,
                   headless: true,

@@ -84,17 +84,6 @@ async function loadedFrame(
 }
 
 /**
- * A selector naming this one frame and no other on the page: the click command
- * looks for it across every frame the suite has open, and several story files
- * run at once.
- */
-function uniqueSelector(frame: HTMLIFrameElement): string {
-  const token = crypto.randomUUID();
-  frame.setAttribute('data-click-run', token);
-  return `iframe[data-click-run="${token}"]`;
-}
-
-/**
  * Where the frame is. Reading it throws once the frame shows another origin's
  * page, which fails the assertion that reads it, as it should.
  */
@@ -147,7 +136,7 @@ export const ExternalLink: Story = {
 
     const commands = await browserCommands();
     if (!commands) return;
-    const opened = await commands.clickInResultFrame(uniqueSelector(frame), '#link', {
+    const opened = await commands.clickInResultFrame(frameSelector(), '#link', {
       waitMs: TAB_WAIT_MS,
     });
     await expect(opened).toHaveLength(1);
@@ -175,7 +164,7 @@ export const RelativeLink: Story = {
 
     const commands = await browserCommands();
     if (!commands) return;
-    const opened = await commands.clickInResultFrame(uniqueSelector(frame), '#link', {
+    const opened = await commands.clickInResultFrame(frameSelector(), '#link', {
       waitMs: TAB_WAIT_MS,
     });
     await expect(opened).toHaveLength(1);
@@ -208,7 +197,7 @@ export const InPageLink: Story = {
     const commands = await browserCommands();
     if (!commands) return;
     const loads = countLoads(frame);
-    const opened = await commands.clickInResultFrame(uniqueSelector(frame), '#toc');
+    const opened = await commands.clickInResultFrame(frameSelector(), '#toc');
     await expect(opened).toHaveLength(0);
     await expect(loads.count).toBe(0);
     await expect(frameLocation(frame)).toBe('about:srcdoc#findings');
