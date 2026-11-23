@@ -40,9 +40,6 @@ import { hostFiles, stored } from './host-files';
 import { unringed } from './unringed';
 
 beforeAll(() => {
-  // A dropped file's preview is an object URL, which jsdom does not make.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
   // The row menu's popper measures its content; jsdom has no ResizeObserver.
   globalThis.ResizeObserver ??= class {
     observe() {}

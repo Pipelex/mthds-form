@@ -8,7 +8,7 @@
  * This is the suite whose absence is why three of them shipped.
  */
 import { useState } from 'react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField } from '../../core';
@@ -29,11 +29,14 @@ const field: FileRunField = {
 
 const noop = () => {};
 
-beforeAll(() => {
-  // jsdom implements neither, and the control makes an object URL on every drop.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
+/** An image slot, for the previews a picture gets. */
+const photoField: FileRunField = {
+  kind: 'image',
+  name: 'photo',
+  conceptRef: 'native.Image',
+  required: true,
+  formats: IMAGE_FORMATS,
+};
 
 const fileInput = () => screen.getByLabelText('cv') as HTMLInputElement;
 const urlToggle = () => screen.getByRole('button', { name: /paste a link instead/i });
@@ -452,17 +455,31 @@ describe('a preview that needs no resolver does not wait for one', () => {
   const spinner = (container: HTMLElement) => container.querySelector('.animate-spin');
   const placeholder = (container: HTMLElement) => container.querySelector('.lucide-image-off');
 
-  it('renders a data URL directly when the host supplies no resolveUrl', async () => {
+  it('says a stored picture cannot be shown when the host supplies no resolveUrl', () => {
+    const { container } = render(
+      <ImageField
+        field={photoField}
+        value={{ filename: 'face.png', url: 'pipelex-storage://bucket/face' }}
+        onDropFile={noop}
+        onChange={noop}
+        id="photo"
+      />,
+    );
+    expect(spinner(container)).toBeNull();
+    expect(placeholder(container)).not.toBeNull();
+  });
+
+  it('shows a data URL PDF as its card at once when the host supplies no resolveUrl', async () => {
     const { container } = renderField({
       value: { filename: 'sample.pdf', url: 'data:application/pdf;base64,QUFB' },
     });
 
-    // The preview is open from the start: nothing is clicked to see it.
+    // The preview is open from the start: nothing is clicked to see it. With
+    // no pdf.js worker it is the compact card, never a frame or an `<object>`.
 
     expect(spinner(container)).toBeNull();
-    expect(container.querySelector('object')?.getAttribute('data')).toBe(
-      'data:application/pdf;base64,QUFB#view=FitH',
-    );
+    expect(container.querySelector('object, embed, iframe')).toBeNull();
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.documentPdfUnavailable)).toBeInTheDocument();
   });
 
   it('says a stored reference cannot be shown when the host supplies no resolveUrl', async () => {
@@ -477,7 +494,7 @@ describe('a preview that needs no resolver does not wait for one', () => {
     // The preview is open from the start: nothing is clicked to see it.
 
     expect(spinner(container)).toBeNull();
-    expect(placeholder(container)).not.toBeNull();
+    expect(screen.getByText(DEFAULT_FIELD_STRINGS.documentPdfUnavailable)).toBeInTheDocument();
   });
 
   it('still waits on a URI only the host can resolve while its resolver answers', async () => {
@@ -517,19 +534,23 @@ describe('the local preview belongs to the value it was made for', () => {
     const user = userEvent.setup();
     const { container } = render(<HostOwnedField />);
 
-    await user.upload(fileInput(), new File(['pdf'], 'dropped.pdf', { type: 'application/pdf' }));
-    // The host's upload lands: the control adopts this URL as the one its
-    // object URL is the preview of.
-    await user.click(screen.getByRole('button', { name: 'host writes A' }));
-    // The preview is open from the start: nothing is clicked to see it.
-    expect(container.querySelector('object')?.getAttribute('data')).toBe(
-      'blob:local-preview#view=FitH',
+    await user.upload(
+      fileInput(),
+      new File(['%PDF-1.7'], 'dropped.pdf', { type: 'application/pdf' }),
     );
+    // The host's upload lands: the control adopts this URL as the one its
+    // local preview is the preview of.
+    await user.click(screen.getByRole('button', { name: 'host writes A' }));
+    // The preview is open from the start: nothing is clicked to see it. It is
+    // the dropped file's card, which knows its size.
+    expect(container.querySelector('[data-local-preview]')).not.toBeNull();
+    expect(screen.getByText('PDF · 8 bytes')).toBeInTheDocument();
 
     // A second write is not this control's upload landing - it is a different
     // file. The chip used to say B over a preview showing A.
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
-    expect(container.querySelector('object')?.getAttribute('data')).toBe(`${DATA_B}#view=FitH`);
+    expect(container.querySelector('[data-local-preview]')).toBeNull();
+    expect(screen.queryByText('PDF · 8 bytes')).toBeNull();
   });
 });
 
@@ -561,8 +582,8 @@ function ResolvingField({
   const [value, setValue] = useState<FileValue>(initial);
   return (
     <>
-      <DocumentField
-        field={field}
+      <ImageField
+        field={photoField}
         value={value}
         onDropFile={noop}
         onChange={(v) => setValue(v as FileValue)}
@@ -583,7 +604,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
   const spinner = (container: HTMLElement) => container.querySelector('.animate-spin');
   const placeholder = (container: HTMLElement) => container.querySelector('.lucide-image-off');
   const previewSrc = (container: HTMLElement) =>
-    container.querySelector('object')?.getAttribute('data');
+    container.querySelector('img')?.getAttribute('src');
 
   it('opens as it mounts and asks the resolver, folds away on Preview, and asks again as it reopens', async () => {
     // Every preview starts open, so a stored file is resolved without a click.
@@ -596,7 +617,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
       <ResolvingField initial={{ filename: 'a.pdf', url: URI_A }} resolveUrl={resolveUrl} />,
     );
 
-    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf'));
     expect(resolveUrl).toHaveBeenCalledTimes(1);
     expect(resolveUrl).toHaveBeenCalledWith(URI_A);
 
@@ -605,7 +626,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     expect(resolveUrl).toHaveBeenCalledTimes(1);
 
     await user.click(previewButton() as HTMLElement);
-    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf'));
     expect(resolveUrl).toHaveBeenCalledTimes(2);
   });
 
@@ -630,7 +651,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     );
 
     // The preview is open from the start: nothing is clicked to see it.
-    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf'));
 
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
 
@@ -640,7 +661,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     expect(spinner(container)).not.toBeNull();
 
     releaseB('https://signed/b.pdf');
-    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/b.pdf#view=FitH'));
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/b.pdf'));
   });
 
   it('shows the placeholder, not the expired file, when the resolver answers with nothing', async () => {
@@ -662,9 +683,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     );
 
     // The preview is open from the start: nothing is clicked to see it.
-    await waitFor(() =>
-      expect(previewSrc(container)).toBe('https://signed/a.pdf?expires=soon#view=FitH'),
-    );
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf?expires=soon'));
 
     // Close and reopen: same file, same URI, and the URL behind it has expired.
     await user.click(previewButton() as HTMLElement);
@@ -690,7 +709,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     );
 
     // The preview is open from the start: nothing is clicked to see it.
-    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf'));
 
     await user.click(screen.getByRole('button', { name: 'host writes B' }));
 
@@ -728,7 +747,7 @@ describe('the resolved preview belongs to the URI it was resolved from', () => {
     expect(placeholder(container)).toBeNull();
 
     release('https://signed/a.pdf');
-    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf#view=FitH'));
+    await waitFor(() => expect(previewSrc(container)).toBe('https://signed/a.pdf'));
   });
 });
 

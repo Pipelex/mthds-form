@@ -2,7 +2,7 @@
  * The local preview of a dropped file, kept for that upload's own result and
  * for nothing else, whichever render a host writes the result in.
  *
- * A dropped file is shown from an object URL until the host's upload lands,
+ * A dropped file is shown from its own bytes until the host's upload lands,
  * then that preview is bound to the value the upload wrote. The field used to
  * tell its upload's result from a file someone else wrote only by when the
  * value landed: the URL had to change in the very render where `uploading`
@@ -17,7 +17,7 @@
  * that failed.
  */
 import { useState } from 'react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { act, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FileRunField } from '../../core';
@@ -43,12 +43,6 @@ const STORED = 'pipelex-storage://org/assets/mine.pdf';
 const OWN: FileValue = { url: STORED, filename: 'mine.pdf' };
 /** A file someone else writes at the same path: a host's `setValues`, an example. */
 const OTHER: FileValue = { url: 'https://example.com/other.pdf', filename: 'other.pdf' };
-
-beforeAll(() => {
-  // jsdom implements neither, and the control makes an object URL on every drop.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
 
 /** An upload the test settles by hand, after writing what it likes meanwhile. */
 function deferredUpload() {
@@ -116,7 +110,7 @@ const drop = (user: User) =>
 /** Answers whether the card's preview, open from the start, paints the dropped file. */
 function paintsLocalPreview(container: HTMLElement): boolean {
   expect(screen.getByRole('button', { name: /^preview$/i })).toBeInTheDocument();
-  return container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
+  return container.querySelector('[data-local-preview]') !== null;
 }
 
 describe('a host whose onDropFile returns the upload keeps its preview in any order', () => {

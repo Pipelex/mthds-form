@@ -12,7 +12,7 @@
  * failure in the kernel, so the controller and the control agree.
  */
 import { Profiler, useState } from 'react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
@@ -103,7 +103,7 @@ const mountAgain = (user: User) => user.click(screen.getByRole('button', { name:
 const press = (user: User, name: string) => user.click(screen.getByRole('button', { name }));
 /** Whether anything on the page paints the dropped file's local preview. */
 const paintsLocalPreview = (container: HTMLElement) =>
-  container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
+  container.querySelector('[data-local-preview]') !== null;
 
 /** An upload the test settles by hand, after writing what it likes meanwhile. */
 function deferredUpload() {
@@ -125,12 +125,6 @@ async function failTheUpload(user: User, container: HTMLElement) {
   await screen.findByText(S.uploadFailed);
   expect(failed()).toEqual(['attachment']);
 }
-
-beforeAll(() => {
-  // A dropped file's preview is an object URL, which jsdom does not make.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
 
 describe('a file put in place of a failed upload ends its failure in the form', () => {
   it('ends it when a file is chosen from the host’s files', async () => {

@@ -59,11 +59,10 @@ function readOf(photo: Blob): ReadPhoto {
   };
 }
 
-let objectUrls = 0;
 beforeEach(() => {
-  objectUrls = 0;
-  URL.createObjectURL = vi.fn(() => `blob:url-${++objectUrls}`);
-  URL.revokeObjectURL = vi.fn();
+  // jsdom makes no object URL, and the camera must not ask for one: a chat
+  // host's view frame refuses `blob:` images. Watched, so a test can say so.
+  URL.createObjectURL = vi.fn(() => 'blob:never');
   readPhotoMock.mockReset();
   readPhotoMock.mockImplementation(async (photo) => readOf(photo));
   pagesToPdfMock.mockClear();
@@ -356,7 +355,17 @@ describe('a photo becomes a page, and the pages one stored file', () => {
     await user.click(screen.getByRole('button', { name: S.removeFileAria }));
     expect(valueOf()).toBeNull();
     expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:url-1');
+  });
+
+  it("paints each page's thumbnail from a data: URL, never a blob: one", async () => {
+    const user = userEvent.setup();
+    const { onDropFile } = storingHost();
+    const { container } = render(<UploadHost field={orderForm} onDropFile={onDropFile} />);
+    await take(user, 'first');
+    await screen.findByText(S.photoPagesChip('Purchase order', 1));
+    const thumbnail = container.querySelector('[data-photo-pages] img');
+    expect(thumbnail?.getAttribute('src')).toMatch(/^data:image\/jpeg;base64,/);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
 
   it('keeps an image input to one photo, stored as its own JPEG, with no "Add page"', async () => {
@@ -399,7 +408,7 @@ describe('a photo becomes a page, and the pages one stored file', () => {
 });
 
 describe('the pages are kept only while the value is their file', () => {
-  it('discards them when another writer puts a file in, and gives back their object URLs', async () => {
+  it('discards them when another writer puts a file in', async () => {
     const user = userEvent.setup();
     const { onDropFile } = storingHost();
     render(<UploadHost field={orderForm} onDropFile={onDropFile} />);
@@ -408,7 +417,6 @@ describe('the pages are kept only while the value is their file', () => {
     await user.click(screen.getByRole('button', { name: 'Another writer' }));
     expect(screen.queryByRole('button', { name: S.photoPage(1) })).not.toBeInTheDocument();
     expect(screen.getByText('other.pdf')).toBeInTheDocument();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:url-1');
   });
 
   it('discards them when the upload of their file fails, leaving the value as it was', async () => {
@@ -896,7 +904,7 @@ describe('a field that unmounts while it makes its file', () => {
     expect(formState()).toEqual({ uploading: true, preparing: ['attachment'] });
   });
 
-  it('stops reading its photos, and makes no object URL nobody will give back', async () => {
+  it('stops reading its photos, and makes no thumbnail nobody will see', async () => {
     const user = userEvent.setup();
     let finish: (read: ReadPhoto) => void = () => {};
     readPhotoMock.mockImplementationOnce(

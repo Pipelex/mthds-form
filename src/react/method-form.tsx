@@ -18,12 +18,13 @@ import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/v
 import type { LoadText } from '../core/stored-value';
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
-import type { UploadedFile } from './file-field';
+import type { FormResolveUrl, UploadedFile } from './file-field';
 import { FramedFormContext, RefusedStructureContext } from './object-field';
 import type { FilePickerSource } from './file-picker';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
+import type { LoadBytes, OpenExternal, PdfWorkerConfig } from './result-env';
 import { destinationOf, movedId, type RowMove } from './row-moves';
 import { cn } from './utils';
 
@@ -789,7 +790,13 @@ export interface MethodFormProps {
   /** `FieldEnv.allowUrl`: `false` takes the "Paste a link instead" link away. */
   allowUrl?: boolean;
   /** `FieldEnv.resolveUrl`: turns a stored reference into a URL a preview can load. */
-  resolveUrl?: (uri: string) => Promise<string | null>;
+  resolveUrl?: FormResolveUrl;
+  /** `FieldEnv.loadBytes`: a stored file's bytes, from which a stored PDF's pages are drawn. */
+  loadBytes?: LoadBytes;
+  /** `FieldEnv.pdfWorker`: pdf.js's worker, which draws a PDF's pages in its field. */
+  pdfWorker?: PdfWorkerConfig;
+  /** `FieldEnv.openExternal`: how the host opens a link to another page. */
+  openExternal?: OpenExternal;
   /** `FieldEnv.loadText`: reads a stored text, so an input holding one can be edited. */
   loadText?: LoadText;
   /**
@@ -882,6 +889,9 @@ function MethodFormFields({
   disabled,
   allowUrl,
   resolveUrl,
+  loadBytes,
+  pdfWorker,
+  openExternal,
   loadText,
   foldOptional = true,
   errors,
@@ -927,6 +937,9 @@ function MethodFormFields({
       rowMoves,
       allowUrl,
       resolveUrl,
+      loadBytes,
+      pdfWorker,
+      openExternal,
       loadText,
       fileSource,
     }),
@@ -940,6 +953,9 @@ function MethodFormFields({
       rowMoves,
       allowUrl,
       resolveUrl,
+      loadBytes,
+      pdfWorker,
+      openExternal,
       loadText,
       fileSource,
     ],

@@ -7,7 +7,7 @@
  * and glyph.
  */
 import type { ReactNode } from 'react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // Deep imports, not the `../../core` barrel: a value import of the barrel
@@ -50,15 +50,9 @@ function Harness({ allowUrl, disabled, ...options }: HarnessProps) {
 
 const values = () => JSON.parse(screen.getByTestId('state').textContent ?? '{}').values;
 
-beforeAll(() => {
-  // A dropped file's preview is an object URL, which jsdom does not make.
-  URL.createObjectURL = vi.fn(() => 'blob:local-preview');
-  URL.revokeObjectURL = vi.fn();
-});
-
 /** Whether anything on the page paints the dropped file's local preview. */
 const paintsLocalPreview = (container: HTMLElement) =>
-  container.querySelector('[src^="blob:"], [data^="blob:"]') !== null;
+  container.querySelector('[data-local-preview]') !== null;
 
 const INVOICE: SourceFile = {
   id: 'fl_1',
