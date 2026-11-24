@@ -19,7 +19,7 @@ import { useLayoutEffect, useSyncExternalStore, type CSSProperties } from 'react
  * `IntersectionObserver` with no root reports how much of a target the screen
  * shows, through every frame and every clipping scroller around it, a
  * cross-origin host's included. So the viewport is covered by `fixed`, hidden
- * bands that are observed, and the part on screen runs from the top of the
+ * bands, each as wide as the viewport, that are observed, and the part on screen runs from the top of the
  * highest band showing to the bottom of the lowest. Bands rather than one
  * probe because the observer reports only when a target's visible share
  * crosses a threshold: a single probe taller than the screen keeps the same
@@ -116,10 +116,14 @@ function startWatching(): { refresh: () => void; stop: () => void } | null {
     const band = document.createElement('div');
     band.setAttribute('aria-hidden', 'true');
     band.setAttribute('data-mthds-frame-band', String(index));
+    // Each band spans the viewport's width: a host that clips or offsets one
+    // column of the frame, its leftmost included, still leaves the rest of the
+    // band to intersect. Being `fixed` and hidden, it takes no room in the
+    // layout and draws nothing, and it lets every pointer through.
     Object.assign(band.style, {
       position: 'fixed',
       left: '0',
-      width: '1px',
+      right: '0',
       top: `${(index * 100) / FRAME_BANDS}%`,
       height: `${100 / FRAME_BANDS}%`,
       visibility: 'hidden',

@@ -9,8 +9,8 @@
  * through an `IntersectionObserver`, as two insets, and lay out between them.
  *
  * jsdom has no `IntersectionObserver` and lays nothing out, so these tests
- * stand one in and report what a browser would; `Inputs/Team Files and
- * Examples` holds the browser half.
+ * stand one in and report what a browser would; `Inputs/Team Files in a Chat
+ * Frame` holds the browser half.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
@@ -159,6 +159,12 @@ describe('a sheet in the part of the viewport on screen', () => {
       expect(band.getAttribute('aria-hidden')).toBe('true');
       expect(band.style.position).toBe('fixed');
       expect(band.style.visibility).toBe('hidden');
+      expect(band.style.pointerEvents).toBe('none');
+      // As wide as the viewport, so a host clipping one column of the frame
+      // leaves the rest of each band to intersect.
+      expect(band.style.left).toBe('0px');
+      expect(band.style.right).toBe('0px');
+      expect(band.style.width).toBe('');
     }
     unmount();
     expect(bands()).toHaveLength(0);
