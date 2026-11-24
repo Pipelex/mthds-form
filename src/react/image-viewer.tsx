@@ -160,8 +160,10 @@ export function ImageViewer({
           }}
           {...(picture.caption ? {} : { 'aria-describedby': undefined })}
           className={cn(
-            'm-0 h-dvh w-full max-w-none gap-0 rounded-none border-0 p-0',
-            'sm:m-auto sm:h-[calc(100dvh-4rem)] sm:w-[calc(100%-4rem)] sm:max-w-6xl sm:rounded-xl sm:border',
+            // The part of the viewport on screen (`ui/frame-in-view`): all of
+            // it on a page, the slice a chat host's tall frame shows.
+            'm-0 h-[calc(100dvh-var(--mthds-frame-top,0px)-var(--mthds-frame-bottom,0px))] w-full max-w-none gap-0 rounded-none border-0 p-0',
+            'sm:m-auto sm:h-[calc(100dvh-var(--mthds-frame-top,0px)-var(--mthds-frame-bottom,0px)-4rem)] sm:w-[calc(100%-4rem)] sm:max-w-6xl sm:rounded-xl sm:border',
           )}
         >
           <div className="flex shrink-0 items-center gap-2 border-b border-border py-1.5 pr-1.5 pl-4">
