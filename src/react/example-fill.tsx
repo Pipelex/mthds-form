@@ -318,8 +318,9 @@ export function FillWithExample({
         {open && (
           <DialogContent
             layout="sheet"
-            // Below 1280px the sheet is as tall as its rows, up to the viewport.
-            className="top-auto max-h-[calc(100dvh-1.5rem)]"
+            // Below 1280px the sheet is as tall as its rows, up to the part of
+            // the viewport on screen (`ui/frame-in-view`).
+            className="top-auto max-h-[calc(100dvh-var(--mthds-frame-top,0px)-var(--mthds-frame-bottom,0px)-1.5rem)]"
             ref={sheet}
             returnFocus={() => control.current ?? afterControl.current}
             onCloseAutoFocus={handOver}

@@ -752,6 +752,12 @@ const RESERVED_NAMESPACES = [
   // Radix sets these on the element at run time (popover sizing, transform
   // origins). No host defines them and no fallback would be right.
   '--radix-',
+  // The kernel's own run-time variables, which a component sets inline on the
+  // element that reads them (the overlays' `--mthds-frame-top` and
+  // `--mthds-frame-bottom`, the part of the viewport on screen). No host
+  // defines them, and each read falls back to the value that held before
+  // them.
+  '--mthds-',
 ];
 
 /**

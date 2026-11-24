@@ -109,7 +109,67 @@ const clickInResultFrame: BrowserCommand<
   );
 };
 
-const frameCommands = { clickInResultFrame };
+/** The part of the story's frame the screen shows, in the frame's own coordinates. */
+interface FrameSlice {
+  frameHeight: number;
+  visible: { top: number; bottom: number };
+}
+
+/**
+ * Makes the frame the story's page runs in a chat host's frame that grew with
+ * its content, for `Inputs/Team Files in a Chat Frame`: at least two and a half
+ * screens tall, and scrolled so the screen shows the slice centred on `around`,
+ * a height in the frame, and reports that slice in the frame's own pixels.
+ * Passed `null`, it puts the frame back as it was.
+ *
+ * A story cannot do this itself: the frame is an element of the page around
+ * it, which only Playwright reaches. The frame's own viewport becomes the
+ * whole tall frame, as a host's does, and the screen (the page around it)
+ * shows a slice of it, which is what the overlays have to measure.
+ */
+const showFrameSlice: BrowserCommand<[around: number | null], FrameSlice | null> = async (
+  context,
+  around,
+) =>
+  context.iframe.owner().evaluate((frame: HTMLIFrameElement, centre: number | null) => {
+    const saved = 'mthdsSavedStyle';
+    if (centre === null) {
+      const style = frame.dataset[saved];
+      if (style !== undefined) frame.setAttribute('style', style);
+      delete frame.dataset[saved];
+      return null;
+    }
+    if (frame.dataset[saved] === undefined)
+      frame.dataset[saved] = frame.getAttribute('style') ?? '';
+    const screen = window.innerHeight;
+    const frameHeight = Math.max(Math.round(screen * 2.5), Math.round(centre + screen * 2));
+    Object.assign(frame.style, {
+      position: 'fixed',
+      left: '0px',
+      top: '0px',
+      width: '375px',
+      height: `${frameHeight}px`,
+      transform: 'none',
+      zIndex: '2147483647',
+    });
+    // The runner may draw the frame scaled, inside a transformed box that is
+    // also what `fixed` is placed against, so the offset is found by
+    // measuring rather than assumed: the frame is moved up until `centre` sits
+    // in the middle of the screen, and the slice is read back off its box.
+    const atZero = frame.getBoundingClientRect();
+    const scale = atZero.height / frameHeight;
+    frame.style.top = `${(screen / 2 - centre * scale - atZero.top) / scale}px`;
+    const box = frame.getBoundingClientRect();
+    return {
+      frameHeight,
+      visible: {
+        top: Math.round((Math.max(box.top, 0) - box.top) / scale),
+        bottom: Math.round((Math.min(box.bottom, screen) - box.top) / scale),
+      },
+    };
+  }, around);
+
+const frameCommands = { clickInResultFrame, showFrameSlice };
 
 /**
  * How many story files run at once, each in a browser page of its own: Vitest's

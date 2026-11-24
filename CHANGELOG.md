@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The overlays sit in the part of a host's frame on screen**: the team's files' sheet, the examples sheet, the questions before a replace or a delete, the rename and download-name dialogs and the picture viewer now lay themselves out in the part of the viewport the screen shows, where they laid out against the whole viewport. In a chat host's frame that grows with its content, whose viewport is as tall as the view, the team's files' sheet was as tall as the whole view, its head above the screen and its Use button far below it; it now runs from 1.5rem under the top of the slice on screen to its bottom. On a page, where the viewport is the screen, nothing moves. The part on screen is measured with an `IntersectionObserver` on hidden `fixed` bands that a dialog's root adds to the page while it is mounted, and with no observer the overlays keep the viewport. See [docs/sources.md](docs/sources.md#the-sheet).
+
 ## [v0.42.0] - 2026-11-23
 
 ### Added
