@@ -5,6 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 import { headingClass } from '../style-tokens';
 import { cn } from '../utils';
+import { useFrameInView, useFrameInViewStyle } from './frame-in-view';
 
 /*
  * The vendored dialog, over `@radix-ui/react-dialog`, which is the behaviour:
@@ -20,14 +21,25 @@ import { cn } from '../utils';
  *
  * Drawn in place rather than in a portal, as the file-name dialog is, so it
  * reads the theme and brand tokens of the scope the control sits in; its
- * overlay and panel are `fixed` over the viewport. The panel is centred by
- * `inset: 0` and `margin: auto` rather than by a transform, because a
+ * overlay is `fixed` over the viewport, and its panel sits in the part of the
+ * viewport on screen (`./frame-in-view`), which on a page is all of it and in
+ * a chat host's frame that grows with its content is the slice the
+ * conversation shows. The panel is centred between `--mthds-frame-top` and
+ * `--mthds-frame-bottom` by `margin: auto` rather than by a transform, because a
  * transform would make it the containing block of every `fixed` element drawn
  * inside it, a menu's popper among them. Every button inside is
  * `type="button"`, because a form may sit inside a host's `<form>`.
  */
 
-const Dialog = DialogPrimitive.Root;
+/**
+ * The dialog's root. It watches the part of the viewport on screen from the
+ * moment it mounts, shut or open, so the panel is placed from a reading taken
+ * before it opened.
+ */
+function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  useFrameInView();
+  return <DialogPrimitive.Root {...props} />;
+}
 const DialogClose = DialogPrimitive.Close;
 
 /** Names where focus goes as a panel closes; nothing leaves it to Radix. */
@@ -94,9 +106,11 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 /**
  * The panel and its overlay. `layout="sheet"` is the picker's: a bottom sheet
- * at nearly the viewport's full height below 1280px, and a dialog at most
- * 560px wide from 1280px, one tree laid out by CSS alone. `layout="dialog"` is
- * a small centred dialog at every width.
+ * at nearly the full height of the part on screen below 1280px, and a dialog
+ * at most 560px wide from 1280px, one tree laid out by CSS alone.
+ * `layout="dialog"` is a small dialog centred in the part on screen at every
+ * width. Each reads `--mthds-frame-top` and `--mthds-frame-bottom` with a `0px` fallback,
+ * so with nothing measured it lays out against the viewport.
  */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
@@ -105,28 +119,37 @@ const DialogContent = React.forwardRef<
     /** Where focus goes when the panel closes. See `closeAutoFocus`. */
     returnFocus?: ReturnFocus;
   }
->(({ className, layout = 'dialog', returnFocus, onCloseAutoFocus, children, ...props }, ref) => (
-  <DialogSurface>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        'fixed z-50 flex flex-col border-border bg-popover text-popover-foreground shadow-lg outline-hidden',
-        layout === 'sheet'
-          ? [
-              'inset-x-0 top-6 bottom-0 rounded-t-xl border-t',
-              'xl:inset-0 xl:m-auto xl:h-fit xl:max-h-[min(720px,calc(100dvh-4rem))] xl:w-[calc(100%-2rem)] xl:max-w-[560px] xl:rounded-xl xl:border',
-            ]
-          : 'inset-0 m-auto h-fit w-[calc(100%-2rem)] max-w-sm gap-3 rounded-lg border p-4',
-        className,
-      )}
-      onCloseAutoFocus={closeAutoFocus(onCloseAutoFocus, returnFocus)}
-      {...props}
-    >
-      {children}
-    </DialogPrimitive.Content>
-  </DialogSurface>
-));
+>(
+  (
+    { className, layout = 'dialog', returnFocus, onCloseAutoFocus, style, children, ...props },
+    ref,
+  ) => {
+    const placed = useFrameInViewStyle(style);
+    return (
+      <DialogSurface>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            'fixed z-50 flex flex-col border-border bg-popover text-popover-foreground shadow-lg outline-hidden',
+            layout === 'sheet'
+              ? [
+                  'inset-x-0 top-[calc(var(--mthds-frame-top,0px)+1.5rem)] bottom-[var(--mthds-frame-bottom,0px)] rounded-t-xl border-t',
+                  'xl:top-[var(--mthds-frame-top,0px)] xl:m-auto xl:h-fit xl:max-h-[min(720px,calc(100dvh-var(--mthds-frame-top,0px)-var(--mthds-frame-bottom,0px)-4rem))] xl:w-[calc(100%-2rem)] xl:max-w-[560px] xl:rounded-xl xl:border',
+                ]
+              : 'inset-x-0 top-[var(--mthds-frame-top,0px)] bottom-[var(--mthds-frame-bottom,0px)] m-auto h-fit w-[calc(100%-2rem)] max-w-sm gap-3 rounded-lg border p-4',
+            className,
+          )}
+          style={placed}
+          onCloseAutoFocus={closeAutoFocus(onCloseAutoFocus, returnFocus)}
+          {...props}
+        >
+          {children}
+        </DialogPrimitive.Content>
+      </DialogSurface>
+    );
+  },
+);
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogTitle = React.forwardRef<

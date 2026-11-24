@@ -15,6 +15,7 @@ import { useAskFileName } from './result-env';
 import { focusOutlineClass } from './role-tokens';
 import { headingClass } from './style-tokens';
 import { cn } from './utils';
+import { useFrameInViewStyle } from './ui/frame-in-view';
 
 /**
  * The name a download should be saved under: the planned one when the host has
@@ -92,7 +93,7 @@ export interface FileNameDialogProps {
  *
  * It is drawn in place rather than in a portal, so it reads the theme and brand
  * tokens of the scope the control sits in, and it is a `fixed` overlay over the
- * viewport. It holds no `<form>`, because a result view may sit inside a host's
+ * viewport, its panel centred in the part of it on screen. It holds no `<form>`, because a result view may sit inside a host's
  * form and a nested form is invalid; Enter is read off the field instead. Its
  * events stop at the overlay, so a click in the dialog never reaches a row or a
  * card the control sits in.
@@ -107,6 +108,7 @@ export function FileNameDialog({ stem, extension, onConfirm, onCancel }: FileNam
   // Where a press on the backdrop began: a drag that selects the field's text
   // and is released over the backdrop is not a click on it.
   const pressedBackdrop = useRef(false);
+  const placed = useFrameInViewStyle();
 
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -143,7 +145,11 @@ export function FileNameDialog({ stem, extension, onConfirm, onCancel }: FileNam
   return (
     <div
       data-file-name-backdrop
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      // The panel is centred in the part of the viewport on screen
+      // (`ui/frame-in-view`): the backdrop covers the viewport, its padding
+      // keeps the panel off the parts scrolled out of sight.
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 pt-[calc(var(--mthds-frame-top,0px)+1rem)] pb-[calc(var(--mthds-frame-bottom,0px)+1rem)]"
+      style={placed}
       onMouseDown={(event) => {
         event.stopPropagation();
         pressedBackdrop.current = event.target === event.currentTarget;

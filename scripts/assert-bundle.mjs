@@ -752,7 +752,26 @@ const RESERVED_NAMESPACES = [
   // Radix sets these on the element at run time (popover sizing, transform
   // origins). No host defines them and no fallback would be right.
   '--radix-',
+  // The kernel's own run-time variables (KERNEL_NAMESPACE below). Reserved here
+  // only so theme.css is not asked to define them; unlike the namespaces above,
+  // every read of one is then held to a fallback of its own.
+  '--mthds-',
 ];
+
+/**
+ * The kernel's own run-time variables, which a component sets inline on the
+ * element that reads them (the overlays' `--mthds-frame-top` and
+ * `--mthds-frame-bottom`, the part of the viewport on screen). No host defines
+ * them and theme.css does not, so they sit among the reserved namespaces. But
+ * the namespace is ours, and wherever the component that sets one is absent
+ * (a server render, a browser with nothing to measure, a future overlay that
+ * forgets to set it) a read without a fallback deletes its declaration exactly
+ * as a missing design token does. So rather than exempting a list of names,
+ * which a new variable would slip past, every `var(--mthds-…)` read in the
+ * shipped sheet must carry a non-empty fallback: the check fails closed for a
+ * variable nobody has added yet.
+ */
+const KERNEL_NAMESPACE = '--mthds-';
 
 /**
  * Tokens whose value is deliberately the same in every scope, so `.dark` has
@@ -1410,6 +1429,23 @@ if (optionalUnshipped.length > 0) {
 if (optionalBare.length > 0) {
   failures.push(
     `dist/styles.css reads ${optionalBare.map((name) => `${name} without falling back to ${fallbackRule(OPTIONAL_TOKENS.get(name), { built: true })}`).join('; ')}, so a host that defines none of them no longer renders what the control painted before.`,
+  );
+}
+const kernelReads = shippedReads.filter(({ name }) => name.startsWith(KERNEL_NAMESPACE));
+// `!r.fallback` for the reason given at `bare` below: an empty fallback fails
+// as none does.
+const kernelBare = [...new Set(kernelReads.filter((r) => !r.fallback).map((r) => r.name))].sort();
+if (kernelReads.length === 0) {
+  failures.push(
+    `dist/styles.css reads no ${KERNEL_NAMESPACE}* variable at all, so the check that each carries a fallback compared nothing. The overlays read \`--mthds-frame-top\` and \`--mthds-frame-bottom\`: either those utilities were dropped from the sheet or the variables were retired, in which case retire this check with them.`,
+  );
+} else if (kernelBare.length === 0) {
+  console.log(
+    `ok  dist/styles.css reads every ${KERNEL_NAMESPACE}* run-time variable with a fallback: ${[...new Set(kernelReads.map((r) => r.name))].sort().join(', ')}`,
+  );
+} else {
+  failures.push(
+    `dist/styles.css reads ${kernelBare.join(', ')} without a fallback, so wherever no component sets the variable the declaration that reads it is discarded rather than falling back to the layout that held before it.`,
   );
 }
 const shipped = shippedReads.filter(
