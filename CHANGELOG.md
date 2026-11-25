@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Packaging: the `mthds` floor moves from `^0.33.0` to `^0.34.0`**: `^0.34.0` is the minor the current `@pipelex/sdk` (0.69) and `@pipelex/mthds-ui` (0.58) take, so a host installing the form beside them gets a single copy of `mthds` instead of `0.33.x` beside `0.34.x`; a host whose own `mthds` requirement is `^0.33.0` moves to `0.34` to keep one copy. The kernel imports `mthds` for types alone, and every type it re-exports is identical in `0.34.0`, so nothing a host compiles against or renders changes.
+
 ## [v0.42.1] - 2026-11-24
 
 ### Fixed
