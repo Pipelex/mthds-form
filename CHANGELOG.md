@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Packaging: the `mthds` floor moves from `^0.33.0` to `^0.34.0` (Breaking)**: `^0.34.0` is the minor `@pipelex/sdk` and `@pipelex/mthds-ui` already take, so a host installing the form beside either one now gets a single copy of `mthds` instead of `0.33.x` beside `0.34.x`. The protocol surface the kernel re-exports is unchanged: the only difference in `mthds/protocol` is `MTHDS_PROTOCOL_VERSION`, now `2.0.1`, which clarifies the order of a files map's checks. A host that also declares `mthds` itself moves to `0.34` with it.
+- **Packaging: the `mthds` floor moves from `^0.33.0` to `^0.34.0`**: `^0.34.0` is the minor the current `@pipelex/sdk` (0.69) and `@pipelex/mthds-ui` (0.58) take, so a host installing the form beside them gets a single copy of `mthds` instead of `0.33.x` beside `0.34.x`; a host whose own `mthds` requirement is `^0.33.0` moves to `0.34` to keep one copy. The kernel imports `mthds` for types alone, and every type it re-exports is identical in `0.34.0`, so nothing a host compiles against or renders changes.
 
 ## [v0.42.1] - 2026-11-24
 
