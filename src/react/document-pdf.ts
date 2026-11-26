@@ -39,7 +39,9 @@ const isNonEmptyString = (value: unknown): value is string =>
  * `DOCUMENT_PDF_ASK_TIMEOUT_MS` or answers something other than a state reads
  * as `failed`, and so does a `ready` whose `url` is not a non-empty string. A
  * `failed` whose `message` is not a non-empty string carries none, so the view
- * says its own words. A string URL is left to the view's URL and frame gates.
+ * says its own words, and it is `final` only when the host said exactly `true`,
+ * so that a loosely typed answer never takes the reader's Try again away. A
+ * string URL is left to the view's URL and frame gates.
  */
 async function askOnce(ask: AskDocumentPdf): Promise<DocumentPdfAnswer> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -52,7 +54,11 @@ async function askOnce(ask: AskDocumentPdf): Promise<DocumentPdfAnswer> {
       case 'ready':
         return isNonEmptyString(answer.url) ? answer : FAILED;
       case 'failed':
-        return isNonEmptyString(answer.message) ? answer : FAILED;
+        return {
+          state: 'failed',
+          ...(isNonEmptyString(answer.message) ? { message: answer.message } : {}),
+          ...(answer.final === true ? { final: true } : {}),
+        };
       case 'preparing':
       case 'unavailable':
         return answer;
