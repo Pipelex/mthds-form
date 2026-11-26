@@ -127,17 +127,21 @@ export interface DocumentPdfRequest {
 /**
  * Where the PDF of a document stands, in the host's answer.
  *
- * - `ready`: `url` is where the PDF is read. It is the URL of a document the
- *   view will frame, so it passes the same gate and the same frame rule as any
- *   resolver's answer: a root-relative path, or an absolute `http(s):` URL on
- *   the page's own origin. An answer on another origin (a CDN, a presigned
- *   storage URL), or one the gate refuses, reads as `unavailable`: serve the
- *   PDF on your own origin.
+ * - `ready`: `url` is where the PDF is read. It passes the same gate as any
+ *   resolver's answer, and the same frame rule: a root-relative path, or an
+ *   absolute `http(s):` URL on the page's own origin, is framed. An answer the
+ *   frame rule refuses (another origin, such as a presigned storage URL) is
+ *   drawn page by page from the host's `loadBytes`, asked with this `url`, when
+ *   the host supplies it and a `pdfWorker` (see {@link LoadBytes}); with
+ *   either missing, or for an answer the gate refuses, it reads as
+ *   `unavailable`.
  * - `preparing`: the host is making the PDF. The view says so and asks again.
  * - `failed`: the host could not make the PDF. `message`, when the host can
  *   say why (a file protected by a password), is shown to the reader as it
  *   stands, so it must be in the reader's language; with none, the view says
- *   the package's `documentPdfFailed`. The reader is offered to try again.
+ *   the package's `documentPdfFailed`. The reader is offered to try again,
+ *   unless `final` is `true`: the host knows asking again cannot help this file
+ *   (it cannot be opened at all), and the view shows the message alone.
  * - `unavailable`: there is no PDF of this document to be had, and asking
  *   again would not change that (a file past the host's limits). The view says
  *   there is no preview.
@@ -145,7 +149,7 @@ export interface DocumentPdfRequest {
 export type DocumentPdfAnswer =
   | { state: 'ready'; url: string }
   | { state: 'preparing' }
-  | { state: 'failed'; message?: string }
+  | { state: 'failed'; message?: string; final?: boolean }
   | { state: 'unavailable' };
 
 /**
@@ -202,9 +206,10 @@ export type AskDocumentPdf = () => Promise<DocumentPdfAnswer>;
  *   preparing and asks again, at growing intervals, until the answer changes.
  *   It stops after three minutes and reads that as `failed`, and it stops when
  *   the reader folds the preview away.
- * - **It only ever shows pages.** The PDF is framed, or linked from the card
- *   shown where the browser has no PDF viewer, and it is nothing else: the
- *   document's name, its copy control and every download keep the original.
+ * - **It only ever shows pages.** The PDF is framed, drawn from its bytes, or
+ *   linked from the card shown where the browser has no PDF viewer, and it is
+ *   nothing else: the document's name, its copy control and every download
+ *   keep the original.
  */
 export type ResolveDocumentPdf = (
   url: string,
@@ -249,7 +254,10 @@ export interface BytesRequest {
  * ## The contract
  *
  * Called with the document's own `url` member, exactly as `resolveRendition`
- * and `resolveDocumentPdf` are, and the {@link BytesRequest}. Resolve to the
+ * and `resolveDocumentPdf` are, and the {@link BytesRequest}; and, for a
+ * Word, Excel or PowerPoint file, with the `url` of the host's own `ready`
+ * answer to `resolveDocumentPdf` when the frame rule refuses it, as it stands
+ * in the answer, so the PDF the host made is drawn the same way. Resolve to the
  * file's bytes, as a `Uint8Array` or an `ArrayBuffer`. It is asked once the
  * open preview's frame-sized placeholder comes within a viewport's height of
  * the visible part of the page (at once where the browser has no
@@ -273,7 +281,9 @@ export interface BytesRequest {
  * reject everything else. Never fetch an arbitrary URL with the reader's
  * credentials or the host's, and never through the host's own server, which
  * would hand a method a request from inside the host's network (server-side
- * request forgery).
+ * request forgery). A `ready` answer's `url` is the host's own, so the same
+ * guard admits it when it is a link to the host's own storage, and the seam
+ * needs no second rule for it.
  *
  * ## The download's deadline is the host's
  *

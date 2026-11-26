@@ -9,6 +9,8 @@ import {
   StuffViewer,
   type DocumentPdfAnswer,
   type FieldPresentation,
+  type LoadBytes,
+  type PdfWorkerConfig,
   type ResolveDocumentPdf,
 } from '../../react';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
@@ -64,16 +66,27 @@ function Preview({
   value,
   presentation = 'studio',
   resolveDocumentPdf,
+  loadBytes,
+  pdfWorker,
 }: {
   value: unknown;
   presentation?: FieldPresentation;
   /** The host's PDF of a document the browser cannot render. */
   resolveDocumentPdf?: ResolveDocumentPdf;
+  /** The bytes of a PDF the view cannot frame, for a host whose view draws them. */
+  loadBytes?: LoadBytes;
+  /** pdf.js's worker, which drawing a PDF's pages needs beside `loadBytes`. */
+  pdfWorker?: PdfWorkerConfig;
 }) {
   return (
     <div style={{ maxWidth: 640 }}>
       <FieldPresentationProvider presentation={presentation}>
-        <ResultEnvProvider resolveUrl={servedFiles} resolveDocumentPdf={resolveDocumentPdf}>
+        <ResultEnvProvider
+          resolveUrl={servedFiles}
+          resolveDocumentPdf={resolveDocumentPdf}
+          loadBytes={loadBytes}
+          pdfWorker={pdfWorker}
+        >
           <StuffViewer field={document} value={value} />
         </ResultEnvProvider>
       </FieldPresentationProvider>
@@ -641,6 +654,81 @@ export const ALoneDeckStudio: Story = {
     await userEvent.click(toggles[0]!);
     await expect(toggles[0]!.getAttribute('aria-expanded')).toBe('false');
     await expect(pdfFrames(canvasElement)).toHaveLength(1);
+  },
+};
+
+// ─── A deck whose PDF is on another origin ───────────────────────────────────
+
+/**
+ * Where this story's host answers the deck's PDF: a presigned link on its
+ * storage bucket's host, another origin, which the frame rule refuses.
+ */
+const PRESIGNED_DECK_PDF =
+  'https://bucket.example.invalid/run/quarterly_review.pptx.pdf?X-Amz-Signature=story';
+
+/**
+ * The host's bytes seam. It reads only the links it hands out itself, and this
+ * story's bucket is a stand-in: the PDF behind its one link is the file
+ * Storybook serves.
+ */
+const loadDeckPdf: LoadBytes = async (url, { signal }) => {
+  if (url !== PRESIGNED_DECK_PDF) throw new Error(`Not a link this host hands out: ${url}`);
+  const response = await fetch(PDF_URL, { signal });
+  if (!response.ok) throw new Error(`The file answered ${response.status}`);
+  return new Uint8Array(await response.arrayBuffer());
+};
+
+/**
+ * **A deck whose host answers its PDF on another origin: its pages, drawn from
+ * bytes.** A host whose view runs in a chat host's sandboxed frame has no route
+ * on the page's origin, so its PDF of the deck is a presigned link the frame
+ * rule refuses. It hands the view the bytes behind that link (`loadBytes`,
+ * asked with the answer's own `url`) and pdf.js's worker, served by this
+ * Storybook under `/pdfjs/`, and the view draws the pages at a page's size,
+ * with no toggle, framing nothing. The deck's own name and link stay the
+ * original's.
+ */
+export const ADeckDrawnFromBytes: Story = {
+  name: 'A deck whose PDF is on another origin, in an app → its pages, drawn from bytes',
+  args: {
+    value: DECK,
+    presentation: 'app',
+    resolveDocumentPdf: hostAnswering({ state: 'ready', url: PRESIGNED_DECK_PDF }),
+    loadBytes: loadDeckPdf,
+    pdfWorker: {
+      workerSrc: '/pdfjs/build/pdf.worker.min.mjs',
+      cMapUrl: '/pdfjs/cmaps/',
+      standardFontDataUrl: '/pdfjs/standard_fonts/',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // One per theme pane.
+    const regions = await waitFor(
+      () => {
+        const found = canvas.getAllByRole('group', { name: DECK.title });
+        expect(found).toHaveLength(2);
+        return found;
+      },
+      { timeout: 15_000 },
+    );
+    for (const region of regions) {
+      await waitFor(
+        () => {
+          expect(region.querySelector('canvas')).not.toBeNull();
+          expect(region.querySelector('.textLayer')?.textContent ?? '').toMatch(/Solar System/);
+        },
+        { timeout: 15_000 },
+      );
+      await expectPageSized(region);
+    }
+    await expect(canvasElement.querySelector('iframe')).toBeNull();
+    await expect(
+      canvas.queryAllByRole('button', { name: DEFAULT_FIELD_STRINGS.preview }),
+    ).toHaveLength(0);
+    for (const link of canvas.getAllByRole('link', { name: DECK.filename })) {
+      await expect(link.getAttribute('href')).toBe(DECK.url);
+    }
   },
 };
 

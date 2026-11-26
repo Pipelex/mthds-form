@@ -445,6 +445,45 @@ describe('when the host cannot make the PDF', () => {
     expect(screen.getByRole('alert').textContent).toBe('This file is protected by a password.');
   });
 
+  it('shows a final failure’s message with nothing to try again, and asks no more', async () => {
+    const { ask, resolve } = answering({
+      state: 'failed',
+      message: 'This file may be protected by a password or damaged.',
+      final: true,
+    });
+    const { container } = render(viewer(resolve));
+    await elapse();
+    expect(screen.getByRole('alert').textContent).toBe(
+      'This file may be protected by a password or damaged.',
+    );
+    expect(screen.queryByRole('button', { name: S.tryAgain })).toBeNull();
+    expect(frame(container)).toBeNull();
+    // The toggle stays, as it does for an answer with no PDF to offer.
+    expect(previewToggle()).toHaveAttribute('aria-expanded', 'true');
+    await elapse(60_000);
+    expect(ask).toHaveBeenCalledTimes(1);
+  });
+
+  it('says its own words for a final failure with no message, still with no Try again', async () => {
+    const { resolve } = answering({ state: 'failed', final: true });
+    render(viewer(resolve));
+    await elapse();
+    expect(screen.getByRole('alert').textContent).toBe(S.documentPdfFailed);
+    expect(screen.queryByRole('button', { name: S.tryAgain })).toBeNull();
+  });
+
+  it.each<[string, unknown]>([
+    ['the string "true"', 'true'],
+    ['a number', 1],
+    ['false', false],
+  ])('keeps Try again for a failure whose final is %s', async (_, final) => {
+    const answer = { state: 'failed', message: 'Busy.', final } as unknown as DocumentPdfAnswer;
+    render(viewer(() => () => Promise.resolve(answer)));
+    await elapse();
+    expect(screen.getByRole('alert').textContent).toBe('Busy.');
+    expect(screen.getByRole('button', { name: S.tryAgain })).toBeTruthy();
+  });
+
   it('reads an ask that throws, rejects or answers nonsense as a failure', async () => {
     const asks: AskDocumentPdf[] = [
       () => {

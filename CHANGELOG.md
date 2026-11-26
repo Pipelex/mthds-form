@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.42.3] - 2026-11-26
+
+### Added
+
+- **A converted document's PDF is drawn from its bytes when its link cannot be framed**: when a `resolveDocumentPdf` answer is `ready` at a `url` the frame rule refuses (another origin, such as a presigned storage link), and the host supplies `loadBytes` and a `pdfWorker`, the view now draws that PDF page by page, asking `loadBytes` with the answer's own `url`, where it used to read the answer as `unavailable`. A same-origin answer is still framed, and a host with no `loadBytes` or no worker still sees `unavailable`; the fallbacks are a stored PDF's (a failed download folds the preview and unfolding it asks the host and the seam again, while bytes past the ceiling or a PDF pdf.js refuses leave the document its link). A host's `loadBytes` is therefore also called with the URLs of its own `ready` answers. See [docs/result-view.md](docs/result-view.md#a-document-the-browser-cannot-render-the-hosts-pdf).
+- **`DocumentPdfAnswer`'s `failed` member takes `final`**: a host that knows asking again cannot help (a file the converter cannot open) answers `{ state: 'failed', message, final: true }`, and the view shows its message, or `documentPdfFailed` with none, with no Try again. Only the value `true` counts, so any other answer keeps the button.
+
 ## [v0.42.2] - 2026-11-25
 
 ### Changed
