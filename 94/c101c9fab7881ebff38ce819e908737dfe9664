@@ -1,0 +1,95 @@
+src/react/field-strings.tsx
+  s_956c4adbd2c714::t_a1f571f109c83a 449-489
+src/react/file-picker.tsx
+  s_956c4adbd2c714::t_84ee5273e239b7 110-115,122-129,131-156
+  s_956c4adbd2c714::t_0dab8f16159ee8 34-40
+src/react/file-field.tsx
+  s_956c4adbd2c714::t_c4581a44d2349a 4,7-17,36,155-163,311-312,317-324,511,514-521,528,1072-1111,1113-1115,1123,1128-1259,1266-1286,1290-1347,1837-1859,1864-1865,1869-1870,1872
+  s_956c4adbd2c714::t_53991c26840752 1112,1122
+  s_956c4adbd2c714::t_8ed35afdaadd76 922-923,925,930-933,935-940,944,946,972-975,977-984,1018,1044-1047,1070-1071,1348-1350,1558-1560,1573,1871
+  s_956c4adbd2c714::t_0451c6e39b494b 924,926-929,934,941-943,945,947-971,976,985-1017,1019-1043,1048-1069,1116-1121,1124-1127,1260-1265,1287-1289,1860-1863,1866-1868
+src/react/list-file-drop.tsx
+  s_956c4adbd2c714::t_75ca16442db2ac 3,5-6,13-22,40-61,83-96,105-107,109,116-118,122-126,129-131,142-149,151,177-199,205-264,270-275,282,290-291,302
+  s_956c4adbd2c714::t_0451c6e39b494b 127-128,200-204,265-269
+  s_956c4adbd2c714::t_c8bde7329afeec 303
+  s_956c4adbd2c714::t_f840edafe024c4 276-281,283-289,292-301
+src/react/list-field.tsx
+  s_956c4adbd2c714::t_ea147bee031328 10-11,31-35,90-93,374-571,576-679
+  s_956c4adbd2c714::t_0451c6e39b494b 24-30,572-575
+  s_956c4adbd2c714::t_e380a3efffae6e 680
+src/react/field-styles.ts
+  s_956c4adbd2c714::t_04a1cce9816b82 47-94
+src/react/method-form.tsx
+  s_956c4adbd2c714::t_c63fa5e4babb5a 22-23,833-853,921-924,971-972,975-976,1031-1037,1042-1095,1098,1107-1109,1112-1114,1118-1227
+  s_956c4adbd2c714::t_0451c6e39b494b 1038-1041
+  s_956c4adbd2c714::t_668c002f93052e 1096-1097,1099-1106
+src/react/field-shell.tsx
+  s_956c4adbd2c714::t_c2552d3d0c7cce 305,307
+  s_956c4adbd2c714::t_ade30802f8e2ab 92-95
+  s_956c4adbd2c714::t_081b3db8e7bc2e 3-4,10-11,32-37,63,70,77-91,96-147,154,159,163-251,253-254,260-295
+  s_956c4adbd2c714::t_abb0fd1e31af4e 296
+src/react/enum-field.tsx
+  s_956c4adbd2c714::t_1e19ae73f764d8 58,62
+  s_956c4adbd2c714::t_4d1966a37c79a4 5-11,56-57,97,103-114,117,134-146
+  s_956c4adbd2c714::t_a333ac9163527f 12,59-60,63-64
+src/react/optional-toggle.tsx
+  s_956c4adbd2c714::t_2c7f86113254dc 3-4,28-55,68
+src/react/role-tokens.ts
+  s_956c4adbd2c714::t_4d1966a37c79a4 162-165
+  s_956c4adbd2c714::t_4c37966d09fc98 124-161
+src/react/field-renderer.tsx
+  s_956c4adbd2c714::t_ade30802f8e2ab 187-196,324-325,347-348
+src/react/number-field.tsx
+  s_956c4adbd2c714::t_ad563fd7596003 113
+  s_956c4adbd2c714::t_f824270d249074 11,13,29-32,39-40,57-59,64-71,85-86,88-90,93-99,102-108,112,114,123-124,130-131,141-149
+src/react/boolean-field.tsx
+  s_956c4adbd2c714::t_f95785262b347b 7-9,34-86,98,102,106
+src/react/locales/en.ts
+  s_956c4adbd2c714::t_a1f571f109c83a 234-256,259-260
+  s_956c4adbd2c714::t_0451c6e39b494b 257-258
+src/react/field-context.ts
+  s_956c4adbd2c714::t_1b96db374b3b61 1-45
+  s_956c4adbd2c714::t_c4581a44d2349a 46-52
+src/react/text-field.tsx
+  s_956c4adbd2c714::t_957d24ec5faba3 10-11,26-27,47-53,76-77,88,99-105
+  s_956c4adbd2c714::t_0451c6e39b494b 8
+src/react/index.ts
+  s_956c4adbd2c714::t_0391fd924c6164 25-32
+src/react/unknown-field.tsx
+  s_956c4adbd2c714::t_0451c6e39b494b 69
+  s_956c4adbd2c714::t_ad563fd7596003 8,10-11,31,33,41-44,56-57,59-61,67
+  s_956c4adbd2c714::t_d99b6792002368 12,32,62-66
+scripts/assert-bundle.mjs
+  s_956c4adbd2c714::t_4c37966d09fc98 831-832
+src/react/date-field.tsx
+  s_956c4adbd2c714::t_ad563fd7596003 9,11,45,69-70,72-73
+src/react/paste-json.tsx
+  s_956c4adbd2c714::t_a0298aa4b93ddc 1-200,204-228,232-235
+  s_956c4adbd2c714::t_0451c6e39b494b 201-203
+  s_956c4adbd2c714::t_b63a7ec1d8a9ab 229-231
+src/react/locales/fr.ts
+  s_956c4adbd2c714::t_a1f571f109c83a 288-314
+src/react/object-field.tsx
+  s_956c4adbd2c714::t_5bdde2d6913ac6 274,318
+  s_956c4adbd2c714::t_46723b783549d5 4,23-25,45-51,216-266,271-273,275-317,319-321,328-349
+  s_956c4adbd2c714::t_0451c6e39b494b 267-270,322-327
+  s_956c4adbd2c714::t_c19c8ea74fc1c6 350
+src/react/file-too-large.tsx
+  s_956c4adbd2c714::t_c890d7985b23e6 1-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "94c101c9fab7881ebff38ce819e908737dfe9664",
+  "prompts": {},
+  "sessions": {
+    "s_956c4adbd2c714": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1eb91be-dac9-416b-93e9-391a3d67fc1d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
