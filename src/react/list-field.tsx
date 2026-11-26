@@ -7,8 +7,8 @@ import {
   roomForChosenFiles,
   roomForDroppedFiles,
 } from '../core/sources';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { focusOutlineClass, selectedHoverBorderClass } from './role-tokens';
 import { cn, isThenable } from './utils';
 import type { ListRunField, RunField } from '../core';
@@ -21,7 +21,18 @@ import {
   useFieldPresentation,
 } from './field-presentation';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
-import { FieldDescription, OptionalMark } from './field-shell';
+import {
+  FieldDescription,
+  FieldHeader,
+  ItemCount,
+  OptionalMark,
+  OptionalPill,
+} from './field-shell';
+import { ListRowContext, InputFillContext, useStructureDepth } from './field-context';
+import { appIconButtonClass } from './field-styles';
+import { PasteJsonEditor, PasteJsonSwitch } from './paste-json';
+import { linkHoverWashClass, linkTextClass } from './role-tokens';
+import { use } from 'react';
 import { rowActionClass, smallPrintClass } from './field-styles';
 import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
@@ -76,6 +87,10 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const items = value ?? [];
   const [rowKeys, setRowKeys] = useRowKeys(items.length, id, env?.rowMoves);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Paste JSON, in an app: the list's value as JSON in place of its rows.
+  const [json, setJson] = useState(false);
+  const depth = useStructureDepth();
+  const fill = use(InputFillContext);
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
   // The row the sheet's last chosen file was written into, set as the sheet
@@ -355,6 +370,313 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
     kinds,
     presentation,
   );
+
+  const pickerSheet = fileSource && fileItem && (
+    <FilePicker
+      source={fileSource}
+      formats={fileItem.formats}
+      multiple
+      maxChoices={room}
+      held={items}
+      open={pickerOpen}
+      onOpenChange={setPickerOpen}
+      disabled={env?.disabled || busy}
+      returnFocusTo={pickerEntryRef}
+      onCloseAutoFocus={(event) => {
+        // Focus goes back to the row that opened the sheet, unless the
+        // choice filled the list and shut that row: then to the row
+        // the last chosen file was written into.
+        const landed = landedRow.current;
+        landedRow.current = null;
+        if (landed === null || !pickerEntryRef.current?.disabled) return;
+        const rows = rowsRef.current?.querySelectorAll(':scope > [data-list-row]');
+        const target = firstFocusable(rows?.[landed]);
+        if (!target) return;
+        event.preventDefault();
+        target.focus();
+      }}
+      onUse={(files) => {
+        const next = addChosenFiles(items, files);
+        landedRow.current = lastWrittenRow(items, next);
+        onChange(next);
+      }}
+    />
+  );
+
+  if (isApp) {
+    const count =
+      items.length > 0 || exactCount !== undefined
+        ? exactCount !== undefined
+          ? s.itemsCountOf(items.length, exactCount)
+          : s.itemsCount(items.length)
+        : undefined;
+    const top = depth === 0 && label.trim() !== '';
+    const row = (item: unknown, index: number) => (
+      <ListRowContext value>
+        <FieldRenderer
+          // `required: true`: a row is in the array because the person added
+          // it, so it is never optional.
+          field={{ ...field.item, title: '', name: `${field.name}[${index}]`, required: true }}
+          value={item}
+          onChange={(v) => setItem(index, v)}
+          id={`${id}.${index}`}
+          env={rowEnv}
+        />
+      </ListRowContext>
+    );
+    const remove = (index: number, name: string, className?: string) => (
+      <button
+        type="button"
+        onClick={() => removeItem(index)}
+        disabled={env?.disabled || busy}
+        aria-label={name}
+        className={cn(appIconButtonClass, focusOutlineClass, className)}
+      >
+        <X className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+      </button>
+    );
+    const fileName = (item: unknown): string | undefined =>
+      typeof item === 'object' && item !== null && 'filename' in item
+        ? String((item as { filename?: unknown }).filename ?? '') || undefined
+        : undefined;
+    const caption = error && (
+      <p className="text-[11px] text-destructive" role="alert">
+        {error}
+      </p>
+    );
+
+    let body: ReactNode;
+    if (json) {
+      body = (
+        <PasteJsonEditor
+          field={field}
+          value={items}
+          disabled={env?.disabled}
+          onUse={(next) => {
+            onChange(next as unknown[]);
+            setJson(false);
+          }}
+        />
+      );
+    } else if (fileItem) {
+      // A list of files: the big drop zone while it is empty, then the files
+      // as lines, or the pictures as a grid, with "Add more" under them.
+      const pickEntry = fileSource && (
+        <FilePickerEntry
+          ref={pickerEntryRef}
+          label={label}
+          disabled={env?.disabled || busy || room === 0}
+          onOpen={() => setPickerOpen(true)}
+          inZone
+        />
+      );
+      const add = (cellSpan?: number) =>
+        dropOffered ? (
+          <ListFileDrop
+            label={label}
+            formats={fileItem.formats}
+            shut={!dropOpen}
+            onPlace={placeFiles}
+            maxFileBytes={env?.maxFileBytes}
+            upgradeHref={env?.upgradeHref}
+            variant="add"
+            images={fileItem.kind === 'image'}
+            cellSpan={cellSpan}
+            onPick={fileSource && room !== 0 ? () => setPickerOpen(true) : undefined}
+          />
+        ) : null;
+      if (items.length === 0) {
+        body = dropOffered ? (
+          <div ref={dropRef} className="flex flex-1 flex-col">
+            <ListFileDrop
+              label={label}
+              formats={fileItem.formats}
+              shut={!dropOpen}
+              onPlace={placeFiles}
+              maxFileBytes={env?.maxFileBytes}
+              upgradeHref={env?.upgradeHref}
+              variant="zone"
+              pickerEntry={pickEntry}
+              fill={fill}
+            />
+          </div>
+        ) : (
+          fileSource && (
+            <FilePickerEntry
+              ref={pickerEntryRef}
+              label={label}
+              disabled={env?.disabled || busy || room === 0}
+              onOpen={() => setPickerOpen(true)}
+            />
+          )
+        );
+      } else if (fileItem.kind === 'image') {
+        // Up to seven pictures, the first one large; past seven, six and a
+        // "+N more" cell. "Add more images" fills the free cells of the last row.
+        const shownCount = items.length > 7 ? 6 : items.length;
+        const more = items.length > 7 ? items.length - 6 : 0;
+        const one = items.length === 1;
+        const cells = (one ? 1 : 4 + Math.max(0, shownCount - 1)) + (more > 0 ? 1 : 0);
+        const span = one ? 1 : (3 - (cells % 3)) % 3 || 3;
+        body = (
+          <div
+            ref={rowsRef}
+            className={cn(
+              'grid gap-1.5',
+              one ? 'auto-rows-[180px] grid-cols-1' : 'auto-rows-[78px] grid-cols-3',
+            )}
+          >
+            <ListDropAreaContext.Provider value={dropArea}>
+              {items.map((item, index) => (
+                <div
+                  key={rowKeys[index] ?? index}
+                  data-list-row
+                  hidden={index >= shownCount}
+                  className={cn(
+                    'group relative overflow-hidden rounded-lg bg-input shadow-[inset_0_0_0_1px_var(--border,hsl(240_5.9%_90%))]',
+                    index === 0 && !one && 'col-span-2 row-span-2',
+                  )}
+                >
+                  {row(item, index)}
+                  {remove(
+                    index,
+                    s.removeNamedFile(fileName(item) ?? s.removeItemAria(index + 1)),
+                    'absolute top-1 right-1 size-7 bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-black/70 hover:text-white max-md:size-9 max-md:opacity-100',
+                  )}
+                </div>
+              ))}
+            </ListDropAreaContext.Provider>
+            {more > 0 && (
+              <div className="grid place-items-center rounded-lg bg-input text-[14px] font-semibold text-foreground">
+                {s.moreImages(more)}
+              </div>
+            )}
+            {add(span)}
+          </div>
+        );
+      } else {
+        // The first four files as lines, each with its remove cross, then
+        // "+ N more · M files in all".
+        body = (
+          <div className="flex flex-col gap-1.5">
+            <div ref={rowsRef} className="flex flex-col gap-1.5">
+              <ListDropAreaContext.Provider value={dropArea}>
+                {items.map((item, index) => (
+                  <div
+                    key={rowKeys[index] ?? index}
+                    data-list-row
+                    hidden={index >= 4}
+                    className="flex min-h-12 items-center gap-2.5 rounded-[9px] bg-input py-1.5 pr-1.5 pl-2"
+                  >
+                    <div className="min-w-0 flex-1">{row(item, index)}</div>
+                    {remove(
+                      index,
+                      s.removeNamedFile(fileName(item) ?? s.removeItemAria(index + 1)),
+                    )}
+                  </div>
+                ))}
+              </ListDropAreaContext.Provider>
+            </div>
+            {items.length > 4 && (
+              <p className="m-0 px-0.5 text-[12.5px] leading-[17px] text-muted-foreground">
+                {s.moreFiles(items.length - 4, items.length)}
+              </p>
+            )}
+            {add()}
+          </div>
+        );
+      }
+    } else {
+      // Numbered items on a thin rule, each with its remove cross, and
+      // "Add item" under them.
+      body = (
+        <div className="flex flex-col border-l-[1.5px] border-border pl-3.5">
+          <div ref={rowsRef} className="flex flex-col">
+            <ListDropAreaContext.Provider value={dropArea}>
+              {items.map((item, index) =>
+                structuredRows ? (
+                  <div key={rowKeys[index] ?? index} data-list-row>
+                    <div className="mt-1.5 flex items-center justify-between gap-2 pt-1 pb-0.5">
+                      <b className="text-[12px] leading-4 font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+                        {index + 1}
+                      </b>
+                      {remove(index, s.removeItemAria(index + 1))}
+                    </div>
+                    {row(item, index)}
+                  </div>
+                ) : (
+                  <div
+                    key={rowKeys[index] ?? index}
+                    data-list-row
+                    className="flex items-center gap-2 py-[3px]"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="w-[18px] shrink-0 text-right font-mono text-[12px] leading-4 font-medium text-muted-foreground"
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">{row(item, index)}</div>
+                    {remove(index, s.removeItemAria(index + 1))}
+                  </div>
+                ),
+              )}
+            </ListDropAreaContext.Provider>
+          </div>
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={addItem}
+              disabled={env?.disabled || isFull}
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium transition-colors max-md:min-h-11',
+                linkTextClass,
+                linkHoverWashClass,
+                'disabled:cursor-default disabled:bg-transparent disabled:text-muted-foreground',
+                focusOutlineClass,
+              )}
+            >
+              <Plus className="size-3.5 shrink-0" aria-hidden="true" />
+              {s.addItem}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const header = top ? (
+      <FieldHeader
+        label={label}
+        count={count}
+        optional={shownAsOptional(field)}
+        description={description}
+        aside={
+          <PasteJsonSwitch label={label} json={json} onChange={setJson} disabled={env?.disabled} />
+        }
+      />
+    ) : label.trim() !== '' ? (
+      <div className="flex flex-col gap-px pt-2.5 pb-0.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[13px] leading-[18px] font-semibold text-foreground">{label}</span>
+          {count && <ItemCount>{count}</ItemCount>}
+          {shownAsOptional(field) && <OptionalPill />}
+        </div>
+        {description && (
+          <p className="m-0 text-[12px] leading-4 text-muted-foreground">{description}</p>
+        )}
+      </div>
+    ) : null;
+
+    return (
+      <div className={cn('flex flex-1 flex-col', top ? 'gap-3' : 'gap-0')}>
+        {header}
+        {itemDescription && <FieldDescription>{itemDescription}</FieldDescription>}
+        {body}
+        {pickerSheet}
+        {caption}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">

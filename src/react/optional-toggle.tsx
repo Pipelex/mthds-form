@@ -1,6 +1,7 @@
 'use client';
 
-import { Minus, Plus } from 'lucide-react';
+import { ChevronRight, Minus, Plus } from 'lucide-react';
+import { useFieldPresentation } from './field-presentation';
 import { useFieldStrings } from './field-strings';
 import { focusOutlineClass } from './role-tokens';
 import { cn } from './utils';
@@ -24,6 +25,34 @@ interface OptionalToggleProps {
  */
 export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: OptionalToggleProps) {
   const s = useFieldStrings();
+  const isApp = useFieldPresentation() === 'app';
+  const text = expanded
+    ? noun === 'field'
+      ? s.hideOptionalFields
+      : s.hideOptionalInputs
+    : noun === 'field'
+      ? s.optionalFieldsCount(count)
+      : s.optionalInputsCount(count);
+  if (isApp) {
+    // A quiet disclosure with a chevron that turns down when it is open.
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className={cn(
+          'mt-1 inline-flex h-7 w-fit items-center gap-1.5 rounded-md px-2 text-[12.5px] font-medium leading-4 text-muted-foreground transition-colors hover:bg-input hover:text-foreground max-md:min-h-11',
+          focusOutlineClass,
+        )}
+      >
+        <ChevronRight
+          className={cn('size-[13px] transition-transform', expanded && 'rotate-90')}
+          aria-hidden="true"
+        />
+        {text}
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -36,13 +65,7 @@ export function OptionalToggle({ count, expanded, onToggle, noun = 'field' }: Op
       )}
     >
       {expanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-      {expanded
-        ? noun === 'field'
-          ? s.hideOptionalFields
-          : s.hideOptionalInputs
-        : noun === 'field'
-          ? s.optionalFieldsCount(count)
-          : s.optionalInputsCount(count)}
+      {text}
     </button>
   );
 }

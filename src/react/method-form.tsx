@@ -19,7 +19,8 @@ import type { LoadText } from '../core/stored-value';
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
 import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { FormResolveUrl, UploadedFile } from './file-field';
-import { FramedFormContext, RefusedStructureContext } from './object-field';
+import { FramedFormContext, InputCardContext, RefusedStructureContext } from './object-field';
+import { GeneratedInputContext, InputFillContext } from './field-context';
 import type { FilePickerSource } from './file-picker';
 import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
@@ -829,6 +830,27 @@ export interface MethodFormProps {
    * it ends on a bare page.
    */
   framed?: boolean;
+  /**
+   * How the inputs are laid out. `stack` (the default): one under the other,
+   * with no card. `grid`: each input in a card of its own, on a twelve-column
+   * grid packed by kind (`packInputs`): two big inputs share a row, up to three
+   * small ones stack beside a lone big one, the rest share rows of up to
+   * three, and on a narrow screen every card takes the whole width. Every card
+   * is as tall as its content, except an empty file input beside a neighbour,
+   * whose drop zone grows to the row's height. See docs/method-form.md, "The
+   * grid".
+   */
+  layout?: 'stack' | 'grid';
+  /**
+   * The inputs a host's synthetic inputs filled and that have not been changed
+   * since, by name: each shows "Generated" with a sparkle beside its label.
+   * The host removes a name once that input changes.
+   */
+  generated?: ReadonlySet<string>;
+  /** `FieldEnv.maxFileBytes`: the upload limit, checked in the browser before anything is sent. */
+  maxFileBytes?: number;
+  /** `FieldEnv.upgradeHref`: where the over-the-limit line's "Upgrade plan" goes. */
+  upgradeHref?: string;
   /** Classes for the stack the fields sit in. */
   className?: string;
 }
@@ -896,6 +918,10 @@ function MethodFormFields({
   foldOptional = true,
   errors,
   framed,
+  layout = 'stack',
+  generated,
+  maxFileBytes,
+  upgradeHref,
   className,
 }: MethodFormFieldsProps) {
   const s = useFieldStrings();
@@ -942,8 +968,12 @@ function MethodFormFields({
       openExternal,
       loadText,
       fileSource,
+      maxFileBytes,
+      upgradeHref,
     }),
     [
+      maxFileBytes,
+      upgradeHref,
       disabled,
       dropFile,
       preparingFile,
@@ -998,44 +1028,200 @@ function MethodFormFields({
     return refusal === 'incomplete' ? s.incompleteField : undefined;
   };
 
+  const fieldFor = (field: RunField) => {
+    const refusal = refusalOf(field);
+    return (
+      // Remounted on each reset, so no control keeps what it held for the
+      // values the reset replaced (a file still arriving, a failed drop). A
+      // structure the gate refuses marks the members it refuses, whatever
+      // a host's message says of the structure.
+      <GeneratedInputContext
+        key={`${field.name}:${resets}`}
+        value={generated?.has(field.name) ?? false}
+      >
+        <RefusedStructureContext value={refusal ? field.name : null}>
+          <FieldRenderer
+            field={field}
+            id={field.name}
+            value={ownProp(values, field.name)}
+            error={errorFor(field, refusal)}
+            env={env}
+            onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
+          />
+        </RefusedStructureContext>
+      </GeneratedInputContext>
+    );
+  };
+  const example = exampleSource && (
+    <FillWithExample
+      source={exampleSource}
+      fields={fields}
+      touched={touched}
+      // Filling is a reset to the example's values: the attempt, the
+      // failed uploads and any upload in flight go with what was there.
+      onFill={(next) => reset(next)}
+      disabled={disabled}
+    />
+  );
+  const optionalToggle = (folded.length > 0 || structureOpen) && (
+    <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />
+  );
+
+  if (layout === 'grid') {
+    // Required inputs first, then the optional ones under their disclosure,
+    // each group packed on its own grid.
+    const shownRequired = visible.filter((field) => !folds(field));
+    const shownOptional = visible.filter((field) => folds(field));
+    const grid = (group: readonly RunField[]) => (
+      <div className="grid grid-cols-12 items-start gap-4 max-md:grid-cols-1">
+        {packInputs(group, (field) => isFilled(ownProp(values, field.name))).map((cell) => (
+          <div
+            key={cell.fields.map((field) => field.name).join('+')}
+            data-input-cell={cell.grow ? 'grow' : cell.fields.length > 1 ? 'stack' : ''}
+            className={cn(
+              'flex min-w-0 flex-col gap-4 max-md:col-span-1',
+              SPAN[cell.span],
+              cell.grow ? 'self-stretch' : 'self-start',
+            )}
+          >
+            {cell.fields.map((field) => (
+              <InputCard key={field.name} fill={cell.grow}>
+                {fieldFor(field)}
+              </InputCard>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+    // Each card is the box its input's structure would otherwise draw, so a
+    // structure in a card draws none of its own.
+    return (
+      <InputCardContext value>
+        <div className={cn('flex flex-col gap-4', className)}>
+          {example}
+          {grid(shownRequired)}
+          {optionalToggle}
+          {shownOptional.length > 0 && grid(shownOptional)}
+        </div>
+      </InputCardContext>
+    );
+  }
+
   return (
     <div className={cn('space-y-6', framed && SECTION_RULES, className)}>
-      {exampleSource && (
-        <FillWithExample
-          source={exampleSource}
-          fields={fields}
-          touched={touched}
-          // Filling is a reset to the example's values: the attempt, the
-          // failed uploads and any upload in flight go with what was there.
-          onFill={(next) => reset(next)}
-          disabled={disabled}
-        />
-      )}
-      {visible.map((field) => {
-        const refusal = refusalOf(field);
-        return (
-          // Remounted on each reset, so no control keeps what it held for the
-          // values the reset replaced (a file still arriving, a failed drop). A
-          // structure the gate refuses marks the members it refuses, whatever
-          // a host's message says of the structure.
-          <RefusedStructureContext
-            key={`${field.name}:${resets}`}
-            value={refusal ? field.name : null}
-          >
-            <FieldRenderer
-              field={field}
-              id={field.name}
-              value={ownProp(values, field.name)}
-              error={errorFor(field, refusal)}
-              env={env}
-              onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
-            />
-          </RefusedStructureContext>
-        );
-      })}
-      {(folded.length > 0 || structureOpen) && (
-        <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />
-      )}
+      {example}
+      {visible.map(fieldFor)}
+      {optionalToggle}
     </div>
+  );
+}
+
+/**
+ * The columns a grid cell spans, written out whole so Tailwind finds each
+ * class in source.
+ */
+const SPAN: Record<number, string> = {
+  4: 'col-span-4',
+  5: 'col-span-5',
+  6: 'col-span-6',
+  7: 'col-span-7',
+  12: 'col-span-12',
+};
+
+/** One cell of the grid: one input, or a stack of small inputs beside a lone big one. */
+interface InputCell {
+  fields: RunField[];
+  span: 4 | 5 | 6 | 7 | 12;
+  /** An empty file input beside a neighbour: its card takes the row's height. */
+  grow: boolean;
+}
+
+/** How much room an input's kind takes: a structure or a list, a file or a long text, or a small input. */
+function weightOf(field: RunField): 7 | 5 | 4 {
+  switch (field.kind) {
+    case 'object':
+    case 'list':
+      return 7;
+    case 'document':
+    case 'image':
+    case 'prose':
+    case 'unknown':
+      return 5;
+    default:
+      return 4;
+  }
+}
+
+/**
+ * The grid's cells, by kind and never by what was typed: a structure or a
+ * list beside a file or a long text (7 and 5 columns), then two of a weight
+ * together (6 and 6), then a lone big input beside a stack of up to three
+ * small ones, or alone across the row, then the small inputs in rows of up to
+ * three. `filled` says whether a file input holds a file, since only an empty
+ * one grows to its row.
+ */
+export function packInputs(
+  fields: readonly RunField[],
+  filled: (field: RunField) => boolean,
+): InputCell[] {
+  const heavy = fields.filter((field) => weightOf(field) === 7);
+  const medium = fields.filter((field) => weightOf(field) === 5);
+  const light = fields.filter((field) => weightOf(field) === 4);
+  const cells: InputCell[] = [];
+  const grows = (field: RunField, span: number) =>
+    (field.kind === 'document' || field.kind === 'image') && !filled(field) && span < 12;
+  const one = (field: RunField, span: InputCell['span']): InputCell => ({
+    fields: [field],
+    span,
+    grow: grows(field, span),
+  });
+  while (heavy.length > 0 && medium.length > 0) {
+    cells.push(one(heavy.shift()!, 7), one(medium.shift()!, 5));
+  }
+  while (heavy.length >= 2) cells.push(one(heavy.shift()!, 6), one(heavy.shift()!, 6));
+  while (medium.length >= 2) cells.push(one(medium.shift()!, 6), one(medium.shift()!, 6));
+  const lone = heavy.shift() ?? medium.shift();
+  if (lone) {
+    if (light.length > 0) {
+      const stack = light.splice(0, 3);
+      const span = weightOf(lone) === 7 ? 7 : 6;
+      cells.push(one(lone, span), { fields: stack, span: span === 7 ? 5 : 6, grow: false });
+    } else {
+      cells.push(one(lone, 12));
+    }
+  }
+  while (light.length > 0) {
+    const row = light.splice(0, 3);
+    const span = (12 / row.length) as InputCell['span'];
+    for (const field of row) cells.push(one(field, span));
+  }
+  return cells;
+}
+
+/** Whether an input holds a value: what decides whether an empty file input grows. */
+function isFilled(value: unknown): boolean {
+  if (value === undefined || value === null || value === '') return false;
+  return !(Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * One input's card in the grid, as the Pipelex Studio canvas draws it: the
+ * card's fill, a hairline ring, 12px corners, and the input's header and
+ * control inside. It is a container, so a structure's rows go under their
+ * labels once the card is narrow.
+ */
+function InputCard({ fill, children }: { fill: boolean; children: ReactNode }) {
+  return (
+    <InputFillContext value={fill}>
+      <div
+        data-input-card=""
+        className={cn(
+          'flex min-w-0 flex-col rounded-xl bg-card px-[18px] pt-4 pb-[18px] text-foreground ring-1 ring-border @container',
+          fill && 'flex-1',
+        )}
+      >
+        {children}
+      </div>
+    </InputFillContext>
   );
 }

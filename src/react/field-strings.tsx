@@ -446,6 +446,47 @@ export interface FieldStrings {
    * loaded, so the file holds their links instead. Takes how many.
    */
   storedTextsNotLoaded: (count: number) => string;
+  /** "Generated", with a sparkle, on an input a host's synthetic inputs filled. */
+  generatedMark: string;
+  /** The two sides of a structure's or a list's switch: "Form" and "Paste JSON". */
+  formMode: string;
+  pasteJsonMode: string;
+  /** The switch's accessible name: "How to fill Property". */
+  fillModeGroup: (label: string) => string;
+  /** The line under a raw JSON value: "Valid JSON", "Not valid JSON yet". */
+  validJson: string;
+  notValidJsonYet: string;
+  /** Paste JSON's line for a structure: "Valid JSON · 2 of 3 fields match". */
+  validJsonFields: (matched: number, total: number) => string;
+  /** Paste JSON's line for a list: "Valid JSON · 3 items". */
+  validJsonItems: (count: number) => string;
+  /** Paste JSON's line for a list when the JSON is valid but not a list. */
+  validJsonNotList: string;
+  useThisJson: string;
+  /** After a drop zone's formats, for an input that takes several files: "as many as you like". */
+  asManyAsYouLike: string;
+  /** A file input's buttons once it holds a file: "Replace" and "Remove". */
+  replaceFile: string;
+  removeFile: string;
+  /** A file row's remove cross, named after its file: "Remove nda.pdf". */
+  removeNamedFile: (name: string) => string;
+  /** Under the first four files of several: "+ 1 more · 5 files in all". */
+  moreFiles: (more: number, total: number) => string;
+  /** The last cell of a grid of pictures past seven: "+4 more". */
+  moreImages: (more: number) => string;
+  addMoreFiles: string;
+  addMoreImages: string;
+  /** A file's size over the upload limit, always with one decimal: "73.4 MB". */
+  fileSizeExact: (bytes: number) => string;
+  /** The upload limit, in whole units: "50 MB". */
+  uploadLimit: (bytes: number) => string;
+  /** After the refused file's name: " is 73.4 MB, over your plan's 50 MB limit." */
+  fileTooLarge: (size: string, limit: string) => string;
+  /** Several files refused at once: "3 files", then " are over your plan's 50 MB limit, the largest 120.0 MB." */
+  filesTooLargeCount: (count: number) => string;
+  filesTooLarge: (limit: string, largest: string) => string;
+  upgradePlan: string;
+  dismiss: string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use, useState } from 'react';
+import { shownAsOptional } from '../core/readiness';
 import { cn } from './utils';
 import type { ObjectRunField, RunField } from '../core';
 import { ownProp } from '../core/own-property';
@@ -19,6 +20,9 @@ import { FieldDescription } from './field-shell';
 import { useFieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 import { headingFaceClass } from './style-tokens';
+import { StructureDepthContext } from './field-context';
+import { FieldHeader, OptionalPill } from './field-shell';
+import { PasteJsonEditor, PasteJsonSwitch } from './paste-json';
 
 interface ObjectFieldProps {
   field: ObjectRunField;
@@ -30,15 +34,6 @@ interface ObjectFieldProps {
 }
 
 /**
- * How many structures a field sits inside: 0 for a form's own field, one more
- * inside each structure. A list adds nothing to it, while the structure a
- * list's row holds counts like any other and draws nothing around its fields
- * (`none`, below), so a structure inside that row hangs from a rule rather
- * than drawing a card in the row's box. Only `ObjectField` reads it.
- */
-const StructureDepthContext = createContext(0);
-
-/**
  * Whether the host draws the form inside a panel of its own, which
  * `MethodForm`'s `framed` states. Only the host knows it: the kernel cannot
  * see the box around it, and a form on a bare page still needs its own card
@@ -46,6 +41,13 @@ const StructureDepthContext = createContext(0);
  * form's own structure (`section`, below).
  */
 export const FramedFormContext = createContext(false);
+
+/**
+ * Whether the form's input sits in a card the form draws for it, which
+ * `MethodForm`'s `layout="grid"` does for each input. A structure in a card
+ * draws no card of its own: the card is the structure's.
+ */
+export const InputCardContext = createContext(false);
 
 /**
  * The id of the structure the form's own run gate refuses, after the person
@@ -210,6 +212,141 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           'aria-labelledby': nameId,
           'aria-describedby': description ? descriptionId : undefined,
         };
+
+  const inCard = use(InputCardContext);
+  const [json, setJson] = useState(false);
+
+  if (isApp) {
+    const fields = (
+      <StructureDepthContext value={depth + 1}>
+        {visible.map((child) => {
+          const childId = `${id}.${child.name}`;
+          const mark = markOf(child);
+          return (
+            <RefusedStructureContext key={child.name} value={mark ? childId : null}>
+              <FieldRenderer
+                field={child}
+                value={ownProp(data, child.name)}
+                onChange={(v) => setChild(child.name, v)}
+                id={childId}
+                error={mark}
+                env={env}
+              />
+            </RefusedStructureContext>
+          );
+        })}
+      </StructureDepthContext>
+    );
+    const optionalToggle = (folded.length > 0 || structureOpen) && (
+      <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="field" />
+    );
+    const appCaption = error && (
+      <p className="text-[11px] text-destructive" role="alert">
+        {error}
+      </p>
+    );
+    if (grouping === 'none') {
+      // A list's row: its fields one under the other, nothing around them.
+      return (
+        <div data-structure-group="none" className="flex flex-col gap-0.5">
+          {fields}
+          {optionalToggle}
+          {appCaption}
+        </div>
+      );
+    }
+    if (grouping === 'rule') {
+      // A structure inside a structure: its name on a row of its own, its
+      // fields hanging from a thin rule under it.
+      return (
+        <div {...group}>
+          <div className="flex flex-col gap-px pt-2.5 pb-0.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span
+                id={nameId}
+                className={cn(
+                  'text-[13px] font-semibold leading-[18px] text-foreground',
+                  headingFaceClass,
+                )}
+              >
+                {label}
+              </span>
+              {shownAsOptional(field) && <OptionalPill />}
+            </div>
+            {description && (
+              <p id={descriptionId} className="m-0 text-[12px] leading-4 text-muted-foreground">
+                {description}
+              </p>
+            )}
+          </div>
+          <div
+            data-structure-group="rule"
+            className={cn(
+              'flex flex-col gap-0.5 border-l-[1.5px] pl-3.5',
+              error ? 'border-destructive' : 'border-border',
+            )}
+          >
+            {fields}
+            {optionalToggle}
+          </div>
+          {appCaption}
+        </div>
+      );
+    }
+    // A form's own structure: the input's header, its Form / Paste JSON
+    // switch, then its fields as rows. In a card the card is the structure's;
+    // on a bare page the structure draws the card itself.
+    const section = grouping === 'section';
+    const card = grouping === 'box' && !inCard;
+    return (
+      <div
+        data-form-section={section ? '' : undefined}
+        data-structure-group={grouping}
+        {...group}
+        className={cn(
+          'relative flex flex-col gap-3 @container',
+          card && 'rounded-xl bg-card px-[18px] pt-4 pb-[18px] ring-1 ring-border',
+          card && error && 'ring-destructive',
+        )}
+      >
+        {section && error && (
+          <span aria-hidden="true" data-error-edge="" className={SECTION_ERROR_EDGE} />
+        )}
+        <FieldHeader
+          label={label}
+          labelId={nameId}
+          optional={shownAsOptional(field)}
+          description={description}
+          descriptionId={descriptionId}
+          aside={
+            <PasteJsonSwitch
+              label={label}
+              json={json}
+              onChange={setJson}
+              disabled={env?.disabled}
+            />
+          }
+        />
+        {json ? (
+          <PasteJsonEditor
+            field={field}
+            value={value}
+            disabled={env?.disabled}
+            onUse={(next) => {
+              onChange(next as Record<string, unknown>);
+              setJson(false);
+            }}
+          />
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {fields}
+            {optionalToggle}
+          </div>
+        )}
+        {appCaption}
+      </div>
+    );
+  }
 
   const section = grouping === 'section';
   const caption = error && (

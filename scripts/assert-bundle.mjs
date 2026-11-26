@@ -828,6 +828,8 @@ const LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:em|px)$/;
 const OPTIONAL_TOKENS = new Map([
   ['--link', { stand: '--primary', tint: false }],
   ['--selected', { stand: '--primary', tint: true }],
+  ['--border-strong', { stand: '--border', tint: false }],
+  ['--success', { stand: '--foreground', tint: false }],
   ['--panel-fill', { stand: '--card', tint: false }],
   ['--panel-edge', { stand: '--border', tint: false }],
   ['--font-heading', { literal: /^revert-layer$/, shape: '`revert-layer`' }],

@@ -285,4 +285,31 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     count <= 1
       ? 'Un texte stocké n’a pas pu être chargé\u00a0; le fichier contient son lien à la place.'
       : `${count} textes stockés n’ont pas pu être chargés\u00a0; le fichier contient leurs liens à la place.`,
+  generatedMark: 'Généré',
+  formMode: 'Formulaire',
+  pasteJsonMode: 'Coller du JSON',
+  fillModeGroup: (label) => `Comment remplir ${label}`,
+  validJson: 'JSON valide',
+  notValidJsonYet: 'JSON pas encore valide',
+  validJsonFields: (matched, total) =>
+    `JSON valide · ${matched} ${plural(total, 'champ', 'champs')} sur ${total} ${matched <= 1 ? 'correspond' : 'correspondent'}`,
+  validJsonItems: (count) => `JSON valide · ${count} ${plural(count, 'élément', 'éléments')}`,
+  validJsonNotList: 'JSON valide · pas une liste',
+  useThisJson: 'Utiliser ce JSON',
+  asManyAsYouLike: 'autant que vous voulez',
+  replaceFile: 'Remplacer',
+  removeFile: 'Retirer',
+  removeNamedFile: (name) => `Retirer ${name}`,
+  moreFiles: (more, total) => `+ ${more} de plus · ${total} fichiers en tout`,
+  moreImages: (more) => `+${more} de plus`,
+  addMoreFiles: 'Ajouter des fichiers',
+  addMoreImages: 'Ajouter des images',
+  fileSizeExact: (bytes) => `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')}\u00a0Mo`,
+  uploadLimit: (bytes) => `${Math.round(bytes / (1024 * 1024))}\u00a0Mo`,
+  fileTooLarge: (size, limit) => ` fait ${size}, au-delà de la limite de ${limit} de votre offre.`,
+  filesTooLargeCount: (count) => `${count} fichiers`,
+  filesTooLarge: (limit, largest) =>
+    ` dépassent la limite de ${limit} de votre offre, le plus gros ${largest}.`,
+  upgradePlan: 'Changer d’offre',
+  dismiss: 'Fermer',
 };

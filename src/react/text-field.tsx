@@ -5,8 +5,10 @@ import { cn } from './utils';
 import type { ProseRunField, TextRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
-import { fieldControlClass } from './field-styles';
+import { appControlHeight, appLineWidthClass, controlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
+import { useFieldPresentation } from './field-presentation';
+import { useCompactControl } from './field-context';
 
 interface TextFieldProps {
   field: TextRunField;
@@ -21,6 +23,8 @@ interface TextFieldProps {
 export function TextField({ field, value, onChange, id, error, disabled }: TextFieldProps) {
   const s = useFieldStrings();
   const domId = useFieldDomId(id);
+  const isApp = useFieldPresentation() === 'app';
+  const compact = useCompactControl();
   return (
     <FieldShell
       name={field.name}
@@ -40,7 +44,13 @@ export function TextField({ field, value, onChange, id, error, disabled }: TextF
         aria-invalid={!!error}
         placeholder={field.placeholder ?? s.typeValuePlaceholder}
         onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
-        className={cn(fieldControlClass, 'h-11 px-3')}
+        className={cn(
+          controlClass(isApp),
+          'px-3',
+          // In an app a line of text is never wider than 560 pixels as an input
+          // of its own; inside a structure it fills the row's control column.
+          isApp ? [appControlHeight(compact), !compact && appLineWidthClass] : 'h-11',
+        )}
       />
     </FieldShell>
   );
@@ -63,6 +73,8 @@ interface ProseFieldProps {
 export function ProseField({ field, value, onChange, id, error, disabled }: ProseFieldProps) {
   const s = useFieldStrings();
   const domId = useFieldDomId(id);
+  const isApp = useFieldPresentation() === 'app';
+  const compact = useCompactControl();
   return (
     <FieldShell
       name={field.name}
@@ -73,6 +85,7 @@ export function ProseField({ field, value, onChange, id, error, disabled }: Pros
       required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
+      stack
     >
       <textarea
         id={domId}
@@ -83,8 +96,13 @@ export function ProseField({ field, value, onChange, id, error, disabled }: Pros
         placeholder={field.placeholder ?? s.writeHerePlaceholder}
         onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
         className={cn(
-          fieldControlClass,
-          'min-h-[88px] resize-y px-3 py-2.5 leading-relaxed field-sizing-content',
+          controlClass(isApp),
+          'resize-y px-3 py-2.5 field-sizing-content',
+          isApp
+            ? compact
+              ? 'min-h-[72px] text-[13.5px] leading-[21px]'
+              : 'min-h-[104px] leading-[21px]'
+            : 'min-h-[88px] leading-relaxed',
         )}
       />
     </FieldShell>

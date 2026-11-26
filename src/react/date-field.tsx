@@ -6,8 +6,9 @@ import type { DateRunField } from '../core';
 import { asCalendarDate, toDateInputValue, toStoredDateValue } from '../core/date-format';
 import { FieldShell } from './field-shell';
 import { useFieldPresentation } from './field-presentation';
-import { fieldControlClass } from './field-styles';
+import { appControlHeight, controlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
+import { useCompactControl } from './field-context';
 
 interface DateFieldProps {
   field: DateRunField;
@@ -41,6 +42,7 @@ interface DateFieldProps {
 export function DateField({ field, value, onChange, id, error, disabled }: DateFieldProps) {
   const domId = useFieldDomId(id);
   const isApp = useFieldPresentation() === 'app';
+  const compact = useCompactControl();
   const shown = toDateInputValue(value);
   return (
     <FieldShell
@@ -64,10 +66,11 @@ export function DateField({ field, value, onChange, id, error, disabled }: DateF
         data-empty={asCalendarDate(shown) === null ? '' : undefined}
         onChange={(e) => onChange(toStoredDateValue(e.target.value, field.datetime))}
         className={cn(
-          fieldControlClass,
-          'h-11 px-3 tabular-nums data-empty:text-muted-foreground dark:scheme-dark',
+          controlClass(isApp),
+          'px-3 tabular-nums data-empty:text-muted-foreground dark:scheme-dark',
           '[&::-webkit-calendar-picker-indicator]:cursor-pointer',
-          !isApp && 'font-mono',
+          // A date as an input of its own is 240 pixels wide, what a day needs.
+          isApp ? [appControlHeight(compact), !compact && 'max-w-[240px]'] : 'h-11 font-mono',
         )}
       />
     </FieldShell>

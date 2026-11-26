@@ -184,6 +184,16 @@ export interface FieldEnv {
    * glyph in the sheet. See docs/sources.md.
    */
   fileSource?: FilePickerSource;
+  /**
+   * The upload limit in bytes. A file over it is refused in the browser before
+   * anything is sent, on a file field and on a list of files' drop area, and
+   * the field shows the over-the-limit line under its drop zone
+   * (`FileTooLarge`). Absent, the controls check no size. See
+   * docs/upload-seam.md, "A file over the upload limit".
+   */
+  maxFileBytes?: number;
+  /** The over-the-limit line's "Upgrade plan" link. Absent, the line has no link. */
+  upgradeHref?: string;
 }
 
 export interface FieldRendererProps {
@@ -311,6 +321,8 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           pdfWorker={env?.pdfWorker}
           openExternal={env?.openExternal}
           fileSource={env?.fileSource}
+          maxFileBytes={env?.maxFileBytes}
+          upgradeHref={env?.upgradeHref}
           id={id}
           error={error}
           disabled={disabled}
@@ -332,6 +344,8 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
           pdfWorker={env?.pdfWorker}
           openExternal={env?.openExternal}
           fileSource={env?.fileSource}
+          maxFileBytes={env?.maxFileBytes}
+          upgradeHref={env?.upgradeHref}
           id={id}
           error={error}
           disabled={disabled}

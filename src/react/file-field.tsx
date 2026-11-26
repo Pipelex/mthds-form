@@ -1,10 +1,20 @@
 'use client';
 
 import { shownAsOptional } from '../core/readiness';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
-import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
+import { InputFillContext, ListRowContext } from './field-context';
+import { FileTooLarge, isOverLimit, type OversizedFile } from './file-too-large';
+import {
+  borderStrongClass,
+  focusOutlineClass,
+  focusWithinOutlineClass,
+  linkBorderClass,
+  linkHoverBorderClass,
+  linkTextClass,
+  linkTintFillClass,
+} from './role-tokens';
 import { cn, isThenable, storedUrlOf } from './utils';
 import type { FileRunField } from '../core';
 // Value imports come from the specific module, never the `../core` barrel - the
@@ -23,7 +33,7 @@ import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
 import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
 import { useFieldStrings, type FieldStrings } from './field-strings';
-import { fieldControlClass, smallPrintClass } from './field-styles';
+import { appMiniButtonClass, fieldControlClass, smallPrintClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
@@ -142,6 +152,15 @@ interface FileFieldProps {
    * the value an upload writes. See docs/sources.md.
    */
   fileSource?: FilePickerSource;
+  /**
+   * The upload limit in bytes. A file over it is refused in the browser before
+   * anything is sent, and the field says so in the one over-the-limit line
+   * (`FileTooLarge`). Absent, no limit is checked here; the host's upload
+   * still enforces its own.
+   */
+  maxFileBytes?: number;
+  /** Where the over-the-limit line's "Upgrade plan" goes. Absent, the line has no link. */
+  upgradeHref?: string;
   error?: string;
   disabled?: boolean;
 }
@@ -289,10 +308,20 @@ function FileField({
   pdfWorker,
   openExternal,
   fileSource,
+  maxFileBytes,
+  upgradeHref,
   error,
   disabled,
   category,
 }: FileFieldProps & { category: 'document' | 'image' }) {
+  // In an app, a file in a list's row is one line of that list (a document)
+  // or one picture of its grid (an image); the list draws the remove cross.
+  const inRow = use(ListRowContext);
+  // In an app's grid, an empty file input beside a neighbour fills its cell.
+  const fill = use(InputFillContext);
+  // Files over the upload limit, from the latest pick, until it is dismissed
+  // or the next pick replaces it.
+  const [tooLarge, setTooLarge] = useState<OversizedFile[] | null>(null);
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
@@ -479,15 +508,24 @@ function FileField({
         // uploader is a network call and often a billed one, and a file the
         // runtime cannot decode has no business reaching it.
         setRejected({ kind: 'type', name: file.name, over: value?.url });
+        setTooLarge(null);
         return undefined;
       }
+      // Over the upload limit: refused here, before anything is sent, so the
+      // person waits for nothing. The line under the zone says by how much.
+      if (isOverLimit(file, maxFileBytes)) {
+        setRejected(null);
+        setTooLarge([{ name: file.name, size: file.size }]);
+        return undefined;
+      }
+      setTooLarge(null);
       setRejected(null);
       setDismissedUploadError(null);
       const upload = onDropFile(file);
       track(file, upload, value?.url);
       return upload;
     },
-    [formats, onDropFile, track, value?.url],
+    [formats, maxFileBytes, onDropFile, track, value?.url],
   );
 
   // The camera: a touch screen's way to photograph a paper document page by
@@ -881,6 +919,435 @@ function FileField({
   const choosingOnly = !canUpload && !allowUrl;
   const noUploadLineId = `${domId}-no-upload`;
 
+  const cameraBits = (
+    <>
+      {/* "Take photo", under the dropzone and before the team's files, while
+      the input is empty: on a touch screen only, which CSS decides. */}
+      {camera && !photos.held && !hasFile && (
+        <TakePhotoButton label={label} disabled={busy} onTake={() => openCamera(null)} />
+      )}
+      {camera && <CameraInput ref={cameraRef} disabled={disabled} onPhoto={takePhoto} />}
+    </>
+  );
+  const alerts = (
+    <>
+      {/* The refusal, or the host's upload failure: one slot, holding whichever
+      came from the user's latest action. `role="alert"` because it appears
+      in response to something the user just did and is the only feedback
+      that the action had no effect - a screen-reader user who drops a .zip
+      otherwise gets silence. A refusal names the file so the message is
+      about the thing they picked, not a generic complaint; a failure is the
+      host's own words, shown on the field that took the file. */}
+      {photos.refusal ? (
+        // A photo that never became a page. It blocks nothing: the pages
+        // already held, and the file they made, stand.
+        <p role="alert" className="text-[12px] text-destructive">
+          {photos.refusal === 'undecodable' ? s.photoUndecodable : s.photoNotKept}
+        </p>
+      ) : (
+        !busy &&
+        (refusal ? (
+          <p role="alert" className="text-[12px] text-destructive">
+            {refusal.kind === 'type' ? (
+              <>
+                <span className={isApp ? 'font-medium' : 'font-mono'}>{refusal.name}</span> —{' '}
+                {s.unsupportedFileType(hint)}
+              </>
+            ) : dropArea?.open ? (
+              // Pointed to only while it takes files: a full list's area is
+              // shut, and would refuse the very drop this sends there.
+              s.oneFileOnlyInList
+            ) : (
+              s.oneFileOnly
+            )}
+          </p>
+        ) : (
+          failure && (
+            <p role="alert" className="text-[12px] text-destructive">
+              {failure}
+            </p>
+          )
+        ))
+      )}
+    </>
+  );
+  const linkBits = (
+    <>
+      {/* URL escape hatch - collapsed by default to keep the happy path clean.
+      It reads `busy`, not `disabled`: an upload is a door into this value
+      like any other, and leaving these two live while the dropzone was shut
+      let a user paste a URL over a file that was still arriving - or, on the
+      host side, abandon a started and billed run client-side. The seam
+      promises the control is disabled while its id is uploading, and that
+      has to mean every way in. With no upload path it is not an escape
+      hatch but the only way in, so it is open from the start; with
+      `allowUrl` off it is not offered at all. */}
+      {linkOpen ? (
+        <input
+          type="text"
+          // With no file input, this is the control the field's label names.
+          id={canUpload ? undefined : domId}
+          // Focus follows the click that opened it. Rendered from the start, the
+          // same attribute would pull focus into the form on page load - and on
+          // a form with several file fields, the last one would win.
+          autoFocus={showUrl}
+          value={urlText}
+          disabled={busy}
+          // A name of its own. In the upload case the field's label is bound to
+          // the file input, so without this the placeholder was the only thing
+          // a screen reader announced here - and the placeholder used to name a
+          // storage scheme. With no upload, it still says what the input is for.
+          aria-label={s.fileUrlAria(fieldLabel(field.title, field.name, presentation))}
+          aria-describedby={noUploadLineShown ? noUploadLineId : undefined}
+          aria-invalid={canUpload ? undefined : !!error}
+          placeholder={s.urlPlaceholder}
+          onChange={(e) => {
+            forgetPhotoRefusal();
+            setLocal(null);
+            // A link typed after a failed upload is the user moving past it.
+            dismissUploadError();
+            setTypedUrl(e.target.value);
+            onChange(e.target.value ? { url: e.target.value } : undefined);
+          }}
+          className={cn(
+            fieldControlClass,
+            // In an app, a control of the field family like any other; in a
+            // studio, a reference set as code, under the field's mono name.
+            isApp ? 'h-11 px-3' : 'h-9 px-3 font-mono text-[12px]',
+          )}
+        />
+      ) : (
+        allowUrl && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setShowUrl(true)}
+            className={cn(
+              'flex w-fit items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
+              // A studio's aside is a mono footnote; an app's is a quiet text
+              // action in the page's face, underlined under the pointer.
+              isApp
+                ? 'gap-1.5 text-[13px] underline-offset-4 hover:underline'
+                : 'gap-1 font-mono text-[11px]',
+              focusOutlineClass,
+              'focus-visible:outline-offset-2',
+            )}
+          >
+            <Link2
+              className={cn('shrink-0', isApp ? 'h-3.5 w-3.5' : 'h-3 w-3')}
+              aria-hidden="true"
+            />
+            {s.pasteUrlInstead}
+          </button>
+        )
+      )}
+    </>
+  );
+  const pickerSheet = (
+    <>
+      {fileSource && (
+        <FilePicker
+          source={fileSource}
+          formats={formats}
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onUse={(files) => {
+            const file = files[0];
+            if (file) chooseFromSource(file);
+          }}
+          onUpload={canUpload ? openFileDialog : undefined}
+          disabled={busy}
+          returnFocusTo={pickerEntryRef}
+          // The row that opened the sheet is gone once a file is chosen, so
+          // focus lands on the card that replaced it rather than on nothing.
+          onCloseAutoFocus={(event) => {
+            if (!cardRef.current) return;
+            event.preventDefault();
+            cardRef.current.focus();
+          }}
+        />
+      )}
+    </>
+  );
+
+  // The app's input, as the Pipelex Studio canvas draws it: one big dashed
+  // drop zone while it is empty, with Pick from your team's files inside it;
+  // one file as a line with Replace and Remove; one picture filling the card.
+  // In a list's row, a file is one line of the list or one picture of its
+  // grid. The studio keeps its own control, below.
+  function appBody() {
+    const shownName = value?.filename ?? s.uploadedFile;
+    const meta = local
+      ? s.fileSize(local.file.size)
+      : fileChipSubtitle(value?.url, value?.filename, formats, presentation, s);
+    const imageSrc = local?.dataUrl ?? previewSrc;
+    const uploadingLine = (
+      <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        {s.uploading}
+      </p>
+    );
+    const picture = (className: string) =>
+      imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={shownName}
+          className={cn('absolute inset-0 size-full object-cover', className)}
+        />
+      ) : previewPending || (local && !local.dataUrl) ? (
+        <span className="absolute inset-0 grid place-items-center">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+        </span>
+      ) : (
+        <span className="absolute inset-0 grid place-items-center">
+          <ImageOff className="size-5 text-muted-foreground" aria-hidden="true" />
+        </span>
+      );
+    const nameTag = (
+      <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-12px)] truncate rounded-[5px] bg-black/60 px-[5px] py-px font-mono text-[10px] leading-[14px] font-medium text-white">
+        {stripExtension(shownName)}
+      </span>
+    );
+
+    if (inRow && (hasFile || uploading || field.kind === 'image')) {
+      if (field.kind === 'image') {
+        // One picture of the list's grid, named.
+        return (
+          <div
+            ref={cardRef}
+            tabIndex={-1}
+            className="absolute inset-0 outline-none"
+            data-file-tile=""
+          >
+            {uploading || !hasFile ? (
+              <span className="absolute inset-0 grid place-items-center">
+                <Loader2
+                  className="size-5 animate-spin text-muted-foreground"
+                  aria-label={s.uploading}
+                />
+              </span>
+            ) : (
+              <>
+                {picture('')}
+                {nameTag}
+              </>
+            )}
+            {alerts}
+          </div>
+        );
+      }
+      return (
+        <div ref={cardRef} tabIndex={-1} className="min-w-0 outline-none">
+          {uploading ? uploadingLine : <FileLine name={shownName} meta={meta} />}
+          {alerts}
+        </div>
+      );
+    }
+
+    let content;
+    if (photos.held) {
+      content = (
+        <div role="group" aria-label={label || undefined} className="space-y-2" data-photo-pages="">
+          <PhotoPageStrip
+            kind={field.kind}
+            pages={photos.pages}
+            reading={photos.reading}
+            disabled={disabled}
+            canRemoveLast={!uploading}
+            onAddPage={() => openCamera(null)}
+            onRetake={openCamera}
+            onRemove={(pageId) => {
+              setRejected(null);
+              photos.remove(pageId);
+            }}
+          />
+          {photos.handedOver && hasFile && !uploading ? (
+            <FileLine
+              name={
+                field.kind === 'image'
+                  ? s.photoChip(photoName)
+                  : s.photoPagesChip(photoName, photos.pages.length)
+              }
+              meta={meta}
+            />
+          ) : (
+            (uploading ||
+              (photos.reading.length === 0 && !photos.handedOver && photos.refusal === null)) &&
+            uploadingLine
+          )}
+        </div>
+      );
+    } else if (hasFile && !uploading) {
+      const replace = () => (fileSource ? setPickerOpen(true) : openFileDialog());
+      const actions = (
+        <span className="flex shrink-0 gap-1.5">
+          <button
+            type="button"
+            disabled={busy || (!fileSource && !canUpload)}
+            aria-haspopup={fileSource ? 'dialog' : undefined}
+            onClick={replace}
+            className={cn(appMiniButtonClass, focusOutlineClass)}
+          >
+            {s.replaceFile}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={clear}
+            className={cn(appMiniButtonClass, focusOutlineClass)}
+          >
+            {s.removeFile}
+          </button>
+        </span>
+      );
+      content =
+        field.kind === 'image' ? (
+          <div ref={cardRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
+            <div className="relative h-[180px] overflow-hidden rounded-lg bg-input shadow-[inset_0_0_0_1px_var(--border,hsl(240_5.9%_90%))]">
+              {picture('')}
+              {nameTag}
+            </div>
+            {actions}
+          </div>
+        ) : (
+          <div
+            ref={cardRef}
+            tabIndex={-1}
+            className="flex min-h-12 flex-wrap items-center gap-2.5 rounded-[9px] bg-input py-1.5 pr-1.5 pl-2 outline-none"
+          >
+            <FileLine name={shownName} meta={meta} />
+            {actions}
+          </div>
+        );
+    } else if (!canUpload) {
+      content = (
+        <div className="space-y-0.5">
+          {uploading ? (
+            uploadingLine
+          ) : (
+            <>
+              {noUploadLineShown && (
+                <p id={noUploadLineId} className="text-[12px] text-muted-foreground">
+                  {s.uploadUnavailable}
+                </p>
+              )}
+              {hint && <p className={smallPrintClass(true)}>{hint}</p>}
+            </>
+          )}
+        </div>
+      );
+    } else {
+      // The big drop zone: a click anywhere in it browses, a file dragged over
+      // it turns its edge to the accent, and over the limit its edge is red.
+      content = (
+        <div
+          {...getRootProps()}
+          data-drop-zone=""
+          data-over-limit={tooLarge ? '' : undefined}
+          className={cn(
+            'flex w-full flex-auto flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed p-3.5 text-center',
+            'cursor-pointer select-none bg-[color-mix(in_oklab,var(--input,hsl(240_4.8%_95.9%))_55%,transparent)] transition-colors',
+            inRow ? 'min-h-0 py-4' : fill ? 'min-h-[136px]' : 'min-h-[200px]',
+            focusWithinOutlineClass,
+            tooLarge
+              ? 'border-destructive'
+              : isDragActive
+                ? linkBorderClass
+                : [borderStrongClass, linkHoverBorderClass],
+            busy && 'cursor-not-allowed opacity-60',
+          )}
+        >
+          <input
+            {...getInputProps({ tabIndex: 0 })}
+            id={domId}
+            disabled={busy}
+            aria-invalid={!!error}
+          />
+          {uploading ? (
+            <>
+              <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+              <p className="text-[13px] text-muted-foreground">{s.uploading}</p>
+            </>
+          ) : (
+            <>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'grid size-11 shrink-0 place-items-center rounded-xl',
+                  linkTintFillClass,
+                  linkTextClass,
+                )}
+              >
+                <Upload className="size-5" strokeWidth={1.7} />
+              </span>
+              <span className="flex min-w-0 flex-col items-center gap-[3px] pt-1">
+                <b className="text-[15px] leading-[21px] font-semibold text-foreground">
+                  {isDragActive ? s.dropToUpload : s.dropOrBrowse}
+                </b>
+                {hint && (
+                  <span className="text-[13px] leading-[18px] text-muted-foreground">{hint}</span>
+                )}
+              </span>
+              {fileSource && !photos.held && (
+                <span className="pt-1.5">
+                  <FilePickerEntry
+                    ref={pickerEntryRef}
+                    label={label}
+                    disabled={busy}
+                    onOpen={() => setPickerOpen(true)}
+                    inZone
+                  />
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <FieldShell
+        name={field.name}
+        title={field.title}
+        conceptRef={field.conceptRef}
+        category={category}
+        description={field.description}
+        required={!shownAsOptional(field)}
+        error={error}
+        htmlFor={domId}
+        className="flex-1"
+      >
+        <div className="flex min-h-full flex-1 flex-col gap-3">
+          {content}
+          {tooLarge && maxFileBytes !== undefined && (
+            <FileTooLarge
+              files={tooLarge}
+              limit={maxFileBytes}
+              upgradeHref={upgradeHref}
+              onDismiss={() => setTooLarge(null)}
+            />
+          )}
+          {cameraBits}
+          {alerts}
+          {linkBits}
+          {/* With no upload, the team's files are a row of their own. */}
+          {fileSource && !hasFile && !photos.held && !canUpload && (
+            <FilePickerEntry
+              ref={pickerEntryRef}
+              id={choosingOnly ? domId : undefined}
+              label={label}
+              disabled={busy}
+              onOpen={() => setPickerOpen(true)}
+            />
+          )}
+          {pickerSheet}
+        </div>
+      </FieldShell>
+    );
+  }
+
+  if (isApp) return appBody();
+
   return (
     <FieldShell
       name={field.name}
@@ -1088,121 +1555,9 @@ function FileField({
         </div>
       )}
 
-      {/* "Take photo", under the dropzone and before the team's files, while
-          the input is empty: on a touch screen only, which CSS decides. */}
-      {camera && !photos.held && !hasFile && (
-        <TakePhotoButton label={label} disabled={busy} onTake={() => openCamera(null)} />
-      )}
-      {camera && <CameraInput ref={cameraRef} disabled={disabled} onPhoto={takePhoto} />}
-
-      {/* The refusal, or the host's upload failure: one slot, holding whichever
-          came from the user's latest action. `role="alert"` because it appears
-          in response to something the user just did and is the only feedback
-          that the action had no effect - a screen-reader user who drops a .zip
-          otherwise gets silence. A refusal names the file so the message is
-          about the thing they picked, not a generic complaint; a failure is the
-          host's own words, shown on the field that took the file. */}
-      {photos.refusal ? (
-        // A photo that never became a page. It blocks nothing: the pages
-        // already held, and the file they made, stand.
-        <p role="alert" className="text-[12px] text-destructive">
-          {photos.refusal === 'undecodable' ? s.photoUndecodable : s.photoNotKept}
-        </p>
-      ) : (
-        !busy &&
-        (refusal ? (
-          <p role="alert" className="text-[12px] text-destructive">
-            {refusal.kind === 'type' ? (
-              <>
-                <span className={isApp ? 'font-medium' : 'font-mono'}>{refusal.name}</span> —{' '}
-                {s.unsupportedFileType(hint)}
-              </>
-            ) : dropArea?.open ? (
-              // Pointed to only while it takes files: a full list's area is
-              // shut, and would refuse the very drop this sends there.
-              s.oneFileOnlyInList
-            ) : (
-              s.oneFileOnly
-            )}
-          </p>
-        ) : (
-          failure && (
-            <p role="alert" className="text-[12px] text-destructive">
-              {failure}
-            </p>
-          )
-        ))
-      )}
-
-      {/* URL escape hatch - collapsed by default to keep the happy path clean.
-          It reads `busy`, not `disabled`: an upload is a door into this value
-          like any other, and leaving these two live while the dropzone was shut
-          let a user paste a URL over a file that was still arriving - or, on the
-          host side, abandon a started and billed run client-side. The seam
-          promises the control is disabled while its id is uploading, and that
-          has to mean every way in. With no upload path it is not an escape
-          hatch but the only way in, so it is open from the start; with
-          `allowUrl` off it is not offered at all. */}
-      {linkOpen ? (
-        <input
-          type="text"
-          // With no file input, this is the control the field's label names.
-          id={canUpload ? undefined : domId}
-          // Focus follows the click that opened it. Rendered from the start, the
-          // same attribute would pull focus into the form on page load - and on
-          // a form with several file fields, the last one would win.
-          autoFocus={showUrl}
-          value={urlText}
-          disabled={busy}
-          // A name of its own. In the upload case the field's label is bound to
-          // the file input, so without this the placeholder was the only thing
-          // a screen reader announced here - and the placeholder used to name a
-          // storage scheme. With no upload, it still says what the input is for.
-          aria-label={s.fileUrlAria(fieldLabel(field.title, field.name, presentation))}
-          aria-describedby={noUploadLineShown ? noUploadLineId : undefined}
-          aria-invalid={canUpload ? undefined : !!error}
-          placeholder={s.urlPlaceholder}
-          onChange={(e) => {
-            forgetPhotoRefusal();
-            setLocal(null);
-            // A link typed after a failed upload is the user moving past it.
-            dismissUploadError();
-            setTypedUrl(e.target.value);
-            onChange(e.target.value ? { url: e.target.value } : undefined);
-          }}
-          className={cn(
-            fieldControlClass,
-            // In an app, a control of the field family like any other; in a
-            // studio, a reference set as code, under the field's mono name.
-            isApp ? 'h-11 px-3' : 'h-9 px-3 font-mono text-[12px]',
-          )}
-        />
-      ) : (
-        allowUrl && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setShowUrl(true)}
-            className={cn(
-              'flex w-fit items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-11',
-              // A studio's aside is a mono footnote; an app's is a quiet text
-              // action in the page's face, underlined under the pointer.
-              isApp
-                ? 'gap-1.5 text-[13px] underline-offset-4 hover:underline'
-                : 'gap-1 font-mono text-[11px]',
-              focusOutlineClass,
-              'focus-visible:outline-offset-2',
-            )}
-          >
-            <Link2
-              className={cn('shrink-0', isApp ? 'h-3.5 w-3.5' : 'h-3 w-3')}
-              aria-hidden="true"
-            />
-            {s.pasteUrlInstead}
-          </button>
-        )
-      )}
-
+      {cameraBits}
+      {alerts}
+      {linkBits}
       {/* The host's files: a way in beside the upload and the link, offered
           while the field holds no file, as the dropzone is, and shut while a
           file is arriving, as every other way in is. */}
@@ -1215,28 +1570,7 @@ function FileField({
           onOpen={() => setPickerOpen(true)}
         />
       )}
-      {fileSource && (
-        <FilePicker
-          source={fileSource}
-          formats={formats}
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          onUse={(files) => {
-            const file = files[0];
-            if (file) chooseFromSource(file);
-          }}
-          onUpload={canUpload ? openFileDialog : undefined}
-          disabled={busy}
-          returnFocusTo={pickerEntryRef}
-          // The row that opened the sheet is gone once a file is chosen, so
-          // focus lands on the card that replaced it rather than on nothing.
-          onCloseAutoFocus={(event) => {
-            if (!cardRef.current) return;
-            event.preventDefault();
-            cardRef.current.focus();
-          }}
-        />
-      )}
+      {pickerSheet}
     </FieldShell>
   );
 }
@@ -1498,5 +1832,41 @@ function ClearButton({ disabled, onClick }: { disabled?: boolean; onClick: () =>
     >
       <X className="h-4 w-4" />
     </button>
+  );
+}
+
+/** A file's name without its extension, as a picture's tag names it. */
+function stripExtension(name: string): string {
+  return name.replace(/\.[a-z0-9]+$/i, '');
+}
+
+/** A file's extension as its badge reads it: `PDF`, `DOCX`, or `FILE` when it has none. */
+function extensionOf(name: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(name);
+  return match?.[1] ? match[1].toUpperCase().slice(0, 4) : 'FILE';
+}
+
+/** One file in an app: its extension badge, its name, and its size or kind under it. */
+function FileLine({ name, meta }: { name: string; meta?: string }) {
+  return (
+    <span className="flex min-w-0 flex-1 basis-40 items-center gap-2.5 [contain:inline-size]">
+      <span
+        aria-hidden="true"
+        className="grid size-[34px] shrink-0 place-items-center rounded-[7px] bg-card font-mono text-[9.5px] leading-none font-semibold tracking-[0.02em] text-muted-foreground shadow-[0_0_0_1px_var(--border,hsl(240_5.9%_90%))]"
+      >
+        {extensionOf(name)}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <b
+          className="truncate text-[13.5px] leading-[19px] font-medium text-foreground"
+          title={name}
+        >
+          {name}
+        </b>
+        {meta && (
+          <span className="truncate text-[12px] leading-4 text-muted-foreground">{meta}</span>
+        )}
+      </span>
+    </span>
   );
 }
