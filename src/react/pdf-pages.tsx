@@ -458,7 +458,10 @@ interface Ready {
 type LoadedPdf = Parameters<NonNullable<ComponentProps<ReactPdf['Document']>['onLoadSuccess']>>[0];
 
 export interface PdfPagesProps {
-  /** The document's own `url` member, as the host's `loadBytes` is asked with it. */
+  /**
+   * What the host's `loadBytes` is asked with: the document's own `url` member,
+   * or, for the PDF a host made of a Word file, its `ready` answer's `url`.
+   */
   url: string;
   /** What the pages are named for assistive technology: the document's title or file name. */
   name: string;

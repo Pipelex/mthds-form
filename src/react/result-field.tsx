@@ -60,6 +60,9 @@ import {
   useTableColumns,
   useTableLayout,
   type AskDocumentPdf,
+  type LoadBytes,
+  type OpenExternal,
+  type PdfWorkerConfig,
   type ResolveRendition,
   type ResolveUrl,
 } from './result-env';
@@ -84,7 +87,7 @@ import { ConceptPill } from './concept-pill';
 import { useDocumentPdf } from './document-pdf';
 import { FocusFrame } from './focus-frame';
 import { usePageOrigin } from './page-origin';
-import { hasPdfWorker, PdfPages } from './pdf-pages';
+import { hasPdfWorker, PdfPages, type PdfPagesFailure } from './pdf-pages';
 import { usePdfViewer } from './pdf-viewer';
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from './ui/tooltip';
 import { HtmlPreview } from './html-preview';
@@ -1137,6 +1140,18 @@ function PdfUnavailable({
 }
 
 /**
+ * How a host that cannot frame its documents has the view draw them: the
+ * bytes seam, a worker for pdf.js, the host's way to open a link, and what the
+ * document does when its pages cannot be drawn.
+ */
+interface DrawnPages {
+  loadBytes: LoadBytes;
+  worker: PdfWorkerConfig;
+  openExternal: OpenExternal | undefined;
+  onUnavailable: (failure: PdfPagesFailure) => void;
+}
+
+/**
  * The preview of a document the browser cannot render, as the PDF its host
  * makes of it, for as long as the preview is open.
  *
@@ -1147,22 +1162,34 @@ function PdfUnavailable({
  * PDF, because the link is the reader's way to the pages, and its download
  * saves the original, because that is the file the result holds.
  *
+ * **An answer the frame rule refuses is drawn from its bytes** when the host
+ * supplies them (`pages`), exactly as a stored PDF the frame refused is: the
+ * host's `loadBytes` is asked with the answer's own `url`, so the host's guard
+ * on what it reads applies unchanged, and `PdfPages` draws the pages in the
+ * place the frame would have had. Only once the page's origin is known, as for
+ * a stored PDF: until then an answer on this origin at an absolute URL looks
+ * refused, so the preparing box holds the place for that render.
+ *
  * As the whole result it takes a page's size from its first render: the
  * "Preparing" box and the failure that offers to try again hold the place the
  * pages will fill, so the result does not jump when the PDF arrives, nor when
- * a reader tries again.
+ * a reader tries again. A failure the host says is final shows its sentence
+ * with no Try again, since asking again cannot help.
  */
 function ConvertedDocumentPreview({
   ask,
   name,
   file,
   whole,
+  pages,
 }: {
   ask: AskDocumentPdf;
   name: string;
   file: StuffFile | undefined;
   /** The preview is the whole result, and takes a page's size (`WHOLE_RESULT_FRAME`). */
   whole: boolean;
+  /** How the view draws a PDF it cannot frame, when the host supplies it. */
+  pages: DrawnPages | undefined;
 }) {
   const s = useFieldStrings();
   const { answer, retry } = useDocumentPdf(ask);
@@ -1179,7 +1206,9 @@ function ConvertedDocumentPreview({
     retried.current = false;
     preparing.current?.focus();
   });
-  if (answer.state === 'preparing') {
+  const gated = answer.state === 'ready' ? viewableUrl(answer.url) : undefined;
+  const url = gated && frameableUrl({ url: gated, fromResolver: true }, origin);
+  if (answer.state === 'preparing' || (gated && !url && pages && origin === undefined)) {
     return (
       <div
         ref={preparing}
@@ -1213,22 +1242,36 @@ function ConvertedDocumentPreview({
           <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
           <span>{answer.message ?? s.documentPdfFailed}</span>
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            retried.current = true;
-            retry();
-          }}
-          className={cn(CARD_ACTION, 'text-foreground', focusOutlineClass)}
-        >
-          {s.tryAgain}
-        </button>
+        {!answer.final && (
+          <button
+            type="button"
+            onClick={() => {
+              retried.current = true;
+              retry();
+            }}
+            className={cn(CARD_ACTION, 'text-foreground', focusOutlineClass)}
+          >
+            {s.tryAgain}
+          </button>
+        )}
       </div>
     );
   }
-  const gated = answer.state === 'ready' ? viewableUrl(answer.url) : undefined;
-  const url = gated && frameableUrl({ url: gated, fromResolver: true }, origin);
   if (url) return <DocumentPreview url={url} name={name} pdf file={file} whole={whole} />;
+  if (gated && pages && answer.state === 'ready') {
+    return (
+      <PdfPages
+        url={answer.url}
+        name={name}
+        href={gated}
+        sizeClass={whole ? WHOLE_RESULT_FRAME : NESTED_FRAME}
+        loadBytes={pages.loadBytes}
+        worker={pages.worker}
+        openExternal={pages.openExternal}
+        onUnavailable={pages.onUnavailable}
+      />
+    );
+  }
   return (
     <p
       role="status"
@@ -1282,10 +1325,13 @@ function DocumentValue({
   const isApp = useFieldPresentation() === 'app';
   // The document whose pages will not be drawn, which keeps its link alone
   // from then on: a renderer that failed must never leave a blank frame behind.
+  // A stored PDF and the PDF a host made of a Word file are drawn alike, and a
+  // document is only ever one of the two, so both share these.
   const [pagesRefusedFor, setPagesRefusedFor] = useState<string | null>(null);
   // The document whose pages failed in a way that may pass (a download that
   // failed or never came): its preview folds away with its toggle kept, even
-  // as the whole result in `app`, and unfolding it tries again.
+  // as the whole result in `app`, and unfolding it tries again, which for a
+  // converted document asks the host for its PDF again too.
   const [pagesFailedFor, setPagesFailedFor] = useState<string | null>(null);
   // Open from the first render, on the server and in the browser alike, so the
   // hydration starts from the server's state.
@@ -1314,7 +1360,9 @@ function DocumentValue({
   // Only a document the browser cannot render is asked about: a PDF that cannot
   // be framed is still a PDF, and a PDF of it would change nothing.
   const askPdf =
-    preview === undefined && !browserRenders(content, content.url)
+    preview === undefined &&
+    !browserRenders(content, content.url) &&
+    pagesRefusedFor !== content.url
       ? resolveDocumentPdf?.(content.url, {
           filename: content.filename,
           mimeType: content.mimeType,
@@ -1333,11 +1381,25 @@ function DocumentValue({
     hasPdfWorker(pdfWorker) &&
     pagesRefusedFor !== content.url &&
     isPdfDocument(content, content.url);
-  const pagesFailed = drawPages && pagesFailedFor === content.url;
+  const pagesFailed = (drawPages || askPdf !== undefined) && pagesFailedFor === content.url;
+  const onPagesUnavailable = (failure: PdfPagesFailure) => {
+    if (failure === 'final') {
+      setPagesRefusedFor(content.url);
+    } else {
+      setPagesFailedFor(content.url);
+      setOpen(false);
+    }
+  };
+  // The PDF a host makes of a Word file is drawn from its bytes, when the frame
+  // rule refuses its link, under the same two settings as a stored PDF.
+  const convertedPages: DrawnPages | undefined =
+    askPdf && loadBytes && hasPdfWorker(pdfWorker)
+      ? { loadBytes, worker: pdfWorker, openExternal, onUnavailable: onPagesUnavailable }
+      : undefined;
   const opened =
     whole &&
     isApp &&
-    (preview !== undefined || askPdf !== undefined || (drawPages && !pagesFailed));
+    (preview !== undefined || ((askPdf !== undefined || drawPages) && !pagesFailed));
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -1398,6 +1460,7 @@ function DocumentValue({
           name={name}
           file={file}
           whole={opened}
+          pages={convertedPages}
         />
       )}
       {drawPages && loadBytes && pdfWorker && (opened || open) && (
@@ -1410,14 +1473,7 @@ function DocumentValue({
           loadBytes={loadBytes}
           worker={pdfWorker}
           openExternal={openExternal}
-          onUnavailable={(failure) => {
-            if (failure === 'final') {
-              setPagesRefusedFor(content.url);
-            } else {
-              setPagesFailedFor(content.url);
-              setOpen(false);
-            }
-          }}
+          onUnavailable={onPagesUnavailable}
         />
       )}
     </div>
