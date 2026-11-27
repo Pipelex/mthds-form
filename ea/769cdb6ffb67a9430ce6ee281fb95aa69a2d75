@@ -1,0 +1,62 @@
+src/__stories__/inputs/files.stories.tsx
+  s_956c4adbd2c714::t_72f0038cf9949c 170-171,177-178
+src/__stories__/inputs/kinds/nested.stories.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 1-59
+src/__stories__/app-form.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 71-73
+  s_956c4adbd2c714::t_47e5b9c0862b3f 1-70,74-136
+  s_956c4adbd2c714::t_c5cd6dfbba0cbd 137-160
+src/__stories__/inputs/kinds/list.stories.tsx
+  s_956c4adbd2c714::t_46c1d722d083bf 113
+  s_956c4adbd2c714::t_e10b33bda8ea4f 1-23,25-108,110-112,114-118
+  s_956c4adbd2c714::t_54c88c9a2fce8c 24,109
+src/__stories__/inputs/kinds/number.stories.tsx
+  s_956c4adbd2c714::t_edfc5875b60c88 1-44
+src/__stories__/inputs/kinds/document.stories.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 55-57,59-61,69-71,74-82,94-96,98-100,135-137,146-148
+  s_956c4adbd2c714::t_661c16753c29c1 1-54,58,62-68,72-73,83-93,97,101-134,138-145,149-152
+src/__stories__/inputs/kinds/long-text.stories.tsx
+  s_956c4adbd2c714::t_edfc5875b60c88 1-44
+src/__stories__/inputs/camera.stories.tsx
+  s_956c4adbd2c714::t_99541adc640ab4 191,294-295,300-305
+src/__stories__/inputs/kinds/structure.stories.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 1-62
+src/__stories__/inputs/kinds/date.stories.tsx
+  s_956c4adbd2c714::t_edfc5875b60c88 1-26
+src/__stories__/inputs/kinds/text.stories.tsx
+  s_956c4adbd2c714::t_54c88c9a2fce8c 21-24,28-31,33
+  s_956c4adbd2c714::t_edfc5875b60c88 1-20,25-27,32,34-76
+src/__stories__/inputs/phone.stories.tsx
+  s_956c4adbd2c714::t_27b9595fe3f7a2 80,82-83,102-103,105-106,129,146-149,153,214,222,247,250-254,286-287,289,297,305
+  s_956c4adbd2c714::t_8071874149a891 245-246,249
+  s_956c4adbd2c714::t_67e6a85d1cade2 150-152,156-157
+src/__stories__/inputs/kinds/yes-no.stories.tsx
+  s_956c4adbd2c714::t_edfc5875b60c88 1-30
+src/__stories__/inputs/kinds/image.stories.tsx
+  s_956c4adbd2c714::t_661c16753c29c1 1-43,47-80,84-85,89-91
+  s_956c4adbd2c714::t_e10b33bda8ea4f 44-46,81-83,86-88
+src/__stories__/inputs/kinds/choice.stories.tsx
+  s_956c4adbd2c714::t_edfc5875b60c88 1-51
+src/__stories__/inputs/kinds/optional.stories.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 1-34
+src/__stories__/inputs/kinds/in-an-app.stories.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 1-39
+src/__stories__/inputs/kinds/any-value.stories.tsx
+  s_956c4adbd2c714::t_e10b33bda8ea4f 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea769cdb6ffb67a9430ce6ee281fb95aa69a2d75",
+  "prompts": {},
+  "sessions": {
+    "s_956c4adbd2c714": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1eb91be-dac9-416b-93e9-391a3d67fc1d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
