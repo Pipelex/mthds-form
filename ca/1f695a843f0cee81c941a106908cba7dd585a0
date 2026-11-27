@@ -1,0 +1,27 @@
+CHANGELOG.md
+  s_956c4adbd2c714::t_582bd05471681b 26-29
+docs/upload-seam.md
+  s_956c4adbd2c714::t_7fa7a4a67f0c4b 204-205
+src/react/__tests__/list-file-drop.test.tsx
+  s_956c4adbd2c714::t_3c90e27feddcf8 15,564-578
+src/react/list-field.tsx
+  s_956c4adbd2c714::t_7c46555280b8e4 44,98-99,519,538
+src/react/list-file-drop.tsx
+  s_956c4adbd2c714::t_313642e5c7b4f8 3,71-77,86-105,134,142-143,179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ca1f695a843f0cee81c941a106908cba7dd585a0",
+  "prompts": {},
+  "sessions": {
+    "s_956c4adbd2c714": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1eb91be-dac9-416b-93e9-391a3d67fc1d",
+        "model": "unknown"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
