@@ -61,6 +61,19 @@ The kernel has one selected state. A pressed toggle, whether an enum pill, the M
 
 `scripts/assert-bundle.mjs` lists the two as optional tokens: every read of one must fall back to what its row says, in source and in the built sheet, the chain must end at a token `theme.css` defines, `theme.css` must not define either, and this page must name each.
 
+## The inputs' roles in `app`
+
+The app presentation draws each input as the Pipelex Studio canvas does, and every colour it reads is a role of the contract, never a literal. The canvas's own palette maps onto the tokens one for one: its card is `--card`, a control's well is `--input` (a field is a filled well with no outline, which turns to `--ring` with a soft ring of it on focus), its hairline is `--border`, its button colour `--primary`, its accent ink `--link` and its error colour `--destructive`. Two of its roles had no token, and are optional tokens outside the table above, which `theme.css` defines neither of.
+
+| Token | What reads it | Falls back to |
+| --- | --- | --- |
+| `--border-strong` | The stronger hairline the canvas draws where a bare `--border` would vanish: the dashed edge of a file input's drop zone and of a list's "Add more images" cell, and the edge a segmented choice's option shows under the pointer | `--border` |
+| `--success` | The dot of "Valid JSON" under a pasted value that reads as the input's shape | `--foreground` |
+
+The accent reaches an input in four more ways, each a mix of `--link` spelled in `src/react/role-tokens.ts`, so a team's accent colours them all: the drop zone's icon square is `--link` at 12% under `--link` ink, a drop zone under the pointer or under a dragged file takes a `--link` edge, a quiet accent button ("Add item", "Add more files") a `--link` wash at 8% under the pointer, and a chosen option of a segmented choice the `--selected` fill with a `--link` edge. A host that defines neither new token renders the hairline and the dot in the colours it already gives `--border` and `--foreground`.
+
+`scripts/assert-bundle.mjs` lists both as optional tokens, with the same rules as the two above: every read falls back to its row's token and on to `theme.css`'s light value, `theme.css` defines neither, and this page names each.
+
 ## Style tokens
 
 A team's app style ([brand.md](brand.md) § "App styles and typefaces") reaches the page through more optional tokens, outside the table above, which `theme.css` defines none of. The `./brand` entry's `deriveStyleRoles` returns the roles a host writes onto them, as `deriveBrandRoles` does for the colours; the kernel and the generative layer only read them.

@@ -209,6 +209,16 @@ A list whose item is a document or an image offers a drop area of its own, under
 
 Its words are `FieldStrings` keys: `dropFilesOrBrowse`, `dropFilesToAdd`, `addFilesAria`, `filesAdded`, `filesRefused`, `filesLeftOut`, `oneFileOnly` and `oneFileOnlyInList` ([i18n.md](i18n.md)).
 
+## A file over the upload limit
+
+A host states its plan's upload limit as `maxFileBytes`, on `MethodForm` or on `FieldEnv`. A file over it never reaches `onDropFile`: the file input and a list's drop area judge each file by its size before anything is placed, refuse the ones over the limit and place the others as usual. What was refused is said in one line under the input, `FileTooLarge`, announced as an alert: the file's name, its size to one decimal and the limit as a whole number, then "Upgrade plan" when the host gives `upgradeHref`. For several files it counts them and names the largest, the count opening a tooltip, reachable by keyboard, that lists each file with its size. The line's cross dismisses it and the next pick replaces it. A single file input's drop zone also turns the error colour while the line stands. A list in `app` keeps the line itself rather than its drop area, since the area swaps from the big zone of an empty list to "Add more files" once a file is in. Without `maxFileBytes` nothing is judged by size, and a host's own upload decides.
+
+Its words are `FieldStrings` keys: `fileSizeExact`, `uploadLimit`, `fileTooLarge`, `filesTooLargeCount`, `filesTooLarge`, `upgradePlan` and `dismiss` ([i18n.md](i18n.md)).
+
+## A list of files in `app`
+
+In `app` a list of files is drawn as the Studio canvas draws it. Empty, it is one big drop zone that takes as many files as the list has room for, with "Pick from your team's files" inside it when the host has a file source. Holding files, a list of documents shows each as a line in a well, its extension badge, its name and a cross named after the file ("Remove nda.pdf"), at most three lines and then "+ N more · M files in all", with "Add more files" under them, which opens the team's files when the host has them and the device's file dialog otherwise, and still takes files dropped on it. A list of pictures is a grid of tiles, the first one larger, at most six and then "+N more", with a dashed "Add more images" cell in the free columns. On a touch screen "Take photo" under the list adds an empty row, whose camera makes its file ([camera.md](camera.md)). The `studio` list keeps its rows, its drop area and Add item.
+
 ## Several uploads in flight: a host writes over the values as they are
 
 The seam always let several uploads be in flight at once, and a list's drop area makes that the ordinary case. So one obligation that was implicit becomes load-bearing: **a host writes each upload's result over its values as they are when the upload lands, never over the values it held when the file was dropped.** A host that captured `values` at the drop and writes `setValueAtPath(values, path, stored)` when the upload lands writes that snapshot back: it erases every row of the batch that landed meanwhile, and the rows the drop appended as well, since they were added after it. The opening example writes through an updater for this reason. `useMethodForm` writes over its own store, so a host on it owes nothing here.

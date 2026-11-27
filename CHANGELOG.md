@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`MethodForm` lays the inputs out on a grid**: `layout="grid"` puts each input in a card of its own on a twelve-column grid, packed in rows by its kind's weight, as the Pipelex Studio canvas draws a method's inputs; under 768 pixels every card takes the whole width. The default, `stack`, is unchanged. See [docs/method-form.md](docs/method-form.md#what-the-component-renders).
+- **A file over the upload limit is refused in the browser**: `MethodForm` and `FieldEnv` take `maxFileBytes` and `upgradeHref`. A file over the limit, dropped or picked on a file input or a list, never reaches `uploadFile`; one line names it with its size and the limit ("contract.pdf is 73.4 MB, over your plan's 50 MB limit. Upgrade plan"), or counts several and names the largest, with a tooltip listing each, and a cross dismisses it. `FileTooLarge`, `isOverLimit` and `OversizedFile` are exported from `./react`. See [docs/upload-seam.md](docs/upload-seam.md#a-file-over-the-upload-limit).
+- **A generated input says so**: `MethodForm`'s `generated`, a set of input names, shows a "Generated" pill on each of those inputs' headers.
+- **A structure and a list take pasted JSON, in `app`**: a Form / Paste JSON switch on the input's header opens an editor seeded with the input's outline, which says whether the text is valid JSON and how many of the shape's fields or items it matches, and writes it with "Use this JSON" only once it does.
+- **Two optional role tokens, `--border-strong` and `--success`**: the stronger hairline of a drop zone's dashed edge and of a segmented option under the pointer, falling back to `--border`, and the dot of "Valid JSON", falling back to `--foreground`. `theme.css` defines neither. See [docs/theming.md](docs/theming.md#the-inputs-roles-in-app).
+- **New strings**: `generatedMark`, `formMode`, `pasteJsonMode`, `fillModeGroup`, `validJson`, `notValidJsonYet`, `validJsonFields`, `validJsonItems`, `validJsonNotList`, `useThisJson`, `asManyAsYouLike`, `replaceFile`, `removeFile`, `removeNamedFile`, `moreFiles`, `moreImages`, `addMoreFiles`, `addMoreImages`, `fileSizeExact`, `uploadLimit`, `fileTooLarge`, `filesTooLargeCount`, `filesTooLarge`, `upgradePlan` and `dismiss`, in English and French.
+- **Storybook: `Inputs/Kinds`**: every kind of input as an app draws it, in each of its states (empty, filled, optional, invalid, disabled, uploading, over the limit, several items, pasted JSON), with play functions for what a person does to it, over a new generated `inputs` case. The fixture generator takes a slot's `hints`.
+
+### Changed
+
+- **The inputs in `app` are drawn as the Pipelex Studio canvas draws them**: each input opens on a header (its label, an "Optional" pill, a list's item count, its description); a text, number and date are filled wells with no outline and a focus ring in `--ring`; a long text grows as it is typed; a number has its steppers on either side and its range under it; a few options are segmented buttons with no checkmark, cleared by a second press when optional; a yes-or-no is a switch on its header's row; a field inside a structure is a row, label on the left and control on the right, wrapping under 521 pixels; a structure inside a structure hangs from a rule; a list of values numbers its rows and adds one with an accent "Add item". The `studio` presentation is unchanged.
+- **A file input in `app` is a drop zone, then the file**: empty, it is a tall drop zone with "Pick from your team's files" inside it; filled, a document is a line in a well (its extension badge, its name and what it is) and a picture fills the card, named by its file, each with Replace and Remove. A list of documents shows its files as lines, three and then "+ N more · M files in all", with "Add more files"; a list of pictures is a grid of tiles, the first one larger, six and then "+N more", with an "Add more images" cell; on a touch screen "Take photo" adds a row. A picture that does not load shows the broken-image glyph rather than its name. See [docs/upload-seam.md](docs/upload-seam.md#a-list-of-files-in-app).
+
+### Removed
+
+- **In `app`, the file input's inline preview and its Preview toggle**: a filled document is its line and a filled picture is the picture itself. The `studio` presentation keeps the preview.
+- **In `app`, the list of files' rows, its small drop area and its "Add item"**, replaced by the drop zone, the lines or tiles and "Add more files" or "Add more images" above; a file's remove button is a cross named after the file.
+- **In `app`, the checkmark on a chosen option, the trash icon on a list's row, the full-width outlined "Add item", the "+" and "−" icons of the optional toggle (now a chevron), the right-aligned "Optional" text (now a pill) and the second card a structure drew inside a card.**
+
 ## [v0.42.3] - 2026-11-26
 
 ### Added
