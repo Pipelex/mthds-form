@@ -23,6 +23,10 @@
 - **In `app`, the list of files' rows, its small drop area and its "Add item"**, replaced by the drop zone, the lines or tiles and "Add more files" or "Add more images" above; a file's remove button is a cross named after the file.
 - **In `app`, the checkmark on a chosen option, the trash icon on a list's row, the full-width outlined "Add item", the "+" and "−" icons of the optional toggle (now a chevron), the right-aligned "Optional" text (now a pill) and the second card a structure drew inside a card.**
 
+### Fixed
+
+- **A drop on an app's empty list keeps its message**: the files a mixed drop refused, and the count of files added, were lost when the list's rows replaced its drop zone with Add more; the list now holds them across the swap.
+
 ## [v0.42.3] - 2026-11-26
 
 ### Added

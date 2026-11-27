@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useMemo, useState, type ReactNode, type Ref } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Plus, Upload } from 'lucide-react';
 import { FileTooLarge, isOverLimit, type OversizedFile } from './file-too-large';
@@ -68,12 +68,39 @@ interface ListFileDropProps {
   cellSpan?: number;
   /** The zone fills its cell of the form's grid, beside a neighbour. */
   fill?: boolean;
+  /**
+   * What the latest batch did, held by the list (`useListDropReport`) rather
+   * than by this area: an app's list swaps its zone for "Add more" once a file
+   * is in, a new area that would otherwise lose the refusal and the count the
+   * zone was about to say. Absent, the area holds it itself.
+   */
+  report?: ListDropReport;
 }
 
 interface Notice {
   refused: readonly string[];
   leftOut: readonly string[];
   fitted: number;
+}
+
+/** What a list's drop area says of the latest batch: the refusals, and how many it added. */
+export interface ListDropReport {
+  notice: Notice | null;
+  setNotice: (notice: Notice | null) => void;
+  /** Counted so that a second batch of the same size is announced again. */
+  added: { count: number; seq: number };
+  announceAdded: (count: number) => void;
+}
+
+/** The report a list holds across its drop areas, so a swap of area keeps what was said. */
+export function useListDropReport(): ListDropReport {
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [added, setAdded] = useState({ count: 0, seq: 0 });
+  const announceAdded = useCallback(
+    (count: number) => setAdded((prev) => ({ count, seq: prev.seq + 1 })),
+    [],
+  );
+  return { notice, setNotice, added, announceAdded };
 }
 
 /**
@@ -104,15 +131,16 @@ export function ListFileDrop({
   fill,
   onTooLarge,
   buttonRef,
+  report,
 }: ListFileDropProps) {
   const s = useFieldStrings();
   const isApp = useFieldPresentation() === 'app';
   const hint = acceptLabel(formats);
   const accept = useMemo(() => acceptMap(formats), [formats]);
-  const [notice, setNotice] = useState<Notice | null>(null);
   // Counted so that a second batch of the same size is announced again: the
   // status's text would not change, and a live region speaks only a change.
-  const [added, setAdded] = useState({ count: 0, seq: 0 });
+  const own = useListDropReport();
+  const { notice, setNotice, added, announceAdded } = report ?? own;
   // The files over the upload limit in the latest pick, until dismissed or
   // replaced by the next pick's answer.
   const [tooLarge, setTooLarge] = useState<OversizedFile[] | null>(null);
@@ -148,7 +176,7 @@ export function ListFileDrop({
         leftOut: taken.slice(fitted).map((file) => file.name),
         fitted,
       });
-      if (fitted > 0) setAdded((prev) => ({ count: fitted, seq: prev.seq + 1 }));
+      if (fitted > 0) announceAdded(fitted);
     },
   });
 

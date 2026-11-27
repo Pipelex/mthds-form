@@ -41,7 +41,7 @@ import { useFieldStrings } from './field-strings';
 import { FilePicker, FilePickerEntry } from './file-picker';
 import { firstFocusable, followingFocusable } from './focus';
 import { ListDropAreaContext, type ListDropArea, type PlacedFile } from './list-drop-area';
-import { ListFileDrop } from './list-file-drop';
+import { ListFileDrop, useListDropReport } from './list-file-drop';
 import { destinationOf, movedId, type RowMove } from './row-moves';
 
 interface ListFieldProps {
@@ -95,6 +95,8 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   // An app's list keeps the over-the-limit line of its latest pick, through
   // the swap of its zone for "Add more files" once a file is in.
   const [tooLarge, setTooLarge] = useState<readonly OversizedFile[] | null>(null);
+  // The latest batch's refusals and count, kept when the empty zone gives way to "Add more".
+  const dropReport = useListDropReport();
   const depth = useStructureDepth();
   const fill = use(InputFillContext);
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
@@ -514,6 +516,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             upgradeHref={env?.upgradeHref}
             variant="add"
             onTooLarge={setTooLarge}
+            report={dropReport}
             buttonRef={fileSource ? pickerEntryRef : undefined}
             images={fileItem.kind === 'image'}
             cellSpan={cellSpan}
@@ -532,6 +535,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               upgradeHref={env?.upgradeHref}
               variant="zone"
               onTooLarge={setTooLarge}
+              report={dropReport}
               pickerEntry={pickEntry}
               fill={fill}
             />

@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import type { FileRunField, ListRunField, ObjectRunField } from '../../core';
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from '../../core/file-formats';
 import type { FieldEnv } from '../field-renderer';
+import { FieldPresentationProvider } from '../field-presentation';
 import { ListField } from '../list-field';
 import { EN_FIELD_STRINGS as S } from '../locales/en';
 
@@ -558,5 +559,20 @@ describe('a bounded list the area fills', () => {
     });
     expect(await screen.findByText(S.oneFileOnly)).toBeInTheDocument();
     expect(screen.queryByText(S.oneFileOnlyInList)).toBeNull();
+  });
+});
+
+describe("an app's empty list, whose zone gives way to Add more once a file is in", () => {
+  it('still names the refused files and counts the added ones after the swap', async () => {
+    const onDropFile = vi.fn();
+    render(
+      <FieldPresentationProvider presentation="app">
+        <Harness field={listOf(imageItem)} env={{ onDropFile }} />
+      </FieldPresentationProvider>,
+    );
+    dropOnZone([png('a.png'), zip('archive.zip'), png('b.png')]);
+    await waitFor(() => expect(onDropFile).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole('alert')).toHaveTextContent('archive.zip');
+    expect(screen.getByRole('status')).toHaveTextContent('2 files added');
   });
 });
