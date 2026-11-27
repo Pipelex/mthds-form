@@ -1,0 +1,26 @@
+src/__stories__/_structures/inputs.mthds
+  s_956c4adbd2c714::t_e3a6e3af78ac1d 1-211
+scripts/generate-fixtures.mjs
+  s_956c4adbd2c714::t_8f1f9d0de76bed 369-373,437-441
+src/__stories__/_structures/inputs.slots.json
+  s_956c4adbd2c714::t_e3a6e3af78ac1d 1-94,101-104
+  s_956c4adbd2c714::t_f971146d089715 95-100
+src/__stories__/_generated/inputs.ts
+  s_956c4adbd2c714::t_e3a6e3af78ac1d 1-4197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f38759a83f5c93cb9671afc6983d014ef6aa27d2",
+  "prompts": {},
+  "sessions": {
+    "s_956c4adbd2c714": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1eb91be-dac9-416b-93e9-391a3d67fc1d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
