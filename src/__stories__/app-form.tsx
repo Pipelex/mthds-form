@@ -137,21 +137,33 @@ export const FIFTY_MB = 50 * 1024 * 1024;
 
 /**
  * A picture for a story's image input: a flat drawing of a building, a room
- * or a car in a few colours, as an SVG `data:` URL, so the grid of pictures
- * paints without a network. Each seed draws a different one.
+ * or a car in a few colours, painted on a canvas and handed over as a PNG
+ * `data:` URL, so the grid of pictures paints without a network. Each seed
+ * draws a different one. Not an SVG: the form paints no `data:image/svg+xml`,
+ * whose markup could carry script.
  */
 export function scenePicture(seed: number): string {
   const skies = ['#c9d9ea', '#e6e1d8', '#dcd8e4', '#cdd4dc', '#e9e4db'];
   const bodies = ['#e2d6bd', '#56715f', '#2c4366', '#8d7a6a', '#b9c4cf'];
-  const sky = skies[seed % skies.length];
-  const body = bodies[(seed * 3) % bodies.length];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="${sky}"/><rect x="${18 + (seed % 4) * 4}" y="${22 + (seed % 3) * 6}" width="84" height="68" fill="${body}"/><rect x="${30 + (seed % 5) * 3}" y="36" width="14" height="12" fill="#4f6378"/><rect x="${62 - (seed % 4) * 2}" y="36" width="14" height="12" fill="#4f6378"/></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  const canvas = document.createElement('canvas');
+  canvas.width = 240;
+  canvas.height = 180;
+  const ink = canvas.getContext('2d');
+  if (!ink) return '';
+  ink.scale(2, 2);
+  ink.fillStyle = skies[seed % skies.length]!;
+  ink.fillRect(0, 0, 120, 90);
+  ink.fillStyle = bodies[(seed * 3) % bodies.length]!;
+  ink.fillRect(18 + (seed % 4) * 4, 22 + (seed % 3) * 6, 84, 68);
+  ink.fillStyle = '#4f6378';
+  ink.fillRect(30 + (seed % 5) * 3, 36, 14, 12);
+  ink.fillRect(62 - (seed % 4) * 2, 36, 14, 12);
+  return canvas.toDataURL('image/png');
 }
 
 /** An image input's value, a picture named like a camera names it. */
 export function picture(name: string, seed: number): { url: string; filename: string } {
-  return { url: scenePicture(seed), filename: `${name}.svg` };
+  return { url: scenePicture(seed), filename: `${name}.png` };
 }
 
 /** A document input's value, as a host's storage writes it back. */

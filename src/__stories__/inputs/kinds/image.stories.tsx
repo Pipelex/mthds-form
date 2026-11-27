@@ -68,7 +68,7 @@ export const RemoveAPicture: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const [remove] = canvas.getAllByRole('button', { name: 'Remove IMG_2042.svg' });
+    const [remove] = canvas.getAllByRole('button', { name: 'Remove IMG_2042.png' });
     remove!.focus();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(canvas.getAllByText('IMG_2042')).toHaveLength(1));

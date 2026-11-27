@@ -2493,9 +2493,9 @@ export const CONTRACTS: PipeIOContracts = {
               title: 'Notes',
             },
             payment_terms: {
-              default: '30_days',
+              default: '30 days',
               description: 'When the invoice is due',
-              enum: ['15_days', '30_days', '45_days', '60_days', 'end_of_month'],
+              enum: ['30 days', '45 days', '60 days'],
               title: 'Payment Terms',
               type: 'string',
             },
@@ -2623,9 +2623,9 @@ export const CONTRACTS: PipeIOContracts = {
               title: 'Notes',
             },
             payment_terms: {
-              default: '30_days',
+              default: '30 days',
               description: 'When the invoice is due',
-              enum: ['15_days', '30_days', '45_days', '60_days', 'end_of_month'],
+              enum: ['30 days', '45 days', '60 days'],
               title: 'Payment Terms',
               type: 'string',
             },
@@ -3491,10 +3491,16 @@ export const INPUT_FORM: InputForm = {
         concept_ref: 'inputs.Keyword',
         description: 'Words the summary must cover.',
         gating: false,
+        hints: {
+          intent: 'label',
+        },
         item: {
           concept_ref: 'inputs.Keyword',
           description: 'Words the summary must cover.',
-          kind: 'prose',
+          hints: {
+            intent: 'label',
+          },
+          kind: 'text',
           refines: ['native.Text'],
           required: true,
         },
@@ -3924,8 +3930,8 @@ export const INPUT_FORM: InputForm = {
         description: 'The commercial terms of the quote.',
         fields: [
           {
-            choices: ['15_days', '30_days', '45_days', '60_days', 'end_of_month'],
-            default_value: '30_days',
+            choices: ['30 days', '45 days', '60 days'],
+            default_value: '30 days',
             description: 'When the invoice is due',
             kind: 'enum',
             name: 'payment_terms',
@@ -3960,8 +3966,8 @@ export const INPUT_FORM: InputForm = {
         description: 'The commercial terms of the quote.',
         fields: [
           {
-            choices: ['15_days', '30_days', '45_days', '60_days', 'end_of_month'],
-            default_value: '30_days',
+            choices: ['30 days', '45 days', '60 days'],
+            default_value: '30 days',
             description: 'When the invoice is due',
             kind: 'enum',
             name: 'payment_terms',

@@ -51,7 +51,7 @@ export const PasteJson: Story = {
     await expect(json).toHaveAttribute('aria-pressed', 'true');
     const [box] = canvas.getAllByRole('textbox', { name: 'Paste JSON' });
     await userEvent.clear(box!);
-    await userEvent.type(box!, '{{"payment_terms": "60_days", "discount": 5');
+    await userEvent.type(box!, '{{"payment_terms": "60 days", "discount": 5');
     await expect(canvas.getAllByText('Not valid JSON yet')).toHaveLength(1);
     await userEvent.type(box!, '}');
     await expect(canvas.getAllByText('Valid JSON · 2 of 3 fields match')).toHaveLength(1);

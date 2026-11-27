@@ -107,12 +107,10 @@ what_to_look_for = { type = "text", description = "What the clause says when it 
 description = "The commercial terms of the quote."
 
 [concept.Terms.structure]
-payment_terms = { type = "text", description = "When the invoice is due", default_value = "30_days", choices = [
-  "15_days",
-  "30_days",
-  "45_days",
-  "60_days",
-  "end_of_month",
+payment_terms = { type = "text", description = "When the invoice is due", default_value = "30 days", choices = [
+  "30 days",
+  "45 days",
+  "60 days",
 ] }
 discount = { type = "number", description = "A discount on the whole quote, in percent" }
 notes    = { type = "text", description = "Anything the client should know" }

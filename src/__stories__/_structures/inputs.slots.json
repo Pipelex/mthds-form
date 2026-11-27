@@ -49,7 +49,12 @@
     {
       "code": "list_inputs",
       "slots": [
-        { "name": "keywords", "concept": "Keyword", "multiplicity": "variable" },
+        {
+          "name": "keywords",
+          "concept": "Keyword",
+          "multiplicity": "variable",
+          "hints": { "intent": "label" }
+        },
         { "name": "bids", "concept": "Bid", "multiplicity": "fixed", "itemCount": 3 },
         { "name": "clauses_to_find", "concept": "ClauseToFind", "multiplicity": "variable" }
       ]
