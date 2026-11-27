@@ -1,0 +1,28 @@
+docs/theming.md
+  s_956c4adbd2c714::t_3167b920fde85e 64-76
+docs/upload-seam.md
+  s_956c4adbd2c714::t_3167b920fde85e 212-221
+docs/storybook.md
+  s_956c4adbd2c714::t_3167b920fde85e 19,239
+  s_956c4adbd2c714::t_9fdd2baff5b4da 240
+docs/method-form.md
+  s_956c4adbd2c714::t_3167b920fde85e 90-94
+CHANGELOG.md
+  s_956c4adbd2c714::t_6c7566d4622078 3-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5cf76d6f6916e7984ba0ed6ed175db88429610b9",
+  "prompts": {},
+  "sessions": {
+    "s_956c4adbd2c714": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1eb91be-dac9-416b-93e9-391a3d67fc1d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
