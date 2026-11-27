@@ -1207,23 +1207,28 @@ function isFilled(value: unknown): boolean {
 }
 
 /**
- * One input's card in the grid, as the Pipelex Studio canvas draws it: the
- * card's fill, a hairline ring, 12px corners, and the input's header and
- * control inside. It is a container, so a structure's rows go under their
- * labels once the card is narrow.
+ * One input's card, as the Pipelex Studio canvas draws it: the card's fill, a
+ * hairline ring, 12px corners, and the input's header and control inside. It
+ * is a container, so a structure's rows go under their labels once the card is
+ * narrow, and the box a structure inside would draw of its own, so it draws
+ * none. The plain form's grid draws one per input, and a host's designed
+ * layout wraps each input it places in the same card, so both layouts show
+ * the same Input field.
  */
-function InputCard({ fill, children }: { fill: boolean; children: ReactNode }) {
+export function InputCard({ fill = false, children }: { fill?: boolean; children: ReactNode }) {
   return (
-    <InputFillContext value={fill}>
-      <div
-        data-input-card=""
-        className={cn(
-          'flex min-w-0 flex-col rounded-xl border border-border bg-card px-[18px] pt-4 pb-[18px] text-foreground @container',
-          fill && 'flex-1',
-        )}
-      >
-        {children}
-      </div>
-    </InputFillContext>
+    <InputCardContext value>
+      <InputFillContext value={fill}>
+        <div
+          data-input-card=""
+          className={cn(
+            'flex min-w-0 flex-col rounded-xl border border-border bg-card px-[18px] pt-4 pb-[18px] text-foreground @container',
+            fill && 'flex-1',
+          )}
+        >
+          {children}
+        </div>
+      </InputFillContext>
+    </InputCardContext>
   );
 }

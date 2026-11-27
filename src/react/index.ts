@@ -42,7 +42,7 @@ export type {
   MethodFormValues,
   UseMethodFormOptions,
 } from './method-form';
-export { MethodForm, useMethodForm } from './method-form';
+export { InputCard, MethodForm, useMethodForm } from './method-form';
 
 // The two optional host seams beside the upload, as controls. A form given a
 // file source offers the team's files on every file field (`FieldEnv.fileSource`
