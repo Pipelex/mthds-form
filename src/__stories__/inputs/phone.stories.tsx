@@ -57,16 +57,6 @@ function buttons(canvasElement: HTMLElement, name: string | RegExp): HTMLElement
   return within(canvasElement).getAllByRole('button', { name });
 }
 
-/** The file card a name is drawn on: its nearest ancestor holding a Preview button. */
-function cardOf(name: HTMLElement): HTMLElement {
-  let card = name.parentElement;
-  while (card && !within(card).queryByRole('button', { name: S.preview })) {
-    card = card.parentElement;
-  }
-  if (!card) throw new Error(`No file card around ${name.textContent ?? ''}.`);
-  return card;
-}
-
 /**
  * Nothing scrolls sideways: not the page, and nothing in either theme's form
  * reaches past the form's own right edge.
@@ -87,12 +77,10 @@ async function expectNoSidewaysScroll(canvasElement: HTMLElement) {
 // ─── A list of documents ─────────────────────────────────────────────────────
 
 /**
- * **A list of three documents with long names, on a phone.** Each card keeps
+ * **A list of three documents with long names, on a phone.** Each line keeps
  * its name readable - its first eighteen characters or so, then an ellipsis -
- * by moving its Preview and remove buttons under the name once the row is too
- * narrow for both, rather than squeezing the name to a letter, and Preview is
- * its icon alone, the word kept as its accessible name. Every button on the
- * card and in the list is 44 pixels square or more.
+ * beside its extension badge and its remove cross, and every button in the
+ * list, each line's cross and Add more files, is 44 pixels square or more.
  */
 export const DocumentListPhone: Story = {
   name: 'A list of documents with long names, phone',
@@ -111,20 +99,12 @@ export const DocumentListPhone: Story = {
       }
     }
     const controls = [
-      ...buttons(canvasElement, S.preview),
-      ...buttons(canvasElement, S.removeFileAria),
-      ...buttons(canvasElement, S.pasteUrlInstead),
-      ...LONG_NAMES.flatMap((_, index) => buttons(canvasElement, S.removeItemAria(index + 1))),
-      ...buttons(canvasElement, S.addItem),
+      ...LONG_NAMES.flatMap((filename) => buttons(canvasElement, S.removeNamedFile(filename))),
+      ...buttons(canvasElement, S.addMoreFiles),
     ];
-    // Three cards, two theme panes: Preview, remove file and the link toggle
-    // on each, a remove button per row, and Add under both lists.
-    await expect(controls).toHaveLength(2 * (3 * 3 + 3 + 2));
+    // Three lines, two theme panes: a cross on each line, and Add more files under both lists.
+    await expect(controls).toHaveLength(2 * (3 + 1));
     for (const control of controls) await expectTouchTarget(control);
-    // Found above by its accessible name, and as wide as its icon's target.
-    for (const preview of buttons(canvasElement, S.preview)) {
-      await expect(Math.round(preview.getBoundingClientRect().width)).toBe(TOUCH_TARGET);
-    }
   },
 };
 
@@ -146,7 +126,7 @@ export const DropAreaPhone: Story = {
   },
 };
 
-/** The same list on a desktop: one line per card, and every control its usual size. */
+/** The same list on a desktop: one line per file, and every control its usual size. */
 export const DocumentListDesktop: Story = {
   name: 'A list of documents with long names, desktop',
   ...pinnedTo('desktop'),
@@ -158,33 +138,23 @@ export const DocumentListDesktop: Story = {
       const { width, height } = control.getBoundingClientRect();
       return { width: Math.round(width), height: Math.round(height) };
     };
-    for (const preview of buttons(canvasElement, S.preview)) {
-      await expect(size(preview).height).toBe(28);
-    }
-    // Beside the name: a desktop card keeps its one row.
     const middle = (element: Element) => {
       const box = element.getBoundingClientRect();
       return box.top + box.height / 2;
     };
     for (const filename of LONG_NAMES) {
-      for (const name of within(canvasElement).getAllByText(filename)) {
-        const preview = within(cardOf(name)).getByRole('button', { name: S.preview });
-        await expect(Math.abs(middle(name) - middle(preview))).toBeLessThan(TOUCH_TARGET / 2);
+      const names = within(canvasElement).getAllByText(filename);
+      const removes = buttons(canvasElement, S.removeNamedFile(filename));
+      for (const [index, name] of names.entries()) {
+        // Beside the name: a desktop line keeps its one row.
+        await expect(Math.abs(middle(name) - middle(removes[index]!))).toBeLessThan(
+          TOUCH_TARGET / 2,
+        );
+        await expect(size(removes[index]!)).toEqual({ width: 30, height: 30 });
       }
     }
-    for (const remove of buttons(canvasElement, S.removeFileAria)) {
-      await expect(size(remove)).toEqual({ width: 28, height: 28 });
-    }
-    for (const index of [1, 2, 3]) {
-      for (const remove of buttons(canvasElement, S.removeItemAria(index))) {
-        await expect(size(remove)).toEqual({ width: 28, height: 28 });
-      }
-    }
-    for (const add of buttons(canvasElement, S.addItem)) await expect(size(add).height).toBe(36);
-    // A line of the app's 13px text, as tall as its line and no taller.
-    for (const link of buttons(canvasElement, S.pasteUrlInstead)) {
-      await expect(size(link).height).toBeLessThanOrEqual(20);
-    }
+    for (const add of buttons(canvasElement, S.addMoreFiles))
+      await expect(size(add).height).toBe(32);
   },
 };
 
@@ -241,7 +211,7 @@ export const OptionalFieldsPhone: Story = {
   },
 };
 
-/** The same on a desktop: the toggle is a line of text and the switch its 44 by 24 track. */
+/** The same on a desktop: the toggle is a quiet 28 pixel button and the switch its 44 by 24 track. */
 export const OptionalFieldsDesktop: Story = {
   name: 'Optional fields and a switch, desktop',
   ...pinnedTo('desktop'),
@@ -249,7 +219,7 @@ export const OptionalFieldsDesktop: Story = {
   play: async ({ canvasElement }) => {
     await atWidth('desktop');
     for (const toggle of buttons(canvasElement, FOLDED)) {
-      await expect(toggle.getBoundingClientRect().height).toBeLessThan(20);
+      await expect(toggle.getBoundingClientRect().height).toBe(28);
     }
     await openOptionalFields(canvasElement);
     for (const control of within(canvasElement).getAllByRole('switch')) {
@@ -272,11 +242,16 @@ const trip = {
 
 /**
  * The narrowest the stay's city may be on a phone, two structures down: the
- * form's 327 pixels less the request's card (a hairline and 12 pixels on each
- * side) and the stay's rule (2 pixels and a 12 pixel gap), 287 pixels. When
- * the stay was a second card inside the first, it was 259.
+ * form's 327 pixels less the request's card (a hairline and 18 pixels on each side) and the
+ * stay's rule (1.5 pixels and a 14 pixel gap), 273 pixels. When the stay was a
+ * second card inside the first, it was 259.
  */
-const NESTED_FLOOR = 285;
+const NESTED_FLOOR = 273;
+
+/** The weight an element's text is set in. */
+function fontWeight(element: Element): number {
+  return Number.parseFloat(getComputedStyle(element).fontWeight);
+}
 
 /** The size an element's text is set in, in pixels. */
 function fontSize(element: Element): number {
@@ -308,8 +283,10 @@ export const TripRequestPhone: Story = {
     const [request] = canvas.getAllByText('Request');
     const [stay] = canvas.getAllByText('Stay');
     const [cityLabel] = canvas.getAllByText('City');
+    // The request's name is the input's header; the stay's heads its rows,
+    // as large as their labels and heavier.
     await expect(fontSize(request!)).toBeGreaterThan(fontSize(stay!));
-    await expect(fontSize(stay!)).toBeGreaterThan(fontSize(cityLabel!));
+    await expect(fontWeight(stay!)).toBeGreaterThan(fontWeight(cityLabel!));
     // The currency's four options and the pace's three, in each theme pane.
     const options = canvas.getAllByRole('radio');
     await expect(options).toHaveLength(2 * (4 + 3));
@@ -317,7 +294,7 @@ export const TripRequestPhone: Story = {
   },
 };
 
-/** The same request on a desktop: each option the 36 pixels it always was. */
+/** The same request on a desktop: each option 34 pixels tall, as the Studio input draws it. */
 export const TripRequestDesktop: Story = {
   name: 'A structure in a structure and its choices, desktop',
   ...pinnedTo('desktop'),
@@ -325,7 +302,7 @@ export const TripRequestDesktop: Story = {
   play: async ({ canvasElement }) => {
     await atWidth('desktop');
     for (const option of within(canvasElement).getAllByRole('radio')) {
-      await expect(Math.round(option.getBoundingClientRect().height)).toBe(36);
+      await expect(Math.round(option.getBoundingClientRect().height)).toBe(34);
     }
   },
 };
