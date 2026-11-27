@@ -1,0 +1,32 @@
+src/__stories__/_generated/inputs.ts
+  s_956c4adbd2c714::t_ddf84fe50803f2 2496,2498,2626,2628,3933-3934,3969-3970
+  s_956c4adbd2c714::t_67e99eaa4ba82a 3494-3496,3500-3503
+src/__stories__/_structures/inputs.slots.json
+  s_956c4adbd2c714::t_67e99eaa4ba82a 52-57
+src/__stories__/inputs/kinds/structure.stories.tsx
+  s_956c4adbd2c714::t_ddf84fe50803f2 54
+src/__stories__/inputs/kinds/in-an-app.stories.tsx
+  s_956c4adbd2c714::t_3e2cf1678d0e0d 2-3,42-64
+src/__stories__/inputs/kinds/image.stories.tsx
+  s_956c4adbd2c714::t_403a3ec2f763f5 71
+src/__stories__/app-form.tsx
+  s_956c4adbd2c714::t_0fd7d2fd1c38af 140-143,148-161,166
+src/__stories__/_structures/inputs.mthds
+  s_956c4adbd2c714::t_ddf84fe50803f2 110-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0a64995b624b0f1a3d92243519cc98761b0ecadd",
+  "prompts": {},
+  "sessions": {
+    "s_956c4adbd2c714": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1eb91be-dac9-416b-93e9-391a3d67fc1d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
