@@ -5,8 +5,11 @@ import { cn } from './utils';
 import type { UnknownRunField } from '../core';
 import { FieldShell } from './field-shell';
 import { useFieldStrings } from './field-strings';
-import { fieldControlClass } from './field-styles';
+import { controlClass } from './field-styles';
 import { useFieldDomId } from './field-dom-id';
+import { useFieldPresentation } from './field-presentation';
+import { JsonStatus, jsonStatusOf } from './paste-json';
+import { useCompactControl } from './field-context';
 
 interface UnknownFieldProps {
   field: UnknownRunField;
@@ -25,6 +28,9 @@ interface UnknownFieldProps {
 export function UnknownField({ field, value, onChange, id, error, disabled }: UnknownFieldProps) {
   const s = useFieldStrings();
   const domId = useFieldDomId(id);
+  const isApp = useFieldPresentation() === 'app';
+  const compact = useCompactControl();
+  const statusId = `${domId}-status`;
   return (
     <FieldShell
       name={field.name}
@@ -32,7 +38,10 @@ export function UnknownField({ field, value, onChange, id, error, disabled }: Un
       conceptRef={field.conceptRef}
       category="structured"
       description={field.description}
-      hint={s.jsonHint}
+      // In an app the hint is the status line under the box, which says
+      // whether what is typed is JSON yet.
+      hint={isApp ? undefined : s.jsonHint}
+      stack
       required={!shownAsOptional(field)}
       error={error}
       htmlFor={domId}
@@ -44,10 +53,20 @@ export function UnknownField({ field, value, onChange, id, error, disabled }: Un
         aria-invalid={!!error}
         rows={3}
         spellCheck={false}
-        placeholder={'{\n  "key": "value"\n}'}
+        placeholder={isApp ? '{ }' : '{\n  "key": "value"\n}'}
+        aria-describedby={isApp ? statusId : undefined}
         onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
-        className={cn(fieldControlClass, 'min-h-[80px] resize-y px-3 py-2.5 font-mono text-[12px]')}
+        className={cn(
+          controlClass(isApp),
+          'resize-y px-3 py-2.5 font-mono',
+          isApp
+            ? compact
+              ? 'min-h-[72px] text-[12.5px] leading-[19px]'
+              : 'min-h-[170px] text-[12.5px] leading-[19px]'
+            : 'min-h-[80px] text-[12px]',
+        )}
       />
+      {isApp && <JsonStatus id={statusId} className="mt-3" status={jsonStatusOf(value ?? '', s)} />}
     </FieldShell>
   );
 }

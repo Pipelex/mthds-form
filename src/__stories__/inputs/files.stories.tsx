@@ -167,16 +167,15 @@ export const StoredFileStudio: Story = {
 
 /**
  * **The same stored file, in `app`.** The person who just chose the file has
- * no use for its storage address, so the card names the format the filename's
- * extension gives, among the slot's own formats, and prints no reference. A
- * pasted `https` link would still be shown back as it is.
+ * no use for its storage address: the picture fills the card, named by its
+ * file, and no reference is printed.
  */
 export const StoredFileApp: Story = {
   args: { pipeCode: 'one_image', initialValues: storedImage, presentation: 'app' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText('rhubarb-sign.png')).toHaveLength(2);
-    await expect(canvas.getAllByText('PNG')).toHaveLength(2);
+    await expect(canvas.getAllByText('rhubarb-sign')).toHaveLength(2);
+    await expect(canvas.getAllByRole('button', { name: 'Replace' })).toHaveLength(2);
     await expect(canvasElement.textContent).not.toContain('pipelex-storage');
   },
 };

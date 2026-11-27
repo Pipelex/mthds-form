@@ -224,8 +224,8 @@ describe('the sheet over a list of files', () => {
         fileSource={sourceOf([INVOICE, OLDER, DRAFT])}
       />,
     );
-    // The list's own entry is the one named for the list.
-    await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') }));
+    // Under the files a list holds, Add more files opens the team's files.
+    await user.click(screen.getAllByRole('button', { name: S.addMoreFiles })[0]!);
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
     await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
     await user.click(within(dialog).getByRole('checkbox', { name: /INV-2288\.pdf/ }));
@@ -412,8 +412,9 @@ describe('a list holding empty rows', () => {
         fileSource={sourceOf([INVOICE, OLDER, DRAFT])}
       />,
     );
-    const entry = screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') });
+    const [entry] = screen.getAllByRole('button', { name: S.addMoreFiles });
     expect(entry).toBeEnabled();
+    if (!entry) throw new Error('No Add more files');
     await user.click(entry);
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
     await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
@@ -502,24 +503,21 @@ describe('a file written into a row whose own upload failed', () => {
       <Harness {...MANY_FILES} uploadFile={uploadFile} fileSource={sourceOf([INVOICE])} />,
     );
     // The first list is the attachments; the fixture's other list is a gallery.
-    const [addAttachment] = screen.getAllByRole('button', { name: S.addItem });
-    if (!addAttachment) throw new Error('No Add item');
-    await user.click(addAttachment);
+    // A file dropped on its zone takes a row of its own.
     const input = container.querySelector<HTMLInputElement>(
-      'input[type="file"]:not([data-camera-input])',
+      '[data-list-file-drop] input[type="file"]',
     );
-    if (!input) throw new Error('No file input in the row');
+    if (!input) throw new Error('No drop zone on the list');
     await user.upload(input, new File(['%PDF-1.4'], 'mine.pdf', { type: 'application/pdf' }));
     await screen.findByText(S.uploadFailed);
 
-    await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') }));
+    await user.click(screen.getAllByRole('button', { name: S.addMoreFiles })[0]!);
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
     await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
     expect(values().attachments).toEqual([{ url: INVOICE.url, filename: 'INV-2291.pdf' }]);
 
     expect(screen.queryByText(S.uploadFailed)).toBeNull();
-    await user.click(screen.getByRole('button', { name: S.preview }));
     expect(paintsLocalPreview(container)).toBe(false);
   });
 });
@@ -569,7 +567,7 @@ describe('a bounded list’s room, counted in files it does not hold yet', () =>
         fileSource={sourceOf([INVOICE, OLDER, OLDER_AGAIN, DRAFT])}
       />,
     );
-    await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') }));
+    await user.click(screen.getAllByRole('button', { name: S.addMoreFiles })[0]!);
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
     await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
     // The held invoice adds nothing, so the list's one room is still free.
@@ -595,7 +593,8 @@ describe('a bounded list’s room, counted in files it does not hold yet', () =>
         fileSource={sourceOf([OLDER])}
       />,
     );
-    const entry = screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') });
+    const [entry] = screen.getAllByRole('button', { name: S.addMoreFiles });
+    if (!entry) throw new Error('No Add more files');
     await user.click(entry);
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
     await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2288\.pdf/ }));

@@ -366,6 +366,11 @@ function validateSlot(caseName, pipeCode, slot, seen) {
   } else if (slot.itemCount !== undefined) {
     die(`${where}: 'itemCount' applies only to a fixed slot.`);
   }
+  // A slot's presentation intent (`{ intent = "label" }`), which the standard
+  // states on the slot rather than on the concept: a `Text` meant as one line.
+  if (slot.hints !== undefined && (typeof slot.hints !== 'object' || slot.hints === null)) {
+    die(`${where}: 'hints' must be a table, e.g. { "intent": "label" }.`);
+  }
   return { ...slot, multiplicity, presence };
 }
 
@@ -429,7 +434,11 @@ function synthesizeCarrier(pipe) {
   const output = pipe.output ?? 'Text';
   const type = pipe.type ?? 'PipeLLM';
   const inputs = pipe.slots
-    .map((slot) => `${slot.name} = "${slotTypeExpression(slot)}"`)
+    .map((slot) =>
+      slot.hints
+        ? `${slot.name} = { concept = "${slotTypeExpression(slot)}", hints = ${tomlValue(slot.hints)} }`
+        : `${slot.name} = "${slotTypeExpression(slot)}"`,
+    )
     .join(', ');
   // An authored prompt is for a case that needs the pipe to DO something
   // specific when the payload pass runs it - an image generator has nothing to

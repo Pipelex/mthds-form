@@ -121,3 +121,45 @@ export const focusOutlineInsetClass =
  */
 export const frameFocusOutlineClass =
   'data-focus-visible:outline-solid data-focus-visible:outline-2 data-focus-visible:-outline-offset-2 data-focus-visible:outline-ring';
+
+/**
+ * The stronger hairline, `--border-strong`, an optional token falling back to
+ * the contract's `--border`: an app input's edges that must read against the
+ * well and the card around them, where the plain hairline is a card's edge.
+ * The "Optional" pill's edge, a drop zone's dashed edge, the edge a choice
+ * takes under the pointer and an off switch's track. See docs/theming.md §
+ * "Link, selected and focus".
+ */
+export const borderStrongClass =
+  'border-[color:var(--border-strong,var(--border,hsl(240_5.9%_90%)))]';
+
+/** The same edge under the pointer. */
+export const borderStrongHoverClass =
+  'hover:border-[color:var(--border-strong,var(--border,hsl(240_5.9%_90%)))]';
+
+/**
+ * The success colour, `--success`, an optional token falling back to the
+ * contract's `--foreground`: the dot beside "Valid JSON". A host that sets
+ * none sees the dot in the text colour, which still reads apart from the
+ * error colour of "Not valid JSON yet".
+ */
+export const successFillClass = 'bg-[color:var(--success,var(--foreground,hsl(240_10%_3.9%)))]';
+
+/** The accent tint behind an app's drop-zone icon and its "Generated" mark: `--link` at 12%. */
+export const linkTintFillClass =
+  'bg-[color:color-mix(in_oklab,var(--link,var(--primary,hsl(240_5.9%_10%)))_12%,transparent)]';
+
+/** The accent's edge, whole: a drop zone under the pointer or a file dragged over it. */
+export const linkBorderClass = 'border-[color:var(--link,var(--primary,hsl(240_5.9%_10%)))]';
+
+/** The same edge under the pointer. */
+export const linkHoverBorderClass =
+  'hover:border-[color:var(--link,var(--primary,hsl(240_5.9%_10%)))]';
+
+/** The accent's faint wash under the pointer, `--link` at 8%: an "Add item" or "Add more files". */
+export const linkHoverWashClass =
+  'hover:bg-[color:color-mix(in_oklab,var(--link,var(--primary,hsl(240_5.9%_10%)))_8%,transparent)]';
+
+/** The accent's whole edge on a pressed item (`data-state="on"`): a chosen option of an app's choice. */
+export const linkStateBorderClass =
+  'data-[state=on]:border-[color:var(--link,var(--primary,hsl(240_5.9%_10%)))]';

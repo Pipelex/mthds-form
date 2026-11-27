@@ -2,7 +2,14 @@
 
 import { shownAsOptional } from '../core/readiness';
 import { Check } from 'lucide-react';
-import { linkTextClass, selectedStateBorderClass } from './role-tokens';
+import {
+  borderStrongHoverClass,
+  linkStateBorderClass,
+  linkTextClass,
+  selectedStateBorderClass,
+} from './role-tokens';
+import { appControlHeight, appLineWidthClass } from './field-styles';
+import { useCompactControl } from './field-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import type { EnumRunField } from '../core';
@@ -46,6 +53,8 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const labelOf = enumLabeler(field.options, presentation);
+  const isApp = presentation === 'app';
+  const compact = useCompactControl();
   const isSegmented =
     field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
   const domId = useFieldDomId(id);
@@ -80,17 +89,27 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
             <ToggleGroupItem
               key={option}
               value={option}
-              variant="outline"
+              variant={isApp ? 'default' : 'outline'}
               // The pressed fill and its text are the toggle's own selected state,
               // and the pressed edge is the accent's, as a tag's is. Below `sm`
               // each option grows to the 44 pixels a finger needs, in both
               // directions, as every other control of the kernel does there.
               className={cn(
-                'h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:font-medium max-sm:h-11 max-sm:min-w-11',
-                selectedStateBorderClass,
+                isApp
+                  ? [
+                      // The Studio input's choice: wells of the field fill, the
+                      // chosen one tinted and edged in the accent, no checkmark.
+                      'h-[34px] min-w-0 rounded-lg border-[1.5px] border-transparent bg-input px-[13px] text-[13px] font-medium text-foreground hover:bg-input hover:text-foreground max-md:h-11 max-md:min-w-11',
+                      borderStrongHoverClass,
+                      linkStateBorderClass,
+                    ]
+                  : [
+                      'h-9 min-w-0 gap-1.5 border-border bg-input px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:font-medium max-sm:h-11 max-sm:min-w-11',
+                      selectedStateBorderClass,
+                    ],
               )}
             >
-              {value === option && (
+              {!isApp && value === option && (
                 <Check
                   className={cn('size-3.5', linkTextClass)}
                   strokeWidth={2.5}
@@ -107,7 +126,19 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
           disabled={disabled}
           onValueChange={(next) => onChange(next === CLEAR_VALUE ? undefined : next)}
         >
-          <SelectTrigger id={domId} aria-invalid={!!error} className="h-11">
+          <SelectTrigger
+            id={domId}
+            aria-invalid={!!error}
+            className={
+              isApp
+                ? cn(
+                    'rounded-lg border-transparent text-[14px] focus:ring-[3px] focus:ring-ring/20',
+                    appControlHeight(compact),
+                    !compact && appLineWidthClass,
+                  )
+                : 'h-11'
+            }
+          >
             <SelectValue placeholder={s.selectPlaceholder} />
           </SelectTrigger>
           <SelectContent>

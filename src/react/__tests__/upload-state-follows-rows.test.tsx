@@ -82,7 +82,7 @@ function Harness(options: HarnessProps) {
   const [mounts, setMounts] = useState(0);
   return (
     <>
-      <MethodForm key={mounts} form={form} presentation="app" />
+      <MethodForm key={mounts} form={form} presentation="studio" />
       <button type="button" onClick={() => setMounts((count) => count + 1)}>
         Mount again
       </button>
@@ -638,7 +638,7 @@ describe('a host’s own setValues is read by position', () => {
 describe('a batch dropped on a list of files, through the form', () => {
   /** The attachments' drop area: its file input, named by the list. */
   const attachmentsDrop = () =>
-    screen.getByLabelText(S.addFilesAria('Attachments')) as HTMLInputElement;
+    screen.getByLabelText(S.addFilesAria('attachments')) as HTMLInputElement;
   const named = (name: string) => new File(['%PDF-1.4'], name, { type: 'application/pdf' });
 
   /** An `uploadFile` whose uploads the test settles by file name, in any order. */

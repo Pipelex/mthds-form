@@ -231,4 +231,31 @@ export const EN_FIELD_STRINGS: FieldStrings = {
     count === 1
       ? 'One stored text could not be loaded; the file holds its link instead.'
       : `${count} stored texts could not be loaded; the file holds their links instead.`,
+  generatedMark: 'Generated',
+  formMode: 'Form',
+  pasteJsonMode: 'Paste JSON',
+  fillModeGroup: (label) => `How to fill ${label}`,
+  validJson: 'Valid JSON',
+  notValidJsonYet: 'Not valid JSON yet',
+  validJsonFields: (matched, total) =>
+    `Valid JSON · ${matched} of ${total} ${total === 1 ? 'field matches' : 'fields match'}`,
+  validJsonItems: (count) => `Valid JSON · ${count === 1 ? '1 item' : `${count} items`}`,
+  validJsonNotList: 'Valid JSON · not a list',
+  useThisJson: 'Use this JSON',
+  asManyAsYouLike: 'as many as you like',
+  replaceFile: 'Replace',
+  removeFile: 'Remove',
+  removeNamedFile: (name) => `Remove ${name}`,
+  moreFiles: (more, total) => `+ ${more} more · ${total} files in all`,
+  moreImages: (more) => `+${more} more`,
+  addMoreFiles: 'Add more files',
+  addMoreImages: 'Add more images',
+  fileSizeExact: (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`,
+  uploadLimit: (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`,
+  fileTooLarge: (size, limit) => ` is ${size}, over your plan's ${limit} limit.`,
+  filesTooLargeCount: (count) => `${count} files`,
+  filesTooLarge: (limit, largest) =>
+    ` are over your plan's ${limit} limit, the largest ${largest}.`,
+  upgradePlan: 'Upgrade plan',
+  dismiss: 'Dismiss',
 };

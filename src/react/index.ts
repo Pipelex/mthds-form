@@ -22,6 +22,14 @@ export { ObjectField } from './object-field';
 export { ProseField, TextField } from './text-field';
 export { UnknownField } from './unknown-field';
 
+// The one line for a file over the upload limit, which every file field and a
+// list of files' drop area show under their drop zone when the form is given
+// `maxFileBytes`; exported for a host that refuses a file elsewhere (a prompt's
+// attachment, a toast) in the same words. See docs/upload-seam.md, "A file
+// over the upload limit".
+export type { OversizedFile } from './file-too-large';
+export { FileTooLarge, isOverLimit } from './file-too-large';
+
 // The whole input form of one method: `useMethodForm` holds its state (the
 // seed, the uploads, the gate, the run inputs) and `MethodForm` renders its
 // fields. The host keeps its panel, its run button and its history. See
@@ -34,7 +42,7 @@ export type {
   MethodFormValues,
   UseMethodFormOptions,
 } from './method-form';
-export { MethodForm, useMethodForm } from './method-form';
+export { InputCard, MethodForm, useMethodForm } from './method-form';
 
 // The two optional host seams beside the upload, as controls. A form given a
 // file source offers the team's files on every file field (`FieldEnv.fileSource`

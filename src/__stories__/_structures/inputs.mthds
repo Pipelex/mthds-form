@@ -1,0 +1,209 @@
+domain      = "inputs"
+description = "Every input kind an app's form draws, in the shapes the Pipelex Studio canvas draws them: one concept per board of its Input components."
+
+# Text and long text. A native Text is a page of text; a slot that hints
+# `intent = "label"` asks for one line (see inputs.slots.json).
+
+[concept.LegalName]
+description = "The company's legal name."
+refines     = "Text"
+
+[concept.RegistrationNumber]
+description = "Speeds up the register look-up."
+refines     = "Text"
+
+[concept.ClientBrief]
+description = "What the client asked for, in their own words."
+refines     = "Text"
+
+# Numbers, yes or no.
+
+[concept.Tolerance]
+description = "Differences below it count as a match."
+refines     = "Number"
+
+[concept.DeepCheck]
+description = "Also searches court records and sanctions lists."
+refines     = "YesNo"
+
+# Choices: a short set (a row of buttons) and a long one (a select), with and
+# without a default.
+
+[concept.ReportLanguage]
+description = "The report's language."
+
+[concept.ReportLanguage.structure]
+language = { type = "text", description = "The language the report is written in", default_value = "english", choices = [
+  "english",
+  "french",
+  "german",
+] }
+
+[concept.Audience]
+description = "Sets the tone and what comes first."
+
+[concept.Audience.structure]
+written_for = { type = "text", description = "Who reads the listing first", required = true, choices = [
+  "first_time_buyers",
+  "families",
+  "investors",
+  "retirees",
+  "students",
+  "expatriates",
+] }
+
+# Dates.
+
+[concept.Appointment]
+description = "When the visit takes place."
+
+[concept.Appointment.structure]
+day       = { type = "date", description = "The day of the visit", required = true }
+booked_at = { type = "datetime", description = "When the visit was booked" }
+starts_at = { type = "time", description = "The time the visit starts" }
+
+# Files and images.
+
+[concept.Nda]
+description = "As you received it, PDF or Word."
+refines     = "Document"
+
+[concept.DataRoomFile]
+description = "Accounts, statutes, contracts, anything relevant."
+refines     = "Document"
+
+[concept.Logo]
+description = "Shown at the top of the report."
+refines     = "Image"
+
+[concept.DamagePhoto]
+description = "As many as you have, from any angle."
+refines     = "Image"
+
+# Lists.
+
+[concept.Keyword]
+description = "Words the summary must cover."
+refines     = "Text"
+
+[concept.Bid]
+description = "Exactly three suppliers to compare."
+
+[concept.Bid.structure]
+supplier = "The supplier's name"
+price    = { type = "number", description = "The price they quote", required = true }
+
+[concept.ClauseToFind]
+description = "Each clause type, and whether every contract must have it."
+
+[concept.ClauseToFind.structure]
+clause_type      = "The kind of clause"
+must_have        = { type = "boolean", description = "Every contract must have it", required = true }
+what_to_look_for = { type = "text", description = "What the clause says when it is there" }
+
+# A structure, its optional fields folded.
+
+[concept.Terms]
+description = "The commercial terms of the quote."
+
+[concept.Terms.structure]
+payment_terms = { type = "text", description = "When the invoice is due", default_value = "30 days", choices = [
+  "30 days",
+  "45 days",
+  "60 days",
+] }
+discount = { type = "number", description = "A discount on the whole quote, in percent" }
+notes    = { type = "text", description = "Anything the client should know" }
+
+# Nested structures: a property, and a claim record.
+
+[concept.Address]
+description = "Where the property is."
+
+[concept.Address.structure]
+street   = "The street and number"
+postcode = "The postcode"
+city     = "The city"
+
+[concept.Room]
+description = "One room of the property."
+
+[concept.Room.structure]
+room     = "What the room is"
+surface  = { type = "number", description = "In square metres.", required = true }
+features = { type = "text", description = "What stands out about it" }
+
+[concept.Property]
+description = "What the visit taught you."
+
+[concept.Property.structure]
+address       = { type = "concept", concept_ref = "inputs.Address", description = "Where the property is", required = true }
+surface       = { type = "number", description = "In square metres.", required = true }
+price         = { type = "integer", description = "The asking price", required = true }
+energy_rating = { type = "text", description = "The energy performance class", required = true, choices = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+] }
+lift  = { type = "boolean", description = "There is a lift", required = true }
+rooms = { type = "list", item_type = "concept", item_concept_ref = "inputs.Room", description = "Every room, one by one", required = true }
+
+[concept.Policy]
+description = "The policy the claim is made under."
+
+[concept.Policy.structure]
+holder        = "Who holds the policy"
+policy_number = "The policy's number"
+cover         = { type = "text", description = "What the policy covers", required = true, choices = [
+  "third_party",
+  "third_party_fire_theft",
+  "comprehensive",
+] }
+
+[concept.Party]
+description = "Someone involved in the incident."
+
+[concept.Party.structure]
+name    = "Their full name"
+role    = { type = "text", description = "Their part in the incident", required = true, choices = [
+  "policyholder",
+  "third_party",
+  "witness",
+  "passenger",
+  "pedestrian",
+] }
+insurer = { type = "text", description = "Their insurer" }
+plate   = { type = "text", description = "Their vehicle's plate" }
+
+[concept.Incident]
+description = "What happened, where and when."
+
+[concept.Incident.structure]
+date    = { type = "date", description = "The day it happened", required = true }
+place   = "Where it happened"
+parties = { type = "list", item_type = "concept", item_concept_ref = "inputs.Party", description = "Who was involved", required = true }
+time    = { type = "time", description = "The time it happened" }
+
+[concept.DamagedItem]
+description = "One damaged part."
+
+[concept.DamagedItem.structure]
+part   = "The damaged part"
+damage = "What happened to it"
+quoted = { type = "number", description = "The repairer's quote, in euros.", required = true }
+
+[concept.ClaimRecord]
+description = "The claim as your claims system holds it."
+
+[concept.ClaimRecord.structure]
+claim_number        = "The claim's number"
+policy              = { type = "concept", concept_ref = "inputs.Policy", description = "The policy", required = true }
+incident            = { type = "concept", concept_ref = "inputs.Incident", description = "The incident", required = true }
+damaged_items       = { type = "list", item_type = "concept", item_concept_ref = "inputs.DamagedItem", description = "Every damaged part", required = true }
+police_report_filed = { type = "boolean", description = "A police report was filed", required = true }
+adjuster_notes      = { type = "text", description = "Notes for the adjuster" }
+extra               = { type = "dict", key_type = "text", value_type = "text", description = "Anything else the claims system holds" }

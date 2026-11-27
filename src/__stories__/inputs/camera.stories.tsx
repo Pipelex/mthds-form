@@ -188,7 +188,7 @@ export const OnePageStored: Story = {
       () => expect(canvas.getAllByText(S.photoPagesChip('Attachment', 1))).toHaveLength(2),
       STORED,
     );
-    await expect(canvas.getAllByRole('button', { name: S.removeFileAria })).toHaveLength(2);
+    await expect(canvas.getAllByRole('button', { name: S.removeFile })).toHaveLength(2);
   },
 };
 
@@ -291,16 +291,18 @@ export const ARefusedPhoto: Story = {
 
 /**
  * **A row of a list of documents, with pages**: each row is a file control of
- * its own, so each empty row offers the camera and makes one PDF; the list's
- * drop area for several files has none.
+ * its own, so each empty row offers the camera and makes one PDF. In an app
+ * the list's "Take photo", under its drop zone, adds that empty row.
  */
 export const AListRowWithPages: Story = {
   args: { pipeCode: 'many_files' },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const [addDocument] = canvas.getAllByRole('button', { name: S.addItem });
-    if (!addDocument) throw new Error('No Add item');
-    await userEvent.click(addDocument);
+    // "Take photo" under the list's drop zone adds an empty row (a touch
+    // screen's button, clicked here through its hidden element).
+    const take = canvasElement.querySelector<HTMLButtonElement>('[data-take-photo]');
+    if (!take) throw new Error('No Take photo on the list');
+    take.click();
+    await waitFor(() => expect(canvasElement.querySelectorAll('[data-list-row]').length).toBe(1));
     const [row] = canvasElement.querySelectorAll<HTMLElement>('[data-list-row]');
     if (!row) throw new Error('No row');
     const [input] = cameraInputs(row);

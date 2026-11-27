@@ -31,7 +31,13 @@ import {
 import { chosenFilesAdded } from '../core/sources';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import { rowActionClass } from './field-styles';
-import { focusOutlineClass, focusOutlineInsetClass, selectedCheckedFillClass } from './role-tokens';
+import {
+  focusOutlineClass,
+  focusOutlineInsetClass,
+  linkHoverWashClass,
+  linkTextClass,
+  selectedCheckedFillClass,
+} from './role-tokens';
 import {
   DimRows,
   drawsNothing,
@@ -101,14 +107,53 @@ export interface FilePickerEntryProps {
   ref?: Ref<HTMLButtonElement>;
   /** The button's id, for a field whose label names this row, when it is the field's only way in. */
   id?: string;
+  /**
+   * Drawn inside an app's drop zone, centred under its words in the accent,
+   * as the Studio input draws "Pick from your team's files". A click on it
+   * opens the sheet and not the zone's file dialog.
+   */
+  inZone?: boolean;
 }
 
 /**
  * "Choose from your team's files": a full-width row with a folder icon, under
  * the field's own controls.
  */
-export function FilePickerEntry({ onOpen, label, disabled, ref, id }: FilePickerEntryProps) {
+export function FilePickerEntry({
+  onOpen,
+  label,
+  disabled,
+  ref,
+  id,
+  inZone,
+}: FilePickerEntryProps) {
   const s = useFieldStrings();
+  if (inZone) {
+    return (
+      <button
+        ref={ref}
+        id={id}
+        type="button"
+        onClick={(event) => {
+          // The zone around it opens the file dialog on a click.
+          event.stopPropagation();
+          onOpen();
+        }}
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-label={s.chooseFromSourceAria(label)}
+        className={cn(
+          'inline-flex h-[30px] items-center gap-[7px] self-center rounded-md px-2.5 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 max-md:min-h-11',
+          linkTextClass,
+          linkHoverWashClass,
+          focusOutlineClass,
+        )}
+      >
+        <Folder className="size-3.5 shrink-0" aria-hidden="true" />
+        {s.chooseFromSource}
+      </button>
+    );
+  }
   return (
     <button
       ref={ref}

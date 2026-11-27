@@ -52,7 +52,14 @@ const rejected = async (): Promise<string> => {
 };
 
 type HarnessProps = Partial<UseMethodFormOptions> &
-  Pick<UseMethodFormOptions, 'descriptor' | 'contract'>;
+  Pick<UseMethodFormOptions, 'descriptor' | 'contract'> & {
+    /**
+     * `studio` for a test that adds an empty row with Add item or reads a
+     * document's drawn preview, which an app's list of files and its file
+     * line do not have.
+     */
+    presentation?: 'app' | 'studio';
+  };
 
 /**
  * A consumer that keeps its controller while it mounts the fields again, as a
@@ -60,12 +67,12 @@ type HarnessProps = Partial<UseMethodFormOptions> &
  * a value at the file's path itself, through `setValues`, or hand a file of
  * its own control to the form's upload, through `dropFile`.
  */
-function Harness(options: HarnessProps) {
+function Harness({ presentation = 'app', ...options }: HarnessProps) {
   const form = useMethodForm(options);
   const [mounts, setMounts] = useState(0);
   return (
     <>
-      <MethodForm key={mounts} form={form} presentation="app" />
+      <MethodForm key={mounts} form={form} presentation={presentation} />
       <button type="button" onClick={() => setMounts((count) => count + 1)}>
         Mount again
       </button>
@@ -172,7 +179,7 @@ describe('a file put in place of a failed upload ends its failure in the form', 
     expect(failed()).toEqual(['attachment']);
     expect(screen.getByText('host.pdf')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: S.removeFileAria }));
+    await user.click(screen.getByRole('button', { name: S.removeFile }));
     expect(state().values.attachment).toBeUndefined();
     expect(failed()).toEqual([]);
 
@@ -186,14 +193,16 @@ describe('a file put in place of a failed upload ends its failure in the form', 
       <Harness {...MANY_FILES} uploadFile={rejected} fileSource={SOURCE} />,
     );
     // The first list is the attachments; the fixture's other list is a gallery.
-    const [addAttachment] = screen.getAllByRole('button', { name: S.addItem });
-    if (!addAttachment) throw new Error('No Add item');
-    await user.click(addAttachment);
-    await user.upload(fileInput(container), pdf());
+    // A file dropped on its zone takes a row of its own.
+    const zone = container.querySelector<HTMLInputElement>(
+      '[data-list-file-drop] input[type="file"]',
+    );
+    if (!zone) throw new Error('No drop zone on the list');
+    await user.upload(zone, pdf());
     await screen.findByText(S.uploadFailed);
     expect(failed()).toEqual(['attachments.0']);
 
-    await user.click(screen.getByRole('button', { name: S.chooseFromSourceAria('Attachments') }));
+    await user.click(screen.getAllByRole('button', { name: S.addMoreFiles })[0]!);
     const dialog = await screen.findByRole('dialog', { name: S.filePickerTitle });
     await user.click(await within(dialog).findByRole('checkbox', { name: /INV-2291\.pdf/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Use INV-2291.pdf' }));
@@ -230,7 +239,9 @@ describe('a write that leaves the failed file’s place as it was keeps the fail
 
   it('keeps it when a row is added after the failed one', async () => {
     const user = userEvent.setup();
-    const { container } = render(<Harness {...MANY_FILES} uploadFile={rejected} />);
+    const { container } = render(
+      <Harness {...MANY_FILES} uploadFile={rejected} presentation="studio" />,
+    );
     const [addAttachment] = screen.getAllByRole('button', { name: S.addItem });
     if (!addAttachment) throw new Error('No Add item');
     await user.click(addAttachment);
@@ -275,7 +286,9 @@ describe('an upload whose place another file took while it was in flight', () =>
   it('still writes its own file over the other one when it succeeds', async () => {
     const user = userEvent.setup();
     const { uploadFile, settle } = deferredUpload();
-    const { container } = render(<Harness {...ONE_DOCUMENT} uploadFile={uploadFile} />);
+    const { container } = render(
+      <Harness {...ONE_DOCUMENT} uploadFile={uploadFile} presentation="studio" />,
+    );
     await user.upload(fileInput(container), pdf());
     await press(user, 'Host writes a file');
     await act(async () => settle.resolve('stored://mine'));
