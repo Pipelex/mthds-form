@@ -1,0 +1,104 @@
+{
+  "description": "One carrier pipe per Input board of the Pipelex Studio canvas: text, long text, numbers, yes or no, choices, dates, documents, images, lists, a structure, nested structures, required and optional, and any value. The stories under Inputs/Kinds draw each kind in every state its board and its features page describe.",
+  "pipes": [
+    {
+      "code": "text_inputs",
+      "slots": [
+        { "name": "supplier", "concept": "LegalName", "hints": { "intent": "label" } },
+        {
+          "name": "registration_number",
+          "concept": "RegistrationNumber",
+          "presence": "optional",
+          "hints": { "intent": "label" }
+        },
+        { "name": "client_brief", "concept": "ClientBrief" }
+      ]
+    },
+    {
+      "code": "number_inputs",
+      "slots": [
+        { "name": "tolerance", "concept": "Tolerance" },
+        { "name": "deep_check", "concept": "DeepCheck" }
+      ]
+    },
+    {
+      "code": "choice_inputs",
+      "slots": [
+        { "name": "report_language", "concept": "ReportLanguage" },
+        { "name": "audience", "concept": "Audience" }
+      ]
+    },
+    {
+      "code": "date_inputs",
+      "slots": [{ "name": "appointment", "concept": "Appointment" }]
+    },
+    {
+      "code": "document_inputs",
+      "slots": [
+        { "name": "nda", "concept": "Nda" },
+        { "name": "data_room", "concept": "DataRoomFile", "multiplicity": "variable" }
+      ]
+    },
+    {
+      "code": "image_inputs",
+      "slots": [
+        { "name": "logo", "concept": "Logo" },
+        { "name": "damage_photos", "concept": "DamagePhoto", "multiplicity": "variable" }
+      ]
+    },
+    {
+      "code": "list_inputs",
+      "slots": [
+        { "name": "keywords", "concept": "Keyword", "multiplicity": "variable" },
+        { "name": "bids", "concept": "Bid", "multiplicity": "fixed", "itemCount": 3 },
+        { "name": "clauses_to_find", "concept": "ClauseToFind", "multiplicity": "variable" }
+      ]
+    },
+    {
+      "code": "structure_inputs",
+      "slots": [{ "name": "terms", "concept": "Terms" }]
+    },
+    {
+      "code": "nested_inputs",
+      "slots": [
+        { "name": "property", "concept": "Property" },
+        { "name": "claim_record", "concept": "ClaimRecord" }
+      ]
+    },
+    {
+      "code": "presence_inputs",
+      "slots": [
+        { "name": "supplier", "concept": "LegalName", "hints": { "intent": "label" } },
+        {
+          "name": "registration_number",
+          "concept": "RegistrationNumber",
+          "presence": "optional",
+          "hints": { "intent": "label" }
+        },
+        { "name": "report_language", "concept": "ReportLanguage", "presence": "optional" },
+        { "name": "terms", "concept": "Terms" }
+      ]
+    },
+    {
+      "code": "unknown_inputs",
+      "slots": [{ "name": "settings", "concept": "Dynamic" }]
+    },
+    {
+      "code": "app_inputs",
+      "slots": [
+        { "name": "property", "concept": "Property" },
+        { "name": "photos", "concept": "DamagePhoto", "multiplicity": "variable" },
+        { "name": "audience", "concept": "Audience" },
+        { "name": "data_room", "concept": "DataRoomFile", "multiplicity": "variable" },
+        { "name": "supplier", "concept": "LegalName", "hints": { "intent": "label" } },
+        { "name": "deep_check", "concept": "DeepCheck" },
+        {
+          "name": "registration_number",
+          "concept": "RegistrationNumber",
+          "presence": "optional",
+          "hints": { "intent": "label" }
+        }
+      ]
+    }
+  ]
+}
