@@ -163,7 +163,7 @@ export function ListFileDrop({
         />
       )}
       {notice && (notice.refused.length > 0 || notice.leftOut.length > 0) && (
-        <div role="alert" className="space-y-1 text-[12px] text-destructive">
+        <div role="alert" className="col-span-full space-y-1 text-[12px] text-destructive">
           {notice.refused.length > 0 && (
             <p>
               {s.filesRefused(
@@ -283,7 +283,9 @@ export function ListFileDrop({
           />
           {button}
         </div>
-        {images ? <div className="col-span-full empty:hidden">{notices}</div> : notices}
+        {/* In the pictures' grid the notices are its items: the status is
+            visually hidden and takes no cell, and a message spans the row. */}
+        {notices}
       </>
     );
   }

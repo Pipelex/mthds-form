@@ -97,7 +97,7 @@ export function ProseField({ field, value, onChange, id, error, disabled }: Pros
         onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
         className={cn(
           controlClass(isApp),
-          'resize-y px-3 py-2.5 field-sizing-content',
+          'w-full resize-y px-3 py-2.5 field-sizing-content',
           isApp
             ? compact
               ? 'min-h-[72px] text-[13.5px] leading-[21px]'

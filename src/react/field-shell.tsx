@@ -204,8 +204,10 @@ export function FieldHeader({
   const generated = use(GeneratedInputContext);
   const Label = htmlFor ? 'label' : 'span';
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+    // The aside wraps under the label once the header is too narrow for both,
+    // rather than squeezing the label to a letter.
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+      <div className="flex min-w-[min(100%,8rem)] flex-1 flex-col gap-[3px]">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Label
             {...(htmlFor ? { htmlFor } : {})}

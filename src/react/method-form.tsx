@@ -1073,13 +1073,13 @@ function MethodFormFields({
     const shownRequired = visible.filter((field) => !folds(field));
     const shownOptional = visible.filter((field) => folds(field));
     const grid = (group: readonly RunField[]) => (
-      <div className="grid grid-cols-12 items-start gap-4 max-md:grid-cols-1">
+      <div className="grid grid-cols-12 items-start gap-4 @max-[767px]/inputs:grid-cols-1">
         {packInputs(group, (field) => isFilled(ownProp(values, field.name))).map((cell) => (
           <div
             key={cell.fields.map((field) => field.name).join('+')}
             data-input-cell={cell.grow ? 'grow' : cell.fields.length > 1 ? 'stack' : ''}
             className={cn(
-              'flex min-w-0 flex-col gap-4 max-md:col-span-1',
+              'flex min-w-0 flex-col gap-4 @max-[767px]/inputs:col-span-1',
               SPAN[cell.span],
               cell.grow ? 'self-stretch' : 'self-start',
             )}
@@ -1094,10 +1094,12 @@ function MethodFormFields({
       </div>
     );
     // Each card is the box its input's structure would otherwise draw, so a
-    // structure in a card draws none of its own.
+    // structure in a card draws none of its own. The grid reads the form's
+    // own width, not the window's: under 768 pixels of it, in a host's
+    // narrow panel as on a phone, every card takes the whole width.
     return (
       <InputCardContext value>
-        <div className={cn('flex flex-col gap-4', className)}>
+        <div className={cn('flex flex-col gap-4 @container/inputs', className)}>
           {example}
           {grid(shownRequired)}
           {optionalToggle}
