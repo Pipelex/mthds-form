@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode, type Ref } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Plus, Upload } from 'lucide-react';
 import { FileTooLarge, isOverLimit, type OversizedFile } from './file-too-large';
@@ -53,6 +53,15 @@ interface ListFileDropProps {
   pickerEntry?: ReactNode;
   /** The `add` button opens the team's files instead of the file dialog, when the host has them. */
   onPick?: () => void;
+  /**
+   * Takes the files over the limit of each pick, for a list that keeps the
+   * over-the-limit line itself: an app's list swaps its zone for "Add more"
+   * once a file is in, which would lose a line this area held. Absent, the
+   * area shows the line.
+   */
+  onTooLarge?: (files: readonly OversizedFile[] | null) => void;
+  /** The `add` button, which the team's files sheet hands focus back to. */
+  buttonRef?: Ref<HTMLButtonElement>;
   /** The list holds pictures: the words say images, and `add` is a dashed cell of the grid. */
   images?: boolean;
   /** How many columns of the pictures' grid the `add` cell spans. */
@@ -93,6 +102,8 @@ export function ListFileDrop({
   images,
   cellSpan,
   fill,
+  onTooLarge,
+  buttonRef,
 }: ListFileDropProps) {
   const s = useFieldStrings();
   const isApp = useFieldPresentation() === 'app';
@@ -128,7 +139,9 @@ export function ListFileDrop({
           oversized.push({ name: file.name, size: file.size });
         else taken.push(file);
       }
-      setTooLarge(oversized.length > 0 ? oversized : null);
+      const over = oversized.length > 0 ? oversized : null;
+      if (onTooLarge) onTooLarge(over);
+      else setTooLarge(over);
       const fitted = taken.length > 0 ? onPlace(taken) : 0;
       setNotice({
         refused: refused.map((file) => file.name),
@@ -231,6 +244,7 @@ export function ListFileDrop({
     const words = images ? s.addMoreImages : s.addMoreFiles;
     const button = (
       <button
+        ref={buttonRef}
         type="button"
         disabled={shut}
         aria-haspopup={onPick ? 'dialog' : undefined}

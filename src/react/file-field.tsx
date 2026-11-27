@@ -322,6 +322,8 @@ function FileField({
   // Files over the upload limit, from the latest pick, until it is dismissed
   // or the next pick replaces it.
   const [tooLarge, setTooLarge] = useState<OversizedFile[] | null>(null);
+  // The app picture whose source failed to load, which then shows the glyph.
+  const [brokenPicture, setBrokenPicture] = useState<string | null>(null);
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const isApp = presentation === 'app';
@@ -1077,9 +1079,16 @@ function FileField({
   // grid. The studio keeps its own control, below.
   function appBody() {
     const shownName = value?.filename ?? s.uploadedFile;
-    const meta = local
+    const subtitle = local
       ? s.fileSize(local.file.size)
       : fileChipSubtitle(value?.url, value?.filename, formats, presentation, s);
+    // The badge is the file's extension when it names one of the slot's own
+    // formats; the line under the name says what the badge does not.
+    const badge =
+      value?.filename && formatOfFilename(formats, value.filename)
+        ? extensionOf(value.filename)
+        : 'FILE';
+    const meta = subtitle && subtitle.toUpperCase() !== badge ? subtitle : undefined;
     const imageSrc = local?.dataUrl ?? previewSrc;
     const uploadingLine = (
       <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
@@ -1088,11 +1097,15 @@ function FileField({
       </p>
     );
     const picture = (className: string) =>
-      imageSrc ? (
+      imageSrc && brokenPicture !== imageSrc ? (
         <img
           src={imageSrc}
           alt={shownName}
+          referrerPolicy="no-referrer"
           className={cn('absolute inset-0 size-full object-cover', className)}
+          // A picture that does not load shows the broken-image glyph, never
+          // its alt text over the card.
+          onError={() => setBrokenPicture(imageSrc)}
         />
       ) : previewPending || (local && !local.dataUrl) ? (
         <span className="absolute inset-0 grid place-items-center">
@@ -1109,7 +1122,7 @@ function FileField({
       </span>
     );
 
-    if (inRow && (hasFile || uploading || field.kind === 'image')) {
+    if (inRow && !photos.held && (hasFile || uploading || field.kind === 'image')) {
       if (field.kind === 'image') {
         // One picture of the list's grid, named.
         return (
@@ -1138,7 +1151,7 @@ function FileField({
       }
       return (
         <div ref={cardRef} tabIndex={-1} className="min-w-0 outline-none">
-          {uploading ? uploadingLine : <FileLine name={shownName} meta={meta} />}
+          {uploading ? uploadingLine : <FileLine name={shownName} badge={badge} meta={meta} />}
           {alerts}
         </div>
       );
@@ -1162,14 +1175,28 @@ function FileField({
             }}
           />
           {photos.handedOver && hasFile && !uploading ? (
-            <FileLine
-              name={
-                field.kind === 'image'
-                  ? s.photoChip(photoName)
-                  : s.photoPagesChip(photoName, photos.pages.length)
-              }
-              meta={meta}
-            />
+            <div className="flex min-h-12 flex-wrap items-center gap-2.5 rounded-[9px] bg-input py-1.5 pr-1.5 pl-2">
+              <FileLine
+                name={
+                  field.kind === 'image'
+                    ? s.photoChip(photoName)
+                    : s.photoPagesChip(photoName, photos.pages.length)
+                }
+                badge={badge}
+                meta={meta}
+              />
+              {/* Empties the input, pages and all. A list's row has its own cross. */}
+              {!inRow && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={clear}
+                  className={cn(appMiniButtonClass, focusOutlineClass)}
+                >
+                  {s.removeFile}
+                </button>
+              )}
+            </div>
           ) : (
             (uploading ||
               (photos.reading.length === 0 && !photos.handedOver && photos.refusal === null)) &&
@@ -1215,7 +1242,7 @@ function FileField({
             tabIndex={-1}
             className="flex min-h-12 flex-wrap items-center gap-2.5 rounded-[9px] bg-input py-1.5 pr-1.5 pl-2 outline-none"
           >
-            <FileLine name={shownName} meta={meta} />
+            <FileLine name={shownName} badge={badge} meta={meta} />
             {actions}
           </div>
         );
@@ -1847,14 +1874,14 @@ function extensionOf(name: string): string {
 }
 
 /** One file in an app: its extension badge, its name, and its size or kind under it. */
-function FileLine({ name, meta }: { name: string; meta?: string }) {
+function FileLine({ name, badge, meta }: { name: string; badge: string; meta?: string }) {
   return (
     <span className="flex min-w-0 flex-1 basis-40 items-center gap-2.5 [contain:inline-size]">
       <span
         aria-hidden="true"
         className="grid size-[34px] shrink-0 place-items-center rounded-[7px] bg-card font-mono text-[9.5px] leading-none font-semibold tracking-[0.02em] text-muted-foreground shadow-[0_0_0_1px_var(--border,hsl(240_5.9%_90%))]"
       >
-        {extensionOf(name)}
+        {badge}
       </span>
       <span className="flex min-w-0 flex-col">
         <b

@@ -31,6 +31,9 @@ import {
 import { ListRowContext, InputFillContext, useStructureDepth } from './field-context';
 import { appIconButtonClass } from './field-styles';
 import { PasteJsonEditor, PasteJsonSwitch } from './paste-json';
+import { FileTooLarge, type OversizedFile } from './file-too-large';
+import { TakePhotoButton } from './photo-camera';
+import { takesPhotos } from '../core/photo-file';
 import { linkHoverWashClass, linkTextClass } from './role-tokens';
 import { use } from 'react';
 import { rowActionClass, smallPrintClass } from './field-styles';
@@ -89,6 +92,9 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
   const [pickerOpen, setPickerOpen] = useState(false);
   // Paste JSON, in an app: the list's value as JSON in place of its rows.
   const [json, setJson] = useState(false);
+  // An app's list keeps the over-the-limit line of its latest pick, through
+  // the swap of its zone for "Add more files" once a file is in.
+  const [tooLarge, setTooLarge] = useState<readonly OversizedFile[] | null>(null);
   const depth = useStructureDepth();
   const fill = use(InputFillContext);
   const pickerEntryRef = useRef<HTMLButtonElement>(null);
@@ -435,6 +441,12 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         <X className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
       </button>
     );
+    // A file's cross is named after its file, "Remove nda.pdf"; a row whose
+    // file has no name yet is its number's.
+    const removeName = (item: unknown, index: number) => {
+      const name = fileName(item);
+      return name ? s.removeNamedFile(name) : s.removeItemAria(index + 1);
+    };
     const fileName = (item: unknown): string | undefined =>
       typeof item === 'object' && item !== null && 'filename' in item
         ? String((item as { filename?: unknown }).filename ?? '') || undefined
@@ -471,7 +483,28 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         />
       );
       const add = (cellSpan?: number) =>
-        dropOffered ? (
+        !dropOffered ? (
+          // No upload: the team's files are the one way to add more.
+          fileSource && (
+            <button
+              ref={pickerEntryRef}
+              type="button"
+              aria-haspopup="dialog"
+              disabled={env?.disabled || busy || room === 0}
+              onClick={() => setPickerOpen(true)}
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 self-start rounded-md px-2.5 text-[13px] font-medium transition-colors max-md:min-h-11',
+                linkTextClass,
+                linkHoverWashClass,
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                focusOutlineClass,
+              )}
+            >
+              <Plus className="size-3.5 shrink-0" aria-hidden="true" />
+              {fileItem.kind === 'image' ? s.addMoreImages : s.addMoreFiles}
+            </button>
+          )
+        ) : (
           <ListFileDrop
             label={label}
             formats={fileItem.formats}
@@ -480,11 +513,13 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
             maxFileBytes={env?.maxFileBytes}
             upgradeHref={env?.upgradeHref}
             variant="add"
+            onTooLarge={setTooLarge}
+            buttonRef={fileSource ? pickerEntryRef : undefined}
             images={fileItem.kind === 'image'}
             cellSpan={cellSpan}
             onPick={fileSource && room !== 0 ? () => setPickerOpen(true) : undefined}
           />
-        ) : null;
+        );
       if (items.length === 0) {
         body = dropOffered ? (
           <div ref={dropRef} className="flex flex-1 flex-col">
@@ -496,6 +531,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
               maxFileBytes={env?.maxFileBytes}
               upgradeHref={env?.upgradeHref}
               variant="zone"
+              onTooLarge={setTooLarge}
               pickerEntry={pickEntry}
               fill={fill}
             />
@@ -540,7 +576,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
                   {row(item, index)}
                   {remove(
                     index,
-                    s.removeNamedFile(fileName(item) ?? s.removeItemAria(index + 1)),
+                    removeName(item, index),
                     'absolute top-1 right-1 size-7 bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-black/70 hover:text-white max-md:size-9 max-md:opacity-100',
                   )}
                 </div>
@@ -569,10 +605,7 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
                     className="flex min-h-12 items-center gap-2.5 rounded-[9px] bg-input py-1.5 pr-1.5 pl-2"
                   >
                     <div className="min-w-0 flex-1">{row(item, index)}</div>
-                    {remove(
-                      index,
-                      s.removeNamedFile(fileName(item) ?? s.removeItemAria(index + 1)),
-                    )}
+                    {remove(index, removeName(item, index))}
                   </div>
                 ))}
               </ListDropAreaContext.Provider>
@@ -672,6 +705,19 @@ export function ListField({ field, value, onChange, id, error, env }: ListFieldP
         {header}
         {itemDescription && <FieldDescription>{itemDescription}</FieldDescription>}
         {body}
+        {/* On a touch screen, a list of files still takes photos: "Take photo"
+            adds an empty row, whose own camera makes the file, page by page. */}
+        {fileItem && dropOffered && takesPhotos(fileItem) && !json && (
+          <TakePhotoButton label={label} disabled={env?.disabled || isFull} onTake={addItem} />
+        )}
+        {tooLarge && env?.maxFileBytes !== undefined && (
+          <FileTooLarge
+            files={tooLarge}
+            limit={env.maxFileBytes}
+            upgradeHref={env.upgradeHref}
+            onDismiss={() => setTooLarge(null)}
+          />
+        )}
         {pickerSheet}
         {caption}
       </div>

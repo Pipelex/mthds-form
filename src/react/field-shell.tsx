@@ -179,6 +179,8 @@ interface FieldHeaderProps {
   count?: string;
   /** What sits on the header's right: a structure's Form / Paste JSON switch. */
   aside?: ReactNode;
+  /** Set at the end of the label's row: a framed section's error message. */
+  note?: ReactNode;
 }
 
 /**
@@ -197,6 +199,7 @@ export function FieldHeader({
   descriptionId,
   count,
   aside,
+  note,
 }: FieldHeaderProps) {
   const generated = use(GeneratedInputContext);
   const Label = htmlFor ? 'label' : 'span';
@@ -214,6 +217,7 @@ export function FieldHeader({
           {count && <ItemCount>{count}</ItemCount>}
           {optional && <OptionalPill />}
           {generated && <GeneratedPill />}
+          {note}
         </div>
         {description && (
           <p id={descriptionId} className="m-0 text-[13px] leading-[18px] text-muted-foreground">

@@ -9,7 +9,7 @@ import {
   selectedStateBorderClass,
 } from './role-tokens';
 import { appControlHeight, appLineWidthClass } from './field-styles';
-import { useCompactControl, useStructureDepth } from './field-context';
+import { useCompactControl } from './field-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import type { EnumRunField } from '../core';
@@ -55,13 +55,8 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
   const labelOf = enumLabeler(field.options, presentation);
   const isApp = presentation === 'app';
   const compact = useCompactControl();
-  const depth = useStructureDepth();
-  // Inside a structure an app's choice is always a select: a structure's row
-  // has a control column, and a row of buttons does not fit one.
   const isSegmented =
-    !(isApp && depth > 0) &&
-    field.options.length <= 4 &&
-    field.options.every((o) => labelOf(o).length <= 16);
+    field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
   const domId = useFieldDomId(id);
 
   return (

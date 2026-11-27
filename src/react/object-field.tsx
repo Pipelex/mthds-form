@@ -298,15 +298,17 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
     // on a bare page the structure draws the card itself.
     const section = grouping === 'section';
     const card = grouping === 'box' && !inCard;
-    return (
+    const structure = (
       <div
         data-form-section={section ? '' : undefined}
         data-structure-group={grouping}
         {...group}
         className={cn(
           'relative flex flex-col gap-3 @container',
-          card && 'rounded-xl bg-card px-[18px] pt-4 pb-[18px] ring-1 ring-border',
-          card && error && 'ring-destructive',
+          // The card's outline turns the error colour itself, which the brand
+          // contract holds at 3:1 on the page.
+          card && 'rounded-xl border bg-card px-[18px] pt-4 pb-[18px]',
+          card && (error ? 'border-destructive' : 'border-border'),
         )}
       >
         {section && error && (
@@ -318,6 +320,9 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           optional={shownAsOptional(field)}
           description={description}
           descriptionId={descriptionId}
+          // A section has no outline to turn red, so its message is set where
+          // it starts, beside its name, rather than under its last field.
+          note={section ? appCaption : undefined}
           aside={
             <PasteJsonSwitch
               label={label}
@@ -343,8 +348,17 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
             {optionalToggle}
           </div>
         )}
+        {!section && !card && appCaption}
+      </div>
+    );
+    // A card in error sets its message under itself, outside its outline.
+    return card && appCaption ? (
+      <div className="flex flex-col gap-1.5">
+        {structure}
         {appCaption}
       </div>
+    ) : (
+      structure
     );
   }
 

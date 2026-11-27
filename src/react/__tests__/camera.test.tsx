@@ -755,7 +755,7 @@ describe("MethodForm's controller while a file is being made", () => {
       });
       return (
         <>
-          <MethodForm form={form} presentation="app" />
+          <MethodForm form={form} presentation="studio" />
           <output data-testid="form">
             {JSON.stringify({ preparing: [...form.preparingIds] })}
           </output>

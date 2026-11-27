@@ -1216,7 +1216,7 @@ function InputCard({ fill, children }: { fill: boolean; children: ReactNode }) {
       <div
         data-input-card=""
         className={cn(
-          'flex min-w-0 flex-col rounded-xl bg-card px-[18px] pt-4 pb-[18px] text-foreground ring-1 ring-border @container',
+          'flex min-w-0 flex-col rounded-xl border border-border bg-card px-[18px] pt-4 pb-[18px] text-foreground @container',
           fill && 'flex-1',
         )}
       >
