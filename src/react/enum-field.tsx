@@ -192,5 +192,20 @@ export function optionLabeler(
   presentation: ReturnType<typeof useFieldPresentation>,
 ): (option: string) => string {
   const fallback = enumLabeler(field.options, presentation);
-  return (option) => optionDetail(field, option)?.label ?? fallback(option);
+  const worded = (option: string) => optionDetail(field, option)?.label ?? fallback(option);
+  // Two options the method labels alike, or an authored label that reads as
+  // another option's worded code, would be one choice twice on the page: each
+  // of those is said with its own code beside its label, as `enumLabeler`
+  // falls back to the codes when two worded codes collide.
+  const seen = new Map<string, number>();
+  for (const option of field.options) {
+    const label = worded(option);
+    seen.set(label, (seen.get(label) ?? 0) + 1);
+  }
+  return (option) => {
+    const label = worded(option);
+    if ((seen.get(label) ?? 0) < 2 || optionDetail(field, option)?.label === undefined)
+      return label;
+    return `${label} (${fallback(option)})`;
+  };
 }

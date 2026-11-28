@@ -1,7 +1,6 @@
 'use client';
 
-import { valueProblem } from '../core/value-checks';
-import { problemMessage } from './value-problem';
+import { locatedProblemMessage } from './value-problem';
 import { createContext, use, useState } from 'react';
 import { cn } from './utils';
 import type { ObjectRunField, RunField } from '../core';
@@ -11,6 +10,7 @@ import {
   gateRefusal,
   isFoldedOptional,
   isOptionalStructure,
+  refusedValue,
 } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures } from '../core/seed';
 import { ConceptPill } from './concept-pill';
@@ -170,8 +170,12 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
     const refusal = gateRefusal(child, held, child.required);
     if (refusal === 'required') return s.requiredField;
     if (refusal === 'invalid') {
-      const problem = valueProblem(child, held);
-      return problem ? problemMessage(child, problem, s) : undefined;
+      const located = refusedValue(child, held);
+      return located
+        ? locatedProblemMessage(located, s, (leaf) =>
+            fieldLabel(leaf.title, leaf.name, presentation),
+          )
+        : undefined;
     }
     return refusal === 'incomplete' ? s.incompleteField : undefined;
   };

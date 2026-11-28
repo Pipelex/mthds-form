@@ -77,17 +77,11 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
   const isApp = presentation === 'app';
   const entry = numberEntry(field);
   const currency = isCurrencyUnit(field.unit) ? field.unit : undefined;
-  const step = field.integer ? 1 : currency ? 0.01 : 0.1;
+  const step = numberStep(field);
   const write = (n: number) => formatFieldNumber(field, n, s.numberLocale);
 
-  const clamp = (n: number) => {
-    let next = n;
-    if (typeof field.min === 'number') next = Math.max(field.min, next);
-    if (typeof field.max === 'number') next = Math.min(field.max, next);
-    return field.integer ? Math.round(next) : next;
-  };
-
-  const nudge = (delta: number) => onChange(clamp((value ?? 0) + delta));
+  const nudge = (delta: number) => onChange(stepped(field, value ?? 0, delta, step));
+  const label = fieldLabel(field.title, field.name, presentation);
 
   const rangeHint =
     entry === 'scale'
@@ -167,11 +161,16 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
           value={value}
           onChange={onChange}
           disabled={disabled}
-          label={fieldLabel(field.title, field.name, presentation)}
+          label={label}
         />
       ) : (
         <div className="flex items-stretch gap-1.5">
           {entry === 'slider' && (
+            // A range input always holds a value, so an unset number rests at
+            // its minimum: drawn faded and announced as not set, so it does
+            // not read as answered, and taken as soon as the person presses
+            // or keys on it - a press on the thumb where it rests fires no
+            // change, and without this the minimum could never be picked.
             <input
               type="range"
               min={field.min}
@@ -179,12 +178,20 @@ export function NumberField({ field, value, onChange, id, error, disabled }: Num
               step={step}
               value={value ?? field.min}
               disabled={disabled}
-              aria-label={fieldLabel(field.title, field.name, presentation)}
-              aria-valuetext={value === undefined ? undefined : write(value)}
+              aria-label={label}
+              aria-valuetext={value === undefined ? s.sliderUnset : write(value)}
               data-number-slider=""
+              data-unset={value === undefined ? '' : undefined}
               onChange={(e) => onChange(Number(e.target.value))}
+              onPointerUp={(e) => {
+                if (value === undefined) onChange(Number(e.currentTarget.value));
+              }}
+              onKeyUp={(e) => {
+                if (value === undefined) onChange(Number(e.currentTarget.value));
+              }}
               className={cn(
                 'h-11 min-w-0 flex-[2] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
+                value === undefined && 'opacity-40',
                 checkedAccentClass,
                 focusOutlineClass,
               )}
@@ -239,7 +246,15 @@ function RatingScale({
   const s = useFieldStrings();
   const min = field.min!;
   const max = field.max!;
-  const steps = Array.from({ length: max - min + 1 }, (_, index) => min + index);
+  const whole = Array.from({ length: max - min + 1 }, (_, index) => min + index);
+  // A value between two steps - a float rating restored from a run, an
+  // example or a default of 3.5 - is a value its schema accepts, so it is
+  // shown as a step of its own, in its place and chosen, rather than leaving
+  // the row with nothing chosen while the form holds it.
+  const steps =
+    value !== undefined && Number.isFinite(value) && !whole.includes(value)
+      ? [...whole, value].sort((a, b) => a - b)
+      : whole;
   return (
     <ToggleGroup
       type="single"
@@ -255,13 +270,13 @@ function RatingScale({
           key={step}
           value={String(step)}
           variant="outline"
-          aria-label={s.scaleStepAria(String(step), String(max))}
+          aria-label={s.scaleStepAria(formatScaleStep(step), String(max))}
           className={cn(
             'h-10 min-w-10 border-border bg-input px-0 text-[14px] tabular-nums text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:font-semibold data-[state=on]:text-foreground max-sm:h-11 max-sm:min-w-11',
             selectedStateBorderClass,
           )}
         >
-          {step}
+          {formatScaleStep(step)}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
@@ -294,4 +309,69 @@ function StepButton({
       {children}
     </button>
   );
+}
+
+/** A step of a rating scale as its button says it: the value, with no float noise. */
+function formatScaleStep(step: number): string {
+  return String(Number(step.toPrecision(12)));
+}
+
+/** How many decimals a number is written with, as JavaScript writes it. */
+function decimalsOf(n: number): number {
+  if (!Number.isFinite(n) || Number.isInteger(n)) return 0;
+  const written = String(n);
+  const exponent = /e-(\d+)$/.exec(written);
+  if (exponent) {
+    const mantissa = written.slice(0, written.indexOf('e'));
+    const fraction = mantissa.split('.')[1]?.length ?? 0;
+    return fraction + Number(exponent[1]);
+  }
+  return written.split('.')[1]?.length ?? 0;
+}
+
+/** The step's own power of ten: no coarser than a hundredth of the span, and fine enough to land on both bounds. */
+function slidingStep(min: number, max: number): number {
+  const coarse = 10 ** Math.floor(Math.log10((max - min) / 100));
+  const exact = 10 ** -Math.max(decimalsOf(min), decimalsOf(max));
+  return Math.min(coarse, exact);
+}
+
+/**
+ * How far one step moves a number: `1` for a whole number, a currency's
+ * hundredth, and for any other number with both bounds a power of ten
+ * derived from them - at most a hundredth of the span, and fine enough that
+ * both bounds are steps from the minimum, so `0..0.05` slides and `0.05`
+ * reaches `1`. An unbounded number steps by a tenth.
+ */
+export function numberStep(field: NumberRunField): number {
+  if (field.integer) return 1;
+  if (isCurrencyUnit(field.unit)) return 0.01;
+  const { min, max } = field;
+  if (min !== undefined && max !== undefined && max > min) return slidingStep(min, max);
+  return 0.1;
+}
+
+/**
+ * `from` moved by `delta`, rounded to the step's decimals so no floating-point
+ * noise (`0.15000000000000002`) reaches the value or the run, and kept inside
+ * the bounds: an inclusive bound is a value it may land on, an excluded one
+ * (`exclusiveMin`, `exclusiveMax`) is not, so a step that would land on or past
+ * it stops one step inside, or stays where it was when there is no room.
+ */
+export function stepped(field: NumberRunField, from: number, delta: number, step: number): number {
+  const places = Math.min(20, Math.max(decimalsOf(step), decimalsOf(from)));
+  const round = (n: number) => Number(n.toFixed(places));
+  let next = round(from + delta);
+  if (field.min !== undefined) next = Math.max(field.min, next);
+  if (field.max !== undefined) next = Math.min(field.max, next);
+  if (field.exclusiveMin !== undefined && next <= field.exclusiveMin)
+    next = round(field.exclusiveMin + step);
+  if (field.exclusiveMax !== undefined && next >= field.exclusiveMax)
+    next = round(field.exclusiveMax - step);
+  // An open interval narrower than one step leaves no step inside it.
+  const outside =
+    (field.exclusiveMin !== undefined && next <= field.exclusiveMin) ||
+    (field.exclusiveMax !== undefined && next >= field.exclusiveMax);
+  if (outside) return from;
+  return field.integer ? Math.round(next) : next;
 }

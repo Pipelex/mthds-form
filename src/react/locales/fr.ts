@@ -342,4 +342,12 @@ export const FR_FIELD_STRINGS: FieldStrings = {
   verdictCountsAria: 'Par verdict',
   recordDetails: 'Détails',
   meterValueText: (value, min, max) => `${value}, entre ${min} et ${max}`,
+  sliderUnset: 'Non renseigné',
+  scanPagesAria: (label) => (label ? `Numériser des pages pour ${label}` : 'Numériser des pages'),
+  pasteUnavailable:
+    'Le navigateur n’a pas laissé cette page lire le presse-papiers. Cliquez dans la zone de dépôt et appuyez sur Ctrl+V ou ⌘V.',
+  problemNonexistentTime:
+    'Cette heure n’existe pas ce jour-là dans votre fuseau horaire\u00a0: on change d’heure. Choisissez-en une autre.',
+  problemInItem: (position, problem) => `Élément ${position}\u00a0: ${problem}`,
+  runWaitsToFix: (name, problem) => `Corrigez ${name} pour lancer\u00a0: ${problem}`,
 };

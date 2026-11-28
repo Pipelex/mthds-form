@@ -1,6 +1,6 @@
 'use client';
 
-import type { InputHTMLAttributes } from 'react';
+import { useState, type InputHTMLAttributes } from 'react';
 import { shownAsOptional } from '../core/readiness';
 import { intentOf } from '../core/hints';
 import { cn } from './utils';
@@ -73,6 +73,14 @@ function pad(n: number): string {
   return String(Math.abs(n)).padStart(2, '0');
 }
 
+/** A year in four digits, as RFC 3339 and a `datetime-local` input write it. */
+function padYear(n: number): string {
+  return String(n).padStart(4, '0');
+}
+
+/** A time of day as a time input writes it: `HH:MM` or `HH:MM:SS`, seconds possibly fractional. */
+const LOCAL_TIME = /^\d\d:\d\d(?::\d\d(?:\.\d+)?)?$/;
+
 /**
  * A time of day as the gate's `time` format takes it, `HH:MM:SS`: the browser's
  * time input drops the seconds when they are zero, and the format requires
@@ -82,28 +90,133 @@ export function timeValue(input: string): string {
   return /^\d\d:\d\d$/.test(input) ? `${input}:00` : input;
 }
 
+/** A `datetime-local` input's value: a local date and time, with no offset. */
+const LOCAL_DATE_TIME = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d))?$/;
+
+/**
+ * A stored value as RFC 3339 writes it, or a bare date: the date, then an
+ * optional time with optional seconds and fraction, then an optional offset.
+ */
+const STORED_DATE_TIME =
+  /^(\d{4})-(\d\d)-(\d\d)(?:[Tt ](\d\d):(\d\d)(?::(\d\d)(?:\.\d+)?)?([Zz]|[+-]\d\d:\d\d)?)?$/;
+
+/** The local `Date` a `datetime-local` value names, with the parts it was read from. */
+function localDate(input: string) {
+  const match = LOCAL_DATE_TIME.exec(input);
+  if (!match) return undefined;
+  const [year, month, day, hours, minutes, seconds = '00'] = match.slice(1).map((part) => part);
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    Number(seconds),
+  );
+  // `new Date(y, …)` reads a year below 100 as 19xx.
+  date.setFullYear(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(date.getTime())) return undefined;
+  return { date, year: year!, month: month!, day: day!, hours: hours!, minutes: minutes!, seconds };
+}
+
+/**
+ * Whether a `datetime-local` value names a local time the clocks skip on that
+ * day in the browser's time zone - 02:30 on the night a spring change goes
+ * from 02:00 to 03:00. A `Date` moves such a time past the gap, so writing it
+ * with an offset would send another instant than the one shown; the control
+ * refuses it instead (`problemNonexistentTime`).
+ */
+export function isNonexistentLocalTime(input: string): boolean {
+  const local = localDate(input);
+  if (!local) return false;
+  const { date } = local;
+  return (
+    date.getFullYear() !== Number(local.year) ||
+    date.getMonth() + 1 !== Number(local.month) ||
+    date.getDate() !== Number(local.day) ||
+    date.getHours() !== Number(local.hours) ||
+    date.getMinutes() !== Number(local.minutes)
+  );
+}
+
 /**
  * A `datetime-local` input's value (`2026-11-28T14:30`, local and with no
  * offset) as an RFC 3339 date-time with the browser's own offset
  * (`2026-11-28T14:30:00+01:00`), so the instant the person meant survives the
- * trip to a server in another time zone.
+ * trip to a server in another time zone. `undefined` for anything but a whole
+ * local date and time, and for a time the clocks skip that day.
  */
 export function dateTimeValue(input: string): string | undefined {
-  const match = /^(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(:\d\d)?/.exec(input);
-  if (!match) return undefined;
-  const local = new Date(`${match[1]}T${match[2]}${match[3] ?? ':00'}`);
-  if (Number.isNaN(local.getTime())) return undefined;
-  const offset = -local.getTimezoneOffset();
+  const local = localDate(input);
+  if (!local || isNonexistentLocalTime(input)) return undefined;
+  // Whole minutes: before standard time a zone's offset was its local mean
+  // time, in seconds, which RFC 3339 cannot write.
+  const offset = Math.round(-local.date.getTimezoneOffset());
   const sign = offset >= 0 ? '+' : '-';
-  return `${match[1]}T${match[2]}${match[3] ?? ':00'}${sign}${pad(Math.trunc(offset / 60))}:${pad(offset % 60)}`;
+  const zone = `${sign}${pad(Math.trunc(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+  return `${local.year}-${local.month}-${local.day}T${local.hours}:${local.minutes}:${local.seconds}${zone}`;
 }
 
-/** A stored date-time, as a `datetime-local` input shows it: in the browser's own time zone. */
+/**
+ * A stored date-time, as a `datetime-local` input shows it: a value with an
+ * offset in the browser's own time zone, the same instant; a value with none,
+ * or a bare date, as the wall time it states, since there is no instant to
+ * convert - a bare `2026-11-28` read as UTC showed the day before west of
+ * Greenwich. Anything else shows empty.
+ */
 export function dateTimeInputValue(value: string | undefined): string {
   if (!value) return '';
-  const date = new Date(value);
+  const match = STORED_DATE_TIME.exec(value);
+  if (!match) return '';
+  const [, year, month, day, hours = '00', minutes = '00', seconds = '00', zone] = match;
+  if (zone === undefined) return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  const date = new Date(value.replace(/^(\d{4}-\d\d-\d\d) /, '$1T'));
   if (Number.isNaN(date.getTime())) return '';
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return `${padYear(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/**
+ * The browser's own date-and-time picker, around what the field stores. What
+ * the person types is kept as typed while the value stands for it, so the
+ * input is not rewritten under them: a year typed digit by digit (`0002`)
+ * reads as itself until it is whole. A local time the clocks skip is refused
+ * with the field's own problem rather than stored as another instant.
+ */
+function DateTimeInput({
+  id,
+  value,
+  onChange,
+  disabled,
+  invalid,
+  onProblem,
+}: {
+  id: string;
+  value: string | undefined;
+  onChange: (value: string | undefined) => void;
+  disabled?: boolean;
+  invalid: boolean;
+  onProblem: (problem: boolean) => void;
+}) {
+  const [typed, setTyped] = useState<{ raw: string; stands: string | undefined } | null>(null);
+  const shown = typed && typed.stands === value ? typed.raw : dateTimeInputValue(value);
+  return (
+    <input
+      id={id}
+      type="datetime-local"
+      step={1}
+      value={shown}
+      disabled={disabled}
+      aria-invalid={invalid}
+      onChange={(e) => {
+        const raw = e.target.value;
+        const next = dateTimeValue(raw);
+        onProblem(isNonexistentLocalTime(raw));
+        setTyped({ raw, stands: next });
+        onChange(next);
+      }}
+      className={cn(fieldControlClass, 'h-11 px-3 tabular-nums dark:scheme-dark')}
+    />
+  );
 }
 
 /**
@@ -118,9 +231,16 @@ export function TextField({ field, value, onChange, id, error, disabled }: TextF
   const counterId = `${domId}-length`;
   const { props, mono } = textInputAttributes(field);
   const change = (next: string) => onChange(next === '' ? undefined : next);
+  const [skippedTime, setSkippedTime] = useState(false);
+  const shownError = error ?? (skippedTime ? s.problemNonexistentTime : undefined);
 
   let control;
-  if (field.format === 'time') {
+  // A time input shows only a local time of day: a restored value carrying a
+  // zone (`14:30:00Z`, `14:30:00+01:00`) would be blank in it while still
+  // submitted, so such a value keeps a plain text input, where it is seen and
+  // edited as it is.
+  const zonedTime = field.format === 'time' && value !== undefined && !LOCAL_TIME.test(value);
+  if (field.format === 'time' && !zonedTime) {
     control = (
       <input
         id={domId}
@@ -135,15 +255,13 @@ export function TextField({ field, value, onChange, id, error, disabled }: TextF
     );
   } else if (field.format === 'date-time') {
     control = (
-      <input
+      <DateTimeInput
         id={domId}
-        type="datetime-local"
-        step={1}
-        value={dateTimeInputValue(value)}
+        value={value}
+        onChange={onChange}
         disabled={disabled}
-        aria-invalid={!!error}
-        onChange={(e) => onChange(dateTimeValue(e.target.value))}
-        className={cn(fieldControlClass, 'h-11 px-3 tabular-nums dark:scheme-dark')}
+        invalid={!!shownError}
+        onProblem={setSkippedTime}
       />
     );
   } else {
@@ -175,7 +293,7 @@ export function TextField({ field, value, onChange, id, error, disabled }: TextF
       category="text"
       description={field.description}
       required={!shownAsOptional(field)}
-      error={error}
+      error={shownError}
       htmlFor={domId}
     >
       {control}

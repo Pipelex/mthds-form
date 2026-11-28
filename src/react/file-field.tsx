@@ -528,10 +528,15 @@ function FileField({
     retakeOf.current = replaces;
     cameraRef.current?.click();
   }, []);
+  // What the paste button last found: no picture on the clipboard, or a
+  // browser that would not let the page read it. Any later way in - a drop,
+  // a pick, a photo, a paste - answers the field anew, so each clears it.
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
   const takePhoto = (photo: File) => {
     const replaces = retakeOf.current;
     retakeOf.current = null;
     setRejected(null);
+    setPasteNote(null);
     photos.take(photo, replaces);
   };
 
@@ -541,6 +546,7 @@ function FileField({
   const handleFile = useCallback(
     (file: File) => {
       forgetPhotoRefusal();
+      setPasteNote(null);
       storeFile(file);
     },
     [forgetPhotoRefusal, storeFile],
@@ -570,36 +576,36 @@ function FileField({
   const intent = intentOf(field);
   const cameraFirst = intent === 'photo' || intent === 'scan';
   const pasteable = canUpload && intent === 'screenshot';
-  const [pasteNote, setPasteNote] = useState<string | null>(null);
   const takePasted = useCallback(
     (blob: Blob | undefined) => {
       if (!blob) {
         setPasteNote(s.pasteNoImage);
         return;
       }
-      setPasteNote(null);
-      const extension = blob.type.split('/')[1] ?? 'png';
-      handleFile(new File([blob], `${label || 'Screenshot'}.${extension}`, { type: blob.type }));
+      handleFile(new File([blob], pastedFileName(label, blob.type), { type: blob.type }));
     },
     [handleFile, label, s.pasteNoImage],
   );
   const pasteFromClipboard = useCallback(async () => {
+    let items: ClipboardItems;
     try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const type = item.types.find((candidate) => candidate.startsWith('image/'));
-        if (type) {
-          takePasted(await item.getType(type));
-          return;
-        }
-      }
-      takePasted(undefined);
+      items = await navigator.clipboard.read();
     } catch {
-      // A browser that refuses clipboard reads, or a person who declined:
-      // the keyboard paste into the drop zone still works.
-      takePasted(undefined);
+      // A browser that refuses clipboard reads, or a person who declined, is
+      // not an empty clipboard, and is said as what it is: the keyboard paste
+      // into the drop zone still works, and the note says so.
+      setPasteNote(s.pasteUnavailable);
+      return;
     }
-  }, [takePasted]);
+    for (const item of items) {
+      const type = item.types.find((candidate) => candidate.startsWith('image/'));
+      if (type) {
+        takePasted(await item.getType(type));
+        return;
+      }
+    }
+    takePasted(undefined);
+  }, [takePasted, s.pasteUnavailable]);
   const onPaste = (event: React.ClipboardEvent) => {
     if (!pasteable || busy) return;
     const file = [...event.clipboardData.files].find((candidate) =>
@@ -638,6 +644,7 @@ function FileField({
     // silently swallowed, which reads as a broken dropzone rather than a
     // refused file.
     onDrop: (accepted, rejections) => {
+      setPasteNote(null);
       // Several files at once are refused as a batch, whatever their types,
       // and none reaches the host. react-dropzone rejects a batch of
       // acceptable files as `too-many-files`, which used to be reported as
@@ -961,7 +968,7 @@ function FileField({
       {camera && cameraFirst && !photos.held && !hasFile && (
         <TakePhotoButton
           label={label}
-          text={intent === 'scan' ? s.scanPages : undefined}
+          scan={intent === 'scan'}
           disabled={busy}
           onTake={() => openCamera(null)}
         />
@@ -1586,4 +1593,39 @@ function ClearButton({ disabled, onClick }: { disabled?: boolean; onClick: () =>
       <X className="h-4 w-4" />
     </button>
   );
+}
+
+/** The extension a pasted picture's type is saved under, where it is not its subtype. */
+const PASTED_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+  'image/bmp': 'bmp',
+  'image/tiff': 'tif',
+  'image/avif': 'avif',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+};
+
+/**
+ * The name a pasted screenshot is stored under: the field's label, with the
+ * characters a file name cannot hold (`/`, `\`, `:` and their kind) made
+ * dashes, and the extension its picture type is saved with (`svg` for
+ * `image/svg+xml`, `jpg` for `image/jpeg`), `png` for a type with none known.
+ * Exported for its test, not from the entry.
+ */
+export function pastedFileName(label: string, mime: string): string {
+  const base =
+    label
+      // eslint-disable-next-line no-control-regex
+      .replace(/[/\\:*?"<>|\u0000-\u001f]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^\.+/, '') || 'Screenshot';
+  const extension = Object.prototype.hasOwnProperty.call(PASTED_EXTENSIONS, mime.toLowerCase())
+    ? PASTED_EXTENSIONS[mime.toLowerCase()]!
+    : 'png';
+  return `${base}.${extension}`;
 }

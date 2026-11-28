@@ -1,6 +1,6 @@
 import type { RunField } from '../core';
 import { formatFieldNumber } from '../core/number-format';
-import type { ValueProblem } from '../core/value-checks';
+import type { LocatedProblem, ValueProblem } from '../core/value-checks';
 import type { FieldStrings } from './field-strings';
 
 /**
@@ -32,4 +32,21 @@ export function problemMessage(field: RunField, problem: ValueProblem, s: FieldS
     case 'format':
       return s.problemFormat(problem.format);
   }
+}
+
+/**
+ * What a person reads about a value found below a field (`refusedValue`): the
+ * problem itself on a leaf, and on a list the item's position first, "Item 2:
+ * Must be at most 10.", with the member's label when the item is a structure.
+ */
+export function locatedProblemMessage(
+  located: LocatedProblem,
+  s: FieldStrings,
+  label: (field: RunField) => string,
+): string {
+  const message = problemMessage(located.field, located.problem, s);
+  const at = located.path.findIndex((step) => typeof step === 'number');
+  if (at === -1) return message;
+  const inner = located.path.length > at + 1 ? `${label(located.field)}: ${message}` : message;
+  return s.problemInItem((located.path[at] as number) + 1, inner);
 }

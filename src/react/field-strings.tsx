@@ -511,6 +511,21 @@ export interface FieldStrings {
   recordDetails: string;
   /** A meter's accessible value: the value as written, between its bounds. */
   meterValueText: (value: string, min: string, max: string) => string;
+  /** What a screen reader hears of a bounded number's slider before it is set. */
+  sliderUnset: string;
+  /** The accessible name of a scan field's camera action, given the field's label. */
+  scanPagesAria: (label: string) => string;
+  /** The browser refused, or cannot do, a clipboard read from the paste button. */
+  pasteUnavailable: string;
+  /** A local date and time the clocks skip on that day in the reader's time zone. */
+  problemNonexistentTime: string;
+  /** A list's refused item: its position, from 1, and what is wrong with it. */
+  problemInItem: (position: number, problem: string) => string;
+  /**
+   * A composer's action row when an input holds a value its facts refuse: the
+   * field's label and what is wrong with it.
+   */
+  runWaitsToFix: (name: string, problem: string) => string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */

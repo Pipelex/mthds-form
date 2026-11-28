@@ -286,4 +286,12 @@ export const EN_FIELD_STRINGS: FieldStrings = {
   verdictCountsAria: 'By verdict',
   recordDetails: 'Details',
   meterValueText: (value, min, max) => `${value}, between ${min} and ${max}`,
+  sliderUnset: 'Not set',
+  scanPagesAria: (label) => (label ? `Scan pages for ${label}` : 'Scan pages'),
+  pasteUnavailable:
+    'The browser did not let this page read the clipboard. Click the drop zone and press Ctrl+V or ⌘V instead.',
+  problemNonexistentTime:
+    'This time does not exist on that day where you are: the clocks change. Pick another time.',
+  problemInItem: (position, problem) => `Item ${position}: ${problem}`,
+  runWaitsToFix: (name, problem) => `Fix ${name} to run: ${problem}`,
 };
