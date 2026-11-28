@@ -21,6 +21,7 @@
  */
 
 import type { RunField } from './descriptor';
+import { ownProp } from './own-property';
 import { FORMATS } from './schema-formats';
 
 /** One thing wrong with a value, with the limit it broke. */
@@ -42,9 +43,29 @@ export function codePointLength(value: string): number {
   return length;
 }
 
+/**
+ * Which facts a check reads. `patterns: false` leaves a method's `pattern`
+ * out: a pattern is the method author's regular expression, and one with
+ * catastrophic backtracking (`^(a+)+$`) runs for seconds or minutes on a
+ * short value, synchronously, with no way to interrupt it. Readiness answers
+ * on every keystroke, so it never runs one (docs/run-gate.md, "A value that
+ * breaks its contract facts"): a pattern is judged where the gate judges it,
+ * when a run is attempted, and in the marks drawn after that.
+ */
+export interface ValueCheckOptions {
+  patterns?: boolean;
+}
+
 /** Patterns compiled once each, with the gate's `u` flag. A pattern that does not compile reads as none. */
 const patterns = new Map<string, RegExp | null>();
 const PATTERN_CACHE_LIMIT = 256;
+
+/**
+ * The last answers each pattern gave, by value, so a re-render that asks
+ * again about a value it has judged does not run the expression again.
+ */
+const verdicts = new Map<string, boolean>();
+const VERDICT_CACHE_LIMIT = 512;
 
 function compiled(source: string): RegExp | null {
   let pattern = patterns.get(source);
@@ -62,13 +83,27 @@ function compiled(source: string): RegExp | null {
   return pattern;
 }
 
+function breaksPattern(source: string, value: string): boolean {
+  const key = `${source}\u0000${value}`;
+  const known = verdicts.get(key);
+  if (known !== undefined) return known;
+  const broken = compiled(source)?.test(value) === false;
+  if (verdicts.size >= VERDICT_CACHE_LIMIT) verdicts.clear();
+  verdicts.set(key, broken);
+  return broken;
+}
+
 /**
  * The first problem with `value` for `field`, or `undefined` when there is
  * none. A leaf check only: a structure or a list is judged member by member by
  * `fieldFilled`, which asks this of each leaf it reaches, and an empty value is
  * absence, which `isFilled` answers, never a problem.
  */
-export function valueProblem(field: RunField, value: unknown): ValueProblem | undefined {
+export function valueProblem(
+  field: RunField,
+  value: unknown,
+  options: ValueCheckOptions = {},
+): ValueProblem | undefined {
   switch (field.kind) {
     case 'number': {
       if (typeof value !== 'number' || Number.isNaN(value)) return undefined;
@@ -91,7 +126,11 @@ export function valueProblem(field: RunField, value: unknown): ValueProblem | un
         return { code: 'too_short', limit: field.minLength };
       if (field.maxLength !== undefined && length > field.maxLength)
         return { code: 'too_long', limit: field.maxLength };
-      if (field.pattern !== undefined && compiled(field.pattern)?.test(value) === false)
+      if (
+        options.patterns !== false &&
+        field.pattern !== undefined &&
+        breaksPattern(field.pattern, value)
+      )
         return { code: 'pattern' };
       if (field.format !== undefined) {
         const known = Object.prototype.hasOwnProperty.call(FORMATS, field.format)
@@ -107,4 +146,48 @@ export function valueProblem(field: RunField, value: unknown): ValueProblem | un
     default:
       return undefined;
   }
+}
+
+/** A problem found below a field: the leaf that has it, where it sits, and what it is. */
+export interface LocatedProblem {
+  /** The leaf holding the value. */
+  field: RunField;
+  /** From the field asked about to the leaf: a member's name, a list item's index. The field itself is `[]`. */
+  path: readonly (string | number)[];
+  problem: ValueProblem;
+}
+
+/**
+ * The first value its contract facts refuse anywhere in `value`, in the
+ * order a form draws it: the leaf itself, a structure's members in declared
+ * order, a list's items in order. What lets a list say which item is wrong
+ * rather than that it is incomplete.
+ */
+export function firstValueProblem(
+  field: RunField,
+  value: unknown,
+  options: ValueCheckOptions = {},
+): LocatedProblem | undefined {
+  if (field.kind === 'list') {
+    if (!Array.isArray(value)) return undefined;
+    for (const [index, item] of value.entries()) {
+      const found = firstValueProblem(field.item, item, options);
+      if (found) return { ...found, path: [index, ...found.path] };
+    }
+    return undefined;
+  }
+  if (field.kind === 'object') {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+    for (const member of field.fields) {
+      const found = firstValueProblem(
+        member,
+        ownProp(value as Record<string, unknown>, member.name),
+        options,
+      );
+      if (found) return { ...found, path: [member.name, ...found.path] };
+    }
+    return undefined;
+  }
+  const problem = valueProblem(field, value, options);
+  return problem ? { field, path: [], problem } : undefined;
 }

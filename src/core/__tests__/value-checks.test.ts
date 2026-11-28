@@ -13,9 +13,12 @@ import {
   computeReadiness,
   gateRefusal,
   gateRunInputs,
+  firstValueProblem,
+  refusedValue,
   rjsfDataFromRunValues,
   valueProblem,
 } from '..';
+import { waitingFields } from '../readiness';
 import { PLAIN_SINGLE, WIRE_PLAIN } from './contract-fixtures';
 
 const number = (facts: Partial<NumberRunField> = {}): NumberRunField => ({
@@ -132,6 +135,8 @@ interface Row {
   wire: InputFormTopLevelField;
   value: unknown;
   runnable: boolean;
+  /** Where the Run button answers otherwise: only ever looser than the gate, never stricter. */
+  buttonLive?: boolean;
 }
 
 const NUMBER_WIRE = {
@@ -180,11 +185,15 @@ const ROWS: Row[] = [
     runnable: true,
   },
   {
+    // A pattern is the method author's expression and readiness answers on
+    // every keystroke, so it is judged at the attempt instead (`gateRefusal`),
+    // as the gate judges it: the button is looser here, never stricter.
     label: 'a text breaking its pattern',
     contract: textContract({ pattern: '^[A-Z]{3}$' }),
     wire: { ...TEXT_WIRE, pattern: '^[A-Z]{3}$' },
     value: 'abc',
     runnable: false,
+    buttonLive: true,
   },
   {
     label: 'a text matching its pattern',
@@ -217,7 +226,7 @@ const ROWS: Row[] = [
 ];
 
 describe('the Run button and the server gate answer together on contract facts', () => {
-  it.each(ROWS)('$label', ({ contract, wire, value, runnable }) => {
+  it.each(ROWS)('$label', ({ contract, wire, value, runnable, buttonLive: looser }) => {
     const inputs = { x: contract };
     const fields = buildRunFields({ fields: [wire] }, inputs);
     const values = { x: value };
@@ -235,7 +244,85 @@ describe('the Run button and the server gate answer together on contract facts',
       },
       rjsfDataFromRunValues(values, fields),
     );
-    expect(buttonLive).toBe(runnable);
+    expect(buttonLive).toBe(looser ?? runnable);
     expect(gate.ok).toBe(runnable);
+    // The one direction that may never hold: the button holding a run the gate takes.
+    if (gate.ok) expect(buttonLive).toBe(true);
+    // Whatever the button says, a value the gate refuses is named at the attempt.
+    if (!runnable && value !== undefined) {
+      expect(gateRefusal(fields[0]!, value, true)).toBe('invalid');
+    }
+  });
+});
+
+describe('a method’s pattern', () => {
+  // A pattern with catastrophic backtracking runs for seconds on a short value,
+  // synchronously. Readiness answers on every keystroke, so it never runs one.
+  const catastrophic = text({ pattern: '^(a+)+$' });
+  const slow = 'a'.repeat(40) + 'b';
+
+  it('is not run by readiness', () => {
+    const started = Date.now();
+    expect(computeReadiness([catastrophic], { t: slow }).missing).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it('is not run when a value is checked without patterns', () => {
+    expect(valueProblem(catastrophic, slow, { patterns: false })).toBeUndefined();
+  });
+
+  it('is judged at the attempt, by gateRefusal', () => {
+    const plain = text({ pattern: '^[A-Z]{3}$' });
+    expect(computeReadiness([plain], { t: 'abc' }).missing).toEqual([]);
+    expect(gateRefusal(plain, 'abc', true)).toBe('invalid');
+    expect(gateRefusal(plain, 'ABC', true)).toBeUndefined();
+  });
+});
+
+describe('a list holding a refused item', () => {
+  const scores = {
+    kind: 'list',
+    name: 'scores',
+    required: true,
+    item: { kind: 'number', name: 'score', required: true, integer: true, min: 0, max: 10 },
+  } as const satisfies RunField;
+
+  it('is invalid, not required or incomplete', () => {
+    expect(gateRefusal(scores, [3, 12], true)).toBe('invalid');
+    expect(gateRefusal(scores, [3, 12], false)).toBe('invalid');
+    expect(gateRefusal(scores, [3, 4], true)).toBeUndefined();
+  });
+
+  it('names the item and its problem', () => {
+    expect(refusedValue(scores, [3, 12])).toEqual({
+      field: scores.item,
+      path: [1],
+      problem: { code: 'above_maximum', limit: 10 },
+    });
+  });
+
+  it('locates a member of a list of structures', () => {
+    const rows = {
+      kind: 'list',
+      name: 'rows',
+      required: true,
+      item: {
+        kind: 'object',
+        name: 'row',
+        required: true,
+        fields: [{ kind: 'number', name: 'amount', required: true, integer: false, max: 5 }],
+      },
+    } as const satisfies RunField;
+    expect(firstValueProblem(rows, [{ amount: 1 }, { amount: 9 }])?.path).toEqual([1, 'amount']);
+  });
+});
+
+describe('what the run waits for', () => {
+  it('says what is wrong with a filled value rather than asking for it', () => {
+    const amount = number({ name: 'amount', max: 50 });
+    const [waiting] = waitingFields([amount], { amount: 80 });
+    expect(waiting?.problem?.problem).toEqual({ code: 'above_maximum', limit: 50 });
+    const [empty] = waitingFields([amount], {});
+    expect(empty?.problem).toBeUndefined();
   });
 });

@@ -133,17 +133,30 @@ export function optionDetail(field: EnumRunField, value: string): ChoiceOption |
 }
 
 /**
- * How an option reads: its stated tone, or `neutral`. A tone is never
+ * How an option reads: its stated tone, or `neutral` when it states none or a
+ * word this build does not know. A tone is never
  * inferred from a value or a label - only the method knows that `HIGH_RISK`
  * is bad.
  */
 export function optionTone(field: EnumRunField, value: string): OptionTone {
-  return optionDetail(field, value)?.tone ?? 'neutral';
+  return toneWord(optionDetail(field, value)?.tone) ?? 'neutral';
 }
 
-/** Whether any option of the choice carries a tone, so a renderer draws badges at all. */
+/**
+ * A tone as the wire states it, when it is one of `OPTION_TONES`. The wire
+ * types the slot, but a producer from a later version, or a hand-built
+ * descriptor, can send another word, and a renderer keys its icons and
+ * colours by the tone: an unknown word reads as no tone at all.
+ */
+function toneWord(tone: unknown): OptionTone | undefined {
+  return typeof tone === 'string' && (OPTION_TONES as readonly string[]).includes(tone)
+    ? (tone as OptionTone)
+    : undefined;
+}
+
+/** Whether any option of the choice carries a tone this build knows, so a renderer draws badges at all. */
 export function hasTones(field: EnumRunField): boolean {
-  return field.optionDetails?.some((option) => option.tone !== undefined) ?? false;
+  return field.optionDetails?.some((option) => toneWord(option.tone) !== undefined) ?? false;
 }
 
 /** Whether any option of the choice carries a description, so a picker draws described cards. */

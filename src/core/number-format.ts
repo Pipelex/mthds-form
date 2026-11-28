@@ -7,7 +7,8 @@
  *
  * - **A currency** (an ISO 4217 code `Intl` lists, such as `EUR`) reads as
  *   money in the currency's own fraction digits: `€4,120.00`.
- * - **`percent`** reads as a percentage, `100` being the whole: `12.5%`.
+ * - **`percent`** reads as a percentage, `100` being the whole: `12.5%`, with
+ *   the same rounding as a unitless number, so `0.004` reads `0.004%`.
  * - **A unit of measure** reads with its symbol: `12.5 kg`, `40 m²`.
  * - **No unit**: up to two decimals, or six significant digits when that keeps
  *   more of a small value (`0.9999` stays `0.9999`, `999.999` stays itself
@@ -101,16 +102,51 @@ export function unitSymbol(unit: string): string {
 }
 
 /**
- * The rounding every unitless number and unit of measure shares. Asserted
- * rather than annotated because `roundingPriority` (ES2023 `Intl`) is newer
- * than the `lib` this package compiles against; every runtime the package
- * supports reads it, and one that did not would round to two decimals.
+ * Whether this runtime's `Intl` reads `roundingPriority` (ES2023). One that
+ * does not ignores the key and lets `maximumSignificantDigits` win over
+ * `maximumFractionDigits`, which writes 1234567.89 as `1,234,570` - a
+ * different amount, not a rounder one. So the support is detected, never
+ * assumed, and without it the same choice is made by hand
+ * (`boundedRounding`).
  */
-const BOUNDED = {
-  maximumFractionDigits: 2,
-  maximumSignificantDigits: 6,
-  roundingPriority: 'morePrecision',
-} as Intl.NumberFormatOptions;
+const ROUNDING_PRIORITY_READ: boolean = (() => {
+  try {
+    const options = new Intl.NumberFormat('en', {
+      maximumFractionDigits: 2,
+      maximumSignificantDigits: 6,
+      roundingPriority: 'morePrecision',
+    } as Intl.NumberFormatOptions).resolvedOptions() as { roundingPriority?: string };
+    return options.roundingPriority === 'morePrecision';
+  } catch {
+    return false;
+  }
+})();
+
+/**
+ * The rounding every unitless number, percentage and unit of measure shares:
+ * up to two decimals, or six significant digits when that keeps more of a
+ * small value, whichever keeps more precision - ES2023's
+ * `roundingPriority: 'morePrecision'`. Where the runtime does not read that
+ * key, the choice is made here from the value's magnitude: six significant
+ * digits keep more decimals than two exactly when the value is below 1,000,
+ * so the whole part of a larger amount is never cut. Exported for its test,
+ * not from the entry.
+ */
+export function boundedRounding(
+  value: number,
+  roundingPriorityRead: boolean = ROUNDING_PRIORITY_READ,
+): Intl.NumberFormatOptions {
+  if (roundingPriorityRead) {
+    return {
+      maximumFractionDigits: 2,
+      maximumSignificantDigits: 6,
+      roundingPriority: 'morePrecision',
+    } as Intl.NumberFormatOptions;
+  }
+  return Math.abs(value) < 1000 && value !== 0
+    ? { maximumSignificantDigits: 6 }
+    : { maximumFractionDigits: 2 };
+}
 
 /** Whether the method says a number is an amount, which is what earns it grouping. */
 function readsAsAmount(field: Pick<NumberRunField, 'unit' | 'hints'>): boolean {
@@ -139,10 +175,12 @@ export function formatFieldNumber(
     }).format(value);
   }
   if (unit === 'percent') {
-    return formatter(lang, { style: 'percent', maximumFractionDigits: 2 }).format(value / 100);
+    // The rounding applies to the percentage as written, so a small share
+    // keeps its digits (`0.004%`) rather than rounding to `0%`.
+    return formatter(lang, { style: 'percent', ...boundedRounding(value) }).format(value / 100);
   }
   const grouped = readsAsAmount(field) || !Number.isInteger(value);
-  const number = formatter(lang, { ...BOUNDED, useGrouping: grouped }).format(value);
+  const number = formatter(lang, { ...boundedRounding(value), useGrouping: grouped }).format(value);
   return unit === undefined ? number : `${number}\u00a0${unitSymbol(unit)}`;
 }
 

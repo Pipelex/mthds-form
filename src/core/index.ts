@@ -64,8 +64,8 @@ export {
 } from './hints';
 export type { FormGroup } from './field-roles';
 export { effectiveRole, formGroupOf, formHasRoles, orderByRole } from './field-roles';
-export type { ValueProblem } from './value-checks';
-export { codePointLength, valueProblem } from './value-checks';
+export type { LocatedProblem, ValueCheckOptions, ValueProblem } from './value-checks';
+export { codePointLength, firstValueProblem, valueProblem } from './value-checks';
 export {
   FALLBACK_NUMBER_LOCALE,
   canonicalNumberLocale,
@@ -233,6 +233,7 @@ export {
   isOptionalStructure,
   mustBeFilled,
   optionalStructureOpen,
+  refusedValue,
   shownAsOptional,
 } from './readiness';
 

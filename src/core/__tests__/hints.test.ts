@@ -115,3 +115,32 @@ describe('an option’s tone and description', () => {
     expect(hasOptionDescriptions(plain)).toBe(false);
   });
 });
+
+describe('a tone this build does not know', () => {
+  // The wire types the slot, but a later producer or a hand-built descriptor
+  // can send another word; a renderer keys its icons by the tone, and an
+  // unknown word made the icon undefined and the result page throw.
+  const choice = {
+    kind: 'enum',
+    name: 'risk',
+    required: true,
+    options: ['LOW', 'HIGH'],
+    optionDetails: [
+      { value: 'LOW', tone: 'glowing' },
+      { value: 'HIGH', tone: 'negative' },
+    ],
+  } as unknown as EnumRunField;
+
+  it('reads as neutral', () => {
+    expect(optionTone(choice, 'LOW')).toBe('neutral');
+    expect(optionTone(choice, 'HIGH')).toBe('negative');
+  });
+
+  it('does not count as a tone', () => {
+    const unknownOnly = {
+      ...choice,
+      optionDetails: [{ value: 'LOW', tone: 'glowing' }, { value: 'HIGH' }],
+    } as unknown as EnumRunField;
+    expect(hasTones(unknownOnly)).toBe(false);
+  });
+});

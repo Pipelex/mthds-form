@@ -16,6 +16,10 @@
  * number a setting, anything else context - so the page reads as one layout
  * rather than a sorted part and an unsorted rest.
  *
+ * An optional structure never folds by its role either: it already folds
+ * behind the optional disclosure, which is what opens it seeded with its
+ * authored defaults and closes it again.
+ *
  * A reference or a setting the run waits for and nothing fills yet never folds:
  * hiding the one input a person still has to give would leave the Run button
  * dark with its reason out of sight. The decision reads the field alone, never
@@ -28,7 +32,7 @@ import type { RoleWord } from 'mthds/protocol';
 
 import type { RunField } from './descriptor';
 import { roleOf } from './hints';
-import { mustBeFilled } from './readiness';
+import { isOptionalStructure, mustBeFilled } from './readiness';
 
 /** Which group of the form an input belongs to. */
 export type FormGroup = 'subject' | 'main' | 'folded';
@@ -58,6 +62,11 @@ export function formHasRoles(fields: readonly RunField[]): boolean {
 export function formGroupOf(field: RunField, formHasRolesFlag: boolean): FormGroup {
   const role = effectiveRole(field, formHasRolesFlag);
   if (role === 'subject') return 'subject';
+  // An optional structure folds already, behind the optional disclosure that
+  // opens it with its authored defaults and closes it again; it has no control
+  // of its own until then. Folded a second time by its role, it lost that
+  // disclosure, so it stays in the main group.
+  if (isOptionalStructure(field)) return 'main';
   if (role === 'reference' || role === 'setting') {
     return mustBeFilled(field) && field.defaultValue === undefined ? 'main' : 'folded';
   }

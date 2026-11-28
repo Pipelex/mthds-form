@@ -7,6 +7,7 @@ import {
   isCurrencyUnit,
   unitSymbol,
 } from '..';
+import { boundedRounding } from '../number-format';
 
 const field = (facts: Partial<NumberRunField> = {}): NumberRunField => ({
   kind: 'number',
@@ -72,5 +73,27 @@ describe('currencies', () => {
   it('places the symbol where the locale writes it', () => {
     expect(currencyAffix('EUR', 'en-GB')).toEqual({ symbol: '€', position: 'before' });
     expect(currencyAffix('EUR', 'fr-FR')).toEqual({ symbol: '€', position: 'after' });
+  });
+});
+
+describe('the bounded rounding', () => {
+  it('never cuts the whole part of a large amount', () => {
+    expect(formatFieldNumber(field(), 1234567.89, 'en-GB')).toBe('1,234,567.89');
+  });
+
+  it('makes the same choice by hand where the runtime ignores roundingPriority', () => {
+    const write = (value: number) =>
+      new Intl.NumberFormat('en-GB', boundedRounding(value, false)).format(value);
+    expect(write(1234567.89)).toBe('1,234,567.89');
+    expect(write(2116.2000000000003)).toBe('2,116.2');
+    expect(write(999.999)).toBe('999.999');
+    expect(write(0.000123456789)).toBe('0.000123457');
+    expect(write(0)).toBe('0');
+  });
+
+  it('keeps a small percentage’s digits', () => {
+    expect(formatFieldNumber(field({ unit: 'percent' }), 0.004, 'en-GB')).toBe('0.004%');
+    expect(formatFieldNumber(field({ unit: 'percent' }), 12.5, 'en-GB')).toBe('12.5%');
+    expect(formatFieldNumber(field({ unit: 'percent' }), 1234.567, 'en-GB')).toBe('1,234.57%');
   });
 });
