@@ -1088,7 +1088,7 @@ async function loadGenerative() {
     import('../src/core/index.ts'),
     import('../src/generative/designer-run.ts'),
     import('../src/generative/layout-fits.ts'),
-    import('../src/brand/styles.ts'),
+    import('../src/generative/style-direction.ts'),
   ]);
   return {
     ...run,

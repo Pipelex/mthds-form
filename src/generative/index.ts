@@ -49,9 +49,10 @@ export { BrandBar, type BrandBarProps } from './brand-bar';
 // What a host's compose-then-result frame tells a layout's frame components:
 // how long a run takes, and the result's actions.
 export { FrameHostProvider, useFrameHost, type FrameHost } from './frame-host';
-// The manifest lives with the rest of the brand in `./brand`, and is re-exported
-// here because the app bar reads it and `GenerativePage` takes it.
-export { brandManifestSchema, type BrandManifest } from '../brand/manifest';
+// The manifest the app bar reads and `GenerativePage` takes as `brand`. Until
+// the host draws the page's chrome, this layer keeps it, with `BrandProvider`
+// and `BrandBar`; a brand's tokens are the host's (docs/theming.md).
+export { brandManifestSchema, type BrandManifest } from './brand-manifest';
 
 // The store a page reads and writes, created by the host with this entry's own
 // json-render, so the page recognises it: a second copy of the runtime resolved

@@ -4,7 +4,7 @@ import { expect } from 'storybook/test';
 import type { InputForm, PipeIOContracts } from '../../../core';
 import { getPipeInputForm, getPipeIOContract } from '../../../core';
 import { MethodForm, useMethodForm } from '../../../react';
-import { APP_STYLE_IDS, type AppStyleId } from '../../../brand';
+import { APP_STYLE_IDS, type AppStyleId } from '../../host';
 import * as files from '../../_generated/files';
 import * as scalars from '../../_generated/scalars';
 import * as structured from '../../_generated/structured';
@@ -31,8 +31,8 @@ import { TEAM_KEYS, type TeamKey } from './teams';
  *   `soft`'s lifted dark one, a painted offset showed as a band of the page
  *   between the control and its ring.
  * - **Errors.** A field's error outline and a structure's card in error are
- *   drawn in the solid error colour, which the brand contract holds at 3:1 on
- *   the page and on a card; at half and seven tenths of it they read under
+ *   drawn in the solid error colour, which needs 3:1 on the page and on a
+ *   card; at half and seven tenths of it they read under
  *   3:1 even in the stock palette.
  *
  * See docs/theming.md, "Link, selected and focus", and docs/storybook.md,

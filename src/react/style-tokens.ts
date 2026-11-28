@@ -1,7 +1,8 @@
 /**
  * The classes every heading, panel and call to action the controls and the
  * generative layer draw read a page's style through: the optional tokens a
- * host sets from the roles `./brand`'s `deriveStyleRoles` returns.
+ * host sets from the roles its app style derives (docs/theming.md, "Style
+ * tokens").
  *
  * - `--font-heading`, `--heading-weight` and `--heading-tracking`: the face,
  *   the weight and the letter spacing of a heading - a page's title, a

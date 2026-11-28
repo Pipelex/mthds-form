@@ -26,15 +26,14 @@ const RENDERING_ENTRIES = ['react', 'generative'];
 
 /**
  * The entries that must import with no DOM and no React: the headless kernel,
- * the brand entry, which a build script, a test and a server's fetcher import
- * alike, and the generative layer's half that renders nothing, which a host's
+ * and the generative layer's half that renders nothing, which a host's
  * server imports to produce and check a layout. None may carry a
  * `'use client'` prologue.
  */
-const ISOMORPHIC_ENTRIES = ['core', 'brand', 'generative/headless'];
+const ISOMORPHIC_ENTRIES = ['core', 'generative/headless'];
 
 /** Every entry, for the bans that hold everywhere. */
-const ENTRIES = ['core', 'react', 'generative', 'generative/headless', 'brand'];
+const ENTRIES = ['core', 'react', 'generative', 'generative/headless'];
 
 /** How an entry is spelled in the package's `exports` map, for a failure's words. */
 const specifierOf = (entry) => (entry === 'core' ? '.' : `./${entry}`);
@@ -112,11 +111,6 @@ const BANNED = [
     match: /^@json-render($|\/)|^zod($|\/)/,
     why: `The \`${entry === 'core' ? '.' : './react'}\` entry must not carry the generative layer's dependencies. See docs/dependency-budget.md.`,
   })),
-  {
-    entry: `${DIST}/brand/index.js`,
-    match: /^@json-render($|\/)/,
-    why: 'The `./brand` entry renders nothing, so it must not carry a layout renderer. See docs/dependency-budget.md.',
-  },
   // The standard's TypeScript client is TYPES-ONLY, banned from EVERY
   // entry. The wire types it declares are erased at build, so a `mthds`
   // specifier surviving into either graph means a value import slipped in -
@@ -271,7 +265,7 @@ for (const { entry, match, why } of BANNED) {
   } else {
     console.log("ok  core/index.js reaches the run gate's validator");
   }
-  for (const entry of ['react', 'generative', 'generative/headless', 'brand']) {
+  for (const entry of ['react', 'generative', 'generative/headless']) {
     const carrying = [...graphOf(`${DIST}/${entry}/index.js`).files].filter(carriesValidator);
     if (carrying.length > 0) {
       failures.push(
@@ -320,38 +314,6 @@ for (const { entry, match, why } of BANNED) {
     console.log(
       `ok  generative/headless/index.js (${files.size} modules) reaches @json-render/core and zod and nothing else`,
     );
-  }
-}
-
-/**
- * The brand entry's budget is an allow-list, not a ban list: zod, and nothing
- * else. It is the one entry whose dependency line can be stated exactly, so it
- * is - a new specifier anywhere in its graph fails here whatever it is.
- *
- * And it never fetches. The entry checks and compiles files a producer already
- * wrote; a `fetch(` reaching its built graph would put a network call in code
- * a build script, a browser and a server all import.
- */
-{
-  const BRAND_ALLOWED = /^zod($|\/)/;
-  const { files, externals } = graphOf(`${DIST}/brand/index.js`);
-  const outside = [...externals].filter((specifier) => !BRAND_ALLOWED.test(specifier));
-  if (externals.size === 0 || outside.length > 0) {
-    failures.push(
-      outside.length > 0
-        ? `brand/index.js reaches ${outside.join(', ')} - the brand entry depends on zod and nothing else. See docs/dependency-budget.md.`
-        : 'brand/index.js reaches no external at all, so the allow-list compared nothing - the entry validates with zod and must reach it.',
-    );
-  } else {
-    console.log(`ok  brand/index.js (${files.size} modules) reaches zod and nothing else`);
-  }
-  const fetching = [...files].filter((file) => /\bfetch\s*\(/.test(readFileSync(file, 'utf8')));
-  if (fetching.length > 0) {
-    failures.push(
-      `brand/index.js reaches a fetch( call in ${fetching.map((file) => relative(DIST, file)).join(', ')} - the brand entry never fetches. See docs/brand.md.`,
-    );
-  } else {
-    console.log('ok  brand/index.js reaches no fetch( call');
   }
 }
 
@@ -789,6 +751,14 @@ const UNUSED_BY_CONTROLS = [
   // The controls pair `bg-destructive` with `text-white` rather than with this
   // token - see src/generative/ui/shadcn.tsx.
   '--destructive-foreground',
+  // The status colours (docs/theming.md, "Status colours"): a named group with
+  // defaults, so the tone badges and verdicts a result page is about to draw
+  // read a token a host can set rather than a literal. No control draws a
+  // status yet; the first that does takes its token off this list.
+  '--positive',
+  '--caution',
+  '--negative',
+  '--neutral',
 ];
 
 /**
@@ -1489,54 +1459,28 @@ if (unshipped.length > 0) {
   );
 }
 
-// 4. The brand contract names the tokens a brand sets, and it is not a second
-//    list kept beside `theme.css`: its colours and its radius are exactly the
-//    tokens `theme.css` defines (its colours exactly the ones `.dark`
-//    restates), so a token added to the theme is a token a producer must set.
-//    Its two typography tokens are Tailwind's own theme variables, which
-//    `theme.css` must NOT define - unlayered, a value there overrides every
-//    host's typeface - and which the shipped sheet must declare, or a brand's
+// 4. The two typography tokens, `--font-sans` and `--font-mono`, are Tailwind's
+//    own theme variables, which a host or a brand's scope sets. `theme.css`
+//    must NOT define them - unlayered, a value there overrides every host's
+//    typeface - and the shipped sheet must declare them, or a host's
 //    `--font-sans` would be the only value the page's `font-sans` could read.
-//    Read from the BUILT entry, so what is checked is what a producer imports.
 {
-  const { BRAND_CONTRACT } = await import(`${DIST}/brand/index.js`);
-  const variablesOf = (...types) =>
-    BRAND_CONTRACT.filter((token) => types.includes(token.type)).map((token) => token.variable);
-  const themed = variablesOf('color', 'dimension');
-  const contractProblems = [];
-  const sameSet = (a, b) => a.length === b.length && a.every((name) => b.includes(name));
-  if (themed.length === 0) contractProblems.push('names no colour and no radius at all');
-  if (!sameSet(themed, [...lightPalette.keys()])) {
-    contractProblems.push(
-      `names ${themed.join(', ')} where theme.css's :root defines ${[...lightPalette.keys()].join(', ')}`,
-    );
-  }
-  const colors = variablesOf('color');
-  if (!sameSet(colors, [...darkPalette.keys()])) {
-    contractProblems.push(
-      `names the colours ${colors.join(', ')} where theme.css's .dark restates ${[...darkPalette.keys()].join(', ')}`,
-    );
-  }
-  const fonts = variablesOf('fontFamily');
-  if (!sameSet(fonts, ['--font-sans', '--font-mono'])) {
-    contractProblems.push(`names the typefaces ${fonts.join(', ') || 'nothing'}, not --font-sans and --font-mono`);
-  }
+  const fonts = ['--font-sans', '--font-mono'];
+  const fontProblems = [];
   const themedFonts = fonts.filter((name) => lightPalette.has(name) || darkPalette.has(name));
   if (themedFonts.length > 0) {
-    contractProblems.push(
-      `finds ${themedFonts.join(', ')} defined in theme.css, where a value overrides every host's own typeface`,
+    fontProblems.push(
+      `theme.css defines ${themedFonts.join(', ')}, where a value overrides every host's own typeface`,
     );
   }
   const undeclared = fonts.filter((name) => !selfDefined.has(name));
   if (undeclared.length > 0) {
-    contractProblems.push(`finds ${undeclared.join(', ')} undeclared by dist/styles.css`);
+    fontProblems.push(`dist/styles.css does not declare ${undeclared.join(', ')}`);
   }
-  if (contractProblems.length === 0) {
-    console.log(
-      `ok  the brand contract names theme.css's ${themed.length} tokens and Tailwind's two typefaces`,
-    );
+  if (fontProblems.length === 0) {
+    console.log("ok  theme.css leaves Tailwind's typefaces to the host, and the sheet declares them");
   } else {
-    failures.push(`The brand contract (src/brand/contract.ts) ${contractProblems.join('; ')}. See docs/brand.md.`);
+    failures.push(`${fontProblems.join('; ')}. See docs/theming.md.`);
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APP_STYLE_IDS } from '../../brand/styles';
+import { APP_STYLE_IDS } from '../../generative/style-direction';
 import { HEROES, selectVariants, variantsOf, type Variant } from '../heroes';
 
 /**

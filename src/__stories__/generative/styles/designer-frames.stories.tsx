@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect } from 'storybook/test';
 import { findFixture } from '../../../generative';
-import { APP_STYLE_IDS, type AppStyleId } from '../../../brand';
+import { APP_STYLE_IDS, type AppStyleId } from '../../host';
 import { atWidth, expectEveryTouchTarget, pinnedTo } from '../../touch-target';
 import { GENERATIVE_STORY_PARAMETERS } from '../layout-page';
 import { APPS, APP_KEYS, type AppKey } from './apps';

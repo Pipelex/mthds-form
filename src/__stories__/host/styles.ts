@@ -1,6 +1,19 @@
-import { isColorTokenName, type ColorTokenName } from './contract';
+import {
+  APP_STYLE_IDS,
+  STYLE_DIRECTIONS,
+  isAppStyle,
+  type AppStyleId,
+} from '../../generative/style-direction';
+import {
+  colorHex,
+  isColorTokenName,
+  linearChannel,
+  type ColorTokenName,
+  type SrgbColor,
+} from './color';
 import { parseHex } from './seed-roles';
-import { colorHex, linearChannel, type SrgbColor } from './tokens';
+
+export { APP_STYLE_IDS, isAppStyle, type AppStyleId };
 
 /**
  * The app styles and the typefaces, as data, and the roles a team's choice of
@@ -22,7 +35,8 @@ import { colorHex, linearChannel, type SrgbColor } from './tokens';
  * value there; `quiet` with no typeface sets nothing at all, which is what
  * makes "no style" and "the default style" one state.
  *
- * See docs/brand.md § "App styles and typefaces".
+ * The stories' copy of a host's derivation (see `./index.ts`); a style's
+ * name and direction are the generative layer's, which the brief carries.
  */
 
 // ─── Typefaces ───────────────────────────────────────────────────────────────
@@ -177,8 +191,6 @@ export interface StyleRoles {
 
 // ─── The styles ──────────────────────────────────────────────────────────────
 
-export type AppStyleId = 'quiet' | 'soft' | 'editorial' | 'bold';
-
 export interface AppStyle {
   id: AppStyleId;
   name: string;
@@ -207,17 +219,13 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
   // The host's own look, named: it sets nothing, and a team's typeface is its
   // body and its headings.
   quiet: {
-    name: 'Quiet',
-    direction:
-      'The host’s own look, unstyled: its light titles and hairline panels, generous air, nothing decorated.',
+    ...STYLE_DIRECTIONS.quiet,
     bodyFace: null,
     headingFace: 'body',
     roles: {},
   },
   soft: {
-    name: 'Soft',
-    direction:
-      'Friendly and rounded: generous corners, panels that float on a soft shadow with no outline, warm medium-weight titles.',
+    ...STYLE_DIRECTIONS.soft,
     bodyFace: 'dm-sans',
     headingFace: 'body',
     roles: {
@@ -258,9 +266,7 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
     },
   },
   editorial: {
-    name: 'Editorial',
-    direction:
-      'Considered and literary: serif display titles, fine hairlines, wide margins and a reading rhythm.',
+    ...STYLE_DIRECTIONS.editorial,
     bodyFace: 'source-sans-3',
     headingFace: 'newsreader',
     roles: {
@@ -290,9 +296,7 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
     },
   },
   bold: {
-    name: 'Bold',
-    direction:
-      'Confident and graphic: heavy, tightly set titles, solid panels with firm edges, a compact rhythm.',
+    ...STYLE_DIRECTIONS.bold,
     bodyFace: 'space-grotesk',
     headingFace: 'body',
     roles: {
@@ -326,20 +330,6 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
     },
   },
 };
-
-export const APP_STYLE_IDS: readonly AppStyleId[] = Object.freeze([
-  'quiet',
-  'soft',
-  'editorial',
-  'bold',
-]);
-
-/** Whether `value` names one of the app styles. */
-export function isAppStyle(value: unknown): value is AppStyleId {
-  // Against the definitions themselves, which no caller can reach, rather
-  // than the exported list.
-  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(DEFINITIONS, value);
-}
 
 /**
  * The roles a team's choice sets: its style and its typeface, each a stored
@@ -386,7 +376,7 @@ export const APP_STYLES: Readonly<Record<AppStyleId, AppStyle>> = deepFreeze(
 /**
  * A deep copy of plain data - objects, arrays and primitives, which is all a
  * style's roles are. Spelled out rather than `structuredClone`, which is a
- * host API rather than the language's, and which this isomorphic entry would
+ * host API rather than the language's, and which this module would
  * otherwise call at import time through `APP_STYLES`.
  */
 function copyData<T>(value: T): T {

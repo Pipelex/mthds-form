@@ -1,5 +1,5 @@
 import type { Spec } from '@json-render/core';
-import type { AppStyleId } from '../brand/styles';
+import type { AppStyleId } from './style-direction';
 import type { PagePlan } from '../generated/layout-design/types';
 import type { Frame } from './frame-definitions';
 

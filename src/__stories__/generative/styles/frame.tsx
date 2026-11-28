@@ -22,7 +22,7 @@ import {
   payloadToState,
   type SpecFixture,
 } from '../../../generative';
-import type { BrandManifest } from '../../../brand';
+import type { BrandManifest } from '../../../generative';
 import { CONTRACTS as TRIP_CONTRACTS, INPUT_FORM as TRIP_INPUT_FORM } from '../../_generated/trips';
 import {
   CONTRACTS as COMPOSITE_CONTRACTS,

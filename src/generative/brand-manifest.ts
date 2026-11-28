@@ -5,7 +5,12 @@ import { z } from 'zod';
  * a token - its name, its site, the logo pair, the web font to load. The tokens
  * are the palette; the manifest is what the page says it is. The generative
  * layer's app bar reads it through `BrandProvider`, which also loads the web
- * font, and `assembleBrand` validates it beside the tokens.
+ * font, and `GenerativePage` takes it as `brand`.
+ *
+ * It is the one piece of a brand the kernel keeps, and only for that chrome:
+ * a brand's tokens, and everything that produces or checks them, are a host's
+ * (docs/theming.md). It leaves with the app bar, once the host draws the
+ * page's chrome itself.
  */
 
 /**
