@@ -6,6 +6,7 @@
 import type { ObjectRunField, RunField } from './descriptor';
 import { hasOwnProp, ownProp } from './own-property';
 import { readStoredReference } from './stored-value';
+import { valueProblem } from './value-checks';
 
 /**
  * How deep `isFilled` walks a value before it stops looking, and the answer it
@@ -177,7 +178,14 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
         value.every((item) => !isFilled(item) || fieldFilled(field.item, item)) && isFilled(value)
       );
   }
-  return isFilled(value);
+  // A leaf holding a value its contract facts refuse is not filled: a number
+  // past its bound, a text past its length or off its format. The gate's
+  // validator refuses exactly that value, so readiness saying "ready" over it
+  // was the disagreement docs/run-gate.md rules out - the button offered a run
+  // its own gate then refused with nothing named. `valueProblem` judges as the
+  // validator does and passes a value of another type, so this is harmless on
+  // the gate's own tree too.
+  return isFilled(value) && valueProblem(field, value) === undefined;
 }
 
 export interface Readiness {
@@ -267,10 +275,24 @@ export function gateRefusal(
   field: RunField,
   value: unknown,
   mustFill: boolean,
-): 'required' | 'incomplete' | undefined {
+): GateRefusal | undefined {
+  // A leaf holding a value its contract facts refuse is `invalid` whether or
+  // not it must be filled: it is not missing, it is wrong, and the person is
+  // told what is wrong with it (`valueProblem`) rather than that it is empty.
+  if (field.kind !== 'object' && field.kind !== 'list' && isFilled(value)) {
+    if (valueProblem(field, value) !== undefined) return 'invalid';
+  }
   if (mustFill) return fieldFilled(field, value) ? undefined : 'required';
   return isFilled(value) && !fieldFilled(field, value) ? 'incomplete' : undefined;
 }
+
+/**
+ * Why the gate refuses a field: it must be filled and is empty (`required`),
+ * it was started and is short of what its concept demands (`incomplete`), or
+ * it is a value its contract facts refuse (`invalid`: a bound, a length, a
+ * pattern or a format, which `valueProblem` names).
+ */
+export type GateRefusal = 'required' | 'incomplete' | 'invalid';
 
 /**
  * The fields a person fills to let the run go, at the depth a form draws
