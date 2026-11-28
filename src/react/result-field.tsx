@@ -38,6 +38,7 @@ import { ownProp } from '../core/own-property';
 import { unwrap } from './result-unwrap';
 import { hasTones, memberWithPart, partOf } from '../core/hints';
 import { optionLabeler } from './enum-field';
+import { formatFieldNumber } from '../core/number-format';
 import {
   AggregateRow,
   columnAggregates,
@@ -49,6 +50,7 @@ import {
   ToneValue,
   VerdictCounts,
   VerdictLine,
+  verdictDraws,
 } from './result-parts';
 import { planFileSave, splitFileName } from '../core/save-plan';
 import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff-files';
@@ -413,10 +415,19 @@ function EnumValue({
  * rather than the code the payload holds. Every other kind keeps the payload's
  * text.
  */
-function cellTitle(column: RunField, cell: string | number, presentation: FieldPresentation) {
-  return column.kind === 'enum' && typeof cell === 'string'
-    ? optionLabeler(column, presentation)(cell)
-    : String(cell);
+function cellTitle(
+  column: RunField,
+  cell: string | number,
+  presentation: FieldPresentation,
+  numberLocale: string,
+) {
+  if (column.kind === 'enum' && typeof cell === 'string')
+    return optionLabeler(column, presentation)(cell);
+  // A number cell shows the number in its unit (`NumberText`), so its tooltip
+  // and its word floor are that text, not the payload's digits.
+  if (column.kind === 'number' && typeof cell === 'number' && Number.isFinite(cell))
+    return formatFieldNumber(column, cell, numberLocale);
+  return String(cell);
 }
 
 /**
@@ -2056,7 +2067,9 @@ function ScalarChips({ field, items }: { field: RunField; items: readonly unknow
           key={index}
           className="rounded-md border border-border bg-card/40 px-2 py-0.5 text-[12.5px] text-foreground"
         >
-          <LeafValue field={field} value={item} />
+          {/* Compact: a chip is one short line, so a bounded number in it is
+              its text, never a meter. */}
+          <LeafValue field={field} value={item} compact />
         </span>
       ))}
     </div>
@@ -2171,6 +2184,11 @@ function stackingFor(columns: number, rowsOpen: boolean): Stacking {
 
 /** What turns each part of a table into blocks, for one of the two ways it stacks. */
 interface StackClasses {
+  /**
+   * A number column's header and cells while the table is a table, aligned
+   * right so its digits line up; the blocks it turns into keep the start.
+   */
+  numberCell: string;
   table: string;
   head: string;
   body: string;
@@ -2232,6 +2250,7 @@ function useTableBox(): { name: 'box' | 'framed'; className: string } {
  */
 const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
   phone: {
+    numberCell: 'sm:text-right',
     table: 'max-sm:block',
     head: 'max-sm:hidden',
     body: 'max-sm:block',
@@ -2244,6 +2263,7 @@ const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
     detailInner: 'max-sm:px-0 max-sm:py-1',
   },
   narrow: {
+    numberCell: '@min-[640px]:text-right',
     table: '@max-[640px]:block',
     head: '@max-[640px]:hidden',
     body: '@max-[640px]:block',
@@ -2257,6 +2277,7 @@ const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
     detailInner: '@max-[640px]:px-0 @max-[640px]:py-1',
   },
   always: {
+    numberCell: '',
     table: 'block',
     head: 'hidden',
     body: 'block',
@@ -2390,9 +2411,14 @@ function identifierWords(label: string): React.ReactNode {
  * shows, the same string its tooltip carries. Anything else - a date, a yes or
  * no, a count, chips, a file - gets no floor beyond the cell's own.
  */
-function cellWords(column: RunField, cell: unknown, presentation: FieldPresentation) {
+function cellWords(
+  column: RunField,
+  cell: unknown,
+  presentation: FieldPresentation,
+  numberLocale: string,
+) {
   return typeof cell === 'string' || typeof cell === 'number'
-    ? cellTitle(column, cell, presentation)
+    ? cellTitle(column, cell, presentation, numberLocale)
     : undefined;
 }
 
@@ -2667,7 +2693,7 @@ function ObjectTable({
                   // table scrolls inside it (see `overflows`).
                   fits ? 'wrap-normal' : 'whitespace-nowrap',
                   'px-3 py-2 text-[12px] font-semibold text-foreground',
-                  column.kind === 'number' && !stacked && 'text-right',
+                  column.kind === 'number' && (stacked ? stacked.numberCell : 'text-right'),
                   presentation === 'app' ? undefined : 'font-mono',
                 )}
               >
@@ -2767,7 +2793,7 @@ function ObjectTable({
                           : undefined;
                       const columnLabel = fieldLabel(column.title, column.name, presentation);
                       const words = floorsWords(column)
-                        ? cellWords(column, cell, presentation)
+                        ? cellWords(column, cell, presentation, s.numberLocale)
                         : undefined;
                       return (
                         <td
@@ -2777,7 +2803,8 @@ function ObjectTable({
                             'px-3 py-1.5 align-top',
                             // A column of numbers aligns right, so its digits
                             // line up, while the table is a table.
-                            column.kind === 'number' && !stacked && 'text-right',
+                            column.kind === 'number' &&
+                              (stacked ? stacked.numberCell : 'text-right'),
                             floorsWords(column) && WORD_FLOOR,
                             stacked?.cell,
                           )}
@@ -2864,7 +2891,7 @@ function ObjectTable({
                                   )
                             }
                             {...(typeof cell === 'string' || typeof cell === 'number'
-                              ? { title: cellTitle(column, cell, presentation) }
+                              ? { title: cellTitle(column, cell, presentation, s.numberLocale) }
                               : {})}
                           >
                             <ResultAt segment={column.name}>
@@ -4128,14 +4155,33 @@ function ResultNode({
         typeof unwrapped === 'object' && unwrapped !== null && !Array.isArray(unwrapped)
           ? (unwrapped as Record<string, unknown>)
           : undefined;
-      const titleMember = isApp ? memberWithPart(field.fields, 'title') : undefined;
-      const summaryMember = isApp ? memberWithPart(field.fields, 'summary') : undefined;
-      const verdictMember = isApp ? memberWithPart(field.fields, 'verdict') : undefined;
+      // A member leaves the grid for the head only when the head draws it: a
+      // title that holds words, a summary that holds something, a verdict and
+      // a metric of the kind their part reads. An absent value, one of
+      // another type, a title still in storage - each stays in the grid,
+      // where it is drawn as every value is, rather than disappearing.
+      const titleCandidate = isApp ? memberWithPart(field.fields, 'title') : undefined;
+      const titleValue = titleCandidate
+        ? unwrap(titleCandidate, memberValue(titleCandidate))
+        : undefined;
+      const titleMember =
+        typeof titleValue === 'string' && titleValue !== '' ? titleCandidate : undefined;
+      const summaryCandidate = isApp ? memberWithPart(field.fields, 'summary') : undefined;
+      const summaryMember =
+        summaryCandidate && isFilledValue(unwrap(summaryCandidate, memberValue(summaryCandidate)))
+          ? summaryCandidate
+          : undefined;
+      const verdictCandidate = isApp ? memberWithPart(field.fields, 'verdict') : undefined;
+      const verdictMember =
+        verdictCandidate && verdictDraws(verdictCandidate, memberValue(verdictCandidate))
+          ? verdictCandidate
+          : undefined;
       const metricMembers = isApp
-        ? field.fields.filter(
-            (member): member is NumberRunField =>
-              member.kind === 'number' && partOf(member) === 'metric',
-          )
+        ? field.fields.filter((member): member is NumberRunField => {
+            if (member.kind !== 'number' || partOf(member) !== 'metric') return false;
+            const held = unwrap(member, memberValue(member));
+            return typeof held === 'number' && Number.isFinite(held);
+          })
         : [];
       const headed = new Set<RunField>(
         [titleMember, summaryMember, verdictMember, ...metricMembers].filter(
@@ -4144,7 +4190,6 @@ function ResultNode({
       );
       const hasHead = record !== undefined && headed.size > 0;
       const rest = hasHead ? field.fields.filter((member) => !headed.has(member)) : field.fields;
-      const titleValue = titleMember ? unwrap(titleMember, memberValue(titleMember)) : undefined;
       const head = hasHead ? (
         <div data-record-head="" className="space-y-2.5">
           {verdictMember &&
@@ -4163,7 +4208,7 @@ function ResultNode({
                 prominent={!inCard}
               />
             ))}
-          {typeof titleValue === 'string' && titleValue !== '' && (
+          {titleMember && typeof titleValue === 'string' && (
             <p
               data-record-title=""
               className="text-[16px] font-semibold leading-snug wrap-break-word text-foreground"
@@ -4171,11 +4216,21 @@ function ResultNode({
               {titleValue}
             </p>
           )}
-          {summaryMember && isFilledValue(unwrap(summaryMember, memberValue(summaryMember))) && (
+          {summaryMember && (
             // An absent summary leaves no line: the head says what the
-            // record holds, and the fields below say what it lacks.
+            // record holds, and the fields below say what it lacks. Drawn by
+            // `ResultField` without its label, so a summary is the value the
+            // record's own field would be: a stored text loaded, Markdown
+            // typeset, the copy button beside it.
             <div data-record-summary="" className="text-[13.5px] text-foreground">
-              <LeafValue field={summaryMember} value={memberValue(summaryMember)} />
+              <ResultAt segment={summaryMember.name}>
+                <ResultField
+                  field={summaryMember}
+                  value={memberValue(summaryMember)}
+                  depth={depth + 1}
+                  hideLabel
+                />
+              </ResultAt>
             </div>
           )}
           {metricMembers.length > 0 && <MetricTiles fields={metricMembers} record={record!} />}

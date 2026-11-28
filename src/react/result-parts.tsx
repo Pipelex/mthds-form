@@ -33,10 +33,19 @@ export function hasMeter(field: NumberRunField): boolean {
  * Anything that is not a finite number is the payload disagreeing with its
  * descriptor, and is left to the caller's floor.
  */
-export function NumberText({ field, value }: { field: NumberRunField; value: number }) {
+export function NumberText({
+  field,
+  value,
+  className,
+}: {
+  field: NumberRunField;
+  value: number;
+  /** Where the number is drawn larger: a verdict's prominent size overrides the 13px a line reads at. */
+  className?: string;
+}) {
   const s = useFieldStrings();
   return (
-    <span className="whitespace-nowrap text-[13px] tabular-nums text-foreground">
+    <span className={cn('whitespace-nowrap text-[13px] tabular-nums text-foreground', className)}>
       {formatFieldNumber(field, value, s.numberLocale)}
     </span>
   );
@@ -49,7 +58,16 @@ export function NumberText({ field, value }: { field: NumberRunField; value: num
  * muted foreground, never a tone: a position between two bounds says nothing
  * of whether it is good, which only a choice's tone may say.
  */
-export function Meter({ field, value }: { field: NumberRunField; value: number }) {
+export function Meter({
+  field,
+  value,
+  numberClassName,
+}: {
+  field: NumberRunField;
+  value: number;
+  /** Passed to the number beside the bar, so a prominent verdict's number keeps its size. */
+  numberClassName?: string;
+}) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
   const min = field.min!;
@@ -58,7 +76,7 @@ export function Meter({ field, value }: { field: NumberRunField; value: number }
   const write = (n: number) => formatFieldNumber(field, n, s.numberLocale);
   return (
     <span className="inline-flex items-center gap-2.5">
-      <NumberText field={field} value={value} />
+      <NumberText field={field} value={value} className={numberClassName} />
       <span
         role="meter"
         aria-valuemin={min}
@@ -88,6 +106,28 @@ export function ToneValue({ field, value }: { field: EnumRunField; value: string
   const presentation = useFieldPresentation();
   const label = optionLabeler(field, presentation)(value);
   return <ToneBadge tone={optionTone(field, value)}>{label}</ToneBadge>;
+}
+
+/**
+ * Whether a record's verdict holds something its line draws: a choice's
+ * option, a yes or no, a finite number, or a structure. Anything else - an
+ * absent value, one of another type - is drawn nowhere by the head, so the
+ * record keeps it in its grid.
+ */
+export function verdictDraws(field: RunField, raw: unknown): boolean {
+  const value = unwrap(field, raw);
+  switch (field.kind) {
+    case 'enum':
+      return typeof value === 'string';
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value);
+    case 'object':
+      return typeof value === 'object' && value !== null && !Array.isArray(value);
+    default:
+      return false;
+  }
 }
 
 /**
@@ -124,7 +164,11 @@ export function VerdictLine({
     shown = (
       <span className={cn('tabular-nums', prominent && 'text-[20px] font-semibold')}>
         {hasMeter(field) ? (
-          <Meter field={field} value={value} />
+          <Meter
+            field={field}
+            value={value}
+            numberClassName={prominent ? 'text-[20px] font-semibold' : undefined}
+          />
         ) : (
           formatFieldNumber(field, value, s.numberLocale)
         )}

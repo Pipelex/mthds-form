@@ -6,7 +6,7 @@
  * totals and averages a field declares. Hand-built `RunField`s, one branch
  * each; the payloads stay as a run returns them.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import type {
   EnumRunField,
@@ -18,6 +18,7 @@ import type {
 import { FieldPresentationProvider, type FieldPresentation } from '../field-presentation';
 import { FieldStringsProvider } from '../field-strings';
 import { ResultField } from '../result-field';
+import { StuffViewer } from '../stuff-viewer';
 import { columnAggregates } from '../result-parts';
 
 const text = (name: string, part?: string): TextRunField => ({
@@ -205,5 +206,111 @@ describe('a list of records', () => {
     expect(columnAggregates(priced, [{ price: 2 }, { price: 3 }, { price: null }])).toEqual([
       { field: priced.fields[0], rule: 'sum', value: 5 },
     ]);
+  });
+});
+
+describe('the edges a review found', () => {
+  it('writes a number cell’s tooltip as the cell shows it', () => {
+    const priced = listOf(record([text('item'), number('price', { unit: 'EUR' })]));
+    const { container } = renderIn(
+      'studio',
+      <ResultField field={priced} value={[{ item: 'a', price: 1234.5 }]} />,
+    );
+    expect(container.querySelector('[title="€1,234.50"]')).not.toBeNull();
+  });
+
+  it('aligns a number column right while a stacking table is a table', () => {
+    // Five columns: a table that turns into blocks only in a narrow box.
+    const rows = listOf(record([text('item'), number('a'), number('b'), number('c'), number('d')]));
+    const { container } = render(
+      <StuffViewer
+        field={rows}
+        value={[
+          { item: 'x', a: 1, b: 2, c: 3, d: 4 },
+          { item: 'y', a: 5, b: 6, c: 7, d: 8 },
+        ]}
+        tableLayout="stack"
+      />,
+    );
+    const headers = [...container.querySelectorAll('th')].filter((th) =>
+      /^[abcd]/.test(th.textContent ?? ''),
+    );
+    expect(headers.length).toBe(4);
+    for (const header of headers) expect(header.className).toMatch(/text-right/);
+  });
+
+  it('keeps in the grid a part the head cannot draw', () => {
+    const check = record([
+      text('url', 'title'),
+      status,
+      number('ms', { unit: 'ms', hints: { part: 'metric' } }),
+    ]);
+    const { container } = renderIn(
+      'app',
+      <ResultField field={check} value={{ url: 'https://a.example', status: 42, ms: 'fast' }} />,
+    );
+    expect(container.textContent).toContain('42');
+    expect(container.textContent).toContain('fast');
+  });
+
+  it('draws a record’s summary as its own field draws it: Markdown and a copy button', () => {
+    // The copy button is drawn only where the browser offers a clipboard.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async () => {} },
+      configurable: true,
+    });
+    onTestFinished(() => {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    });
+    const check = record([
+      text('url', 'title'),
+      { kind: 'prose', name: 'note', required: true, hints: { part: 'summary' } },
+    ]);
+    const { container } = renderIn(
+      'app',
+      <ResultField
+        field={check}
+        value={{ url: 'https://a.example', note: 'Answered **fast**.' }}
+      />,
+    );
+    const summary = container.querySelector('[data-record-summary]')!;
+    expect(summary.querySelector('strong')?.textContent).toBe('fast');
+    expect(within(summary as HTMLElement).getByRole('button', { name: /copy/i })).toBeTruthy();
+  });
+
+  it('draws no meter in a chip', () => {
+    const scored = record([
+      text('name'),
+      {
+        kind: 'list',
+        name: 'scores',
+        required: true,
+        item: { kind: 'number', name: 'score', required: true, integer: true, min: 0, max: 10 },
+      },
+    ]);
+    const { container } = renderIn(
+      'app',
+      <ResultField field={scored} value={{ name: 'a', scores: [3, 7] }} />,
+    );
+    expect(container.querySelector('[data-chips]')).not.toBeNull();
+    expect(container.querySelector('[data-chips] [data-meter]')).toBeNull();
+  });
+
+  it('keeps a bounded verdict’s number at the prominent size beside its meter', () => {
+    const scored = record([
+      text('name', 'title'),
+      number('score', { min: 0, max: 100, hints: { part: 'verdict' } }),
+    ]);
+    const { container } = renderIn(
+      'app',
+      <ResultField field={scored} value={{ name: 'a', score: 72 }} />,
+    );
+    const line = container.querySelector('[data-verdict-line]')!;
+    expect(line.querySelector('[data-meter]')).not.toBeNull();
+    const numberText = [...line.querySelectorAll('span.whitespace-nowrap')].find(
+      (span) => span.textContent === '72',
+    );
+    expect(numberText?.className).toMatch(/text-\[20px\]/);
+    expect(numberText?.className).not.toMatch(/text-\[13px\]/);
   });
 });
