@@ -865,3 +865,54 @@ describe("a host's conditional checks on a page", () => {
     await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
   });
 });
+
+/**
+ * A value its facts refuse is not an input to fill but one to fix: the action
+ * row said "Fill in Budget to run" over a budget that was filled, and the
+ * field itself said nothing.
+ */
+describe('a composer input holding a value its facts refuse', () => {
+  const inputs = [
+    { kind: 'number', name: 'budget', title: 'Budget', required: true, integer: false, max: 5000 },
+    { kind: 'text', name: 'city', title: 'City', required: true },
+  ] as RunField[];
+  const spec: Spec = {
+    root: 'composer',
+    elements: {
+      composer: {
+        type: 'Composer',
+        props: {
+          headline: 'Plan a trip',
+          lede: null,
+          runLabel: 'Plan my trip',
+          columns: null,
+          notes: null,
+        },
+        children: ['budget'],
+      },
+      budget: {
+        type: 'MthdsField',
+        props: { path: '/inputs/budget', label: null, hint: null },
+        children: [],
+      },
+    },
+  };
+
+  it('says what to fix in the action row, before what to fill', () => {
+    const store = createStateStore({ inputs: { budget: 8000 } });
+    render(<GenerativePage spec={spec} store={store} scope={{ inputs }} presentation="app" />);
+    expect(screen.getByRole('button', { name: /Plan my trip/ })).toHaveAccessibleDescription(
+      'Fix Budget to run: Must be at most 5000. Fill in City to run',
+    );
+  });
+
+  it('names the problem on the field once the person leaves it', async () => {
+    const store = createStateStore({ inputs: { budget: 8000 } });
+    render(<GenerativePage spec={spec} store={store} scope={{ inputs }} presentation="app" />);
+    expect(screen.queryByText('Must be at most 5000.')).toBeNull();
+    const input = screen.getByRole('spinbutton');
+    await userEvent.click(input);
+    await userEvent.tab();
+    expect(screen.getByText('Must be at most 5000.')).toBeTruthy();
+  });
+});

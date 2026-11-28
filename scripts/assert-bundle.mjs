@@ -75,7 +75,8 @@ function graphOf(entry) {
   while (queue.length > 0) {
     const file = queue.pop();
     if (files.has(file)) continue;
-    if (!existsSync(file)) throw new Error(`Bundle graph names a file that does not exist: ${file}`);
+    if (!existsSync(file))
+      throw new Error(`Bundle graph names a file that does not exist: ${file}`);
     files.add(file);
 
     for (const specifier of specifiersOf(readFileSync(file, 'utf8'))) {
@@ -183,7 +184,9 @@ function staticGraphOf(entry) {
       // relative chunk reached that way is not walked as static either.
       const onlyDynamic =
         dynamic.has(specifier) &&
-        !new RegExp(`(?:^|[\\n;])\\s*(?:import|export)\\b[^;]*?['"]${specifier.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}['"]`).test(code);
+        !new RegExp(
+          `(?:^|[\\n;])\\s*(?:import|export)\\b[^;]*?['"]${specifier.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}['"]`,
+        ).test(code);
       if (onlyDynamic) continue;
       if (specifier.startsWith('.')) queue.push(resolve(dirname(file), specifier));
       else statics.add(specifier);
@@ -201,14 +204,18 @@ for (const entry of ENTRIES) {
       `${entry}/index.js reaches ${reached.join(', ')} through a static import - the PDF libraries load with import() on first use. See docs/dependency-budget.md.`,
     );
   } else {
-    console.log(`ok  ${entry}/index.js has no static edge to jspdf, modern-screenshot, react-pdf or pdfjs-dist`);
+    console.log(
+      `ok  ${entry}/index.js has no static edge to jspdf, modern-screenshot, react-pdf or pdfjs-dist`,
+    );
   }
 }
 {
   for (const entry of ISOMORPHIC_ENTRIES) {
     const reached = [...graphOf(`${DIST}/${entry}/index.js`).externals].filter((s) => LAZY.test(s));
     if (reached.length > 0) {
-      failures.push(`${entry}/index.js reaches ${reached.join(', ')} - an entry that renders nothing makes and draws no PDF.`);
+      failures.push(
+        `${entry}/index.js reaches ${reached.join(', ')} - an entry that renders nothing makes and draws no PDF.`,
+      );
     } else {
       console.log(`ok  ${entry}/index.js reaches no PDF library, even dynamically`);
     }
@@ -227,10 +234,15 @@ for (const entry of ENTRIES) {
 for (const { entry, match, why } of BANNED) {
   const { files, externals } = graphOf(entry);
   const reached = [...externals].filter((specifier) => match.test(specifier));
-  const graph = [...files].map((f) => relative(DIST, f)).sort().join(', ');
+  const graph = [...files]
+    .map((f) => relative(DIST, f))
+    .sort()
+    .join(', ');
 
   if (reached.length > 0) {
-    failures.push(`${relative(DIST, entry)} reaches ${reached.join(', ')} - ${why}\n    graph: ${graph}`);
+    failures.push(
+      `${relative(DIST, entry)} reaches ${reached.join(', ')} - ${why}\n    graph: ${graph}`,
+    );
   } else {
     console.log(
       `ok  ${relative(DIST, entry)} (${files.size} modules) reaches nothing matching ${match.source}`,
@@ -486,22 +498,33 @@ for (const entry of RENDERING_ENTRIES) {
     "const catalog = m.designerCatalog({ frame: 'composer' });",
     "const spec = m.specFromJsonl(m.specToJsonl({ root: 'p', elements: { p: { type: 'Composer', props: { headline: 'h', lede: null, runLabel: 'Run', columns: null, notes: null }, on: { press: [{ action: 'run' }] }, children: [] } } }));",
     "const problems = m.layoutCheckProblems(spec, { frame: 'composer', descriptor: { inputs: [] } });",
-    "console.log(JSON.stringify({ components: catalog.components.length, hash: m.PROMPT_HASH, problems }));",
+    'console.log(JSON.stringify({ components: catalog.components.length, hash: m.PROMPT_HASH, problems }));',
   ].join('\n');
   // Run from the repository, whose `package.json` the specifier resolves
   // through, and bounded: a probe that hangs is a failure, never a wait.
-  const result = spawnSync(process.execPath, ['--conditions=react-server', '--input-type=module', '-e', probe], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
+  const result = spawnSync(
+    process.execPath,
+    ['--conditions=react-server', '--input-type=module', '-e', probe],
+    {
+      cwd: ROOT,
+      encoding: 'utf8',
+      timeout: 60_000,
+    },
+  );
   let answer;
   try {
     answer = JSON.parse(result.stdout.trim().split('\n').pop() ?? '');
   } catch {
     answer = undefined;
   }
-  if (result.status === 0 && answer && answer.components > 0 && /^[0-9a-f]{12}$/.test(answer.hash) && Array.isArray(answer.problems) && answer.problems.length === 0) {
+  if (
+    result.status === 0 &&
+    answer &&
+    answer.components > 0 &&
+    /^[0-9a-f]{12}$/.test(answer.hash) &&
+    Array.isArray(answer.problems) &&
+    answer.problems.length === 0
+  ) {
     console.log(
       `ok  ./generative/headless imports and runs under the react-server condition (${answer.components} composer components, prompt ${answer.hash})`,
     );
@@ -528,12 +551,12 @@ for (const entry of RENDERING_ENTRIES) {
     "const m = await import('@pipelex/mthds-form/react');",
     "const field = { kind: 'document', name: 'output', conceptRef: 'native.Document', required: true, formats: [] };",
     "const value = { url: 'pipelex-storage://run/report.pdf', filename: 'report.pdf', mime_type: 'application/pdf' };",
-    "const env = {",
+    'const env = {',
     "  resolveUrl: () => 'https://bucket.example.invalid/report.pdf?signature=1',",
-    "  loadBytes: async () => new Uint8Array([37, 80, 68, 70]),",
+    '  loadBytes: async () => new Uint8Array([37, 80, 68, 70]),',
     "  pdfWorker: { workerSrc: 'https://assets.example.invalid/pdf.worker.min.mjs' },",
-    "};",
-    "const html = renderToString(React.createElement(m.ResultEnvProvider, env, React.createElement(m.ResultField, { field, value })));",
+    '};',
+    'const html = renderToString(React.createElement(m.ResultEnvProvider, env, React.createElement(m.ResultField, { field, value })));',
     "console.log(JSON.stringify({ link: html.includes('href=\"https://bucket.example.invalid/report.pdf?signature=1\"'), frame: html.includes('<iframe'), canvas: html.includes('<canvas'), hasDocument: typeof document !== 'undefined' }));",
   ].join('\n');
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
@@ -547,8 +570,17 @@ for (const entry of RENDERING_ENTRIES) {
   } catch {
     answer = undefined;
   }
-  if (result.status === 0 && answer && answer.link && !answer.frame && !answer.canvas && !answer.hasDocument) {
-    console.log('ok  ./react server-renders a PDF the view would draw, as its link, with no DOM and no pdf.js');
+  if (
+    result.status === 0 &&
+    answer &&
+    answer.link &&
+    !answer.frame &&
+    !answer.canvas &&
+    !answer.hasDocument
+  ) {
+    console.log(
+      'ok  ./react server-renders a PDF the view would draw, as its link, with no DOM and no pdf.js',
+    );
   } else {
     failures.push(
       `./react did not server-render a PDF under the bytes seam as its link: ${result.error ? result.error.message : `exit ${result.status}`}, ${(result.stderr || result.stdout || '').trim().split('\n').slice(0, 3).join(' / ')}. The PDF renderer must import react-pdf after mount, in the browser only.`,
@@ -562,11 +594,16 @@ for (const entry of RENDERING_ENTRIES) {
 // prebuilt sheet. Without them the text layer is drawn visibly out of place.
 {
   const LAYER_SELECTOR = '.mthds-pdf-pages .textLayer';
-  const stylesSheet = existsSync(`${DIST}/styles.css`) ? readFileSync(`${DIST}/styles.css`, 'utf8') : '';
-  const layersSheet = existsSync(`${DIST}/pdf-layers.css`) ? readFileSync(`${DIST}/pdf-layers.css`, 'utf8') : '';
+  const stylesSheet = existsSync(`${DIST}/styles.css`)
+    ? readFileSync(`${DIST}/styles.css`, 'utf8')
+    : '';
+  const layersSheet = existsSync(`${DIST}/pdf-layers.css`)
+    ? readFileSync(`${DIST}/pdf-layers.css`, 'utf8')
+    : '';
   const missing = [
     ...(stylesSheet.includes(LAYER_SELECTOR) ? [] : ['dist/styles.css']),
-    ...(layersSheet.includes(LAYER_SELECTOR) && layersSheet.includes('.mthds-pdf-pages .annotationLayer')
+    ...(layersSheet.includes(LAYER_SELECTOR) &&
+    layersSheet.includes('.mthds-pdf-pages .annotationLayer')
       ? []
       : ['dist/pdf-layers.css']),
   ];
@@ -663,7 +700,6 @@ if (testOnlyFiles.length === 0) {
   );
 }
 
-
 /**
  * The token contract: what the sheet READS, what `theme.css` DEFINES, and the
  * fallback that stands between them.
@@ -751,14 +787,6 @@ const UNUSED_BY_CONTROLS = [
   // The controls pair `bg-destructive` with `text-white` rather than with this
   // token - see src/generative/ui/shadcn.tsx.
   '--destructive-foreground',
-  // The status colours (docs/theming.md, "Status colours"): a named group with
-  // defaults, so the tone badges and verdicts a result page is about to draw
-  // read a token a host can set rather than a literal. No control draws a
-  // status yet; the first that does takes its token off this list.
-  '--positive',
-  '--caution',
-  '--negative',
-  '--neutral',
 ];
 
 /**
@@ -802,14 +830,20 @@ const OPTIONAL_TOKENS = new Map([
   ['--panel-edge', { stand: '--border', tint: false }],
   ['--font-heading', { literal: /^revert-layer$/, shape: '`revert-layer`' }],
   ['--heading-weight', { literal: /^[1-9]00$/, shape: 'a weight such as `600`' }],
-  ['--heading-tracking', { literal: /^(?:revert-layer|-?(?:\d+\.?\d*|\.\d+)em)$/, shape: '`revert-layer` or an `em` length' }],
+  [
+    '--heading-tracking',
+    {
+      literal: /^(?:revert-layer|-?(?:\d+\.?\d*|\.\d+)em)$/,
+      shape: '`revert-layer` or an `em` length',
+    },
+  ],
   ['--panel-edge-width', { literal: LENGTH, shape: 'a length' }],
   [
     '--panel-shadow',
     {
       literal: /^(?:none|\S.*\d.*)$/,
       exact: ['none', '0 20px 25px -5px rgb(0 0 0/0.1),0 8px 10px -6px rgb(0 0 0/0.1)'],
-      shape: '`none` or the rail\'s large shadow',
+      shape: "`none` or the rail's large shadow",
     },
   ],
   [
@@ -820,13 +854,17 @@ const OPTIONAL_TOKENS = new Map([
         '0 0 28px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 35%,transparent)',
         '0 0 44px color-mix(in oklab,var(--primary,hsl(240 5.9% 10%)) 50%,transparent)',
       ],
-      shape: 'the call to action\'s glow in the button colour',
+      shape: "the call to action's glow in the button colour",
     },
   ],
 ]);
 
 /** A value with its spaces collapsed and none around a comma, to compare it whole. */
-const normalizeValue = (value) => value.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
+const normalizeValue = (value) =>
+  value
+    .replace(/\s*,\s*/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * CSS with its comments removed, newlines kept so error messages stay readable.
@@ -977,19 +1015,27 @@ function blocksScopedUnder(css, test) {
 function soleBlock(css, head, label, where) {
   const { bodies, unterminated } = blocksOf(css, head);
   if (unterminated) {
-    failures.push(`${where} has an unterminated \`${label}\` block - a brace is missing, so nothing below could be read.`);
+    failures.push(
+      `${where} has an unterminated \`${label}\` block - a brace is missing, so nothing below could be read.`,
+    );
     return null;
   }
   if (bodies.length === 0) {
-    failures.push(`${where} has no \`${label}\` block. It is the executable form of this package's token contract; without it there is nothing to check against.`);
+    failures.push(
+      `${where} has no \`${label}\` block. It is the executable form of this package's token contract; without it there is nothing to check against.`,
+    );
     return null;
   }
   if (bodies.length > 1) {
-    failures.push(`${where} has ${bodies.length} \`${label}\` blocks. A later one overrides an earlier one and only the first is read here, so the contract this file states would not be the contract it ships. Keep one.`);
+    failures.push(
+      `${where} has ${bodies.length} \`${label}\` blocks. A later one overrides an earlier one and only the first is read here, so the contract this file states would not be the contract it ships. Keep one.`,
+    );
     return null;
   }
   if (bodies[0].includes('{')) {
-    failures.push(`${where}'s \`${label}\` block contains a nested block. Its declarations would be folded in with the top-level ones - a nested \`@media (prefers-color-scheme: dark)\` inside \`:root\` is how the dark palette ends up being read as the light one. Move it out.`);
+    failures.push(
+      `${where}'s \`${label}\` block contains a nested block. Its declarations would be folded in with the top-level ones - a nested \`@media (prefers-color-scheme: dark)\` inside \`:root\` is how the dark palette ends up being read as the light one. Move it out.`,
+    );
     return null;
   }
   return bodies[0];
@@ -1100,10 +1146,13 @@ function fallsBackTo(fallback, { stand, tint, literal, exact }, { built }) {
   const value = unescapeArbitrary(fallback).trim();
   if (literal) {
     if (!built && exact) return exact.map(normalizeValue).includes(normalizeValue(value));
-    return literal.test(value) && !/var\(\s*--[^,)]*\)/.test(value.replace(/var\(\s*--[\w-]+\s*,/g, ''));
+    return (
+      literal.test(value) && !/var\(\s*--[^,)]*\)/.test(value.replace(/var\(\s*--[\w-]+\s*,/g, ''))
+    );
   }
   if (!tint) return isWholeRead(value, stand);
-  const mix = /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
+  const mix =
+    /^color-mix\(\s*in\s+[a-z]+\s*,\s*(.+)\s+\d+(?:\.\d+)?%\s*,\s*transparent\s*\)$/i.exec(value);
   if (mix !== null) return isWholeRead(mix[1].trim(), stand);
   return built && isWholeRead(value, stand);
 }
@@ -1133,8 +1182,18 @@ function fallbackRule({ stand, tint, literal, shape }, { built }) {
 }
 
 const themeCss = withoutComments(readFileSync(resolve(ROOT, 'src/styles/theme.css'), 'utf8'));
-const lightBody = soleBlock(themeCss, /(?:^|[}\s;])(?::root)\s*\{/g, ':root', 'src/styles/theme.css');
-const darkBody = soleBlock(themeCss, /(?:^|[}\s;])(?:\.dark)\s*\{/g, '.dark', 'src/styles/theme.css');
+const lightBody = soleBlock(
+  themeCss,
+  /(?:^|[}\s;])(?::root)\s*\{/g,
+  ':root',
+  'src/styles/theme.css',
+);
+const darkBody = soleBlock(
+  themeCss,
+  /(?:^|[}\s;])(?:\.dark)\s*\{/g,
+  '.dark',
+  'src/styles/theme.css',
+);
 const lightPalette = lightBody === null ? new Map() : declarationsOf(lightBody);
 const darkPalette = darkBody === null ? new Map() : declarationsOf(darkBody);
 if (lightBody !== null && lightPalette.size === 0) {
@@ -1143,9 +1202,17 @@ if (lightBody !== null && lightPalette.size === 0) {
   );
 }
 
-const entryCss = withoutComments(readFileSync(resolve(ROOT, 'src/styles/tailwind-entry.css'), 'utf8'));
-const themeBody = soleBlock(entryCss, /@theme\s+inline\s*\{/g, '@theme inline', 'src/styles/tailwind-entry.css');
-const arms = themeBody === null ? [] : readsOf(themeBody, 'src/styles/tailwind-entry.css `@theme inline`');
+const entryCss = withoutComments(
+  readFileSync(resolve(ROOT, 'src/styles/tailwind-entry.css'), 'utf8'),
+);
+const themeBody = soleBlock(
+  entryCss,
+  /@theme\s+inline\s*\{/g,
+  '@theme inline',
+  'src/styles/tailwind-entry.css',
+);
+const arms =
+  themeBody === null ? [] : readsOf(themeBody, 'src/styles/tailwind-entry.css `@theme inline`');
 const mapped = new Set(arms.map((arm) => arm.name));
 if (themeBody !== null && arms.length === 0) {
   failures.push(
@@ -1159,7 +1226,9 @@ if (themeBody !== null && arms.length === 0) {
 const unthemed = [...mapped].filter((name) => !lightPalette.has(name)).sort();
 const unmapped = [...lightPalette.keys()].filter((name) => !mapped.has(name)).sort();
 if (unthemed.length === 0 && unmapped.length === 0 && lightPalette.size > 0) {
-  console.log(`ok  the ${mapped.size} tokens tailwind-entry.css reads are the ones theme.css defines`);
+  console.log(
+    `ok  the ${mapped.size} tokens tailwind-entry.css reads are the ones theme.css defines`,
+  );
 }
 if (unthemed.length > 0) {
   failures.push(
@@ -1182,7 +1251,12 @@ const darkMissing = [...lightPalette.keys()]
   .filter((name) => !darkPalette.has(name) && !SCOPE_INDEPENDENT.includes(name))
   .sort();
 const darkExtra = [...darkPalette.keys()].filter((name) => !lightPalette.has(name)).sort();
-if (darkBody !== null && darkMissing.length === 0 && darkExtra.length === 0 && lightPalette.size > 0) {
+if (
+  darkBody !== null &&
+  darkMissing.length === 0 &&
+  darkExtra.length === 0 &&
+  lightPalette.size > 0
+) {
   console.log(`ok  theme.css's .dark block restates every token :root defines`);
 }
 if (darkMissing.length > 0) {
@@ -1207,8 +1281,12 @@ for (const { name, fallback } of arms) {
   // An EMPTY fallback is not a fallback: `var(--x,)` substitutes nothing, so the
   // declaration is invalid and the browser discards it - the exact failure this
   // whole block exists to catch. It must read as missing, not as present.
-  if (!fallback) armProblems.push(`${name} carries no fallback (expected \`var(${name}, ${light})\`)`);
-  else if (fallback !== light) armProblems.push(`${name} falls back to \`${fallback}\`, but theme.css's light value is \`${light}\``);
+  if (!fallback)
+    armProblems.push(`${name} carries no fallback (expected \`var(${name}, ${light})\`)`);
+  else if (fallback !== light)
+    armProblems.push(
+      `${name} falls back to \`${fallback}\`, but theme.css's light value is \`${light}\``,
+    );
 }
 if (armProblems.length === 0 && arms.length > 0 && lightPalette.size > 0) {
   console.log("ok  every @theme inline arm falls back to theme.css's light value");
@@ -1246,7 +1324,9 @@ for (const dir of ARBITRARY_SOURCES) {
       if (rule !== undefined) {
         optionalReads.set(name, optionalReads.get(name) + 1);
         if (!fallsBackTo(fallback, rule, { built: false })) {
-          arbitraryProblems.push(`${relative} reads ${name} without falling back to ${fallbackRule(rule, { built: false })}`);
+          arbitraryProblems.push(
+            `${relative} reads ${name} without falling back to ${fallbackRule(rule, { built: false })}`,
+          );
         }
         continue;
       }
@@ -1255,12 +1335,17 @@ for (const dir of ARBITRARY_SOURCES) {
       arbitraryReads += 1;
       const spelled = fallback === null ? null : unescapeArbitrary(fallback);
       if (!spelled) arbitraryProblems.push(`${relative} reads ${name} with no fallback`);
-      else if (spelled !== light) arbitraryProblems.push(`${relative} falls ${name} back to \`${spelled}\`, but theme.css's light value is \`${light}\``);
+      else if (spelled !== light)
+        arbitraryProblems.push(
+          `${relative} falls ${name} back to \`${spelled}\`, but theme.css's light value is \`${light}\``,
+        );
     }
   }
 }
 if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
-  console.log(`ok  the ${arbitraryReads} token reads outside the mapping spell theme.css's light value`);
+  console.log(
+    `ok  the ${arbitraryReads} token reads outside the mapping spell theme.css's light value`,
+  );
 } else if (arbitraryProblems.length > 0) {
   failures.push(
     `${arbitraryProblems.join('; ')}. A token read through an arbitrary value never passes through the \`@theme inline\` mapping, so it inherits no fallback and has to spell the light value itself.`,
@@ -1284,17 +1369,25 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
       last = OPTIONAL_TOKENS.get(last).stand;
     }
     if (!literal && !lightPalette.has(last)) {
-      optionalProblems.push(`${name} falls back through ${chain.join(' → ')} to ${last}, which theme.css does not define`);
+      optionalProblems.push(
+        `${name} falls back through ${chain.join(' → ')} to ${last}, which theme.css does not define`,
+      );
     }
     if (lightPalette.has(name) || darkPalette.has(name)) {
       const fallback = literal ? 'the value it painted before' : stand;
-      optionalProblems.push(`theme.css defines ${name}, so its fallback to ${fallback} never fires for a host that loads the file`);
+      optionalProblems.push(
+        `theme.css defines ${name}, so its fallback to ${fallback} never fires for a host that loads the file`,
+      );
     }
     if (optionalReads.get(name) === 0) {
-      optionalProblems.push(`nothing under ${ARBITRARY_SOURCES.join(', ')} reads ${name}, so listing it in OPTIONAL_TOKENS is stale`);
+      optionalProblems.push(
+        `nothing under ${ARBITRARY_SOURCES.join(', ')} reads ${name}, so listing it in OPTIONAL_TOKENS is stale`,
+      );
     }
     if (!themingText.includes(`\`${name}\``)) {
-      optionalProblems.push(`docs/theming.md never names ${name}, so no host is told it may define it`);
+      optionalProblems.push(
+        `docs/theming.md never names ${name}, so no host is told it may define it`,
+      );
     }
   }
   if (optionalProblems.length === 0) {
@@ -1302,7 +1395,9 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
       `ok  optional tokens are read, fall back toward the contract or to the value they replaced, and are documented: ${[...OPTIONAL_TOKENS.keys()].join(', ')}`,
     );
   } else {
-    failures.push(`${optionalProblems.join('; ')}. See OPTIONAL_TOKENS in scripts/assert-bundle.mjs.`);
+    failures.push(
+      `${optionalProblems.join('; ')}. See OPTIONAL_TOKENS in scripts/assert-bundle.mjs.`,
+    );
   }
 }
 
@@ -1325,7 +1420,9 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
   ];
   for (const [where, path] of sheets) {
     if (!existsSync(path)) {
-      failures.push(`${where} is missing, so the fallbacks of the PDF layer rules in it could not be checked.`);
+      failures.push(
+        `${where} is missing, so the fallbacks of the PDF layer rules in it could not be checked.`,
+      );
       continue;
     }
     const { bodies, unterminated } = blocksScopedUnder(
@@ -1333,12 +1430,16 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
       (head) => head.includes(PDF_SCOPE),
     );
     if (unterminated) {
-      failures.push(`${where} has an unterminated block - a brace is missing, so its PDF layer rules could not be read.`);
+      failures.push(
+        `${where} has an unterminated block - a brace is missing, so its PDF layer rules could not be read.`,
+      );
       continue;
     }
     const reads = bodies.flatMap((body) => readsOf(body, `${where}'s PDF layer rules`));
     // `!fallback` rather than `=== null`: `var(--x,)` fails as no fallback does.
-    const bare = [...new Set(reads.filter(({ fallback }) => !fallback).map(({ name }) => name))].sort();
+    const bare = [
+      ...new Set(reads.filter(({ fallback }) => !fallback).map(({ name }) => name)),
+    ].sort();
     if (reads.length === 0) {
       failures.push(
         `${where} has no \`var()\` read in a rule under \`${PDF_SCOPE}\`, so the PDF layer fallback check compared nothing - the layer rules were dropped, moved off the renderer's frame, or no longer parse. See src/styles/pdf-layers.css.`,
@@ -1348,7 +1449,9 @@ if (arbitraryProblems.length === 0 && lightPalette.size > 0) {
         `${where}'s PDF layer rules read ${bare.join(', ')} with no fallback, so wherever pdf.js or the frame has not set it the declaration is discarded. Give each read a fallback - see src/styles/pdf-layers.css.`,
       );
     } else {
-      console.log(`ok  ${where}'s PDF layer rules read ${reads.length} custom properties, each with a fallback`);
+      console.log(
+        `ok  ${where}'s PDF layer rules read ${reads.length} custom properties, each with a fallback`,
+      );
     }
   }
 }
@@ -1379,7 +1482,9 @@ const optionalShipped = shippedReads.filter(({ name }) => OPTIONAL_TOKENS.has(na
 const optionalBare = [
   ...new Set(
     optionalShipped
-      .filter(({ name, fallback }) => !fallsBackTo(fallback, OPTIONAL_TOKENS.get(name), { built: true }))
+      .filter(
+        ({ name, fallback }) => !fallsBackTo(fallback, OPTIONAL_TOKENS.get(name), { built: true }),
+      )
       .map(({ name }) => name),
   ),
 ].sort();
@@ -1430,10 +1535,15 @@ const undocumented = [...shippedNames].filter((n) => !lightPalette.has(n)).sort(
 // `!r.fallback` rather than `=== null`: `var(--x,)` and `var(--x, )` parse as an
 // empty fallback and fail identically to none at all.
 const bare = [...new Set(shipped.filter((r) => !r.fallback).map((r) => r.name))].sort();
-const unshipped = [...mapped].filter(
-  (name) => !shippedNames.has(name) && !UNUSED_BY_CONTROLS.includes(name),
-).sort();
-if (undocumented.length === 0 && bare.length === 0 && unshipped.length === 0 && shippedNames.size > 0) {
+const unshipped = [...mapped]
+  .filter((name) => !shippedNames.has(name) && !UNUSED_BY_CONTROLS.includes(name))
+  .sort();
+if (
+  undocumented.length === 0 &&
+  bare.length === 0 &&
+  unshipped.length === 0 &&
+  shippedNames.size > 0
+) {
   console.log(
     `ok  dist/styles.css reads ${shippedNames.size} design tokens, all defined by theme.css and all with a fallback`,
   );
@@ -1478,7 +1588,9 @@ if (unshipped.length > 0) {
     fontProblems.push(`dist/styles.css does not declare ${undeclared.join(', ')}`);
   }
   if (fontProblems.length === 0) {
-    console.log("ok  theme.css leaves Tailwind's typefaces to the host, and the sheet declares them");
+    console.log(
+      "ok  theme.css leaves Tailwind's typefaces to the host, and the sheet declares them",
+    );
   } else {
     failures.push(`${fontProblems.join('; ')}. See docs/theming.md.`);
   }
@@ -1510,7 +1622,12 @@ if (tableRows === null) {
 }
 const undocumentedInTable = [...mapped].filter((name) => !documented.has(name)).sort();
 const staleInTable = [...documented].filter((name) => !mapped.has(name)).sort();
-if (tableRows !== null && undocumentedInTable.length === 0 && staleInTable.length === 0 && mapped.size > 0) {
+if (
+  tableRows !== null &&
+  undocumentedInTable.length === 0 &&
+  staleInTable.length === 0 &&
+  mapped.size > 0
+) {
   console.log("ok  docs/theming.md's token table lists exactly the tokens the package reads");
 }
 if (undocumentedInTable.length > 0) {
@@ -1526,6 +1643,8 @@ if (staleInTable.length > 0) {
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`::error::${failure}`);
-  console.error('\nSee docs/dependency-budget.md for the dependency rules, docs/theming.md for the token contract.');
+  console.error(
+    '\nSee docs/dependency-budget.md for the dependency rules, docs/theming.md for the token contract.',
+  );
   process.exit(1);
 }

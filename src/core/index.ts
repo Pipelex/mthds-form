@@ -34,6 +34,47 @@ export { conceptCategory } from './descriptor';
 // choice controls, and a host's own. What a control stores stays the code.
 export { enumValueLabeler, humanizeEnumValue, humanizeFieldName } from './humanize';
 
+// The method's meaning, read by name (MTHDS 9.2.0): the intent, role and part
+// hints this build knows, the words and tone of a choice's options, the role
+// layout of a form, the problems a value's contract facts find, and a number
+// written in its unit. Every reader answers from the descriptor, never from a
+// value, and ignores a word it does not know. See docs/method-form.md and
+// docs/result-view.md.
+export type {
+  ChoiceOption,
+  ContractFormat,
+  IntentWord,
+  OptionTone,
+  PartWord,
+  RoleWord,
+} from 'mthds/protocol';
+export {
+  INTENT_WORDS,
+  OPTION_TONES,
+  PART_WORDS,
+  ROLE_WORDS,
+  hasOptionDescriptions,
+  hasTones,
+  intentOf,
+  memberWithPart,
+  optionDetail,
+  optionTone,
+  partOf,
+  roleOf,
+} from './hints';
+export type { FormGroup } from './field-roles';
+export { effectiveRole, formGroupOf, formHasRoles, orderByRole } from './field-roles';
+export type { LocatedProblem, ValueCheckOptions, ValueProblem } from './value-checks';
+export { codePointLength, firstValueProblem, valueProblem } from './value-checks';
+export {
+  FALLBACK_NUMBER_LOCALE,
+  canonicalNumberLocale,
+  currencyAffix,
+  formatFieldNumber,
+  isCurrencyUnit,
+  unitSymbol,
+} from './number-format';
+
 // The ONE derivation function - the wire input-form descriptor mapped
 // structurally onto RunField, with the contract beside it for the two
 // schema-derived facts (contentKey, nested list bounds). The wire types are
@@ -180,10 +221,11 @@ export {
 // Do not assemble a server gate out of them by hand: `gateRunInputs` exists
 // because the near-miss pair is easy to pick and impossible to test for without
 // a structured concept.
-export type { Readiness } from './readiness';
+export type { GateRefusal, Readiness } from './readiness';
 export {
   computeReadiness,
   fieldFilled,
+  gateRefusal,
   anyOptionalStructureOpen,
   foldsBehindOptionalDisclosure,
   isFilled,
@@ -191,6 +233,7 @@ export {
   isOptionalStructure,
   mustBeFilled,
   optionalStructureOpen,
+  refusedValue,
   shownAsOptional,
 } from './readiness';
 

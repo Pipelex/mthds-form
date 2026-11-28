@@ -39,6 +39,28 @@ function someNames(names: readonly string[], more: number): string {
   return AND.format(more > 0 ? [...names, `${more} more`] : names);
 }
 
+/** What a text the method gives a format must be, by the standard's format name. */
+const FORMAT_PROBLEMS: Readonly<Record<string, string>> = {
+  email: 'Must be an email address.',
+  uri: 'Must be a full web address, such as https://example.com.',
+  'date-time': 'Must be a date and a time.',
+  uuid: 'Must be a UUID.',
+  hostname: 'Must be a host name, such as example.com.',
+  ipv4: 'Must be an IPv4 address, such as 192.0.2.1.',
+  ipv6: 'Must be an IPv6 address, such as 2001:db8::1.',
+  time: 'Must be a time of day.',
+};
+
+/** The placeholder of a text the method gives a format: a value of that form. */
+const FORMAT_PLACEHOLDERS: Readonly<Record<string, string>> = {
+  email: 'name@example.com',
+  uri: 'https://',
+  uuid: '00000000-0000-0000-0000-000000000000',
+  hostname: 'example.com',
+  ipv4: '192.0.2.1',
+  ipv6: '2001:db8::1',
+};
+
 export const EN_FIELD_STRINGS: FieldStrings = {
   optionalBadge: 'Optional',
   selectPlaceholder: 'Select…',
@@ -231,4 +253,45 @@ export const EN_FIELD_STRINGS: FieldStrings = {
     count === 1
       ? 'One stored text could not be loaded; the file holds its link instead.'
       : `${count} stored texts could not be loaded; the file holds their links instead.`,
+  numberLocale: 'en-GB',
+  problemBelowMinimum: (limit) => `Must be at least ${limit}.`,
+  problemAboveMaximum: (limit) => `Must be at most ${limit}.`,
+  problemNotAbove: (limit) => `Must be more than ${limit}.`,
+  problemNotBelow: (limit) => `Must be less than ${limit}.`,
+  problemNotInteger: 'Must be a whole number.',
+  problemTooShort: (limit) =>
+    limit === 1 ? 'Must be at least 1 character.' : `Must be at least ${limit} characters.`,
+  problemTooLong: (limit) =>
+    limit === 1 ? 'Must be at most 1 character.' : `Must be at most ${limit} characters.`,
+  problemPattern: 'Is not in the expected form.',
+  problemFormat: (format) => FORMAT_PROBLEMS[format] ?? 'Is not in the expected form.',
+  lengthCounter: (count, max) => `${count} / ${max}`,
+  lengthCounterAria: (count, max) =>
+    count <= max
+      ? `${max - count} ${max - count === 1 ? 'character' : 'characters'} left`
+      : `${count - max} ${count - max === 1 ? 'character' : 'characters'} too many`,
+  examplesLabel: 'Examples',
+  useExampleAria: (example) => `Use the example: ${example}`,
+  formatPlaceholder: (format) => FORMAT_PLACEHOLDERS[format],
+  questionPlaceholder: 'Ask your question…',
+  scaleStepAria: (value, max) => `${value} out of ${max}`,
+  foldedGroupShow: (count) =>
+    count === 1 ? 'Show 1 reference or setting' : `Show ${count} references and settings`,
+  foldedGroupHide: 'Hide references and settings',
+  pasteScreenshot: 'Paste a screenshot',
+  pasteNoImage: 'The clipboard holds no picture.',
+  scanPages: 'Scan pages',
+  aggregateSum: 'Total',
+  aggregateAverage: 'Average',
+  verdictCountsAria: 'By verdict',
+  recordDetails: 'Details',
+  meterValueText: (value, min, max) => `${value}, between ${min} and ${max}`,
+  sliderUnset: 'Not set',
+  scanPagesAria: (label) => (label ? `Scan pages for ${label}` : 'Scan pages'),
+  pasteUnavailable:
+    'The browser did not let this page read the clipboard. Click the drop zone and press Ctrl+V or ⌘V instead.',
+  problemNonexistentTime:
+    'This time does not exist on that day where you are: the clocks change. Pick another time.',
+  problemInItem: (position, problem) => `Item ${position}: ${problem}`,
+  runWaitsToFix: (name, problem) => `Fix ${name} to run: ${problem}`,
 };

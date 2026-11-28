@@ -237,13 +237,14 @@ describe("a table cell's tooltip reads as its cell", () => {
 
 describe('no other value changes with the presentation', () => {
   // The enum arm is the whole difference: a number and a text read the same
-  // in both presentations.
+  // in both presentations - a number grouped and rounded alike in each
+  // (`formatFieldNumber`), a text as it came.
   const review = record([number('total'), text('memo')]);
   const value = { total: 2116.2, memo: 'The unit price is **above** the order.' };
 
-  it.each(['studio', 'app'] as const)('prints a number and a text as they came in %s', (mode) => {
+  it.each(['studio', 'app'] as const)('prints a number and a text alike in %s', (mode) => {
     const { container } = renderIn(mode, <ResultField field={review} value={value} />);
-    expect(screen.getByText('2116.2')).toBeTruthy();
+    expect(screen.getByText('2,116.2')).toBeTruthy();
     expect(screen.getByText(value.memo)).toBeTruthy();
     expect(container.querySelector('strong')).toBeNull();
   });

@@ -79,10 +79,12 @@ import {
 } from 'lucide-react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import type { RunField } from '../core';
-import { FieldRenderer, ResultField, type FieldEnv } from '../react';
+import { FieldRenderer, ResultField, useFieldStrings, type FieldEnv } from '../react';
+import { refusedValue } from '../core/readiness';
+import { locatedProblemMessage } from '../react/value-problem';
 import { focusOutlineClass, linkTextClass, selectedFillStrongClass } from '../react/role-tokens';
 import { fieldControlClass } from '../react/field-styles';
-import { enumLabeler, useFieldPresentation } from '../react/field-presentation';
+import { enumLabeler, fieldLabel, useFieldPresentation } from '../react/field-presentation';
 import { ResultRoot } from '../react/result-location';
 import {
   Select as SelectRoot,
@@ -272,15 +274,32 @@ function MthdsField({
   const value = useStateValue<unknown>(path);
   const { set } = useStateStore();
   const onChange = React.useCallback((next: unknown) => set(path, next), [set, path]);
+  const strings = useFieldStrings();
+  const presentation = useFieldPresentation();
+  // A value its facts refuse is named on the field once the person has left
+  // it, as the composer's action row names it, so a half-typed address is not
+  // called wrong while it is being typed; from then on the mark follows the
+  // value. A method's pattern is left to the run's own checks, since this
+  // follows every keystroke.
+  const [left, setLeft] = React.useState(false);
+  const located = left && field ? refusedValue(field, value, { patterns: false }) : undefined;
+  const error = located
+    ? locatedProblemMessage(located, strings, (leaf) =>
+        fieldLabel(leaf.title, leaf.name, presentation),
+      )
+    : undefined;
   if (!field) return <Unresolved path={props.path} side="input" />;
   return (
-    <FieldRenderer
-      field={field}
-      value={value}
-      onChange={onChange}
-      id={domIdFor(scope.idPrefix, path)}
-      env={scope.env}
-    />
+    <div className="contents" onBlur={() => setLeft(true)}>
+      <FieldRenderer
+        field={field}
+        value={value}
+        onChange={onChange}
+        id={domIdFor(scope.idPrefix, path)}
+        env={scope.env}
+        error={error}
+      />
+    </div>
   );
 }
 

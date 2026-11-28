@@ -27,11 +27,14 @@ export const TOUCH_ONLY_CLASS = 'hidden [@media(hover:none)]:flex';
  */
 export function TakePhotoButton({
   label,
+  scan = false,
   disabled,
   onTake,
 }: {
   /** The field's label as the form shows it, which the button's name carries. */
   label: string;
+  /** A scan field's camera (`intent = "scan"`): "Scan pages" in place of "Take photo". */
+  scan?: boolean;
   disabled?: boolean;
   onTake: () => void;
 }) {
@@ -41,7 +44,9 @@ export function TakePhotoButton({
       type="button"
       onClick={onTake}
       disabled={disabled}
-      aria-label={s.takePhotoAria(label)}
+      // The field's label is in the name, so several camera buttons on one
+      // form are told apart, and the name starts with what the button says.
+      aria-label={scan ? s.scanPagesAria(label) : s.takePhotoAria(label)}
       data-take-photo=""
       className={cn(
         rowActionClass,
@@ -51,7 +56,7 @@ export function TakePhotoButton({
       )}
     >
       <Camera className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      {s.takePhoto}
+      {scan ? s.scanPages : s.takePhoto}
     </button>
   );
 }

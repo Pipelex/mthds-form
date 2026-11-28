@@ -3,7 +3,17 @@
 import { shownAsOptional } from '../core/readiness';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
+import {
+  ClipboardPaste,
+  Eye,
+  EyeOff,
+  FileText,
+  ImageOff,
+  Link2,
+  Loader2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
 import { cn, isThenable, storedUrlOf } from './utils';
 import type { FileRunField } from '../core';
@@ -23,7 +33,8 @@ import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
 import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
 import { useFieldStrings, type FieldStrings } from './field-strings';
-import { fieldControlClass, smallPrintClass } from './field-styles';
+import { fieldControlClass, rowActionClass, smallPrintClass } from './field-styles';
+import { intentOf } from '../core/hints';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
@@ -517,10 +528,15 @@ function FileField({
     retakeOf.current = replaces;
     cameraRef.current?.click();
   }, []);
+  // What the paste button last found: no picture on the clipboard, or a
+  // browser that would not let the page read it. Any later way in - a drop,
+  // a pick, a photo, a paste - answers the field anew, so each clears it.
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
   const takePhoto = (photo: File) => {
     const replaces = retakeOf.current;
     retakeOf.current = null;
     setRejected(null);
+    setPasteNote(null);
     photos.take(photo, replaces);
   };
 
@@ -530,6 +546,7 @@ function FileField({
   const handleFile = useCallback(
     (file: File) => {
       forgetPhotoRefusal();
+      setPasteNote(null);
       storeFile(file);
     },
     [forgetPhotoRefusal, storeFile],
@@ -550,6 +567,55 @@ function FileField({
   }, [dropArea, id, track]);
 
   const busy = disabled || uploading;
+
+  // What the method says the picture is (MTHDS 9.2.0 intent words): a `photo`
+  // or a `scan` offers the camera FIRST, above the drop zone, a scan worded as
+  // the page-by-page capture it is; a `screenshot` takes a paste from the
+  // clipboard, through a button and through Ctrl+V or Cmd+V anywhere in the
+  // drop zone. A word a field does not have changes nothing.
+  const intent = intentOf(field);
+  const cameraFirst = intent === 'photo' || intent === 'scan';
+  const pasteable = canUpload && intent === 'screenshot';
+  const takePasted = useCallback(
+    (blob: Blob | undefined) => {
+      if (!blob) {
+        setPasteNote(s.pasteNoImage);
+        return;
+      }
+      handleFile(new File([blob], pastedFileName(label, blob.type), { type: blob.type }));
+    },
+    [handleFile, label, s.pasteNoImage],
+  );
+  const pasteFromClipboard = useCallback(async () => {
+    let items: ClipboardItems;
+    try {
+      items = await navigator.clipboard.read();
+    } catch {
+      // A browser that refuses clipboard reads, or a person who declined, is
+      // not an empty clipboard, and is said as what it is: the keyboard paste
+      // into the drop zone still works, and the note says so.
+      setPasteNote(s.pasteUnavailable);
+      return;
+    }
+    for (const item of items) {
+      const type = item.types.find((candidate) => candidate.startsWith('image/'));
+      if (type) {
+        takePasted(await item.getType(type));
+        return;
+      }
+    }
+    takePasted(undefined);
+  }, [takePasted, s.pasteUnavailable]);
+  const onPaste = (event: React.ClipboardEvent) => {
+    if (!pasteable || busy) return;
+    const file = [...event.clipboardData.files].find((candidate) =>
+      candidate.type.startsWith('image/'),
+    );
+    if (file) {
+      event.preventDefault();
+      takePasted(file);
+    }
+  };
 
   const {
     getRootProps,
@@ -578,6 +644,7 @@ function FileField({
     // silently swallowed, which reads as a broken dropzone rather than a
     // refused file.
     onDrop: (accepted, rejections) => {
+      setPasteNote(null);
       // Several files at once are refused as a batch, whatever their types,
       // and none reaches the host. react-dropzone rejects a batch of
       // acceptable files as `too-many-files`, which used to be reported as
@@ -896,6 +963,16 @@ function FileField({
       // and the input's accessible name computes to the empty string.
       htmlFor={domId}
     >
+      {/* A photo or a scan offers the camera first, above the drop zone,
+          while the input is empty: on a touch screen only, as ever. */}
+      {camera && cameraFirst && !photos.held && !hasFile && (
+        <TakePhotoButton
+          label={label}
+          scan={intent === 'scan'}
+          disabled={busy}
+          onTake={() => openCamera(null)}
+        />
+      )}
       {photos.held ? (
         // The pages in place of the dropzone, and under them the file they
         // made once it is stored, or its upload while it is on its way.
@@ -1052,7 +1129,7 @@ function FileField({
         // outline is `focus-within` because the element that takes focus is
         // clip-hidden.
         <div
-          {...getRootProps()}
+          {...getRootProps({ onPaste })}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center',
             'cursor-pointer select-none transition-colors',
@@ -1090,8 +1167,25 @@ function FileField({
 
       {/* "Take photo", under the dropzone and before the team's files, while
           the input is empty: on a touch screen only, which CSS decides. */}
-      {camera && !photos.held && !hasFile && (
+      {camera && !cameraFirst && !photos.held && !hasFile && (
         <TakePhotoButton label={label} disabled={busy} onTake={() => openCamera(null)} />
+      )}
+      {pasteable && !hasFile && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void pasteFromClipboard()}
+          data-paste-screenshot=""
+          className={cn(rowActionClass, focusOutlineClass)}
+        >
+          <ClipboardPaste className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          {s.pasteScreenshot}
+        </button>
+      )}
+      {pasteNote && (
+        <p role="status" className="text-[12px] text-muted-foreground">
+          {pasteNote}
+        </p>
       )}
       {camera && <CameraInput ref={cameraRef} disabled={disabled} onPhoto={takePhoto} />}
 
@@ -1499,4 +1593,39 @@ function ClearButton({ disabled, onClick }: { disabled?: boolean; onClick: () =>
       <X className="h-4 w-4" />
     </button>
   );
+}
+
+/** The extension a pasted picture's type is saved under, where it is not its subtype. */
+const PASTED_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+  'image/bmp': 'bmp',
+  'image/tiff': 'tif',
+  'image/avif': 'avif',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+};
+
+/**
+ * The name a pasted screenshot is stored under: the field's label, with the
+ * characters a file name cannot hold (`/`, `\`, `:` and their kind) made
+ * dashes, and the extension its picture type is saved with (`svg` for
+ * `image/svg+xml`, `jpg` for `image/jpeg`), `png` for a type with none known.
+ * Exported for its test, not from the entry.
+ */
+export function pastedFileName(label: string, mime: string): string {
+  const base =
+    label
+      // eslint-disable-next-line no-control-regex
+      .replace(/[/\\:*?"<>|\u0000-\u001f]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^\.+/, '') || 'Screenshot';
+  const extension = Object.prototype.hasOwnProperty.call(PASTED_EXTENSIONS, mime.toLowerCase())
+    ? PASTED_EXTENSIONS[mime.toLowerCase()]!
+    : 'png';
+  return `${base}.${extension}`;
 }

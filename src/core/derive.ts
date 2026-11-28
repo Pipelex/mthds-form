@@ -205,13 +205,27 @@ function mapNode(
             node.integer,
             (endpoint) => Math.ceil(endpoint) - 1,
           ),
+        exclusiveMin: node.exclusive_minimum,
+        exclusiveMax: node.exclusive_maximum,
+        unit: node.unit,
+        aggregate: node.aggregate,
       };
     case 'boolean':
       return { ...common, contentKey: scalarWrapperKey(schema), kind: 'boolean' };
     case 'enum':
       // The wire carries the authored `choices` verbatim (`unknown[]`); the
       // control set renders and stores strings, as it always has.
-      return { ...common, kind: 'enum', options: node.choices.map(String) };
+      // `options` rides beside them only when an option carries a word, one per
+      // choice in the same order - a producer obligation the type cannot state,
+      // so a list of another length is dropped rather than misaligned.
+      return {
+        ...common,
+        kind: 'enum',
+        options: node.choices.map(String),
+        ...(node.options && node.options.length === node.choices.length
+          ? { optionDetails: node.options }
+          : {}),
+      };
     case 'document':
     case 'image':
       // `formats` is a renderer-side affordance the wire deliberately does not

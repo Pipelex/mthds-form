@@ -12,8 +12,13 @@ import {
   isOptionalStructure,
   mustBeFilled,
   optionalStructureOpen,
+  refusedValue,
 } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures, seedInputs } from '../core/seed';
+import { formGroupOf, formHasRoles, orderByRole } from '../core/field-roles';
+import { Minus, Plus } from 'lucide-react';
+import { focusOutlineClass } from './role-tokens';
+import { locatedProblemMessage } from './value-problem';
 import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/values';
 import type { LoadText } from '../core/stored-value';
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
@@ -21,7 +26,12 @@ import { FieldRenderer, type FieldEnv } from './field-renderer';
 import type { FormResolveUrl, UploadedFile } from './file-field';
 import { FramedFormContext, RefusedStructureContext } from './object-field';
 import type { FilePickerSource } from './file-picker';
-import { FieldPresentationProvider, type FieldPresentation } from './field-presentation';
+import {
+  FieldPresentationProvider,
+  fieldLabel,
+  useFieldPresentation,
+  type FieldPresentation,
+} from './field-presentation';
 import { FieldStringsProvider, useFieldStrings, type FieldStrings } from './field-strings';
 import { OptionalToggle } from './optional-toggle';
 import type { LoadBytes, OpenExternal, PdfWorkerConfig } from './result-env';
@@ -575,7 +585,10 @@ export function useMethodForm({
   const fields = useMemo(() => {
     const derived = buildRunFields(descriptor, contract.inputs);
     const prepared = prepareFields ? prepareFields(derived) : derived;
-    return orderFields(prepared, orderKey ? orderKey.split('\u0000') : undefined);
+    // The role layout first (subject, then context and guidance, then the
+    // references and settings, when the method states roles), then the host's
+    // own order over it, which a host states for a reason the method cannot.
+    return orderFields(orderByRole(prepared), orderKey ? orderKey.split('\u0000') : undefined);
   }, [descriptor, contract.inputs, prepareFields, orderKey]);
 
   const initial = useMemo<MethodFormValues>(() => {
@@ -899,9 +912,15 @@ function MethodFormFields({
   className,
 }: MethodFormFieldsProps) {
   const s = useFieldStrings();
+  const presentation = useFieldPresentation();
   const [showOptional, setShowOptional] = useState(false);
+  // The folded group's disclosure: the person's own choice, which a refusal or
+  // a host's error on one of its inputs opens once (see below) and which only
+  // the person closes again.
+  const [showFoldedGroup, setShowFoldedGroup] = useState(false);
+  const [flaggedSeen, setFlaggedSeen] = useState('');
   const {
-    fields,
+    fields: allFields,
     values,
     setValues,
     removeItem,
@@ -961,6 +980,15 @@ function MethodFormFields({
     ],
   );
 
+  // The role layout (MTHDS 9.2.0 `role` hints, docs/method-form.md): the
+  // references and settings a method states fold behind a disclosure of their
+  // own, after every other input, unless the run waits for one that nothing
+  // fills. With no role stated, nothing is in that group and the form is as it
+  // was. The optional disclosure below covers the other inputs only.
+  const roles = formHasRoles(allFields);
+  const roleFolded = allFields.filter((field) => formGroupOf(field, roles) === 'folded');
+  const fields = allFields.filter((field) => !roleFolded.includes(field));
+
   // The same disclosure the object control draws inside a structure, at the
   // top level. With folding off, only a closed optional structure folds: it
   // has no control of its own, and the disclosure is what opens it.
@@ -991,11 +1019,57 @@ function MethodFormFields({
   // run: what a structure's members are marked by as well.
   const refusalOf = (field: RunField) =>
     attempted ? gateRefusal(field, ownProp(values, field.name), mustBeFilled(field)) : undefined;
+  const hostErrorOf = (field: RunField) => (errors ? ownProp(errors, field.name) : undefined);
   const errorFor = (field: RunField, refusal: ReturnType<typeof refusalOf>): string | undefined => {
-    const hostError = errors ? ownProp(errors, field.name) : undefined;
+    const hostError = hostErrorOf(field);
     if (hostError) return hostError;
     if (refusal === 'required') return s.requiredField;
+    if (refusal === 'invalid') {
+      // The leaf's own problem, or a list's first refused item by position.
+      const located = refusedValue(field, ownProp(values, field.name));
+      return located
+        ? locatedProblemMessage(located, s, (leaf) =>
+            fieldLabel(leaf.title, leaf.name, presentation),
+          )
+        : undefined;
+    }
     return refusal === 'incomplete' ? s.incompleteField : undefined;
+  };
+
+  // The folded group opens by itself when one of its inputs is newly refused
+  // after an attempt, or newly carries a host's error (a server's verdict), so
+  // a mark is never first drawn out of sight. Opened, it is the person's: it
+  // stays open once the value is put right, and its Hide button closes it
+  // even while a mark stands. Adjusted during render, as React has state
+  // follow a change in what it is derived from, so no frame shows it closed.
+  const flagged = roleFolded
+    .filter((field) => refusalOf(field) !== undefined || hostErrorOf(field))
+    .map((field) => field.name)
+    .join('\u0000');
+  if (flagged !== flaggedSeen) {
+    setFlaggedSeen(flagged);
+    if (flagged !== '') setShowFoldedGroup(true);
+  }
+  const foldedGroupOpen = showFoldedGroup || (flagged !== '' && flagged !== flaggedSeen);
+
+  const renderField = (field: RunField) => {
+    const refusal = refusalOf(field);
+    return (
+      // Remounted on each reset, so no control keeps what it held for the
+      // values the reset replaced (a file still arriving, a failed drop). A
+      // structure the gate refuses marks the members it refuses, whatever
+      // a host's message says of the structure.
+      <RefusedStructureContext key={`${field.name}:${resets}`} value={refusal ? field.name : null}>
+        <FieldRenderer
+          field={field}
+          id={field.name}
+          value={ownProp(values, field.name)}
+          error={errorFor(field, refusal)}
+          env={env}
+          onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
+        />
+      </RefusedStructureContext>
+    );
   };
 
   return (
@@ -1003,7 +1077,7 @@ function MethodFormFields({
       {exampleSource && (
         <FillWithExample
           source={exampleSource}
-          fields={fields}
+          fields={allFields}
           touched={touched}
           // Filling is a reset to the example's values: the attempt, the
           // failed uploads and any upload in flight go with what was there.
@@ -1011,30 +1085,35 @@ function MethodFormFields({
           disabled={disabled}
         />
       )}
-      {visible.map((field) => {
-        const refusal = refusalOf(field);
-        return (
-          // Remounted on each reset, so no control keeps what it held for the
-          // values the reset replaced (a file still arriving, a failed drop). A
-          // structure the gate refuses marks the members it refuses, whatever
-          // a host's message says of the structure.
-          <RefusedStructureContext
-            key={`${field.name}:${resets}`}
-            value={refusal ? field.name : null}
-          >
-            <FieldRenderer
-              field={field}
-              id={field.name}
-              value={ownProp(values, field.name)}
-              error={errorFor(field, refusal)}
-              env={env}
-              onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
-            />
-          </RefusedStructureContext>
-        );
-      })}
+      {visible.map(renderField)}
       {(folded.length > 0 || structureOpen) && (
         <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />
+      )}
+      {/* The group's disclosure and inputs are children of the form itself,
+          not of a wrapper, so a framed form's section rules (`SECTION_RULES`,
+          which reach direct children) separate them as they do the rest. */}
+      {roleFolded.length > 0 && (
+        <>
+          <button
+            type="button"
+            data-folded-group=""
+            onClick={() => setShowFoldedGroup(!foldedGroupOpen)}
+            aria-expanded={foldedGroupOpen}
+            className={cn(
+              'flex w-fit items-center gap-1.5 rounded-sm text-[12px] text-muted-foreground transition-colors hover:text-foreground max-sm:min-h-11',
+              focusOutlineClass,
+              'focus-visible:outline-offset-2',
+            )}
+          >
+            {foldedGroupOpen ? (
+              <Minus className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <Plus className="h-3 w-3" aria-hidden="true" />
+            )}
+            {foldedGroupOpen ? s.foldedGroupHide : s.foldedGroupShow(roleFolded.length)}
+          </button>
+          {foldedGroupOpen && roleFolded.map(renderField)}
+        </>
       )}
     </div>
   );

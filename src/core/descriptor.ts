@@ -12,6 +12,8 @@
  * Pure module: no React, no API calls. Trivially unit-testable.
  */
 
+import type { ChoiceOption, ContractFormat } from 'mthds/protocol';
+
 import type { InputPresence } from './contracts';
 import type { FileFormat } from './file-formats';
 
@@ -97,10 +99,19 @@ export interface RunFieldCommon {
  * (`'time'`, `'uri'`, …); a renderer may hint on it and ignore it safely.
  */
 export interface TextConstraints {
+  /** The fewest characters, counted in Unicode code points as the gate counts them. */
   minLength?: number;
+  /** The most characters, counted in Unicode code points as the gate counts them. */
   maxLength?: number;
+  /** An ECMA-262 regular expression, matching anywhere unless anchored, compiled with `u` as the gate compiles it. */
   pattern?: string;
-  format?: string;
+  /**
+   * One of the standard's closed text formats (`email`, `uri`, `date-time`,
+   * `uuid`, `hostname`, `ipv4`, `ipv6`, `time`). Since MTHDS `9.2.0` a
+   * producer emits no other value; a control offers the matching input
+   * (docs/method-form.md, "What the method's meaning changes").
+   */
+  format?: ContractFormat;
 }
 
 export interface TextRunField extends RunFieldCommon, TextConstraints {
@@ -128,8 +139,30 @@ export interface DateRunField extends RunFieldCommon {
 export interface NumberRunField extends RunFieldCommon {
   kind: 'number';
   integer: boolean;
+  /**
+   * The inclusive bounds a control can clamp to: the wire's `minimum` /
+   * `maximum`, or an exclusive bound's nearest inclusive neighbour on an
+   * integer (docs/wire-correspondence.md).
+   */
   min?: number;
   max?: number;
+  /**
+   * The wire's exclusive bounds, verbatim. A clamping control cannot express
+   * an open interval on a float, so `min`/`max` leave them out there; readiness
+   * still checks them (`valueProblem`), so a typed value at the excluded
+   * endpoint holds the Run button back instead of reaching the gate.
+   */
+  exclusiveMin?: number;
+  exclusiveMax?: number;
+  /**
+   * What the number counts, as written: an ISO 4217 currency code (`EUR`),
+   * `percent` (`100` is the whole), or a unit of measure (`kg`). A
+   * description: a control and a result show the number in it and convert
+   * nothing.
+   */
+  unit?: string;
+  /** How a column of this field combines across records: a result shows only the one it declares. */
+  aggregate?: 'sum' | 'average';
 }
 
 export interface BooleanRunField extends RunFieldCommon {
@@ -139,6 +172,14 @@ export interface BooleanRunField extends RunFieldCommon {
 export interface EnumRunField extends RunFieldCommon {
   kind: 'enum';
   options: string[];
+  /**
+   * The words and tone the method gives each option, one per entry of
+   * `options` and in the same order, straight from the wire's `options`.
+   * Absent when no option carries a word, so a renderer reading `options`
+   * alone stays correct. Presentation only: the stored value is always the
+   * entry of `options`.
+   */
+  optionDetails?: ChoiceOption[];
 }
 
 export interface FileRunField extends RunFieldCommon {

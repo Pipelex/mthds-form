@@ -6,6 +6,12 @@
 import type { ObjectRunField, RunField } from './descriptor';
 import { hasOwnProp, ownProp } from './own-property';
 import { readStoredReference } from './stored-value';
+import {
+  firstValueProblem,
+  valueProblem,
+  type LocatedProblem,
+  type ValueCheckOptions,
+} from './value-checks';
 
 /**
  * How deep `isFilled` walks a value before it stops looking, and the answer it
@@ -177,7 +183,18 @@ export function fieldFilled(field: RunField, value: unknown): boolean {
         value.every((item) => !isFilled(item) || fieldFilled(field.item, item)) && isFilled(value)
       );
   }
-  return isFilled(value);
+  // A leaf holding a value its contract facts refuse is not filled: a number
+  // past its bound, a text past its length or off its format. The gate's
+  // validator refuses exactly that value, so readiness saying "ready" over it
+  // was the disagreement docs/run-gate.md rules out - the button offered a run
+  // its own gate then refused with nothing named. `valueProblem` judges as the
+  // validator does and passes a value of another type, so this is harmless on
+  // the gate's own tree too. A method's `pattern` is the one fact left out:
+  // this answers on every keystroke, and a pattern with catastrophic
+  // backtracking would freeze the page while the person types, so a pattern
+  // is judged at the attempt (`gateRefusal`), where the gate judges it.
+  // Leaving it out makes readiness looser than the gate, never stricter.
+  return isFilled(value) && valueProblem(field, value, { patterns: false }) === undefined;
 }
 
 export interface Readiness {
@@ -267,9 +284,42 @@ export function gateRefusal(
   field: RunField,
   value: unknown,
   mustFill: boolean,
-): 'required' | 'incomplete' | undefined {
+  options: ValueCheckOptions = {},
+): GateRefusal | undefined {
+  // A leaf holding a value its contract facts refuse is `invalid` whether or
+  // not it must be filled: it is not missing, it is wrong, and the person is
+  // told what is wrong with it (`valueProblem`) rather than that it is empty.
+  // So is a list holding such an item, which `refusedValue` locates, since a
+  // list draws no mark of its own on an item. A structure's members carry
+  // their own marks, so a structure is refused as before.
+  if (field.kind !== 'object' && isFilled(value) && refusedValue(field, value, options)) {
+    return 'invalid';
+  }
   if (mustFill) return fieldFilled(field, value) ? undefined : 'required';
   return isFilled(value) && !fieldFilled(field, value) ? 'incomplete' : undefined;
+}
+
+/**
+ * Why the gate refuses a field: it must be filled and is empty (`required`),
+ * it was started and is short of what its concept demands (`incomplete`), or
+ * it is a value its contract facts refuse (`invalid`: a bound, a length, a
+ * pattern or a format, which `valueProblem` names).
+ */
+export type GateRefusal = 'required' | 'incomplete' | 'invalid';
+
+/**
+ * What its contract facts refuse in a leaf or a list that holds a value: the
+ * leaf's own problem, or the first list item holding one, with its index. A
+ * structure answers `undefined`: its members are judged, and marked, one by
+ * one. What a form names under an `invalid` field.
+ */
+export function refusedValue(
+  field: RunField,
+  value: unknown,
+  options: ValueCheckOptions = {},
+): LocatedProblem | undefined {
+  if (field.kind === 'object' || !isFilled(value)) return undefined;
+  return firstValueProblem(field, value, options);
 }
 
 /**
@@ -290,18 +340,28 @@ export function waitingFields(
   );
 }
 
-/** A field the run waits for, and the names that lead to it from the inputs, its own last. */
+/**
+ * A field the run waits for, and the names that lead to it from the inputs,
+ * its own last. `problem` is set when it holds a value its contract facts
+ * refuse rather than nothing - the leaf's own problem, or a list's first
+ * refused item - so a surface says what to fix instead of what to fill.
+ * Judged as readiness judges, so a method's `pattern` is not read here.
+ */
 export interface WaitingField {
   field: RunField;
   path: readonly string[];
+  problem?: LocatedProblem;
 }
 
 function refusedWithin(field: RunField, value: unknown, path: readonly string[]): WaitingField[] {
-  if (field.kind !== 'object') return [{ field, path }];
+  if (field.kind !== 'object') {
+    const problem = refusedValue(field, value, { patterns: false });
+    return [problem ? { field, path, problem } : { field, path }];
+  }
   const members = optionalStructureOpen(value) ? (value as Record<string, unknown>) : undefined;
   const refused = field.fields.flatMap((member) => {
     const held = ownProp(members, member.name);
-    return gateRefusal(member, held, member.required)
+    return gateRefusal(member, held, member.required, { patterns: false })
       ? refusedWithin(member, held, [...path, member.name])
       : [];
   });

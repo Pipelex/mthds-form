@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import type { EnumRunField, ObjectRunField, RunField } from '../core';
+import type { EnumRunField, NumberRunField, ObjectRunField, RunField } from '../core';
 import { conceptCategory } from '../core/descriptor';
 import type {
   CompositeMember,
@@ -35,6 +35,23 @@ import {
   viewableUrl,
 } from '../core/native-content';
 import { ownProp } from '../core/own-property';
+import { unwrap } from './result-unwrap';
+import { hasTones, memberWithPart, partOf } from '../core/hints';
+import { optionLabeler } from './enum-field';
+import { formatFieldNumber } from '../core/number-format';
+import {
+  AggregateRow,
+  columnAggregates,
+  countableVerdict,
+  hasMeter,
+  Meter,
+  MetricTiles,
+  NumberText,
+  ToneValue,
+  VerdictCounts,
+  VerdictLine,
+  verdictDraws,
+} from './result-parts';
 import { planFileSave, splitFileName } from '../core/save-plan';
 import { readStuffFile, type StuffFile, type StuffFileKind } from '../core/stuff-files';
 import {
@@ -101,12 +118,7 @@ import { splitExtractedText } from './extracted-text';
 import { encodedFileSummary } from './encoded-file';
 import { useFieldStrings, type FieldStrings } from './field-strings';
 import { humanizeEnumValue, humanizeFieldName } from '../core/humanize';
-import {
-  enumLabeler,
-  fieldLabel,
-  useFieldPresentation,
-  type FieldPresentation,
-} from './field-presentation';
+import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
 import { focusOutlineClass, focusOutlineInsetClass } from './role-tokens';
 import { cn } from './utils';
 
@@ -151,22 +163,6 @@ import { cn } from './utils';
  * (`native.Rating`) and a choice (`native.Choice`). See `docs/result-view.md`
  * for each.
  */
-
-/**
- * The wire wraps a scalar (and a plural) payload inside its content model; this
- * unwraps by the property NAME the descriptor carries.
- *
- * `contentKey` is the only unwrap path there is. The property-counting fallback
- * that used to sit here is deleted, not bypassed: it was the output side
- * reintroducing the shape sniffing the derivation swap removed, and requiring a
- * schema on `buildResultField` is what made deleting it possible.
- */
-function unwrap(field: RunField, value: unknown): unknown {
-  if (!field.contentKey) return value;
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
-  const unwrapped = ownProp(value as Record<string, unknown>, field.contentKey);
-  return unwrapped === undefined ? value : unwrapped;
-}
 
 /**
  * A description, on hover and on focus — and nothing at rest.
@@ -403,7 +399,12 @@ function EnumValue({
   compact: boolean;
 }) {
   const presentation = useFieldPresentation();
-  const shown = typeof value === 'string' ? enumLabeler(field.options, presentation)(value) : value;
+  // A choice whose options carry tones reads as a badge in its value's tone
+  // (MTHDS 9.2.0); one without reads as words, never as colours guessed from
+  // them.
+  if (typeof value === 'string' && hasTones(field))
+    return <ToneValue field={field} value={value} />;
+  const shown = typeof value === 'string' ? optionLabeler(field, presentation)(value) : value;
   return <Scalar value={shown} compact={compact} />;
 }
 
@@ -414,10 +415,19 @@ function EnumValue({
  * rather than the code the payload holds. Every other kind keeps the payload's
  * text.
  */
-function cellTitle(column: RunField, cell: string | number, presentation: FieldPresentation) {
-  return column.kind === 'enum' && typeof cell === 'string'
-    ? enumLabeler(column.options, presentation)(cell)
-    : String(cell);
+function cellTitle(
+  column: RunField,
+  cell: string | number,
+  presentation: FieldPresentation,
+  numberLocale: string,
+) {
+  if (column.kind === 'enum' && typeof cell === 'string')
+    return optionLabeler(column, presentation)(cell);
+  // A number cell shows the number in its unit (`NumberText`), so its tooltip
+  // and its word floor are that text, not the payload's digits.
+  if (column.kind === 'number' && typeof cell === 'number' && Number.isFinite(cell))
+    return formatFieldNumber(column, cell, numberLocale);
+  return String(cell);
 }
 
 /**
@@ -1848,9 +1858,39 @@ function LeafValue({
       return compact ? <RecordSummary field={field} value={value} /> : <Scalar value={value} />;
     case 'enum':
       return <EnumValue field={field} value={value} compact={compact} />;
+    case 'number':
+      // A number reads in the unit its method states, grouped and rounded
+      // otherwise (`formatFieldNumber`), and against its bounds as a meter
+      // when it has both - outside a cell, which keeps to one short line.
+      // Anything but a finite number is the payload disagreeing with its
+      // descriptor, and takes the floor every kind has.
+      return typeof value === 'number' && Number.isFinite(value) ? (
+        !compact && hasMeter(field) ? (
+          <Meter field={field} value={value} />
+        ) : (
+          <NumberText field={field} value={value} />
+        )
+      ) : (
+        <Scalar value={value} compact={compact} />
+      );
     default:
       return <Scalar value={value} compact={compact} />;
   }
+}
+
+/**
+ * Inside a record's card (a list of records drawn as cards, see the list arm),
+ * where the record's head shows its title, verdict, summary and metrics and
+ * the rest folds behind "Details". Reset to `false` around that rest, so a
+ * record nested inside it is laid out as any other.
+ */
+const RecordCardContext = createContext(false);
+
+/** Whether a value is there to show: not absent, and not an empty or blank text. */
+function isFilledValue(value: unknown): boolean {
+  return (
+    value !== undefined && value !== null && !(typeof value === 'string' && value.trim() === '')
+  );
 }
 
 /**
@@ -2027,7 +2067,9 @@ function ScalarChips({ field, items }: { field: RunField; items: readonly unknow
           key={index}
           className="rounded-md border border-border bg-card/40 px-2 py-0.5 text-[12.5px] text-foreground"
         >
-          <LeafValue field={field} value={item} />
+          {/* Compact: a chip is one short line, so a bounded number in it is
+              its text, never a meter. */}
+          <LeafValue field={field} value={item} compact />
         </span>
       ))}
     </div>
@@ -2142,6 +2184,11 @@ function stackingFor(columns: number, rowsOpen: boolean): Stacking {
 
 /** What turns each part of a table into blocks, for one of the two ways it stacks. */
 interface StackClasses {
+  /**
+   * A number column's header and cells while the table is a table, aligned
+   * right so its digits line up; the blocks it turns into keep the start.
+   */
+  numberCell: string;
   table: string;
   head: string;
   body: string;
@@ -2203,6 +2250,7 @@ function useTableBox(): { name: 'box' | 'framed'; className: string } {
  */
 const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
   phone: {
+    numberCell: 'sm:text-right',
     table: 'max-sm:block',
     head: 'max-sm:hidden',
     body: 'max-sm:block',
@@ -2215,6 +2263,7 @@ const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
     detailInner: 'max-sm:px-0 max-sm:py-1',
   },
   narrow: {
+    numberCell: '@min-[640px]:text-right',
     table: '@max-[640px]:block',
     head: '@max-[640px]:hidden',
     body: '@max-[640px]:block',
@@ -2228,6 +2277,7 @@ const STACKED: Record<'phone' | 'narrow' | 'always', StackClasses> = {
     detailInner: '@max-[640px]:px-0 @max-[640px]:py-1',
   },
   always: {
+    numberCell: '',
     table: 'block',
     head: 'hidden',
     body: 'block',
@@ -2361,9 +2411,14 @@ function identifierWords(label: string): React.ReactNode {
  * shows, the same string its tooltip carries. Anything else - a date, a yes or
  * no, a count, chips, a file - gets no floor beyond the cell's own.
  */
-function cellWords(column: RunField, cell: unknown, presentation: FieldPresentation) {
+function cellWords(
+  column: RunField,
+  cell: unknown,
+  presentation: FieldPresentation,
+  numberLocale: string,
+) {
   return typeof cell === 'string' || typeof cell === 'number'
-    ? cellTitle(column, cell, presentation)
+    ? cellTitle(column, cell, presentation, numberLocale)
     : undefined;
 }
 
@@ -2638,6 +2693,7 @@ function ObjectTable({
                   // table scrolls inside it (see `overflows`).
                   fits ? 'wrap-normal' : 'whitespace-nowrap',
                   'px-3 py-2 text-[12px] font-semibold text-foreground',
+                  column.kind === 'number' && (stacked ? stacked.numberCell : 'text-right'),
                   presentation === 'app' ? undefined : 'font-mono',
                 )}
               >
@@ -2737,7 +2793,7 @@ function ObjectTable({
                           : undefined;
                       const columnLabel = fieldLabel(column.title, column.name, presentation);
                       const words = floorsWords(column)
-                        ? cellWords(column, cell, presentation)
+                        ? cellWords(column, cell, presentation, s.numberLocale)
                         : undefined;
                       return (
                         <td
@@ -2745,6 +2801,10 @@ function ObjectTable({
                           {...(words === undefined ? {} : { 'data-fit': words })}
                           className={cn(
                             'px-3 py-1.5 align-top',
+                            // A column of numbers aligns right, so its digits
+                            // line up, while the table is a table.
+                            column.kind === 'number' &&
+                              (stacked ? stacked.numberCell : 'text-right'),
                             floorsWords(column) && WORD_FLOOR,
                             stacked?.cell,
                           )}
@@ -2831,7 +2891,7 @@ function ObjectTable({
                                   )
                             }
                             {...(typeof cell === 'string' || typeof cell === 'number'
-                              ? { title: cellTitle(column, cell, presentation) }
+                              ? { title: cellTitle(column, cell, presentation, s.numberLocale) }
                               : {})}
                           >
                             <ResultAt segment={column.name}>
@@ -3898,6 +3958,7 @@ function ResultNode({
   const pageDownloadShown = useFileDownloadShown('markup');
   const pdfShown = usePdfSaveShown();
   const location = useResultLocation();
+  const inCard = use(RecordCardContext);
   const isApp = useFieldPresentation() === 'app';
 
   // The description rides the label's `title`, at every depth including this
@@ -4085,50 +4146,137 @@ function ResultNode({
       const sharesALine = (child: RunField) =>
         isInlineColumn(child) &&
         !(isApp && child.kind === 'text' && isLongText(unwrap(child, memberValue(child))));
-      return (
-        <div className="space-y-2">
-          {header}
-          {/* Plain elements, NOT a `<dl>`, and that is a decision rather than an
-              oversight. A definition list may hold only ordered `<dt>`/`<dd>`
-              groups, and this grid also holds tables, frames and galleries -
-              blocks a `<dl>` rejects (`definition-list` in the a11y gate). The
-              only way to keep the semantics would be to separate the short
-              fields from the rest, which reorders them, and authored order is a
-              fact the descriptor carries deliberately. So: a layout, honestly
-              labelled as one. */}
-          <div
-            className={cn(
-              // A definition grid, not a stack. Label above value spends two
-              // lines on every field, so a structure of ten is twenty lines of
-              // alternating label and answer with nothing aligned. Beside each
-              // other they take one line and the values line up, which is what
-              // makes a record scannable.
-              //
-              // The label column is CAPPED at 40%, and that is not cosmetic. A
-              // bare `auto` sizes to the widest label in the grid - label text
-              // plus its concept pill - so one long field name starved every
-              // value beside it, and inside a 400px panel a paragraph came out
-              // as a ten-line ribbon in a 130px column. `min-content` keeps a
-              // short label short; the cap stops any label taking more than its
-              // share, whatever the panel width turns out to be.
-              'grid grid-cols-[minmax(min-content,40%)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5',
-              // A list item already sits in its own bordered row; nesting a
-              // second card inside it draws a box in a box for no information
-              // gained.
-              !hideLabel && 'rounded-lg border border-border bg-card/40 px-3.5 py-3',
-            )}
-          >
-            {field.fields.map((child) =>
-              // Only a SHORT value shares a line. Prose needs the full width, and
-              // so does anything with chrome of its own - a table, a gallery, a
-              // frame - which beside a label would be squeezed into whatever the
-              // longest label left over.
-              sharesALine(child) ? (
-                <Fragment key={child.name}>
-                  <div className="min-w-0">
-                    <Label field={child} describe />
-                  </div>
-                  {/* The value sits at the RIGHT EDGE of its column, not against
+      // The record's anatomy (MTHDS 9.2.0 `part` hints), in `app`: its verdict
+      // first, in its tone, then the words that name it, its summary and its
+      // headline numbers, above the fields that remain. `studio` keeps every
+      // field in its authored place, the record a builder checks. A record
+      // with no part keeps the grid alone, as it always did.
+      const record =
+        typeof unwrapped === 'object' && unwrapped !== null && !Array.isArray(unwrapped)
+          ? (unwrapped as Record<string, unknown>)
+          : undefined;
+      // A member leaves the grid for the head only when the head draws it: a
+      // title that holds words, a summary that holds something, a verdict and
+      // a metric of the kind their part reads. An absent value, one of
+      // another type, a title still in storage - each stays in the grid,
+      // where it is drawn as every value is, rather than disappearing.
+      const titleCandidate = isApp ? memberWithPart(field.fields, 'title') : undefined;
+      const titleValue = titleCandidate
+        ? unwrap(titleCandidate, memberValue(titleCandidate))
+        : undefined;
+      const titleMember =
+        typeof titleValue === 'string' && titleValue !== '' ? titleCandidate : undefined;
+      const summaryCandidate = isApp ? memberWithPart(field.fields, 'summary') : undefined;
+      const summaryMember =
+        summaryCandidate && isFilledValue(unwrap(summaryCandidate, memberValue(summaryCandidate)))
+          ? summaryCandidate
+          : undefined;
+      const verdictCandidate = isApp ? memberWithPart(field.fields, 'verdict') : undefined;
+      const verdictMember =
+        verdictCandidate && verdictDraws(verdictCandidate, memberValue(verdictCandidate))
+          ? verdictCandidate
+          : undefined;
+      const metricMembers = isApp
+        ? field.fields.filter((member): member is NumberRunField => {
+            if (member.kind !== 'number' || partOf(member) !== 'metric') return false;
+            const held = unwrap(member, memberValue(member));
+            return typeof held === 'number' && Number.isFinite(held);
+          })
+        : [];
+      const headed = new Set<RunField>(
+        [titleMember, summaryMember, verdictMember, ...metricMembers].filter(
+          (member): member is RunField => member !== undefined,
+        ),
+      );
+      const hasHead = record !== undefined && headed.size > 0;
+      const rest = hasHead ? field.fields.filter((member) => !headed.has(member)) : field.fields;
+      const head = hasHead ? (
+        <div data-record-head="" className="space-y-2.5">
+          {verdictMember &&
+            (verdictMember.kind === 'object' ? (
+              <ResultAt segment={verdictMember.name}>
+                <ResultField
+                  field={verdictMember}
+                  value={memberValue(verdictMember)}
+                  depth={depth + 1}
+                />
+              </ResultAt>
+            ) : (
+              <VerdictLine
+                field={verdictMember}
+                value={memberValue(verdictMember)}
+                prominent={!inCard}
+              />
+            ))}
+          {titleMember && typeof titleValue === 'string' && (
+            <p
+              data-record-title=""
+              className="text-[16px] font-semibold leading-snug wrap-break-word text-foreground"
+            >
+              {titleValue}
+            </p>
+          )}
+          {summaryMember && (
+            // An absent summary leaves no line: the head says what the
+            // record holds, and the fields below say what it lacks. Drawn by
+            // `ResultField` without its label, so a summary is the value the
+            // record's own field would be: a stored text loaded, Markdown
+            // typeset, the copy button beside it.
+            <div data-record-summary="" className="text-[13.5px] text-foreground">
+              <ResultAt segment={summaryMember.name}>
+                <ResultField
+                  field={summaryMember}
+                  value={memberValue(summaryMember)}
+                  depth={depth + 1}
+                  hideLabel
+                />
+              </ResultAt>
+            </div>
+          )}
+          {metricMembers.length > 0 && <MetricTiles fields={metricMembers} record={record!} />}
+        </div>
+      ) : null;
+      // Plain elements, NOT a `<dl>`, and that is a decision rather than an
+      // oversight. A definition list may hold only ordered `<dt>`/`<dd>`
+      // groups, and this grid also holds tables, frames and galleries - blocks
+      // a `<dl>` rejects (`definition-list` in the a11y gate). The only way to
+      // keep the semantics would be to separate the short fields from the
+      // rest, which reorders them, and authored order is a fact the descriptor
+      // carries deliberately. So: a layout, honestly labelled as one.
+      const grid = rest.length > 0 && (
+        <div
+          className={cn(
+            // A definition grid, not a stack. Label above value spends two
+            // lines on every field, so a structure of ten is twenty lines of
+            // alternating label and answer with nothing aligned. Beside each
+            // other they take one line and the values line up, which is what
+            // makes a record scannable.
+            //
+            // The label column is CAPPED at 40%, and that is not cosmetic. A
+            // bare `auto` sizes to the widest label in the grid - label text
+            // plus its concept pill - so one long field name starved every
+            // value beside it, and inside a 400px panel a paragraph came out
+            // as a ten-line ribbon in a 130px column. `min-content` keeps a
+            // short label short; the cap stops any label taking more than its
+            // share, whatever the panel width turns out to be.
+            'grid grid-cols-[minmax(min-content,40%)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5',
+            // A list item already sits in its own bordered row; nesting a
+            // second card inside it draws a box in a box for no information
+            // gained.
+            !hideLabel && 'rounded-lg border border-border bg-card/40 px-3.5 py-3',
+          )}
+        >
+          {rest.map((child) =>
+            // Only a SHORT value shares a line. Prose needs the full width, and
+            // so does anything with chrome of its own - a table, a gallery, a
+            // frame - which beside a label would be squeezed into whatever the
+            // longest label left over.
+            sharesALine(child) ? (
+              <Fragment key={child.name}>
+                <div className="min-w-0">
+                  <Label field={child} describe />
+                </div>
+                {/* The value sits at the RIGHT EDGE of its column, not against
                       the label. Names vary in length and answers do not line up
                       behind them, so a left-aligned value column leaves a ragged
                       seam down the middle of the record and the eye has to find
@@ -4144,7 +4292,7 @@ function ResultNode({
                       edge through `justify-end` on its `data-chips` hook, so a
                       list of tags ends where the numbers above it do rather than
                       starting under the label. */}
-                  {/* A value that WRAPS aligns left. The flex row ends a
+                {/* A value that WRAPS aligns left. The flex row ends a
                       one-line value at the right edge, as above; one that
                       needs more than a line is shrunk to the column's width
                       and reads left to right inside it, because a paragraph
@@ -4153,21 +4301,46 @@ function ResultNode({
                       unbounded `text` holds a company name in one record and
                       ninety words in the next - and this needs no telling:
                       the value's own width decides, without being measured. */}
-                  <div className="flex min-w-0 justify-end **:data-chips:justify-end">
-                    <div className="min-w-0 text-left wrap-break-word">
-                      <LeafValue field={child} value={memberValue(child)} />
-                    </div>
+                <div className="flex min-w-0 justify-end **:data-chips:justify-end">
+                  <div className="min-w-0 text-left wrap-break-word">
+                    <LeafValue field={child} value={memberValue(child)} />
                   </div>
-                </Fragment>
-              ) : (
-                <div key={child.name} className="col-span-2 min-w-0">
-                  <ResultAt segment={child.name}>
-                    <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
-                  </ResultAt>
                 </div>
-              ),
-            )}
-          </div>
+              </Fragment>
+            ) : (
+              <div key={child.name} className="col-span-2 min-w-0">
+                <ResultAt segment={child.name}>
+                  <ResultField field={child} value={memberValue(child)} depth={depth + 1} />
+                </ResultAt>
+              </div>
+            ),
+          )}
+        </div>
+      );
+      return (
+        <div className="space-y-2">
+          {header}
+          {head}
+          {grid &&
+            (inCard && hasHead ? (
+              // On a card, the head is what the reader scans; the rest of the
+              // record opens on demand, as a table's row does.
+              <details data-record-details="" className="group">
+                <summary
+                  className={cn(
+                    'w-fit cursor-pointer rounded-sm text-[12.5px] text-muted-foreground hover:text-foreground max-sm:min-h-11',
+                    focusOutlineClass,
+                  )}
+                >
+                  {s.recordDetails}
+                </summary>
+                <div className="pt-2">
+                  <RecordCardContext value={false}>{grid}</RecordCardContext>
+                </div>
+              </details>
+            ) : (
+              <RecordCardContext value={false}>{grid}</RecordCardContext>
+            ))}
         </div>
       );
     }
@@ -4179,6 +4352,20 @@ function ResultNode({
       // that used to stand in for the schema is gone.
       const items = Array.isArray(unwrapped) ? unwrapped : [];
       const columns = recordColumns(field.item);
+      // What the method's meaning adds to a list of records (MTHDS 9.2.0):
+      // the records counted by their verdict above them, the totals and
+      // averages their fields declare below them, and, in `app`, a card per
+      // record whose element names a title and a verdict or a summary, where
+      // a table would bury the summary in a cell.
+      const element = field.item.kind === 'object' ? field.item : undefined;
+      const countBy = items.length > 0 ? countableVerdict(field.item) : undefined;
+      const aggregates = element && items.length > 0 ? columnAggregates(element, items) : [];
+      const asCards =
+        isApp &&
+        element !== undefined &&
+        memberWithPart(element.fields, 'title') !== undefined &&
+        (memberWithPart(element.fields, 'summary') !== undefined ||
+          memberWithPart(element.fields, 'verdict') !== undefined);
       return (
         <div className="space-y-2">
           {/* `hideLabel` is honoured here as everywhere else - it was not, and
@@ -4201,8 +4388,24 @@ function ResultNode({
               </span>
             </div>
           )}
+          {countBy && <VerdictCounts verdict={countBy} items={items} />}
           {items.length === 0 ? (
             <p className="text-[13px] italic text-muted-foreground">{s.noItemsYet}</p>
+          ) : asCards ? (
+            <div data-record-cards="" className="space-y-2">
+              {items.map((item, index) => (
+                <article
+                  key={index}
+                  className="rounded-lg border border-border bg-card/40 px-3.5 py-3"
+                >
+                  <ResultAt segment={String(index)}>
+                    <RecordCardContext value={true}>
+                      <ResultField field={field.item} value={item} depth={depth + 1} hideLabel />
+                    </RecordCardContext>
+                  </ResultAt>
+                </article>
+              ))}
+            </div>
           ) : isNativeValueNode(field.item) ||
             (isStoredValueNode(field.item) &&
               items.some((item) => readStoredReference(field.item, item))) ? (
@@ -4305,6 +4508,7 @@ function ResultNode({
               ))}
             </div>
           )}
+          <AggregateRow aggregates={aggregates} />
         </div>
       );
     }

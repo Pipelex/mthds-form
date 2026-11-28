@@ -6,6 +6,7 @@ import { MethodForm, useMethodForm, type FieldPresentation } from '../../react';
 import { CONTRACTS, INPUT_FORM } from '../_generated/structured';
 import { CONTRACTS as FILE_CONTRACTS, INPUT_FORM as FILE_INPUT_FORM } from '../_generated/files';
 import { backgroundOf, paintedContrast } from '../painted-color';
+import { SPEC_INPUT_CONTRACTS, SPEC_INPUT_FORM } from '../_spec-shaped';
 
 /**
  * The whole input form of one method, `useMethodForm` + `MethodForm`, as a host
@@ -294,5 +295,69 @@ export const FramedAfterAnAttempt: Story = {
         await expect(caption.getBoundingClientRect().bottom).toBeLessThan(fields[0]!.top);
       }
     }
+  },
+};
+
+/**
+ * The role layout (MTHDS `9.2.0` `role` hints, annotated in
+ * `src/__stories__/_spec-shaped/`): the invoice's source document is the
+ * subject, so it comes first, before the invoice the method reads as context,
+ * though the method declares them the other way round.
+ */
+export const RoleLayout: Story = {
+  args: { contracts: SPEC_INPUT_CONTRACTS, inputForm: SPEC_INPUT_FORM, pipeCode: 'roles' },
+  play: async ({ canvasElement }) => {
+    // The two theme panes come one after the other, so the first of each
+    // label is the first pane's.
+    const labels = [...canvasElement.querySelectorAll('label')].map(
+      (label) => label.textContent ?? '',
+    );
+    const source = labels.findIndex((text) => /source/i.test(text));
+    const reference = labels.findIndex((text) => /reference/i.test(text));
+    await expect(source).toBeGreaterThanOrEqual(0);
+    await expect(source).toBeLessThan(reference);
+  },
+};
+
+/**
+ * An optional reference the method states folds behind its own disclosure,
+ * after the subject; the budget is an amount in euros, the notes a question.
+ */
+export const ReferenceFolded: Story = {
+  args: {
+    contracts: SPEC_INPUT_CONTRACTS,
+    inputForm: SPEC_INPUT_FORM,
+    domain: 'trips',
+    pipeCode: 'roles_folded',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggles = canvas.getAllByRole('button', { name: 'Show 1 reference or setting' });
+    await expect(toggles).toHaveLength(2);
+    await userEvent.click(toggles[0]!);
+    await expect(
+      canvas.getAllByRole('button', { name: 'Hide references and settings' }),
+    ).toHaveLength(1);
+  },
+};
+
+/**
+ * A value that breaks its method's format is named after Run, and the run
+ * waits: the email here is not one.
+ */
+export const InvalidValueAfterAnAttempt: Story = {
+  args: {
+    contracts: SPEC_INPUT_CONTRACTS,
+    inputForm: SPEC_INPUT_FORM,
+    domain: 'scalars',
+    pipeCode: 'formats',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const email of canvasElement.querySelectorAll<HTMLInputElement>('input[type="email"]')) {
+      await userEvent.type(email, 'not-an-email');
+    }
+    for (const run of canvas.getAllByRole('button', { name: 'Run' })) await userEvent.click(run);
+    await expect(canvas.getAllByText('Must be an email address.')).toHaveLength(2);
   },
 };

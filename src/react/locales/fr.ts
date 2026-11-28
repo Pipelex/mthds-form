@@ -73,6 +73,28 @@ function someNames(names: readonly string[], more: number): string {
   return AND.format(more > 0 ? [...names, `${more} ${plural(more, 'autre', 'autres')}`] : names);
 }
 
+/** Ce que doit être un texte auquel la méthode donne un format, par le nom du format. */
+const FORMAT_PROBLEMS: Readonly<Record<string, string>> = {
+  email: 'Doit être une adresse e-mail.',
+  uri: 'Doit être une adresse web complète, comme https://example.com.',
+  'date-time': 'Doit être une date et une heure.',
+  uuid: 'Doit être un UUID.',
+  hostname: 'Doit être un nom d’hôte, comme example.com.',
+  ipv4: 'Doit être une adresse IPv4, comme 192.0.2.1.',
+  ipv6: 'Doit être une adresse IPv6, comme 2001:db8::1.',
+  time: 'Doit être une heure.',
+};
+
+/** L’indication d’un texte auquel la méthode donne un format : une valeur de cette forme. */
+const FORMAT_PLACEHOLDERS: Readonly<Record<string, string>> = {
+  email: 'nom@exemple.fr',
+  uri: 'https://',
+  uuid: '00000000-0000-0000-0000-000000000000',
+  hostname: 'exemple.fr',
+  ipv4: '192.0.2.1',
+  ipv6: '2001:db8::1',
+};
+
 export const FR_FIELD_STRINGS: FieldStrings = {
   optionalBadge: 'Facultatif',
   selectPlaceholder: 'Choisir…',
@@ -285,4 +307,47 @@ export const FR_FIELD_STRINGS: FieldStrings = {
     count <= 1
       ? 'Un texte stocké n’a pas pu être chargé\u00a0; le fichier contient son lien à la place.'
       : `${count} textes stockés n’ont pas pu être chargés\u00a0; le fichier contient leurs liens à la place.`,
+  numberLocale: 'fr-FR',
+  problemBelowMinimum: (limit) => `Doit valoir au moins ${limit}.`,
+  problemAboveMaximum: (limit) => `Doit valoir au plus ${limit}.`,
+  problemNotAbove: (limit) => `Doit être supérieur à ${limit}.`,
+  problemNotBelow: (limit) => `Doit être inférieur à ${limit}.`,
+  problemNotInteger: 'Doit être un nombre entier.',
+  problemTooShort: (limit) =>
+    `Doit compter au moins ${limit} ${PLURALS.select(limit) === 'one' ? 'caractère' : 'caractères'}.`,
+  problemTooLong: (limit) =>
+    `Doit compter au plus ${limit} ${PLURALS.select(limit) === 'one' ? 'caractère' : 'caractères'}.`,
+  problemPattern: 'N’a pas la forme attendue.',
+  problemFormat: (format) => FORMAT_PROBLEMS[format] ?? 'N’a pas la forme attendue.',
+  lengthCounter: (count, max) => `${count} / ${max}`,
+  lengthCounterAria: (count, max) =>
+    count <= max
+      ? `${PLURALS.select(max - count) === 'one' ? `${max - count} caractère restant` : `${max - count} caractères restants`}`
+      : `${PLURALS.select(count - max) === 'one' ? `${count - max} caractère en trop` : `${count - max} caractères en trop`}`,
+  examplesLabel: 'Exemples',
+  useExampleAria: (example) => `Utiliser l’exemple\u00a0: ${example}`,
+  formatPlaceholder: (format) => FORMAT_PLACEHOLDERS[format],
+  questionPlaceholder: 'Posez votre question…',
+  scaleStepAria: (value, max) => `${value} sur ${max}`,
+  foldedGroupShow: (count) =>
+    PLURALS.select(count) === 'one'
+      ? `Afficher ${count} référence ou réglage`
+      : `Afficher ${count} références et réglages`,
+  foldedGroupHide: 'Masquer les références et réglages',
+  pasteScreenshot: 'Coller une capture d’écran',
+  pasteNoImage: 'Le presse-papiers ne contient pas d’image.',
+  scanPages: 'Numériser des pages',
+  aggregateSum: 'Total',
+  aggregateAverage: 'Moyenne',
+  verdictCountsAria: 'Par verdict',
+  recordDetails: 'Détails',
+  meterValueText: (value, min, max) => `${value}, entre ${min} et ${max}`,
+  sliderUnset: 'Non renseigné',
+  scanPagesAria: (label) => (label ? `Numériser des pages pour ${label}` : 'Numériser des pages'),
+  pasteUnavailable:
+    'Le navigateur n’a pas laissé cette page lire le presse-papiers. Cliquez dans la zone de dépôt et appuyez sur Ctrl+V ou ⌘V.',
+  problemNonexistentTime:
+    'Cette heure n’existe pas ce jour-là dans votre fuseau horaire\u00a0: on change d’heure. Choisissez-en une autre.',
+  problemInItem: (position, problem) => `Élément ${position}\u00a0: ${problem}`,
+  runWaitsToFix: (name, problem) => `Corrigez ${name} pour lancer\u00a0: ${problem}`,
 };

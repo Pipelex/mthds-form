@@ -11,6 +11,8 @@ import { useFieldStrings } from './field-strings';
 import { useFieldDomId } from './field-dom-id';
 import { enumLabeler, fieldLabel, useFieldPresentation } from './field-presentation';
 import { cn } from './utils';
+import { hasOptionDescriptions, hasTones, optionDetail, optionTone } from '../core/hints';
+import { ToneDot } from './tone-badge';
 
 interface EnumFieldProps {
   field: EnumRunField;
@@ -45,10 +47,13 @@ const CLEAR_VALUE = '__none__';
 export function EnumField({ field, value, onChange, id, error, disabled }: EnumFieldProps) {
   const s = useFieldStrings();
   const presentation = useFieldPresentation();
-  const labelOf = enumLabeler(field.options, presentation);
+  const labelOf = optionLabeler(field, presentation);
+  const toned = hasTones(field);
+  const described = hasOptionDescriptions(field);
   const isSegmented =
-    field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
+    !described && field.options.length <= 4 && field.options.every((o) => labelOf(o).length <= 16);
   const domId = useFieldDomId(id);
+  const groupLabel = fieldLabel(field.title, field.name, presentation);
 
   return (
     <FieldShell
@@ -59,9 +64,55 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
       description={field.description}
       required={!shownAsOptional(field)}
       error={error}
-      htmlFor={isSegmented ? undefined : domId}
+      htmlFor={isSegmented || described ? undefined : domId}
     >
-      {isSegmented ? (
+      {described ? (
+        // Options the method describes are cards: each its label, its tone's
+        // dot and the sentence saying what choosing it means, so the person
+        // reads the consequence before picking. The same single-choice group
+        // as the segmented row, with its roving focus and arrow keys.
+        <ToggleGroup
+          type="single"
+          value={value ?? ''}
+          onValueChange={(next) => onChange(next === '' ? undefined : next)}
+          disabled={disabled}
+          aria-label={groupLabel}
+          data-option-cards=""
+          className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2"
+        >
+          {field.options.map((option) => {
+            const detail = optionDetail(field, option);
+            return (
+              <ToggleGroupItem
+                key={option}
+                value={option}
+                variant="outline"
+                className={cn(
+                  'h-auto min-w-0 flex-col items-start justify-start gap-1 whitespace-normal rounded-lg border-border bg-input px-3.5 py-3 text-left text-foreground hover:bg-muted',
+                  selectedStateBorderClass,
+                )}
+              >
+                <span className="flex w-full items-center gap-2 text-[13.5px] font-medium">
+                  {toned && <ToneDot tone={optionTone(field, option)} />}
+                  <span className="min-w-0 flex-1">{labelOf(option)}</span>
+                  {value === option && (
+                    <Check
+                      className={cn('size-3.5 shrink-0', linkTextClass)}
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+                {detail?.description && (
+                  <span className="text-[12.5px] leading-snug font-normal text-muted-foreground">
+                    {detail.description}
+                  </span>
+                )}
+              </ToggleGroupItem>
+            );
+          })}
+        </ToggleGroup>
+      ) : isSegmented ? (
         // `type="single"` gives the roving tabindex and arrow-key navigation a
         // radiogroup owes its user, and emits `''` when the active item is
         // pressed again - which is the field's "clear" path.
@@ -73,7 +124,7 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
           // The group is named with the label the field SHOWS, so a screen
           // reader announces "Risk level" where the page reads it, not the
           // `risk_level` identifier behind it in `app`.
-          aria-label={fieldLabel(field.title, field.name, presentation)}
+          aria-label={groupLabel}
           className="flex flex-wrap justify-start gap-1.5"
         >
           {field.options.map((option) => (
@@ -90,12 +141,14 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
                 selectedStateBorderClass,
               )}
             >
-              {value === option && (
+              {value === option ? (
                 <Check
                   className={cn('size-3.5', linkTextClass)}
                   strokeWidth={2.5}
                   aria-hidden="true"
                 />
+              ) : (
+                toned && <ToneDot tone={optionTone(field, option)} />
               )}
               {labelOf(option)}
             </ToggleGroupItem>
@@ -114,7 +167,10 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
             <SelectItem value={CLEAR_VALUE}>{s.selectPlaceholder}</SelectItem>
             {field.options.map((option) => (
               <SelectItem key={option} value={option}>
-                {labelOf(option)}
+                <span className="flex items-center gap-2">
+                  {toned && <ToneDot tone={optionTone(field, option)} />}
+                  {labelOf(option)}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -122,4 +178,34 @@ export function EnumField({ field, value, onChange, id, error, disabled }: EnumF
       )}
     </FieldShell>
   );
+}
+
+/**
+ * How a choice's options are worded: the label the method gives an option
+ * (MTHDS `9.2.0` option tables), shown verbatim in both presentations as an
+ * authored title is, and otherwise the presentation's rule (`enumLabeler`):
+ * the code in `studio`, the code in words in `app`. The stored value is always
+ * the code. Shared with the result view, so a result reads as its form did.
+ */
+export function optionLabeler(
+  field: EnumRunField,
+  presentation: ReturnType<typeof useFieldPresentation>,
+): (option: string) => string {
+  const fallback = enumLabeler(field.options, presentation);
+  const worded = (option: string) => optionDetail(field, option)?.label ?? fallback(option);
+  // Two options the method labels alike, or an authored label that reads as
+  // another option's worded code, would be one choice twice on the page: each
+  // of those is said with its own code beside its label, as `enumLabeler`
+  // falls back to the codes when two worded codes collide.
+  const seen = new Map<string, number>();
+  for (const option of field.options) {
+    const label = worded(option);
+    seen.set(label, (seen.get(label) ?? 0) + 1);
+  }
+  return (option) => {
+    const label = worded(option);
+    if ((seen.get(label) ?? 0) < 2 || optionDetail(field, option)?.label === undefined)
+      return label;
+    return `${label} (${fallback(option)})`;
+  };
 }
