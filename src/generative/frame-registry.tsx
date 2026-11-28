@@ -8,6 +8,7 @@ import { waitingFields } from '../core/readiness';
 import { useFieldStrings, useResolveUrl } from '../react';
 import { fieldLabel, useFieldPresentation } from '../react/field-presentation';
 import { focusOutlineClass, linkTextClass } from '../react/role-tokens';
+import { locatedProblemMessage } from '../react/value-problem';
 import {
   actionShadowClass,
   headingClass,
@@ -58,7 +59,8 @@ interface ComposerProps {
 const NAMED_WAITING = 3;
 
 /**
- * What the run waits for, in the action row's words: the fields to fill for
+ * What the run waits for, in the action row's words: the first value to fix,
+ * with what is wrong with it, then the fields to fill for
  * the inputs the kernel's readiness counts as missing (`waitingFields`), or
  * nothing once none is. Inside a structure those are the members it refuses,
  * since a composer commonly spreads one structure's members over the page,
@@ -75,13 +77,28 @@ function useRunWaitsFor(): string | undefined {
   const presentation = useFieldPresentation();
   const strings = useFieldStrings();
   const waiting = waitingFields(inputs ?? [], isRecord(values) ? values : undefined)
-    .map(({ field, path }) => {
+    .map(({ field, path, problem }) => {
       const at = joinPath(INPUTS_ROOT, ...path);
-      return { field, path, on: placed.get(at), rank: rankOf(placed, at) };
+      return { field, path, problem, on: placed.get(at), rank: rankOf(placed, at) };
     })
     // A stable sort: what the page does not place keeps the descriptor's order, after the rest.
     .sort((a, b) => a.rank - b.rank);
   if (waiting.length === 0) return undefined;
+  // An input holding a value its facts refuse is not to fill but to fix, and
+  // the line says what is wrong with it - the first one, before the inputs
+  // still to fill. A method's pattern is judged at the run's own checks, not
+  // here, since this line follows every keystroke.
+  const fixing = waiting.find((entry) => entry.problem !== undefined);
+  const fix =
+    fixing?.problem &&
+    strings.runWaitsToFix(
+      fixing.on?.label ?? fieldLabel(fixing.field.title, fixing.field.name, presentation),
+      locatedProblemMessage(fixing.problem, strings, (leaf) =>
+        fieldLabel(leaf.title, leaf.name, presentation),
+      ),
+    );
+  const toFill = waiting.filter((entry) => entry.problem === undefined);
+  if (toFill.length === 0) return fix || undefined;
   const labelAt = (path: readonly string[]): string | undefined => {
     const field = inputFieldAtPath(inputs ?? [], joinPath(INPUTS_ROOT, ...path));
     if (!field) return undefined;
@@ -90,7 +107,7 @@ function useRunWaitsFor(): string | undefined {
       fieldLabel(field.title, field.name, presentation)
     );
   };
-  const named = waiting.slice(0, NAMED_WAITING);
+  const named = toFill.slice(0, NAMED_WAITING);
   const labels = named.map(
     ({ field, on }) => on?.label ?? fieldLabel(field.title, field.name, presentation),
   );
@@ -102,7 +119,8 @@ function useRunWaitsFor(): string | undefined {
     const around = shared && parent.length > 0 ? labelAt(parent) : undefined;
     return around ? `${label} (${around})` : label;
   });
-  return strings.runWaitsFor(names, waiting.length - names.length);
+  const fill = strings.runWaitsFor(names, toFill.length - names.length);
+  return fix ? `${fix} ${fill}` : fill;
 }
 
 /**
