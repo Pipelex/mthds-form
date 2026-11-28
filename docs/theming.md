@@ -128,11 +128,11 @@ The scan reads only what ships. Each tree's `__tests__` directory is excluded wi
 
 ## Status colours
 
-Four tokens name what a verdict, a badge or a count by outcome says, as a group of their own: `--positive` (passed, approved, within bounds), `--caution` (needs a look, near a bound), `--negative` (failed, refused, out of bounds) and `--neutral` (no judgement, not applicable). They are in the table above because each has a default in both themes, in `theme.css` and as the fallback of its `@theme inline` mapping, so `text-positive` or `bg-negative/10` renders in a host that defines nothing.
+Four tokens name what a verdict, a badge or a count by outcome says, as a group of their own: `--positive` (passed, approved, within bounds), `--caution` (needs a look, near a bound), `--negative` (failed, refused, out of bounds) and `--neutral` (no judgement, not applicable). They are in the table above because each has a default in both themes, in `theme.css` and as the fallback of its `@theme inline` mapping in `tailwind-entry.css`. The prebuilt sheet carries no utility for them while no control reads them, so a Tailwind host that wants `text-positive` or `bg-negative/10` maps the four `--color-*` keys in its own theme, as it maps the others ("Tailwind 4" above); the variables themselves have their defaults wherever `theme.css` is imported.
 
 - **Never derived from the brand's colours.** A team's button colour and accent say who the page belongs to; a status says what happened, and a red accent must not make every passed check read as a failure. A host or a brand sets the four as it sets any token, and holds them to the bar themselves: each reads at 4.5:1 as text on `--background` and on `--muted` in its theme, and the four stay distinct from one another.
 - **`--destructive` is not one of them.** It stays the colour of an error the form itself reports (a field in error, a framed section's error bar) and of a destructive action; `--negative` is the colour of a result's verdict.
-- **The defaults** are the Tailwind 700 shades of green, amber, red and zinc on the light page and the 400 shades on the dark one, each above 4.5:1 on the page and on the muted fill.
+- **The defaults** are the Tailwind 700 shades of green, amber and red and zinc-600 on the light page and the 400 shades on the dark one, each above 4.5:1 on the page and on the muted fill.
 - **No control reads them yet.** They are defined ahead of the result view's badges and verdicts, so that the first control to draw a status reads a token rather than a literal; `scripts/assert-bundle.mjs` lists them among the tokens the sheet may leave unread until then.
 
 ## Someone else's tokens: a brand

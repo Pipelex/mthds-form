@@ -4,7 +4,9 @@
 
 ### Added
 
-- **Status colour tokens**: `--positive`, `--caution`, `--negative` and `--neutral` join the theme table as a group of their own, each with a light and a dark default in `theme.css` and as the fallback of its `@theme inline` mapping (`text-positive`, `bg-negative/10` and the like), each reading at 4.5:1 on the page and on the muted fill; no control reads them yet, and a host sets them like any token (docs/theming.md, "Status colours").
+- **Status colour tokens**: `--positive`, `--caution`, `--negative` and `--neutral` join the theme table as a group of their own, each with a light and a dark default in `theme.css` and as the fallback of its `@theme inline` mapping, which a Tailwind host copies to get `text-positive`, `bg-negative/10` and the like, each reading at 4.5:1 on the page and on the muted fill; no control reads them yet, and a host sets them like any token (docs/theming.md, "Status colours").
+
+- **`AppStyleId` and `APP_STYLE_IDS` from `./generative/headless`** (and `./generative`): the style ids `inputBrief` and `resultBrief` take, which hosts imported from `./brand` before.
 
 ### Removed
 

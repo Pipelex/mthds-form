@@ -1478,7 +1478,7 @@ if (unshipped.length > 0) {
     fontProblems.push(`dist/styles.css does not declare ${undeclared.join(', ')}`);
   }
   if (fontProblems.length === 0) {
-    console.log("ok  theme.css leaves Tailwind's two typefaces to the host, and the sheet declares them");
+    console.log("ok  theme.css leaves Tailwind's typefaces to the host, and the sheet declares them");
   } else {
     failures.push(`${fontProblems.join('; ')}. See docs/theming.md.`);
   }

@@ -31,8 +31,8 @@ import { TEAM_KEYS, type TeamKey } from './teams';
  *   `soft`'s lifted dark one, a painted offset showed as a band of the page
  *   between the control and its ring.
  * - **Errors.** A field's error outline and a structure's card in error are
- *   drawn in the solid error colour, which the brand contract holds at 3:1 on
- *   the page and on a card; at half and seven tenths of it they read under
+ *   drawn in the solid error colour, which needs 3:1 on the page and on a
+ *   card; at half and seven tenths of it they read under
  *   3:1 even in the stock palette.
  *
  * See docs/theming.md, "Link, selected and focus", and docs/storybook.md,

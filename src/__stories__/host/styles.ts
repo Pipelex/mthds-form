@@ -1,4 +1,9 @@
-import { APP_STYLE_IDS, STYLE_DIRECTIONS, type AppStyleId } from '../../generative/style-direction';
+import {
+  APP_STYLE_IDS,
+  STYLE_DIRECTIONS,
+  isAppStyle,
+  type AppStyleId,
+} from '../../generative/style-direction';
 import {
   colorHex,
   isColorTokenName,
@@ -8,7 +13,7 @@ import {
 } from './color';
 import { parseHex } from './seed-roles';
 
-export { APP_STYLE_IDS, type AppStyleId };
+export { APP_STYLE_IDS, isAppStyle, type AppStyleId };
 
 /**
  * The app styles and the typefaces, as data, and the roles a team's choice of
@@ -325,13 +330,6 @@ const DEFINITIONS: Readonly<Record<AppStyleId, Definition>> = {
     },
   },
 };
-
-/** Whether `value` names one of the app styles. */
-export function isAppStyle(value: unknown): value is AppStyleId {
-  // Against the definitions themselves, which no caller can reach, rather
-  // than the exported list.
-  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(DEFINITIONS, value);
-}
 
 /**
  * The roles a team's choice sets: its style and its typeface, each a stored

@@ -57,3 +57,8 @@ export const APP_STYLE_IDS: readonly AppStyleId[] = Object.freeze([
   'editorial',
   'bold',
 ]);
+
+/** Whether `value` names one of the app styles. */
+export function isAppStyle(value: unknown): value is AppStyleId {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(STYLE_DIRECTIONS, value);
+}

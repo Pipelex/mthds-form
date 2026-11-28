@@ -11,7 +11,6 @@ import { buildRunFields, computeReadiness } from '@pipelex/mthds-form'; // headl
 import { FieldRenderer } from '@pipelex/mthds-form/react'; // the controls
 import { GenerativePage } from '@pipelex/mthds-form/generative'; // a produced layout
 import { layoutCheckProblems } from '@pipelex/mthds-form/generative/headless'; // producing and checking one, on a server
-import { assembleBrand } from '@pipelex/mthds-form/brand'; // a brand, held to the theme contract
 ```
 
 `.` is the kernel: no React, no design system, no framework. It has no runtime dependency to speak of: the gate validates through the kernel's own JSON Schema interpreter, which generates no code, so it runs in a browser under a Content Security Policy without `'unsafe-eval'`, in Node and in a worker.

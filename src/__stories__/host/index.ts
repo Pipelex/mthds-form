@@ -11,7 +11,9 @@
  * when the entry moved out of this package. It is story code, outside every
  * entry tree and shipped in nothing, and it is not kept in step with any
  * host's own derivation: what the stories measure is the controls, under
- * values a host could set, never the derivation itself.
+ * values a host could set, never the derivation itself. It is untested on
+ * purpose: its unit tests left with the code, to the host that owns it now,
+ * and a derivation slip here shows as a story's contrast check failing.
  */
 
 export {

@@ -11,8 +11,8 @@
  *
  * - `--link`, the accent as text (`accentInk`): an eyebrow or a section number
  *   on the page, and the checkmark, tag or step number on the selected fill.
- *   `deriveBrandRoles` measures that ink against the page and against the
- *   fill, so one token serves both.
+ *   A branding host's derivation measures that ink against the page and
+ *   against the fill, so one token serves both.
  * - `--selected`, the pale accent fill (`accentFill`) behind a selected pill
  *   or toggle, a chosen file, a tag or a completed step.
  *

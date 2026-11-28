@@ -19,7 +19,7 @@
  * un-branded: this package renders MTHDS input specs, and the surrounding
  * product supplies the brand.
  *
- * The four status colours (`--positive`, `--caution`, `--negative`,
+ * The status colours (`--positive`, `--caution`, `--negative`,
  * `--neutral`) are this package's own addition to that palette: a group of
  * their own, never derived from the brand's colours, each reading at 4.5:1
  * as text on the page and on the muted fill in its theme (docs/theming.md,
