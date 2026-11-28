@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { CONTRACTS, OUTPUT_FORM } from '../_generated/results';
 import { PAYLOADS } from '../_generated/results.payloads';
-import { readDateContent } from '../../core';
+import { formatFieldNumber, readDateContent } from '../../core';
 import { DEFAULT_FIELD_STRINGS } from '../../react';
 import { ResultView, itemsOf } from '../result-view';
 
@@ -85,13 +85,22 @@ export const NativeText: Story = {
   },
 };
 
-/** A `Number` output — the same single-property unwrap, over `number`. */
+/**
+ * A `Number` output — the same single-property unwrap, over `number`, written
+ * grouped and rounded as every number is (`formatFieldNumber`, read here as an
+ * oracle).
+ */
 export const NativeNumber: Story = {
   args: story('number_result'),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const value = payload('number_result').number;
-    await expect(canvas.getAllByText(String(value))).toHaveLength(BOTH_THEMES);
+    const value = payload('number_result').number as number;
+    const written = formatFieldNumber(
+      { integer: false },
+      value,
+      DEFAULT_FIELD_STRINGS.numberLocale,
+    );
+    await expect(canvas.getAllByText(written)).toHaveLength(BOTH_THEMES);
   },
 };
 
