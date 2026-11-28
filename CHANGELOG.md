@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Controls drawn from a method's meaning (MTHDS `9.2.0`)**: a bounded number gets a slider, a `rating` with whole bounds a row of steps, and a number with a `unit` its currency symbol, `%` or unit of measure beside the input; a text's `format` picks the browser's email, web address, time or date-and-time input (a time stored with its seconds, a date-time with the browser's offset); a `max_length` draws a counter; `examples` are chips that fill the field; options with descriptions are cards, with the dot of their `tone`; and the `code`, `identifier`, `question`, `photo`, `screenshot` and `scan` intents set a monospace input, a composer box, the camera first or a paste button.
+- **The role layout in `MethodForm`**: when a method states a `role` on some input, the subject comes first and the references and settings fold behind a disclosure of their own, with the standard's defaults for an input that states none; a reference or setting the run waits for stays in view.
+- **A result page drawn from a method's meaning**: a number reads in its unit (money in its currency where the reader's locale writes it, a percentage, a measure), against its bounds as a meter; a toned choice reads as a badge; a record's `verdict` comes first and large, with its `title`, `summary` and `metric` tiles after it, in `app`; a list of titled records reads as cards in `app`, counted by its verdict above them, with the totals and averages its fields declare below them.
+- **Core helpers for a method's meaning**: `formatFieldNumber`, `currencyAffix`, `isCurrencyUnit` and `unitSymbol` write a number in its unit; `intentOf`, `roleOf`, `partOf`, `memberWithPart`, `optionTone` and the word lists read the hints; `valueProblem` and `codePointLength` check a value against its contract facts; `orderByRole`, `formGroupOf` and `effectiveRole` lay the inputs out by role; and `RunField` carries `unit`, `aggregate`, `exclusiveMin`, `exclusiveMax` and an enum's `optionDetails`.
+- **New `FieldStrings` keys**: `numberLocale`, the `problem*` messages, `lengthCounter`, `examplesLabel`, `formatPlaceholder`, `questionPlaceholder`, `scaleStepAria`, `foldedGroupShow`, `foldedGroupHide`, `pasteScreenshot`, `pasteNoImage`, `scanPages`, `aggregateSum`, `aggregateAverage`, `verdictCountsAria`, `recordDetails` and `meterValueText`, in English and French; a host with its own complete `FieldStrings` adds them.
+
+### Changed
+
+- **Readiness checks a value against its contract facts (Breaking)**: a filled value that breaks its method's bounds, lengths, `pattern` or `format` counts as missing, as the run gate refuses it, and `gateRefusal` returns the new `invalid` arm, which `MethodForm` words after an attempt ("Must be an email address."); a host switching over `gateRefusal`'s result handles `invalid`.
+- **Every number in a result is grouped and rounded**: a number with no unit reads `2,116.2` rather than `2116.2000000000003`, grouped when the method says it is an amount or it is not whole, and a number column aligns right; the JSON view and the download keep the value as the run returned it.
+- **An option's authored `label` replaces its worded code** in the form and the result, in both presentations.
+- **`TextConstraints.format` is the standard's `ContractFormat` (Breaking)**: the closed set of formats MTHDS `9.2.0` defines, rather than any string.
+- **Packaging: the `mthds` floor moves to `^0.38.0`**, the client of MTHDS `9.2.0`, whose descriptor types this release reads.
+
 ## [v0.43.0] - 2026-11-28
 
 ### Added

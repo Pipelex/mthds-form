@@ -93,7 +93,9 @@ The budget's real subject is **what a consumer ships to its users**, and for a b
 
 Every control imported its types from the `../core` barrel, which is convenient and free; two of them also imported a _value_ from it (`isFilled`, and the two date helpers). The barrel statically imports the gate, the gate imported ajv, so tsup's shared chunk began `import Ajv from 'ajv'` and every host rendering a control got the validator. The validator is the package's own code now, and the same import would put it in that chunk just the same.
 
-So the rule the controls follow is: **type imports from the `../core` barrel, value imports from the specific module.** A type import is erased before bundling and costs nothing; a value import is what pulls a graph. `../core/readiness` and `../core/date-format` are leaves — between them they import one small module and nothing else — so the chunk the two entries share is those three files and has no imports at all.
+So the rule the controls follow is: **type imports from the `../core` barrel, value imports from the specific module.** A type import is erased before bundling and costs nothing; a value import is what pulls a graph. The modules a control takes values from are small and import nothing beyond the core's own small modules, so the chunk the two entries share never reaches the gate or its validator.
+
+Readiness grew one leaf of its own with MTHDS `9.2.0`: it checks a filled value against its contract facts (`value-checks`), and a format by the gate's own table, `schema-formats`, so the two halves cannot disagree about what an email is. That table and its date helpers therefore reach `./react` beside readiness. The table is a module of regular expressions and small functions with no import of its own; the validator, `schema-validator`, is not on that path, and `make assert-bundle` still fails any entry but `.` that reaches it. No dependency was added for any of the `9.2.0` work: numbers, currencies and percentages are the platform's `Intl.NumberFormat`.
 
 ### The `.` barrel is a pure re-export, so a consumer can tree-shake it
 

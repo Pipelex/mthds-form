@@ -274,6 +274,10 @@ The last four are about the [generative layer](../src/generative/) rather than t
 
 Every pass is dev-only: the emitted `.ts` files are committed, so `make storybook` and `make test` need nothing but node. The three that read this repo's TypeScript straight from `src/` run under tsx, because node cannot resolve extensionless imports on its own.
 
+### The facts the engine does not project yet: `_spec-shaped/`
+
+MTHDS `9.2.0` added facts to the descriptor (a number's `unit` and `aggregate`, a text's `format` and lengths, `examples`, described and toned `options`, and the `intent`, `role` and `part` hints) that the engine `make fixtures` runs on does not project yet. The stories of the controls and result elements those facts drive (`Inputs/Designed Controls`, the role stories of `Inputs/Method Form`, `Outputs/Designed Results`) read `src/__stories__/_spec-shaped/` instead. It is not a hand-written fixture: it clones a generated descriptor, contract and payload unchanged, under a new pipe code so no other story sees the change, and adds the 9.2.0 facts to named nodes, typed by the standard's own node interfaces so a fact the standard does not define does not compile. The payloads are the real runs'. It is temporary: once the engine projects these facts, they move into the structures under `src/__stories__/_structures/`, `make fixtures` and `make fixtures-runs` regenerate, the stories point back at `_generated/`, and the directory is deleted.
+
 ### The guard
 
 `src/__stories__/__tests__/corpus.test.ts` (the `corpus` vitest project, node) asserts the corpus and the generated tree describe the same set. It cannot assert the _content_ is current — only a regeneration can — but a case added, renamed or removed without regenerating is the shape this actually fails as, and nothing else would notice.
