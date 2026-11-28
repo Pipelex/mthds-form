@@ -14,6 +14,11 @@ import {
   optionalStructureOpen,
 } from '../core/readiness';
 import { closeOptionalStructures, openOptionalStructures, seedInputs } from '../core/seed';
+import { formGroupOf, formHasRoles, orderByRole } from '../core/field-roles';
+import { valueProblem } from '../core/value-checks';
+import { Minus, Plus } from 'lucide-react';
+import { focusOutlineClass } from './role-tokens';
+import { problemMessage } from './value-problem';
 import { apiInputsFromRunValues, sameRunValues, setValueAtPath } from '../core/values';
 import type { LoadText } from '../core/stored-value';
 import { FillWithExample, type ExamplePickerSource } from './example-fill';
@@ -575,7 +580,10 @@ export function useMethodForm({
   const fields = useMemo(() => {
     const derived = buildRunFields(descriptor, contract.inputs);
     const prepared = prepareFields ? prepareFields(derived) : derived;
-    return orderFields(prepared, orderKey ? orderKey.split('\u0000') : undefined);
+    // The role layout first (subject, then context and guidance, then the
+    // references and settings, when the method states roles), then the host's
+    // own order over it, which a host states for a reason the method cannot.
+    return orderFields(orderByRole(prepared), orderKey ? orderKey.split('\u0000') : undefined);
   }, [descriptor, contract.inputs, prepareFields, orderKey]);
 
   const initial = useMemo<MethodFormValues>(() => {
@@ -900,8 +908,9 @@ function MethodFormFields({
 }: MethodFormFieldsProps) {
   const s = useFieldStrings();
   const [showOptional, setShowOptional] = useState(false);
+  const [showFoldedGroup, setShowFoldedGroup] = useState(false);
   const {
-    fields,
+    fields: allFields,
     values,
     setValues,
     removeItem,
@@ -961,6 +970,15 @@ function MethodFormFields({
     ],
   );
 
+  // The role layout (MTHDS 9.2.0 `role` hints, docs/method-form.md): the
+  // references and settings a method states fold behind a disclosure of their
+  // own, after every other input, unless the run waits for one that nothing
+  // fills. With no role stated, nothing is in that group and the form is as it
+  // was. The optional disclosure below covers the other inputs only.
+  const roles = formHasRoles(allFields);
+  const roleFolded = allFields.filter((field) => formGroupOf(field, roles) === 'folded');
+  const fields = allFields.filter((field) => !roleFolded.includes(field));
+
   // The same disclosure the object control draws inside a structure, at the
   // top level. With folding off, only a closed optional structure folds: it
   // has no control of its own, and the disclosure is what opens it.
@@ -995,7 +1013,35 @@ function MethodFormFields({
     const hostError = errors ? ownProp(errors, field.name) : undefined;
     if (hostError) return hostError;
     if (refusal === 'required') return s.requiredField;
+    if (refusal === 'invalid') {
+      const problem = valueProblem(field, ownProp(values, field.name));
+      return problem ? problemMessage(field, problem, s) : undefined;
+    }
     return refusal === 'incomplete' ? s.incompleteField : undefined;
+  };
+
+  // The folded group opens by itself once a run was attempted with one of its
+  // inputs refused, so the mark is never out of sight.
+  const foldedGroupOpen = showFoldedGroup || roleFolded.some((field) => refusalOf(field));
+
+  const renderField = (field: RunField) => {
+    const refusal = refusalOf(field);
+    return (
+      // Remounted on each reset, so no control keeps what it held for the
+      // values the reset replaced (a file still arriving, a failed drop). A
+      // structure the gate refuses marks the members it refuses, whatever
+      // a host's message says of the structure.
+      <RefusedStructureContext key={`${field.name}:${resets}`} value={refusal ? field.name : null}>
+        <FieldRenderer
+          field={field}
+          id={field.name}
+          value={ownProp(values, field.name)}
+          error={errorFor(field, refusal)}
+          env={env}
+          onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
+        />
+      </RefusedStructureContext>
+    );
   };
 
   return (
@@ -1003,7 +1049,7 @@ function MethodFormFields({
       {exampleSource && (
         <FillWithExample
           source={exampleSource}
-          fields={fields}
+          fields={allFields}
           touched={touched}
           // Filling is a reset to the example's values: the attempt, the
           // failed uploads and any upload in flight go with what was there.
@@ -1011,30 +1057,31 @@ function MethodFormFields({
           disabled={disabled}
         />
       )}
-      {visible.map((field) => {
-        const refusal = refusalOf(field);
-        return (
-          // Remounted on each reset, so no control keeps what it held for the
-          // values the reset replaced (a file still arriving, a failed drop). A
-          // structure the gate refuses marks the members it refuses, whatever
-          // a host's message says of the structure.
-          <RefusedStructureContext
-            key={`${field.name}:${resets}`}
-            value={refusal ? field.name : null}
-          >
-            <FieldRenderer
-              field={field}
-              id={field.name}
-              value={ownProp(values, field.name)}
-              error={errorFor(field, refusal)}
-              env={env}
-              onChange={(next) => setValues((previous) => ({ ...previous, [field.name]: next }))}
-            />
-          </RefusedStructureContext>
-        );
-      })}
+      {visible.map(renderField)}
       {(folded.length > 0 || structureOpen) && (
         <OptionalToggle count={folded.length} expanded={expanded} onToggle={toggle} noun="input" />
+      )}
+      {roleFolded.length > 0 && (
+        <div data-folded-group="" className="space-y-6">
+          <button
+            type="button"
+            onClick={() => setShowFoldedGroup(!foldedGroupOpen)}
+            aria-expanded={foldedGroupOpen}
+            className={cn(
+              'flex w-fit items-center gap-1.5 rounded-sm text-[12px] text-muted-foreground transition-colors hover:text-foreground max-sm:min-h-11',
+              focusOutlineClass,
+              'focus-visible:outline-offset-2',
+            )}
+          >
+            {foldedGroupOpen ? (
+              <Minus className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <Plus className="h-3 w-3" aria-hidden="true" />
+            )}
+            {foldedGroupOpen ? s.foldedGroupHide : s.foldedGroupShow(roleFolded.length)}
+          </button>
+          {foldedGroupOpen && roleFolded.map(renderField)}
+        </div>
       )}
     </div>
   );

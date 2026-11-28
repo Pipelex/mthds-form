@@ -242,6 +242,21 @@ export function FieldRenderer({ field, value, onChange, id, error, env }: FieldR
         />
       );
     case 'prose':
+      // A text the method gives a format (an email, a web address, a time) is
+      // one line by nature, whatever its kind: the engine assigns `prose` to
+      // every `native.Text` slot, so the format, not the kind, picks the
+      // single-line, format-aware input here.
+      if (field.format !== undefined)
+        return (
+          <TextField
+            field={{ ...field, kind: 'text' }}
+            value={value as string | undefined}
+            onChange={onChange}
+            id={id}
+            error={error}
+            disabled={disabled}
+          />
+        );
       return (
         <ProseField
           field={field}

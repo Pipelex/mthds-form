@@ -27,11 +27,14 @@ export const TOUCH_ONLY_CLASS = 'hidden [@media(hover:none)]:flex';
  */
 export function TakePhotoButton({
   label,
+  text,
   disabled,
   onTake,
 }: {
   /** The field's label as the form shows it, which the button's name carries. */
   label: string;
+  /** What the button says in place of `takePhoto`: `scanPages` for a scan. */
+  text?: string;
   disabled?: boolean;
   onTake: () => void;
 }) {
@@ -41,7 +44,8 @@ export function TakePhotoButton({
       type="button"
       onClick={onTake}
       disabled={disabled}
-      aria-label={s.takePhotoAria(label)}
+      // A scan's own words are its name, so the name holds what it says.
+      aria-label={text === undefined ? s.takePhotoAria(label) : undefined}
       data-take-photo=""
       className={cn(
         rowActionClass,
@@ -51,7 +55,7 @@ export function TakePhotoButton({
       )}
     >
       <Camera className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      {s.takePhoto}
+      {text ?? s.takePhoto}
     </button>
   );
 }

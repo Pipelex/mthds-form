@@ -1,5 +1,7 @@
 'use client';
 
+import { valueProblem } from '../core/value-checks';
+import { problemMessage } from './value-problem';
 import { createContext, use, useState } from 'react';
 import { cn } from './utils';
 import type { ObjectRunField, RunField } from '../core';
@@ -164,8 +166,13 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
   const s = useFieldStrings();
   const markOf = (child: RunField): string | undefined => {
     if (!refused) return undefined;
-    const refusal = gateRefusal(child, ownProp(data, child.name), child.required);
+    const held = ownProp(data, child.name);
+    const refusal = gateRefusal(child, held, child.required);
     if (refusal === 'required') return s.requiredField;
+    if (refusal === 'invalid') {
+      const problem = valueProblem(child, held);
+      return problem ? problemMessage(child, problem, s) : undefined;
+    }
     return refusal === 'incomplete' ? s.incompleteField : undefined;
   };
 

@@ -3,7 +3,17 @@
 import { shownAsOptional } from '../core/readiness';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Eye, EyeOff, FileText, ImageOff, Link2, Loader2, Upload, X } from 'lucide-react';
+import {
+  ClipboardPaste,
+  Eye,
+  EyeOff,
+  FileText,
+  ImageOff,
+  Link2,
+  Loader2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { focusOutlineClass, focusWithinOutlineClass } from './role-tokens';
 import { cn, isThenable, storedUrlOf } from './utils';
 import type { FileRunField } from '../core';
@@ -23,7 +33,8 @@ import { FieldShell } from './field-shell';
 import { encodedFileSummary } from './encoded-file';
 import { fieldLabel, useFieldPresentation, type FieldPresentation } from './field-presentation';
 import { useFieldStrings, type FieldStrings } from './field-strings';
-import { fieldControlClass, smallPrintClass } from './field-styles';
+import { fieldControlClass, rowActionClass, smallPrintClass } from './field-styles';
+import { intentOf } from '../core/hints';
 import { useFieldDomId } from './field-dom-id';
 import { FilePicker, FilePickerEntry, type FilePickerSource } from './file-picker';
 import { useListDropArea } from './list-drop-area';
@@ -551,6 +562,55 @@ function FileField({
 
   const busy = disabled || uploading;
 
+  // What the method says the picture is (MTHDS 9.2.0 intent words): a `photo`
+  // or a `scan` offers the camera FIRST, above the drop zone, a scan worded as
+  // the page-by-page capture it is; a `screenshot` takes a paste from the
+  // clipboard, through a button and through Ctrl+V or Cmd+V anywhere in the
+  // drop zone. A word a field does not have changes nothing.
+  const intent = intentOf(field);
+  const cameraFirst = intent === 'photo' || intent === 'scan';
+  const pasteable = canUpload && intent === 'screenshot';
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
+  const takePasted = useCallback(
+    (blob: Blob | undefined) => {
+      if (!blob) {
+        setPasteNote(s.pasteNoImage);
+        return;
+      }
+      setPasteNote(null);
+      const extension = blob.type.split('/')[1] ?? 'png';
+      handleFile(new File([blob], `${label || 'Screenshot'}.${extension}`, { type: blob.type }));
+    },
+    [handleFile, label, s.pasteNoImage],
+  );
+  const pasteFromClipboard = useCallback(async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((candidate) => candidate.startsWith('image/'));
+        if (type) {
+          takePasted(await item.getType(type));
+          return;
+        }
+      }
+      takePasted(undefined);
+    } catch {
+      // A browser that refuses clipboard reads, or a person who declined:
+      // the keyboard paste into the drop zone still works.
+      takePasted(undefined);
+    }
+  }, [takePasted]);
+  const onPaste = (event: React.ClipboardEvent) => {
+    if (!pasteable || busy) return;
+    const file = [...event.clipboardData.files].find((candidate) =>
+      candidate.type.startsWith('image/'),
+    );
+    if (file) {
+      event.preventDefault();
+      takePasted(file);
+    }
+  };
+
   const {
     getRootProps,
     getInputProps,
@@ -896,6 +956,16 @@ function FileField({
       // and the input's accessible name computes to the empty string.
       htmlFor={domId}
     >
+      {/* A photo or a scan offers the camera first, above the drop zone,
+          while the input is empty: on a touch screen only, as ever. */}
+      {camera && cameraFirst && !photos.held && !hasFile && (
+        <TakePhotoButton
+          label={label}
+          text={intent === 'scan' ? s.scanPages : undefined}
+          disabled={busy}
+          onTake={() => openCamera(null)}
+        />
+      )}
       {photos.held ? (
         // The pages in place of the dropzone, and under them the file they
         // made once it is stored, or its upload while it is on its way.
@@ -1052,7 +1122,7 @@ function FileField({
         // outline is `focus-within` because the element that takes focus is
         // clip-hidden.
         <div
-          {...getRootProps()}
+          {...getRootProps({ onPaste })}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center',
             'cursor-pointer select-none transition-colors',
@@ -1090,8 +1160,25 @@ function FileField({
 
       {/* "Take photo", under the dropzone and before the team's files, while
           the input is empty: on a touch screen only, which CSS decides. */}
-      {camera && !photos.held && !hasFile && (
+      {camera && !cameraFirst && !photos.held && !hasFile && (
         <TakePhotoButton label={label} disabled={busy} onTake={() => openCamera(null)} />
+      )}
+      {pasteable && !hasFile && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void pasteFromClipboard()}
+          data-paste-screenshot=""
+          className={cn(rowActionClass, focusOutlineClass)}
+        >
+          <ClipboardPaste className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          {s.pasteScreenshot}
+        </button>
+      )}
+      {pasteNote && (
+        <p role="status" className="text-[12px] text-muted-foreground">
+          {pasteNote}
+        </p>
       )}
       {camera && <CameraInput ref={cameraRef} disabled={disabled} onPhoto={takePhoto} />}
 

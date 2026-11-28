@@ -446,6 +446,71 @@ export interface FieldStrings {
    * loaded, so the file holds their links instead. Takes how many.
    */
   storedTextsNotLoaded: (count: number) => string;
+  // The method's meaning (MTHDS 9.2.0, docs/method-form.md and
+  // docs/result-view.md): what a value's contract facts refuse, the length
+  // counter, the examples, the role layout's folded group, and a result's
+  // totals, counts and meters.
+  /**
+   * The BCP 47 locale a number, an amount and a percentage are written in, in
+   * the form's amount control and in the result view (`formatFieldNumber`). A
+   * tag `Intl` refuses falls back to `en-GB`.
+   */
+  numberLocale: string;
+  /** A number under its minimum; the limit as the field writes it. */
+  problemBelowMinimum: (limit: string) => string;
+  /** A number over its maximum. */
+  problemAboveMaximum: (limit: string) => string;
+  /** A number at or under an exclusive minimum. */
+  problemNotAbove: (limit: string) => string;
+  /** A number at or over an exclusive maximum. */
+  problemNotBelow: (limit: string) => string;
+  /** A fraction in a whole-number field. */
+  problemNotInteger: string;
+  /** A text shorter than its minimum length, in characters. */
+  problemTooShort: (limit: number) => string;
+  /** A text longer than its maximum length, in characters. */
+  problemTooLong: (limit: number) => string;
+  /** A text that does not match the method's pattern. */
+  problemPattern: string;
+  /** A text that is not of its format, given the standard's format name (`email`, `uri`, …). */
+  problemFormat: (format: string) => string;
+  /** Under a text with a maximum length: how many characters it holds, of how many. */
+  lengthCounter: (count: number, max: number) => string;
+  /** What a screen reader hears of that counter: how many are left, or how many too many. */
+  lengthCounterAria: (count: number, max: number) => string;
+  /** Before the chips that fill a field with one of the method's examples. */
+  examplesLabel: string;
+  /** The accessible name of one example chip, given the example as the chip shows it. */
+  useExampleAria: (example: string) => string;
+  /**
+   * The placeholder of a text field the method gives a format, given the
+   * format's name; `undefined` keeps the field's ordinary placeholder.
+   */
+  formatPlaceholder: (format: string) => string | undefined;
+  /** The placeholder of a question's composer box (`intent = "question"`). */
+  questionPlaceholder: string;
+  /** The accessible name of one step of a rating scale: the value, of the scale's top. */
+  scaleStepAria: (value: string, max: string) => string;
+  /** The disclosure over the references and settings a role layout folds, given how many. */
+  foldedGroupShow: (count: number) => string;
+  /** The same disclosure, open. */
+  foldedGroupHide: string;
+  /** The button that pastes a picture from the clipboard into a screenshot field. */
+  pasteScreenshot: string;
+  /** The clipboard held no picture when a screenshot was pasted. */
+  pasteNoImage: string;
+  /** The camera action of a scan field (`intent = "scan"`), in place of `takePhoto`. */
+  scanPages: string;
+  /** A result table's total row, before the column's name. */
+  aggregateSum: string;
+  /** A result table's average row. */
+  aggregateAverage: string;
+  /** The line over a list of records counting them by verdict, as its accessible name. */
+  verdictCountsAria: string;
+  /** The disclosure on a record's card that holds the fields its head does not show. */
+  recordDetails: string;
+  /** A meter's accessible value: the value as written, between its bounds. */
+  meterValueText: (value: string, min: string, max: string) => string;
 }
 
 /** The English strings, which every control falls back to. Kept under this name for existing hosts. */
