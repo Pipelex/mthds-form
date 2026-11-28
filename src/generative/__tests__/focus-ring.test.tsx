@@ -2,7 +2,7 @@ import type { Spec } from '@json-render/core';
 import { createStateStore } from '@json-render/core';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { BrandManifest } from '../../brand/manifest';
+import type { BrandManifest } from '../brand-manifest';
 import { unringed } from '../../react/__tests__/unringed';
 import { GenerativePage } from '../page';
 

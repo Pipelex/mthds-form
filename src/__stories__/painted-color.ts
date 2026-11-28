@@ -1,4 +1,4 @@
-import { contrastRatio, type SrgbColor } from '../brand';
+import { contrastRatio, type SrgbColor } from './host';
 
 /**
  * Colours as the browser paints them, for a story that asks whether one reads

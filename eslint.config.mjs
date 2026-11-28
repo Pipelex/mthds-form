@@ -92,7 +92,7 @@ const BUDGET_PATTERNS = [
  * control set.
  *
  * json-render is what a produced layout is written against, and zod is what
- * json-render's catalog and the brand entry's schemas are written in; neither
+ * json-render's catalog and the layer's schemas are written in; neither
  * has any business in the kernel or in the control set, and the entry split
  * alone would not stop one arriving there - a single import from `src/react/`
  * would put both in the chunk the controls ship. `scripts/assert-bundle.mjs`
@@ -102,29 +102,7 @@ const GENERATIVE_PATTERNS = [
   {
     group: ['@json-render/*', 'zod', 'zod/*'],
     message:
-      'json-render and zod belong to the generative layer and the brand entry - src/generative/, src/brand/. See docs/dependency-budget.md.',
-  },
-];
-
-/**
- * What `./brand` may not reach. The entry is isomorphic and network-free and
- * depends on zod and nothing else (docs/dependency-budget.md), so it is held
- * off every other entry's dependencies, off the other entries themselves (a
- * value import of `../generative` would drag React and json-render into a
- * module a node script imports), and off Terrazzo, which is a devDependency of
- * one cross-check test and of nothing that ships. `scripts/assert-bundle.mjs`
- * holds the same line on the built graph, where the allow-list is exact.
- */
-const BRAND_PATTERNS = [
-  {
-    group: ['@json-render/*'],
-    message: '`./brand` depends on zod alone. See docs/dependency-budget.md.',
-  },
-  {
-    regex: '^(?:\\.\\./)+(?:core|react|generative)(?:/.*)?$',
-    allowTypeImports: true,
-    message:
-      '`./brand` reaches no other entry - it has to stay importable from a node script with nothing else installed. See docs/brand.md.',
+      'json-render and zod belong to the generative layer - src/generative/. See docs/dependency-budget.md.',
   },
 ];
 
@@ -312,12 +290,6 @@ const headlessImportsRule = {
   },
 };
 
-const TERRAZZO_PATTERN = {
-  group: ['@terrazzo/*'],
-  message:
-    "Terrazzo is the cross-check test's devDependency - the kernel compiles a brand itself. See docs/brand.md.",
-};
-
 const REACT_PATTERNS = [
   {
     group: ['react', 'react-dom', 'react/*', 'react-dom/*'],
@@ -440,26 +412,6 @@ export default tseslint.config(
         { patterns: [...BUDGET_PATTERNS, CORE_BARREL_PATTERN, ...HEADLESS_GENERATIVE_PATTERNS] },
       ],
       'mthds/headless-imports': 'error',
-    },
-  },
-  {
-    files: ['src/brand/**/*.ts'],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS, ...BRAND_PATTERNS, TERRAZZO_PATTERN] },
-      ],
-    },
-  },
-  {
-    // The cross-check compiles every committed brand through Terrazzo, which
-    // is the one place a standard DTCG tool is asked what it reads.
-    files: ['src/brand/__tests__/**/*.ts'],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        { patterns: [...BUDGET_PATTERNS, ...REACT_PATTERNS, ...BRAND_PATTERNS] },
-      ],
     },
   },
   {

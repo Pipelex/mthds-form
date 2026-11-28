@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { findFixture } from '../../generative';
 import { CONTRACTS, INPUT_FORM } from '../_generated/trips';
 import { SPECS } from '../_generated/trips.specs';
-import { MTHDS, PIPELEX, STOCK } from './brands';
+import { STOCK } from './brands';
 import {
   GENERATIVE_STORY_PARAMETERS,
   heroFields,
@@ -43,7 +43,5 @@ type Story = StoryObj<typeof meta>;
 const PINNED = 'pipelex-method--gpt-6.1-sol';
 
 export const Gpt61Sol: Story = layoutStory(layout(PINNED), STOCK);
-export const MthdsTokens: Story = layoutStory(layout(PINNED), MTHDS);
-export const PipelexTokens: Story = layoutStory(layout(PINNED), PIPELEX);
 
 export const Gpt61SolPhone: Story = onAPhone(layoutStory(layout(PINNED), STOCK));

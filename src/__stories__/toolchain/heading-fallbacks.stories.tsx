@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { createStateStore, type Spec } from '@json-render/core';
 import * as React from 'react';
 import { expect } from 'storybook/test';
-import type { BrandManifest } from '../../brand';
+import type { BrandManifest } from '../../generative';
 import { GenerativePage } from '../../generative';
 import { Markdown } from '../../react';
 import { Dialog, DialogTitle } from '../../react/ui/dialog';

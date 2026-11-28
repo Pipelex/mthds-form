@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Status colour tokens**: `--positive`, `--caution`, `--negative` and `--neutral` join the theme table as a group of their own, each with a light and a dark default in `theme.css` and as the fallback of its `@theme inline` mapping, which a Tailwind host copies to get `text-positive`, `bg-negative/10` and the like, each reading at 4.5:1 on the page and on the muted fill; no control reads them yet, and a host sets them like any token (docs/theming.md, "Status colours").
+
+- **`AppStyleId` and `APP_STYLE_IDS` from `./generative/headless`** (and `./generative`): the style ids `inputBrief` and `resultBrief` take, which hosts imported from `./brand` before.
+
+### Removed
+
+- **The `./brand` entry (Breaking)**: the brand contract and its compiler, the token validator, the stated facts, the provenance, `assembleBrand`, `deriveBrandRoles` and `deriveStyleRoles` with `APP_STYLES` and `TYPEFACES` are no longer exported, and the package no longer depends on Terrazzo; producing and checking a brand is the host's, and the kernel keeps only the named tokens its controls read, each with a default. A host that imported `@pipelex/mthds-form/brand` keeps its own copy of what it used. `./generative` still exports `brandManifestSchema`, `BrandManifest`, `BrandProvider` and `BrandBar` for `GenerativePage`'s `brand` prop and its app bar, and the designer's brief still takes a style id (`quiet`, `soft`, `editorial` or `bold`).
+
 ## [v0.42.3] - 2026-11-26
 
 ### Added

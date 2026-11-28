@@ -15,7 +15,7 @@
  * reads it off the generated module.
  */
 
-import { APP_STYLE_IDS, type AppStyleId } from '../brand/styles';
+import { APP_STYLE_IDS, type AppStyleId } from '../generative/style-direction';
 import { FRAMES, type Frame } from '../generative/frame-definitions';
 
 /** Where a hero's case lives, and what the fixtures pass did to it. */

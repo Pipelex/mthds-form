@@ -93,8 +93,8 @@ export function FieldShell({
           at this position changed type whenever the error toggled, and React
           remounted the control: a host that clears an error as the user types
           took the focus and the keystroke after the first with it.
-          The outline is the error colour itself, which the brand contract
-          holds at 3:1 on the page and on a card; at seven tenths of it, it
+          The outline is the error colour itself, which needs 3:1 on the
+          page and on a card; at seven tenths of it, it
           read under that bar even in the stock palette. And it is an outline,
           whose offset is a gap the surface shows through: a ring's offset is
           painted in the page colour, and inside a host's panel filled

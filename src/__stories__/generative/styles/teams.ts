@@ -4,7 +4,7 @@ import {
   type BrandSeeds,
   type ColorTokenName,
   type StyleRoles,
-} from '../../../brand';
+} from '../../host';
 
 /**
  * Teams' colours, as a team sets them: up to three seeds (the button,
@@ -12,8 +12,7 @@ import {
  * colours, read off the custom properties each site's stylesheets declare.
  * They were picked from brands a brand-reading method produced from those
  * sites on 2026-10-10 (claude-5.5-opus), a corpus kept outside this
- * repository, unlike the one under `data/brands/` that `make brands`
- * compiles. So `provenance` is the audit trail here: it names the property
+ * repository. So `provenance` is the audit trail here: it names the property
  * behind each seed, which anyone can read off the live site again. A team's
  * name and logo are the site's, loaded from the site on every render (no
  * check depends on them arriving), and nothing here is that organisation's
@@ -169,7 +168,7 @@ export function bandOn(header: string, onHeader: string, theme: Theme): Record<s
 
 /**
  * A team's colours as the kernel's tokens, in one theme, mapped as
- * docs/brand.md § "Mapping the roles onto tokens" says: the button colour
+ * a branding host maps them (docs/theming.md, "Link, selected and focus"): the button colour
  * onto `--primary`, the accent's ink onto `--link` and `--ring`, its pale
  * fill onto `--selected`. The header band's two roles go to the host's own
  * band, which the controls do not draw. An absent role sets nothing, so the

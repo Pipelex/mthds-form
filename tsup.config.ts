@@ -7,7 +7,6 @@ import { defineConfig } from "tsup";
  *   `./react`               -> dist/react/index.js                (the control set)
  *   `./generative`          -> dist/generative/index.js           (the layer over a produced layout)
  *   `./generative/headless` -> dist/generative/headless/index.js  (that layer's half that renders nothing)
- *   `./brand`               -> dist/brand/index.js                (a brand as data: validated and compiled)
  *
  * The two generative entries split the layer the way `.` and `./react` split
  * the form: `./generative/headless` is the producer and the checks, React-free
@@ -47,7 +46,6 @@ export default defineConfig({
     "src/react/index.ts",
     "src/generative/index.ts",
     "src/generative/headless/index.ts",
-    "src/brand/index.ts",
   ],
   format: ["esm"],
   dts: true,
@@ -70,7 +68,7 @@ export default defineConfig({
     // that every control file carries in source does NOT survive into the
     // bundle. Re-assert it on the entries that render: a consumer bundler
     // treats each as a client boundary, which pulls the shared chunks it
-    // imports into the client graph with it. The core, brand and
+    // imports into the client graph with it. The core and
     // generative/headless entries deliberately do NOT get one - each must stay
     // usable from a server component, and from a plain node script as well.
     for (const entry of ["dist/react/index.js", "dist/generative/index.js"]) {

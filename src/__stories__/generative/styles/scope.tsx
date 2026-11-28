@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { deriveStyleRoles, type AppStyleId, type TypefaceId } from '../../../brand';
+import { deriveStyleRoles, type AppStyleId, type TypefaceId } from '../../host';
 import { googleFontsHref, styleTokens } from './styles';
 import { TEAMS, styleSurfaces, teamTokens, type TeamKey } from './teams';
 import './frame.css';

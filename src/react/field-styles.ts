@@ -5,8 +5,7 @@
  * so every field type reads as the same family - generous enough for touch
  * (≥44px tall) and never the cramped `text-xs` of the old playground panel.
  *
- * A branding host sets `--ring` to its accent ink (`deriveBrandRoles`'s
- * `accentInk`), which reads at 4.5:1 against the page it was derived for, so
+ * A branding host sets `--ring` to its accent ink, which reads at 4.5:1 against the page it was derived for, so
  * the border reads at 3:1 or more against that page. See docs/theming.md
  * § "Link, selected and focus".
  */

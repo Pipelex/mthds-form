@@ -102,8 +102,8 @@ function structureGrouping(depth: number, labelled: boolean, framed: boolean): S
  * closer loses the bar as it loses the outline, while the section's message
  * at its heading stays. Three pixels in the solid error colour, where the
  * card's outline is one, because a single edge has less length to be seen
- * by; the brand contract holds that colour to the 3:1 a mark needs on the
- * page and on a card. `m-0` undoes the spacing the stack
+ * by; that colour needs the 3:1 a mark needs on the page and on a card,
+ * which the stock palette meets and a host's own red has to. `m-0` undoes the spacing the stack
  * it heads gives its children, which would shorten it.
  */
 const SECTION_ERROR_EDGE =
@@ -244,8 +244,8 @@ export function ObjectField({ field, value, onChange, id, error, env }: ObjectFi
           grouping === 'section' && 'pt-2',
           grouping === 'rule' && 'border-l-2 pl-4 max-sm:pl-3',
           // In error, a card's outline and a rule turn the error colour
-          // itself, which the brand contract holds at 3:1 on the page and on
-          // a card: at half of it they read under that bar in every palette.
+          // itself, which needs 3:1 on the page and on a card (the stock
+          // palette meets it, a host's red has to): at half of it they read under that bar in every palette.
           (grouping === 'box' || grouping === 'rule') &&
             (error ? 'border-destructive' : 'border-border'),
         )}

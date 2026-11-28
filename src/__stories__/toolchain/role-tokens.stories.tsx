@@ -64,8 +64,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * An amber team's ink and pale fill on a white page, as `deriveBrandRoles`
- * derives them. A branding host writes the same ink onto `--ring`; here the
+ * An amber team's ink and pale fill on a white page, as the sample host's
+ * `deriveBrandRoles` (`src/__stories__/host/`) derives them. A branding host writes the same ink onto `--ring`; here the
  * ring is set a shade apart, so a story can tell which of the two tokens a
  * focus border read.
  */

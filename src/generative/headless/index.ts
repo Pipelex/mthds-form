@@ -81,6 +81,9 @@ export {
   type InputBriefOptions,
   type ResultBriefOptions,
 } from '../brief';
+// The style ids the brief's `style` takes, until the brief names the host's
+// page shell instead of a style.
+export { APP_STYLE_IDS, type AppStyleId } from '../style-direction';
 
 // The two checks a host runs before it stores or renders a layout.
 export {

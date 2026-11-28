@@ -117,6 +117,11 @@
   --color-destructive: var(--destructive, hsl(0 84.2% 60.2%));
   --color-destructive-foreground: var(--destructive-foreground, hsl(0 0% 98%));
 
+  --color-positive: var(--positive, hsl(142 72% 29%));
+  --color-caution: var(--caution, hsl(26 90% 37%));
+  --color-negative: var(--negative, hsl(0 74% 42%));
+  --color-neutral: var(--neutral, hsl(240 5.2% 33.9%));
+
   --color-muted: var(--muted, hsl(240 4.8% 95.9%));
   --color-muted-foreground: var(--muted-foreground, hsl(240 3.8% 46.1%));
 
