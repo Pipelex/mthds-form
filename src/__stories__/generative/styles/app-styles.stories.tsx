@@ -15,7 +15,7 @@ import { atWidth, expectEveryTouchTarget, pinnedTo } from '../../touch-target';
 import { GENERATIVE_STORY_PARAMETERS, assertRenderable, heroFields } from '../layout-page';
 import { DesignedPage, Frame } from './frame';
 import { AppScope, styleFontsReady } from './scope';
-import { APP_STYLE_IDS, TYPEFACES, type AppStyleId, type TypefaceId } from '../../../brand';
+import { APP_STYLE_IDS, TYPEFACES, type AppStyleId, type TypefaceId } from '../../host';
 import { TEAM_KEYS, type TeamKey } from './teams';
 import { backgroundOf, paintedContrast } from '../../painted-color';
 
@@ -37,7 +37,7 @@ import { backgroundOf, paintedContrast } from '../../painted-color';
  * shot. `style: none` renders the host's page with no style class at all, the
  * reference `quiet` must match pixel for pixel.
  *
- * The values are the `./brand` entry's: `deriveStyleRoles` returns the roles a
+ * The values are the sample host's (`../../host`): `deriveStyleRoles` returns the roles a
  * style and a typeface set, `styles.ts` writes them onto this host's tokens,
  * and the kernel's controls and the generative layer read the tokens
  * themselves. See docs/storybook.md, "App styles".

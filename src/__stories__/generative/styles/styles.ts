@@ -5,7 +5,7 @@ import {
   type RoleColor,
   type StyleRoles,
   type TypefaceId,
-} from '../../../brand';
+} from '../../host';
 
 /**
  * A host's mapping of the style roles onto the tokens it paints with, as the

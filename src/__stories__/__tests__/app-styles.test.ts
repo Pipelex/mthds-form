@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { APP_STYLE_IDS, TYPEFACES, deriveBrandRoles, deriveStyleRoles } from '../../brand';
+import { APP_STYLE_IDS, TYPEFACES, deriveBrandRoles, deriveStyleRoles } from '../host';
 import { googleFontsHref, roleColorCss, styleTokens } from '../generative/styles/styles';
 import {
   HOST_PAGE,
@@ -14,11 +14,11 @@ import {
 
 /**
  * The stories' host, held to the rules the stories rely on: it writes the
- * roles `deriveStyleRoles` returns onto the tokens docs/brand.md maps them to,
+ * roles `deriveStyleRoles` returns onto the tokens docs/theming.md names,
  * `quiet` sets nothing, a style adds no colour of its own, the faces load in
  * every weight a style or the host asks of them, and a team's colours land on
- * the tokens docs/brand.md names, the accent's ink measured on every surface
- * the style draws. The roles themselves are `src/brand/__tests__/styles.test.ts`'s,
+ * the tokens docs/theming.md names, the accent's ink measured on every surface
+ * the style draws. The roles themselves are the host's to test,
  * and the rendering the `Generative/App styles` stories'.
  */
 
@@ -138,8 +138,8 @@ describe('the faces the stories load', () => {
 });
 
 /**
- * docs/brand.md § "Mapping the roles onto tokens", as written there: each
- * token a team's colours set, and the role it takes. The header's roles go to
+ * The mapping a branding host writes (docs/theming.md, "Link, selected and
+ * focus"): each token a team's colours set, and the role it takes. The header's roles go to
  * the host's band, which `bandOn` draws.
  */
 const BRAND_MAPPING = {
@@ -208,7 +208,7 @@ describe('teamTokens', () => {
     });
   });
 
-  it("maps a team's roles onto the tokens docs/brand.md names, and leaves the host's where a role is absent", () => {
+  it("maps a team's roles onto the tokens docs/theming.md names, and leaves the host's where a role is absent", () => {
     for (const key of TEAM_KEYS) {
       for (const theme of THEMES) {
         const roles: Record<string, string | undefined> = {

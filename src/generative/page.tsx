@@ -18,7 +18,7 @@ import {
   type ElementErrorHandler,
   type ReportedRenderers,
 } from './element-errors';
-import type { BrandManifest } from '../brand/manifest';
+import type { BrandManifest } from './brand-manifest';
 import { PlacedInputsProvider } from './placed-inputs';
 import { generativeRegistry } from './product-registry';
 import { DescriptorProvider, type DescriptorScope } from './registry';

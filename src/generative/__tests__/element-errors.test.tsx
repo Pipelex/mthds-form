@@ -3,7 +3,7 @@ import { createStateStore } from '@json-render/core';
 import { act, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BrandManifest } from '../../brand/manifest';
+import type { BrandManifest } from '../brand-manifest';
 import { BrandProvider } from '../brand-context';
 import { contentOf } from '../element-errors';
 import { BrandBar, GenerativePage, generativeRegistry } from '../index';

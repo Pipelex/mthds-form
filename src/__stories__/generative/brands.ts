@@ -1,29 +1,18 @@
-import type { BrandManifest } from '../../brand';
-import { fixtureLabel } from '../../generative';
-import { type BrandBuild, BRAND_BUILDS } from './brands/generated';
-import './brands/index.css';
+import type { BrandManifest } from '../../generative';
 
 /**
- * The brands a generative story can paint a page in - STORY fixtures, not
+ * The brand a generative story paints a page in - a STORY fixture, not
  * package data.
  *
  * A page with an app bar needs a brand whatever else is true: the bar reads
  * a logo pair and a name off the manifest, and nothing on the page names a
- * brand itself. So a story has to bring one. Besides the stock palette, they
- * are the corpus under `data/brands/`, which the brand study produced from
- * real sites and which `make brands` compiles with the brand entry's own
- * `assembleBrand` into `./brands/`. What they are for is the question a
- * single palette cannot answer: whether a layout reads because of the layout
- * or because of the colours it was written against.
+ * brand itself. So a story has to bring one. The stories paint every layout
+ * in the stock palette, `theme.css`, under a manifest that names the
+ * standard. Brands compiled from real sites' tokens used to sit beside it;
+ * they went with the brand entry, which a host now owns, and a host's
+ * palette is what the `Generative/App styles` stories paint with instead.
  *
- * `scope` is the class the compiled stylesheet sets its custom properties on
- * (and their dark values under `.dark`, and the brand's typeface). Everything
- * below that class - the catalog's own components, the kernel's controls -
- * reads the tokens it always reads, which is the whole of what a brand does
- * to a page.
- *
- * All of this is outside every entry tree, so it ships in nothing. See
- * docs/brand.md.
+ * All of this is outside every entry tree, so it ships in nothing.
  */
 
 export interface BrandFixture {
@@ -31,7 +20,7 @@ export interface BrandFixture {
   key: string;
   /** What produced the tokens, for a story title. */
   producedBy: string;
-  /** The class the compiled stylesheet scopes its tokens to, or null for the stock palette. */
+  /** The class a brand's stylesheet scopes its tokens to, or null for the stock palette. */
   scope: string | null;
   manifest: BrandManifest;
 }
@@ -57,27 +46,5 @@ export const STOCK: BrandFixture = {
   },
 };
 
-function fixtureOf(build: BrandBuild): BrandFixture {
-  return {
-    key: `${build.brand}--${build.producerId}`,
-    producedBy: fixtureLabel(build),
-    scope: build.scope,
-    manifest: build.manifest,
-  };
-}
-
-/** The corpus brand a story names, or a loud failure: a story must never paint in a brand it did not name. */
-function corpusBrand(brand: string, producerId: string): BrandFixture {
-  const found = BRAND_BUILDS.find(
-    (build) => build.brand === brand && build.producerId === producerId,
-  );
-  if (!found) throw new Error(`No brand ${brand}/${producerId} in data/brands/; run make brands.`);
-  return fixtureOf(found);
-}
-
-/** The two brands the captured layouts were looked at under. */
-export const MTHDS = corpusBrand('mthds', 'pipelex-method--claude-4.8-opus');
-export const PIPELEX = corpusBrand('pipelex', 'pipelex-method--claude-4.8-opus');
-
-/** Every brand a story may paint in, stock first. */
-export const BRANDS: readonly BrandFixture[] = [STOCK, ...BRAND_BUILDS.map(fixtureOf)];
+/** Every brand a story may paint in. */
+export const BRANDS: readonly BrandFixture[] = [STOCK];

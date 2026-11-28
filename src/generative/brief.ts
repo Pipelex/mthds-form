@@ -5,7 +5,7 @@ import {
   isNativeHtmlNode,
   isNativeValueNode,
 } from '../core/native-content';
-import { APP_STYLES, type AppStyleId } from '../brand/styles';
+import { STYLE_DIRECTIONS, type AppStyleId } from './style-direction';
 import type { Brief, PathEntry, Style } from '../generated/layout-design/types';
 import type { Frame } from './frame-definitions';
 import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
@@ -44,7 +44,7 @@ import { INPUTS_ROOT, RESULT_ROOT, joinPath } from './paths';
 export type DesignerBrief = Brief;
 /** One path of the brief: where it is, what it holds, what constrains it, whether the kernel keeps it. */
 export type DesignerPathEntry = PathEntry;
-/** The style a brief carries: its name and its direction, as `APP_STYLES` states them. */
+/** The style a brief carries: its name and its direction, as `STYLE_DIRECTIONS` states them. */
 export type DesignerStyle = Style;
 
 /** The concept a run request names for the `brief` input: the method's own, domain-qualified. */
@@ -323,10 +323,10 @@ function returnsOf(result: RunField): string[] {
   });
 }
 
-/** The style a brief carries, read off `APP_STYLES`: its name and its direction, as data. */
+/** The style a brief carries, read off `STYLE_DIRECTIONS`: its name and its direction, as data. */
 function styleOf(style: AppStyleId | undefined): DesignerStyle | undefined {
   if (!style) return undefined;
-  const { name, direction } = APP_STYLES[style];
+  const { name, direction } = STYLE_DIRECTIONS[style];
   return { name, direction };
 }
 

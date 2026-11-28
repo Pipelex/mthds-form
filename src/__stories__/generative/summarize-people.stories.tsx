@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { findFixture } from '../../generative';
 import { CONTRACTS, INPUT_FORM } from '../_generated/summarize_people';
 import { SPECS } from '../_generated/summarize_people.specs';
-import { MTHDS, PIPELEX, STOCK } from './brands';
+import { STOCK } from './brands';
 import {
   GENERATIVE_STORY_PARAMETERS,
   heroFields,
@@ -34,5 +34,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Gpt61Sol: Story = layoutStory(layout, STOCK);
-export const MthdsTokens: Story = layoutStory(layout, MTHDS);
-export const PipelexTokens: Story = layoutStory(layout, PIPELEX);

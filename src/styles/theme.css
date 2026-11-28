@@ -19,6 +19,12 @@
  * un-branded: this package renders MTHDS input specs, and the surrounding
  * product supplies the brand.
  *
+ * The four status colours (`--positive`, `--caution`, `--negative`,
+ * `--neutral`) are this package's own addition to that palette: a group of
+ * their own, never derived from the brand's colours, each reading at 4.5:1
+ * as text on the page and on the muted fill in its theme (docs/theming.md,
+ * "Status colours").
+ *
  * Dark mode follows the `.dark` class convention, declared as the `dark`
  * custom variant in `tailwind-entry.css`.
  */
@@ -46,6 +52,11 @@
 
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: hsl(0 0% 98%);
+
+  --positive: hsl(142 72% 29%);
+  --caution: hsl(26 90% 37%);
+  --negative: hsl(0 74% 42%);
+  --neutral: hsl(240 5.2% 33.9%);
 
   --border: hsl(240 5.9% 90%);
   --input: hsl(240 4.8% 95.9%);
@@ -78,6 +89,11 @@
 
   --destructive: hsl(0 62.8% 50.6%);
   --destructive-foreground: hsl(0 0% 98%);
+
+  --positive: hsl(142 69% 58%);
+  --caution: hsl(43 96% 56%);
+  --negative: hsl(0 91% 71%);
+  --neutral: hsl(240 5% 64.9%);
 
   --border: hsl(240 3.7% 15.9%);
   --input: hsl(240 3.7% 12%);

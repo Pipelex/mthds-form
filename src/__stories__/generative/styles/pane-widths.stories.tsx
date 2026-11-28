@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect } from 'storybook/test';
 import { findFixture, type SpecFixture } from '../../../generative';
-import type { AppStyleId } from '../../../brand';
+import type { AppStyleId } from '../../host';
 import { atWidth, expectEveryTouchTarget, pinnedTo, type Viewport } from '../../touch-target';
 import { GENERATIVE_STORY_PARAMETERS } from '../layout-page';
 import { APPS, type AppKey } from './apps';

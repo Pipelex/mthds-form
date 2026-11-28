@@ -31,9 +31,9 @@ import { useControlId } from './ui/shadcn';
  * (`--primary`) composed with `color-mix()` (see `react/style-tokens`); the corners are
  * `--radius` and its multiples, a tag is `font-mono`, the logo is the
  * manifest's pair. The running text names no face at all: it inherits the
- * page's, which a brand's compiled stylesheet sets on its scope from
- * `--font-sans` (docs/brand.md). That is what lets one set of components
- * render any brand the `./brand` entry compiles - and what makes anything the
+ * page's, which a brand's stylesheet sets on its scope from `--font-sans`
+ * (docs/theming.md). That is what lets one set of components render any
+ * brand a host compiles - and what makes anything the
  * tokens cannot state absent from the page by construction.
  *
  * The layer's renderers are reused as they are; two of shadcn's are replaced

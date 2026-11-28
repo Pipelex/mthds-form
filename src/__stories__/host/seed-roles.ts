@@ -1,5 +1,10 @@
-import { MIN_CONTRAST, MIN_CONTROL_CONTRAST } from './contract';
-import { colorHex, contrastRatio, type SrgbColor } from './tokens';
+import {
+  colorHex,
+  contrastRatio,
+  MIN_CONTRAST,
+  MIN_CONTROL_CONTRAST,
+  type SrgbColor,
+} from './color';
 
 /**
  * Up to three seed colours in, the colour roles a page paints with out.
@@ -49,7 +54,7 @@ import { colorHex, contrastRatio, type SrgbColor } from './tokens';
  * dark set that falls back, colour by colour, to the light one.
  *
  * It returns roles, never custom property names: each host maps the roles onto
- * its own tokens. See docs/brand.md § "Three seed colours".
+ * its own tokens. A host's own derivation documents the rules; this is the stories' copy (see `./index.ts`).
  */
 
 /**
@@ -248,7 +253,7 @@ function textOn(fill: SrgbColor): TextOnFill {
   return contrastRatio(BLACK, fill) >= contrastRatio(WHITE, fill) ? '#000000' : '#ffffff';
 }
 
-/** A `#rrggbb` colour, or a throw naming `what` it was meant to be. Module-internal: not on the entry. */
+/** A `#rrggbb` colour, or a throw naming `what` it was meant to be. Module-internal. */
 export function parseHex(value: string, what: string): SrgbColor {
   if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) {
     throw new Error(`${what} must be a #rrggbb colour, not ${JSON.stringify(value)}.`);

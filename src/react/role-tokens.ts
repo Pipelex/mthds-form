@@ -7,8 +7,7 @@
  * anything a person picked - an amber, a pale yellow - which is a fine fill and
  * unreadable as text. So the button colour is only ever a solid fill, and the
  * two roles that want the team's accent without being a button read a token a
- * branding host defines, each derived to read on what it sits on (the
- * `./brand` entry's `deriveBrandRoles` returns them):
+ * branding host defines, each derived to read on what it sits on:
  *
  * - `--link`, the accent as text (`accentInk`): an eyebrow or a section number
  *   on the page, and the checkmark, tag or step number on the selected fill.

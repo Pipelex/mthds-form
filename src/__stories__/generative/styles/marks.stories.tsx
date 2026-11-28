@@ -4,7 +4,7 @@ import { expect } from 'storybook/test';
 import type { InputForm, PipeIOContracts } from '../../../core';
 import { getPipeInputForm, getPipeIOContract } from '../../../core';
 import { MethodForm, useMethodForm } from '../../../react';
-import { APP_STYLE_IDS, type AppStyleId } from '../../../brand';
+import { APP_STYLE_IDS, type AppStyleId } from '../../host';
 import * as files from '../../_generated/files';
 import * as scalars from '../../_generated/scalars';
 import * as structured from '../../_generated/structured';
